@@ -18,7 +18,12 @@ trait Aliases {
   lazy val Counter = pcc.ir.Counter
   type CounterChain = pcc.ir.CounterChain
 
-  type DRAM[T] = pcc.ir.DRAM[T]
-  type DRAM1[T] = pcc.ir.DRAM1[T]
-  type DRAM2[T] = pcc.ir.DRAM2[T]
+  type DRAM[T] = pcc.ir.memories.DRAM[T]
+  lazy val DRAM = pcc.ir.memories.DRAM
+  type SRAM[T] = pcc.ir.memories.SRAM[T]
+  lazy val SRAM = pcc.ir.memories.SRAM
+  type FIFO[T] = pcc.ir.memories.FIFO[T]
+  lazy val FIFO = pcc.ir.memories.FIFO
+  type LIFO[T] = pcc.ir.memories.LIFO[T]
+  lazy val LIFO = pcc.ir.memories.LIFO
 }

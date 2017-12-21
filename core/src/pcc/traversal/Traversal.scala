@@ -11,6 +11,7 @@ trait Traversal extends Pass { self =>
     type Recurse = Value
     val Always, Default, Never = Value
   }
+  type Recurse = Recurse.Recurse
   import Recurse._
 
   // --- Options

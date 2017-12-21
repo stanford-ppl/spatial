@@ -1,7 +1,7 @@
 package pcc.core
 
 import pcc.util.Freq._
-import pcc.data.Effects
+import pcc.data.{Effectful, Effects}
 
 case class Block[R](
   inputs:  Seq[Sym[_]], // External inputs to this block
@@ -16,4 +16,8 @@ case class Block[R](
   override def toString: String = {
     if (inputs.isEmpty) s"Block($result)" else s"""Block(${inputs.mkString("(", ",", ")")} => $result)"""
   }
+
+  // TODO: Use this if large blocks start to become a memory issue
+  // (recomputes impure statements in the block each time)
+  //def impure: Seq[Sym[_]] = stms.collect{case e@Effectful(eff,_) if !eff.isPure => e }
 }

@@ -2,6 +2,7 @@ package pcc
 package ir
 
 import forge._
+import pcc.ir.memories.{Box, BoxAlloc}
 
 /** Types **/
 case class Counter(eid: Int) extends Box[Counter](eid) {

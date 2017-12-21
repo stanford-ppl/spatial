@@ -3,6 +3,7 @@ package pcc
 import pcc.core.{CompilerBugs, CompilerErrors}
 import pcc.data._
 import pcc.traversal.{Pass, Transformer}
+import pcc.util.files
 import pcc.util.files.deleteExts
 
 import scala.collection.mutable.ArrayBuffer
@@ -89,7 +90,7 @@ trait Compiler { self =>
     if (config.enLog) msg(s"Logging ${config.name} to ${config.logDir}")
 
     val startTime = System.currentTimeMillis()
-    echoConfig()
+    if (config.enDbg) echoConfig()
     val block = withLog(config.logDir, "0000 Staging.log"){ stageProgram(args) }
 
     // Exit now if errors were found during staging
@@ -135,8 +136,12 @@ trait Compiler { self =>
     //oldState.graph.copyNodesTo(globals, IR.graph)
 
     passes.clear()                 // Reset traversal passes
-    IR.config.name = name          // Set the default program name
     IR.config.init(args)           // Initialize the Config (from files)
+    IR.config.name = name          // Set the default program name
+    IR.config.logDir = files.cwd + files.sep + "logs" + files.sep + name + files.sep
+    IR.config.genDir = files.cwd + files.sep + "gen" + files.sep + name + files.sep
+    IR.config.repDir = files.cwd + files.sep + "reports" + files.sep + name + files.sep
+
     settings()                     // Override config with any DSL or App specific settings
     createTraversalSchedule(IR)    // Set up the compiler schedule for the app
   }
@@ -158,6 +163,8 @@ trait Compiler { self =>
 
       case CompilerErrors(stage,n) =>
         error(s"""${IR.errors} ${plural(IR.errors,"error","errors")} found during $stage""")
+
+      case t: TestbenchFailure => throw t
 
       case t: Throwable => onException(t); IR.bugs += 1
     }

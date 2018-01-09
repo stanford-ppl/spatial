@@ -1,5 +1,4 @@
-all: spatial
+all: pcc
 
-spatial:
-	#bash bin/make-isl.sh
+pcc:
 	sbt compile

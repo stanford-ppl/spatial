@@ -30,4 +30,5 @@ lazy val core = project
   .settings(commonSettings)
   .dependsOn(forge)
 
+
 addCommandAlias("make", "compile")

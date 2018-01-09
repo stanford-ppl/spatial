@@ -2,8 +2,6 @@ package pcc
 package ir
 package units
 
-import pcc.ir.memories.BoxAlloc
-
 case class PCU(eid: Int) extends PU[PCU](eid) {
   override type I = Any // TODO
 

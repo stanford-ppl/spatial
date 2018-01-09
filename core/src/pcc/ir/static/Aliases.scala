@@ -26,4 +26,14 @@ trait Aliases {
   lazy val FIFO = pcc.ir.memories.FIFO
   type LIFO[T] = pcc.ir.memories.LIFO[T]
   lazy val LIFO = pcc.ir.memories.LIFO
+
+  type Num[T] = pcc.ir.typeclasses.Num[T]
+  type Bits[T] = pcc.ir.typeclasses.Bits[T]
+
+  lazy val Foreach = pcc.ir.Foreach
+
+  type Overload0 = pcc.ir.Overload0
+  type Overload1 = pcc.ir.Overload1
+  type Overload2 = pcc.ir.Overload2
+  type Overload3 = pcc.ir.Overload3
 }

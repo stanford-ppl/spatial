@@ -4,29 +4,29 @@ package codegen
 package dot
 
 import scala.language.implicitConversions
-import scala.collection.mutable.Map
+import scala.collection.mutable.{ListBuffer, Map}
 
 trait DotCodegen extends Codegen {
-
   private val regex = "\\[[0-9]*\\]".r
   def q(s: Any): String = regex.replaceAllIn(quoteOrRemap(s), "")
 
-  def emitNode(n: Any, label: String): Unit = emit(src"""$n [label="${q(label)}"];""")
+  val edges = ListBuffer[() => Unit]()
 
   def emitNode(n: Any, attr: DotAttr): Unit = emit(src"""$n [${attr.list}];""")
-  def emitNode(n: Any, label: Any, attr: DotAttr): Unit = emit(src"""$n [label="${q(label)}" ${attr.list} ];""")
+  def emitNode(n: Any, label: String): Unit = emitNode(n, DotAttr().label(label))
+  def emitNode(n: Any, label: Any, attr: DotAttr): Unit = emitNode(n, attr.label(label))
 
-  def emitEdge(from: Any, to: Any, label: String): Unit = emitEdge(from, to, DotAttr().label(label))
   def emitEdge(from: Any, to: Any, attr: DotAttr): Unit = {
-    emit(src"""$from -> $to ${if (attr.attrMap.nonEmpty) s"[${attr.list}]" else ""}""")
+    edges += (() => emit(src"""$from -> $to ${if (attr.attrMap.nonEmpty) s"[${attr.list}]" else ""}"""))
   }
-  def emitEdge(from: Any, to: Any):Unit = emit(src"""$from -> $to""")
-  def emitEdge(from: Any, ffield: Any, to: Any, tfield: Any):Unit = emitEdge(s"$from:$ffield", s"$to:$tfield")
+  def emitEdge(from: Any, to: Any, label: String): Unit = emitEdge(from, to, DotAttr().label(label))
+  def emitEdge(from: Any, to: Any): Unit = emitEdge(from, to, DotAttr())
+  def emitEdge(from: Any, ffield: Any, to: Any, tfield: Any): Unit = emitEdge(s"$from:$ffield", s"$to:$tfield")
 
-  def emitEdge(from: Any, ffield: Any, to: Any, tfield: Any, attr: DotAttr):Unit = {
+  def emitEdge(from: Any, ffield: Any, to: Any, tfield: Any, attr: DotAttr): Unit = {
     emitEdge(s"$from:$ffield", s"$to:$tfield", attr)
   }
-  def emitEdge(from: Any, ffield: Any, fd: String, to: Any, tfield: Any, td: String):Unit = {
+  def emitEdge(from: Any, ffield: Any, fd: String, to: Any, tfield: Any, td: String): Unit = {
     emitEdge(s"$from:$ffield:$fd", s"$to:$tfield:$td")
   }
 

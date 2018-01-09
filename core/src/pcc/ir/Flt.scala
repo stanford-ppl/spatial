@@ -5,8 +5,14 @@ import forge._
 
 abstract class Flt[A](id: Int, sigBits: Int, expBits: Int)(implicit ev: A<:<Flt[A]) extends Num[A](id) {
   final override def bits: Int = sigBits + expBits
+  private implicit val tA: Flt[A] = this
   def sBits: Int = sigBits
   def eBits: Int = expBits
+
+  @api def +(that: A): A = stage(FltAdd[A](me,that))
+  @api def -(that: A): A = stage(FltSub[A](me,that))
+  @api def *(that: A): A = stage(FltMul[A](me,that))
+  @api def /(that: A): A = stage(FltDiv[A](me,that))
 }
 
 case class F32(eid: Int) extends Flt[F32](eid, 24, 8) {

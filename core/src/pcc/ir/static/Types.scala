@@ -3,10 +3,8 @@ package pcc.ir.static
 import forge.api
 
 import pcc._
-import pcc.ir.{Num,Bits}
 
 trait Types {
-  def num[T:Num]: Num[T] = implicitly[Num[T]]
   def bits[T:Bits]: Bits[T] = implicitly[Bits[T]]
 
   @api implicit def BooleanToBit(x: Boolean): Bit = const[Bit](x)

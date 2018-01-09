@@ -1,5 +1,7 @@
 package pcc.ir.static
 
+import pcc.ir.control.Foreach
+
 trait Aliases {
   type I32 = pcc.ir.I32
   type I16 = pcc.ir.I16
@@ -30,7 +32,7 @@ trait Aliases {
   type Num[T] = pcc.ir.typeclasses.Num[T]
   type Bits[T] = pcc.ir.typeclasses.Bits[T]
 
-  lazy val Foreach = pcc.ir.Foreach
+  lazy val Foreach = Foreach
 
   type Overload0 = pcc.ir.Overload0
   type Overload1 = pcc.ir.Overload1

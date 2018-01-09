@@ -1,7 +1,8 @@
-package pcc
-package ir
+package pcc.ir.control
 
 import forge._
+import pcc.ir.{Bit, Counter, CounterChain, CounterChainAlloc, I32, Void}
+import pcc.{Block, Op, bound, stage, stageBlock, syms}
 
 object Foreach {
   @api def apply(ctr: Counter)(func: I32 => Void): Void = Foreach(Seq(ctr)){is => func(is.head) }

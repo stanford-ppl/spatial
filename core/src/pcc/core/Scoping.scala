@@ -56,7 +56,6 @@ trait Scoping { this: Printing =>
   @stateful def stageBlock[R](block: => Sym[R], options: BlockOptions = BlockOptions.Normal): Block[R] = {
     stageScope(Nil, block, options)
   }
-
   @stateful def stageLambda1[A,R](a: Sym[A])(block: => Sym[R], options: BlockOptions = BlockOptions.Normal): Block[R] = {
     stageScope(Seq(a), block, options)
   }
@@ -65,6 +64,9 @@ trait Scoping { this: Printing =>
   }
   @stateful def stageLambda3[A,B,C,R](a: Sym[A], b: Sym[B], c: Sym[C])(block: => Sym[R], options: BlockOptions = BlockOptions.Normal): Block[R] = {
     stageScope(Seq(a,b,c), block, options)
+  }
+  @stateful def stageLambdaN[R](inputs: Seq[Sym[_]])(block: => Sym[R], options: BlockOptions = BlockOptions.Normal): Block[R] = {
+    stageScope(inputs, block, options)
   }
 
 }

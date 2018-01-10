@@ -19,7 +19,7 @@ trait Traversal extends Pass { self =>
 
   // --- Methods
   /** Run a single traversal, including pre- and post- processing **/
-  final protected def runSingle[S](b: Block[S]): Block[S] = {
+  final protected def runSingle[R](b: Block[R]): Block[R] = {
     val b2 = preprocess(b)
     val b3 = visitBlock(b2)
     postprocess(b3)
@@ -29,16 +29,16 @@ trait Traversal extends Pass { self =>
     * Called to execute this traversal, including optional pre- and post- processing.
     * Default is to run pre-processing, then a single traversal, then post-processing
     */
-  protected def process[S](block: Block[S]): Block[S] = runSingle(block)
-  protected def preprocess[S](block: Block[S]): Block[S] = { block }
-  protected def postprocess[S](block: Block[S]): Block[S] = { block }
-  protected def visitBlock[S,R](block: Block[S], func: Seq[Sym[_]] => R): R = {
+  protected def process[R](block: Block[R]): Block[R] = runSingle(block)
+  protected def preprocess[R](block: Block[R]): Block[R] = { block }
+  protected def postprocess[R](block: Block[R]): Block[R] = { block }
+  protected def visitBlock[R,A](block: Block[R], func: Seq[Sym[_]] => A): A = {
     state.logTab += 1
     val result = func(block.stms)
     state.logTab -= 1
     result
   }
-  protected def visitBlock[S](block: Block[S]): Block[S] = visitBlock(block, {stms => stms.foreach(visit); block})
+  protected def visitBlock[R](block: Block[R]): Block[R] = visitBlock(block, {stms => stms.foreach(visit); block})
 
   final protected def visit(lhs: Sym[_]): Unit = lhs.rhs match {
     case Two(rhs) =>

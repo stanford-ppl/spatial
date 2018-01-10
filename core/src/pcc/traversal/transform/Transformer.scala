@@ -8,15 +8,19 @@ trait Transformer extends Pass {
   protected val f: Transformer = this
 
   def apply[T](x: T): T = (x match {
-    case x: Sym[_] => transformSym(x.asInstanceOf[Sym[T]])
+    case x: Sym[_]   => transformSym(x.asInstanceOf[Sym[T]])
     case x: Block[_] => transformBlock(x)
-    case x: Seq[_] => x.map{this.apply}
+    case x: Seq[_]   => x.map{this.apply}
   }).asInstanceOf[T]
 
-  def tx[T](x: Block[T]): () => T
+  def tx[T](block: Block[T]): () => T = () => inlineBlock(block).asInstanceOf[T]
 
   protected def transformSym[T](sym: Sym[T]): Sym[T]
-  protected def transformBlock[T](block: Block[T]): Block[T]
+  protected def transformBlock[T](block: Block[T]): Block[T] = {
+    stageLambdaN(block.inputs)({ inlineBlock(block) }, block.options)
+  }
+
+  protected def inlineBlock[T](block: Block[T]): Sym[T]
 
   def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = {
     transferMetadata(srcDest._1, srcDest._2)

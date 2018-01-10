@@ -28,7 +28,7 @@ trait Pass { self =>
   protected lazy val instrument: Instrument = new NoInstrument("top")
 
   /** Run method - called internally from compiler **/
-  final def run[T](block: Block[T]): Block[T] = if (shouldRun) {
+  final def run[R](block: Block[R]): Block[R] = if (shouldRun) {
     state.pass += 1
     withLog(config.logDir, logFile){
       val start = System.currentTimeMillis()
@@ -41,5 +41,5 @@ trait Pass { self =>
   } else block
 
   /** Called to execute this pass. Override to implement custom IR processing **/
-  protected def process[S](block: Block[S]): Block[S]
+  protected def process[R](block: Block[R]): Block[R]
 }

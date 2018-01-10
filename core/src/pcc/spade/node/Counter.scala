@@ -1,4 +1,4 @@
-package pcc.spade2.node
+package pcc.spade.node
 
 import pcc._
 import pcc.ir.{I32,Bit}

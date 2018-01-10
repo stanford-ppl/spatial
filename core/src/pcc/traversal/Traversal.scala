@@ -32,12 +32,13 @@ trait Traversal extends Pass { self =>
   protected def process[S](block: Block[S]): Block[S] = runSingle(block)
   protected def preprocess[S](block: Block[S]): Block[S] = { block }
   protected def postprocess[S](block: Block[S]): Block[S] = { block }
-  protected def visitBlock[S](block: Block[S]): Block[S] = {
+  protected def visitBlock[S,R](block: Block[S], func: Seq[Sym[_]] => R): R = {
     state.logTab += 1
-    block.stms.foreach{stm => visit(stm) }
+    val result = func(block.stms)
     state.logTab -= 1
-    block
+    result
   }
+  protected def visitBlock[S](block: Block[S]): Block[S] = visitBlock(block, {stms => stms.foreach(visit); block})
 
   final protected def visit(lhs: Sym[_]): Unit = lhs.rhs match {
     case Two(rhs) =>

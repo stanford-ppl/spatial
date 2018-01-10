@@ -25,6 +25,7 @@ object LIFO {
 
 
 /** Nodes **/
-case class LIFOAlloc[A:Bits](depth: I32) extends Op[LIFO[A]] {
+case class LIFOAlloc[A:Bits](depth: I32) extends Alloc[LIFO[A]] {
   override def effects: Effects = Effects.Mutable
+  def mirror(f:Tx) = LIFO.apply(f(depth))
 }

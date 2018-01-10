@@ -7,6 +7,9 @@ package object pcc extends core.Printing with core.Staging with core.Scoping  {
 
   /** IR **/
   type Op[T] = core.Op[T]
+  lazy val Op = core.Op
+  lazy val Stm = core.Stm
+  lazy val Lit = core.Lit
   type Sym[T] = core.Sym[T]
   type Block[T] = core.Block[T]
 

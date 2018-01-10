@@ -40,9 +40,9 @@ trait LinearAlgebra {
     val KP: I32 = 1 (1 -> 16)
     val NP: I32 = 1 (1 -> 16)
 
-    Foreach(M par MP, N par NP) { (i, j) =>
-
-    }
+    /*Foreach(M par MP, N par NP) { (i, j) =>
+      BlackBox.GEMM(Y, A, B, C,
+    }*/
       /*def getA(i: Int, j: Int): T = if (transA) A(j,i) else A(i,j)
       def getB(i: Int, j: Int): T = if (transB) B(j,i) else B(i,j)
 
@@ -60,16 +60,21 @@ trait LinearAlgebra {
     transA: Boolean,
     transB: Boolean,
     alpha:  T,
-    beta:   T
+    beta:   T,
+    mp:     Option[I32] = None,
+    kp:     Option[I32] = None,
+    np:     Option[I32] = None
   )(implicit state: State): Unit = {
     val M = A.rows
     val K = A.cols
     val N = B.cols
-    val MP: I32 = 1 (1 -> 32)
-    val KP: I32 = 1 (1 -> 16)
-    val NP: I32 = 1 (1 -> 16)
-    val cb  = C*beta
+    val MP: I32 = mp.getOrElse{ 1 (1 -> 32) }
+    val KP: I32 = kp.getOrElse{ 1 (1 -> 16) }
+    val NP: I32 = np.getOrElse{ 1 (1 -> 16) }
 
+    Foreach(M par MP, N par NP){(i,j) =>
+      BlackBox.GEMM(Y, A, B, C, alpha, beta, i, j, M/NP, N/NP, KP)
+    }
     /*def getA(i: Int, j: Int): T = if (transA) A(j,i) else A(i,j)
     def getB(i: Int, j: Int): T = if (transB) B(j,i) else B(i,j)
 

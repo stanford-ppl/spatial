@@ -1,4 +1,4 @@
-package pcc.spade2.node
+package pcc.spade.node
 
 abstract class Switch {
 

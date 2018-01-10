@@ -27,6 +27,7 @@ object DRAM {
 
 
 /** Nodes **/
-case class DRAMAlloc[A:Bits](dims: Seq[I32]) extends Op[DRAM[A]] {
+case class DRAMAlloc[A:Bits](dims: Seq[I32]) extends Alloc[DRAM[A]] {
   override def effects: Effects = Effects.Mutable
+  def mirror(f:Tx) = DRAM.apply(f(dims):_*)
 }

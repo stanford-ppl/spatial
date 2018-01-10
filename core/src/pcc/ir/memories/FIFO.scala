@@ -25,6 +25,7 @@ object FIFO {
 
 
 /** Nodes **/
-case class FIFOAlloc[A:Bits](depth: I32) extends Op[FIFO[A]] {
+case class FIFOAlloc[A:Bits](depth: I32) extends Alloc[FIFO[A]] {
   override def effects: Effects = Effects.Mutable
+  def mirror(f:Tx) = FIFO.apply(f(depth))
 }

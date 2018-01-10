@@ -23,11 +23,11 @@ case class SRAM[A](eid: Int, tA: Bits[A]) extends LocalMem[A,SRAM](eid) {
   @api def dim(d: Int): I32 = SRAM.dim(this,d)
   @api def rank: I32 = SRAM.rank(this)
 
-  @api def apply(addr: I32*): A = stage(SRAMRead(this,addr))
-  @api def update(i: I32, data: A): Void = stage(SRAMWrite(this,Seq(i),data))
-  @api def update(i: I32, j: I32, data: A): Void = stage(SRAMWrite(this,Seq(i,j),data))
-  @api def update(i: I32, j: I32, k: I32, data: A): Void = stage(SRAMWrite(this,Seq(i,j,k),data))
-  @api def update(i: I32, j: I32, k: I32, l: I32, data: A): Void = stage(SRAMWrite(this,Seq(i,j,k,l),data))
+  @api def apply(addr: I32*): A = SRAM.read(this,addr,Nil)
+  @api def update(i: I32, data: A): Void = SRAM.write(this,data,Seq(i),Nil)
+  @api def update(i: I32, j: I32, data: A): Void = SRAM.write(this,data,Seq(i,j),Nil)
+  @api def update(i: I32, j: I32, k: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k),Nil)
+  @api def update(i: I32, j: I32, k: I32, l: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k,l),Nil)
 }
 object SRAM {
   private def apply[A](eid: Int, tA: Bits[A]): SRAM[A] = new SRAM[A](eid,tA)
@@ -45,17 +45,30 @@ object SRAM {
     case Op(SRAMAlloc(dims)) => I32.c(dims.length)
     case _ => stage(SRAMRank(sram))
   }
+
+  @internal def read[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]): A = stage(SRAMRead(sram, addr, ens))
+  @internal def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]): Void = {
+    stage(SRAMWrite(sram,data,addr,ens))
+  }
 }
 
 
 /** Nodes **/
-case class SRAMAlloc[A:Bits](dims: Seq[I32]) extends Op[SRAM[A]] {
+case class SRAMAlloc[A:Bits](dims: Seq[I32]) extends Alloc[SRAM[A]] {
   override def effects: Effects = Effects.Mutable
+  def mirror(f:Tx) = SRAM.apply(f(dims):_*)
 }
-case class SRAMRead[A:Bits](sram: SRAM[A], addr: Seq[I32]) extends Op[A]
-case class SRAMWrite[A:Bits](sram: SRAM[A], addr: Seq[I32], data: A) extends Op[Void] {
+case class SRAMRead[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]) extends Reader[A,A](sram,Some(addr),ens) {
+  def mirror(f:Tx) = SRAM.read(f(sram),f(addr),f(ens))
+}
+case class SRAMWrite[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]) extends Writer[A](sram,data.asSym,Some(addr),ens) {
   override def effects: Effects = Effects.Writes(sram)
+  def mirror(f:Tx) = SRAM.write(f(sram),f(data),f(addr),f(ens))
 }
 
-case class SRAMDim(sram: SRAM[_], d: Int) extends Op[I32]
-case class SRAMRank(sram: SRAM[_]) extends Op[I32]
+case class SRAMDim(sram: SRAM[_], d: Int) extends Op[I32] {
+  def mirror(f:Tx) = SRAM.dim(f(sram), d)
+}
+case class SRAMRank(sram: SRAM[_]) extends Op[I32] {
+  def mirror(f:Tx) = SRAM.rank(f(sram))
+}

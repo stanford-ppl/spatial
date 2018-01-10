@@ -9,9 +9,7 @@ trait Staging { this: Printing =>
   def tp[T:Sym]: Sym[T] = implicitly[Sym[T]]
   def mtp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
 
-  implicit class SymOps[T](x: T) {
-    def asSym(implicit sym: Sym[T]): Sym[T] = sym.asSym(x)
-  }
+  implicit def toSym[A:Sym](x: A): Sym[A] = tp[A].asSym(x)
 
   @stateful def bound[T:Sym]: T = fresh(tp[T])
   @stateful def const[T:Sym](c: Any): T = const(tp[T], c)

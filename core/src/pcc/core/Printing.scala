@@ -43,7 +43,8 @@ trait Printing {
   @stateful def error(x: => Any): Unit = if (config.enError) state.out.error(x)
   @stateful def error(ctx: SrcCtx): Unit = if (config.enError) state.out.error(ctx)
   @stateful def error(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enError) state.out.error(ctx,showCaret)
-  @stateful def error(ctx: SrcCtx, x: => Any, noError: Boolean = false): Unit = {
+  @stateful def error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
+  @stateful def error(ctx: SrcCtx, x: => String, noError: Boolean): Unit = {
     if (config.enError) state.out.error(ctx, x)
     if (!noError) state.logError()
   }

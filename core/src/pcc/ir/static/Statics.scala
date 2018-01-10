@@ -1,9 +1,9 @@
 package pcc.ir.static
 
-trait Statics extends Implicits
+trait Statics extends Types
   with Debug
   with Strings
-  with Types
   with Overloads
-  with Params
   with Numerics
+  with Math
+  with Ints

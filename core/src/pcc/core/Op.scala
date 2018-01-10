@@ -4,9 +4,10 @@ import pcc.data.Effects
 import pcc.util.recursive
 import pcc.util.Freq._
 import Filters._
+import pcc.traversal.transform.Transformer
 
 abstract class Op[T:Sym] extends Product with Serializable {
-  type Tx = pcc.traversal.Transformer
+  type Tx = Transformer
   protected implicit var ctx: SrcCtx = SrcCtx.empty
   protected implicit var state: State = _
   def setCtx(c: SrcCtx): Unit = { ctx = c }

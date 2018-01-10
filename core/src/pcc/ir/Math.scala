@@ -4,11 +4,63 @@ package ir
 import forge._
 
 object Math {
-  @api def sigmoid[A:Num](a: A): A = (a match {
-    case x: Fix[_] => fix_sig(a)(x.asInstanceOf[Fix[A]],ctx,state)
-    case x: Flt[_] => flt_sig(a)(x.asInstanceOf[Flt[A]],ctx,state)
-    case _ => throw new Exception(s"No implementation for type ${num[A].typeName}")
-  }).asInstanceOf[A]
+  @api def min[A:Num](a: A, b: A): A = a match {
+    case x: Fix[_] => fix_min(a,b)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_min(a,b)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"min is not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
+  @api def max[A:Num](a: A, b: A): A = a match {
+    case x: Fix[_] => fix_max(a,b)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_max(a,b)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"max is not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
+
+  @api def sigmoid[A:Num](a: A): A = a match {
+    case x: Fix[_] => fix_sig(a)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_sig(a)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"sigmoid not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
+  @api def exp[A:Num](a: A): A = a match {
+    case x: Fix[_] => fix_exp(a)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_exp(a)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"exp not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
+  @api def log[A:Num](a: A): A = a match {
+    case x: Fix[_] => fix_exp(a)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_exp(a)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"log not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
+  @api def sqrt[A:Num](a: A): A = a match {
+    case x: Fix[_] => fix_exp(a)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_exp(a)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"sqrt not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
+  @api def abs[A:Num](a: A): A = a match {
+    case x: Fix[_] => fix_exp(a)(x.asType[Fix[A]],ctx,state)
+    case x: Flt[_] => flt_exp(a)(x.asType[Flt[A]],ctx,state)
+    case _ =>
+      error(ctx, s"abs not defined for inputs of type ${num[A].typeName}")
+      error(ctx)
+      bound[A]
+  }
 
   @api def mux[A:Bits](s: Bit, a: A, b: A): A = stage(Mux(s,a,b))
 

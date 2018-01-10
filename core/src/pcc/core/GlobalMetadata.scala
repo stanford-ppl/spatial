@@ -1,7 +1,8 @@
 package pcc.core
 
+import pcc.traversal.transform.Transformer
+
 import scala.collection.mutable
-import pcc.traversal.Transformer
 
 class GlobalMetadata {
   type Tx = Transformer

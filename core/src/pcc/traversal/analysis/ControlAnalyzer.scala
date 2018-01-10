@@ -2,7 +2,7 @@ package pcc
 package traversal
 package analysis
 
-import pcc.ir.control._
+import pcc.ir._
 import pcc.data._
 
 case class ControlAnalyzer(IR: State) extends Traversal {
@@ -25,7 +25,7 @@ case class ControlAnalyzer(IR: State) extends Traversal {
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case Accel(_) => annotateControl(lhs, rhs)
+    case _:Control => annotateControl(lhs, rhs)
     case _ => super.visit(lhs,rhs)
   }
 

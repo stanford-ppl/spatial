@@ -1,6 +1,10 @@
 package pcc
 package core
 
+import forge._
+
+import pcc.ir.Text
+
 import pcc.util.Tri._
 import pcc.util.Types._
 import pcc.util.escapeConst
@@ -32,6 +36,7 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
 
   final def asSym(x: A): Sym[A] = ev(x)
   final def asSym: Sym[A] = this
+  final def asType[T]: T = this.asInstanceOf[T]
 
   override def toString: String = if (isType) this.productPrefix else _rhs match {
     case One(c) => s"${escapeConst(c)}"
@@ -47,6 +52,8 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
 
   final def <:<(that: Sym[_]): Boolean = isSubtype(this.stagedClass, that.stagedClass)
   final def <:>(that: Sym[_]): Boolean = this <:< that && that <:< this
+
+  @api def toText: Text = Text.textify(me)(this.asType[A],ctx,state)
 }
 
 object Lit {

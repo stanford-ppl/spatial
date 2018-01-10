@@ -17,7 +17,20 @@ object StageMemories extends Testbench {
   }
 }
 
+object StageUpdate extends Testbench {
+  def main(): Void = {
+    val sram = SRAM[I32](16)
+    Foreach(0 until 32){i =>
+      sram(i) = exp(i)
+    }
+    Foreach(0 until 32){i =>
+      println("i=">i>": ">sram(i))
+    }
+  }
+}
+
 class StagingTests extends Tests {
   "StageForeach" should "compile" in { test(StageForeach) }
   "StageMemories" should "compile" in { test(StageMemories) }
+  "StageUpdate" should "compile" in { test(StageUpdate) }
 }

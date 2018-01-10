@@ -2,21 +2,30 @@ package pcc.ir.static
 
 trait Aliases {
   type I32 = pcc.ir.I32
+  lazy val I32 = pcc.ir.I32
   type I16 = pcc.ir.I16
+  lazy val I16 = pcc.ir.I16
   type I8  = pcc.ir.I8
+  lazy val I8 = pcc.ir.I8
 
   type F32 = pcc.ir.F32
+  lazy val F32 = pcc.ir.F32
   type F16 = pcc.ir.F16
+  lazy val F16 = pcc.ir.F16
 
   type Bit = pcc.ir.Bit
+  lazy val Bit = pcc.ir.Bit
   type Void = pcc.ir.Void
+  lazy val Void = pcc.ir.Void
   type Text = pcc.ir.Text
+  lazy val Text = pcc.ir.Text
 
   type Series = pcc.ir.Series
   lazy val Series = pcc.ir.Series
   type Counter = pcc.ir.Counter
   lazy val Counter = pcc.ir.Counter
   type CounterChain = pcc.ir.CounterChain
+  lazy val CounterChain = pcc.ir.CounterChain
 
   type DRAM[T] = pcc.ir.memories.DRAM[T]
   lazy val DRAM = pcc.ir.memories.DRAM

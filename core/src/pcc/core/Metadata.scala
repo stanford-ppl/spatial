@@ -1,6 +1,6 @@
 package pcc.core
 
-import pcc.traversal.Transformer
+import pcc.traversal.transform.Transformer
 
 abstract class Metadata[T] { self =>
   type Tx = Transformer

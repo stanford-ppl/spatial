@@ -2,7 +2,7 @@ package pcc
 package data
 
 import forge._
-import pcc.traversal.Transformer
+import pcc.traversal.transform.Transformer
 
 /** Shortcuts for metadata **/
 @data object metadata {

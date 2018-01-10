@@ -2,7 +2,8 @@ package pcc
 
 import pcc.core.{CompilerBugs, CompilerErrors}
 import pcc.data._
-import pcc.traversal.{Pass, Transformer}
+import pcc.traversal.Pass
+import pcc.traversal.transform.Transformer
 import pcc.util.files
 import pcc.util.files.deleteExts
 

@@ -1,6 +1,7 @@
 package pcc.test
 
 import pcc.lang._
+import pcc.lib._
 
 object GEMM extends Testbench {
   def main(): Void = {
@@ -9,9 +10,8 @@ object GEMM extends Testbench {
     val K = 96  // Common dimension
     val a = SRAM[I32](M,K)
     val b = SRAM[I32](K,N)
-    val c = SRAM[I32](M,N)
-
-
+    val y = SRAM[I32](M,N)
+    gemm[I32](y,a,b,0,false,false,1,2)
   }
 }
 

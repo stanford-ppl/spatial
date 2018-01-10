@@ -4,8 +4,8 @@ import forge._
 
 import pcc.ir.Dbg
 
-trait Debug { this: Implicits =>
-  @api def println(msg: Text): Void = print(msg + "\n")
+trait Debug { this: Statics =>
+  @api def println(msg: Text): Void = print(msg>"\n")
   @api def println(): Void = println("")
 
   @api def print(msg: Text): Void = Dbg.printIf(Nil, msg)

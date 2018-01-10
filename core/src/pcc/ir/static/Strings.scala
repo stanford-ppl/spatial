@@ -16,10 +16,10 @@ trait StringVeryLowImplicits extends StringSuperLowImplicits {
 
 trait StringLowPriorityImplicits extends StringVeryLowImplicits {
   // Shadows Predef method..
-  @api implicit def wrapString(x: String): Text = const[Text](x)
+  @api implicit def wrapString(x: String): Text = Text.c(x)
 }
 
 trait Strings extends StringLowPriorityImplicits {
   // Shadows Predef method...
-  @api implicit def augmentString(x: String): Text = const[Text](x)
+  @api implicit def augmentString(x: String): Text = Text.c(x)
 }

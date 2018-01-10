@@ -62,6 +62,7 @@ object I32 {
   implicit val i32: I32 = I32(-1)
 
   @api def c(x: Int): I32 = const[I32](x)
+  @api def p(x: Int): I32 = param[I32](x)
 }
 
 

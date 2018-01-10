@@ -14,11 +14,14 @@ object Counter {
   implicit val ctr: Counter = Counter(-1)
 
   @api def apply(start: I32, end: I32, step: Option[I32] = None, par: Option[I32] = None): Counter = {
-    val stride = step.getOrElse(const[I32](1))
-    val parfac = par.getOrElse(param[I32](1))
-    stage(CounterAlloc(start, end, stride, parfac))
+    Counter.staged(start, end, step.getOrElse(I32.c(1)), par.getOrElse(I32.p(1)))
+  }
+  @internal def staged(start: I32, end: I32, step: I32, par: I32): Counter = {
+    stage(CounterAlloc(start, end, step, par))
   }
 }
 
 /** Nodes **/
-case class CounterAlloc(start: I32, end: I32, step: I32, par: I32) extends BoxAlloc[Counter]
+case class CounterAlloc(start: I32, end: I32, step: I32, par: I32) extends BoxAlloc[Counter] {
+  def mirror(f:Tx) = Counter.staged(f(start),f(end),f(step),f(par))
+}

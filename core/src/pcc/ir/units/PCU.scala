@@ -18,5 +18,5 @@ case class PCUAlloc(
 
 
 ) extends BoxAlloc[PCU] {
-
+  def mirror(f:Tx) = stage(this) // TODO
 }

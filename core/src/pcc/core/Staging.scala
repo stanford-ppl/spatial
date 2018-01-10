@@ -7,6 +7,7 @@ import pcc.util.recursive
 trait Staging { this: Printing =>
 
   def tp[T:Sym]: Sym[T] = implicitly[Sym[T]]
+  def mtp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
 
   implicit class SymOps[T](x: T) {
     def asSym(implicit sym: Sym[T]): Sym[T] = sym.asSym(x)

@@ -18,7 +18,7 @@ object Foreach {
   @api def apply(ctrs: Seq[Counter])(func: Seq[I32] => Void): Void = {
     val iters  = ctrs.map{_ => bound[I32] }
     val block  = () => func(iters)
-    val cchain = stage(CounterChainAlloc(ctrs))
+    val cchain = CounterChain(ctrs:_*)
     Foreach.staged(Nil, cchain, block, iters)
   }
 

@@ -23,10 +23,10 @@ trait Transformer extends Pass {
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
     dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
-    metadata.all(src).foreach{case (key,meta) =>
-      val meta2 = mirror(meta)
-      meta2.foreach{m => metadata.add(dest, m) }
+    val data = metadata.all(src).flatMap{case (_,meta) =>
+      mirror(meta) : Option[Metadata[_]]
     }
+    metadata.addAll(dest, data)
   }
 
   final protected def transferMetadataIfNew[A](lhs: Sym[A])(tx: => Sym[A]): (Sym[A], Boolean) = {

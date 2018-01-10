@@ -12,8 +12,11 @@ case class CounterChain(eid: Int) extends Box[CounterChain](eid) {
 }
 object CounterChain {
   implicit val cchain: CounterChain = CounterChain(-1)
+  @api def apply(ctrs: Counter*): CounterChain = stage(CounterChainAlloc(ctrs))
 }
 
 /** Nodes **/
-case class CounterChainAlloc(counters: Seq[Counter]) extends BoxAlloc[CounterChain]
+case class CounterChainAlloc(counters: Seq[Counter]) extends BoxAlloc[CounterChain] {
+  def mirror(f:Tx) = CounterChain.apply(f(counters):_*)
+}
 

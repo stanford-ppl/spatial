@@ -60,6 +60,10 @@ class GraphMetadata {
     that
   }
 
+  def addAll(edge: Sym[_], data: Iterable[Metadata[_]]): Unit = {
+    data.foreach{m => addMetadata(edge, m) }
+  }
+
   def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = addMetadata(edge, m)
   def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: Option[M]): Unit = m match {
     case Some(data) => addMetadata(edge, data)

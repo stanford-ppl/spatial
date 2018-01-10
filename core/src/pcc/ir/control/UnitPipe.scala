@@ -2,8 +2,10 @@ package pcc
 package ir
 package control
 
+import forge._
+
 object UnitPipe {
-  def staged(ens: Seq[Bit], block: () => Void): Void = {
+  @internal def staged(ens: Seq[Bit], block: () => Void): Void = {
     stage(UnitPipe(ens,stageBlock{block()}))
   }
 }

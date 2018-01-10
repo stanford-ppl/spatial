@@ -49,5 +49,5 @@ case class PCUModule(
   vOuts:  Seq[Vec[Vec[Bit]]],
   spec:   PCUSpec
 ) extends Module[PCU] {
-
+  def mirror(f:Tx) = stage(this) // TODO
 }

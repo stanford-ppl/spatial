@@ -9,6 +9,7 @@ import pcc.traversal.Transformer
   def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = state.metadata[M](edge)
   def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = state.metadata.add[M](edge, m)
   def all(edge: Sym[_]): Map[Class[_],Metadata[_]] = state.metadata.all(edge)
+  def addAll(edge: Sym[_], data: Iterable[Metadata[_]]): Unit = state.metadata.addAll(edge,data)
   def clear[M<:Metadata[M]:Manifest]: Unit = state.metadata.clear[M]
 }
 

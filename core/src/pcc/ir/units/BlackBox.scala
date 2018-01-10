@@ -9,7 +9,7 @@ import pcc.ir.memories.SRAM
 sealed abstract class BlackBox extends Control {
   override def effects: Effects = Effects.Simple
 }
-case class GEMMBox[T](
+case class GEMMBox[T:Num](
   y:     SRAM[T],
   a:     SRAM[T],
   b:     SRAM[T],
@@ -23,12 +23,15 @@ case class GEMMBox[T](
   p:     I32
 ) extends BlackBox {
   override def effects: Effects = Effects.Writes(y)
+  def mirror(f:Tx) = BlackBox.GEMM(f(y),f(a),f(b),f(c),f(alpha),f(beta),f(i),f(j),f(lenI),f(lenJ),f(p))
 }
 
 
-case class GEMVBox() extends BlackBox
-case class CONVBox() extends BlackBox
-case class SHIFTBox(validAfter: Int) extends BlackBox // Shift out registers, valid after X cycles
+case class GEMVBox() extends BlackBox { def mirror(f:Tx) = stage(this) }
+case class CONVBox() extends BlackBox { def mirror(f:Tx) = stage(this) }
+case class SHIFTBox(validAfter: Int) extends BlackBox {
+  def mirror(f:Tx) = stage(this)
+}
 
 object BlackBox {
   /**

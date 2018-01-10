@@ -52,5 +52,5 @@ case class PMUModule(
   vOuts: Seq[Vec[Vec[Bit]]],
   spec:  PMUSpec
 ) extends Module[PMU] {
-
+  def mirror(f:Tx) = stage(this) // TODO
 }

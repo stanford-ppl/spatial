@@ -1,9 +1,8 @@
 package pcc.core
 
-import java.io.PrintStream
-
 import pcc.util.NullOutputStream
 
+import java.io.PrintStream
 import scala.collection.mutable
 
 class State {

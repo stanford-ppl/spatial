@@ -1,10 +1,7 @@
-package pcc
-package core
+package pcc.core
 
 import forge._
-
-import pcc.ir.Text
-
+import pcc.lang.Text
 import pcc.util.Tri._
 import pcc.util.Types._
 import pcc.util.escapeConst

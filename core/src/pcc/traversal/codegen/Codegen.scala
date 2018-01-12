@@ -1,9 +1,9 @@
-package pcc
-package traversal
+package pcc.traversal
 package codegen
 
-import util.files
-import util.Tri._
+import pcc.core._
+import pcc.util.files
+import pcc.util.Tri._
 
 trait Codegen extends Traversal {
   override val recurse: Recurse = Recurse.Never

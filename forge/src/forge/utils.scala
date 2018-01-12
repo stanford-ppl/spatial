@@ -31,8 +31,17 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     errorIfExists: Boolean,
     method: (String, Tree) => Tree
   ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,body)) = cls
-    val (fields, methods) = cls.fieldsAndMethods
+    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,bodyX)) = cls
+    val (fieldsX, methods) = cls.fieldsAndMethods
+
+    val fields = fieldsX.map{
+      case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
+        val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.PRIVATE)
+        ValDef(flags, name, tp, rhs)
+      case v => v
+    }
+    val body = fields ++ methods
+
     val fieldNames = fields.map(_.name)
     val methodNames = methods.map(_.name)
     val names = fieldNames ++ methodNames

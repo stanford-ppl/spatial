@@ -1,7 +1,7 @@
-package pcc
-package data
+package pcc.data
 
 import forge._
+import pcc.core._
 
 sealed abstract class ControlLevel
 case object Outer extends ControlLevel

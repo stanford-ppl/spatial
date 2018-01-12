@@ -1,7 +1,7 @@
 package pcc.core
 
 import pcc.util.Freq._
-import pcc.data.{Effectful, Effects}
+import pcc.data.Effects
 
 case class Block[R](
   inputs:  Seq[Sym[_]], // External inputs to this block

@@ -1,7 +1,7 @@
-package pcc
-package data
+package pcc.data
 
 import forge._
+import pcc.core._
 import pcc.traversal.transform.Transformer
 
 /** Shortcuts for metadata **/

@@ -1,6 +1,6 @@
-package pcc
-package util
+package pcc.util
 
+import pcc.core._
 import forge._
 
 import scala.util.{Failure, Success, Try}

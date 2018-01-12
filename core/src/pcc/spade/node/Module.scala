@@ -1,7 +1,7 @@
 package pcc.spade.node
 
-import pcc._
-import pcc.ir._
+import pcc.core._
+import pcc.lang.Box
 
 abstract class Module[B:Box] extends Op[B] {
   //def wires: Seq[Sym[_]] = inputs

@@ -1,8 +1,8 @@
 package pcc.spade.node
 
 import forge._
-import pcc._
-import pcc.ir._
+import pcc.core._
+import pcc.lang._
 
 case class PMUSpec(
   nRegs:   Int, // Number of registers per stage
@@ -43,7 +43,7 @@ object PMU {
   }
 }
 
-case class PMUModule(
+@op case class PMUModule(
   cIns:  Seq[Bit],
   cOuts: Seq[Bit],
   sIns:  Seq[Vec[Bit]],
@@ -51,6 +51,4 @@ case class PMUModule(
   vIns:  Seq[Vec[Vec[Bit]]],
   vOuts: Seq[Vec[Vec[Bit]]],
   spec:  PMUSpec
-) extends Module[PMU] {
-  def mirror(f:Tx) = stage(this) // TODO
-}
+) extends Module[PMU]

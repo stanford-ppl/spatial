@@ -1,6 +1,7 @@
 package pcc
 
 import forge._
+import pcc.core._
 import pcc.data._
 
 import org.apache.commons.lang3.StringEscapeUtils.escapeJava

@@ -1,9 +1,9 @@
-package pcc
-package traversal
+package pcc.traversal
 package analysis
 
-import pcc.ir._
+import pcc.core._
 import pcc.data._
+import pcc.node._
 
 case class ControlAnalyzer(IR: State) extends Traversal {
   override val name = "Control Analyzer"

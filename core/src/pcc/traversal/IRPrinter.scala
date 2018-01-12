@@ -1,6 +1,6 @@
-package pcc
-package traversal
+package pcc.traversal
 
+import pcc.core._
 import pcc.util.strMeta
 
 case class IRPrinter(IR: State) extends Traversal {

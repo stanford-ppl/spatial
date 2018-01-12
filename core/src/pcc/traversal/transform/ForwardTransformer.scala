@@ -1,6 +1,7 @@
-package pcc
-package traversal
+package pcc.traversal
 package transform
+
+import pcc.core._
 
 trait ForwardTransformer extends SubstTransformer with Traversal {
   final override val recurse = Recurse.Never

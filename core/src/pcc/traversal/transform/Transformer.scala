@@ -1,7 +1,7 @@
-package pcc
-package traversal
+package pcc.traversal
 package transform
 
+import pcc.core._
 import pcc.data._
 
 trait Transformer extends Pass {
@@ -11,6 +11,13 @@ trait Transformer extends Pass {
     case x: Sym[_]   => transformSym(x.asInstanceOf[Sym[T]])
     case x: Block[_] => transformBlock(x)
     case x: Seq[_]   => x.map{this.apply}
+    case x: Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
+    case x: Iterable[_] => x.map{this.apply}
+    case x: Int => x
+    case x: Long => x
+    case x: Float => x
+    case x: Double => x
+    case _ => throw new Exception(s"No rule for mirroring ${x.getClass}")
   }).asInstanceOf[T]
 
   def tx[T](block: Block[T]): () => T = () => inlineBlock(block).asInstanceOf[T]
@@ -47,9 +54,25 @@ trait Transformer extends Pass {
 
   def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Sym[A] = rhs.tR
+    implicit val ctx: SrcCtx = lhs.ctx
     log(s"$lhs = $rhs [Mirror]")
-    rhs.setCtx(lhs.ctx)  // Update context prior to transforming
-    val (lhs2,_) = transferMetadataIfNew(lhs){ rhs.mirrorNode(f).asSym }
+    val (lhs2,_) = try {
+      transferMetadataIfNew(lhs) {
+        /*val inputs = rhs.productIterator.toSeq.map{x => f(x).asInstanceOf[Object] }
+        rhs.getClass.getConstructors.foreach{c =>
+          log(s"constructor: $c")
+        }
+        val constructor = rhs.getClass.getConstructors.head
+        val node = constructor.newInstance(inputs:_*).asInstanceOf[Op[A]]*/
+        //rhs.setContext(IR, lhs.ctx)
+        val node = rhs.mirror(f)
+        stage(node).asSym
+      }
+    }
+    catch {case t: Throwable =>
+      bug(s"An error occurred while mirroring $lhs = $rhs")
+      throw t
+    }
     log(s"${stm(lhs2)}")
     lhs2
   }

@@ -1,8 +1,9 @@
 package pcc
 
-import pcc.ir._
+import pcc.core._
+import pcc.node._
 
 package object data {
-  def isControl(x: Sym[_]): Boolean = x.op.exists(isControl)
-  def isControl(x: Op[_]): Boolean = x.isInstanceOf[Control]
+  def isControl(sym: Sym[_]): Boolean = sym.op.exists(isControl)
+  def isControl(op: Op[_]): Boolean = op.isInstanceOf[Control]
 }

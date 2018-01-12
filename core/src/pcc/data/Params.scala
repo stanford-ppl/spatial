@@ -1,8 +1,8 @@
-package pcc
-package data
+package pcc.data
 
 import forge._
-import pcc.aliases._
+import pcc.core._
+import pcc.lang._
 
 /**
   * Parameter Range

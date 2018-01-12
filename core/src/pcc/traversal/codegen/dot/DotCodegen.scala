@@ -1,7 +1,8 @@
-package pcc
-package traversal
+package pcc.traversal
 package codegen
 package dot
+
+import pcc.core._
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map}

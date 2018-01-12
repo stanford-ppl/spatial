@@ -1,7 +1,7 @@
-package pcc
-package traversal
+package pcc.traversal
 
-import util.{Instrument,NoInstrument}
+import pcc.core._
+import pcc.util.{Instrument,NoInstrument}
 
 /**
   * Common trait for all passes which can be run by the compiler,

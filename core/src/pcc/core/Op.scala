@@ -8,9 +8,6 @@ import pcc.traversal.transform.Transformer
 
 abstract class Op[T:Sym] extends Product with Serializable {
   type Tx = Transformer
-  protected implicit var ctx: SrcCtx = SrcCtx.empty
-  protected implicit var state: State = _
-  def setCtx(c: SrcCtx): Unit = { ctx = c }
 
   def tR: Sym[T] = implicitly[Sym[T]]
 
@@ -64,12 +61,7 @@ abstract class Op[T:Sym] extends Product with Serializable {
   /** Effects **/
   def effects: Effects = blocks.map(_.effects).fold(Effects.Pure){(a,b) => a andAlso b }
 
-  def mirror(f: Tx): T
-
-  final def mirrorNode(f: Tx)(implicit state: State): T = {
-    this.state = state
-    mirror(f)
-  }
+  def mirror(f:Tx): Op[T]
 }
 
 object Op {

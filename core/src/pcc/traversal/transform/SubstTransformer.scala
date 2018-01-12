@@ -1,6 +1,7 @@
-package pcc
-package traversal
+package pcc.traversal
 package transform
+
+import pcc.core._
 
 trait SubstTransformer extends Transformer {
   val allowUnsafeSubst: Boolean = false

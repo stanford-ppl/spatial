@@ -1,7 +1,7 @@
-package pcc
-package data
+package pcc.data
 
 import forge._
+import pcc.core._
 
 case class AntiDeps(syms: Seq[Sym[_]]) extends ComplexData[AntiDeps]
 

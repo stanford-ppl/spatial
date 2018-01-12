@@ -1,7 +1,7 @@
-package pcc
-package traversal
+package pcc.traversal
 
-import util.Tri._
+import pcc.core._
+import pcc.util.Tri._
 
 /**
   * Single traversal of the IR with pre- and post- processing

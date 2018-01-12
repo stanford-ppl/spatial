@@ -6,10 +6,8 @@ import pcc.data._
 
 import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 
-
 /** Miscellaneous Utilities **/
 package object util {
-
   def escapeString(raw: String): String = "\"" + escapeJava(raw) + "\""
   def escapeChar(raw: Char): String = "'"+escapeJava(raw.toString)+"'"
 
@@ -34,6 +32,6 @@ package object util {
       dbgs(s" - Aliases: $aliases")
     }
     dbgs(s" - Type: ${lhs.typeName}")
-    metadata.all(lhs).foreach{m => dbgs(s" - ${m._1}: ${m._2}") }
+    metadata.all(lhs).foreach{case (k,m) => dbgs(s" - $k: $m") }
   }
 }

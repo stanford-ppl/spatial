@@ -4,7 +4,7 @@ package transform
 import pcc.core._
 import pcc.data._
 
-trait Transformer extends Pass {
+abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
   def apply[T](x: T): T = (x match {
@@ -29,15 +29,11 @@ trait Transformer extends Pass {
 
   protected def inlineBlock[T](block: Block[T]): Sym[T]
 
-  def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = {
-    transferMetadata(srcDest._1, srcDest._2)
-  }
+  def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = transferMetadata(srcDest._1, srcDest._2)
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
     dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
-    val data = metadata.all(src).flatMap{case (_,meta) =>
-      mirror(meta) : Option[Metadata[_]]
-    }
+    val data = metadata.all(src).flatMap{case (_,m) => mirror(m) : Option[Metadata[_]] }
     metadata.addAll(dest, data)
   }
 
@@ -57,17 +53,7 @@ trait Transformer extends Pass {
     implicit val ctx: SrcCtx = lhs.ctx
     log(s"$lhs = $rhs [Mirror]")
     val (lhs2,_) = try {
-      transferMetadataIfNew(lhs) {
-        /*val inputs = rhs.productIterator.toSeq.map{x => f(x).asInstanceOf[Object] }
-        rhs.getClass.getConstructors.foreach{c =>
-          log(s"constructor: $c")
-        }
-        val constructor = rhs.getClass.getConstructors.head
-        val node = constructor.newInstance(inputs:_*).asInstanceOf[Op[A]]*/
-        //rhs.setContext(IR, lhs.ctx)
-        val node = rhs.mirror(f)
-        stage(node).asSym
-      }
+      transferMetadataIfNew(lhs){ stage(rhs.mirror(f)).asSym }
     }
     catch {case t: Throwable =>
       bug(s"An error occurred while mirroring $lhs = $rhs")
@@ -76,4 +62,6 @@ trait Transformer extends Pass {
     log(s"${stm(lhs2)}")
     lhs2
   }
+
+
 }

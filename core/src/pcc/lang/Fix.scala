@@ -41,7 +41,7 @@ case class I32(eid: Int) extends Fix[I32](eid, 32, 0) {
   override def stagedClass: Class[I32] = classOf[I32]
 }
 object I32 {
-  implicit val i32: I32 = I32(-1)
+  implicit val tp: I32 = I32(-1)
 
   @api def c(x: Int): I32 = const[I32](x)
   @api def p(x: Int): I32 = param[I32](x)
@@ -58,7 +58,7 @@ case class I16(eid: Int) extends Fix[I16](eid, 16, 0) {
   @api def one: I16 = I16.c(1)
 }
 object I16 {
-  implicit val i16: I16 = I16(-1)
+  implicit val tp: I16 = I16(-1)
   @api def c(x: Short): I16 = const[I16](x)
 }
 
@@ -74,7 +74,7 @@ case class I8(eid: Int) extends Fix[I8](eid, 8, 0) {
   @api def one: I8 = I8.c(1)
 }
 object I8 {
-  implicit val i8: I8 = I8(-1)
+  implicit val tp: I8 = I8(-1)
   @api def c(x: Byte): I8 = const[I8](x)
 }
 

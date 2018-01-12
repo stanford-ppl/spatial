@@ -3,7 +3,7 @@ package transform
 
 import pcc.core._
 
-trait ForwardTransformer extends SubstTransformer with Traversal {
+abstract class ForwardTransformer extends SubstTransformer with Traversal {
   final override val recurse = Recurse.Never
 
   /**
@@ -74,7 +74,7 @@ trait ForwardTransformer extends SubstTransformer with Traversal {
   }
 
   final override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    createSubstRule(lhs.asInstanceOf[Sym[Any]], rhs.asInstanceOf[Op[Any]])(mtp(lhs), lhs.ctx)
+    createSubstRule(lhs.asInstanceOf[Sym[Any]], rhs.asInstanceOf[Op[Any]])(mtyp(lhs), lhs.ctx)
   }
 
   final override protected def visitBlock[R](block: Block[R]): Block[R] = {

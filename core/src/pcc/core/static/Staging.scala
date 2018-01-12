@@ -6,14 +6,14 @@ import pcc.util.recursive
 
 trait Staging { this: Printing =>
 
-  def tp[T:Sym]: Sym[T] = implicitly[Sym[T]]
-  def mtp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
+  def typ[T:Sym]: Sym[T] = implicitly[Sym[T]]
+  def mtyp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
 
-  implicit def toSym[A:Sym](x: A): Sym[A] = tp[A].asSym(x)
+  implicit def toSym[A:Sym](x: A): Sym[A] = typ[A].asSym(x)
 
-  @stateful def bound[T:Sym]: T = fresh(tp[T])
-  @stateful def const[T:Sym](c: Any): T = const(tp[T], c)
-  @stateful def param[T:Sym](c: Any): T = param(tp[T], c)
+  @stateful def bound[T:Sym]: T = fresh(typ[T])
+  @stateful def const[T:Sym](c: Any): T = const(typ[T], c)
+  @stateful def param[T:Sym](c: Any): T = param(typ[T], c)
 
   @stateful def fresh[T](tp: Sym[T]): T = tp.asSym(tp.fresh(state.nextId())).asBound()
   @stateful def const[T](tp: Sym[T], c: Any): T = tp.asSym(tp.fresh(state.nextId())).asConst(c)

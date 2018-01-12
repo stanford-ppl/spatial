@@ -6,6 +6,14 @@ import scala.language.experimental.macros
 case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
   import ctx.universe._
 
+  // Fix for bug where <caseaccessor> gets added to (private) implicit fields
+  def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
+    case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
+      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.PRIVATE)
+      ValDef(flags, name, tp, rhs)
+    case v => v
+  }
+
   def makeTypeName(tp: TypeDef): Tree = {
     val TypeDef(mods,TypeName(name),targs,_) = tp
     makeType(name, targs)
@@ -34,12 +42,7 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     val ClassDef(mods,TypeName(name),tparams,Template(parents,self,bodyX)) = cls
     val (fieldsX, methods) = cls.fieldsAndMethods
 
-    val fields = fieldsX.map{
-      case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
-        val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.PRIVATE)
-        ValDef(flags, name, tp, rhs)
-      case v => v
-    }
+    val fields = fieldsFix(fieldsX)
     val body = fields ++ methods
 
     val fieldNames = fields.map(_.name)
@@ -63,10 +66,26 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     else cls
   }
 
+  def modifyClassFields(
+    cls: ClassDef,
+    func: ValDef => ValDef
+  ): ClassDef = {
+    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,body)) = cls
+    val (fieldsX,methods) = cls.fieldsAndMethods
+    val fields = fieldsFix(fieldsX)
+    val fields2 = fields.map(func)
+    val body2 = fields2 ++ methods
+    ClassDef(mods,TypeName(name),tparams,Template(parents,self,body2))
+  }
+
   implicit class ValDefOps(v: ValDef) {
     def tp: Option[Tree] = {
       val ValDef(_,name,tp,rhs) = v
       if (tp == EmptyTree) None else Some(tp)
+    }
+    def asVar: ValDef = {
+      val ValDef(mods,name,tp,rhs) = v
+      ValDef(Modifiers(mods.flags | Flag.MUTABLE),name,tp,rhs)
     }
   }
 
@@ -92,6 +111,17 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
 
     def fields: List[ValDef]  = fieldsAndMethods._1
     def methods: List[DefDef] = fieldsAndMethods._2
+
+    def modifyFields(func: ValDef => ValDef): ClassDef = {
+      modifyClassFields(cls,func)
+    }
+    def withVarParams: ClassDef = {
+      val params = constructorArgs.head.map(_.name)
+      cls.modifyFields{
+        case field if params.contains(field.name) => field.asVar
+        case field => field
+      }
+    }
 
     def constructor: Option[DefDef] = methods.find{_.name == termNames.CONSTRUCTOR}
     def constructorArgs: List[List[ValDef]] = constructor.map{d =>  d.paramss }.getOrElse(Nil)

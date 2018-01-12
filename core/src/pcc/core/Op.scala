@@ -62,6 +62,7 @@ abstract class Op[T:Sym] extends Product with Serializable {
   def effects: Effects = blocks.map(_.effects).fold(Effects.Pure){(a,b) => a andAlso b }
 
   def mirror(f:Tx): Op[T]
+  def update(f:Tx): Unit
 }
 
 object Op {

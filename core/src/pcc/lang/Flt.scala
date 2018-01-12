@@ -32,7 +32,7 @@ case class F32(eid: Int) extends Flt[F32](eid, 24, 8) {
   @api def one: F32 = F32.c(1)
 }
 object F32 {
-  implicit val f32: F32 = F32(-1)
+  implicit val tp: F32 = F32(-1)
   @api def c(x: Float): F32 = const[F32](x)
 }
 
@@ -47,6 +47,6 @@ case class F16(eid: Int) extends Flt[F16](eid, 11, 5) {
   @api def one: F16 = F16.c(0)
 }
 object F16 {
-  implicit val f16: F16 = F16(-1)
+  implicit val tp: F16 = F16(-1)
   @api def c(x: Float): F16 = const[F16](x)
 }

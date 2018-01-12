@@ -60,8 +60,10 @@ class GraphMetadata {
     that
   }
 
-  def addAll(edge: Sym[_], data: Iterable[Metadata[_]]): Unit = {
-    data.foreach{m => addMetadata(edge, m) }
+  def addAll(edge: Sym[_], data: Iterable[Metadata[_]]): Unit = data.foreach{m => addMetadata(edge, m) }
+  def addOrRemoveAll(edge: Sym[_], data: Iterable[(Class[_],Option[Metadata[_]])]): Unit = data.foreach{
+    case (key,Some(m)) => addMetadata(edge, m)
+    case (key,None)    => removeMetadata(edge,key)
   }
 
   def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = addMetadata(edge, m)
@@ -69,7 +71,7 @@ class GraphMetadata {
     case Some(data) => addMetadata(edge, data)
     case None => removeMetadata(edge, keyOf[M])
   }
-  def all(edge: Sym[_]): Map[Class[_],Metadata[_]] = getAllMetadata(edge).map(_.toMap).getOrElse(Map.empty)
+  def all(edge: Sym[_]): Iterable[(Class[_],Metadata[_])] = getAllMetadata(edge).getOrElse(Nil)
 
   def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = getMetadata(edge,keyOf[M])
 

@@ -22,7 +22,7 @@ case class Reg[A](eid: Int, tA: Bits[A]) extends LocalMem[A,Reg](eid) {
 }
 object Reg {
   private lazy val types = new mutable.HashMap[Bits[_],Reg[_]]()
-  implicit def reg[A:Bits]: Reg[A] = types.getOrElseUpdate(bits[A], new Reg[A](-1,bits[A])).asInstanceOf[Reg[A]]
+  implicit def tp[A:Bits]: Reg[A] = types.getOrElseUpdate(bits[A], new Reg[A](-1,bits[A])).asInstanceOf[Reg[A]]
 
   @api def apply[T:Bits]: Reg[T] = Reg[T](bits[T].zero)
   @api def apply[T:Bits](reset: T): Reg[T] = stage(RegAlloc(reset))

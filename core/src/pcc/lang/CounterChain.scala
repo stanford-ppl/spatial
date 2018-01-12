@@ -13,7 +13,7 @@ case class CounterChain(eid: Int) extends Sym[CounterChain](eid) {
   override def isPrimitive: Boolean = false
 }
 object CounterChain {
-  implicit val cchain: CounterChain = CounterChain(-1)
+  implicit val tp: CounterChain = CounterChain(-1)
   @api def apply(ctrs: Counter*): CounterChain = stage(CounterChainAlloc(ctrs))
 }
 

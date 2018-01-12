@@ -49,7 +49,7 @@ abstract class EnPrimitive[A:Sym] extends Primitive[A] {
 }
 
 abstract class Accessor[A:Sym,R:Sym] extends EnPrimitive[R] {
-  val tA: Sym[A] = tp[A]
+  val tA: Sym[A] = typ[A]
 
   def localReads: Seq[Read]
   def localWrites: Seq[Write]

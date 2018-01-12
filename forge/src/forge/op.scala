@@ -4,7 +4,6 @@ import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.language.experimental.macros
 
-
 final class op extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro op.impl
 }
@@ -17,17 +16,24 @@ object op {
 
     val tree = annottees.head match {
       case cls: ClassDef =>
-        cls.asCaseClass.injectMethod {(_,tp) =>
-          val names = cls.constructorArgs.head.map(_.name)
-          val mirrored = names.map{name => q"f($name)" }
-          val name = cls.name
-          q"override def mirror(f:Tx) = new $name(..$mirrored)"
-        }
+        val name = cls.name
+        val names = cls.constructorArgs.head.map(_.name)
+        val fnames = names.map{name => q"f($name)" }
+        val updates = names.zip(fnames).map{case (name,fname) => q"$name = $fname" }
+
+        cls.asCaseClass.withVarParams
+           .injectMethod {(_,_) =>
+             q"override def mirror(f:Tx) = new $name(..$fnames)"
+           }
+           .injectMethod{(_,_) =>
+             q"override def update(f:Tx) = { ..$updates }"
+           }
+
       case t =>
         c.error(c.enclosingPosition, "@mod can only be used on class definitions")
         t
     }
-    //c.info(c.enclosingPosition, showCode(tree), force = true)
+    c.info(c.enclosingPosition, showCode(tree), force = true)
     tree
   }
 }

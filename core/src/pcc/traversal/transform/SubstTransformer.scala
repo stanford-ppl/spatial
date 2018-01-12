@@ -3,7 +3,7 @@ package transform
 
 import pcc.core._
 
-trait SubstTransformer extends Transformer {
+abstract class SubstTransformer extends Transformer {
   val allowUnsafeSubst: Boolean = false
   val allowDuplication: Boolean = false
 

@@ -19,6 +19,6 @@ case class Bit(eid: Int) extends Bits[Bit](eid) {
   @api def ||(that: Bit): Bit = stage(Or(this,that))
 }
 object Bit {
-  implicit val bit: Bit = Bit(-1)
+  implicit val tp: Bit = Bit(-1)
   @api def c(b: Boolean): Bit = const[Bit](b)
 }

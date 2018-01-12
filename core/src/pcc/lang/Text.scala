@@ -16,7 +16,7 @@ case class Text(eid: Int) extends Sym[Text](eid) {
   @api def >(that: Text): Text = Text.concat(that,this)
 }
 object Text {
-  implicit val text: Text = Text(-1)
+  implicit val tp: Text = Text(-1)
 
   @api def c(x: String) = const[Text](x)
   @api def concat(a: Text, b: Text): Text = stage(TextConcat(a,b))

@@ -91,7 +91,7 @@ trait Compiler { self =>
     if (config.enLog) msg(s"Logging ${config.name} to ${config.logDir}")
 
     val startTime = System.currentTimeMillis()
-    if (config.enDbg) echoConfig()
+    //if (config.enDbg) echoConfig()
     val block = withLog(config.logDir, "0000 Staging.log"){ stageProgram(args) }
 
     // Exit now if errors were found during staging

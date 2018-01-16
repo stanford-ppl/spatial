@@ -4,7 +4,7 @@ import pcc.lang._
 import org.scalatest.{FlatSpec, Matchers}
 import pcc.compiler
 
-abstract class Testbench extends compiler.App {
+abstract class Test extends compiler.App {
   override protected val testbench = true
 }
 

@@ -3,7 +3,7 @@ package pcc.test
 import pcc.lang._
 import pcc.lib._
 
-object GEMM extends Testbench {
+object GEMM extends Test {
   def main(): Void = {
     val M = 96  // Rows of output
     val N = 96  // Cols of output

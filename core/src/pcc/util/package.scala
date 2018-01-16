@@ -32,6 +32,7 @@ package object util {
       dbgs(s" - Aliases: $aliases")
     }
     dbgs(s" - Type: ${lhs.typeName}")
+    dbgs(s" - SrcCtx: ${lhs.ctx}")
     metadata.all(lhs).foreach{case (k,m) => dbgs(s" - $k: $m") }
   }
 }

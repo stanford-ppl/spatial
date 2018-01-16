@@ -11,9 +11,9 @@ case class Text(eid: Int) extends Sym[Text](eid) {
   override def isPrimitive: Boolean = true
   override def stagedClass: Class[Text] = classOf[Text]
 
-  @api def >[A](that: Sym[A]): Text = Text.concat(that.toText,this)
-  @api def >[A](that: A): Text = Text.concat(Text.c(that.toString),this)
-  @api def >(that: Text): Text = Text.concat(that,this)
+  @api def >[A](that: Sym[A]): Text = Text.concat(this,that.toText)
+  @api def >[A](that: A): Text = Text.concat(this,Text.c(that.toString))
+  @api def >(that: Text): Text = Text.concat(this,that)
 }
 object Text {
   implicit val tp: Text = Text(-1)

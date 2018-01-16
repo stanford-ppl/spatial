@@ -11,6 +11,8 @@ trait InternalAliases {
   lazy val LIFO = pcc.lang.memories.LIFO
   type Reg[T] = pcc.lang.memories.Reg[T]
   lazy val Reg = pcc.lang.memories.Reg
+  lazy val ArgIn = pcc.lang.memories.ArgIn
+  lazy val ArgOut = pcc.lang.memories.ArgOut
 
   type Num[T] = pcc.lang.types.Num[T]
   type Bits[T] = pcc.lang.types.Bits[T]

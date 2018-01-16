@@ -12,7 +12,7 @@ object ctx {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
 
-    val srcCtx = q"ctx: pcc.core.SrcCtx"
+    val srcCtx = q"ctx: forge.SrcCtx"
 
     val tree = annottees.head match {
       case DefDef(mods,name,tparams,vparamss,tpt,rhs) =>
@@ -20,7 +20,7 @@ object ctx {
         val params = if (hasImplicits) {
           val hasCtx = vparamss.lastOption.exists(_.exists{
             case ValDef(_,_,Ident(TypeName(n)),_) => n == "SrcCtx"
-            case ValDef(_,_,Select(Select(Ident(TermName("pcc")), TermName("core")), TypeName("SrcCtx")), EmptyTree) => true
+            case ValDef(_,_,Select(Ident(TermName("forge")), TypeName("SrcCtx")), EmptyTree) => true
             case _ => false
           })
           if (!hasCtx) {

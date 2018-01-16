@@ -13,14 +13,3 @@ object Struct {
   @internal def field[S:Struct,A:Sym](struct: S, name: String): A = stage(FieldApply[S,A](struct,name))
   @internal def field_update[S:Struct,A:Sym](struct: S, name: String, data: A): Void = stage(FieldUpdate[S,A](struct,name,data))
 }
-
-
-abstract class StructAlloc[S:Struct] extends Op[S] {
-  def elems: Seq[(String,Sym[_])]
-
-  override def inputs = syms(elems.map(_._2))
-  override def reads  = Nil
-  override def aliases = Nil
-  override def contains = syms(elems.map(_._2))
-}
-

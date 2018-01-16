@@ -24,10 +24,21 @@ abstract class Transformer extends Pass {
 
   protected def transformSym[T](sym: Sym[T]): Sym[T]
   protected def transformBlock[T](block: Block[T]): Block[T] = {
-    stageLambdaN(block.inputs)({ inlineBlock(block) }, block.options)
+    stageLambdaN(f(block.inputs))({ inlineBlock(block) }, block.options)
   }
 
   protected def inlineBlock[T](block: Block[T]): Sym[T]
+
+  /**
+    * Visit and perform some transformation `func` over all statements in the block.
+    * @return the substitution for the block's result
+    */
+  final protected def inlineBlockWith[T](block: Block[T])(func: Seq[Sym[_]] => Sym[T]): Sym[T] = {
+    state.logTab += 1
+    val result = func(block.stms)
+    state.logTab -= 1
+    result
+  }
 
   def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = transferMetadata(srcDest._1, srcDest._2)
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
@@ -51,7 +62,7 @@ abstract class Transformer extends Pass {
   def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Sym[A] = rhs.tR
     implicit val ctx: SrcCtx = lhs.ctx
-    log(s"$lhs = $rhs [Mirror]")
+    //logs(s"$lhs = $rhs [Mirror]")
     val (lhs2,_) = try {
       transferMetadataIfNew(lhs){ stage(rhs.mirror(f)).asSym }
     }
@@ -59,9 +70,16 @@ abstract class Transformer extends Pass {
       bug(s"An error occurred while mirroring $lhs = $rhs")
       throw t
     }
-    log(s"${stm(lhs2)}")
+    //logs(s"${stm(lhs2)}")
     lhs2
   }
 
+  final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {
+    case Op(rhs) => mirror(sym,rhs)
+    case _ => sym
+  }
 
+  final protected def removeSym(sym: Sym[_]): Unit = {
+    state.context = state.context.filterNot(_ == sym)
+  }
 }

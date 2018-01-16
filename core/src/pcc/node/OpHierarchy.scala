@@ -12,7 +12,10 @@ import pcc.lang._
   */
 
 /** An operation supported for acceleration **/
-sealed abstract class AccelOp[T:Sym] extends Op[T]
+sealed abstract class AccelOp[T:Sym] extends Op[T] {
+  // If true, this node is only supported in debug mode, not implementation
+  val debugOnly: Boolean = false
+}
 
 /** Memory allocation **/
 abstract class Alloc[T:Sym] extends AccelOp[T]
@@ -44,6 +47,7 @@ abstract class Loop extends Pipeline
 abstract class Primitive[A:Sym] extends AccelOp[A] {
   val isStateless: Boolean = false
 }
+
 abstract class EnPrimitive[A:Sym] extends Primitive[A] {
   def ens: Seq[Bit]
 }
@@ -65,13 +69,6 @@ abstract class Reader[A:Sym,R:Sym](
   def localWrites = Nil
 }
 
-object Reader {
-  def unapply(x: Sym[_]): Option[Seq[Read]] = x match {
-    case Op(a: Accessor[_,_]) if a.localReads.nonEmpty => Some(a.localReads)
-    case _ => None
-  }
-}
-
 abstract class Writer[A:Sym](
   mem: Sym[_],
   dat: Sym[_],
@@ -83,9 +80,41 @@ abstract class Writer[A:Sym](
   def localWrites = Seq(Write(mem,dat,adr,ens))
 }
 
+object Alloc {
+  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
+    case Op(_: Alloc[_]) => Some(x)
+    case _ => None
+  }
+}
+
 object Writer {
   def unapply(x: Sym[_]): Option[Seq[Write]] = x match {
     case Op(a: Accessor[_,_]) if a.localWrites.nonEmpty => Some(a.localWrites)
+    case _ => None
+  }
+}
+object Reader {
+  def unapply(x: Sym[_]): Option[Seq[Read]] = x match {
+    case Op(a: Accessor[_,_]) if a.localReads.nonEmpty => Some(a.localReads)
+    case _ => None
+  }
+}
+
+object Primitive {
+  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
+    case Op(_:Primitive[_]) => Some(x)
+    case _ => None
+  }
+}
+object Stateless {
+  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
+    case Op(p:Primitive[_]) if p.isStateless => Some(x)
+    case _ => None
+  }
+}
+object Control {
+  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
+    case Op(_:Control) => Some(x)
     case _ => None
   }
 }

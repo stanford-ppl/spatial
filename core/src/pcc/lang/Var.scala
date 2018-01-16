@@ -16,12 +16,12 @@ case class Var[A:Sym](eid: Int, tA: Sym[A]) extends Sym[Var[A]](eid) {
 }
 object Var {
   private lazy val types = new mutable.HashMap[Sym[_],Var[_]]()
-  implicit def tp[A:Sym]: Var[A] = types.getOrElseUpdate(tp[A], new Var[A](-1,typ[A])).asInstanceOf[Var[A]]
+  implicit def tp[A:Sym]: Var[A] = types.getOrElseUpdate(typ[A], new Var[A](-1,typ[A])).asInstanceOf[Var[A]]
 
-  @api def newVar[A:Sym](init: A): Var[A] = {
+  @api def alloc[A:Sym](init: Option[A]): Var[A] = {
     implicit val tV: Var[A] = Var.tp[A]
     stage(NewVar(init))
   }
-  @api def readVar[A:Sym](v: Var[A]): A = stage(ReadVar(v))
-  @api def assignVar[A:Sym](v: Var[A], x: A): Void = stage(AssignVar(v,x))
+  @api def read[A:Sym](v: Var[A]): A = stage(ReadVar(v))
+  @api def assign[A:Sym](v: Var[A], x: A): Void = stage(AssignVar(v,x))
 }

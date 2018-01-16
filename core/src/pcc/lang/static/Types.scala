@@ -5,6 +5,7 @@ import pcc.core._
 
 trait Types {
   def bits[T:Bits]: Bits[T] = implicitly[Bits[T]]
+  def mbits[A,B](x: Bits[A]): Bits[B] = x.asInstanceOf[Bits[B]]
 
   @api implicit def BooleanToBit(x: Boolean): Bit = const[Bit](x)
   @api implicit def UnitToVoid(x: Unit): Void = const[Void](x)

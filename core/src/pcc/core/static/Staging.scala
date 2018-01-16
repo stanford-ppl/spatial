@@ -20,66 +20,72 @@ trait Staging { this: Printing =>
   @stateful def param[T](tp: Sym[T], c: Any): T = tp.asSym(tp.fresh(state.nextId())).asParam(c)
   @stateful def symbol[T](tp: Sym[T], d: Op[T]): T = tp.asSym(tp.fresh(state.nextId())).asSymbol(d)
 
-  @internal def stage[T](d: Op[T]): T = {
+  @internal def restage[T](sym: Sym[T]): Sym[T] = sym match {
+    case Op(rhs) =>
+      val sym2 = rewrite(rhs).map{s => sym.asSym(s) }.getOrElse(sym)
+      if (sym2 == sym) state.context +:= sym2
+      val rhs2 = sym2.op
+      rhs2.foreach{o =>
+        val (effects,deps) = allEffects(o)
+        if (effects != Effects.Pure) effectsOf(sym2) = effects
+        if (deps.nonEmpty) depsOf(sym2) = deps
+      }
+      sym2
+
+    case _ => sym
+  }
+
+
+
+  @internal def stage[T](d: Op[T]): T = rewrite(d).getOrElse{
     if (state == null) throw new Exception("Null state during staging")
+    val (effects,deps) = allEffects(d)
 
-    //val atomicEffects = propagateWrites(u)
+    //logs(s"Staging $d, effects = ${d.effects}")
+    //logs(s"  full effects = $effects")
+    //logs(s"  isIdempotent = ${effects.isIdempotent}")
 
-    log(s"Staging $d, effects = ${d.effects}")
-    //log(s"  actual writes = ${atomicEffects.writes}")
-    val mIns = mutableInputs(d)
+    def stageEffects(): T = {
+      val lhs = symbol(d.tR, d)
+      val sym = d.tR.asSym(lhs)
+      if (effects != Effects.Pure) effectsOf(sym) = effects
+      if (deps.nonEmpty) depsOf(sym) = deps
+      state.context +:= sym // prepend
 
-    val effects = if (mIns.isEmpty) d.effects else d.effects andAlso Effects.Reads(mIns)
-    log(s"  mutable inputs = $mIns")
-    log(s"  full effects = $effects")
-    log(s"  isIdempotent = ${effects.isIdempotent}")
+      // Correctness checks -- cannot have mutable aliases, cannot mutate immutable symbols
+      val immutables = effects.writes.filterNot(x => isMutable(x))
+      val aliases = mutableAliases(d) diff effects.writes
 
-    //val lhs = if (effects == Effects.Pure) registerDefWithCSE(d)(ctx)
-    //else {
-    //  state.checkContext()
-      val deps = effectDependencies(effects)
+      if (aliases.nonEmpty) {
+        error(ctx, "Illegal sharing of mutable objects: ")
+        (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
+      }
+      if (immutables.nonEmpty) {
+        error(ctx, "Illegal mutation of immutable symbols")
+        immutables.foreach { mut => error(s"${mut.ctx}:  symbol ${stm(mut)} defined here") }
+      }
 
-      def stageEffects(): T = {
-        val lhs = symbol(d.tR, d)
-        val sym = d.tR.asSym(lhs)
-        if (effects != Effects.Pure) effectsOf(sym) = effects
-        if (deps.nonEmpty) depsOf(sym) = deps
-        state.context +:= sym // prepend
+      lhs
+    }
 
-        // Correctness checks -- cannot have mutable aliases, cannot mutate immutable symbols
-        val immutables = effects.writes.filterNot(x => isMutable(x))
-        val aliases = mutableAliases(d) diff effects.writes
+    if (effects.mayCSE) {
+      // CSE statements which are idempotent and have identical effect summaries (e.g. repeated reads w/o writes)
+      val symsWithSameDef = state.defCache.get(d).toList intersect state.context
+      val symsWithSameEffects = symsWithSameDef.filter {
+        case Effectful(u2, es) => u2 == effects && es == deps
+        case _ => deps.isEmpty && effects == Effects.Pure
+      }
 
-        if (aliases.nonEmpty) {
-          error(ctx, "Illegal sharing of mutable objects: ")
-          (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
-        }
-        if (immutables.nonEmpty) {
-          error(ctx, "Illegal mutation of immutable symbols")
-          immutables.foreach { mut => error(s"${mut.ctx}:  symbol ${stm(mut)} defined here") }
-        }
-
+      if (symsWithSameEffects.isEmpty) {
+        val lhs = stageEffects()
+        state.defCache += d -> d.tR.asSym(lhs)
         lhs
       }
-
-      if (effects.mayCSE) {
-        // CSE statements which are idempotent and have identical effect summaries (e.g. repeated reads w/o writes)
-        val symsWithSameDef = state.defCache.get(d).toList intersect state.context
-        val symsWithSameEffects = symsWithSameDef.filter { case Effectful(u2, es) => u2 == effects && es == deps }
-
-        if (symsWithSameEffects.isEmpty) {
-          val lhs = stageEffects()
-          state.defCache += d -> d.tR.asSym(lhs)
-          lhs
-        }
-        else {
-          symsWithSameEffects.head.asInstanceOf[T]
-        }
+      else {
+        symsWithSameEffects.head.asInstanceOf[T]
       }
-      else stageEffects()
-    //}
-
-    //lhs
+    }
+    else stageEffects()
   }
 
   private def aliasSyms(a: Any): Set[Sym[_]]   = recursive.collectSets{case s: Sym[_] => Set(s) case d: Op[_] => d.aliases }(a)
@@ -142,5 +148,17 @@ trait Staging { this: Printing =>
 
       hazards ++ simpleDep ++ globalDep
     }
+  }
+
+  @internal final def allEffects(d: Op[_]): (Effects, Seq[Sym[_]]) = {
+    val mIns = mutableInputs(d)
+    //val atomicEffects = propagateWrites(u)
+
+    //logs(s"  mutable inputs = $mIns")
+    //logs(s"  actual writes = ${atomicEffects.writes}")
+
+    val effects = if (mIns.isEmpty) d.effects else d.effects andAlso Effects.Reads(mIns)
+    val deps = effectDependencies(effects)
+    (effects, deps)
   }
 }

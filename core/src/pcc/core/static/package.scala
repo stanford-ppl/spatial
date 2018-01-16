@@ -2,7 +2,7 @@ package pcc.core
 
 package object static {
   type State = pcc.core.State
-  type SrcCtx = pcc.core.SrcCtx
+  type SrcCtx = forge.SrcCtx
   type Config = pcc.core.Config
 
   type Sym[T] = pcc.core.Sym[T]
@@ -14,4 +14,6 @@ package object static {
   lazy val BlockOptions = pcc.core.BlockOptions
 
   lazy val Stm = pcc.core.Stm
+
+  lazy val rewrite = pcc.core.rewrite
 }

@@ -18,7 +18,7 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
 
   final def fixed(): Unit = { isFixed = true }
   final def asBound(): A = { _rhs = Nix; me }
-  final def asConst(c: Any): A = { _rhs = One(c.asInstanceOf[self.I]); me }
+  final def asConst(c: Any): A = { _rhs = One(c.asInstanceOf[self.I]); isFixed = true; me }
   final def asParam(c: Any): A = { _rhs = One(c.asInstanceOf[self.I]); isFixed = false; me }
   final def asSymbol(rhs: Op[A]): A = { _rhs = Two(rhs); me }
   final def isConst: Boolean = { _rhs.isOne && isFixed }
@@ -31,11 +31,13 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
   final def op: Option[Op[A]] = _rhs.getTwo
   final def id: Int = eid
 
+  final def dataInputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
+
   final def asSym(x: A): Sym[A] = ev(x)
   final def asSym: Sym[A] = this
   final def asType[T]: T = this.asInstanceOf[T]
 
-  override def toString: String = if (isType) this.productPrefix else _rhs match {
+  override def toString: String = if (isType) this.typeName else _rhs match {
     case One(c) => s"${escapeConst(c)}"
     case Two(_) => s"x$id"
     case Nix    => s"b$id"
@@ -55,5 +57,17 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
 
 object Lit {
   def unapply[A<:Sym[A]](x: A): Option[A#I] = if (x.isConst) x.c else None
+}
+object Const {
+  def unapply(x: Any): Option[Any] = x match {
+    case s: Sym[_] if s.isConst => s.c
+    case _ => None
+  }
+}
+object Param {
+  def unapply(x: Any): Option[Any] = x match {
+    case s: Sym[_] if s.isParam || s.isConst => s.c
+    case _ => None
+  }
 }
 

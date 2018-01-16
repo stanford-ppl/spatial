@@ -34,7 +34,7 @@ object SRAM {
   private lazy val types = new mutable.HashMap[Bits[_],SRAM[_]]()
   implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(bits[A], new SRAM[A](-1,bits[A])).asInstanceOf[SRAM[A]]
 
-  @api def apply[A:Bits](dims: I32*): SRAM[A] = stage(SRAMAlloc(dims))
+  @api def apply[A:Bits](dims: I32*): SRAM[A] = stage(SRAMNew(dims))
 
   @internal def dim(sram: SRAM[_], d: Int): I32 = stage(SRAMDim(sram, d))
   @internal def rank(sram: SRAM[_]): I32 = stage(SRAMRank(sram))

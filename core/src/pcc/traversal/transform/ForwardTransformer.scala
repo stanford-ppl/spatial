@@ -4,7 +4,16 @@ package transform
 import pcc.core._
 
 abstract class ForwardTransformer extends SubstTransformer with Traversal {
-  final override val recurse = Recurse.Never
+  override val recurse = Recurse.Never
+
+  /*
+   * Options when transforming a statement:
+   *   0. Remove it: s -> None. Statement will not appear in resulting graph.
+   *   1. Subst. it: s -> Some(s'). Substitution s' will appear instead.
+   *
+   * Note that identity transformation s -> Some(s) is disallowed here.
+   * This is to help prevent accidental use of stale symbols.
+   */
 
   /**
     * Determine a substitution rule for the given symbol.
@@ -24,14 +33,14 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     Some(transform(lhs,rhs))
   }
 
-  private def createSubstRule[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Unit = {
+  protected def createSubstRule[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Unit = {
     val lhs2: Option[Sym[A]] = if (!subst.contains(lhs)) {
       // Untransformed case: no rule yet exists for this symbol
       val lhs2 = transformOrRemove(lhs, rhs)
       val lhs3 = subst.get(lhs).map(_.asInstanceOf[Sym[A]])
       (lhs2, lhs3) match {
         case (Some(s2), Some(s3)) if s2 != s3 =>
-          throw new Exception(s"Illegal substitution: $lhs had rule $lhs -> $lhs3 when creating rule $lhs -> $lhs2")
+          throw new Exception(s"Conflicting substitutions: $lhs had rule $lhs -> $lhs3 when creating rule $lhs -> $lhs2")
         case (Some(s2), _) => Some(s2)
         case (_, Some(s3)) => Some(s3)
         case (None, None)  => None
@@ -47,7 +56,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
       //   Action: Mirror the existing symbol, scrub previous substitution from context
       //   to avoid having it show up in effects summaries.
       val lhs2: Sym[A] = f(lhs)
-      val lhs3: Sym[A] = mirrorSym(lhs)
+      val lhs3: Sym[A] = mirrorSym(lhs2)
       if (lhs3 != lhs2 && lhs != lhs2) removeSym(lhs2)
       Some(lhs3)
     }
@@ -60,17 +69,6 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     */
   override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
     inlineBlockWith(block){stms => stms.foreach(visit); f(block.result) }
-  }
-
-  /**
-    * Visit and perform some transformation `func` over all statements in the block.
-    * @return the substitution for the block's result
-    */
-  final protected def inlineBlockWith[T](block: Block[T])(func: Seq[Sym[_]] => Sym[T]): Sym[T] = {
-    state.logTab += 1
-    val result = func(block.stms)
-    state.logTab -= 1
-    result
   }
 
   final override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
@@ -90,12 +88,5 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     super.preprocess(block)
   }
 
-  final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {
-    case Op(rhs) => mirror(sym,rhs)
-    case _ => sym
-  }
 
-  final protected def removeSym(sym: Sym[_]): Unit = {
-    state.context = state.context.filterNot(_ == sym)
-  }
 }

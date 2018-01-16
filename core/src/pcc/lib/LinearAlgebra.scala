@@ -1,6 +1,7 @@
 package pcc.lib
 
 import pcc.lang._
+import pcc.core._
 
 trait LinearAlgebra {
 
@@ -13,6 +14,8 @@ trait LinearAlgebra {
     val N = A.cols
     val MP: I32 = 1 (1 -> 32)
     val NP: I32 = 1 (1 -> 32)
+
+    val x: SrcCtx = SrcCtx.empty
 
     def getA(i: I32, j: I32) = perm match {
       case Seq(0,1) => A(i,j)

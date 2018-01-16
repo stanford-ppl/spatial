@@ -20,5 +20,5 @@ object FIFO {
   private lazy val types = new mutable.HashMap[Bits[_],FIFO[_]]()
   implicit def tp[A:Bits]: FIFO[A] = types.getOrElseUpdate(bits[A], FIFO[A](-1,bits[A])).asInstanceOf[FIFO[A]]
 
-  @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFOAlloc(depth))
+  @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
 }

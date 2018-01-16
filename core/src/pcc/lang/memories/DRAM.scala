@@ -22,5 +22,5 @@ object DRAM {
   private lazy val types = new mutable.HashMap[Bits[_],DRAM[_]]()
   implicit def tp[A:Bits]: DRAM[A] = types.getOrElseUpdate(bits[A], new DRAM[A](-1,bits[A])).asInstanceOf[DRAM[A]]
 
-  @api def apply[A:Bits](dims: I32*): DRAM[A] = stage(DRAMAlloc(dims))
+  @api def apply[A:Bits](dims: I32*): DRAM[A] = stage(DRAMNew(dims))
 }

@@ -1,7 +1,7 @@
 /*package pcc.test
 
 import org.scalatest.{FlatSpec, Matchers}
-import pcl.compiler.{Compiler, ParserError, SrcCtx}
+import pcl.compiler.{Compiler, ParserError, forge.SrcCtx}
 
 class CompilerSpec extends FlatSpec with Matchers {
 
@@ -55,7 +55,7 @@ class CompilerSpec extends FlatSpec with Matchers {
     ))
   )
 
-  val errorMsg = ParserError(SrcCtx(3,14), "string literal expected")
+  val errorMsg = ParserError(forge.SrcCtx(3,14), "string literal expected")
 
 
   "Workflow compiler" should "successfully parse a valid workflow" in {

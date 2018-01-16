@@ -5,9 +5,10 @@ import pcc.core._
 
 abstract class SubstTransformer extends Transformer {
   val allowUnsafeSubst: Boolean = false
-  val allowDuplication: Boolean = false
+  val allowOldSymbols: Boolean = false
 
   var subst: Map[Sym[_],Sym[_]] = Map.empty
+  var blockSubst: Map[Block[_],Block[_]] = Map.empty
 
   /**
     * Register a substitution rule.
@@ -28,15 +29,25 @@ abstract class SubstTransformer extends Transformer {
   def register[A,B](orig: A, sub: B, unsafe: Boolean = allowUnsafeSubst): Unit = (orig,sub) match {
     case (s1: Sym[_], s2: Sym[_]) =>
       if (s2 <:< s1 || unsafe) subst += s1 -> s2
-      else throw new Exception(s"Substitution $s1 -> $s2: $s2 is not a subtype of $s1")
+      else throw new Exception(s"Substitution $s1 -> $s2: ${s2.typeName} is not a subtype of ${s1.typeName}")
 
-    case _ => throw new Exception(s"Cannot register non-symbol ${orig.getClass}, ${sub.getClass}")
+    case (b1: Block[_], b2: Block[_]) =>
+      if (b2.result <:< b1.result || unsafe) blockSubst += b1 -> b2
+      else throw new Exception(s"Substitution $b1 -> $b2: ${b2.result.typeName} is not a subtype of ${b1.result.typeName}")
+
+    case _ => throw new Exception(s"Cannot register ${orig.getClass}, ${sub.getClass}")
+  }
+
+  override protected def transformBlock[T](block: Block[T]): Block[T] = blockSubst.get(block) match {
+    case Some(block2) => block2.asInstanceOf[Block[T]]
+    case None =>
+      stageLambdaN(f(block.inputs))({ inlineBlock(block) }, block.options)
   }
 
 
   override protected def transformSym[T](sym: Sym[T]): Sym[T] = subst.get(sym) match {
     case Some(y) => y.asInstanceOf[Sym[T]]
-    case None if sym.isSymbol && !allowDuplication =>
+    case None if sym.isSymbol && !allowOldSymbols =>
       throw new Exception(s"Used untransformed symbol $sym!")
     case None => sym
   }

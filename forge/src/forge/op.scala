@@ -30,10 +30,10 @@ object op {
            }
 
       case t =>
-        c.error(c.enclosingPosition, "@mod can only be used on class definitions")
+        c.error(c.enclosingPosition, "@op can only be used on class definitions")
         t
     }
-    c.info(c.enclosingPosition, showCode(tree), force = true)
+    //c.info(c.enclosingPosition, showCode(tree), force = true)
     tree
   }
 }

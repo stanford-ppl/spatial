@@ -20,5 +20,5 @@ object LIFO {
   private lazy val types = new mutable.HashMap[Bits[_],LIFO[_]]()
   implicit def tp[A:Bits]: LIFO[A] = types.getOrElseUpdate(bits[A], LIFO[A](-1,bits[A])).asInstanceOf[LIFO[A]]
 
-  @api def apply[A:Bits](depth: I32): LIFO[A] = stage(LIFOAlloc(depth))
+  @api def apply[A:Bits](depth: I32): LIFO[A] = stage(LIFONew(depth))
 }

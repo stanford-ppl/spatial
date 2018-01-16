@@ -2,13 +2,13 @@ package pcc.test
 
 import pcc.lang._
 
-object StageForeach extends Testbench {
+object StageForeach extends Test {
   def main(): Void = {
     (0::32){i => println("Hi") }
   }
 }
 
-object StageMemories extends Testbench {
+object StageMemories extends Test {
   def main(): Void = {
     val dram = DRAM[I32](32)
     val sram = SRAM[I32](16)
@@ -17,7 +17,7 @@ object StageMemories extends Testbench {
   }
 }
 
-object StageUpdate extends Testbench {
+object StageUpdate extends Test {
   def main(): Void = {
     val sram = SRAM[I32](16)
     Foreach(0 until 32){i =>

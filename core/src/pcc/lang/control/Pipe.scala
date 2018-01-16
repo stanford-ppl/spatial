@@ -9,5 +9,3 @@ object Pipe {
   @api def apply(block: => Void): Void = Pipe.apply()(block)
   @api def apply(ens: Bit*)(block: => Void): Void = stage(UnitPipe(ens,stageBlock{ block }))
 }
-
-

@@ -1,7 +1,8 @@
 package pcc.compiler
 package parser
 
-import pcc.core.{ParserError, SrcCtx}
+import forge.SrcCtx
+import pcc.core.ParserError
 import pcc.compiler.lexer._
 
 import scala.util.parsing.combinator.Parsers

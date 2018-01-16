@@ -24,12 +24,20 @@ object Reg {
   private lazy val types = new mutable.HashMap[Bits[_],Reg[_]]()
   implicit def tp[A:Bits]: Reg[A] = types.getOrElseUpdate(bits[A], new Reg[A](-1,bits[A])).asInstanceOf[Reg[A]]
 
-  @api def apply[T:Bits]: Reg[T] = Reg[T](bits[T].zero)
-  @api def apply[T:Bits](reset: T): Reg[T] = stage(RegAlloc(reset))
+  @api def apply[T:Bits]: Reg[T] = Reg.alloc[T](bits[T].zero)
+  @api def apply[T:Bits](reset: T): Reg[T] = Reg.alloc[T](reset)
 
+  @api def alloc[T:Bits](reset: T)(implicit ctx: SrcCtx, state: State): Reg[T] = stage(RegNew(reset))
   @api def read[T:Bits](reg: Reg[T]): T = stage(RegRead(reg))
-  @api def write[T:Bits](reg: Reg[T], data: T, en: Seq[Bit]): Void = stage(RegWrite(reg,data,en))
+  @api def write[T:Bits](reg: Reg[T], data: T, en: Seq[Bit] = Nil): Void = stage(RegWrite(reg,data,en))
 }
 
+object ArgIn {
+  @api def apply[T:Bits] = stage(ArgInNew(bits[T].zero))
+}
+
+object ArgOut {
+  @api def apply[T:Bits] = stage(ArgOutNew(bits[T].zero))
+}
 
 

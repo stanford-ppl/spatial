@@ -7,7 +7,6 @@ import pcc.node._
 
 import scala.collection.mutable
 
-/** Types **/
 case class SRAM[A](eid: Int, tA: Bits[A]) extends LocalMem[A,SRAM](eid) {
   type AI = tA.I
   override type I = Array[AI]

@@ -12,6 +12,7 @@ abstract class Transformer extends Pass {
     case x: Block[_] => transformBlock(x)
     case x: Seq[_]   => x.map{this.apply}
     case x: Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
+    case x: Product  => mirrorProduct(x)
     case x: Iterable[_] => x.map{this.apply}
     case x: Int => x
     case x: Long => x
@@ -72,6 +73,13 @@ abstract class Transformer extends Pass {
     }
     //logs(s"${stm(lhs2)}")
     lhs2
+  }
+
+  final def mirrorProduct[T<:Product](x: T): T = {
+    // Note: this only works if the case class has no implicit parameters!
+    val constructor = x.getClass.getConstructors.head
+    val inputs = x.productIterator.map{x => f(x).asInstanceOf[Object] }.toSeq
+    constructor.newInstance(inputs:_*).asInstanceOf[T]
   }
 
   final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {

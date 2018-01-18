@@ -66,6 +66,11 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     else cls
   }
 
+  def isWildcardType(tp: Tree, str: String): Boolean = tp match {
+    case ExistentialTypeTree(AppliedTypeTree(Ident(TypeName(`str`)), List(Ident(TypeName(arg)))), _) => arg.startsWith("_$")
+    case _ => false
+  }
+
   def modifyClassFields(
     cls: ClassDef,
     func: ValDef => ValDef

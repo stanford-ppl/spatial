@@ -1,5 +1,6 @@
 package pcc.node
 
+import forge._
 import pcc.core._
 import pcc.data._
 import pcc.lang._
@@ -19,6 +20,7 @@ sealed abstract class AccelOp[T:Sym] extends Op[T] {
 
 /** Memory allocation **/
 abstract class Alloc[T:Sym] extends AccelOp[T]
+abstract class Memory[T:Sym] extends Alloc[T]
 
 /** Memory accesses **/
 abstract class Access {
@@ -80,26 +82,42 @@ abstract class Writer[A:Sym](
   def localWrites = Seq(Write(mem,dat,adr,ens))
 }
 
+object Accessor {
+  def unapply(x: Op[_]): Option[(Seq[Write],Seq[Read])] = x match {
+    case a: Accessor[_,_] if a.localWrites.nonEmpty || a.localReads.nonEmpty => Some((a.localWrites,a.localReads))
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Seq[Write],Seq[Read])] = x.op.flatMap(Accessor.unapply)
+}
+
+object Writer {
+  def unapply(x: Op[_]): Option[Seq[Write]] = x match {
+    case a: Accessor[_,_] if a.localWrites.nonEmpty => Some(a.localWrites)
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[Seq[Write]] = x.op.flatMap(Writer.unapply)
+}
+object Reader {
+  def unapply(x: Op[_]): Option[Seq[Read]] = x match {
+    case a: Accessor[_,_] if a.localReads.nonEmpty => Some(a.localReads)
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[Seq[Read]] = x.op.flatMap(Reader.unapply)
+}
+
+
 object Alloc {
   def unapply(x: Sym[_]): Option[Sym[_]] = x match {
     case Op(_: Alloc[_]) => Some(x)
     case _ => None
   }
 }
-
-object Writer {
-  def unapply(x: Sym[_]): Option[Seq[Write]] = x match {
-    case Op(a: Accessor[_,_]) if a.localWrites.nonEmpty => Some(a.localWrites)
+object Memory {
+  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
+    case Op(_: Memory[_]) => Some(x)
     case _ => None
   }
 }
-object Reader {
-  def unapply(x: Sym[_]): Option[Seq[Read]] = x match {
-    case Op(a: Accessor[_,_]) if a.localReads.nonEmpty => Some(a.localReads)
-    case _ => None
-  }
-}
-
 object Primitive {
   def unapply(x: Sym[_]): Option[Sym[_]] = x match {
     case Op(_:Primitive[_]) => Some(x)
@@ -107,8 +125,9 @@ object Primitive {
   }
 }
 object Stateless {
-  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
+  @stateful def unapply(x: Sym[_]): Option[Sym[_]] = x match {
     case Op(p:Primitive[_]) if p.isStateless => Some(x)
+    case Expect(c) => Some(x)
     case _ => None
   }
 }

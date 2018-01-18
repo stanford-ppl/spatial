@@ -16,8 +16,8 @@ import pcc.traversal.transform.Transformer
 
 @data object globals {
   def add[M<:Metadata[M]:Manifest](m: M): Unit = state.globals.add[M](m)
-  def get[M<:Metadata[M]:Manifest]: Option[M] = state.globals.get[M]
-  def apply[M<:Metadata[M]:Manifest]: M = get[M].get
+  def apply[M<:Metadata[M]:Manifest]: Option[M] = state.globals[M]
   def clear[M<:Metadata[M]:Manifest]: Unit = state.globals.clear[M]
   def mirrorAll(f: Transformer): Unit = state.globals.mirrorAll(f)
+  def clearOnTransform(): Unit = state.globals.clearOnTransform()
 }

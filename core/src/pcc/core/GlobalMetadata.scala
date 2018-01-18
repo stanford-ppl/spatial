@@ -13,13 +13,17 @@ class GlobalMetadata {
 
   private def add(k: Class[_], m: Metadata[_]): Unit = { data += k -> m }
   def add[M<:Metadata[M]:Manifest](m : M): Unit = { data += m.key -> m }
-  def get[M<:Metadata[M]:Manifest]: Option[M] = data.get(keyOf[M]).map(_.asInstanceOf[M])
+  def apply[M<:Metadata[M]:Manifest]: Option[M] = data.get(keyOf[M]).map(_.asInstanceOf[M])
   def clear[M<:Metadata[M]:Manifest]: Unit = data.remove(keyOf[M])
 
   def mirrorAll(f:Tx): Unit = data.foreach{case (k,v) => Option(v.mirror(f)) match {
     case Some(v2) => data(k) = v2.asInstanceOf[Metadata[_]]
     case None => data.remove(k)
   }}
+  def clearOnTransform(): Unit = {
+    val remove = data.collect{case (k,v) if v.clearOnTransform => k }
+    remove.foreach{k => data.remove(k) }
+  }
 
   def copyTo(that: GlobalMetadata): Unit = data.foreach{case (k,v) => that.add(k,v) }
   def reset(): Unit = data.clear()

@@ -2,6 +2,7 @@ package pcc.traversal
 package transform
 
 import pcc.core._
+import pcc.data._
 
 abstract class ForwardTransformer extends SubstTransformer with Traversal {
   override val recurse = Recurse.Never
@@ -85,8 +86,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
   override protected def preprocess[S](block: Block[S]): Block[S] = {
     subst = Map.empty
     state.defCache = Map.empty
+    globals.clearOnTransform()
     super.preprocess(block)
   }
-
-
 }

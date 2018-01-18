@@ -73,8 +73,8 @@ case class PipeInserter(IR: State) extends MutateTransformer {
         dbgs(s"Escaping vars: ")
         escapingVars.foreach{s => s"  ${stm(s)}"}
 
-        val regs = escapingBits.map{s => Reg.alloc(s.zero(s.ctx,state))(mbits(s),s.ctx,state) }
-        val vars = escapingVars.map{s => Var.alloc(None)(mtyp(s),s.ctx,state) }
+        val regs = escapingBits.map{s => regNew(s) }
+        val vars = escapingVars.map{s => varNew(s) }
 
         implicit val ctx: SrcCtx = SrcCtx.empty
         val pipe = stage(UnitPipe(Nil,stageBlock{
@@ -101,16 +101,10 @@ case class PipeInserter(IR: State) extends MutateTransformer {
     }).asInstanceOf[Sym[R]]
   }, block.options)
 
-  def regWrite(x: Reg[_], data: Bits[_]): Unit = {
-    Reg.write(x.asInstanceOf[Reg[Any]],data)(mbits(data),data.ctx,state)
-  }
-  def varWrite(x: Var[_], data: Sym[_]): Unit = {
-    Var.assign(x.asInstanceOf[Var[Any]],data)(mtyp(data),data.ctx,state)
-  }
-  def regRead(x: Reg[_]): Sym[_] = {
-    Reg.read(x)(mbits(x.tA),SrcCtx.empty,state).asInstanceOf[Sym[_]]
-  }
-  def varRead(x: Var[_]): Sym[_] = {
-    Var.read(x)(mtyp(x.tA),SrcCtx.empty,state).asInstanceOf[Sym[_]]
-  }
+  def regNew(s: Bits[_]): Reg[_] = Reg.alloc(s.zero(s.ctx,state))(mbits(s),s.ctx,state)
+  def varNew(s: Sym[_]): Var[_] = Var.alloc(None)(mtyp(s),s.ctx,state)
+  def regWrite(x: Reg[_], data: Bits[_]): Unit = Reg.write(x.asInstanceOf[Reg[Any]],data)(mbits(data),data.ctx,state)
+  def varWrite(x: Var[_], data: Sym[_]): Unit = Var.assign(x.asInstanceOf[Var[Any]],data)(mtyp(data),data.ctx,state)
+  def regRead(x: Reg[_]): Sym[_] = Reg.read(x)(mbits(x.tA),SrcCtx.empty,state).asInstanceOf[Sym[_]]
+  def varRead(x: Var[_]): Sym[_] = Var.read(x)(mtyp(x.tA),SrcCtx.empty,state).asInstanceOf[Sym[_]]
 }

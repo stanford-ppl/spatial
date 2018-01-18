@@ -1,6 +1,10 @@
 package pcc.lang.static
 
 trait InternalAliases {
+  type Mem[A,C[_]] = pcc.lang.memories.Mem[A,C]
+  type LocalMem[A,C[_]] = pcc.lang.memories.LocalMem[A,C]
+  type RemoteMem[A,C[_]] = pcc.lang.memories.RemoteMem[A,C]
+
   type DRAM[T] = pcc.lang.memories.DRAM[T]
   lazy val DRAM = pcc.lang.memories.DRAM
   type SRAM[T] = pcc.lang.memories.SRAM[T]
@@ -48,8 +52,6 @@ trait Aliases extends InternalAliases {
   lazy val Counter = pcc.lang.Counter
   type CounterChain = pcc.lang.CounterChain
   lazy val CounterChain = pcc.lang.CounterChain
-
-
 
   type Overload0 = pcc.lang.Overload0
   type Overload1 = pcc.lang.Overload1

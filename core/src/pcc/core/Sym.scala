@@ -33,7 +33,7 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
 
   final def dataInputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
 
-  final def asSym(x: A): Sym[A] = ev(x)
+  final def viewAsSym(x: A): Sym[A] = ev(x)
   final def asSym: Sym[A] = this
   final def asType[T]: T = this.asInstanceOf[T]
 

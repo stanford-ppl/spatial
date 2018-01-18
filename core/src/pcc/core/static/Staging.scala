@@ -2,91 +2,90 @@ package pcc.core.static
 
 import forge._
 import pcc.data.{Effects,isMutable,effectsOf,depsOf,Effectful}
-import pcc.util.recursive
+import pcc.util.{recursive,strMeta}
 
 trait Staging { this: Printing =>
 
   def typ[T:Sym]: Sym[T] = implicitly[Sym[T]]
   def mtyp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
 
-  implicit def toSym[A:Sym](x: A): Sym[A] = typ[A].asSym(x)
+  implicit def toSym[A:Sym](x: A): Sym[A] = typ[A].viewAsSym(x)
 
   @stateful def bound[T:Sym]: T = fresh(typ[T])
   @stateful def const[T:Sym](c: Any): T = const(typ[T], c)
   @stateful def param[T:Sym](c: Any): T = param(typ[T], c)
 
-  @stateful def fresh[T](tp: Sym[T]): T = tp.asSym(tp.fresh(state.nextId())).asBound()
-  @stateful def const[T](tp: Sym[T], c: Any): T = tp.asSym(tp.fresh(state.nextId())).asConst(c)
-  @stateful def param[T](tp: Sym[T], c: Any): T = tp.asSym(tp.fresh(state.nextId())).asParam(c)
-  @stateful def symbol[T](tp: Sym[T], d: Op[T]): T = tp.asSym(tp.fresh(state.nextId())).asSymbol(d)
+  @stateful def fresh[T](tp: Sym[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asBound()
+  @stateful def const[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asConst(c)
+  @stateful def param[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asParam(c)
+  @stateful def symbol[T](tp: Sym[T], d: Op[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asSymbol(d)
 
-  @internal def restage[T](sym: Sym[T]): Sym[T] = sym match {
-    case Op(rhs) =>
-      val sym2 = rewrite(rhs).map{s => sym.asSym(s) }.getOrElse(sym)
-      if (sym2 == sym) state.context +:= sym2
-      val rhs2 = sym2.op
-      rhs2.foreach{o =>
-        val (effects,deps) = allEffects(o)
-        if (effects != Effects.Pure) effectsOf(sym2) = effects
-        if (deps.nonEmpty) depsOf(sym2) = deps
-      }
-      sym2
+  @internal def register[T](op: Op[T], symbol: () => T): T = rewrites.apply(op) match {
+    case Some(s) => s
+    case None    =>
+      if (state == null) throw new Exception("Null state during staging")
 
-    case _ => sym
-  }
+      val (effects,deps) = allEffects(op)
 
+      def stageEffects(): T = {
+        val lhs = symbol()
+        val sym = op.tR.viewAsSym(lhs)
+        if (effects != Effects.Pure) effectsOf(sym) = effects
+        if (deps.nonEmpty) depsOf(sym) = deps
 
+        flows.apply(sym,op)
 
-  @internal def stage[T](d: Op[T]): T = rewrite(d).getOrElse{
-    if (state == null) throw new Exception("Null state during staging")
-    val (effects,deps) = allEffects(d)
+        state.context +:= sym // prepend
 
-    //logs(s"Staging $d, effects = ${d.effects}")
-    //logs(s"  full effects = $effects")
-    //logs(s"  isIdempotent = ${effects.isIdempotent}")
+        // Correctness checks -- cannot have mutable aliases, cannot mutate immutable symbols
+        val immutables = effects.writes.filterNot(x => isMutable(x))
+        val aliases = mutableAliases(op) diff effects.writes
 
-    def stageEffects(): T = {
-      val lhs = symbol(d.tR, d)
-      val sym = d.tR.asSym(lhs)
-      if (effects != Effects.Pure) effectsOf(sym) = effects
-      if (deps.nonEmpty) depsOf(sym) = deps
-      state.context +:= sym // prepend
+//        logs(s"$lhs = $op")
+//        logs(s"  effects: $effects")
+//        logs(s"  deps: $deps")
+//        logs(s"  written immutables: $immutables")
+//        logs(s"  mutable aliases: $aliases")
 
-      // Correctness checks -- cannot have mutable aliases, cannot mutate immutable symbols
-      val immutables = effects.writes.filterNot(x => isMutable(x))
-      val aliases = mutableAliases(d) diff effects.writes
-
-      if (aliases.nonEmpty) {
-        error(ctx, "Illegal sharing of mutable objects: ")
-        (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
-      }
-      if (immutables.nonEmpty) {
-        error(ctx, "Illegal mutation of immutable symbols")
-        immutables.foreach { mut => error(s"${mut.ctx}:  symbol ${stm(mut)} defined here") }
-      }
-
-      lhs
-    }
-
-    if (effects.mayCSE) {
-      // CSE statements which are idempotent and have identical effect summaries (e.g. repeated reads w/o writes)
-      val symsWithSameDef = state.defCache.get(d).toList intersect state.context
-      val symsWithSameEffects = symsWithSameDef.filter {
-        case Effectful(u2, es) => u2 == effects && es == deps
-        case _ => deps.isEmpty && effects == Effects.Pure
-      }
-
-      if (symsWithSameEffects.isEmpty) {
-        val lhs = stageEffects()
-        state.defCache += d -> d.tR.asSym(lhs)
+        if (aliases.nonEmpty) {
+          error(ctx, "Illegal sharing of mutable objects: ")
+          (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
+        }
+        if (immutables.nonEmpty) {
+          error(ctx, "Illegal mutation of immutable symbols")
+          immutables.foreach{s =>
+            error(s"${s.ctx}:  symbol ${stm(s)} defined here")
+            dbgs(s"${stm(s)}")
+            strMeta(s)
+          }
+        }
         lhs
       }
-      else {
-        symsWithSameEffects.head.asInstanceOf[T]
+
+      if (effects.mayCSE) {
+        val symsWithSameDef = state.defCache.get(op).toList intersect state.context
+        val symsWithSameEffects = symsWithSameDef.filter {
+          case Effectful(u2, es) => u2 == effects && es == deps
+          case _ => deps.isEmpty && effects == Effects.Pure
+        }
+        if (symsWithSameEffects.isEmpty) {
+          val lhs = stageEffects()
+          state.defCache += op -> op.tR.viewAsSym(lhs)
+          lhs
+        }
+        else {
+          symsWithSameEffects.head.asInstanceOf[T]
+        }
       }
-    }
-    else stageEffects()
+      else stageEffects()
   }
+
+  @internal def restage[T](sym: Sym[T]): Sym[T] = sym match {
+    case Op(rhs) => sym.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
+    case _ => sym
+  }
+  @internal def stage[T](op: Op[T]): T = register(op, () => symbol(op.tR,op))
+
 
   private def aliasSyms(a: Any): Set[Sym[_]]   = recursive.collectSets{case s: Sym[_] => Set(s) case d: Op[_] => d.aliases }(a)
   private def containSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.contains}(a)

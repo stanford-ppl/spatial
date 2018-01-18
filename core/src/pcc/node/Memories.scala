@@ -6,27 +6,27 @@ import pcc.data._
 import pcc.lang._
 
 /** DRAM **/
-@op case class DRAMNew[A:Bits](dims: Seq[I32]) extends Alloc[DRAM[A]] {
+@op case class DRAMNew[A:Bits](dims: Seq[I32]) extends Memory[DRAM[A]] {
   override def effects: Effects = Effects.Mutable
 }
 
 /** FIFO **/
-@op case class FIFONew[A:Bits](depth: I32) extends Alloc[FIFO[A]] {
+@op case class FIFONew[A:Bits](depth: I32) extends Memory[FIFO[A]] {
   override def effects: Effects = Effects.Mutable
 }
 
 /** LIFO **/
-@op case class LIFONew[A:Bits](depth: I32) extends Alloc[LIFO[A]] {
+@op case class LIFONew[A:Bits](depth: I32) extends Memory[LIFO[A]] {
   override def effects: Effects = Effects.Mutable
 }
 
 /** Reg **/
-@op case class RegNew[T:Bits](reset: T) extends Alloc[Reg[T]] {
+@op case class RegNew[T:Bits](reset: T) extends Memory[Reg[T]] {
   override def effects: Effects = Effects.Mutable
 }
 
-@op case class ArgInNew[T:Bits](init: T) extends Alloc[Reg[T]]
-@op case class ArgOutNew[T:Bits](init: T) extends Alloc[Reg[T]] {
+@op case class ArgInNew[T:Bits](init: T) extends Memory[Reg[T]]
+@op case class ArgOutNew[T:Bits](init: T) extends Memory[Reg[T]] {
   override def effects: Effects = Effects.Mutable
 }
 
@@ -38,7 +38,7 @@ import pcc.lang._
 }
 
 /** SRAM **/
-@op case class SRAMNew[A:Bits](dims: Seq[I32]) extends Alloc[SRAM[A]] {
+@op case class SRAMNew[A:Bits](dims: Seq[I32]) extends Memory[SRAM[A]] {
   override def effects: Effects = Effects.Mutable
 }
 @op case class SRAMRead[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]) extends Reader[A,A](sram,Some(addr),ens)

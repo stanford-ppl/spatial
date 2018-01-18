@@ -10,6 +10,8 @@ abstract class Metadata[T] { self =>
 
   final def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
+
+  val clearOnTransform: Boolean = false
 }
 
 abstract class SimpleData[T] extends Metadata[T] {
@@ -18,4 +20,5 @@ abstract class SimpleData[T] extends Metadata[T] {
 
 abstract class ComplexData[T] extends Metadata[T] { self =>
   override def mirror(f: Tx): T = null.asInstanceOf[T]
+  override val clearOnTransform: Boolean = true
 }

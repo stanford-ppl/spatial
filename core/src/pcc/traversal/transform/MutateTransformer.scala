@@ -26,14 +26,16 @@ abstract class MutateTransformer extends ForwardTransformer {
 
   /**
     * Update the metadata on sym using current substitution rules
+    * NOTE: We don't erase invalid metadata here to avoid issues with Effects, etc.
     */
   def updateMetadata(sym: Sym[_]): Unit = {
-    val data = metadata.all(sym).map{case (k,m) => k -> mirror(m) }
-    metadata.addOrRemoveAll(sym, data)
+    val data = metadata.all(sym).flatMap{case (k,m) => mirror(m) : Option[Metadata[_]] }
+    metadata.addAll(sym, data)
   }
 
   /**
     * Mutate this symbol's node with the current substitution rules
+    * TODO: This has a small inefficiency where metadata created through flows is immediately mirrored
     */
   def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val ctx: SrcCtx = lhs.ctx
@@ -41,7 +43,7 @@ abstract class MutateTransformer extends ForwardTransformer {
     try {
       rhs.update(f)
       val lhs2 = restage(lhs)
-      updateMetadata(lhs2)
+      if (lhs2 == lhs) updateMetadata(lhs2)
       lhs2
     }
     catch {case t: Throwable =>

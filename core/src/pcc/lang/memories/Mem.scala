@@ -3,7 +3,6 @@ package memories
 
 import pcc.core._
 
-/** Symbols **/
 abstract class Mem[A,C[_<:A]](eid: Int)(implicit ev: C[A] <:< Mem[A,C]) extends Sym[C[A]](eid) {
   final override def isPrimitive: Boolean = false
 }

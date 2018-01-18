@@ -15,5 +15,6 @@ package object static {
 
   lazy val Stm = pcc.core.Stm
 
-  lazy val rewrite = pcc.core.rewrite
+  lazy val rewrites = pcc.core.rewrites
+  lazy val flows = pcc.core.flows
 }

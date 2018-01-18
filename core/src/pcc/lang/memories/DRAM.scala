@@ -7,7 +7,6 @@ import pcc.node._
 
 import scala.collection.mutable
 
-/** Types **/
 case class DRAM[A](eid: Int, tA: Bits[A]) extends RemoteMem[A,DRAM](eid) {
   type AI = tA.I
   override type I = Array[AI]

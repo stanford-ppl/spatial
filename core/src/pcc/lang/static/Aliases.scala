@@ -2,8 +2,8 @@ package pcc.lang.static
 
 trait InternalAliases {
   type Mem[A,C[_]] = pcc.lang.memories.Mem[A,C]
-  type LocalMem[A,C[_]] = pcc.lang.memories.LocalMem[A,C]
-  type RemoteMem[A,C[_]] = pcc.lang.memories.RemoteMem[A,C]
+  type LocalMem[A,C[_<:A]] = pcc.lang.memories.LocalMem[A,C]
+  type RemoteMem[A,C[_<:A]] = pcc.lang.memories.RemoteMem[A,C]
 
   type DRAM[T] = pcc.lang.memories.DRAM[T]
   lazy val DRAM = pcc.lang.memories.DRAM

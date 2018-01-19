@@ -33,6 +33,17 @@ package object data {
     def isLocalMem: Boolean = x.isInstanceOf[LocalMem[_,C forSome {type C[_]}]] // ... yep
     def isRemoteMem: Boolean = x.isInstanceOf[RemoteMem[_,C forSome {type C[_]}]]
 
+    def isReg: Boolean = x.isInstanceOf[Reg[_]]
+    def isArgIn: Boolean = x.op.exists(_.isInstanceOf[ArgInNew[_]])
+    def isArgOut: Boolean = x.op.exists(_.isInstanceOf[ArgOutNew[_]])
+
+    def isSRAM: Boolean = x.isInstanceOf[SRAM[_]]
+    def isFIFO: Boolean = x.isInstanceOf[FIFO[_]]
+    def isLIFO: Boolean = x.isInstanceOf[LIFO[_]]
+
+    def isReader: Boolean = Reader.unapply(x).isDefined
+    def isWriter: Boolean = Writer.unapply(x).isDefined
+
     def nestedDataInputs: Set[Sym[_]] = {
       x.dataInputs.toSet ++ x.op.map{o =>
         val outs = o.blocks.flatMap(_.nestedStms)

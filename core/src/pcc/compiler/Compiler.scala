@@ -17,17 +17,8 @@ trait Compiler { self =>
   def name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
   protected val testbench: Boolean = false
 
-  final protected val passes: ArrayBuffer[Pass] = ArrayBuffer.empty[Pass]
-  //final protected def codegenerators: Seq[Codegen] = passes.collect{case x: Codegen => x}
-
-  protected def checkBugs(start: Long, stage: String): Unit = if (IR.hadBugs) {
-    throw CompilerBugs(stage, IR.bugs)
-  }
-
-  protected def checkErrors(start: Long, stage: String): Unit = if (IR.hadErrors) {
-    throw CompilerErrors(stage, IR.errors)
-  }
-
+  protected def checkBugs(stage: String): Unit = if (IR.hadBugs) throw CompilerBugs(stage, IR.bugs)
+  protected def checkErrors(stage: String): Unit = if (IR.hadErrors) throw CompilerErrors(stage, IR.errors)
   protected def checkWarnings(): Unit = if (IR.hadWarnings) {
     warn(s"""${IR.warnings} ${plural(IR.warnings, "warning","warnings")} found""")
   }
@@ -54,34 +45,46 @@ trait Compiler { self =>
     bug(s"  ${config.logDir}${config.name}_exception.log")
   }
 
-  def createTraversalSchedule(state: State): Unit
   def stageProgram(args: Array[String]): Block[_]
   def settings(): Unit = { }
+  def runPasses[R](b: Block[R]): Unit
 
-  final protected def runTraversals[R](startTime: Long, b: Block[R], timingLog: String): Unit = {
-    var block: Block[R] = b
+  var timingLog: String = ""
+  private var passes = Set[Pass]()
 
-    // --- Traversals
-    for (t <- passes) {
-      if (t.needsInit) t.init()
+  implicit class BlockOps[R](block: Block[R]) {
+    def ==>(pass: Pass): Block[R] = runPass(pass, block)
+    def ==>(pass: (Boolean,Pass)): Block[R] = if (pass._1) runPass(pass._2,block) else block
+  }
+  implicit class BooleanOps(x: Boolean) {
+    def ?(pass: Pass): (Boolean,Pass) = (x,pass)
+  }
 
-      block = t.run(block)
-      // After each traversal, check whether there were any reported errors
-      checkBugs(startTime, t.name)
-      checkErrors(startTime, t.name)
-
-      val v = IR.config.logLevel
-      IR.config.logLevel = 2
-      inLog(timingLog) {
-        dbg(s"  ${t.name}: " + "%.4f".format(t.lastTime / 1000))
-      }
-      IR.config.logLevel = v
-
-      t match {
-        case f: Transformer => globals.mirrorAll(f)
-        case _ =>
-      }
+  final def runPass[R](t: Pass, block: Block[R]): Block[R] = {
+    if (t.isInstanceOf[Transformer]) {
+      globals.clearOnTransform()
     }
+
+    if (t.needsInit) t.init()
+    val result = t.run(block)
+    // After each traversal, check whether there were any reported errors
+    checkBugs(t.name)
+    checkErrors(t.name)
+
+    val v = IR.config.logLevel
+    IR.config.logLevel = 2
+    inLog(timingLog) {
+      dbg(s"  ${t.name}: " + "%.4f".format(t.lastTime / 1000))
+    }
+    IR.config.logLevel = v
+
+    t match {
+      case f: Transformer => globals.mirrorAll(f)
+      case _ =>
+    }
+    passes += t
+
+    result
   }
 
 
@@ -95,11 +98,11 @@ trait Compiler { self =>
     val block = withLog(config.logDir, "0000 Staging.log"){ stageProgram(args) }
 
     // Exit now if errors were found during staging
-    checkBugs(startTime, "staging")
-    checkErrors(startTime, "staging")
+    checkBugs("staging")
+    checkErrors("staging")
 
-    val timingLog = setupStream(IR.config.logDir, "9999 Timing.log")
-    runTraversals(startTime, block, timingLog)
+    timingLog = setupStream(IR.config.logDir, "9999 Timing.log")
+    runPasses(block)
 
     val time = (System.currentTimeMillis - startTime).toFloat
 
@@ -108,7 +111,7 @@ trait Compiler { self =>
     inLog(timingLog) {
       dbg(s"  Total: " + "%.4f".format(time / 1000))
       dbg(s"")
-      val totalTimes = passes.distinct.groupBy(_.name).mapValues{pass => pass.map(_.totalTime).sum }.toList.sortBy(_._2)
+      val totalTimes = passes.groupBy(_.name).mapValues{pass => pass.map(_.totalTime).sum }.toList.sortBy(_._2)
       for (t <- totalTimes) {
         dbg(s"  ${t._1}: " + "%.4f".format(t._2 / 1000))
       }
@@ -136,7 +139,6 @@ trait Compiler { self =>
     //val globals = 0 until oldState.graph.firstNonGlobal
     //oldState.graph.copyNodesTo(globals, IR.graph)
 
-    passes.clear()                 // Reset traversal passes
     IR.config.init(args)           // Initialize the Config (from files)
     IR.config.name = name          // Set the default program name
     IR.config.logDir = files.cwd + files.sep + "logs" + files.sep + name + files.sep
@@ -144,7 +146,6 @@ trait Compiler { self =>
     IR.config.repDir = files.cwd + files.sep + "reports" + files.sep + name + files.sep
 
     settings()                     // Override config with any DSL or App specific settings
-    createTraversalSchedule(IR)    // Set up the compiler schedule for the app
   }
 
   /**
@@ -158,16 +159,17 @@ trait Compiler { self =>
       compileProgram(args)
     }
     catch {
-      case CompilerBugs(stage,n) =>
+      case e @ CompilerBugs(stage,n) =>
         onException(new Exception(s"Encountered compiler ${plural(n,"bug","bugs")} during pass $stage"))
-        if (testbench) throw new TestbenchFailure(s"$n compiler bugs")
+        if (testbench) throw e
 
-      case CompilerErrors(stage,n) =>
+      case e @ CompilerErrors(stage,n) =>
         error(s"""${IR.errors} ${plural(IR.errors,"error","errors")} found during $stage""")
+        if (testbench) throw e
 
-      case t: TestbenchFailure => throw t
-
-      case t: Throwable => onException(t); IR.bugs += 1
+      case t: Throwable =>
+        onException(t)
+        if (testbench) throw t
     }
     val time = (System.currentTimeMillis - start).toFloat
 

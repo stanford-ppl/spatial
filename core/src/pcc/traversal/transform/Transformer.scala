@@ -4,15 +4,19 @@ package transform
 import pcc.core._
 import pcc.data._
 
+import scala.collection.mutable
+
 abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
   def apply[T](x: T): T = (x match {
-    case x: Sym[_]   => transformSym(x.asInstanceOf[Sym[T]])
-    case x: Block[_] => transformBlock(x)
-    case x: Seq[_]   => x.map{this.apply}
-    case x: Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
-    case x: Product  => mirrorProduct(x)
+    case x: Sym[_]    => transformSym(x.asInstanceOf[Sym[T]])
+    case x: Block[_]  => transformBlock(x)
+    case x: Option[_] => x.map{this.apply}
+    case x: Seq[_]    => x.map{this.apply}
+    case x: Map[_,_]  => x.map{case (k,v) => f(k) -> f(v) }
+    case x: mutable.Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
+    case x: Product     => mirrorProduct(x)
     case x: Iterable[_] => x.map{this.apply}
     case x: Int => x
     case x: Long => x

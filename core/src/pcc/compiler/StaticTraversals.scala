@@ -11,17 +11,19 @@ trait StaticTraversals extends Compiler {
   val rewrites = new RewriteRules {}
   val flows = new FlowRules {}
 
-  override def createTraversalSchedule(state: State): Unit = {
+  val isPIR = false
+
+  def runPasses[R](block: Block[R]): Unit = {
     lazy val printer = IRPrinter(state)
-//    lazy val identity = IdentityTransform(state)
     lazy val pipeInserter = PipeInserter(state)
     lazy val globalAllocation = GlobalAllocation(state)
 
-    passes += printer
-    passes += pipeInserter
-    passes += printer
-    passes += globalAllocation
-    passes += printer
+    block ==>
+      printer ==>
+      !isPIR ? pipeInserter ==>
+      !isPIR ? printer ==>
+      !isPIR ? globalAllocation ==>
+      !isPIR ? printer
   }
 
 }

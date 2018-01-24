@@ -6,6 +6,7 @@ import pcc.lang._
 import pcc.node._
 
 import scala.language.existentials
+import scala.collection.mutable.ListBuffer
 
 package object data {
   def isControl(sym: Sym[_]): Boolean = sym.op.exists(isControl)
@@ -25,6 +26,9 @@ package object data {
 
   @api def isInnerControl(sym: Sym[_]): Boolean = isControl(sym) && !isOuter(sym)
   @api def isOuterControl(sym: Sym[_]): Boolean = isControl(sym) && isOuter(sym)
+
+  def getCChains(block: Block[_]): Seq[CounterChain] = getCChains(block.stms)
+  def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}
 
   implicit class SymUtils(x: Sym[_]) {
     def isNum:  Boolean = x.isInstanceOf[Num[_]]
@@ -58,5 +62,47 @@ package object data {
       s.op.map{o => o.blocks.flatMap(_.nestedStms) }.getOrElse(Nil)
     }.toSet
   }
+
+
+  /**
+    * Returns all ancestors of the given node x (inclusive) to optional stop (inclusive)
+    * Ancestors are ordered outermost to innermost
+    */
+  @stateful def allParents[T](x: T, stop: Option[T] = None)(parent: T => Option[T]): Seq[T] = {
+    val parents = ListBuffer.empty[T]
+    var current: Option[T] = Some(x)
+    while (current.isDefined && current != stop) {
+      parents.prepend(current.get)
+      current = parent(current.get)
+    }
+    parents
+  }
+
+  /**
+    * Returns the controller parent of this controller
+    */
+  @stateful def ctrlParent(ctrl: Ctrl): Option[Ctrl] = ctrl.id match {
+    case -1 => parentOf.get(ctrl.sym)
+    case _  => Some(Ctrl(ctrl.sym, -1))
+  }
+
+  /**
+    * Returns the symbols of all ancestor controllers of this symbol
+    * Ancestors are ordered outermost to innermost
+    */
+  @stateful def symParents(sym: Sym[_], stop: Option[Sym[_]] = None): Seq[Sym[_]] = {
+    allParents(sym, stop){p => parentOf.get(p).map(_.sym) }
+  }
+
+  /**
+    * Returns all ancestor controllers from this controller (inclusive) to optional stop (inclusive)
+    * Ancestors are ordered outermost to innermost
+    */
+  @stateful def ctrlParents(ctrl: Ctrl): Seq[Ctrl] = allParents(ctrl,None){ctrlParent}
+  @stateful def ctrlParents(ctrl: Ctrl, stop: Option[Ctrl]): Seq[Ctrl] = allParents(ctrl,stop){ctrlParent}
+  @stateful def ctrlParents(sym: Sym[_], stop: Option[Ctrl] = None): Seq[Ctrl] = {
+    parentOf.get(sym).map(p => ctrlParents(p,stop)).getOrElse(Nil)
+  }
+
 
 }

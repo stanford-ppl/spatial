@@ -37,6 +37,10 @@ case class Writers(writers: Set[Sym[_]]) extends ComplexData[Writers]
   def update(x: Sym[_], writers: Set[Sym[_]]): Unit = metadata.add(x, Writers(writers))
 }
 
+@data object accessesOf {
+  def apply(x: Sym[_]): Set[Sym[_]] = writersOf(x) ++ readersOf(x)
+}
+
 /**
   * Set of local memory reads which each symbol uses
   * Used to detect accumulation cycles

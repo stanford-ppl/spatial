@@ -94,9 +94,8 @@ case class PipeInserter(IR: State) extends MutateTransformer {
         stg.nodes.foreach(visit)
     }
 
-    implicit val ctx: SrcCtx = block.result.ctx
     (block.result match {
-      case _:Void => Void.c
+      case _:Void => void
       case s      => f(s)
     }).asInstanceOf[Sym[R]]
   }, block.options)

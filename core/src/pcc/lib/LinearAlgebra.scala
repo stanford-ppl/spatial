@@ -15,8 +15,6 @@ trait LinearAlgebra {
     val MP: I32 = 1 (1 -> 32)
     val NP: I32 = 1 (1 -> 32)
 
-    val x: SrcCtx = SrcCtx.empty
-
     def getA(i: I32, j: I32) = perm match {
       case Seq(0,1) => A(i,j)
       case Seq(1,0) => A(j,i)
@@ -69,14 +67,16 @@ trait LinearAlgebra {
     np:     Option[I32] = None
   )(implicit state: State): Unit = {
     val M = A.rows
-    val K = A.cols
+    val P = A.cols
     val N = B.cols
     val MP: I32 = mp.getOrElse{ 1 (1 -> 32) }
-    val KP: I32 = kp.getOrElse{ 1 (1 -> 16) }
     val NP: I32 = np.getOrElse{ 1 (1 -> 16) }
 
-    Foreach(M par MP, N par NP){(i,j) =>
-      BlackBox.GEMM(Y, A, B, C, alpha, beta, i, j, M/NP, N/NP, KP)
+    val MT: I32 = 16 (1 -> 32)
+    val NT: I32 = 16 (1 -> 32)
+
+    Foreach(M by MT par MP, N by NT par NP){(i,j) =>
+      BlackBox.GEMM(Y, A, B, C, alpha, beta, i, j, P, MT, NT)
     }
     /*def getA(i: Int, j: Int): T = if (transA) A(j,i) else A(i,j)
     def getB(i: Int, j: Int): T = if (transB) B(j,i) else B(i,j)

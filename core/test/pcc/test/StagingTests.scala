@@ -3,13 +3,13 @@ package pcc.test
 import pcc.lang._
 
 object StageForeach extends Test {
-  def main(): Void = {
+  def main(): Void = Accel {
     (0::32){i => println("Hi") }
   }
 }
 
 object StageMemories extends Test {
-  def main(): Void = {
+  def main(): Void = Accel {
     val dram = DRAM[I32](32)
     val sram = SRAM[I32](16)
     val fifo = FIFO[I32](8)
@@ -18,7 +18,7 @@ object StageMemories extends Test {
 }
 
 object StageUpdate extends Test {
-  def main(): Void = {
+  def main(): Void = Accel {
     val sram = SRAM[I32](16)
     Foreach(0 until 32){i =>
       sram(i) = exp(i)

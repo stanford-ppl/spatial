@@ -64,7 +64,7 @@ object rewrite {
         c.error(c.enclosingPosition, "@rewrite can only be used on defs")
         t
     }
-    c.info(c.enclosingPosition, showCode(tree), force = true)
+    //c.info(c.enclosingPosition, showCode(tree), force = true)
     tree
   }
 }

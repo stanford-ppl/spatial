@@ -3,7 +3,7 @@ package pcc.core
 import pcc.traversal.transform.Transformer
 
 abstract class Metadata[T] { self =>
-  type Tx = Transformer
+  final type Tx = Transformer
 
   /** If null, transformers will drop this metadata during mirroring. **/
   def mirror(f: Tx): T

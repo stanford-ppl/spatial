@@ -15,7 +15,9 @@ case class Counter(eid: Int) extends Sym[Counter](eid) {
 object Counter {
   implicit val tp: Counter = Counter(-1)
 
+  @api def fromSeries(series: Series): Counter = Counter(series.start,series.end,series.step,series.par)
+
   @api def apply(start: I32, end: I32, step: Option[I32] = None, par: Option[I32] = None): Counter = {
-    stage(CounterAlloc(start, end, step.getOrElse(I32.c(1)), par.getOrElse(I32.p(1)) ))
+    stage(CounterNew(start, end, step.getOrElse(I32.c(1)), par.getOrElse(I32.p(1)) ))
   }
 }

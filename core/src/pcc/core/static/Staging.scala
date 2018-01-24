@@ -84,7 +84,11 @@ trait Staging { this: Printing =>
     case Op(rhs) => sym.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
     case _ => sym
   }
-  @internal def stage[T](op: Op[T]): T = register(op, () => symbol(op.tR,op))
+  @internal def stage[T](op: Op[T]): T = {
+    val t = register(op, () => symbol(op.tR,op))
+    op.tR.viewAsSym(t).ctx = ctx
+    t
+  }
 
 
   private def aliasSyms(a: Any): Set[Sym[_]]   = recursive.collectSets{case s: Sym[_] => Set(s) case d: Op[_] => d.aliases }(a)

@@ -13,11 +13,12 @@ trait LowerPriorityIntegerOps {
 trait LowPriorityIntegerOps extends LowerPriorityIntegerOps {
   //@api implicit def intToSeries(x: Int): Series = Series.alloc(Some(I32.c(x)),I32.c(x+1),None,None,isUnit=true)
   @api implicit def i32ToSeries(x: I32): Series = Series.alloc(Some(x),x + I32.c(1), None, None, isUnit=true)
+
+  @api implicit def IntToI32(x: Int): I32 = I32.c(x)
 }
 
 trait Ints extends LowPriorityIntegerOps {
 
-  @api implicit def IntToI32(x: Int): I32 = I32.c(x)
 
   // Note: Naming is important here to override the name in Predef.scala
   // Note: Need the ctx and state at the implicit class to avoid issues with currying

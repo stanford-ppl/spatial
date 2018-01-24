@@ -4,7 +4,7 @@ import pcc.lang._
 import pcc.lib._
 
 object GEMM extends Test {
-  def main(): Void = {
+  def main(): Void = Accel {
     val M = 96  // Rows of output
     val N = 96  // Cols of output
     val K = 96  // Common dimension

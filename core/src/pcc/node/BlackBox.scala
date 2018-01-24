@@ -8,6 +8,7 @@ sealed abstract class BlackBox extends Control {
   override def effects: Effects = Effects.Simple
 }
 @op case class GEMMBox[T:Num](
+  cchain: CounterChain,
   y:     SRAM[T],
   a:     SRAM[T],
   b:     SRAM[T],
@@ -16,17 +17,18 @@ sealed abstract class BlackBox extends Control {
   beta:  T,
   i:     I32,
   j:     I32,
-  lenI:  I32,
-  lenJ:  I32,
-  p:     I32
+  mt:    I32,
+  nt:    I32,
+  iters: Seq[I32]
 ) extends BlackBox {
+  override def cchains = Seq(cchain)
   override def effects: Effects = Effects.Writes(y)
 }
 
 
-@op case class GEMVBox() extends BlackBox
-@op case class CONVBox() extends BlackBox
-@op case class SHIFTBox(validAfter: Int) extends BlackBox
+//@op case class GEMVBox() extends BlackBox
+//@op case class CONVBox() extends BlackBox
+//@op case class SHIFTBox(validAfter: Int) extends BlackBox
 
 
 

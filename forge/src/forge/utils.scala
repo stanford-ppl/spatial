@@ -107,6 +107,9 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     def injectMethod(method: (String, Tree) => Tree): ClassDef = {
       injectClassMethod(cls, errorIfExists = false, method)
     }
+//    def optionalInjectMethod(method: (String,Tree) => Tree): ClassDef = {
+//      injectClassMethod(cls, errorIfExists = false, method)
+//    }
 
     def fieldsAndMethods: (List[ValDef],List[DefDef]) = {
       val fields  = body.collect{case x: ValDef => x }

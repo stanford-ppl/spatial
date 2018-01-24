@@ -2,27 +2,38 @@ package pcc.traversal.transform
 
 import pcc.core._
 import pcc.data._
+import pcc.lang._
 import pcc.node._
 import pcc.node.pir._
-import pcc.lang._
 
 import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 
 case class GlobalAllocation(IR: State) extends MutateTransformer {
   override val name = "Global Allocation"
 
-  val memoryPMUs = HashMap[Sym[_],PMU]()
-  def getPMU(mem: Sym[_]): PMU = memoryPMUs.getOrElse(mem, throw new Exception(s"No PMU has been created for $mem"))
+  val memoryPMUs = HashMap[Sym[_],VPMU]()
+  def getPMU(mem: Sym[_]): VPMU = memoryPMUs.getOrElse(mem, throw new Exception(s"No PMU has been created for $mem"))
 
-  val outerSyms = HashMap[Sym[_],ArrayBuffer[Sym[_]]]()
+  case class CtrlData(var syms: ArrayBuffer[Sym[_]], var iters: ArrayBuffer[Seq[I32]])
+  object CtrlData {
+    def empty = CtrlData(ArrayBuffer.empty, ArrayBuffer.empty)
+  }
+
+  val controlData = HashMap[Sym[_],CtrlData]()
+
   def addOuter(s: Sym[_], ctrl: Sym[_]): Unit = {
-    if (!outerSyms.contains(ctrl)) outerSyms += ctrl -> ArrayBuffer.empty
-    outerSyms(ctrl) += s
+    if (!controlData.contains(ctrl)) controlData += ctrl -> CtrlData.empty
+    controlData(ctrl).syms += s
+  }
+  def prependOuter(data: CtrlData, ctrl: Sym[_]): Unit = {
+    if (!controlData.contains(ctrl)) controlData += ctrl -> CtrlData.empty
+    controlData(ctrl).syms = data.syms ++ controlData(ctrl).syms
+    controlData(ctrl).iters ++= data.iters
   }
 
   protected def makePMU[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     val mem = super.transform(lhs,rhs)
-    val pmu = PMU(Seq(mem))
+    val pmu = VPMU(Seq(mem))
     memoryPMUs += mem -> pmu
     stage(pmu)
     mem
@@ -30,7 +41,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
 
   override def preprocess[S](block: Block[S]): Block[S] = {
     memoryPMUs.clear()
-    outerSyms.clear()
+    controlData.clear()
     super.preprocess(block)
   }
 
@@ -39,76 +50,97 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     case FIFONew(_) => makePMU(lhs,rhs)
     case LIFONew(_) => makePMU(lhs,rhs)
 
-    case UnitPipe(ens, block) if isInnerControl(lhs) => innerBlock(lhs,block,Nil)
-    case OpForeach(ens,cchain,block,iters) if isInnerControl(lhs) => innerBlock(lhs,block,Seq(iters))
+    case c: BlackBox => super.transform(lhs,rhs)
+    case c: VPCU => super.transform(lhs,rhs)
+    case c: VPMU => super.transform(lhs,rhs)
 
-    case _ if isOuterControl(lhs) =>
-      rhs.blocks.foreach{blk => register(blk -> outerBlock(blk)) }
-      super.transform(lhs, rhs)
+    case c: Control if isInnerControl(lhs) => innerBlock(lhs,c.blocks.head,c.iters)
+    case c: Control if isOuterControl(lhs) => outerBlock(lhs,c.blocks.head,c.iters)
 
     case _ => super.transform(lhs,rhs)
   }
 
-  protected def outerBlock[R](block: Block[R]): Block[R] = {
+  protected def outerBlock[A:Sym](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
     val usedSyms = HashMap[Sym[_],Set[Sym[_]]]()
     def addUsed(x: Sym[_], using: Set[Sym[_]]): Unit = usedSyms(x) = usedSyms.getOrElse(x, Set.empty) ++ using
+    var children = HashSet[Sym[_]]()
 
     block.stms.reverseIterator.foreach{
       case Memory(_)  =>
-      case Control(s) => s.dataInputs.foreach{in => addUsed(in, Set(s)) }
+      case Bus(_)     =>
+      case Control(s) =>
+        children += s
+        s.dataInputs.foreach{in => addUsed(in, Set(s)) }
+
       case s =>
         if (usedSyms.contains(s)) s.dataInputs.foreach{in => addUsed(in,usedSyms(s)) }
     }
 
-    stageBlock {
+    // Stage the inner block, preserving only memory allocations and other controllers
+    val blk = stageBlock {
       block.stms.foreach {
-        case Memory(s) => visit(s)
+        case Memory(s)  => visit(s)
         case Control(s) => visit(s)
-        case s if usedSyms.contains(s) =>
-          usedSyms(s).foreach {c => addOuter(s, c) }
-        case s =>
-          dbgs(s"Dropping ${stm(s)}")
+        case Bus(s)     => visit(s)
+        case s if usedSyms.contains(s) => usedSyms(s).foreach{c => addOuter(s, c) }
+        case s => dbgs(s"Dropping ${stm(s)}")
       }
       implicit val ctx: SrcCtx = block.result.ctx
-      (block.result match {case _:Void => Void.c; case s => f(s)}).asInstanceOf[Sym[R]]
+      Void.c
     }
+    val psu = VSwitch(blk, iters)
+    stage(psu).asInstanceOf[Sym[A]]
   }
 
-  protected def innerBlock[A:Sym](lhs: Sym[A], block: Block[_], iters: Seq[Seq[I32]]): Sym[A] = {
-    val outer = outerSyms.getOrElse(lhs, Nil)
-    val scope = outer ++ block.stms
+  protected def innerBlock[A:Sym](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
+    val parents = symParents(lhs)
+    val edata = parents.map{p => controlData.getOrElse(p, CtrlData.empty) }
+    val cdata = controlData.getOrElse(lhs, CtrlData.empty)
+    val external = edata.flatMap(_.syms)
+    val outer = cdata.syms
+    val scope = block.stms
+    val allIters = edata.flatMap(_.iters) ++ cdata.iters :+ iters
 
-    val wrSyms = HashMap[Sym[_],Set[SRAM[_]]]()
-    val rdSyms = HashMap[Sym[_],Set[SRAM[_]]]()
+    val wrSyms = HashMap[Sym[_],Set[Sym[_]]]()
+    val rdSyms = HashMap[Sym[_],Set[Sym[_]]]()
     val dataSyms = HashSet[Any]()
     val memAllocs = HashSet[Sym[_]]()
 
-    def addWr(x: Sym[_], mem: Set[SRAM[_]]): Unit = wrSyms(x) = wrSyms.getOrElse(x, Set.empty) ++ mem
-    def addRd(x: Sym[_], mem: Set[SRAM[_]]): Unit = rdSyms(x) = rdSyms.getOrElse(x, Set.empty) ++ mem
-    def isWr(x: Sym[_], mem: SRAM[_]): Boolean = wrSyms.contains(x) && wrSyms(x).contains(mem)
-    def isRd(x: Sym[_], mem: SRAM[_]): Boolean = rdSyms.contains(x) && rdSyms(x).contains(mem)
+    val outputs = HashSet[Sym[_]]()
+
+    def addWr(x: Sym[_], mem: Set[Sym[_]]): Unit = wrSyms(x) = wrSyms.getOrElse(x, Set.empty) ++ mem
+    def addRd(x: Sym[_], mem: Set[Sym[_]]): Unit = rdSyms(x) = rdSyms.getOrElse(x, Set.empty) ++ mem
+    def isWr(x: Sym[_], mem: Sym[_]): Boolean = wrSyms.contains(x) && wrSyms(x).contains(mem)
+    def isRd(x: Sym[_], mem: Sym[_]): Boolean = rdSyms.contains(x) && rdSyms(x).contains(mem)
     def isDatapath(x: Sym[_]): Boolean = {
       dataSyms.contains(x) || (!wrSyms.contains(x) && !rdSyms.contains(x) && !memAllocs.contains(x))
     }
-
-    def blk(use: Sym[_] => Boolean): Block[Void] = stageBlock {
-      implicit val ctx: SrcCtx = SrcCtx.empty
-      scope.foreach{ s => if (use(s)) visit(s) }
-      Void.c
+    def isRemoteMemory(mem: Sym[_]): Boolean = !mem.isReg || {
+      accessesOf(mem).exists{access => parentOf(access).sym != lhs }
     }
-
-    // TODO: Multi-config for multiple readers/writers
     scope.reverseIterator.foreach{
-      case Stm(s, SRAMRead(sram,addr,_)) =>
-        rdSyms += s -> Set(sram)
-        addr.foreach{a => addRd(a, Set(sram)) }
-        dataSyms += s // Keep the load to denote the data transfer
+      case s @ Reader(reads) =>
+        val remotelyAccessed = reads.filter{rd => isRemoteMemory(rd.mem) }
+        val (pushed, local) = remotelyAccessed.partition{rd => readersOf(rd.mem).size == 1 }
+        rdSyms += s -> remotelyAccessed.map(_.mem)
+        dataSyms += s
+        // Only push read address to remote PMU if this the only read of this memory
+        pushed.foreach{read =>
+          read.addr.foreach{adr => adr.foreach{a => addRd(a, Set(read.mem)) }}
+        }
 
-      case Stm(s, SRAMWrite(sram,data,addr,_)) =>
-        wrSyms += s -> Set(sram)
-        addr.foreach{a => addWr(a, Set(sram)) }
-        dataSyms += data
-        dataSyms += s // Keep the write to denote the data transfer
+      case s @ Writer(writes) =>
+        val remotelyAccessed = writes.filter{wr => isRemoteMemory(wr.mem) }
+        val (pushed, local) = remotelyAccessed.partition{wr => writersOf(wr.mem).size == 1}
+        wrSyms += s -> remotelyAccessed.map(_.mem)
+        dataSyms += s
+        // Only push write address to remote PMU if this is the only write to this memory
+        pushed.foreach{write =>
+          write.addr.foreach{adr =>
+            adr.foreach{a => addWr(a, Set(write.mem)) }
+            dataSyms += write.data // Make sure not to push data calculation
+          }
+        }
 
       case Memory(s) if !s.isReg => memAllocs += s
 
@@ -117,17 +149,51 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
         if (rdSyms.contains(s)) s.dataInputs.foreach{in => addRd(in,rdSyms(s)) }
         if (dataSyms.contains(s)) dataSyms ++= s.dataInputs
     }
-    val wrSRAMs: Seq[SRAM[_]] = wrSyms.values.flatten.toSeq.distinct
-    val rdSRAMs: Seq[SRAM[_]] = rdSyms.values.flatten.toSeq.distinct
+    val wrMems: Seq[Sym[_]] = wrSyms.values.flatten.toSeq.distinct
+    val rdMems: Seq[Sym[_]] = rdSyms.values.flatten.toSeq.distinct
 
-    val writes = wrSRAMs.map{sram => blk{s => isWr(s,sram) } }
-    val reads  = rdSRAMs.map{sram => blk{s => isRd(s,sram) } }
-    val datapath = blk{s => isDatapath(s) }
+    // Add statements to a PCU
+    // For inner statements, this is always a PCU
+    def update(x: Sym[_]): Unit = x match {
 
-    val pcu = PU.compute(datapath,iters)
+      case  _ => visit(x)
+    }
+
+    // Copy statements from another block
+    // For inner statements, this is always a PMU
+    def clone(x: Sym[_]): Unit = x match {
+      case Op(CounterChainNew(ctrs)) => stage(CounterChainCopy(f(ctrs)))
+      case _ => mirrorSym(x)
+    }
+
+    def blk(copy: Sym[_] => Unit)(use: Sym[_] => Boolean): Block[Void] = stageBlock {
+      // Copy parent controllers' dependencies into the controller
+      external.foreach{s => clone(s) }
+      // Push this controller's direct dependencies into the controller
+      outer.foreach{s => copy(s) }
+      // Add statements to the data/address path in this block
+      scope.foreach{s => if (use(s)) copy(s) }
+      void
+    }
+
+    dbgs(s"${stm(lhs)}")
+    dbgs(s"Iters: $allIters")
+    dbgs(s"Outer: ")
+    outer.foreach{s => dbgs(s"  ${stm(s)}")}
+    dbgs(s"Scope: ")
+    scope.foreach{s => dbgs(s"  ${stm(s)} [datapath:${isDatapath(s)}]")}
+
+    val wrs = wrMems.map{sram => blk(clone){s => isWr(s,sram)} }
+    val rds = rdMems.map{sram => blk(clone){s => isRd(s,sram)} }
+    val datapath = blk(update){s => isDatapath(s) }
+
+    val pcu = VPCU(datapath,allIters)
     memAllocs.foreach{mem => visit(mem) }
-    wrSRAMs.zip(writes).foreach{case (mem,blk) => getPMU(f(mem)).writeAddr = Some(blk) }
-    rdSRAMs.zip(reads).foreach{case (mem,blk) => getPMU(f(mem)).readAddr = Some(blk) }
-    pcu.asInstanceOf[Sym[A]]
+    wrMems.zip(wrs).foreach{case (mem,blk) => getPMU(f(mem)).setWr(blk,allIters) }
+    rdMems.zip(rds).foreach{case (mem,blk) => getPMU(f(mem)).setRd(blk,allIters) }
+
+    stage(pcu).asInstanceOf[Sym[A]]
   }
+
+
 }

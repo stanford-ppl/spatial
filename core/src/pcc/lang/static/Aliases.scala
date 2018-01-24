@@ -23,7 +23,6 @@ trait InternalAliases {
 
   lazy val Accel = pcc.lang.control.Accel
   lazy val Foreach = pcc.lang.control.Foreach
-  lazy val BlackBox = pcc.lang.units.BlackBox
 }
 
 trait Aliases extends InternalAliases {

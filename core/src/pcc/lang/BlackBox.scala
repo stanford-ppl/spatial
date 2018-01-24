@@ -1,5 +1,4 @@
 package pcc.lang
-package units
 
 import forge._
 import pcc.core._
@@ -19,10 +18,16 @@ object BlackBox {
     beta: T,
     i: I32,
     j: I32,
-    lenI: I32,
-    lenJ: I32,
-    p: I32
-  ): Void = stage(GEMMBox(y,a,b,c,alpha,beta,i,j,lenI,lenJ,p))
+    k: I32, // common dimension length
+    mt: I32,
+    nt: I32
+  ): Void = {
+    val PP: I32 = 1 (1 -> 16)
+    val ctrP = 1 until k par PP
+    val cchain = CounterChain(ctrP)
+    val iters = Seq(bound[I32])
+    stage(GEMMBox(cchain,y,a,b,c,alpha,beta,i,j,mt,nt,iters))
+  }
 
   @api def GEMV: Void = ???
   @api def CONV: Void = ???

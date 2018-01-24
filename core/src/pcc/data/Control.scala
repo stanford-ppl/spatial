@@ -7,7 +7,7 @@ sealed abstract class ControlLevel
 case object Outer extends ControlLevel
 case object Inner extends ControlLevel
 
-case class Ctrl(x: Sym[_], id: Int)
+case class Ctrl(sym: Sym[_], id: Int)
 
 case class CtrlLevel(level: ControlLevel) extends SimpleData[CtrlLevel]
 @data object levelOf {

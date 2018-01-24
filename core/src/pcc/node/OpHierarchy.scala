@@ -33,7 +33,10 @@ case class Write(mem: Sym[_], data: Sym[_], addr: Option[Seq[I32]], ens: Seq[Bit
 
 
 /** Nodes with implicit control signals/logic with internal state **/
-abstract class Control extends AccelOp[Void]
+abstract class Control extends AccelOp[Void] {
+  def cchains: Iterable[CounterChain] = getCChains(inputs)
+  def iters: Seq[I32]
+}
 
 abstract class EnabledControl extends Control {
   def ens: Seq[Bit]
@@ -57,9 +60,9 @@ abstract class EnPrimitive[A:Sym] extends Primitive[A] {
 abstract class Accessor[A:Sym,R:Sym] extends EnPrimitive[R] {
   val tA: Sym[A] = typ[A]
 
-  def localReads: Seq[Read]
-  def localWrites: Seq[Write]
-  def localAccesses: Seq[Access] = localReads ++ localWrites
+  def localReads: Set[Read]
+  def localWrites: Set[Write]
+  def localAccesses: Set[Access] = localReads ++ localWrites
 }
 
 abstract class Reader[A:Sym,R:Sym](
@@ -67,8 +70,8 @@ abstract class Reader[A:Sym,R:Sym](
   adr: Option[Seq[I32]],
   ens: Seq[Bit]
 ) extends Accessor[A,R] {
-  def localReads = Seq(Read(mem,adr,ens))
-  def localWrites = Nil
+  def localReads = Set(Read(mem,adr,ens))
+  def localWrites = Set.empty
 }
 
 abstract class Writer[A:Sym](
@@ -78,31 +81,31 @@ abstract class Writer[A:Sym](
   en:  Seq[Bit]
 ) extends Accessor[A,Void] {
   override def effects = Effects.Writes(mem)
-  def localReads = Nil
-  def localWrites = Seq(Write(mem,dat,adr,ens))
+  def localReads = Set.empty
+  def localWrites = Set(Write(mem,dat,adr,ens))
 }
 
 object Accessor {
-  def unapply(x: Op[_]): Option[(Seq[Write],Seq[Read])] = x match {
+  def unapply(x: Op[_]): Option[(Set[Write],Set[Read])] = x match {
     case a: Accessor[_,_] if a.localWrites.nonEmpty || a.localReads.nonEmpty => Some((a.localWrites,a.localReads))
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Seq[Write],Seq[Read])] = x.op.flatMap(Accessor.unapply)
+  def unapply(x: Sym[_]): Option[(Set[Write],Set[Read])] = x.op.flatMap(Accessor.unapply)
 }
 
 object Writer {
-  def unapply(x: Op[_]): Option[Seq[Write]] = x match {
+  def unapply(x: Op[_]): Option[Set[Write]] = x match {
     case a: Accessor[_,_] if a.localWrites.nonEmpty => Some(a.localWrites)
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[Seq[Write]] = x.op.flatMap(Writer.unapply)
+  def unapply(x: Sym[_]): Option[Set[Write]] = x.op.flatMap(Writer.unapply)
 }
 object Reader {
-  def unapply(x: Op[_]): Option[Seq[Read]] = x match {
+  def unapply(x: Op[_]): Option[Set[Read]] = x match {
     case a: Accessor[_,_] if a.localReads.nonEmpty => Some(a.localReads)
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[Seq[Read]] = x.op.flatMap(Reader.unapply)
+  def unapply(x: Sym[_]): Option[Set[Read]] = x.op.flatMap(Reader.unapply)
 }
 
 

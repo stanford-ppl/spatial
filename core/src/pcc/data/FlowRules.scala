@@ -13,9 +13,9 @@ trait FlowRules {
   }
 
   @flow def accesses(s: Sym[_], op: Op[_]): Unit = op match {
-    case Accessor(wrs,rds) =>
-      wrs.foreach{wr => writersOf(wr.mem) += s }
-      rds.foreach{rd => readersOf(rd.mem) += s }
+    case Accessor(wr,rd) =>
+      wr.foreach{w => writersOf(w.mem) += s }
+      rd.foreach{r => readersOf(r.mem) += s }
     case _ =>
   }
 
@@ -24,14 +24,13 @@ trait FlowRules {
     readUsesOf(s) ++= s.dataInputs.flatMap{in => readUsesOf(in) }
 
     s match {
-      case Writer(wrs) =>
+      case Writer(wrMem,_,_,_) =>
         val readers = readUsesOf(s)
-        val reads = readers.flatMap{case Reader(rds) => rds }
-        wrs.foreach{wr =>
-          reads.foreach{rd => if (rd.mem == wr.mem) {
-            isAccum(rd.mem) = true
+        readers.foreach{case Reader(rdMem,_,_) =>
+          if (rdMem == wrMem) {
+            isAccum(rdMem) = true
             isAccum(s) = true
-          }}
+          }
         }
       case _ =>
     }

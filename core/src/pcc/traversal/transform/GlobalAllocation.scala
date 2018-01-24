@@ -119,27 +119,21 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
       accessesOf(mem).exists{access => parentOf(access).sym != lhs }
     }
     scope.reverseIterator.foreach{
-      case s @ Reader(reads) =>
-        val remotelyAccessed = reads.filter{rd => isRemoteMemory(rd.mem) }
-        val (pushed, local) = remotelyAccessed.partition{rd => readersOf(rd.mem).size == 1 }
-        rdSyms += s -> remotelyAccessed.map(_.mem)
+      case s @ Reader(mem,addr,_) =>
         dataSyms += s
-        // Only push read address to remote PMU if this the only read of this memory
-        pushed.foreach{read =>
-          read.addr.foreach{adr => adr.foreach{a => addRd(a, Set(read.mem)) }}
+        if (isRemoteMemory(mem)) {
+          rdSyms += s -> Set(mem)
+          // Push read address computation to PMU if this is the only reader
+          if (readersOf(mem).size == 1) addr.foreach{a => addRd(a, Set(mem)) }
         }
 
-      case s @ Writer(writes) =>
-        val remotelyAccessed = writes.filter{wr => isRemoteMemory(wr.mem) }
-        val (pushed, local) = remotelyAccessed.partition{wr => writersOf(wr.mem).size == 1}
-        wrSyms += s -> remotelyAccessed.map(_.mem)
+      case s @ Writer(mem,data,addr,_) =>
         dataSyms += s
-        // Only push write address to remote PMU if this is the only write to this memory
-        pushed.foreach{write =>
-          write.addr.foreach{adr =>
-            adr.foreach{a => addWr(a, Set(write.mem)) }
-            dataSyms += write.data // Make sure not to push data calculation
-          }
+        dataSyms += data
+        if (isRemoteMemory(mem)) {
+          wrSyms += s -> Set(mem)
+          // Push write address to PMU if this is the only writer
+          if (writersOf(mem).size == 1) addr.foreach{a => addWr(a, Set(mem)) }
         }
 
       case Memory(s) if !s.isReg => memAllocs += s
@@ -155,7 +149,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     // Add statements to a PCU
     // For inner statements, this is always a PCU
     def update(x: Sym[_]): Unit = x match {
-
+      case Reader(mem,addr,_) => visit(x)
       case  _ => visit(x)
     }
 

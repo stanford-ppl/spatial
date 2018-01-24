@@ -30,9 +30,9 @@ import pcc.lang._
   override def effects: Effects = Effects.Mutable
 }
 
-@op case class RegWrite[T:Bits](reg: Reg[T], data: T, ens: Seq[Bit]) extends Writer(reg,data.asSym,None,ens)
+@op case class RegWrite[T:Bits](reg: Reg[T], data: T, ens: Seq[Bit]) extends Writer(reg,data.asSym,Nil,ens)
 
-@op case class RegRead[T:Bits](reg: Reg[T]) extends Reader(reg,None,Nil) {
+@op case class RegRead[T:Bits](reg: Reg[T]) extends Reader(reg,Nil,Nil) {
   override val isStateless = true
   override def ens: Seq[Bit] = Nil
 }
@@ -41,8 +41,8 @@ import pcc.lang._
 @op case class SRAMNew[A:Bits](dims: Seq[I32]) extends Memory[SRAM[A]] {
   override def effects: Effects = Effects.Mutable
 }
-@op case class SRAMRead[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]) extends Reader[A,A](sram,Some(addr),ens)
-@op case class SRAMWrite[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]) extends Writer[A](sram,data.asSym,Some(addr),ens)
+@op case class SRAMRead[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]) extends Reader[A,A](sram,addr,ens)
+@op case class SRAMWrite[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]) extends Writer[A](sram,data.asSym,addr,ens)
 
 @op case class SRAMDim(sram: SRAM[_], d: Int) extends Primitive[I32] {
   override val isStateless: Boolean = true

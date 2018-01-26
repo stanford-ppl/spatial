@@ -7,11 +7,32 @@ import pcc.core._
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map}
 
-trait DotCodegen extends Codegen {
+trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
+
+
   def q(s: Any): String = regex.replaceAllIn(quoteOrRemap(s), "")
 
+  val lang = "dot"
+  def ext = s"$lang"
   val edges = ListBuffer[() => Unit]()
+
+  override protected def preprocess[R](block: Block[R]): Block[R] = {
+    emit("digraph G {")
+    open
+    block
+  }
+
+  override protected def postprocess[R](block: Block[R]): Block[R] = {
+    edges.foreach {_()}
+    close
+    emit("}")
+    block
+  }
+
+  override protected def visitBlock[R](block: Block[R]): Block[R] = {
+    visitBlock(block, {stms => stms.foreach(visit); block})
+  }
 
   def emitNode(n: Any, attr: DotAttr): Unit = emit(src"""$n [${attr.list}];""")
   def emitNode(n: Any, label: String): Unit = emitNode(n, DotAttr().label(label))

@@ -6,6 +6,7 @@ import pcc.rewrites.RewriteRules
 import pcc.traversal._
 //import pcc.traversal.analysis._
 import pcc.traversal.transform._
+import pcc.traversal.codegen.dot._
 
 trait StaticTraversals extends Compiler {
   val rewrites = new RewriteRules {}
@@ -17,13 +18,15 @@ trait StaticTraversals extends Compiler {
     lazy val printer = IRPrinter(state)
     lazy val pipeInserter = PipeInserter(state)
     lazy val globalAllocation = GlobalAllocation(state)
+    lazy val irDotCodegen = IRDotCodegen(state)
 
     block ==>
       printer ==>
       !isPIR ? pipeInserter ==>
       !isPIR ? printer ==>
       !isPIR ? globalAllocation ==>
-      !isPIR ? printer
+      !isPIR ? printer ==>
+      isPIR ? irDotCodegen
   }
 
 }

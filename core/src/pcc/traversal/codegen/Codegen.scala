@@ -8,8 +8,9 @@ import pcc.util.Tri._
 trait Codegen extends Traversal {
   override val recurse: Recurse = Recurse.Never
   val lang: String
-  val ext: String
-  def out: String = s"${config.genDir}${files.sep}$lang${files.sep}"
+  def ext: String
+  def dir: String = s"${config.genDir}${files.sep}${lang}${files.sep}"
+  def filename: String = s"Top.${ext}"
 
   protected def nameMap(x: String): String = x
 
@@ -44,4 +45,13 @@ trait Codegen extends Traversal {
     def src(args: Any*): String = sc.raw(args.map(quoteOrRemap): _*).stripMargin
   }
 
+  override protected def process[R](block: Block[R]): Block[R] = {
+    inGen(dir, filename) {
+      super.process(block)
+    }
+  }
+
+  override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
+    throw new Exception(s"No codegen rule for $lhs, $rhs")
+  }
 }

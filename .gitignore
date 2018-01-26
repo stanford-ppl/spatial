@@ -6,6 +6,7 @@
 target/
 /.idea/
 /out/
+/gen/
 
 *.class
 *.iml

@@ -72,7 +72,7 @@ abstract class PU extends Control {
 ) extends PU {
   override def cchains = rdPath.map(getCChains).getOrElse(Nil) ++ wrPath.map(getCChains).getOrElse(Nil)
   override def iters = rdIters.flatten ++ wrIters.flatten
-  override def inputs = syms(rdPath) ++ syms(wrPath)
+  override def inputs = syms(rdPath) ++ syms(wrPath) ++ syms(memories)
   override def binds  = super.binds ++ iters
 
   def setWr(addr: Block[_], iters: Seq[Seq[I32]]): Unit = {

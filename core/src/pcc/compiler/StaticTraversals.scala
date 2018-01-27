@@ -19,6 +19,7 @@ trait StaticTraversals extends Compiler {
     lazy val pipeInserter = PipeInserter(state)
     lazy val globalAllocation = GlobalAllocation(state)
     lazy val irDotCodegen = IRDotCodegen(state)
+    lazy val puDotCodegen = PUDotCodegen(state)
 
     block ==>
       printer ==>
@@ -26,7 +27,8 @@ trait StaticTraversals extends Compiler {
       !isPIR ? printer ==>
       !isPIR ? globalAllocation ==>
       !isPIR ? printer ==>
-      isPIR ? irDotCodegen
+        isPIR ? irDotCodegen ==>
+      isPIR ? puDotCodegen
   }
 
 }

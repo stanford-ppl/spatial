@@ -12,9 +12,9 @@ import pcc.node.pir.{Lanes, VPCU, VPMU}
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
 
-case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
-  override val name: String = "IR Dot Printer"
-  override def filename: String = s"IRGraph.${ext}"
+case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
+  override val name: String = "PU Dot Printer"
+  override def filename: String = s"PUGraph.${ext}"
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
     case s: SRAM[_] => s"$s"
@@ -108,7 +108,7 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    println(s"[IRDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
+    println(s"[PUDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
 
     if (needsSubgraph(rhs)) {
       emitSubgraph(getSubgraphAttr(lhs, rhs)) { visitCommon(lhs, rhs) }

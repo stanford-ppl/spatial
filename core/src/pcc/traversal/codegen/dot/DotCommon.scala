@@ -23,6 +23,8 @@ trait DotCommon { this: Codegen =>
     emit("digraph G {")
     open
     emit("rankdir=BT;")
+    emit("labelloc=\"t\"")
+    emit(s"""label="${filename}"""")
     block
   }
 

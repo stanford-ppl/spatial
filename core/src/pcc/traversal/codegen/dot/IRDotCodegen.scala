@@ -7,7 +7,7 @@ import pcc.node._
 import pcc.lang.memories.SRAM
 import pcc.lang.Void
 import pcc.lang.pir.{In, Out}
-import pcc.node.pir.Lanes
+import pcc.node.pir.{Lanes, VPCU, VPMU}
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map}
@@ -34,6 +34,7 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
 
   def getNodeName(sym: Sym[_]) = sym.op.map(o => o.productPrefix).getOrElse(sym.typeName) + s"_x${sym.id}"
 
+  def getBlockName[R](block: Block[R]) = "cluster_" + getNodeName(block.result)
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
     emit(s"subgraph cluster_${getNodeName(block.result)} {")
     open
@@ -48,10 +49,22 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
     println(s"[IRDotCodegen] visit $lhs, $rhs")
     emitNode(getNodeName(lhs), attributes)
-    println(s"[IRDotCodegen] $lhs num inputs: ${rhs.inputs.size}")
+    val blockEdgeAttr = DotAttr()
+    blockEdgeAttr + ("color", "blue")
+
     rhs.inputs.foreach { in =>
-      println(s"[IRDotCodegen] $in")
+//      emitEdge(getNodeName(lhs), getNodeName(in))
       emitEdge(getNodeName(in), getNodeName(lhs))
+    }
+
+    rhs match {
+      case pcu: VPCU =>
+        visitBlock(pcu.datapath)
+//        emitEdge(getBlockName(pcu.datapath), getNodeName(lhs), blockEdgeAttr.label("datapath").+ ("lhead", getBlockName(pcu.datapath)))
+      case pmu: VPMU =>
+        pmu.rdPath.map { b => visitBlock(b) }
+        pmu.wrPath.map { b => visitBlock(b) }
+      case _ =>
     }
   }
 }

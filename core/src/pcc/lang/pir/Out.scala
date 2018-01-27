@@ -16,7 +16,7 @@ case class Out[A](eid: Int, tA: Bits[A]) extends Bits[Out[A]](eid) {
 
   @api def zero: Out[A] = Out.c(Ptr(tA.zero))
   @api def one: Out[A] = Out.c(Ptr(tA.one))
-  @api def :=(x: A): Void = stage(WriteOut(this,tA))
+  @api def :=(x: A): Void = stage(WriteOut(this, x.asInstanceOf[Bits[A]]))
 
   @api def -->(in: In[A]): Void = { stage(ScalarBus(this,in)); void }
   @api def ==>(in: In[A]): Void = { stage(VectorBus(this,in)); void }

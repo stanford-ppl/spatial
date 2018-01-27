@@ -20,6 +20,7 @@ trait DotCommon { this: Codegen =>
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     emit("digraph G {")
     open
+    emit("rankdir=LR;")
     block
   }
 
@@ -28,10 +29,6 @@ trait DotCommon { this: Codegen =>
     close
     emit("}")
     block
-  }
-
-  override protected def visitBlock[R](block: Block[R]): Block[R] = {
-    visitBlock(block, {stms => stms.foreach(visit); block})
   }
 
   def emitNode(n: Any, attr: DotAttr): Unit = emit(src"""$n [${attr.list}];""")

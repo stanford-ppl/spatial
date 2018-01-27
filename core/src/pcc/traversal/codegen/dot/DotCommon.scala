@@ -5,7 +5,7 @@ package dot
 import pcc.core._
 
 import scala.language.implicitConversions
-import scala.collection.mutable.{ListBuffer, Map}
+import scala.collection.mutable.{ListBuffer, Map, Set}
 
 trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
@@ -15,12 +15,14 @@ trait DotCommon { this: Codegen =>
 
   val lang = "dot"
   def ext = s"$lang"
+
+  val emittedNodes = Set[Any]()
   val edges = ListBuffer[() => Unit]()
 
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     emit("digraph G {")
     open
-    emit("rankdir=LR;")
+    emit("rankdir=BT;")
     block
   }
 
@@ -31,7 +33,22 @@ trait DotCommon { this: Codegen =>
     block
   }
 
-  def emitNode(n: Any, attr: DotAttr): Unit = emit(src"""$n [${attr.list}];""")
+  def emitSubgraph(attr: DotAttr)(f: => Any): Unit = {
+    emit(s"subgraph cluster_${attr.attrMap("label")} {")
+    open
+    attr.attrMap.keys.foreach { k =>
+      emit(s"$k=${attr.attrMap(k)}")
+    }
+    f
+    close
+    emit("}")
+  }
+  def emitNode(n: Any, attr: DotAttr): Unit = {
+    if (!emittedNodes.contains(n)) {
+      emit(src"""$n [${attr.list}];""")
+      emittedNodes += n
+    }
+  }
   def emitNode(n: Any, label: String): Unit = emitNode(n, DotAttr().label(label))
   def emitNode(n: Any, label: Any, attr: DotAttr): Unit = emitNode(n, attr.label(label))
 
@@ -113,6 +130,7 @@ trait DotCommon { this: Codegen =>
   val white     = Color("white")
   val black     = Color("black")
   val lightgrey = Color("lightgrey")
+  val grey = Color("grey")
   val hexagon   = Color("hexagon")
   val gold      = Color("gold")
   val limegreen = Color("limegreen")
@@ -120,6 +138,13 @@ trait DotCommon { this: Codegen =>
   val red       = Color("red")
   val indianred = Color("indianred1")
   val cyan      = Color("cyan4")
+  val darkolivegreen = Color("darkolivegreen")
+  val chocolate4 = Color("chocolate4")
+  val cadetblue = Color("cadetblue")
+  val chocolate = Color("chocolate")
+  val chocolate1 = Color("chocolate1")
+  val lemonchiffon = Color("lemonchiffon")
+  val teal = Color("teal")
 
   val both = Direction("both")
 

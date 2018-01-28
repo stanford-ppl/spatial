@@ -7,10 +7,10 @@ import pcc.node._
 import pcc.lang.memories.SRAM
 import pcc.lang.Void
 import pcc.lang.pir.{In, Out}
-import pcc.node.pir.{Lanes, VPCU, VPMU}
+import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
 
 import scala.language.implicitConversions
-import scala.collection.mutable.{ListBuffer, Map, Set}
+import scala.collection.mutable.{ListBuffer, HashMap, Set}
 
 case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
   override val name: String = "PU Dot Printer"
@@ -50,8 +50,6 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
   }
 
   private def needsSubgraph(rhs: Op[_]): Boolean = rhs match {
-    case pcu: VPCU => true
-    case pmu: VPMU => true
     case _ => false
   }
 
@@ -72,6 +70,49 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
 
   }
 
+
+  private def getPCUTable() = {
+s"""
+pcu00 [shape=plaintext, label=<
+<table  CELLBORDER="1" CELLSPACING="0">
+  <tr>
+    <TD colspan="4">PCU00</TD>
+  </tr>
+  <tr>
+    <TD HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="white" PORT="in_0">in_0</TD>
+    <TD HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="gray" PORT="out_0">out_0</TD>
+  </tr>
+  <tr>
+    <td HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="gray" PORT="in_1">in_1</td>
+    <td HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="white" PORT="out_1">out_1</td>
+  </tr>
+  <tr>
+    <td HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="gray" PORT="in_2">in_2</td>
+    <td HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="gray" PORT="out_2">out_2</td>
+  </tr>
+  <tr>
+    <td HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="gray" PORT="in_3">in_3</td>
+    <td HEIGHT="20" WIDTH="50" FIXEDSIZE="true" BGCOLOR="gray" PORT="out_3">out_3</td>
+  </tr>
+  <tr>
+    <TD colspan="4">
+      <table BORDER="0" CELLBORDER="1" CELLSPACING="0">
+        <tr><td HEIGHT="20" BGCOLOR="yellow">FixAdd_x133</td></tr>
+        <tr><td HEIGHT="20" BGCOLOR="yellow">FixMul</td></tr>
+        <tr><td HEIGHT="20" BGCOLOR="yellow">FixAdd</td></tr>
+        <tr><td HEIGHT="20" BGCOLOR="yellow">FixAdd</td></tr>
+        <tr><td HEIGHT="20" BGCOLOR="yellow">op1</td></tr>
+        <tr><td HEIGHT="20" BGCOLOR="yellow">op2</td></tr>
+        <tr><td HEIGHT="20" BGCOLOR="yellow">op2</td></tr>
+      </table>
+    </TD>
+
+  </tr>
+</table>
+>];
+"""
+  }
+
   private def getNodeAttr(lhs: Sym[_]): DotAttr = {
     val nodeAttr = DotAttr()
     val color = lhs.op match {
@@ -86,23 +127,20 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
               .labelfontcolor(black)
   }
 
+  val boundsToPUMap = HashMap[Sym[_], Sym[_]]()
+
   private def visitCommon(lhs: Sym[_], rhs: Op[_]): Unit = {
-    emitNode(getNodeName(lhs), getNodeAttr(lhs))
     rhs.binds.foreach { b =>
-      emitNode(getNodeName(b), getNodeAttr(b))
-      emitEdge(getNodeName(b), getNodeName(lhs))
-    }
-    rhs.inputs.foreach { in =>
-      if (in.isBound) emitNode(getNodeName(in), getNodeAttr(in))
-      emitEdge(getNodeName(in), getNodeName(lhs))
+      boundsToPUMap(b) = lhs
     }
 
     rhs match {
       case pcu: VPCU =>
-        visitBlock(pcu.datapath)
+        emitNode(getNodeName(lhs), getNodeAttr(lhs))
       case pmu: VPMU =>
-        pmu.rdPath.map { b => visitBlock(b) }
-        pmu.wrPath.map { b => visitBlock(b) }
+        emitNode(getNodeName(lhs), getNodeAttr(lhs))
+      case vb: VectorBus[_] =>
+        emitEdge(getNodeName(boundsToPUMap(vb.out)), getNodeName(boundsToPUMap(vb.in)))
       case _ =>
     }
   }

@@ -13,6 +13,10 @@ sealed abstract class ConfigBlackBox[T:Bits] extends Primitive[T]
 @op case class GEMMConfig[T:Bits](a: T, b: T) extends ConfigBlackBox[T]
 @op case class GEMVConfig[T:Bits](a: T, b: T) extends ConfigBlackBox[T]
 @op case class CONVConfig[T:Bits](a: T, b: T) extends ConfigBlackBox[T]
+@op case class StreamConfig1[T:Bits](a1: T) extends ConfigBlackBox[T]
+@op case class StreamConfig2[T:Bits](a1: T, a2: T) extends ConfigBlackBox[T]
+@op case class StreamConfig3[T:Bits](a1: T, a2: T, a3: T) extends ConfigBlackBox[T]
+@op case class StreamConfig4[T:Bits](a1: T, a2: T, a3: T, a4: T) extends ConfigBlackBox[T]
 
 @op case class CounterChainCopy(ctrs: Seq[Counter]) extends Alloc[CounterChain]
 
@@ -74,6 +78,12 @@ abstract class PU extends Control {
   override def iters = rdIters.flatten ++ wrIters.flatten
   override def inputs = syms(rdPath) ++ syms(wrPath) ++ syms(memories)
   override def binds  = super.binds ++ iters
+
+  def getWdata(): Option[Sym[_]] = {
+    wrPath.flatMap { b =>
+      b.stms.find { case s @ Op(_:Data) => true; case _ => false }
+    }
+  }
 
   def setWr(addr: Block[_], iters: Seq[Seq[I32]]): Unit = {
     this.wrPath = Some(addr); this.wrIters = iters

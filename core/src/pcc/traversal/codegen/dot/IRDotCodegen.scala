@@ -57,11 +57,7 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
 
   private def getSubgraphAttr(lhs: Sym[_], rhs: Op[_]): DotAttr = {
     val subgraphAttr = DotAttr()
-    val color = rhs match {
-      case pcu: VPCU => indianred
-      case pmu: VPMU => cadetblue
-      case _ => white
-    }
+    val color = getNodeColor(rhs)
 
     // Default attributes
     subgraphAttr.style(filled)

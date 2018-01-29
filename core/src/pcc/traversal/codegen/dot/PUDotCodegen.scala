@@ -16,6 +16,8 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
   override val name: String = "PU Dot Printer"
   override def filename: String = s"PUGraph.${ext}"
 
+  override def rankdir = "LR"
+  override def useOrtho = true
   override protected def quoteOrRemap(arg: Any): String = arg match {
     case s: SRAM[_] => s"$s"
     case s: Void => s"$s"
@@ -55,11 +57,7 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
 
   private def getSubgraphAttr(lhs: Sym[_], rhs: Op[_]): DotAttr = {
     val subgraphAttr = DotAttr()
-    val color = rhs match {
-      case pcu: VPCU => indianred
-      case pmu: VPMU => cadetblue
-      case _ => white
-    }
+    val color = getNodeColor(rhs)
 
     // Default attributes
     subgraphAttr.style(filled)
@@ -116,7 +114,7 @@ pcu00 [shape=plaintext, label=<
   private def getNodeAttr(lhs: Sym[_]): DotAttr = {
     val nodeAttr = DotAttr()
     val color = lhs.op match {
-      case Some(x) => white
+      case Some(x) => getNodeColor(x)
       case None => lightgrey
     }
 

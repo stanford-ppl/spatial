@@ -6,6 +6,7 @@ import pcc.core._
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
+import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
 
 trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
@@ -15,16 +16,19 @@ trait DotCommon { this: Codegen =>
 
   val lang = "dot"
   def ext = s"$lang"
+  def useOrtho = false
 
   val emittedNodes = Set[Any]()
   val edges = ListBuffer[() => Unit]()
 
+  def rankdir = "BT"  // Direction in which graph is laid out
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     emit("digraph G {")
     open
-    emit("rankdir=BT;")
+    emit(s"rankdir=$rankdir;")
     emit("labelloc=\"t\"")
     emit(s"""label="${filename}"""")
+    if (useOrtho) emit(s"splines=ortho")
     block
   }
 
@@ -33,6 +37,12 @@ trait DotCommon { this: Codegen =>
     close
     emit("}")
     block
+  }
+
+  def getNodeColor(rhs: Op[_]) = rhs match {
+    case pcu: VPCU => indianred
+    case pmu: VPMU => cadetblue
+    case _ => white
   }
 
   def emitSubgraph(attr: DotAttr)(f: => Any): Unit = {

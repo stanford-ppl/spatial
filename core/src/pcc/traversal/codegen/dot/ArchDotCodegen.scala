@@ -93,7 +93,7 @@ case class ArchDotCodegen(IR: State) extends Codegen with DotCommon {
     asFields(atLeastOne).map { f => wrapTag(f, "tr") }
   }
 
-  private def getPMUTable(lhs: Sym[_], m: PMUModule) = {
+  private def getPUTable(lhs: Sym[_], m: PUModule[_]) = {
 s"""
 <table  CELLBORDER="1" CELLSPACING="0">
   <tr>
@@ -124,7 +124,7 @@ s"""
     <TD colspan="6">
       <table BORDER="0" CELLBORDER="2" CELLSPACING="0" COLOR="white">
         <tr>
-          <td COLSPAN="6" BGCOLOR="teal"><font color="white"><b>${getNodeName(lhs)}</b></font></td>
+          <td COLSPAN="6" BGCOLOR="${getNodeColor(m).field}"><font color="white"><b>${getNodeName(lhs)}</b></font></td>
         </tr>
         <tr>
           <td HEIGHT="20" BGCOLOR="yellow">
@@ -136,132 +136,6 @@ s"""
           <td HEIGHT="20" BGCOLOR="yellow">
             <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
               <tr><td>x141</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </TD>
-    <TD colspan="1">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        ${asRows(m.vIO(E).map{getNodeName(_)}).mkString("\n")}
-      </table>
-    </TD>
-  </tr>
-  <tr>
-    <TD colspan="1">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        ${asRows(m.vIO(SW).map{getNodeName(_)}).mkString("\n")}
-      </table>
-    </TD>
-    <TD colspan="6">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        <tr>
-        ${asFields(m.vIO(S).map{getNodeName(_)}).mkString("\n")}
-        </tr>
-      </table>
-    </TD>
-    <TD colspan="1">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        ${asRows(m.vIO(SE).map{getNodeName(_)}).mkString("\n")}
-      </table>
-    </TD>
-  </tr>
-</table>
-"""
-  }
-
-  private def getPCUTable(lhs: Sym[_], m: PCUModule) = {
-s"""
-<table  CELLBORDER="1" CELLSPACING="0">
-  <tr>
-    <TD colspan="1">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        ${asRows(m.vIO(NW).map{getNodeName(_)}).mkString("\n")}
-      </table>
-    </TD>
-    <TD colspan="6">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        <tr>
-        ${asFields(m.vIO(N).map{getNodeName(_)}).mkString("\n")}
-        </tr>
-      </table>
-    </TD>
-    <TD colspan="1">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        ${asRows(m.vIO(NE).map{getNodeName(_)}).mkString("\n")}
-      </table>
-    </TD>
-  </tr>
-  <tr>
-    <TD colspan="1">
-      <table BORDER="0" CELLBORDER="1" CELLSPACING="0" COLOR="gray">
-        ${asRows(m.vIO(W).map{getNodeName(_)}).mkString("\n")}
-      </table>
-    </TD>
-    <TD colspan="6">
-      <table BORDER="0" CELLBORDER="2" CELLSPACING="0" COLOR="white">
-        <tr>
-          <td COLSPAN="6" BGCOLOR="indianred"><font color="white"><b>${getNodeName(lhs)}</b></font></td>
-        </tr>
-        <tr>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>*+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x141</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
-              <tr><td>+</td></tr>
-            </table>
-          </td>
-          <td HEIGHT="20" BGCOLOR="yellow">
-            <table BORDER="0" CELLBORDER="0" CELLSPACING="0">
-              <tr><td>x133</td></tr>
               <tr><td>+</td></tr>
             </table>
           </td>
@@ -305,17 +179,17 @@ $tableStr
   private def getNodeAttr(lhs: Sym[_]): DotAttr = {
     val nodeAttr = DotAttr()
     val color = lhs.op match {
-      case Some(x) => getNodeColor(x)
+      case Some(x) => white
       case None => lightgrey
     }
 
     lhs.op.map { op => op match {
       case p: PCUModule =>
         nodeAttr.append("pos", s"${p.x * 10}.0, ${p.y * 5}.0!")
-        nodeAttr.label(getTableLabel(getPCUTable(lhs, p)), quote = false)
+        nodeAttr.label(getTableLabel(getPUTable(lhs, p)), quote = false)
       case p: PMUModule =>
         nodeAttr.append("pos", s"${p.x * 10}.0, ${p.y * 5}.0!")
-        nodeAttr.label(getTableLabel(getPMUTable(lhs, p)), quote = false)
+        nodeAttr.label(getTableLabel(getPUTable(lhs, p)), quote = false)
     }}
 
     nodeAttr.style(filled)

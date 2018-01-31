@@ -68,6 +68,7 @@ object ArchModel_Simple extends Test {
     val g = grid(rows, cols)
 
     g(0)(1).vOut(NW, 0).get ==> g(0)(0).vIn(NE, 0).get
+    g(0)(0).vOut(NE, 0).get ==> g(0)(1).vIn(NW, 0).get
 
 //    y.vOuts(0) ==> x.vIns(0)
   }

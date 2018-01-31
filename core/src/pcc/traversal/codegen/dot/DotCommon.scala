@@ -7,6 +7,7 @@ import pcc.core._
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
 import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
+import pcc.spade.node.{PCUModule, PMUModule}
 
 trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
@@ -41,7 +42,9 @@ trait DotCommon { this: Codegen =>
 
   def getNodeColor(rhs: Op[_]) = rhs match {
     case pcu: VPCU => indianred
+    case pcu: PCUModule => indianred
     case pmu: VPMU => cadetblue
+    case pmu: PMUModule => cadetblue
     case _ => white
   }
 

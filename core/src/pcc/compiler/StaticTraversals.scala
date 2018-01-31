@@ -13,6 +13,7 @@ trait StaticTraversals extends Compiler {
   val flows = new FlowRules {}
 
   val isPIR = false
+  val isArchModel = false
 
   def runPasses[R](block: Block[R]): Unit = {
     lazy val printer = IRPrinter(state)
@@ -20,6 +21,7 @@ trait StaticTraversals extends Compiler {
     lazy val globalAllocation = GlobalAllocation(state)
     lazy val irDotCodegen = IRDotCodegen(state)
     lazy val puDotCodegen = PUDotCodegen(state)
+    lazy val archDotCodegen = ArchDotCodegen(state)
 
     block ==>
       printer ==>
@@ -27,8 +29,9 @@ trait StaticTraversals extends Compiler {
       !isPIR ? printer ==>
       !isPIR ? globalAllocation ==>
       !isPIR ? printer ==>
-        isPIR ? irDotCodegen ==>
-      isPIR ? puDotCodegen
+      (isPIR & !isArchModel) ? puDotCodegen ==>
+      (isPIR | isArchModel) ? irDotCodegen ==>
+      (isArchModel) ? archDotCodegen
   }
 
 }

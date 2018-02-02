@@ -46,7 +46,10 @@ abstract class EnabledControl extends Control {
 abstract class Pipeline extends EnabledControl
 
 /** Nodes with bodies which execute multiple times **/
-abstract class Loop extends Pipeline
+abstract class Loop extends Pipeline {
+  def iters: Seq[I32]
+  def bodies: Seq[(Seq[I32],Seq[Block[_]])]
+}
 
 /** Nodes with non-zero latency, no internal state, which can be conditionally executed **/
 abstract class Primitive[A:Sym] extends AccelOp[A] {

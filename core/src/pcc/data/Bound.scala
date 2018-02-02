@@ -20,13 +20,11 @@ case class SymbolBound(bound: Bound) extends SimpleData[SymbolBound]
 }
 
 object Final {
-  def apply(x: Int): Final = Final(x)
   @stateful def unapply(x: Sym[_]): Option[Int] = boundOf.get(x) match {
     case Some(x: Final) => Some(x.toInt)
     case _ => None
   }
 }
 object Expect {
-  def apply(x: Int): Expect = Expect(x)
   @stateful def unapply(x: Sym[_]): Option[Int] = boundOf.get(x).map(_.toInt)
 }

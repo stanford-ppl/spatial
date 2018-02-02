@@ -61,8 +61,8 @@ abstract class Op[T:Sym] extends Product with Serializable {
   /** Effects **/
   def effects: Effects = blocks.map(_.effects).fold(Effects.Pure){(a,b) => a andAlso b }
 
-  def mirror(f:Tx): Op[T]
-  def update(f:Tx): Unit
+  def mirror(f:Tx): Op[T] = throw new Exception(s"Use @op annotation or override mirror method for node class $productPrefix")
+  def update(f:Tx): Unit  = throw new Exception(s"Use @op annotation or override update method for node class $productPrefix")
 }
 
 object Op {

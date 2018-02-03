@@ -23,45 +23,45 @@ sealed abstract class ConfigBlackBox[T:Bits] extends Primitive[T]
 abstract class PU extends Control {
   def ins: mutable.Map[Int,In[_]]
   def outs: mutable.Map[Int,Out[_]]
-  override def binds = super.binds ++ ins.values ++ outs.values
+
+  def iterss: Seq[Seq[I32]]
+
+  def ccs: Seq[CounterChain] = this.blocks.flatMap(getCChains)
+  override def iters   = iterss.flatten
+  override def cchains = ccs.zip(iterss)
+  override def bodies  = Seq(iters -> this.blocks)
+
+  override def binds = super.binds ++ ins.values ++ outs.values ++ iters
 }
 
 // Virtual switch (outer controller)
 @op case class VSwitch(
-  scope: Block[Void],
-  iters: Seq[I32],
-  ins:   mutable.Map[Int,In[_]] = mutable.Map.empty,
-  outs:  mutable.Map[Int,Out[_]] = mutable.Map.empty
+  scope:  Block[Void],
+  iterss: Seq[Seq[I32]],
+  ins:    mutable.Map[Int,In[_]] = mutable.Map.empty,
+  outs:   mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def cchains = scope.stms.collect{case s: CounterChain => s}
   override def inputs = syms(scope)
-  override def binds = super.binds ++ iters
 }
 
 // Address Generator
 @op case class AG(
   datapath: Block[Void],
   iterss:   Seq[Seq[I32]],
-  ins:   mutable.Map[Int,In[_]] = mutable.Map.empty,
-  outs:  mutable.Map[Int,Out[_]] = mutable.Map.empty
+  ins:      mutable.Map[Int,In[_]] = mutable.Map.empty,
+  outs:     mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def cchains = getCChains(datapath)
-  override def iters   = iterss.flatten
-  override def inputs  = syms(datapath)
-  override def binds   = super.binds ++ iterss.flatten
+  override def inputs = syms(datapath)
 }
 
 // Virtual compute unit
 @op case class VPCU(
   datapath: Block[Void],
   iterss:   Seq[Seq[I32]],
-  ins:   mutable.Map[Int,In[_]] = mutable.Map.empty,
-  outs:  mutable.Map[Int,Out[_]] = mutable.Map.empty
+  ins:      mutable.Map[Int,In[_]] = mutable.Map.empty,
+  outs:     mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def cchains = getCChains(datapath)
-  override def iters   = iterss.flatten
   override def inputs  = syms(datapath)
-  override def binds   = super.binds ++ iterss.flatten
 }
 
 // Virtual memory unit
@@ -74,10 +74,14 @@ abstract class PU extends Control {
   ins:   mutable.Map[Int,In[_]] = mutable.Map.empty,
   outs:  mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def cchains = rdPath.map(getCChains).getOrElse(Nil) ++ wrPath.map(getCChains).getOrElse(Nil)
-  override def iters = rdIters.flatten ++ wrIters.flatten
+  override def iterss = rdIters ++ wrIters
+  override def cchains = rdPath.toSeq.flatMap{getCChains}.zip(rdIters) ++
+                         wrPath.toSeq.flatMap{getCChains}.zip(wrIters)
+
+  override def bodies = rdPath.map{blk => rdIters.flatten -> Seq(blk) }.toSeq ++
+                        wrPath.map{blk => wrIters.flatten -> Seq(blk) }
+
   override def inputs = syms(rdPath) ++ syms(wrPath) ++ syms(memories)
-  override def binds  = super.binds ++ iters
 
   def getWdata(): Option[Sym[_]] = {
     wrPath.flatMap { b =>

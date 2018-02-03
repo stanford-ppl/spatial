@@ -144,7 +144,7 @@ pcu00 [shape=plaintext, label=<
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    println(s"[PUDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
+    dbgs(s"[PUDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
 
     if (needsSubgraph(rhs)) {
       emitSubgraph(getSubgraphAttr(lhs, rhs)) { visitCommon(lhs, rhs) }

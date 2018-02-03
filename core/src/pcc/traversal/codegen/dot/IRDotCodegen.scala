@@ -104,7 +104,7 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    println(s"[IRDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
+    dbgs(s"[IRDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
 
     if (needsSubgraph(rhs)) {
       emitSubgraph(getSubgraphAttr(lhs, rhs)) { visitCommon(lhs, rhs) }

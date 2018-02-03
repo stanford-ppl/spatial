@@ -1,27 +1,63 @@
 name := "pcc"
 
-version := "1.0"
+val pcc_version = "1.0"
+val scala_version     = "2.12.4"
+val scalatest_version = "3.0.4"
+val paradise_version  = "2.1.0"
 
-scalaVersion := "2.12.4"
-
-val scalatestVersion = "3.0.4"
-val paradiseVersion = "2.1.0"
+scalaVersion := scala_version
+version := pcc_version
 
 val commonSettings = Seq(
+  scalaVersion := scala_version,
+  version := pcc_version,
+
+  /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-    "org.scalatest" %% "scalatest" % scalatestVersion % "test",
-    "org.scala-lang.modules"  %% "scala-parser-combinators" % "1.0.4"
+    "org.scala-lang" % "scala-reflect" % scala_version,
+    "org.scalatest" %% "scalatest" % scalatest_version % "test",
+    "org.scala-lang.modules"  %% "scala-parser-combinators" % "1.0.4",
+    "com.github.scopt" %% "scopt" % "3.5.0",
+    //"com.github.pureconfig" %% "pureconfig" % "0.7.0",
+    "org.apache.commons" % "commons-lang3" % "3.3.2",
+    "commons-io" % "commons-io" % "2.5"
   ),
 
-  //paradise
+  /** Scalac Options **/
+  scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
+  scalacOptions += "-opt:box-unbox",                // Optimizations
+  scalacOptions += "-opt:copy-propagation",
+  scalacOptions += "-opt:simplify-jumps",
+  scalacOptions += "-opt:compact-locals",
+  scalacOptions += "-opt:redundant-casts",
+  scalacOptions += "-opt:nullness-tracking",
+  scalacOptions += "-opt:closure-invocations",
+
+  scalacOptions += "-opt-warnings:_",               // Optimization warnings
+  scalacOptions += "-unchecked",                    // Enable additional warnings
+  scalacOptions += "-deprecation",                  // Enable warnings on deprecated usage
+  scalacOptions += "-feature",                      // Warnings for features requiring explicit import
+  scalacOptions += "-Xfatal-warnings",              // Warnings are errors
+  scalacOptions += "-language:higherKinds",         // Globally enable higher kinded type parameters
+  scalacOptions += "-language:implicitConversions", // Globally enable implicit conversions
+  scalacOptions += "-language:experimental.macros", // Globally enable macros
+
+  /** Testing **/
+  parallelExecution in Test := false,
+  resourceDirectory in Compile := baseDirectory(_/ "resources").value,
+  scalaSource in Compile := baseDirectory(_/"src").value,
+  scalaSource in Test := baseDirectory(_/"test").value,
+
+    /** Macro Paradise **/
   resolvers += Resolver.sonatypeRepo("snapshots"),
   resolvers += Resolver.sonatypeRepo("releases"),
-  addCompilerPlugin("org.scalamacros" % "paradise" % paradiseVersion cross CrossVersion.full)
+  addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
+
+  /** Other **/
+  publishArtifact := false
 )
 
-publishArtifact := false
-
+/** Project structure **/
 lazy val forge: Project = project
   .settings(commonSettings)
 

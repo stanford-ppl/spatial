@@ -21,7 +21,8 @@ sealed abstract class BlackBox extends Control {
   nt:    I32,
   iters: Seq[I32]
 ) extends BlackBox {
-  override def cchains = Seq(cchain)
+  override def cchains = Seq(cchain -> iters)
+  override def bodies = Seq(iters -> Nil)
   override def effects: Effects = Effects.Writes(y)
 }
 

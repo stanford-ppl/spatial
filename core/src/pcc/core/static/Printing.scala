@@ -73,7 +73,7 @@ trait Printing {
   @stateful def log(x: => Any): Unit = if (config.enLog) state.log.println(x)
   @stateful def logs(x: => Any): Unit = if (config.enLog) state.log.println("  "*state.logTab + x)
 
-  @stateful def stm(lhs: Sym[_]): String = lhs.rhs match {
+  def stm(lhs: Sym[_]): String = lhs.rhs match {
     case Nix => s"$lhs"
     case One(c) => s"$lhs = $c"
     case Two(rhs) => s"$lhs = $rhs"

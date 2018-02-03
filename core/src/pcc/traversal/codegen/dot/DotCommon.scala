@@ -24,7 +24,7 @@ trait DotCommon { this: Codegen =>
   def rankdir = "BT"  // Direction in which graph is laid out
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     emit("digraph G {")
-    open
+    open()
     emit(s"rankdir=$rankdir;")
     emit("labelloc=\"t\"")
     emit(s"""label="${filename}"""")
@@ -34,7 +34,7 @@ trait DotCommon { this: Codegen =>
 
   override protected def postprocess[R](block: Block[R]): Block[R] = {
     edges.foreach {_()}
-    close
+    close()
     emit("}")
     block
   }
@@ -47,12 +47,12 @@ trait DotCommon { this: Codegen =>
 
   def emitSubgraph(attr: DotAttr)(f: => Any): Unit = {
     emit(s"subgraph cluster_${attr.attrMap("label")} {")
-    open
+    open()
     attr.attrMap.keys.foreach { k =>
       emit(s"$k=${attr.attrMap(k)}")
     }
     f
-    close
+    close()
     emit("}")
   }
   def emitNode(n: Any, attr: DotAttr): Unit = {

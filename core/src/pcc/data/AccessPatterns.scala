@@ -81,10 +81,10 @@ case class AffineProduct(a: Sum, i: I32) {
 case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[I32,Option[I32]], last: Option[I32]) {
 
   /**
-    * Convert this to a sparse vector representation if all affine multipliers are representable as constants.
-    * Otherwise, returns None.
+    * Convert this to a sparse vector representation if it is representable as an affine equation with
+    * constant multipliers. Returns None otherwise.
     */
-  def getSparseVector: Option[(SparseVector,Seq[I32])] = {
+  @stateful def getSparseVector: Option[SparseVector] = {
     val is = comps.map(_.i)
     val as = comps.map{_.a.partialEval{case Expect(c) => c}}
     val bx = ofs.partialEval{case Expect(c) => c}
@@ -92,14 +92,26 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[I3
       val randComponents = bx.ps.map{p => (p.m, p.xs.head) }
       val rs: Seq[(I32,Int)] = randComponents.groupBy(_._2).mapValues{as => as.map(_._1).sum}.toSeq
 
-      val xs: Seq[I32] = is ++ rs.map(_._1)
+      val xs_all: Seq[I32] = is ++ rs.map(_._1)
       val as_all: Seq[Int] = as.map(_.b) ++ rs.map(_._2)
-      val xs_str: Seq[String] = xs.map(_.toString)
-      val lastIs = lastIters.map{case (k,v) => k.toString -> v }
-      Some( SparseVector(xs_str.zip(as_all).toMap, bx.b, lastIs), rs.map(_._1))
+      val lastIs = lastIters.map{case (k,v) => k -> v }
+      Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIs) )
     }
     else None
   }
+
+  /**
+    * Convert this to a sparse vector representation if it is representable as an affine equation with
+    * constant multipliers. Falls back to a representation of 1*x + 0 otherwise.
+    */
+  @stateful def toSparseVector(x: () => I32): SparseVector = {
+    getSparseVector.getOrElse{
+      val y = x()
+      SparseVector(Map(y -> 1), 0, Map(y -> last))
+    }
+  }
+
+  override def toString: String = comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs
 }
 
 case class AccessPattern(pattern: Seq[AddressPattern]) extends SimpleData[AccessPattern]

@@ -39,11 +39,11 @@ trait HelpersControl {
   }
 
   implicit class IndexHelperOps(i: I32) {
-    def ctrStart: I32 = ctrOf(i).start
-    def ctrStep: I32 = ctrOf(i).step
-    def ctrEnd: I32 = ctrOf(i).end
-    def ctrPar: I32 = ctrOf(i).ctrPar
-    def ctrParOr1: Int = ctrOf.get(i).map(_.ctrPar.toInt).getOrElse(1)
+    @stateful def ctrStart: I32 = ctrOf(i).start
+    @stateful def ctrStep: I32 = ctrOf(i).step
+    @stateful def ctrEnd: I32 = ctrOf(i).end
+    @stateful def ctrPar: I32 = ctrOf(i).ctrPar
+    @stateful def ctrParOr1: Int = ctrOf.get(i).map(_.ctrPar.toInt).getOrElse(1)
   }
 
 
@@ -51,8 +51,8 @@ trait HelpersControl {
     * Returns the least common ancestor (LCA) of the two controllers.
     * If the controllers have no ancestors in common, returns None.
     */
-  def LCA(a: Ctrl, b: Ctrl): Option[Ctrl] = DAG.LCA(a, b){ctrlParent}
-  def LCA(a: Option[Ctrl], b: Option[Ctrl]): Option[Ctrl] = (a,b) match {
+  @stateful def LCA(a: Ctrl, b: Ctrl): Option[Ctrl] = DAG.LCA(a, b){ctrlParent}
+  @stateful def LCA(a: Option[Ctrl], b: Option[Ctrl]): Option[Ctrl] = (a,b) match {
     case (Some(c1),Some(c2)) => LCA(c1,c2)
     case _ => None
   }

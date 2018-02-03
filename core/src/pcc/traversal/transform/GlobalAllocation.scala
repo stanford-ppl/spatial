@@ -88,7 +88,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
       implicit val ctx: SrcCtx = block.result.ctx
       Void.c
     }
-    val psu = VSwitch(blk, iters)
+    val psu = VSwitch(blk, Seq(iters))
     stage(psu).asInstanceOf[Sym[A]]
   }
 

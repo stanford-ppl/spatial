@@ -25,4 +25,7 @@ import pcc.traversal.transform.Transformer
 ) extends Loop {
   override def inputs = syms(ens) ++ syms(cchain) ++ syms(block)
   override def binds = super.binds ++ iters
+
+  def cchains = Seq(cchain -> iters)
+  def bodies = Seq(iters -> Seq(block))
 }

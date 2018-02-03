@@ -13,21 +13,27 @@ import pcc.lang._
 /** FIFO **/
 @op case class FIFONew[A:Bits](depth: I32) extends Memory[FIFO[A]] {
   override def effects: Effects = Effects.Mutable
+  def dims = Seq(depth)
 }
 
 /** LIFO **/
 @op case class LIFONew[A:Bits](depth: I32) extends Memory[LIFO[A]] {
   override def effects: Effects = Effects.Mutable
+  def dims = Seq(depth)
 }
 
 /** Reg **/
 @op case class RegNew[T:Bits](reset: T) extends Memory[Reg[T]] {
   override def effects: Effects = Effects.Mutable
+  def dims = Nil
 }
 
-@op case class ArgInNew[T:Bits](init: T) extends Memory[Reg[T]]
+@op case class ArgInNew[T:Bits](init: T) extends Memory[Reg[T]] {
+  def dims = Nil
+}
 @op case class ArgOutNew[T:Bits](init: T) extends Memory[Reg[T]] {
   override def effects: Effects = Effects.Mutable
+  def dims = Nil
 }
 
 @op case class RegWrite[T:Bits](reg: Reg[T], data: T, ens: Seq[Bit]) extends Writer(reg,data.asSym,Nil,ens)

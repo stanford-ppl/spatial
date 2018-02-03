@@ -2,7 +2,7 @@ package pcc.data
 
 import forge._
 import pcc.core._
-import pcc.lang._
+import pcc.data._
 import pcc.node._
 
 trait FlowRules {
@@ -43,6 +43,15 @@ trait FlowRules {
     op.blocks.zipWithIndex.foreach{case (blk,id) =>
       blk.stms.foreach{lhs => parentOf(lhs) = Ctrl(s,id) }
     }
+  }
+
+  @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
+    case loop: Loop =>
+      loop.cchains.foreach{case (cchain,is) =>
+        cchain.ctrs.zip(is).foreach{case (ctr, i) => ctrOf(i) = ctr }
+      }
+
+    case _ =>
   }
 
 }

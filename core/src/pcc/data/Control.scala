@@ -2,6 +2,7 @@ package pcc.data
 
 import forge._
 import pcc.core._
+import pcc.lang._
 
 sealed abstract class ControlLevel
 case object Outer extends ControlLevel
@@ -33,3 +34,9 @@ case class Parent(parent: Ctrl) extends SimpleData[Parent]
   def update(x: Sym[_], parent: Ctrl): Unit = metadata.add(x, Parent(parent))
 }
 
+case class IndexCounter(ctr: Counter) extends SimpleData[IndexCounter]
+@data object ctrOf {
+  def get(i: I32): Option[Counter] = metadata[IndexCounter](i).map(_.ctr)
+  def apply(i: I32): Counter = ctrOf.get(i).getOrElse{throw new Exception(s"No counter associated with $i") }
+  def update(i: I32, ctr: Counter): Unit = metadata.add(i, IndexCounter(ctr))
+}

@@ -8,6 +8,18 @@ import org.apache.commons.lang3.StringEscapeUtils.escapeJava
 
 /** Miscellaneous Utilities **/
 package object util {
+  /**
+    * Returns an iterator over the multi-dimensional space `dims`.
+    * If dims is empty, trivially returns an iterator with only one element (Nil)
+    */
+  def multiLoop(dims: Seq[Int]): Iterator[Seq[Int]] = {
+    val ndims = dims.length
+    val prods = List.tabulate(ndims) { i => dims.slice(i + 1, ndims).product }
+    val total = dims.product
+    (0 until total).iterator.map{x => Seq.tabulate(ndims){d => (x / prods(d)) % dims(d) } }
+  }
+  def multiLoopWithIndex(dims: Seq[Int]): Iterator[(Seq[Int],Int)] = multiLoop(dims).zipWithIndex
+
   def escapeString(raw: String): String = "\"" + escapeJava(raw) + "\""
   def escapeChar(raw: Char): String = "'"+escapeJava(raw.toString)+"'"
 

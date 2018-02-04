@@ -7,12 +7,12 @@ import pcc.node._
 
 import scala.collection.mutable
 
-case class SRAM[A](eid: Int, tA: Bits[A]) extends LocalMem[A,SRAM](eid) {
+case class SRAM[A](eid: Int, tA: Bits[A], dummy: String) extends LocalMem[A,SRAM](eid) {
   type AI = tA.I
   override type I = Array[AI]
   private implicit val bA: Bits[A] = tA
 
-  override def fresh(id: Int): SRAM[A] = new SRAM[A](id, tA)
+  override def fresh(id: Int): SRAM[A] = new SRAM[A](id, tA, dummy)
   override def stagedClass: Class[SRAM[A]] = classOf[SRAM[A]]
   override def typeArguments: List[Sym[_]] = List(tA)
 
@@ -28,10 +28,8 @@ case class SRAM[A](eid: Int, tA: Bits[A]) extends LocalMem[A,SRAM](eid) {
   @api def update(i: I32, j: I32, k: I32, l: I32, data: A): pcc.lang.Void = SRAM.write(this,data,Seq(i,j,k,l),Nil)
 }
 object SRAM {
-  private def apply[A](eid: Int, tA: Bits[A]): SRAM[A] = new SRAM[A](eid,tA)
-
   private lazy val types = new mutable.HashMap[Bits[_],SRAM[_]]()
-  implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(bits[A], new SRAM[A](-1,bits[A])).asInstanceOf[SRAM[A]]
+  implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(bits[A], new SRAM[A](-1,bits[A],null)).asInstanceOf[SRAM[A]]
 
   @api def apply[A:Bits](dims: I32*): SRAM[A] = stage(SRAMNew(dims))
 

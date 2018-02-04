@@ -1,9 +1,10 @@
 name := "pcc"
 
 val pcc_version = "1.0"
-val scala_version     = "2.12.4"
+val scala_version     = "2.11.12"
 val scalatest_version = "3.0.4"
 val paradise_version  = "2.1.0"
+enablePlugins(ScalaNativePlugin)
 
 scalaVersion := scala_version
 version := pcc_version
@@ -24,16 +25,17 @@ val commonSettings = Seq(
   ),
 
   /** Scalac Options **/
-  scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
-  scalacOptions += "-opt:box-unbox",                // Optimizations
-  scalacOptions += "-opt:copy-propagation",
-  scalacOptions += "-opt:simplify-jumps",
-  scalacOptions += "-opt:compact-locals",
-  scalacOptions += "-opt:redundant-casts",
-  scalacOptions += "-opt:nullness-tracking",
-  scalacOptions += "-opt:closure-invocations",
+  //  scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
+  //  scalacOptions += "-opt:box-unbox",                // Optimizations
+  //  scalacOptions += "-opt:copy-propagation",
+  //  scalacOptions += "-opt:simplify-jumps",
+  //  scalacOptions += "-opt:compact-locals",
+  //  scalacOptions += "-opt:redundant-casts",
+  //  scalacOptions += "-opt:nullness-tracking",
+  //  scalacOptions += "-opt:closure-invocations",
+  //  scalacOptions += "-opt-warnings:_",               // Optimization warnings
+  //  scalacOptions += "-optimise",
 
-  scalacOptions += "-opt-warnings:_",               // Optimization warnings
   scalacOptions += "-unchecked",                    // Enable additional warnings
   scalacOptions += "-deprecation",                  // Enable warnings on deprecated usage
   scalacOptions += "-feature",                      // Warnings for features requiring explicit import
@@ -41,6 +43,7 @@ val commonSettings = Seq(
   scalacOptions += "-language:higherKinds",         // Globally enable higher kinded type parameters
   scalacOptions += "-language:implicitConversions", // Globally enable implicit conversions
   scalacOptions += "-language:experimental.macros", // Globally enable macros
+  scalacOptions += "-language:existentials",        // Globally enable existentials
 
   /** Testing **/
   parallelExecution in Test := false,

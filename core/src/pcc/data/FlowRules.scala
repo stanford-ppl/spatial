@@ -14,14 +14,14 @@ trait FlowRules {
 
   @flow def accesses(s: Sym[_], op: Op[_]): Unit = op match {
     case Accessor(wr,rd) =>
-      wr.foreach{w => writersOf(w.mem) += s }
-      rd.foreach{r => readersOf(r.mem) += s }
+      wr.foreach{w => writersOf(w.mem) = writersOf(w.mem) + s }
+      rd.foreach{r => readersOf(r.mem) = readersOf(r.mem) + s }
     case _ =>
   }
 
   @flow def accumulator(s: Sym[_], op: Op[_]): Unit = {
-    if (s.isReader) readUsesOf(s) += s
-    readUsesOf(s) ++= s.dataInputs.flatMap{in => readUsesOf(in) }
+    if (s.isReader) readUsesOf(s) = readUsesOf(s) + s
+    readUsesOf(s) = readUsesOf(s) ++ s.dataInputs.flatMap{in => readUsesOf(in) }
 
     s match {
       case Writer(wrMem,_,_,_) =>

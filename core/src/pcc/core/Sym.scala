@@ -36,7 +36,6 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
 
   @inline final def viewAsSym(x: A): Sym[A] = ev(x)
   @inline final def asSym: Sym[A] = this
-  @inline final def asType[T]: T = this.asInstanceOf[T]
 
   override def toString: String = if (isType) this.typeName else _rhs match {
     case One(c) => s"${escapeConst(c)}"
@@ -55,11 +54,13 @@ abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self 
   def typeArguments: List[Sym[_]] = Nil
   def stagedClass: Class[A]
   def typeName: String = productPrefix + (if (typeArguments.isEmpty) "" else typeArguments.map(_.typeName).mkString("[", ",", "]"))
+  def tp: A = fresh(-1)
+  def mtyp[B]: B = this.tp.asInstanceOf[B]
 
   final def <:<(that: Sym[_]): Boolean = isSubtype(this.stagedClass, that.stagedClass)
   final def <:>(that: Sym[_]): Boolean = this <:< that && that <:< this
 
-  @api def toText: Text = Text.textify(me)(this.asType[A],ctx,state)
+  @api def toText: Text = Text.textify(me)(this.tp,ctx,state)
 }
 
 object Lit {

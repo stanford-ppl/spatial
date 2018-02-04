@@ -4,16 +4,11 @@ package analysis
 import pcc.core._
 import pcc.data._
 import pcc.lang._
-import pcc.util.multiLoop
 
-import scala.collection.mutable
+class MemoryConfigurer[C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State) extends AccessExpansion(mem) {
+  protected val rank: Int = rankOf(mem)
 
-case class MemoryConfigurer[C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State)
-  extends AccessExpansion(mem)
-{
-  private val rank: Int = rankOf(mem)
-
-
+  
 
 
 }

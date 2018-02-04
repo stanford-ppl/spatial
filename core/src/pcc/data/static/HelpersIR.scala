@@ -27,9 +27,4 @@ trait HelpersIR {
   implicit class ParamHelpers(x: I32) {
     def toInt: Int = x.c.getOrElse{throw new Exception(s"Cannot convert symbol $x to a constant")}
   }
-
-  implicit class SeqHelpers[T](x: Seq[T]) {
-    def get(i: Int): Option[T] = if (i >= 0 && i < x.length) Some(x(i)) else None
-    def indexOrElse(i: Int, els: => T): T = if (i >= 0 && i < x.length) x(i) else els
-  }
 }

@@ -1,8 +1,5 @@
 package pcc
 
-import pcc.data.static._
+import pcc.data.static.Helpers
 
-package object data extends HelpersIR
-  with HelpersControl
-  with HelpersHierarchy
-  with HelpersMemory
+package object data extends Helpers

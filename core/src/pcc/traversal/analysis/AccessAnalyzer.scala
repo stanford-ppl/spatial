@@ -109,7 +109,7 @@ case class AccessAnalyzer(IR: State) extends Traversal {
     val Affine(products, offset) = x
     val components = products.toAffineProducts
     val lastIters  = offset.syms.map{x => x -> lastVariantIter(iters,x) }.toMap
-    val lastIter   = lastIters.values.maxBy{i => i.map{iters.indexOf}.getOrElse(-1) }
+    val lastIter   = lastIters.values.maxFoldBy(None){i => i.map{iters.indexOf}.getOrElse(-1) }
     val pattern = AddressPattern(components, offset, lastIters, lastIter)
     dbgs(s"${stm(x)} [ADDRESS]")
     dbgs(s"  pattern: $pattern")

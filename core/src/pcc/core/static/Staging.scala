@@ -20,7 +20,7 @@ trait Staging { this: Printing =>
   @stateful def param[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asParam(c)
   @stateful def symbol[T](tp: Sym[T], d: Op[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asSymbol(d)
 
-  @internal def register[T](op: Op[T], symbol: () => T): T = rewrites.apply(op) match {
+  @internal def register[T](op: Op[T], symbol: () => T): T = rewrites.apply(op)(op.tR,ctx,state) match {
     case Some(s) => s
     case None    =>
       if (state == null) throw new Exception("Null state during staging")

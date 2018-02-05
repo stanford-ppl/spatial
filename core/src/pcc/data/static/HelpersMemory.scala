@@ -6,13 +6,15 @@ import pcc.data._
 import pcc.node._
 import pcc.lang._
 
-import scala.language.existentials
-
 trait HelpersMemory { this: HelpersControl =>
 
   def rankOf[C[_]](mem: Mem[_,C]): Int = mem match {
-    case Op(m: Memory[_]) => m.rank
+    case Op(m: MemAlloc[_]) => m.rank
     case _ => throw new Exception(s"Could not statically determine the rank of $mem")
+  }
+  def dimsOf[C[_]](mem: Mem[_,C]): Seq[I32] = mem match {
+    case Op(m: MemAlloc[_]) => m.dims
+    case _ => throw new Exception(s"Could not statically determine the dimensions of $mem")
   }
 
   /**
@@ -29,8 +31,8 @@ trait HelpersMemory { this: HelpersControl =>
     def isRemoteMem: Boolean = x.isInstanceOf[RemoteMem[_,C forSome {type C[_]}]]
 
     def isReg: Boolean = x.isInstanceOf[Reg[_]]
-    def isArgIn: Boolean = x.op.exists(_.isInstanceOf[ArgInNew[_]])
-    def isArgOut: Boolean = x.op.exists(_.isInstanceOf[ArgOutNew[_]])
+    def isArgIn: Boolean = x.op.exists{op => op.isInstanceOf[ArgInNew[_]]}
+    def isArgOut: Boolean = x.op.exists{op => op.isInstanceOf[ArgOutNew[_]]}
 
     def isSRAM: Boolean = x.isInstanceOf[SRAM[_]]
     def isFIFO: Boolean = x.isInstanceOf[FIFO[_]]

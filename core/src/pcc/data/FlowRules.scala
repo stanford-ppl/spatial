@@ -8,7 +8,7 @@ import pcc.node._
 trait FlowRules {
 
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
-    case Memory(mem) if mem.isLocalMem => localMems += mem
+    case MemAlloc(mem) if mem.isLocalMem => localMems += mem
     case _ =>
   }
 

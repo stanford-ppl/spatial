@@ -2,7 +2,7 @@ package pcc.lang.static
 
 import forge._
 import pcc.core._
-import pcc.data.domainOf
+import pcc.data.rangeOf
 
 import scala.runtime.RichInt
 
@@ -55,7 +55,7 @@ trait Ints extends LowPriorityIntegerOps {
 
   @internal def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
     val p = I32.p(default)
-    domainOf(p) = (start, stride, end)
+    rangeOf(p) = (start, stride, end)
     p
   }
 

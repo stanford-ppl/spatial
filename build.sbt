@@ -1,10 +1,10 @@
 name := "pcc"
 
 val pcc_version = "1.0"
-val scala_version     = "2.11.12"
+val scala_version     = "2.12.4" //"2.11.12"
 val scalatest_version = "3.0.4"
 val paradise_version  = "2.1.0"
-enablePlugins(ScalaNativePlugin)
+// enablePlugins(ScalaNativePlugin) // requires scala 2.11.12
 
 scalaVersion := scala_version
 version := pcc_version
@@ -15,13 +15,13 @@ val commonSettings = Seq(
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scala_version,
-    "org.scalatest" %% "scalatest" % scalatest_version % "test",
-    "org.scala-lang.modules"  %% "scala-parser-combinators" % "1.0.4",
-    "com.github.scopt" %% "scopt" % "3.5.0",
+    "org.scala-lang" % "scala-reflect" % scala_version,                 // Reflection
+    "org.scalatest" %% "scalatest" % scalatest_version % "test",        // Testing
+    "org.scala-lang.modules"  %% "scala-parser-combinators" % "1.0.4",  // Parsing
+    "com.github.scopt" %% "scopt" % "3.5.0",                            // Command line parsing
+    "org.apache.commons" % "commons-lang3" % "3.3.2",                   // Apache common (utils)
+    "commons-io" % "commons-io" % "2.5"                                 // Apache common (utils)
     //"com.github.pureconfig" %% "pureconfig" % "0.7.0",
-    "org.apache.commons" % "commons-lang3" % "3.3.2",
-    "commons-io" % "commons-io" % "2.5"
   ),
 
   /** Scalac Options **/
@@ -34,7 +34,6 @@ val commonSettings = Seq(
   //  scalacOptions += "-opt:nullness-tracking",
   //  scalacOptions += "-opt:closure-invocations",
   //  scalacOptions += "-opt-warnings:_",               // Optimization warnings
-  //  scalacOptions += "-optimise",
 
   scalacOptions += "-unchecked",                    // Enable additional warnings
   scalacOptions += "-deprecation",                  // Enable warnings on deprecated usage

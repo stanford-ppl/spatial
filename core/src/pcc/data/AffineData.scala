@@ -1,5 +1,6 @@
 package pcc.data
 
+import forge._
 import pcc.core._
 import pcc.lang._
 
@@ -50,4 +51,27 @@ case class AccessMatrix(
     matrix.printWithTab(print)
   }
   def keys: Set[I32] = matrix.keys
+}
+
+
+case class AffineMatrices(matrices: Seq[AccessMatrix]) extends SimpleData[AffineMatrices]
+@data object affineMatricesOf {
+  def get(access: Sym[_]): Option[Seq[AccessMatrix]] = metadata[AffineMatrices](access).map(_.matrices)
+  def apply(access: Sym[_]): Seq[AccessMatrix] = affineMatricesOf.get(access).getOrElse{throw new Exception(s"No affine matrices defined for $access")}
+  def update(access: Sym[_], matrices: Seq[AccessMatrix]): Unit = metadata.add(access, AffineMatrices(matrices))
+}
+
+case class Domain(domain: Seq[SparseConstraint]) extends SimpleData[Domain]
+@data object domainOf {
+  def get(x: Sym[_]): Option[Seq[SparseConstraint]] = metadata[Domain](x).map(_.domain)
+  def apply(x: Sym[_]): Seq[SparseConstraint] = domainOf.get(x).getOrElse{throw new Exception(s"No domain defined for $x")}
+  def update(x: Sym[_], domain: Seq[SparseConstraint]): Unit = metadata.add(x, Domain(domain))
+
+  def getOrElseUpdate(x: Sym[_], els: => Seq[SparseConstraint]): Seq[SparseConstraint] = domainOf.get(x) match {
+    case Some(domain) => domain
+    case None =>
+      val domain = els
+      domainOf(x) = domain
+      domain
+  }
 }

@@ -8,14 +8,14 @@ import pcc.util.multiLoop
 
 import scala.collection.mutable
 
-abstract class AccessExpansion(mem: Sym[_])(implicit state: State) {
-  private val domains = mutable.HashMap[I32,Seq[SparseConstraint]]()
+trait AccessExpansion {
+  implicit def __IR: State
   private val unrolls = mutable.HashMap[(I32,Seq[Int]),I32]()
 
   private def nextRand(): I32 = bound[I32]
   private def nextRand(x: I32): I32 = {
     val x2 = nextRand()
-    domains.get(x).foreach{d => domains += (x2 -> d) }
+    domainOf.get(x).foreach{d => domainOf(x2) = d }
     x2
   }
   private def unrolled(x: I32, id: Seq[Int]): I32 = unrolls.getOrElseUpdate((x,id), nextRand(x))
@@ -24,7 +24,7 @@ abstract class AccessExpansion(mem: Sym[_])(implicit state: State) {
     * Returns a SparseMatrix representing the minimum and maximum bounds of this symbol.
     * TODO: Account for bounds of random values
     */
-  private def getOrAddDomain(x: I32): Seq[SparseConstraint] = domains.getOrElseUpdate(x, {
+  private def getOrAddDomain(x: I32): Seq[SparseConstraint] = domainOf.getOrElseUpdate(x, {
     if (ctrOf.get(x).isDefined) {
       val min = constraint(x, x.ctrStart, isMin = true)
       val max = constraint(x, x.ctrEnd, isMin = false)
@@ -46,17 +46,22 @@ abstract class AccessExpansion(mem: Sym[_])(implicit state: State) {
   def domain(x: I32): Seq[SparseConstraint] = getOrAddDomain(x)
 
 
-  def getAccessCompactMatrix(access: Sym[_], addr: Seq[I32]): SparseMatrix = {
-    val aps = accessPatternOf(access)
-    val rows = aps.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => addr.indexOrElse(d,nextRand())} }
+  def getAccessCompactMatrix(access: Sym[_], addr: Seq[I32], pattern: Seq[AddressPattern]): SparseMatrix = {
+    val rows = pattern.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => addr.indexOrElse(d,nextRand())} }
     SparseMatrix(rows)
   }
 
-  def getUnrolledMatrix(access: Sym[_], addr: Seq[I32], vecID: Seq[Int] = Nil): Seq[AccessMatrix] = {
+  def getUnrolledMatrices(
+    mem:     Sym[_],
+    access:  Sym[_],
+    addr:    Seq[I32],
+    pattern: Seq[AddressPattern],
+    vecID:   Seq[Int] = Nil
+  ): Seq[AccessMatrix] = {
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrParOr1)
     val iMap = is.zipWithIndex.toMap
-    val matrix = getAccessCompactMatrix(access, addr)
+    val matrix = getAccessCompactMatrix(access, addr, pattern)
 
     multiLoop(ps).map{uid =>
       val mat = matrix.map{vec =>

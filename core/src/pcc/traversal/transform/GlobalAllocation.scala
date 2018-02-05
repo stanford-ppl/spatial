@@ -66,7 +66,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     var children = HashSet[Sym[_]]()
 
     block.stms.reverseIterator.foreach{
-      case Memory(_)  =>
+      case MemAlloc(_)  =>
       case Bus(_)     =>
       case Control(s) =>
         children += s
@@ -79,7 +79,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     // Stage the inner block, preserving only memory allocations and other controllers
     val blk = stageBlock {
       block.stms.foreach {
-        case Memory(s)  => visit(s)
+        case MemAlloc(s)  => visit(s)
         case Control(s) => visit(s)
         case Bus(s)     => visit(s)
         case s if usedSyms.contains(s) => usedSyms(s).foreach{c => addOuter(s, c) }
@@ -136,7 +136,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
           if (writersOf(mem).size == 1) addr.foreach{a => addWr(a, Set(mem)) }
         }
 
-      case Memory(s) if !s.isReg => memAllocs += s
+      case MemAlloc(s) if !s.isReg => memAllocs += s
 
       case s =>
         if (wrSyms.contains(s)) s.dataInputs.foreach{in => addWr(in,wrSyms(s)) }

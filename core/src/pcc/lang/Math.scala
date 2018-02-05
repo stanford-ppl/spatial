@@ -64,4 +64,17 @@ object Math {
   }
 
   @api def mux[A:Bits](s: Bit, a: A, b: A): A = stage(Mux(s,a,b))
+
+
+  @api def reduce[T](xs: Seq[T])(reduce: (T,T) => T): T = reduceTreeLevel(xs, reduce).head
+
+  @api def product[T:Num](xs: Seq[T]): T = if (xs.isEmpty) num[T].one else reduce(xs){_*_}
+  @api def sum[T:Num](xs: Seq[T]): T = if (xs.isEmpty) num[T].zero else reduce(xs){_+_}
+
+  @api private def reduceTreeLevel[T](xs: Seq[T], reduce: (T,T) => T): Seq[T] = xs.length match {
+    case 0 => throw new Exception("Empty reduction level")
+    case 1 => xs
+    case len if len % 2 == 0 => reduceTreeLevel(List.tabulate(len/2){i => reduce( xs(2*i), xs(2*i+1)) }, reduce)
+    case len => reduceTreeLevel(List.tabulate(len/2){i => reduce( xs(2*i), xs(2*i+1)) } :+ xs.last, reduce)
+  }
 }

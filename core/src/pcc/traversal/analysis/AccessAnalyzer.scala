@@ -6,7 +6,7 @@ import pcc.data._
 import pcc.lang._
 import pcc.node._
 
-case class AccessAnalyzer(IR: State) extends Traversal {
+case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   override val name = "Access Analyzer"
 
   private var iters: Seq[I32] = Nil                     // List of loop iterators, ordered outermost to innermost
@@ -110,15 +110,20 @@ case class AccessAnalyzer(IR: State) extends Traversal {
     val components = products.toAffineProducts
     val lastIters  = offset.syms.map{x => x -> lastVariantIter(iters,x) }.toMap
     val lastIter   = lastIters.values.maxFoldBy(None){i => i.map{iters.indexOf}.getOrElse(-1) }
-    val pattern = AddressPattern(components, offset, lastIters, lastIter)
-    dbgs(s"${stm(x)} [ADDRESS]")
-    dbgs(s"  pattern: $pattern")
-    pattern
+    AddressPattern(components, offset, lastIters, lastIter)
   }
 
-  private def setAccessPattern(access: Sym[_], addr: Seq[I32]): Unit = {
+  private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[I32]): Unit = {
+    val pattern = addr.map(getAddressPattern)
+    val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
+    accessPatternOf(access) = pattern
+    affineMatricesOf(access) = matrices
+
     dbgs(s"${stm(access)}")
-    accessPatternOf(access) = addr.map(getAddressPattern)
+    dbgs(s"  Access pattern: ")
+    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
+    dbgs(s"  Access matrices: ")
+    matrices.foreach{m => m.matrix.printWithTab(x => dbgs(x)) }
   }
 
   /**
@@ -130,25 +135,33 @@ case class AccessAnalyzer(IR: State) extends Traversal {
     * }
     * will have access pattern (8*i + j)
     */
-  private def setStreamingPattern(access: Sym[_], mem: Sym[_]): Unit = {
-    dbgs(s"${stm(access)} [STREAMING]")
+  private def setStreamingPattern(mem: Sym[_], access: Sym[_]): Unit = {
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrPar.toInt)
     val as = Array.tabulate(is.length){d => ps.drop(d+1).product }
     val components = as.zip(ps).map{case (a,i) => AffineProduct(Sum.single(a),i) }
     val ap = AddressPattern(components, Sum.single(0), Map.empty, is.lastOption)
-    dbgs(s"  pattern: $ap")
-    accessPatternOf(access) = Seq(ap)
+
+    val pattern = Seq(ap)
+    val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
+    accessPatternOf(access) = pattern
+    affineMatricesOf(access) = matrices
+
+    dbgs(s"${stm(access)} [STREAMING]")
+    dbgs(s"  Access pattern: ")
+    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
+    dbgs(s"  Access matrices: ")
+    matrices.foreach{m => m.matrix.printWithTab(x => dbgs(x)) }
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = lhs match {
     case Op(loop: Loop) =>
       loop.bodies.foreach{case (is,blocks) => inLoop(lhs, is, blocks) }
 
-    case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(lhs, mem)
-    case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(lhs, mem)
-    case Reader(_,adr,_)   => setAccessPattern(lhs, adr)
-    case Writer(_,_,adr,_) => setAccessPattern(lhs, adr)
+    case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
+    case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
+    case Reader(mem,adr,_)   => setAccessPattern(mem, lhs, adr)
+    case Writer(mem,_,adr,_) => setAccessPattern(mem, lhs, adr)
     case _ => super.visit(lhs, rhs)
   }
 }

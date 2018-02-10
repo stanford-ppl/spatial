@@ -4,6 +4,7 @@ package object static {
   type State = pcc.core.State
   type SrcCtx = forge.SrcCtx
   type Config = pcc.core.Config
+  type Issue  = pcc.core.Issue
 
   type Sym[T] = pcc.core.Sym[T]
   type Op[T] = pcc.core.Op[T]

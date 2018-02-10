@@ -28,8 +28,8 @@ trait FlowRules {
         val readers = readUsesOf(s)
         readers.foreach{case Reader(rdMem,_,_) =>
           if (rdMem == wrMem) {
-            isAccum(rdMem) = true
-            isAccum(s) = true
+            accumTypeOf(rdMem) = AccumType.Fold
+            accumTypeOf(s) = AccumType.Fold
           }
         }
       case _ =>

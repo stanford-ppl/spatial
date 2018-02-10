@@ -6,7 +6,7 @@ import pcc.util.Freq._
 import Filters._
 import pcc.traversal.transform.Transformer
 
-abstract class Op[T:Sym] extends Product with Serializable {
+abstract class Op[+T:Sym] extends Product with Serializable {
   final type Tx = Transformer
 
   def tR: Sym[T] = implicitly[Sym[T]]

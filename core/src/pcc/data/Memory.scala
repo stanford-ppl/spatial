@@ -9,7 +9,7 @@ import pcc.lang._
   *
   * If undefined, assumed to be empty
   */
-case class LocalMemories(memories: Set[Sym[_]]) extends ComplexData[LocalMemories]
+case class LocalMemories(memories: Set[Sym[_]]) extends FlowData[LocalMemories]
 @data object localMems {
   def all: Set[Sym[_]] = globals[LocalMemories].map(_.memories).getOrElse(Set.empty)
   def +=(mem: Sym[_]): Unit = globals.add(LocalMemories(localMems.all + mem ))
@@ -20,7 +20,7 @@ case class LocalMemories(memories: Set[Sym[_]]) extends ComplexData[LocalMemorie
   *
   * If undefined, assumed to be empty
   */
-case class Readers(readers: Set[Sym[_]]) extends ComplexData[Readers]
+case class Readers(readers: Set[Sym[_]]) extends FlowData[Readers]
 @data object readersOf {
   def apply(x: Sym[_]): Set[Sym[_]] = metadata[Readers](x).map(_.readers).getOrElse(Set.empty)
   def update(x: Sym[_], readers: Set[Sym[_]]): Unit = metadata.add(x, Readers(readers))
@@ -31,7 +31,7 @@ case class Readers(readers: Set[Sym[_]]) extends ComplexData[Readers]
   *
   * If undefined, assumed to be empty
   */
-case class Writers(writers: Set[Sym[_]]) extends ComplexData[Writers]
+case class Writers(writers: Set[Sym[_]]) extends FlowData[Writers]
 @data object writersOf {
   def apply(x: Sym[_]): Set[Sym[_]] = metadata[Writers](x).map(_.writers).getOrElse(Set.empty)
   def update(x: Sym[_], writers: Set[Sym[_]]): Unit = metadata.add(x, Writers(writers))
@@ -47,7 +47,7 @@ case class Writers(writers: Set[Sym[_]]) extends ComplexData[Writers]
   *
   * If undefined, assumed to be empty
   */
-case class ReadUses(reads: Set[Sym[_]]) extends ComplexData[ReadUses]
+case class ReadUses(reads: Set[Sym[_]]) extends FlowData[ReadUses]
 @data object readUsesOf {
   def apply(x: Sym[_]): Set[Sym[_]] = metadata[ReadUses](x).map(_.reads).getOrElse(Set.empty)
   def update(x: Sym[_], reads: Set[Sym[_]]): Unit = metadata.add(x, ReadUses(reads))
@@ -60,10 +60,30 @@ case class ReadUses(reads: Set[Sym[_]]) extends ComplexData[ReadUses]
   *
   * If undefined, assumed to be false
   */
-case class Accumulator(isAccum: Boolean) extends ComplexData[Accumulator]
-@data object isAccum {
-  def apply(x: Sym[_]): Boolean = metadata[Accumulator](x).exists(_.isAccum)
-  def update(x: Sym[_], flag: Boolean): Unit = metadata.add(x, Accumulator(flag))
+sealed abstract class AccumType {
+  def |(that: AccumType): AccumType
+  def >(that: AccumType): Boolean
+  final def >=(that: AccumType): Boolean = this > that || this == that
+}
+object AccumType {
+  case object None extends AccumType {
+    def |(that: AccumType): AccumType = that
+    def >(that: AccumType): Boolean = false
+  }
+  case object Fold extends AccumType {
+    def |(that: AccumType): AccumType = this
+    def >(that: AccumType): Boolean = that != Fold
+  }
+  case object Buff extends AccumType {
+    def |(that: AccumType): AccumType = that match {case Fold => Fold; case _ => Buff}
+    def >(that: AccumType): Boolean = that match {case None => true; case _ => false}
+  }
+}
+
+case class Accumulator(tp: AccumType) extends StableData[Accumulator]
+@data object accumTypeOf {
+  def apply(x: Sym[_]): AccumType = metadata[Accumulator](x).map(_.tp).getOrElse(AccumType.None)
+  def update(x: Sym[_], tp: AccumType): Unit = metadata.add(x, Accumulator(tp))
 }
 
 

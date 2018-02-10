@@ -41,11 +41,15 @@ trait Staging { this: Printing =>
         val immutables = effects.writes.filterNot(x => isMutable(x))
         val aliases = mutableAliases(op) diff effects.writes
 
-//        logs(s"$lhs = $op")
-//        logs(s"  effects: $effects")
-//        logs(s"  deps: $deps")
-//        logs(s"  written immutables: $immutables")
-//        logs(s"  mutable aliases: $aliases")
+        logs(s"$lhs = $op")
+        logs(s"  aliases: ${aliasSyms(op)}")
+        logs(s"  copies: ${copySyms(op)}")
+        logs(s"  contains: ${containSyms(op)}")
+        logs(s"  extracts: ${extractSyms(op)}")
+        logs(s"  effects: $effects")
+        logs(s"  deps: $deps")
+        logs(s"  written immutables: $immutables")
+        logs(s"  mutable aliases: $aliases")
 
         if (aliases.nonEmpty) {
           error(ctx, "Illegal sharing of mutable objects: ")

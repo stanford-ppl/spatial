@@ -62,12 +62,17 @@ trait Compiler { self =>
 
   final def runPass[R](t: Pass, block: Block[R]): Block[R] = {
     if (t.isInstanceOf[Transformer]) {
-      globals.clearOnTransform()
+      globals.clearBeforeTransform()
+      metadata.clearBeforeTransform()
     }
+    val issuesBefore = state.issues
 
     if (t.needsInit) t.init()
     val result = t.run(block)
-    // After each traversal, check whether there were any reported errors
+    // After each traversal, check whether there were any reported errors or unresolved issues
+    val issuesAfter = state.issues
+    val persistingIssues = issuesBefore intersect issuesAfter
+    persistingIssues.foreach{_.onUnresolved(t.name) }
     checkBugs(t.name)
     checkErrors(t.name)
 
@@ -78,10 +83,8 @@ trait Compiler { self =>
     }
     IR.config.logLevel = v
 
-    t match {
-      case f: Transformer => globals.mirrorAll(f)
-      case _ =>
-    }
+    // Mirror after transforming
+    t match {case f: Transformer => globals.mirrorAfterTransform(f); case _ => }
     passes += t
 
     result

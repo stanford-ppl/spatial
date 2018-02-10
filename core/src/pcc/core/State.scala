@@ -62,6 +62,10 @@ class State {
   def hadBugs: Boolean = bugs > 0
   def logBug(): Unit = { bugs += 1 }
 
+  /** Back-edges **/
+  var issues: Set[Issue] = Set.empty
+  def hasIssues: Boolean = issues.size > 0
+
   def reset(): Unit = {
     config.reset()
     id = -1
@@ -82,6 +86,7 @@ class State {
     warnings = 0
     errors = 0
     bugs = 0
+    issues = Set.empty
   }
 
   def copyTo(target: State): Unit = {

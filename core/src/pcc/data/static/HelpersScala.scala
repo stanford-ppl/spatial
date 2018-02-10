@@ -26,11 +26,34 @@ trait HelpersScala {
       * Equivalent to (but faster than) x.length > len
       */
     def lengthMoreThan(len: Int): Boolean = x.lengthCompare(len) > 0
+
   }
 
   implicit class IterableHelpers[A](x: Iterable[A]) {
     def maxFoldBy[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.maxBy(f)
     def minFoldBy[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.minBy(f)
+
+    def minOrZero(z: A)(implicit o: Ordering[A]): A = if (x.isEmpty) z else x.min
+    def maxOrZero(z: A)(implicit o: Ordering[A]): A = if (x.isEmpty) z else x.max
+
+    def cross[B](y: Iterable[B]): Iterator[(A,B)] = {
+      x.iterator.flatMap{a => y.iterator.map{b => (a,b) } }
+    }
+
+    /**
+      * Returns true if the given function is true over all combinations of 2 elements
+      * in this collection.
+      */
+    def forallPairs(func: (A,A) => Boolean): Boolean = x.pairs.forall{case (a,b) => func(a,b) }
+
+    /**
+      * Returns an iterator over all combinations of 2 from this iterable collection.
+      * Assumes that either the collection has (functionally) distinct elements.
+      */
+    def pairs: Iterator[(A,A)] = x match {
+      case m0 :: y => y.iterator.map{m1 => (m0,m1) } ++ y.pairs
+      case _ => Iterator.empty
+    }
   }
 
 }

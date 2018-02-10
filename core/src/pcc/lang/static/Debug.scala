@@ -1,10 +1,12 @@
 package pcc.lang.static
 
 import forge._
+import pcc.core._
 import pcc.lang.Dbg
 
 trait Debug { this: Statics =>
   @api def println(msg: Text): Void = print(msg>"\n")
+  @api def println[T<:Sym[T]](v: T): Void = println(v.toText)
   @api def println(): Void = println("")
 
   @api def print(msg: Text): Void = Dbg.printIf(Nil, msg)

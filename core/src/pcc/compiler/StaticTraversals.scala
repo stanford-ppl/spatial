@@ -2,6 +2,8 @@ package pcc.compiler
 
 import pcc.core._
 import pcc.data.FlowRules
+import pcc.poly.ISL
+
 import pcc.rewrites.RewriteRules
 import pcc.traversal._
 import pcc.traversal.analysis._
@@ -15,9 +17,13 @@ trait StaticTraversals extends Compiler {
   val isPIR = false
 
   def runPasses[R](block: Block[R]): Unit = {
+    implicit val isl = ISL()
+    isl.startup()
+
     lazy val printer = IRPrinter(state)
     lazy val pipeInserter = PipeInserter(state)
     lazy val accessAnalyzer = AccessAnalyzer(state)
+    lazy val memoryAnalyzer = MemoryAnalyzer(state)
 
     lazy val globalAllocation = GlobalAllocation(state)
     lazy val irDotCodegen = IRDotCodegen(state)
@@ -28,10 +34,14 @@ trait StaticTraversals extends Compiler {
       (!isPIR ? pipeInserter) ==>
       (!isPIR ? printer) ==>
       accessAnalyzer ==>
+      printer ==>
+      memoryAnalyzer ==>
       (!isPIR ? globalAllocation) ==>
       (!isPIR ? printer) ==>
       (isPIR ? irDotCodegen) ==>
       (isPIR ? puDotCodegen)
+
+    isl.shutdown()
   }
 
 }

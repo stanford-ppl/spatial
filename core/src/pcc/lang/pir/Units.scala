@@ -90,7 +90,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
   }
 }
 
-case class CurrentPtr(ptr: PUPtr) extends SimpleData[CurrentPtr]
+case class CurrentPtr(ptr: PUPtr) extends FlowData[CurrentPtr]
 @data object curPtr {
   def get: Option[PUPtr] = globals[CurrentPtr].map(_.ptr)
   def set(ptr: PUPtr): Unit = globals.add(CurrentPtr(ptr))

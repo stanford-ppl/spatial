@@ -123,7 +123,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
     dbgs(s"  Access matrices: ")
-    matrices.foreach{m => m.matrix.printWithTab(x => dbgs(x)) }
+    matrices.foreach{m => dbgss(m) }
   }
 
   /**
@@ -151,10 +151,15 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
     dbgs(s"  Access matrices: ")
-    matrices.foreach{m => m.matrix.printWithTab(x => dbgs(x)) }
+    matrices.foreach{m => dbgss(m) }
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = lhs match {
+    case Op(CounterNew(start,end,step,_)) =>
+      accessPatternOf(start) = Seq(getAddressPattern(start))
+      accessPatternOf(end)   = Seq(getAddressPattern(end))
+      accessPatternOf(step)  = Seq(getAddressPattern(step))
+
     case Op(loop: Loop) =>
       loop.bodies.foreach{case (is,blocks) => inLoop(lhs, is, blocks) }
 

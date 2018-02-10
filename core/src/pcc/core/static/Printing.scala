@@ -12,6 +12,8 @@ trait Printing {
   def ctx(implicit localCtx: SrcCtx): SrcCtx = localCtx
   def config(implicit localState: State): Config = localState.config
 
+  @stateful def raiseIssue(issue: Issue): Unit = state.issues += issue
+
   def plural(x: Int, singular: String, plur: String): String = pcc.util.Report.plural(x, singular, plur)
 
   /** Compiler Generated Files (reports, codegen, etc.) **/
@@ -64,6 +66,9 @@ trait Printing {
   /** Debugging **/
   @stateful def dbg(x: => Any): Unit = if (config.enDbg) state.log.println(x)
   @stateful def dbgs(x: => Any): Unit = if (config.enDbg) state.log.println("  "*state.logTab + x)
+  @stateful def dbgss(x: => Any): Unit = if (config.enDbg) {
+    x.toString.split("\n").foreach{line => dbgs(line) }
+  }
   @stateful def dbgblk(x: => Unit): Unit = if (config.enDbg) {
     state.logTab += 1
     x

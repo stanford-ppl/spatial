@@ -16,14 +16,11 @@ case class Subproc(args: String*)(react: (String,BufferedReader) => Option[Strin
 
   def run(dir: String = ""): Unit = if (p eq null) {
     val pb = new ProcessBuilder(args:_*)
-    pb.redirectError(ProcessBuilder.Redirect.INHERIT)
     if (dir.nonEmpty) pb.directory(new File(dir))
     p = pb.start()
     reader = new BufferedReader(new InputStreamReader(p.getInputStream))
     writer = new BufferedWriter(new OutputStreamWriter(p.getOutputStream))
     logger = new BufferedReader(new InputStreamReader(p.getErrorStream))
-    //watcher = new ExceptionWatcher(logger)
-    //pool.submit(watcher)
   } else {
     throw new Exception(s"Cannot run process $args while it is already running.")
   }
@@ -47,16 +44,22 @@ case class Subproc(args: String*)(react: (String,BufferedReader) => Option[Strin
     p.waitFor() // This is a java.lang.Process
   }
 
-  def blockAndReturnOut(dir: String = ""): Seq[String] = {
+  def blockAndReturnOut(dir: String = ""): (Seq[String],Seq[String]) = {
     if (p eq null) run(dir)
     p.waitFor()
     var lines: Seq[String] = Nil
+    var errs: Seq[String] = Nil
     var line = ""
     while (reader.ready && (line ne null)) {
       line = reader.readLine()
       if (line ne null) lines = line +: lines
     }
-    lines.reverse
+    line = ""
+    while (logger.ready && (line ne null)) {
+      line = logger.readLine()
+      if (line ne null) errs = line +: errs
+    }
+    (lines.reverse, errs.reverse)
   }
 
   def kill(): Unit = if (p eq null) throw new Exception("Process has not started") else p.destroy()

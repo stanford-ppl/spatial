@@ -5,6 +5,7 @@ import pcc.core._
 import pcc.data._
 import pcc.lang._
 import pcc.util.multiLoop
+import pcc.poly._
 
 import scala.collection.mutable
 
@@ -21,19 +22,6 @@ trait AccessExpansion {
   private def unrolled(x: I32, id: Seq[Int]): I32 = unrolls.getOrElseUpdate((x,id), nextRand(x))
 
   /**
-    * Returns a SparseMatrix representing the minimum and maximum bounds of this symbol.
-    * TODO: Account for bounds of random values
-    */
-  private def getOrAddDomain(x: I32): Seq[SparseConstraint] = domainOf.getOrElseUpdate(x, {
-    if (ctrOf.get(x).isDefined) {
-      val min = constraint(x, x.ctrStart, isMin = true)
-      val max = constraint(x, x.ctrEnd, isMin = false)
-      min.toSeq ++ max
-    }
-    else Nil
-  })
-
-  /**
     * If the access pattern is representable as an affine access for bound, returns
     * a min or max constraint for x based on this bound. Otherwise returns None.
     */
@@ -42,13 +30,27 @@ trait AccessExpansion {
     if (isMin) vec.map(_.asMinConstraint(x)) else vec.map(_.asMaxConstraint(x))
   }
 
+  /**
+    * Returns a SparseMatrix representing the minimum and maximum bounds of this symbol.
+    * TODO: Account for bounds of random values
+    */
+  private def getOrAddDomain(x: I32): ConstraintMatrix = domainOf.getOrElseUpdate(x, {
+    if (ctrOf.get(x).isDefined) {
+      val min = constraint(x, x.ctrStart, isMin = true).toSet
+      val max = constraint(x, x.ctrEnd, isMin = false)
+      ConstraintMatrix(min ++ max)
+    }
+    else ConstraintMatrix.empty
+  })
 
-  def domain(x: I32): Seq[SparseConstraint] = getOrAddDomain(x)
+  def domain(x: I32): ConstraintMatrix = getOrAddDomain(x)
 
 
   def getAccessCompactMatrix(access: Sym[_], addr: Seq[I32], pattern: Seq[AddressPattern]): SparseMatrix = {
     val rows = pattern.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => addr.indexOrElse(d,nextRand())} }
-    SparseMatrix(rows)
+    val matrix = SparseMatrix(rows)
+    matrix.keys.foreach{x => getOrAddDomain(x) }
+    matrix
   }
 
   def getUnrolledMatrices(
@@ -89,7 +91,9 @@ trait AccessExpansion {
         val lI = components.collect{case (a,x,b,i) if !i.contains(x) => x -> i }.toMap
         SparseVector(xs.zip(as).toMap, c, lI)
       }
-      AccessMatrix(access, mat, uid ++ vecID)
+      val amat = AccessMatrix(access, mat, uid ++ vecID)
+      amat.keys.foreach{x => getOrAddDomain(x) }
+      amat
     }.toSeq
   }
 

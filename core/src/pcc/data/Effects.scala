@@ -3,7 +3,7 @@ package pcc.data
 import forge._
 import pcc.core._
 
-case class AntiDeps(syms: Seq[Sym[_]]) extends ComplexData[AntiDeps]
+case class AntiDeps(syms: Seq[Sym[_]]) extends AnalysisData[AntiDeps]
 
 case class Effects(
   unique:  Boolean = false,           // Should not be CSEd
@@ -14,7 +14,7 @@ case class Effects(
   throws:  Boolean = false,           // May throw exceptions (speculative execution may be unsafe)
   reads:   Set[Sym[_]] = Set.empty,   // Reads given mutable symbols
   writes:  Set[Sym[_]] = Set.empty    // Writes given mutable symbols
-) extends ComplexData[Effects] {
+) extends AnalysisData[Effects] {
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(
     unique  = this.unique || that.unique,

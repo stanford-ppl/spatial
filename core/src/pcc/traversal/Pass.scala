@@ -16,10 +16,19 @@ trait Pass { self =>
   def name: String = self.getClass.toString
   def logFile: String = state.paddedPass + " " + name + ".log"
 
-  var verbosity: Option[Int] = None
+  var enWarn: Option[Boolean] = None
+  var enError: Option[Boolean] = None
+  var enInfo: Option[Boolean] = None
+  var logLevel: Option[Int] = None
+
   var needsInit: Boolean = true
   def shouldRun: Boolean = true
-  def silence(): Unit = { verbosity = Some(-2) }
+  def silence(): Unit = {
+    enWarn = Some(false)
+    enError = Some(false)
+    enInfo = Some(false)
+    logLevel = Some(0)
+  }
   def init(): Unit = { needsInit = false }
 
   /** Performance debugging **/
@@ -30,13 +39,20 @@ trait Pass { self =>
   /** Run method - called internally from compiler **/
   final def run[R](block: Block[R]): Block[R] = if (shouldRun) {
     state.pass += 1
-    withLog(config.logDir, logFile){
-      val start = System.currentTimeMillis()
-      val result = process(block)
-      val time = (System.currentTimeMillis - start).toFloat
-      lastTime = time
-      totalTime += time
-      result
+    config.withVerbosity(
+      warn  = enWarn.getOrElse(config.enWarn),
+      error = enError.getOrElse(config.enError),
+      info  = enInfo.getOrElse(config.enInfo),
+      log   = logLevel.getOrElse(config.logLevel)
+    ) {
+      withLog(config.logDir, logFile) {
+        val start = System.currentTimeMillis()
+        val result = process(block)
+        val time = (System.currentTimeMillis - start).toFloat
+        lastTime = time
+        totalTime += time
+        result
+      }
     }
   } else block
 

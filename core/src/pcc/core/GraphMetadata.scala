@@ -76,6 +76,12 @@ class GraphMetadata {
   def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = getMetadata(edge,keyOf[M])
 
   def clear[M<:Metadata[M]:Manifest]: Unit = clearMetadata(keyOf[M])
+
+  def clearBeforeTransform(): Unit = {
+    // TODO: Could use optimization
+    val keys = edgeMetadata.flatMap{case (_,v) => v.collect{case (kk,vv) if vv.clearBeforeTransform => kk}}.toSet
+    keys.foreach{k => clearMetadata(k) }
+  }
 }
 
 

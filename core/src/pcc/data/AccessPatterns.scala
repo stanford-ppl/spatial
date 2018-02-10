@@ -3,6 +3,7 @@ package pcc.data
 import forge._
 import pcc.core._
 import pcc.lang._
+import pcc.poly._
 
 case class Prod(xs: Seq[I32], m: Int = 1) {
   def syms: Seq[I32] = xs
@@ -114,7 +115,7 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[I3
   override def toString: String = comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs
 }
 
-case class AccessPattern(pattern: Seq[AddressPattern]) extends SimpleData[AccessPattern]
+case class AccessPattern(pattern: Seq[AddressPattern]) extends AnalysisData[AccessPattern]
 @data object accessPatternOf {
   def get(x: Sym[_]): Option[Seq[AddressPattern]] = metadata[AccessPattern](x).map(_.pattern)
   def apply(x: Sym[_]): Seq[AddressPattern] = accessPatternOf.get(x).getOrElse{throw new Exception(s"No access pattern defined for $x")}

@@ -7,14 +7,9 @@ import pcc.node._
 
 import scala.collection.mutable
 
-case class SRAM[A](eid: Int, tA: Bits[A], dummy: String) extends LocalMem[A,SRAM](eid) {
-  type AI = tA.I
+case class SRAM[A:Bits]() extends LocalMem[A,SRAM] {
   override type I = Array[AI]
-  private implicit val bA: Bits[A] = tA
-
-  override def fresh(id: Int): SRAM[A] = new SRAM[A](id, tA, dummy)
-  override def stagedClass: Class[SRAM[A]] = classOf[SRAM[A]]
-  override def typeArguments: List[Sym[_]] = List(tA)
+  override def fresh: SRAM[A] = new SRAM[A]
 
   @api def rows: I32 = SRAM.dim(this,0)
   @api def cols: I32 = SRAM.dim(this,1)
@@ -29,14 +24,14 @@ case class SRAM[A](eid: Int, tA: Bits[A], dummy: String) extends LocalMem[A,SRAM
 }
 object SRAM {
   private lazy val types = new mutable.HashMap[Bits[_],SRAM[_]]()
-  implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(bits[A], new SRAM[A](-1,bits[A],null)).asInstanceOf[SRAM[A]]
+  implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(bits[A], (new SRAM[A]).asType).asInstanceOf[SRAM[A]]
 
   @api def apply[A:Bits](dims: I32*): SRAM[A] = stage(SRAMNew(dims))
 
-  @internal def dim(sram: SRAM[_], d: Int): I32 = stage(SRAMDim(sram, d))
-  @internal def rank(sram: SRAM[_]): I32 = stage(SRAMRank(sram))
+  @rig def dim(sram: SRAM[_], d: Int): I32 = stage(SRAMDim(sram, d))
+  @rig def rank(sram: SRAM[_]): I32 = stage(SRAMRank(sram))
 
-  @internal def read[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]): A = stage(SRAMRead(sram,addr,ens))
-  @internal def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]): Void = stage(SRAMWrite(sram,data,addr,ens))
+  @rig def read[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]): A = stage(SRAMRead(sram,addr,ens))
+  @rig def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]): Void = stage(SRAMWrite(sram,data,addr,ens))
 }
 

@@ -4,9 +4,6 @@ import forge.{SrcCtx, api}
 import pcc.core._
 
 trait Types {
-  def bits[T:Bits]: Bits[T] = implicitly[Bits[T]]
-  def mbits[A,B](x: Bits[A]): Bits[B] = x.asInstanceOf[Bits[B]]
-
   @api def void: Void = {
     implicit val ctx: SrcCtx = SrcCtx.empty
     Void.c

@@ -53,7 +53,7 @@ trait Ints extends LowPriorityIntegerOps {
     //def to[B:Type](implicit cast: Cast[Int,B]): B = cast(x)
   }
 
-  @internal def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
+  @rig def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
     val p = I32.p(default)
     rangeOf(p) = (start, stride, end)
     p

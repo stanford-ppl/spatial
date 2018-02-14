@@ -3,7 +3,7 @@ package pcc.core.static
 import forge._
 import pcc.util.files
 import pcc.util.Report._
-import pcc.util.Tri._
+import pcc.util.escapeConst
 import java.io.PrintStream
 import java.nio.file.{Files,Paths}
 
@@ -79,9 +79,11 @@ trait Printing {
   @stateful def logs(x: => Any): Unit = if (config.enLog) state.log.println("  "*state.logTab + x)
 
   def stm(lhs: Sym[_]): String = lhs.rhs match {
-    case Nix => s"$lhs"
-    case One(c) => s"$lhs = $c"
-    case Two(rhs) => s"$lhs = $rhs"
+    case Def.TypeRef     => s"$lhs"
+    case Def.Bound(id)   => s"b$id"
+    case Def.Const(c)    => s"${escapeConst(c)}"
+    case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
+    case Def.Node(id,op) => s"x$id = $op"
   }
 
   @stateful def createStream(dir: String, filename: String): PrintStream = {
@@ -161,5 +163,17 @@ trait Printing {
 
   @stateful def withOut[T](dir: String, filename: String)(blk: => T): T = {
     inStream(enable = true, () => createStream(dir,filename), blk, () => state.out, {s => state.out = s}, _.close())
+  }
+
+
+  def readable(x: Any): String = x match {
+    case x: Tuple3[_,_,_] => s"${readable(x._1)} = ${readable(x._2)} [inputs = ${readable(x._3)}]"
+    case c: Class[_]      => c.getName.split('$').last.replace("class ", "").split('.').last
+    case _ =>
+      if (x == null) "null" else x.toString
+  }
+
+  implicit class CompilerReportHelper(sc: StringContext) {
+    def c(args: Any*): String = sc.raw(args.map(readable): _*).stripMargin
   }
 }

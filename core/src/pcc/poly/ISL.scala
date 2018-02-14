@@ -2,7 +2,7 @@ package pcc.poly
 
 import forge._
 import pcc.core._
-import pcc.util.{BackgroundProc, Subproc}
+import pcc.util.BackgroundProc
 
 /**
   * Self initializing object that runs
@@ -28,24 +28,14 @@ case class ISL()(implicit state: State) {
 
   def nonEmpty(constraints: ConstraintMatrix): Boolean = !isEmpty(constraints)
   def isEmpty(constraints: ConstraintMatrix): Boolean = {
-    //init()
     val matrix = constraints.toDenseString
-    dbg(matrix)
+    //dbg(matrix)
     proc.send(matrix)
     val response = proc.blockOnChar()
-    dbg(response)
-
-//    dbg(matrix)
-//    val p = Subproc("./emptiness"){(_,_) => None}
-//    p.run(s"$HOME/isl")
-//    p.send(matrix)
-//    val (response,_) = p.blockAndReturnOut()
-//    dbg(response.head)
+    //dbg(response)
 
     if (response == '0') true
     else if (response == '1') false
-//    if (response.head.contains('0')) true
-//    else if (response.head.contains('1')) false
     else throw new Exception("Failed isEmpty check")
   }
 

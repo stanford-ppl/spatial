@@ -71,12 +71,11 @@ case class Instance(
     val ps = (0 until depth).map{Some(_)} :+ None
 
     s"""
-       |isAccum:    $accType
+       |accumType:  $accType
        |Depth:      $depth
        |Banking:    $banking
        |Controller: ${metapipe.map(_.toString).getOrElse("---")}
-       |Buffer Ports:
-     """.stripMargin +
+       |Buffer Ports:""".stripMargin + "\n" +
     ps.flatMap{port => prtStr(port,writes,"WR") ++ prtStr(port,reads,"RD") }.mkString("\n")
   }
 

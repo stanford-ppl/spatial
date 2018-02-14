@@ -10,7 +10,7 @@ import forge._
 abstract class Issue { this: Product =>
 
   /**
-    * Method called when this backedge remains unresolved.
+    * Method called when this issue remains unresolved.
     */
   @stateful def onUnresolved(traversal: String): Unit = {
     error(s"Issue ${this.productPrefix} was unresolved after traversal $traversal.")

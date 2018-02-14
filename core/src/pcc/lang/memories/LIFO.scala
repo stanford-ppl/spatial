@@ -7,17 +7,13 @@ import pcc.node._
 
 import scala.collection.mutable
 
-case class LIFO[A:Bits](eid: Int, tA: Bits[A]) extends LocalMem[A,LIFO](eid) {
-  type AI = tA.I
-  override type I = Array[AI]
-
-  override def fresh(id: Int): LIFO[A] = LIFO[A](id,tA)
-  override def stagedClass: Class[LIFO[A]] = classOf[LIFO[A]]
-  override def typeArguments: List[Sym[_]] = List(tA)
+case class LIFO[A:Bits]() extends LocalMem[A,LIFO] {
+  override type I = mutable.MutableList[AI]
+  override def fresh: LIFO[A] = new LIFO[A]
 }
 object LIFO {
   private lazy val types = new mutable.HashMap[Bits[_],LIFO[_]]()
-  implicit def tp[A:Bits]: LIFO[A] = types.getOrElseUpdate(bits[A], LIFO[A](-1,bits[A])).asInstanceOf[LIFO[A]]
+  implicit def tp[A:Bits]: LIFO[A] = types.getOrElseUpdate(bits[A], (new LIFO[A]).asType).asInstanceOf[LIFO[A]]
 
   @api def apply[A:Bits](depth: I32): LIFO[A] = stage(LIFONew(depth))
 }

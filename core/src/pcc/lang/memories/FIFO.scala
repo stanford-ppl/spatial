@@ -7,17 +7,14 @@ import pcc.node._
 
 import scala.collection.mutable
 
-case class FIFO[A](eid: Int, tA: Bits[A]) extends LocalMem[A,FIFO](eid) {
-  type AI = tA.I
-  override type I = Array[AI]
+case class FIFO[A:Bits]() extends LocalMem[A,FIFO] {
+  override type I = mutable.Queue[AI]
 
-  override def fresh(id: Int): FIFO[A] = FIFO[A](id,tA)
-  override def stagedClass: Class[FIFO[A]] = classOf[FIFO[A]]
-  override def typeArguments: List[Sym[_]] = List(tA)
+  override def fresh: FIFO[A] = new FIFO[A]
 }
 object FIFO {
   private lazy val types = new mutable.HashMap[Bits[_],FIFO[_]]()
-  implicit def tp[A:Bits]: FIFO[A] = types.getOrElseUpdate(bits[A], FIFO[A](-1,bits[A])).asInstanceOf[FIFO[A]]
+  implicit def tp[A:Bits]: FIFO[A] = types.getOrElseUpdate(bits[A], (new FIFO[A]).asType).asInstanceOf[FIFO[A]]
 
   @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
 }

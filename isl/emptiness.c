@@ -13,6 +13,7 @@ int main(int argc, char **argv)
 
     // Don't buffer stdout (it's buffered in compiler)
 	setbuf(stdout, NULL);
+	//setbuf(stderr, NULL);
 
     while(1) {
 	    bset = isl_basic_set_read_from_file(ctx, stdin);

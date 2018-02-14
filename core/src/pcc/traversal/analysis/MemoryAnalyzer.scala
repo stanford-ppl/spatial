@@ -5,7 +5,7 @@ import pcc.core._
 import pcc.data._
 import pcc.lang._
 import pcc.poly.ISL
-import banking._
+import pcc.traversal.analysis.banking._
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
   override val name = "Memory Analyzer"

@@ -6,7 +6,9 @@ import pcc.data._
 import pcc.lang._
 import pcc.util.multiLoop
 import pcc.poly._
+import pcc.helpers._
 
+import pcc.util.ScalaImplicits._
 import scala.collection.mutable
 
 trait AccessExpansion {
@@ -78,10 +80,14 @@ trait AccessExpansion {
           }
           else {
             val i = vec.lastIters(x)
-            val xid = uid.dropRight( is.length - i.map(is.indexOf).getOrElse(-1) + 1)
+            val xid = uid.dropRight(is.length - i.map(is.indexOf).getOrElse(-1) - 1)
             val a = vec(x)
             val b = 0
             val x2 = unrolled(x, xid)
+            dbgs(s"Iterators: ${is.mkString(",")}")
+            dbgs(s"Last variant iterator: $i")
+            dbgs(s"Full UID: {${uid.mkString(",")}}")
+            dbgs(s"Unrolling $x {${xid.mkString(",")}} -> $x2")
             (a,x2,b,i)
           }
         }

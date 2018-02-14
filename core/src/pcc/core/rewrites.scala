@@ -22,11 +22,11 @@ object rewrites {
     names += name
   }
 
-  def apply[A:Sym](op: Op[A])(implicit ctx: SrcCtx, state: State): Option[A] = rules.get(op.getClass).flatMap{pf =>
+  def apply[A:Type](op: Op[A])(implicit ctx: SrcCtx, state: State): Option[A] = rules.get(op.getClass).flatMap{pf =>
     val tuple = (op,ctx,state)
     if (pf.isDefinedAt(tuple)) {
       pf.apply(tuple) match {
-        case Some(s) if s <:< typ[A] => Some(s.asInstanceOf[A])
+        case Some(s) if s.tp <:< typ[A] => Some(s.asInstanceOf[A])
         case _ => None
       }
     }

@@ -4,7 +4,7 @@ package types
 import forge._
 import pcc.core._
 
-abstract class Bits[A](id: Int)(implicit ev: A<:<Bits[A]) extends Prim[A](id) {
+abstract class Bits[A](implicit ev: A<:<Bits[A]) extends Prim[A] {
   def bits: Int
   @api def zero: A
   @api def one: A

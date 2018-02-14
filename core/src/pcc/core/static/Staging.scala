@@ -6,28 +6,27 @@ import pcc.util.{recursive,strMeta}
 
 trait Staging { this: Printing =>
 
-  def typ[T:Sym]: Sym[T] = implicitly[Sym[T]]
-  def mtyp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
+  def typ[A:Type]: Type[A] = implicitly[Type[A]]
+  def mtyp[A,B](tp: Type[A]): Type[B] = tp.asInstanceOf[Type[B]]
 
-  implicit def toSym[A:Sym](x: A): Sym[A] = typ[A].viewAsSym(x)
+  def const[A:Type](c: Any): A = const(typ[A], c)
+  def const[A](tp: Type[A], c: Any): A = tp.freshSym.asConst(c)
 
-  @stateful def bound[T:Sym]: T = fresh(typ[T])
-  @stateful def const[T:Sym](c: Any): T = const(typ[T], c)
-  @stateful def param[T:Sym](c: Any): T = param(typ[T], c)
+  @stateful def bound[A:Type]: A = typ[A].freshSym.asBound(state.nextId())
 
-  @stateful def fresh[T](tp: Sym[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asBound()
-  @stateful def const[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asConst(c)
-  @stateful def param[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asParam(c)
-  @stateful def symbol[T](tp: Sym[T], d: Op[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asSymbol(d)
+  @stateful def param[A:Type](c: Any): A = param(typ[A], c)
+  @stateful def param[A](tp: Type[A], c: Any): A = tp.freshSym.asParam(state.nextId(), c)
+  @stateful def symbol[A](tp: Type[A], op: Op[A]): A = tp.freshSym.asSymbol(state.nextId(), op)
 
-  @internal def register[T](op: Op[T], symbol: () => T): T = rewrites.apply(op)(op.tR,ctx,state) match {
+
+  @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.tR,ctx,state) match {
     case Some(s) => s
     case None    =>
       if (state == null) throw new Exception("Null state during staging")
 
       val (effects,deps) = allEffects(op)
 
-      def stageEffects(): T = {
+      def stageEffects(): R = {
         val lhs = symbol()
         val sym = op.tR.viewAsSym(lhs)
         if (effects != Effects.Pure) effectsOf(sym) = effects
@@ -78,17 +77,17 @@ trait Staging { this: Printing =>
           lhs
         }
         else {
-          symsWithSameEffects.head.asInstanceOf[T]
+          symsWithSameEffects.head.asInstanceOf[R]
         }
       }
       else stageEffects()
   }
 
-  @internal def restage[T](sym: Sym[T]): Sym[T] = sym match {
-    case Op(rhs) => sym.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
+  @rig def restage[T](sym: Sym[T]): Sym[T] = sym match {
+    case Op(rhs) => sym.tp.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
     case _ => sym
   }
-  @internal def stage[T](op: Op[T]): T = {
+  @rig def stage[T](op: Op[T]): T = {
     val t = register(op, () => symbol(op.tR,op))
     op.tR.viewAsSym(t).ctx = ctx
     t
@@ -99,7 +98,7 @@ trait Staging { this: Printing =>
   private def containSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.contains}(a)
   private def extractSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.extracts}(a)
   private def copySyms(a: Any): Set[Sym[_]]    = recursive.collectSets{case d: Op[_] => d.copies}(a)
-  private def noPrims(x: Set[Sym[_]]): Set[Sym[_]] = x.filter{s => !s.isPrimitive}
+  private def noPrims(x: Set[Sym[_]]): Set[Sym[_]] = x.filter{s => !s.tp.isPrimitive}
 
   @stateful def shallowAliases(x: Any): Set[Sym[_]] = {
     noPrims(aliasSyms(x)).flatMap { case Stm(s,d) => state.shallowAliasCache.getOrElseUpdate(s, shallowAliases(d)) + s } ++
@@ -157,7 +156,7 @@ trait Staging { this: Printing =>
     }
   }
 
-  @internal final def allEffects(d: Op[_]): (Effects, Seq[Sym[_]]) = {
+  @rig final def allEffects(d: Op[_]): (Effects, Seq[Sym[_]]) = {
     val mIns = mutableInputs(d)
     //val atomicEffects = propagateWrites(u)
 

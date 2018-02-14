@@ -5,6 +5,8 @@ import pcc.core._
 import pcc.data._
 import pcc.lang._
 import pcc.poly.ISL
+import pcc.helpers._
+import pcc.util.ScalaImplicits._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -138,7 +140,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     * Should not attempt to merge instances if any of the following conditions hold:
     *   1. The two instances have a common LCA controller
     *   2. The two instances result in hierarchical buffers (for now)
-    *   3. Either instance is an accumulator (TODO: UNLESS the accumulation is a Reduce, not a Fold)
+    *   3. Either instance is a Fold or Buffer "accumulator"
     */
   protected def getMergeAttemptError(a: Instance, b: Instance): Option[String] = {
     lazy val reads = a.reads.flatten ++ b.reads.flatten

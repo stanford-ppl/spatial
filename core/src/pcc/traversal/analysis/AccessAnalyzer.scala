@@ -5,6 +5,8 @@ import pcc.core._
 import pcc.data._
 import pcc.lang._
 import pcc.node._
+import pcc.helpers._
+import pcc.util.ScalaImplicits._
 
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   override val name = "Access Analyzer"

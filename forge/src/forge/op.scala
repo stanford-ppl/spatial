@@ -1,8 +1,8 @@
 package forge
 
 import scala.annotation.StaticAnnotation
-import scala.reflect.macros.blackbox
 import scala.language.experimental.macros
+import scala.reflect.macros.blackbox
 
 final class op extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro op.impl

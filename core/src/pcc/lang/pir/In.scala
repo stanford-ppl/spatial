@@ -6,12 +6,11 @@ import pcc.core._
 import pcc.node.pir._
 import pcc.util.Ptr
 
-case class In[A](eid: Int, tA: Bits[A]) extends Bits[In[A]](eid) {
+case class In[A:Bits]() extends Bits[In[A]] {
+  val tA: Bits[A] = tbits[A]
   override type I = Ptr[Any]
-  private implicit val bA: Bits[A] = tA
 
-  override def fresh(id: Int): In[A] = In(id, tA)
-  override def stagedClass: Class[In[A]] = classOf[In[A]]
+  override def fresh: In[A] = new In[A]
   override def bits: Int = tA.bits
 
   @api def zero: In[A] = In.c(Ptr(tA.zero))
@@ -21,7 +20,6 @@ case class In[A](eid: Int, tA: Bits[A]) extends Bits[In[A]](eid) {
 }
 
 object In {
-  implicit def tp[A:Bits]: In[A] = In(-1,bits[A])
-  @api def c[A:Bits](values: Ptr[Any]): In[A] = const[In[A]](values)
+  implicit def tp[A:Bits]: In[A] = (new In[A]).asType
+  def c[A:Bits](values: Ptr[Any]): In[A] = const[In[A]](values)
 }
-

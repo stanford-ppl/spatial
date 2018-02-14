@@ -53,6 +53,30 @@ case class ReadUses(reads: Set[Sym[_]]) extends FlowData[ReadUses]
   def update(x: Sym[_], reads: Set[Sym[_]]): Unit = metadata.add(x, ReadUses(reads))
 }
 
+sealed abstract class AccumType {
+  def |(that: AccumType): AccumType
+  def >(that: AccumType): Boolean
+  final def >=(that: AccumType): Boolean = this > that || this == that
+}
+object AccumType {
+  case object Fold extends AccumType {
+    def |(that: AccumType): AccumType = this
+    def >(that: AccumType): Boolean = that != Fold
+  }
+  case object Buff extends AccumType {
+    def |(that: AccumType): AccumType = that match {case Fold => Fold; case _ => Buff}
+    def >(that: AccumType): Boolean = (that | Reduce) match {case Reduce => true; case _ => false }
+  }
+  case object Reduce extends AccumType {
+    def |(that: AccumType): AccumType = that match {case None => Reduce; case _ => that}
+    def >(that: AccumType): Boolean = that match {case None => true; case _ => false }
+  }
+  case object None extends AccumType {
+    def |(that: AccumType): AccumType = that
+    def >(that: AccumType): Boolean = false
+  }
+}
+
 /**
   * Flags that this symbol is associated with an accumulator
   * If this symbol is a memory, this memory is an accumulator
@@ -60,26 +84,6 @@ case class ReadUses(reads: Set[Sym[_]]) extends FlowData[ReadUses]
   *
   * If undefined, assumed to be false
   */
-sealed abstract class AccumType {
-  def |(that: AccumType): AccumType
-  def >(that: AccumType): Boolean
-  final def >=(that: AccumType): Boolean = this > that || this == that
-}
-object AccumType {
-  case object None extends AccumType {
-    def |(that: AccumType): AccumType = that
-    def >(that: AccumType): Boolean = false
-  }
-  case object Fold extends AccumType {
-    def |(that: AccumType): AccumType = this
-    def >(that: AccumType): Boolean = that != Fold
-  }
-  case object Buff extends AccumType {
-    def |(that: AccumType): AccumType = that match {case Fold => Fold; case _ => Buff}
-    def >(that: AccumType): Boolean = that match {case None => true; case _ => false}
-  }
-}
-
 case class Accumulator(tp: AccumType) extends StableData[Accumulator]
 @data object accumTypeOf {
   def apply(x: Sym[_]): AccumType = metadata[Accumulator](x).map(_.tp).getOrElse(AccumType.None)

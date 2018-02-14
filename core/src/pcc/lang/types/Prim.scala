@@ -1,8 +1,8 @@
 package pcc.lang
 package types
 
-import pcc.core.Sym
+import pcc.core.Top
 
-abstract class Prim[A](id: Int)(implicit ev: A<:<Prim[A]) extends Sym[A](id) {
+abstract class Prim[A](implicit ev: A<:<Prim[A]) extends Top[A] {
   final override def isPrimitive: Boolean = true
 }

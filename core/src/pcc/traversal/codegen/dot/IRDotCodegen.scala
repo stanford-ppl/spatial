@@ -1,13 +1,13 @@
-package pcc.traversal
+package rig.traversal
 package codegen
 package dot
 
-import pcc.core._
-import pcc.node._
-import pcc.lang.memories.SRAM
-import pcc.lang.Void
-import pcc.lang.pir.{In, Out}
-import pcc.node.pir.{Lanes, VPCU, VPMU}
+import rig.core._
+import rig.node._
+import rig.lang.memories.SRAM
+import rig.lang.Void
+import rig.lang.pir.{In, Out}
+import rig.node.pir.{Lanes, VPCU, VPMU}
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
@@ -15,6 +15,7 @@ import scala.collection.mutable.{ListBuffer, Map, Set}
 case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   override val name: String = "IR Dot Printer"
   override def filename: String = s"IRGraph.${ext}"
+  override def ext = s"dot.$lang"
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
     case s: SRAM[_] => s"$s"

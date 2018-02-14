@@ -5,6 +5,7 @@ import pcc.data._
 import pcc.lang.I32
 import pcc.util.isPow2
 import pcc.poly._
+import pcc.util.ScalaImplicits._
 
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   private val MAGIC_CUTOFF_N = 1.4  // TODO: What should this be?

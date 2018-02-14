@@ -6,18 +6,16 @@ import pcc.node._
 import pcc.node.pir.CounterChainCopy
 
 /** Types **/
-case class CounterChain(eid: Int) extends Sym[CounterChain](eid) {
+case class CounterChain() extends Top[CounterChain] {
   override type I = Array[Range]
-
-  override def fresh(id: Int): CounterChain = CounterChain(id)
-  override def stagedClass: Class[CounterChain] = classOf[CounterChain]
+  override def fresh: CounterChain = new CounterChain
   override def isPrimitive: Boolean = false
 }
 object CounterChain {
-  implicit val tp: CounterChain = CounterChain(-1)
-  @api def apply(ctrs: Counter*): CounterChain = stage(CounterChainNew(ctrs))
+  implicit val tp: CounterChain = (new CounterChain).asType
 
-  @api def copy(ctrs: Counter*): CounterChain = stage(CounterChainCopy(ctrs))
+  @api def apply(ctrs: Counter*): CounterChain = stage(CounterChainNew(ctrs))
+  @rig def copy(ctrs: Counter*): CounterChain = stage(CounterChainCopy(ctrs))
 }
 
 

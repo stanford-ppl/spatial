@@ -1,5 +1,7 @@
 package pcc.lang.static
 
+// No aliases of the form type X = pcc.lang.X (creates a circular reference)
+// Everything else is ok.
 trait InternalAliases {
   type Mem[A,C[_]] = pcc.lang.memories.Mem[A,C]
   type LocalMem[A,C[_<:A]] = pcc.lang.memories.LocalMem[A,C]
@@ -18,8 +20,8 @@ trait InternalAliases {
   lazy val ArgIn = pcc.lang.memories.ArgIn
   lazy val ArgOut = pcc.lang.memories.ArgOut
 
-  type Num[T] = pcc.lang.types.Num[T]
   type Bits[T] = pcc.lang.types.Bits[T]
+  type Num[T] = pcc.lang.types.Num[T]
 
   lazy val Accel = pcc.lang.control.Accel
   lazy val Foreach = pcc.lang.control.Foreach
@@ -44,6 +46,9 @@ trait Aliases extends InternalAliases {
   lazy val Void = pcc.lang.Void
   type Text = pcc.lang.Text
   lazy val Text = pcc.lang.Text
+
+  type Fix[T] = pcc.lang.Fix[T]
+  type Flt[T] = pcc.lang.Flt[T]
 
   type Series = pcc.lang.Series
   lazy val Series = pcc.lang.Series

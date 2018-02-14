@@ -4,11 +4,12 @@ import forge._
 import pcc.core._
 import pcc.lang._
 import pcc.poly._
+import pcc.util.ScalaImplicits._
 
 case class Prod(xs: Seq[I32], m: Int = 1) {
   def syms: Seq[I32] = xs
   def isConst: Boolean = xs.isEmpty
-  def isSymWithMultiplier: Boolean = xs.length == 1
+  def isSymWithMultiplier: Boolean = xs.lengthIs(1)
 
   def unary_-(): Prod = Prod(xs, -m)
   def *(p: Prod): Prod = Prod(this.xs ++ p.xs, this.m * p.m)

@@ -3,23 +3,24 @@ package pcc.spade.node
 import forge._
 import pcc.core._
 import pcc.lang._
+import pcc.lang.pir.{In, Out}
 
-case class PMUSpec(
-  nRegs:   Int, // Number of registers per stage
-  nCtrs:   Int, // Number of counters
-  nLanes:  Int, // Number of vector lanes
-  nStages: Int, // Number of compute stages
-  nCIns:   Int, // Number of control inputs
-  nCOuts:  Int, // Number of control outputs
-  nSIns:   Int, // Number of scalar inputs
-  nSOuts:  Int, // Number of scalar outputs
-  nVIns:   Int, // Number of vector inputs
-  nVOuts:  Int, // Number of vector outputs
-  muxSize: Int, // TODO
-  cFifoDepth: Int = 16,  // Depth of control signal FIFOs
-  sFifoDepth: Int = 16,  // Depth of scalar FIFOs
-  vFifoDepth: Int = 16   // Depth of vector FIFOs
-)
+class PMUSpec(
+  val nRegs:   Int, // Number of registers per stage
+  val nCtrs:   Int, // Number of counters
+  val nLanes:  Int, // Number of vector lanes
+  val nStages: Int, // Number of compute stages
+  val muxSize: Int, // TODO
+  val cFifoDepth: Int = 16,  // Depth of control signal FIFOs
+  val sFifoDepth: Int = 16,  // Depth of scalar FIFOs
+  val vFifoDepth: Int = 16,  // Depth of vector FIFOs
+  val cIns    : List[Direction], // Control input directions
+  val cOuts   : List[Direction], // Control output directions
+  val sIns    : List[Direction], // Scalar input directions
+  val sOuts   : List[Direction], // Scalar output directions
+  val vIns    : List[Direction], // Vector input directions
+  val vOuts   : List[Direction]  // Vector output directions
+) extends PUSpec
 
 case class PMU(eid: Int) extends Box[PMU](eid) {
   override type I = this.type
@@ -32,23 +33,23 @@ object PMU {
   @api def apply(spec: PMUSpec)(implicit wSize: Vec[Bit]): PMU = {
     implicit val vSize: Vec[Vec[Bit]] = Vec[Vec[Bit]](-1, spec.nLanes, wSize)
 
-    val cIns  = Seq.fill(spec.nCIns){ bound[Bit] }
-    val cOuts = Seq.fill(spec.nCOuts){ bound[Bit] }
-    val sIns  = Seq.fill(spec.nSIns){ bound[Vec[Bit]] }
-    val sOuts = Seq.fill(spec.nSOuts){ bound[Vec[Bit]] }
-    val vIns  = Seq.fill(spec.nVIns){ bound[Vec[Vec[Bit]]] }
-    val vOuts = Seq.fill(spec.nVOuts){ bound[Vec[Vec[Bit]]] }
+    val cIns  = Seq.fill(spec.nCIns){ bound[In[Bit]] }
+    val cOuts = Seq.fill(spec.nCOuts){ bound[Out[Bit]] }
+    val sIns  = Seq.fill(spec.nSIns){ bound[In[Vec[Bit]]] }
+    val sOuts = Seq.fill(spec.nSOuts){ bound[Out[Vec[Bit]]] }
+    val vIns  = Seq.fill(spec.nVIns){ bound[In[Vec[Vec[Bit]]]] }
+    val vOuts = Seq.fill(spec.nVOuts){ bound[Out[Vec[Vec[Bit]]]] }
 
     stage(PMUModule(cIns,cOuts,sIns,sOuts,vIns,vOuts,spec))
   }
 }
 
 @op case class PMUModule(
-  cIns:  Seq[Bit],
-  cOuts: Seq[Bit],
-  sIns:  Seq[Vec[Bit]],
-  sOuts: Seq[Vec[Bit]],
-  vIns:  Seq[Vec[Vec[Bit]]],
-  vOuts: Seq[Vec[Vec[Bit]]],
+  cIns:   Seq[In[Bit]],
+  cOuts:  Seq[Out[Bit]],
+  sIns:   Seq[In[Vec[Bit]]],
+  sOuts:  Seq[Out[Vec[Bit]]],
+  vIns:   Seq[In[Vec[Vec[Bit]]]],
+  vOuts:  Seq[Out[Vec[Vec[Bit]]]],
   spec:  PMUSpec
-) extends Module[PMU]
+) extends PUModule[PMU]

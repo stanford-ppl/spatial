@@ -2,21 +2,47 @@ package pcc.core.static
 
 import forge._
 import pcc.data.{Effects,isMutable,effectsOf,depsOf,Effectful}
-import pcc.util.{recursive,strMeta}
+import pcc.util.{recursive,strMeta,escapeConst}
 
 trait Staging { this: Printing =>
 
   def typ[A:Type]: Type[A] = implicitly[Type[A]]
   def mtyp[A,B](tp: Type[A]): Type[B] = tp.asInstanceOf[Type[B]]
 
-  def const[A:Type](c: Any): A = const(typ[A], c)
-  def const[A](tp: Type[A], c: Any): A = tp.freshSym.asConst(c)
+  def const[A<:Sym[A]:Type](c: A#I): A = {
+    val tp = typ[A]
+    constant(tp)(c.asInstanceOf[tp.I])
+  }
+  def constant[A](tp: Type[A])(c: tp.I): A = {
+    val x = tp.freshSym.asConst(c)
+    val s = tp.viewAsSym(x)
+    //logs(c"${stm(s)} [constant] [type: ${s.tp}]")
+    x
+  }
 
-  @stateful def bound[A:Type]: A = typ[A].freshSym.asBound(state.nextId())
+  @stateful def bound[A:Type]: A = {
+    val x = typ[A].freshSym.asBound(state.nextId())
+    val s = typ[A].viewAsSym(x)
+    logs(c"${stm(s)} [bound] [type: ${s.tp}]")
+    x
+  }
 
-  @stateful def param[A:Type](c: Any): A = param(typ[A], c)
-  @stateful def param[A](tp: Type[A], c: Any): A = tp.freshSym.asParam(state.nextId(), c)
-  @stateful def symbol[A](tp: Type[A], op: Op[A]): A = tp.freshSym.asSymbol(state.nextId(), op)
+  @stateful def param[A<:Sym[A]:Type](c: A#I): A = {
+    val tp = typ[A]
+    parameter(tp)(c.asInstanceOf[tp.I])
+  }
+  @stateful def parameter[A](tp: Type[A])(c: tp.I): A = {
+    val x = tp.freshSym.asParam(state.nextId(), c)
+    val s = tp.viewAsSym(x)
+    logs(c"${stm(s)} [parameter] [type: ${s.tp}]")
+    x
+  }
+  @stateful def symbol[A](tp: Type[A], op: Op[A]): A = {
+    val x = tp.freshSym.asSymbol(state.nextId(), op)
+    val s = tp.viewAsSym(x)
+    logs(c"${stm(s)} [symbol] [type: ${s.tp}]")
+    x
+  }
 
 
   @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.tR,ctx,state) match {
@@ -40,15 +66,14 @@ trait Staging { this: Printing =>
         val immutables = effects.writes.filterNot(x => isMutable(x))
         val aliases = mutableAliases(op) diff effects.writes
 
-        logs(s"$lhs = $op")
-        logs(s"  aliases: ${aliasSyms(op)}")
-        logs(s"  copies: ${copySyms(op)}")
-        logs(s"  contains: ${containSyms(op)}")
-        logs(s"  extracts: ${extractSyms(op)}")
-        logs(s"  effects: $effects")
-        logs(s"  deps: $deps")
-        logs(s"  written immutables: $immutables")
-        logs(s"  mutable aliases: $aliases")
+//        logs(s"  aliases: ${aliasSyms(op)}")
+//        logs(s"  copies: ${copySyms(op)}")
+//        logs(s"  contains: ${containSyms(op)}")
+//        logs(s"  extracts: ${extractSyms(op)}")
+//        logs(s"  effects: $effects")
+//        logs(s"  deps: $deps")
+//        logs(s"  written immutables: $immutables")
+//        logs(s"  mutable aliases: $aliases")
 
         if (aliases.nonEmpty) {
           error(ctx, "Illegal sharing of mutable objects: ")
@@ -88,6 +113,7 @@ trait Staging { this: Printing =>
     case _ => sym
   }
   @rig def stage[T](op: Op[T]): T = {
+    logs(s"Staging $op with type evidence ${op.tR}")
     val t = register(op, () => symbol(op.tR,op))
     op.tR.viewAsSym(t).ctx = ctx
     t

@@ -22,16 +22,15 @@ class PMUSpec(
   val vOuts   : List[Direction]  // Vector output directions
 ) extends PUSpec
 
-case class PMU(eid: Int) extends Box[PMU](eid) {
+case class PMU() extends Box[PMU] {
   override type I = this.type
-  override def fresh(id: Int): PMU = PMU(id)
-  override def stagedClass: Class[PMU] = classOf[PMU]
+  override def fresh: PMU = new PMU
 }
 object PMU {
-  implicit val pmu: PMU = PMU(-1)
+  implicit val pmu: PMU = (new PMU).asType
 
   @api def apply(spec: PMUSpec)(implicit wSize: Vec[Bit]): PMU = {
-    implicit val vSize: Vec[Vec[Bit]] = Vec[Vec[Bit]](-1, spec.nLanes, wSize)
+    implicit val vSize: Vec[Vec[Bit]] = Vec.tp[Vec[Bit]](spec.nLanes)
 
     val cIns  = Seq.fill(spec.nCIns){ bound[In[Bit]] }
     val cOuts = Seq.fill(spec.nCOuts){ bound[Out[Bit]] }

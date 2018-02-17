@@ -1,6 +1,7 @@
 package pcc.node
 
 import forge._
+import pcc.data.Effects
 import pcc.lang._
 
 /** Fix **/
@@ -32,15 +33,19 @@ import pcc.lang._
 @op case class FixLn[A:Fix](a: A) extends Primitive[A]
 @op case class FixSqrt[A:Fix](a: A) extends Primitive[A]
 
-@op case class FixSin[A:Fix](x: A) extends Primitive[A]
-@op case class FixCos[A:Fix](x: A) extends Primitive[A]
-@op case class FixTan[A:Fix](x: A) extends Primitive[A]
-@op case class FixSinh[A:Fix](x: A) extends Primitive[A]
-@op case class FixCosh[A:Fix](x: A) extends Primitive[A]
-@op case class FixTanh[A:Fix](x: A) extends Primitive[A]
-@op case class FixAsin[A:Fix](x: A) extends Primitive[A]
-@op case class FixAcos[A:Fix](x: A) extends Primitive[A]
-@op case class FixAtan[A:Fix](x: A) extends Primitive[A]
+@op case class FixSin[A:Fix](a: A) extends Primitive[A]
+@op case class FixCos[A:Fix](a: A) extends Primitive[A]
+@op case class FixTan[A:Fix](a: A) extends Primitive[A]
+@op case class FixSinh[A:Fix](a: A) extends Primitive[A]
+@op case class FixCosh[A:Fix](a: A) extends Primitive[A]
+@op case class FixTanh[A:Fix](a: A) extends Primitive[A]
+@op case class FixAsin[A:Fix](a: A) extends Primitive[A]
+@op case class FixAcos[A:Fix](a: A) extends Primitive[A]
+@op case class FixAtan[A:Fix](a: A) extends Primitive[A]
 
 @op case class FixInvSqrt[A:Fix](a: A) extends Primitive[A]
 @op case class FixSigmoid[A:Fix](a: A) extends Primitive[A]
+
+@op case class FixRandom[A:Fix](max: Option[A]) extends Primitive[A] {
+  override def effects: Effects = Effects.Simple
+}

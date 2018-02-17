@@ -11,6 +11,17 @@ case class DRAM[A:Bits]() extends RemoteMem[A,DRAM] {
   override type I = Array[AI]
 
   override def fresh: DRAM[A] = new DRAM[A]
+
+  @api override def !==(that: DRAM[A]): Bit = {
+    error(ctx, "Comparison on DRAMs is unsupported. Use getMem to extract data.")
+    error(ctx)
+    super.!==(that)
+  }
+  @api override def ===(that: DRAM[A]): Bit = {
+    error(ctx, "Comparison on DRAMs is unsupported. Use getMem to extract data.")
+    error(ctx)
+    super.===(that)
+  }
 }
 object DRAM {
   private lazy val types = new mutable.HashMap[Bits[_],DRAM[_]]()

@@ -55,7 +55,7 @@ package object util {
       val aliases = lhs.prevNames.map{case (tx,alias) => s"$tx: $alias" }.mkString(", ")
       dbgs(s" - Aliases: $aliases")
     }
-    dbgs(s" - Type: ${lhs.typeName}")
+    dbgs(s" - Type: ${lhs.tp}")
     dbgs(s" - SrcCtx: ${lhs.ctx}")
     metadata.all(lhs).foreach{case (k,m) => dbgss(s" - $k: $m") }
   }

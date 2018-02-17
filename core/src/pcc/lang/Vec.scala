@@ -3,21 +3,29 @@ package pcc.lang
 import forge._
 import pcc.core._
 import pcc.node._
+import pcc.emul.Number
 
-case class Vec[A:Bits](private val len: Int) extends Bits[Vec[A]] {
+case class Vec[A:Bits](private val len: Int)(implicit val tV: Bits[Vec[A]]) extends Bits[Vec[A]] {
   val tA: Bits[A] = tbits[A]
   type AI = tA.I
   override type I = Array[AI]
-  private implicit val bA: Bits[A] = tA
 
   override def fresh: Vec[A] = new Vec[A](0)
 
   def length: Int = tp.extract.len
 
-  override def bits: Int = tA.bits * length
+  override def nBits: Int = tA.nBits * length
 
-  @api def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ tA.zero }:_*)
-  @api def one: Vec[A] = Vec.LeastLast(Seq.fill(length-1){ tA.zero} :+ tA.one :_*)
+  @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ tA.zero }:_*)
+  @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(length-1){ tA.zero} :+ tA.one :_*)
+  @rig def random(max: Option[Vec[A]]): Vec[A] = {
+    if (max.isDefined && max.get.length != length) {
+      error(ctx, s"Vector length mismatch. Expected $length ${plural(length,"word")}, got ${max.get.length}")
+      error(ctx)
+    }
+    val elems = Seq.tabulate(length){i => tA.random(max.map{vec => vec(i)}) }
+    Vec.LeastLast(elems:_*)
+  }
 
   /**
     * Returns the word at index i in this vector.
@@ -30,15 +38,15 @@ case class Vec[A:Bits](private val len: Int) extends Bits[Vec[A]] {
     * The range must be statically known, and must have a stride of 1.
     */
   @api def apply(s: Series): Vec[A] = (s.start, s.end, s.step) match {
-    case (Lit(x1),Lit(x2),Lit(step)) =>
-      if (step != 1) {
+    case (Lit(x1),Lit(x2),Lit(c)) =>
+      if (c !== 1) {
         error(ctx, "Strides for vector slice are currently unsupported.")
         error(ctx)
         Vec.empty[A]
       }
       else {
-        val msb = java.lang.Math.max(x1, x2)
-        val lsb = java.lang.Math.min(x1, x2)
+        val msb = Number.max(x1, x2).toInt
+        val lsb = Number.min(x1, x2).toInt
         if (msb - lsb == 0) {
           warn(ctx, "Empty vector slice.")
           warn(ctx)
@@ -55,10 +63,15 @@ case class Vec[A:Bits](private val len: Int) extends Bits[Vec[A]] {
     * Returns a new vector formed by the concatenation of this and that.
     */
   @api def ++(that: Vec[A]): Vec[A] = Vec.concat(Seq(this,that))
+
+  /**
+    * Returns a new vector with this vector's elements in reverse order.
+    */
+  @api def reverse: Vec[A] = stage(VecReverse(this)(tA, this.tp.extract))
 }
 
 object Vec {
-  def tp[A:Bits](len: Int): Vec[A] = (new Vec(len)).asType
+  def tp[A:Bits](len: Int): Vec[A] = (new Vec(len)(tbits[A],null)).asType
 
   /**
     * Creates a little-endian vector from the given N elements
@@ -107,7 +120,7 @@ object Vec {
     * Creates an element slice of the vector from [lsb,msb]
     */
   @rig def slice[A:Bits](vec: Vec[A], msw: Int, lsw: Int): Vec[A] = {
-    implicit val tV: Vec[A] = Vec.tp[A](Math.max(msw - lsw + 1, 0))
+    implicit val tV: Vec[A] = Vec.tp[A](java.lang.Math.max(msw - lsw + 1, 0))
     stage(VecSlice(vec,msw,lsw))
   }
 

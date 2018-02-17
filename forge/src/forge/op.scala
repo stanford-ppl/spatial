@@ -18,12 +18,13 @@ object op {
       case cls: ClassDef =>
         val name = cls.name
         val names = cls.constructorArgs.head.map(_.name)
+        val targs = cls.typeArgs
         val fnames = names.map{name => q"f($name)" }
         val updates = names.zip(fnames).map{case (name,fname) => q"$name = $fname" }
 
         cls.asCaseClass.withVarParams
            .injectMethod {(_,_) =>
-             q"override def mirror(f:Tx) = new $name(..$fnames)"
+             q"override def mirror(f:Tx) = new $name[..$targs](..$fnames)"
            }
            .injectMethod{(_,_) =>
              q"override def update(f:Tx) = { ..$updates }"

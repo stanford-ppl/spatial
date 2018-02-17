@@ -5,12 +5,16 @@ import pcc.core._
 
 case class Void() extends Bits[Void]() {
   override type I = Unit
-  def bits = 0
+  def nBits = 0
 
   override def fresh: Void = new Void
 
-  @api def zero: Void = Void.c
-  @api def one: Void = Void.c
+  @rig def zero: Void = Void.c
+  @rig def one: Void = Void.c
+  @rig def random(max: Option[Void]): Void = Void.c
+
+  @api override def !==(that: Void): Bit = false
+  @api override def ===(that: Void): Bit = true
 }
 object Void {
   implicit val tp: Void = (new Void).asType

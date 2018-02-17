@@ -6,10 +6,12 @@ import pcc.util.Freq._
 import Filters._
 import pcc.traversal.transform.Transformer
 
+import scala.annotation.unchecked.uncheckedVariance
+
 abstract class Op[+R:Type] extends Product with Serializable {
   final type Tx = Transformer
 
-  def tR: Type[R] = implicitly[Type[R]]
+  def tR: Type[R @ uncheckedVariance] = implicitly[Type[R]]
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies **/
   // Inputs: symbol dataflow dependencies for this Def.

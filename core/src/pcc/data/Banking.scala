@@ -4,6 +4,8 @@ import forge._
 import pcc.core._
 import pcc.lang.LocalMem
 import pcc.util.IntLike._
+import pcc.util.ScalaImplicits._
+import pcc.helpers._
 
 /**
   * Abstract class for any banking strategy

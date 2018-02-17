@@ -7,8 +7,6 @@ import pcc.traversal.transform.Transformer
 import pcc.util.files
 import pcc.util.files.deleteExts
 
-import scala.collection.mutable.ArrayBuffer
-
 
 trait Compiler { self =>
   protected var IR: State = new State
@@ -38,8 +36,8 @@ trait Compiler { self =>
     if (t.getCause != null) bug(s"  ${t.getCause}")
     else bug(s"  $t")
     if (config.enDbg) {
-      trace.take(4).foreach{t => bug("  " + t) }
-      if (trace.length > 4) bug(s"  ... [see log]")
+      trace.take(20).foreach{t => bug("  " + t) }
+      if (trace.length > 20) bug(s" .. [see ${config.logDir}${config.name}_exception.log]")
     }
     bug(s"This is due to a compiler bug. A log file has been created at: ")
     bug(s"  ${config.logDir}${config.name}_exception.log")
@@ -63,7 +61,6 @@ trait Compiler { self =>
   final def runPass[R](t: Pass, block: Block[R]): Block[R] = {
     if (t.isInstanceOf[Transformer]) {
       globals.clearBeforeTransform()
-      metadata.clearBeforeTransform()
     }
     val issuesBefore = state.issues
 
@@ -163,16 +160,16 @@ trait Compiler { self =>
     }
     catch {
       case e @ CompilerBugs(stage,n) =>
-        onException(new Exception(s"Encountered compiler ${plural(n,"bug","bugs")} during pass $stage"))
-        if (testbench) throw e
+        onException(new Exception(s"$n compiler ${plural(n,"bug")} during pass $stage"))
+        if (testbench) throw TestbenchFailure(s"$n compiler ${plural(n,"bug")} during pass $stage")
 
       case e @ CompilerErrors(stage,n) =>
-        error(s"""${IR.errors} ${plural(IR.errors,"error","errors")} found during $stage""")
-        if (testbench) throw e
+        error(s"${IR.errors} ${plural(n,"error")} found during $stage")
+        if (testbench) throw TestbenchFailure(s"$n ${plural(n,"error")} found during $stage")
 
       case t: Throwable =>
         onException(t)
-        if (testbench) throw t
+        if (testbench) throw TestbenchFailure(s"Uncaught exception ${t.getMessage}")
     }
     val time = (System.currentTimeMillis - start).toFloat
 

@@ -4,6 +4,8 @@ package transform
 import pcc.core._
 import pcc.data._
 
+import pcc.util.Invert._
+
 abstract class ForwardTransformer extends SubstTransformer with Traversal {
   override val recurse = Recurse.Never
 
@@ -21,7 +23,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     * By default, the rule is to mirror the symbol's node.
     * @return the symbol which should replace lhs
     */
-  def transform[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+  def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     mirror(lhs,rhs)
   }
 
@@ -30,11 +32,11 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     * If the result is None, the symbol will be removed.
     * Otherwise, the given substitution rule will be registered.
     */
-  def transformOrRemove[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Option[Sym[A]] = {
+  def transformOrRemove[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Option[Sym[A]] = {
     Some(transform(lhs,rhs))
   }
 
-  protected def createSubstRule[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Unit = {
+  protected def createSubstRule[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Unit = {
     val lhs2: Option[Sym[A]] = if (!subst.contains(lhs)) {
       // Untransformed case: no rule yet exists for this symbol
       val lhs2 = transformOrRemove(lhs, rhs)
@@ -73,7 +75,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
   }
 
   final override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    createSubstRule(lhs.asInstanceOf[Sym[Any]], rhs.asInstanceOf[Op[Any]])(mtyp(lhs), lhs.ctx)
+    createSubstRule(lhs.asInstanceOf[Sym[Any]], rhs.asInstanceOf[Op[Any]])(lhs.mtp, lhs.ctx)
   }
 
   final override protected def visitBlock[R](block: Block[R]): Block[R] = {

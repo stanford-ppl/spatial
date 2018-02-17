@@ -5,14 +5,23 @@ import pcc.lang.{Bit,Text}
 import pcc.util.escapeConst
 
 import scala.annotation.unchecked.uncheckedVariance
+import scala.collection.mutable
 
-sealed abstract class Type[+A](implicit private val ev: A <:< Top[A]) { this: Product =>
+sealed abstract class Type[A](implicit private val ev: A <:< Top[A]) { this: Product =>
   type I
   def fresh: A
-  def freshSym: Sym[A] = ev(fresh)
+  def freshSym: Sym[A]
+
   @inline final def extract: A = this.asInstanceOf[A]
+  final def view[B[_]<:Type[_]](value: B[A]): B[A] = value match {
+    case t: Top[_] if this <:< t.tp => this.asInstanceOf[B[A]]
+    case t: Top[_] => throw new Exception(s"Cannot view $this as a ${t.tp} ($this has type ${this.tp})")
+    case _ => throw new Exception(c"Cannot view $this as a ${value.getClass}")
+  }
+  def tp: Type[A]
+  def isType: Boolean
   def viewAsSym(a: A @ uncheckedVariance): Sym[A] = ev(a)
-  def viewAsTop(a: A @ uncheckedVariance): Top[A] = ev(a)
+  def viewAsTop(a: A @ uncheckedVariance): Top[A @ uncheckedVariance] = ev(a)
   def isPrimitive: Boolean
   def typeArgs: Seq[Type[_]] = Nil
   def supertypes: Seq[Type[_]] = Nil
@@ -21,7 +30,7 @@ sealed abstract class Type[+A](implicit private val ev: A <:< Top[A]) { this: Pr
   final def <:>(that: Type[_]): Boolean = this <:< that && that <:< this
 
   final def typePrefix: String = this.productPrefix
-  final def typeName: String = this.typePrefix + typeArgs.map(_.typeName).mkString("[", ",", "]")
+  final def typeName: String = this.typePrefix + (if (typeArgs.isEmpty) "" else "[" + typeArgs.mkString(",") + "]")
 }
 
 
@@ -31,23 +40,23 @@ sealed abstract class Type[+A](implicit private val ev: A <:< Top[A]) { this: Pr
 sealed trait Sym[+A] extends Product with Serializable { self =>
   type I
   @inline final protected def me: A = this.asInstanceOf[A]
-  protected[core] var rhs: Def[I,A @ uncheckedVariance] = Def.TypeRef
+  private var _rhs: Def[I,A @ uncheckedVariance] = Def.TypeRef
   private var _tp: Type[A @ uncheckedVariance] = _
-  protected[core] var data: Map[Class[_],Metadata[_]] = Map.empty
+  private[pcc] val data: mutable.Map[Class[_],Metadata[_]] = mutable.Map.empty
 
   var name: Option[String] = None
   var ctx: SrcCtx = SrcCtx.empty
   var prevNames: Seq[(String,String)] = Nil
 
   final def tp: Type[A @ uncheckedVariance] = if (this.isType) this.asInstanceOf[Type[A]] else _tp
-  final def mtp[B]: Type[B] = this.tp.asInstanceOf[Type[B]]
+  final def rhs: Def[I, A @ uncheckedVariance] = _rhs
 
-  final private[pcc] def asType: A = { rhs = Def.TypeRef; me }
-  final private[core] def asBound(id: Int): A = { rhs = Def.Bound(id); me }
-  final private[core] def asConst(c: Any): A = { rhs = Def.Const(c.asInstanceOf[self.I]); me }
-  final private[core] def asParam(id: Int, c: Any): A = { rhs = Def.Param(id, c.asInstanceOf[self.I]); me }
-  final private[core] def asSymbol(id: Int, op: Op[A @uncheckedVariance]): A = { rhs = Def.Node(id, op); me }
-  final private[core] def withType(t: Type[A @uncheckedVariance]): A = { _tp = t; me }
+  final private[pcc] def asType: A = { _rhs = Def.TypeRef; me }
+  final private[core] def asBound(id: Int): A = { _rhs = Def.Bound(id); me }
+  final private[core] def asConst(c: Any): A = { _rhs = Def.Const(c.asInstanceOf[self.I]); me }
+  final private[core] def asParam(id: Int, c: Any): A = { _rhs = Def.Param(id, c.asInstanceOf[self.I]); me }
+  final private[core] def asSymbol(id: Int, op: Op[A @uncheckedVariance]): A = { _rhs = Def.Node(id, op); me }
+  final private[core] def withType(t: Type[A @uncheckedVariance]): Sym[A] = { _tp = t; this }
 
   final def isType: Boolean = rhs.isType
   final def isConst: Boolean = rhs.isConst
@@ -62,11 +71,40 @@ sealed trait Sym[+A] extends Product with Serializable { self =>
 }
 
 
-class Top[+A](implicit ev: A <:< Top[A]) extends Type[A] with Sym[A] {
-  override type I = Any
+abstract class Top[A](implicit ev: A <:< Top[A]) extends Type[A] with Sym[A] {
+  type I
 
-  @api def ===(that: Sym[_]): Bit = Bit.c(this == that)
-  @api def !==(that: Sym[_]): Bit = Bit.c(this != that)
+  final override def freshSym: Sym[A] = {
+    if (!this.isType) throw new Exception(s"Fresh call from non-Type evidence $this")
+    ev(fresh).withType(this)
+  }
+
+  @rig private def unrelated(that: Any): Unit = that match {
+    case t: Top[_] =>
+      warn(ctx, s"Comparison between unrelated types ${this.tp} and ${t.tp}")
+      warn(ctx)
+    case t =>
+      warn(ctx, s"Comparison between unrelated types ${this.tp} and ${t.getClass}")
+      warn(ctx)
+  }
+
+  @api def nEql(that: Any): Bit = that match {
+    case t: Top[_] if t.tp <:> this.tp => this !== that.asInstanceOf[A]
+    case _ => unrelated(that); true
+  }
+  @api def isEql(that: Any): Bit = that match {
+    case t: Top[_] if t.tp <:> this.tp => this === that.asInstanceOf[A]
+    case _ => unrelated(that); false
+  }
+
+  @api def !==(that: A): Bit = !this.equals(that)    // FIXME: Correct default?
+  @api def ===(that: A): Bit = this.equals(that)   // FIXME: Correct default?
+
+  @api def ++(that: Any): Text = that match {
+    case t: Text   => Text.concat(this.toText, t)
+    case t: Top[_] => Text.concat(this.toText, t.toText)
+    case t => Text.concat(this.toText, Text.c(t.toString))
+  }
   @api def toText: Text = Text.textify(me)(this.tp,ctx,state)
 
 
@@ -102,7 +140,7 @@ class Top[+A](implicit ev: A <:< Top[A]) extends Type[A] with Sym[A] {
     case Def.Param(id,c) => s"p$id (${escapeConst(c)})"
     case Def.Node(id,_)  => s"x$id"
     case Def.Bound(id)   => s"b$id"
-    case Def.TypeRef     => typeName + typeArgs.mkString("[", ",", "]")
+    case Def.TypeRef     => typeName
   }
 }
 

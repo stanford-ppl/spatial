@@ -2,6 +2,7 @@ package pcc.util
 
 import forge._
 import pcc.lang.{Math,I32}
+import pcc.emul.FixedPoint
 
 trait IntLike[T] {
   @api def neg(a: T): T
@@ -41,8 +42,8 @@ object IntLike {
   }
   @api def zero[T:IntLike]: T = int[T].fromInt(0)
   @api def one[T:IntLike]: T = int[T].fromInt(1)
-  @api def product[T:IntLike](xs: Seq[T]): T = if (xs.isEmpty) one[T] else Math.reduce(xs){_*_}
-  @api def sum[T:IntLike](xs: Seq[T]): T = if (xs.isEmpty) zero[T] else Math.reduce(xs){_+_}
+  @api def product[T:IntLike](xs: Seq[T]): T = if (xs.isEmpty) one[T] else Math.reduce(xs:_*){_*_}
+  @api def sum[T:IntLike](xs: Seq[T]): T = if (xs.isEmpty) zero[T] else Math.reduce(xs:_*){_+_}
 
   implicit object I32IsIntLike extends IntLike[I32] {
     @api def neg(a: I32): I32 = -a
@@ -64,4 +65,14 @@ object IntLike {
     @api def fromInt(a: Int): Int = a
   }
 
+  implicit object FixedPointIsIntLike extends IntLike[FixedPoint] {
+    @api def neg(a: FixedPoint): FixedPoint = -a
+    @api def add(a: FixedPoint, b: FixedPoint): FixedPoint = a + b
+    @api def sub(a: FixedPoint, b: FixedPoint): FixedPoint = a - b
+    @api def mul(a: FixedPoint, b: FixedPoint): FixedPoint = a * b
+    @api def div(a: FixedPoint, b: FixedPoint): FixedPoint = a / b
+    @api def mod(a: FixedPoint, b: FixedPoint): FixedPoint = a % b
+    // FIXME: This isn't quite correct, what if expected format is not signed 32 bit integer?
+    @api def fromInt(a: Int): FixedPoint = FixedPoint.fromInt(a)
+  }
 }

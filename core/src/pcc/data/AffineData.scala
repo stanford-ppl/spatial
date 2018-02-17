@@ -4,6 +4,7 @@ import forge._
 import pcc.core._
 import pcc.lang._
 import pcc.poly._
+import pcc.helpers._
 
 case class AccessMatrix(
   access: Sym[_],

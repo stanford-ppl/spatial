@@ -1,7 +1,7 @@
 package pcc.lang
 
-import pcc.core.Sym
+import pcc.core.Top
 
-abstract class Box[A](eid: Int)(implicit ev: A <:< Box[A]) extends Sym[A](eid) {
+abstract class Box[A](implicit ev: A <:< Box[A]) extends Top[A] {
   override def isPrimitive = false
 }

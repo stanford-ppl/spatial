@@ -20,9 +20,9 @@ abstract class PUPtr {
   def outputs: mutable.Map[Int,Out[_]] = unit.map(_.outs).getOrElse(_outputs)
 
   @api def in[A:Bits](i: Int): In[A] = inputs.get(i) match {
-    case Some(in) if in.tA <:> bits[A] => in.asInstanceOf[In[A]]
+    case Some(in) if in.tA <:> tbits[A] => in.asInstanceOf[In[A]]
     case Some(in) =>
-      error(ctx, s"Cannot cast input $i as both ${bits[A].typeName} and ${in.tA.typeName}")
+      error(ctx, s"Cannot cast input $i as both ${tbits[A]} and ${in.tA}")
       error(ctx)
       bound[In[A]]
     case None =>
@@ -32,9 +32,9 @@ abstract class PUPtr {
   }
 
   @api def out[A:Bits](i: Int): Out[A] = outputs.get(i) match {
-    case Some(out) if out.tA <:> bits[A] => out.asInstanceOf[Out[A]]
+    case Some(out) if out.tA <:> tbits[A] => out.asInstanceOf[Out[A]]
     case Some(out) =>
-      error(ctx, s"Cannot cast output $i as both ${bits[A].typeName} and ${out.tA.typeName}")
+      error(ctx, s"Cannot cast output $i as both ${tbits[A]} and ${out.tA}")
       error(ctx)
       bound[Out[A]]
     case None =>

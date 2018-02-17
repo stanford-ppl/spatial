@@ -9,7 +9,7 @@ import pcc.traversal.analysis.AmbiguousMetaPipes
 import pcc.util.DAG
 import pcc.util.ScalaImplicits._
 
-trait Control {
+trait HelpersControl {
   implicit class SymControl(x: Sym[_]) {
     @stateful def getParent: Option[Ctrl] = parentOf.get(x)
     @stateful def parent: Ctrl = parentOf(x)
@@ -148,7 +148,7 @@ trait Control {
           if (lca == metapipe) a -> Some(dist) else a -> None
         }
         val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
-        val minDist = buffers.minOrZero(0)
+        val minDist = buffers.minOrElse(0)
         val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
         (Some(metapipe), ports)
 

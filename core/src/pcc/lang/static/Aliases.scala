@@ -21,6 +21,7 @@ trait InternalAliases {
   lazy val ArgOut = pcc.lang.memories.ArgOut
 
   type Bits[T] = pcc.lang.types.Bits[T]
+  lazy val Bits = pcc.lang.types.Bits
   type Num[T] = pcc.lang.types.Num[T]
 
   lazy val Accel = pcc.lang.control.Accel
@@ -49,6 +50,9 @@ trait Aliases extends InternalAliases {
 
   type Fix[T] = pcc.lang.Fix[T]
   type Flt[T] = pcc.lang.Flt[T]
+
+  type Vec[T] = pcc.lang.Vec[T]
+  lazy val Vec = pcc.lang.Vec
 
   type Series = pcc.lang.Series
   lazy val Series = pcc.lang.Series

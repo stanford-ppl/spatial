@@ -6,11 +6,11 @@ import pcc.core._
 import pcc.node._
 import pcc.lang.memories.SRAM
 import pcc.lang.Void
-import pcc.lang.pir.{In, Out}
-import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
+import pcc.lang.pir.{In, Lanes, Out}
+import pcc.node.pir.{VPCU, VPMU, VectorBus}
 
 import scala.language.implicitConversions
-import scala.collection.mutable.{ListBuffer, HashMap, Set}
+import scala.collection.mutable.{HashMap, ListBuffer, Set}
 
 case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
   override val name: String = "PU Dot Printer"
@@ -36,8 +36,7 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
             .fill(white)
             .labelfontcolor(black)
 
-  def getNodeName(sym: Sym[_]) = sym.op.map(o => o.productPrefix).getOrElse(sym.typeName) + s"_x${sym.id}"
-  def getBlockName[R](block: Block[R]) = "cluster_" + getNodeName(block.result)
+
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
     val subgraphAttr = DotAttr().style(filled)

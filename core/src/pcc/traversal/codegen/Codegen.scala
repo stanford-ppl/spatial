@@ -10,28 +10,30 @@ trait Codegen extends Traversal {
   val lang: String
   def ext: String
   def dir: String = s"${config.genDir}${files.sep}${lang}${files.sep}"
-  def filename: String = s"Top.${ext}"
+  def filename: String = s"Top.$ext"
 
   protected def nameMap(x: String): String = x
 
-  protected def remap(tp: Sym[_]): String = tp.typeName
+  protected def remap(tp: Type[_]): String = tp.typeName
 
-  protected def quoteConst(tp: Sym[_], c: Any): String = {
+  protected def quoteConst(tp: Type[_], c: Any): String = {
     throw new Exception(s"$name failed to generate constant $c of type $tp")
   }
 
-  protected def named(s: Sym[_]): String = if (s.isBound) s"b${s.id}" else nameMap(s"x${s.id}")
+  protected def named(s: Sym[_], id: Int): String = nameMap(s"x$id")
 
-  protected def quote(s: Sym[_]): String = s.rhs match {
-    case Nix    => s"b${s.id}"
-    case One(c) => quoteConst(s, c)
-    case Two(_) => named(s)
+  protected def quote(s: Top[_]): String = s.rhs match {
+    case Def.TypeRef    => remap(s)
+    case Def.Const(c)   => quoteConst(s.tp, c)
+    case Def.Param(_,c) => quoteConst(s.tp, c)
+    case Def.Bound(id)  => s"b$id"
+    case Def.Node(id,_) => named(s,id)
   }
 
   protected def quoteOrRemap(arg: Any): String = arg match {
     case p: Seq[_] => p.map(quoteOrRemap).mkString(", ")  // By default, comma separate Seq
     case s: Set[_] => s.map(quoteOrRemap).mkString(", ")  // TODO: Is this expected? Sets are unordered..
-    case e: Sym[_] if e.isType => quote(e)
+    case e: Top[_] => quote(e)
     case s: String => s
     case c: Int => c.toString
     case b: Boolean => b.toString

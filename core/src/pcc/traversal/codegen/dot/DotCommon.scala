@@ -6,12 +6,11 @@ import pcc.core._
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
-import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
+import pcc.node.pir.{VPCU, VPMU, VectorBus}
 import pcc.spade.node.{PCUModule, PMUModule}
 
 trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
-
 
   def q(s: Any): String = regex.replaceAllIn(quoteOrRemap(s), "")
 
@@ -40,13 +39,23 @@ trait DotCommon { this: Codegen =>
     block
   }
 
-  def getNodeColor(rhs: Op[_]) = rhs match {
+  def getNodeName(sym: Sym[_]): String = sym.rhs match {
+    case Def.TypeRef     => sym.toString
+    case Def.Const(c)    => s"$c"
+    case Def.Param(id,_) => s"${sym.tp}_x$id"
+    case Def.Bound(id)   => s"${sym.tp}_x$id"
+    case Def.Node(id,op) => s"${op.productPrefix}_x$id"
+  }
+  def getBlockName[R](block: Block[R]): String = "cluster_" + getNodeName(block.result)
+
+  def getNodeColor(rhs: Op[_]): Color = rhs match {
     case pcu: VPCU => indianred
     case pcu: PCUModule => indianred
     case pmu: VPMU => cadetblue
     case pmu: PMUModule => cadetblue
     case _ => white
   }
+
 
   def emitSubgraph(attr: DotAttr)(f: => Any): Unit = {
     emit(s"subgraph cluster_${attr.attrMap("label")._1} {")

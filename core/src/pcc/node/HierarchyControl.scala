@@ -4,7 +4,7 @@ import pcc.core._
 import pcc.lang._
 
 /** An operation supported for acceleration **/
-abstract class AccelOp[T:Sym] extends Op[T] {
+abstract class AccelOp[R:Type] extends Op[R] {
   // If true, this node is only supported in debug mode, not implementation
   val debugOnly: Boolean = false
 }

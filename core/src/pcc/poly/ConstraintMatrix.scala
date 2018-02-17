@@ -3,22 +3,7 @@ package pcc.poly
 import forge._
 import pcc.data._
 import pcc.lang.I32
-
-sealed abstract class ConstraintType { def toInt: Int }
-case object GEQ_ZERO extends ConstraintType { def toInt = 1; override def toString = "1" }
-case object EQL_ZERO extends ConstraintType { def toInt = 0; override def toString = "0" }
-
-case class SparseConstraint(cols: Map[I32,Int], c: Int, tp: ConstraintType) extends SparseVectorLike {
-  def toDenseString(keys: Seq[I32]): String = tp.toString + " " + keys.map{x => this(x) }.mkString(" ") + " " + c.toString
-  def toDenseVector(keys: Seq[I32]): Seq[Int] = tp.toInt +: keys.map{x => this(x) } :+ c
-
-  @stateful def andDomain: ConstraintMatrix = ConstraintMatrix(Set(this)).andDomain
-
-  def isEmpty(implicit isl: ISL): Boolean = isl.isEmpty(this)
-  def nonEmpty(implicit isl: ISL): Boolean = isl.nonEmpty(this)
-
-  def ::(that: SparseConstraint): ConstraintMatrix = ConstraintMatrix(Set(this,that))
-}
+import pcc.util.ScalaImplicits._
 
 case class ConstraintMatrix(rows: Set[SparseConstraint], hasDomain: Boolean = false) {
   def keys: Set[I32] = rows.flatMap(_.keys)
@@ -51,7 +36,7 @@ case class ConstraintMatrix(rows: Set[SparseConstraint], hasDomain: Boolean = fa
     val header = this.keys.toSeq
     val rowStrs = rows.toSeq.map{row => row.tp.toString +: header.map{k => row(k).toString } :+ row.c.toString }
     val entries = (" " +: header.map(_.toString) :+ "c") +: rowStrs
-    val maxCol = entries.flatMap(_.map(_.length)).maxOrZero(0)
+    val maxCol = entries.flatMap(_.map(_.length)).maxOrElse(0)
     entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n")
   }
 }

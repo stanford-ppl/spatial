@@ -69,7 +69,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
   protected def findBanking(grps: Set[Seq[SparseMatrix]], dims: Seq[Int]): ModBanking = {
     val rank = dims.length
-    val Nmin = grps.map(_.size).maxOrZero(1)
+    val Nmin = grps.map(_.size).maxOrElse(1)
 
     val (n2,nx) = (Nmin to 8*Nmin).partition(isPow2)
     val n2Head = if (n2.head.toDouble/Nmin > MAGIC_CUTOFF_N) Seq(Nmin) else Nil

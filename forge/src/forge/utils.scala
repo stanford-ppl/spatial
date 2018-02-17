@@ -9,7 +9,7 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
   // Fix for bug where <caseaccessor> gets added to (private) implicit fields
   def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
     case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
-      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.PRIVATE)
+      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR)
       ValDef(flags, name, tp, rhs)
     case v => v
   }
@@ -130,6 +130,8 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
         case field => field
       }
     }
+
+    def typeArgs: List[Tree] = tparams.map{tp => Ident(tp.name)}
 
     def constructor: Option[DefDef] = methods.find{_.name == termNames.CONSTRUCTOR}
     def constructorArgs: List[List[ValDef]] = constructor.map{d =>  d.paramss }.getOrElse(Nil)

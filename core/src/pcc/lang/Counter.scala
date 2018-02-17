@@ -15,7 +15,7 @@ object Counter {
 
   @api def fromSeries(series: Series): Counter = Counter(series.start,series.end,series.step,series.par)
 
-  @api def apply(start: I32, end: I32, step: Option[I32] = None, par: Option[I32] = None): Counter = {
-    stage(CounterNew(start, end, step.getOrElse(I32.c(1)), par.getOrElse(I32.p(1)) ))
+  @api def apply(start: I32, end: I32, step: I32 = I32.c(1), par: I32 = I32.c(1)): Counter = {
+    stage(CounterNew(start, end, step, par))
   }
 }

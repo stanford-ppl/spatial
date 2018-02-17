@@ -4,15 +4,30 @@ import forge._
 import pcc.core._
 import pcc.traversal.transform.Transformer
 
+import scala.collection.mutable
+
 /** Shortcuts for metadata **/
 @data object metadata {
-  def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = state.metadata[M](edge)
-  def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = state.metadata.add[M](edge, m)
-  def all(edge: Sym[_]): Iterable[(Class[_],Metadata[_])] = state.metadata.all(edge)
-  def addAll(edge: Sym[_], data: Iterable[Metadata[_]]): Unit = state.metadata.addAll(edge,data)
-  def addOrRemoveAll(edge: Sym[_], data: Iterable[(Class[_],Option[Metadata[_]])]): Unit = state.metadata.addOrRemoveAll(edge,data)
-  def clear[M<:Metadata[M]:Manifest]: Unit = state.metadata.clear[M]
-  def clearBeforeTransform(): Unit = state.metadata.clearBeforeTransform()
+  type Data = mutable.Map[Class[_],Metadata[_]]
+
+  private def keyOf[M<:Metadata[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]
+
+  def addAll(edge: Sym[_], data: Iterator[Metadata[_]]): Unit = data.foreach{m => edge.data += (m.key -> m) }
+  def addOrRemoveAll(edge: Sym[_], data: Iterator[(Class[_],Option[Metadata[_]])]): Unit = data.foreach{
+    case (key,Some(m)) => edge.data += (key -> m)
+    case (key,None)    => edge.data.remove(key)
+  }
+
+  def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = edge.data += (m.key -> m)
+  def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: Option[M]): Unit = m match {
+    case Some(data) => edge.data += (data.key -> data)
+    case None => edge.data.remove(keyOf[M])
+  }
+  def all(edge: Sym[_]): Iterator[(Class[_],Metadata[_])] = edge.data.iterator
+
+  def clear[M<:Metadata[M]:Manifest](edge: Sym[_]): Unit = edge.data.remove(keyOf[M])
+
+  def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = edge.data.get(keyOf[M]).map(_.asInstanceOf[M])
 }
 
 @data object globals {

@@ -25,7 +25,7 @@ object StageUpdate extends Test {
       sram(i) = exp(i)
     }
     Foreach(0 until 32){i =>
-      println("i=">i>": ">sram(i))
+      println("i=" ++ i ++ ": " ++ sram(i))
     }
   }
 }

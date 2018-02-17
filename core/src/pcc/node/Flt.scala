@@ -1,6 +1,7 @@
 package pcc.node
 
 import forge._
+import pcc.data.Effects
 import pcc.lang._
 
 @op case class FltNeg[A:Flt](a: A) extends Primitive[A]
@@ -25,15 +26,19 @@ import pcc.lang._
 @op case class FltLn[A:Flt](a: A) extends Primitive[A]
 @op case class FltSqrt[A:Flt](a: A) extends Primitive[A]
 
-@op case class FltSin[A:Flt](x: A) extends Primitive[A]
-@op case class FltCos[A:Flt](x: A) extends Primitive[A]
-@op case class FltTan[A:Flt](x: A) extends Primitive[A]
-@op case class FltSinh[A:Flt](x: A) extends Primitive[A]
-@op case class FltCosh[A:Flt](x: A) extends Primitive[A]
-@op case class FltTanh[A:Flt](x: A) extends Primitive[A]
-@op case class FltAsin[A:Flt](x: A) extends Primitive[A]
-@op case class FltAcos[A:Flt](x: A) extends Primitive[A]
-@op case class FltAtan[A:Flt](x: A) extends Primitive[A]
+@op case class FltSin[A:Flt](a: A) extends Primitive[A]
+@op case class FltCos[A:Flt](a: A) extends Primitive[A]
+@op case class FltTan[A:Flt](a: A) extends Primitive[A]
+@op case class FltSinh[A:Flt](a: A) extends Primitive[A]
+@op case class FltCosh[A:Flt](a: A) extends Primitive[A]
+@op case class FltTanh[A:Flt](a: A) extends Primitive[A]
+@op case class FltAsin[A:Flt](a: A) extends Primitive[A]
+@op case class FltAcos[A:Flt](a: A) extends Primitive[A]
+@op case class FltAtan[A:Flt](a: A) extends Primitive[A]
 
 @op case class FltInvSqrt[A:Flt](a: A) extends Primitive[A]
 @op case class FltSigmoid[A:Flt](a: A) extends Primitive[A]
+
+@op case class FltRandom[A:Flt](max: Option[A]) extends Primitive[A] {
+  override def effects: Effects = Effects.Simple
+}

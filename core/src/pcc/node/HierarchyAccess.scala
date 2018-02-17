@@ -16,8 +16,8 @@ case class Write(mem: Sym[_], data: Sym[_], addr: Seq[I32], ens: Seq[Bit]) exten
 
 
 /** Any access of a memory **/
-abstract class Accessor[A:Sym,R:Sym] extends EnPrimitive[R] {
-  val tA: Sym[A] = typ[A]
+abstract class Accessor[A:Type,R:Type] extends EnPrimitive[R] {
+  val tA: Type[A] = typ[A]
 
   def localRead: Option[Read]
   def localWrite: Option[Write]
@@ -33,7 +33,7 @@ object Accessor {
 }
 
 /** Any read of a memory **/
-abstract class Reader[A:Sym,R:Sym](
+abstract class Reader[A:Type,R:Type](
   mem: Sym[_],
   adr: Seq[I32],
   ens: Seq[Bit]
@@ -51,7 +51,7 @@ object Reader {
 }
 
 /** Any dequeue-like operation from a memory **/
-abstract class Dequeuer[A:Sym,R:Sym](
+abstract class Dequeuer[A:Type,R:Type](
   mem: Sym[_],
   adr: Seq[I32],
   ens: Seq[Bit]
@@ -67,7 +67,7 @@ object Dequeuer {
 
 
 /** Any write to a memory **/
-abstract class Writer[A:Sym](
+abstract class Writer[A:Type](
   mem: Sym[_],
   dat: Sym[_],
   adr: Seq[I32],
@@ -87,7 +87,7 @@ object Writer {
 }
 
 /** Any enqueue-like operation to a memory **/
-abstract class Enqueuer[A:Sym](
+abstract class Enqueuer[A:Type](
   mem: Sym[_],
   dat: Sym[_],
   adr: Seq[I32],

@@ -5,15 +5,16 @@ import pcc.util.files
 import pcc.util.Report._
 import pcc.util.escapeConst
 import java.io.PrintStream
-import java.nio.file.{Files,Paths}
+import java.nio.file.{Files, Paths}
 
 trait Printing {
-  def state(implicit localState: State): State = localState
   def ctx(implicit localCtx: SrcCtx): SrcCtx = localCtx
+  def state(implicit localState: State): State = localState
   def config(implicit localState: State): Config = localState.config
 
   @stateful def raiseIssue(issue: Issue): Unit = state.issues += issue
 
+  def plural(x: Int, singular: String): String = pcc.util.Report.plural(x, singular)
   def plural(x: Int, singular: String, plur: String): String = pcc.util.Report.plural(x, singular, plur)
 
   /** Compiler Generated Files (reports, codegen, etc.) **/

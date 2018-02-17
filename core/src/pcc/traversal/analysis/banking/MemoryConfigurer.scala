@@ -22,12 +22,24 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbg("\n\n--------------------------------")
     dbg(s"${mem.ctx}: Inferring instances for memory $mem")
     dbg(mem.ctx.content.getOrElse(""))
-    val readers = readersOf(mem).flatMap{rd => affineMatricesOf(rd) }
-    val writers = writersOf(mem).flatMap{wr => affineMatricesOf(wr) }
-    val instances = bank(readers, writers)
+    val readers = readersOf(mem)
+    val writers = writersOf(mem)
+    resetData(readers, writers)
 
+    val readMatrices = readers.flatMap{rd => affineMatricesOf(rd) }
+    val writeMatrices = writers.flatMap{wr => affineMatricesOf(wr) }
+
+    val instances = bank(readMatrices, writeMatrices)
     summarize(instances)
     finalize(instances)
+  }
+
+  protected def resetData(readers: Set[Sym[_]], writers: Set[Sym[_]]): Unit = {
+    (readers.iterator ++ writers.iterator).foreach{a =>
+      metadata.clear[Dispatch](a)
+      metadata.clear[Ports](a)
+    }
+    metadata.clear[Duplicates](mem)
   }
 
   protected def summarize(instances: Seq[Instance]): Unit = {
@@ -108,7 +120,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     seqGrps.zipWithIndex.foreach{case (grp,i) =>
       val prev = seqGrps.take(i).flatten  // The first i groups (the ones before the current)
       val grpPorts = grp.map{a =>
-        val mux = prev.filter{b => areInParallel(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrZero(0)
+        val mux = prev.filter{b => areInParallel(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrElse(0)
         a -> Port(mux, bufPorts(a.access))
       }
       ports ++= grpPorts
@@ -125,7 +137,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val bankings = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, dimGrps)
     if (bankings.nonEmpty) {
       val (metapipe, bufPorts) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
-      val depth = bufPorts.values.collect{case Some(p) => p}.maxOrZero(0) + 1
+      val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
       val bankingCosts = bankings.map{b => b -> cost(b,depth) }
       val (banking, bankCost) = bankingCosts.minBy(_._2)
       // TODO: ASSUMPTION: All memories are at least simple dual port (support a read and a write simultaneously)

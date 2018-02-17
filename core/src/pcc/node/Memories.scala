@@ -4,6 +4,7 @@ import forge.op
 import pcc.core._
 import pcc.data._
 import pcc.lang._
+import pcc.util.Invert._
 
 /** DRAM **/
 @op case class DRAMNew[A:Bits](dims: Seq[I32]) extends MemAlloc[DRAM[A]] {
@@ -23,20 +24,20 @@ import pcc.lang._
 }
 
 /** Reg **/
-@op case class RegNew[T:Bits](reset: T) extends MemAlloc[Reg[T]] {
+@op case class RegNew[T:Bits](reset: Bits[T]) extends MemAlloc[Reg[T]] {
   override def effects: Effects = Effects.Mutable
   def dims = Nil
 }
 
-@op case class ArgInNew[T:Bits](init: T) extends MemAlloc[Reg[T]] {
+@op case class ArgInNew[T:Bits](init: Bits[T]) extends MemAlloc[Reg[T]] {
   def dims = Nil
 }
-@op case class ArgOutNew[T:Bits](init: T) extends MemAlloc[Reg[T]] {
+@op case class ArgOutNew[T:Bits](init: Bits[T]) extends MemAlloc[Reg[T]] {
   override def effects: Effects = Effects.Mutable
   def dims = Nil
 }
 
-@op case class RegWrite[T:Bits](reg: Reg[T], data: T, ens: Seq[Bit]) extends Writer(reg,data.asSym,Nil,ens)
+@op case class RegWrite[T:Bits](reg: Reg[T], data: Bits[T], ens: Seq[Bit]) extends Writer(reg,data,Nil,ens)
 
 @op case class RegRead[T:Bits](reg: Reg[T]) extends Reader(reg,Nil,Nil) {
   override val isStateless = true
@@ -48,7 +49,7 @@ import pcc.lang._
   override def effects: Effects = Effects.Mutable
 }
 @op case class SRAMRead[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]) extends Reader[A,A](sram,addr,ens)
-@op case class SRAMWrite[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]) extends Writer[A](sram,data.asSym,addr,ens)
+@op case class SRAMWrite[A:Bits](sram: SRAM[A], data: Bits[A], addr: Seq[I32], ens: Seq[Bit]) extends Writer[A](sram,data,addr,ens)
 
 @op case class SRAMDim(sram: SRAM[_], d: Int) extends Primitive[I32] {
   override val isStateless: Boolean = true

@@ -6,8 +6,9 @@ import pcc.data._
 import pcc.lang._
 import pcc.node._
 import pcc.poly.ISL
+import pcc.util.ScalaImplicits._
 
-trait Memory { this: Control with Hierarchy =>
+trait HelpersMemory { this: HelpersControl with HelpersHierarchy =>
   implicit class SymMemories(x: Sym[_]) {
     def isLocalMem: Boolean = x.isInstanceOf[LocalMem[_,C forSome {type C[_]}]] // ... yep
     def isRemoteMem: Boolean = x.isInstanceOf[RemoteMem[_,C forSome {type C[_]}]]
@@ -177,5 +178,4 @@ trait Memory { this: Control with Hierarchy =>
     val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
     if (isBuffAccum) AccumType.Buff else AccumType.None
   }
-
 }

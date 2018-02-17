@@ -11,6 +11,8 @@ package object static {
   type Def[+A,+B] = pcc.core.Def[A,B]
   lazy val Def = pcc.core.Def
 
+  type Top[T] = pcc.core.Top[T]
+
   type Op[T] = pcc.core.Op[T]
   lazy val Op = pcc.core.Op
 

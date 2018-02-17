@@ -6,6 +6,7 @@ import pcc.core._
 import pcc.data._
 import pcc.lang._
 import pcc.lang.pir._
+import pcc.helpers._
 
 import scala.collection.mutable
 

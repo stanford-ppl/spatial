@@ -33,8 +33,8 @@ object ScalaImplicits {
     def maxFoldBy[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.maxBy(f)
     def minFoldBy[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.minBy(f)
 
-    def minOrZero(z: A)(implicit o: Ordering[A]): A = if (x.isEmpty) z else x.min
-    def maxOrZero(z: A)(implicit o: Ordering[A]): A = if (x.isEmpty) z else x.max
+    def minOrElse(z: A)(implicit o: Ordering[A]): A = if (x.isEmpty) z else x.min
+    def maxOrElse(z: A)(implicit o: Ordering[A]): A = if (x.isEmpty) z else x.max
 
     def cross[B](y: Iterable[B]): Iterator[(A,B)] = {
       x.iterator.flatMap{a => y.iterator.map{b => (a,b) } }

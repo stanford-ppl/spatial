@@ -11,7 +11,7 @@ abstract class Metadata[T] { self =>
   final def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
 
-  val clearBeforeTransform: Boolean = false
+  val skipOnTransform: Boolean = false
 }
 
 /**
@@ -28,7 +28,7 @@ abstract class StableData[T] extends Metadata[T] {
   */
 abstract class FlowData[T] extends Metadata[T] {
   override def mirror(f:Tx): T = this.asInstanceOf[T]
-  override val clearBeforeTransform: Boolean = true
+  override val skipOnTransform: Boolean = true
 }
 
 /**

@@ -14,7 +14,7 @@ case class FIFO[A:Bits]() extends LocalMem[A,FIFO] {
 }
 object FIFO {
   private lazy val types = new mutable.HashMap[Bits[_],FIFO[_]]()
-  implicit def tp[A:Bits]: FIFO[A] = types.getOrElseUpdate(bits[A], (new FIFO[A]).asType).asInstanceOf[FIFO[A]]
+  implicit def tp[A:Bits]: FIFO[A] = types.getOrElseUpdate(tbits[A], (new FIFO[A]).asType).asInstanceOf[FIFO[A]]
 
   @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
 }

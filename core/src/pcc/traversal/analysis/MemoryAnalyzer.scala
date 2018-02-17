@@ -22,14 +22,10 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
     case m:FIFO[_] => new MemoryConfigurer(m, strategy)
     case m:LIFO[_] => new MemoryConfigurer(m, strategy)
     case m:Reg[_]  => new MemoryConfigurer(m, strategy)
-    case _ => throw new Exception(s"Don't know how to bank memory of type ${mem.typeName}")
+    case _ => throw new Exception(s"Don't know how to bank memory of type ${mem.tp}")
   }).asInstanceOf[MemoryConfigurer[C]]
 
   def run(): Unit = {
-    // Reset metadata
-    metadata.clear[Duplicates]
-    metadata.clear[Dispatch]
-    metadata.clear[Ports]
     // Run
     val memories = localMems.all
     memories.foreach{m => configurer(m).configure() }

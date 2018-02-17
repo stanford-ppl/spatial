@@ -5,7 +5,7 @@ import pcc.core._
 import pcc.node._
 import pcc.lang._
 
-// TODO: It's a little too easy to write something horribly broken here
+// FIXME: It's a little too easy to write something horribly broken here
 trait RewriteRules {
   @rewrite def fixdiv(x: FixDiv[_]) = {case FixDiv(a:Fix[_],Const(1)) => a }
 

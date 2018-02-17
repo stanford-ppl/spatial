@@ -6,7 +6,7 @@ import pcc.data._
 import pcc.lang._
 
 /** Nodes with non-zero latency, no internal state, which can be conditionally executed **/
-abstract class Primitive[A:Sym] extends AccelOp[A] {
+abstract class Primitive[R:Type] extends AccelOp[R] {
   val isStateless: Boolean = false
 }
 object Primitive {
@@ -23,7 +23,7 @@ object Stateless {
   }
 }
 
-abstract class EnPrimitive[A:Sym] extends Primitive[A] {
+abstract class EnPrimitive[R:Type] extends Primitive[R] {
   def ens: Seq[Bit]
 }
 

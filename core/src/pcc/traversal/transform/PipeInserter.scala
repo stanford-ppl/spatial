@@ -4,6 +4,8 @@ import pcc.core._
 import pcc.data._
 import pcc.lang._
 import pcc.node._
+import pcc.helpers._
+import pcc.util.Invert._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -17,14 +19,14 @@ case class PipeInserter(IR: State) extends MutateTransformer {
       dbgs(s"Stage #$i: " + (if (inner) "[Inner]" else "[Outer]"))
       nodes.foreach{s => dbgs(s"  ${stm(s)}") }
     }
-    lazy val inputs: Set[Sym[_]] = nodes.toSet.flatMap{s: Sym[_] => s.nestedDataInputs}
+    lazy val inputs: Set[Sym[_]] = nodes.toSet.flatMap{s: Sym[_] => s.nestedInputs}
   }
   private object Stage {
     def outer = new Stage(inner = false)
     def inner = new Stage(inner = true)
   }
 
-  override def transform[A: Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     if (isOuterControl(lhs)) {
       rhs.blocks.foreach{block =>
         register(block -> insertPipes(block))
@@ -101,9 +103,9 @@ case class PipeInserter(IR: State) extends MutateTransformer {
   }, block.options)
 
   def regNew(s: Bits[_]): Reg[_] = Reg.alloc(s.zero(s.ctx,state))(mbits(s),s.ctx,state)
-  def varNew(s: Sym[_]): Var[_] = Var.alloc(None)(mtyp(s),s.ctx,state)
-  def regWrite(x: Reg[_], data: Bits[_]): Unit = Reg.write(x.asInstanceOf[Reg[Any]],data)(mbits(data),data.ctx,state)
-  def varWrite(x: Var[_], data: Sym[_]): Unit = Var.assign(x.asInstanceOf[Var[Any]],data)(mtyp(data),data.ctx,state)
+  def varNew(s: Sym[_]): Var[_] = Var.alloc(None)(mtyp(s.tp),s.ctx,state)
+  def regWrite(x: Reg[_], data: Bits[_]): Unit = Reg.write(x.asInstanceOf[Reg[Any]],data)(data.mtp,data.ctx,state)
+  def varWrite(x: Var[_], data: Sym[_]): Unit = Var.assign(x.asInstanceOf[Var[Any]],data)(data.mtp,data.ctx,state)
   def regRead(x: Reg[_]): Sym[_] = Reg.read(x)(mbits(x.tA),SrcCtx.empty,state).asInstanceOf[Sym[_]]
   def varRead(x: Var[_]): Sym[_] = Var.read(x)(mtyp(x.tA),SrcCtx.empty,state).asInstanceOf[Sym[_]]
 }

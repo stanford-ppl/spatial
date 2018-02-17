@@ -13,6 +13,11 @@ case class Var[A:Type]() extends Top[Var[A]] {
 
   override def fresh: Var[A] = new Var[A]
   override def isPrimitive: Boolean = false
+
+  @rig def value: A = Var.read(this)
+
+  @api override def !==(that: Var[A]): Bit = this.value.viewTop nEql that.value.viewTop
+  @api override def ===(that: Var[A]): Bit = this.value.viewTop isEql that.value.viewTop
 }
 object Var {
   private lazy val types = new mutable.HashMap[Type[_],Var[_]]()

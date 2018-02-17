@@ -5,7 +5,7 @@ import pcc.core._
 import pcc.data._
 import pcc.node._
 
-trait Hierarchy {
+trait HelpersHierarchy {
   def isControl(sym: Sym[_]): Boolean = sym.op.exists(isControl)
   def isControl(op: Op[_]): Boolean = op.isInstanceOf[Control]
 

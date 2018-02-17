@@ -17,14 +17,14 @@ case class SRAM[A:Bits]() extends LocalMem[A,SRAM] {
   @api def rank: I32 = SRAM.rank(this)
 
   @api def apply(addr: I32*): A = SRAM.read(this,addr,Nil)
-  @api def update(i: I32, data: A): pcc.lang.Void = SRAM.write(this,data,Seq(i),Nil)
-  @api def update(i: I32, j: I32, data: A): pcc.lang.Void = SRAM.write(this,data,Seq(i,j),Nil)
-  @api def update(i: I32, j: I32, k: I32, data: A): pcc.lang.Void = SRAM.write(this,data,Seq(i,j,k),Nil)
-  @api def update(i: I32, j: I32, k: I32, l: I32, data: A): pcc.lang.Void = SRAM.write(this,data,Seq(i,j,k,l),Nil)
+  @api def update(i: I32, data: A): Void = SRAM.write(this,data,Seq(i),Nil)
+  @api def update(i: I32, j: I32, data: A): Void = SRAM.write(this,data,Seq(i,j),Nil)
+  @api def update(i: I32, j: I32, k: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k),Nil)
+  @api def update(i: I32, j: I32, k: I32, l: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k,l),Nil)
 }
 object SRAM {
   private lazy val types = new mutable.HashMap[Bits[_],SRAM[_]]()
-  implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(bits[A], (new SRAM[A]).asType).asInstanceOf[SRAM[A]]
+  implicit def tp[A:Bits]: SRAM[A] = types.getOrElseUpdate(tbits[A], (new SRAM[A]).asType).asInstanceOf[SRAM[A]]
 
   @api def apply[A:Bits](dims: I32*): SRAM[A] = stage(SRAMNew(dims))
 
@@ -32,6 +32,6 @@ object SRAM {
   @rig def rank(sram: SRAM[_]): I32 = stage(SRAMRank(sram))
 
   @rig def read[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]): A = stage(SRAMRead(sram,addr,ens))
-  @rig def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]): Void = stage(SRAMWrite(sram,data,addr,ens))
+  @rig def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]): Void = stage(SRAMWrite(sram,data.view[Bits],addr,ens))
 }
 

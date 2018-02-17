@@ -13,7 +13,7 @@ case class LIFO[A:Bits]() extends LocalMem[A,LIFO] {
 }
 object LIFO {
   private lazy val types = new mutable.HashMap[Bits[_],LIFO[_]]()
-  implicit def tp[A:Bits]: LIFO[A] = types.getOrElseUpdate(bits[A], (new LIFO[A]).asType).asInstanceOf[LIFO[A]]
+  implicit def tp[A:Bits]: LIFO[A] = types.getOrElseUpdate(tbits[A], (new LIFO[A]).asType).asInstanceOf[LIFO[A]]
 
   @api def apply[A:Bits](depth: I32): LIFO[A] = stage(LIFONew(depth))
 }

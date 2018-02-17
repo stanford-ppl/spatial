@@ -43,7 +43,7 @@ object ArchModel_Simple extends Test {
   val SRAM_SIZE_WORDS = SRAM_SIZE_BYTES / 4
 
   def main(): Void = {
-    implicit val wSize: Vec[Bit] = Vec(-1, pmuSpec.nLanes, bits[Bit])  // word width
+    implicit val wSize: Vec[Bit] = Vec.tp(pmuSpec.nLanes)  // word width
     def getPMU(x: Int, y: Int) = {
       val m = PMU(pmuSpec).op.get.asInstanceOf[PMUModule]
       m.x = x

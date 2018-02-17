@@ -7,6 +7,7 @@ import pcc.core._
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
 import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
+import pcc.spade.node.{PCUModule, PMUModule}
 
 trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
@@ -41,15 +42,18 @@ trait DotCommon { this: Codegen =>
 
   def getNodeColor(rhs: Op[_]) = rhs match {
     case pcu: VPCU => indianred
+    case pcu: PCUModule => indianred
     case pmu: VPMU => cadetblue
+    case pmu: PMUModule => cadetblue
     case _ => white
   }
 
   def emitSubgraph(attr: DotAttr)(f: => Any): Unit = {
-    emit(s"subgraph cluster_${attr.attrMap("label")} {")
+    emit(s"subgraph cluster_${attr.attrMap("label")._1} {")
     open
     attr.attrMap.keys.foreach { k =>
-      emit(s"$k=${attr.attrMap(k)}")
+      if (attr.attrMap(k)._2) emit(s"$k=${attr.attrMap(k)._1}")
+      else emit(s"$k=${attr.attrMap(k)._1}")
     }
     f
     close
@@ -89,24 +93,24 @@ trait DotCommon { this: Codegen =>
   }*/
 
   class DotAttr() {
-    val attrMap: Map[String, String] = Map.empty
+    val attrMap: Map[String, (String, Boolean)] = Map.empty
     val graphAttrMap: Map[String, String] = Map.empty
 
-    def + (rec:(String, String)):DotAttr = { attrMap += rec; this}
+    def append(key: String, value: String, quote: Boolean = true):DotAttr = { attrMap(key) = (value, quote); this}
 
-    def shape(s: Shape): DotAttr = { attrMap += "shape" -> s.field; this }
-    def color(s: Color): DotAttr = { attrMap += "color" -> s.field; this }
-    def fill(s: Color): DotAttr = { attrMap += "fillcolor" -> s.field; this }
-    def labelfontcolor(s: Color): DotAttr = { attrMap += "labelfontcolor" -> s.field; this }
-    def style(ss: Style*): DotAttr = { attrMap += "style" -> ss.map(_.field).mkString(","); this }
+    def shape(s: Shape): DotAttr = { this.append("shape", s.field); this }
+    def color(s: Color): DotAttr = { this.append("color", s.field); this }
+    def fill(s: Color): DotAttr = { this.append("fillcolor", s.field); this }
+    def labelfontcolor(s: Color): DotAttr = { this.append("labelfontcolor", s.field); this }
+    def style(ss: Style*): DotAttr = { this.append("style", ss.map(_.field).mkString(",")); this }
     def graphStyle(s: Style): DotAttr = { graphAttrMap += "style" -> s"${s.field}"; this }
-    def label(s: Any): DotAttr = { attrMap += "label" -> s.toString; this }
-    def label: Option[String] = { attrMap.get("label") }
-    def dir(s: Direction): DotAttr = { attrMap += "dir" -> s.field; this }
-    def pos(coord: (Double,Double)): DotAttr = { attrMap += "pos" -> s"${coord._1},${coord._2}!"; this }
+    def label(s: Any, quote: Boolean = true): DotAttr = { this.append("label", s.toString, quote); this }
+//    def label: Option[String] = { iattrMap.get("label")._1 }
+    def dir(s: Direction): DotAttr = { this.append("dir", s.field); this }
+    def pos(coord: (Double,Double)): DotAttr = { this.append("pos", s"${coord._1},${coord._2}!"); this }
 
     def elements:List[String] = {
-      var elems = attrMap.map{case (k,v) => s"""$k="$v""""}.toList
+      var elems = attrMap.map{case (k,v) => if (v._2) s"""$k="${v._1}"""" else s"""$k=${v._1}""" }.toList
       if (graphAttrMap.nonEmpty)
         elems = elems :+ s"graph[${graphAttrMap.map{case(k,v) => s"""$k="$v"""" }.mkString(",")}]"
       elems
@@ -118,7 +122,7 @@ trait DotCommon { this: Codegen =>
     def apply(): DotAttr = new DotAttr()
     def copy(attr: DotAttr): DotAttr = {
       val newAttr = DotAttr()
-      attr.attrMap.foreach { e => newAttr + e }
+      attr.attrMap.foreach { e => newAttr.append(e._1, e._2._1, e._2._2) }
       newAttr
     }
   }

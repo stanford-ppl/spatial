@@ -1,7 +1,6 @@
 package nova.traversal.analysis.routing
 
 import forge.tags._
-import forge.tags.stateful
 import nova.core._
 
 import scala.collection.mutable

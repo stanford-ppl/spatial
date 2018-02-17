@@ -162,12 +162,12 @@ object FixedPoint {
     if (fmt.sign && bits.length >= fmt.bits && bits(fmt.bits-1).value) {
       var x = BigInt(-1)
       bits.take(fmt.bits).zipWithIndex.foreach{case (bit, i) => if (!bit.value) x = x.clearBit(i) }
-      new FixedPoint(x, bits.forall(_.valid), fmt)
+      new FixedPoint(x, bits.forall{bit => bit.valid}, fmt)
     }
     else {
       var x = BigInt(0)
       bits.take(fmt.bits).zipWithIndex.foreach{case (bit, i) => if (bit.value) x = x.setBit(i) }
-      new FixedPoint(x, bits.forall(_.valid), fmt)
+      new FixedPoint(x, bits.forall{bit => bit.valid}, fmt)
     }
   }
 
@@ -255,6 +255,7 @@ object FixedPoint {
     def toLong(x : FixedPoint) : scala.Long = x.toLong
     def toFloat(x : FixedPoint) : scala.Float = x.toFloat
     def toDouble(x : FixedPoint) : scala.Double = x.toDouble
+    def parseString(str: String): Option[FixedPoint] = None // Undefined for general type
   }
 }
 

@@ -2,7 +2,6 @@ package nova.node
 
 import forge.tags._
 import nova.core._
-import nova.data.Effects
 import nova.lang._
 
 @op case class NewVar[T:Type](init: Option[T])(implicit val tp: Type[Var[T]]) extends Alloc[Var[T]] {

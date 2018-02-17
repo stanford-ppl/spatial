@@ -6,6 +6,8 @@ import nova.data._
 import nova.lang._
 import nova.poly.ISL
 import nova.utils._
+
+import forge.tags._
 import forge.implicits.collections._
 
 import scala.collection.mutable.ArrayBuffer

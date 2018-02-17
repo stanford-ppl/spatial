@@ -9,8 +9,6 @@ import nova.utils._
 import forge.implicits.collections._
 
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
-  override val name = "Access Analyzer"
-
   private var iters: Seq[I32] = Nil                     // List of loop iterators, ordered outermost to innermost
   private var loops: Map[I32,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
   private var scopes: Map[I32,Set[Sym[_]]] = Map.empty  // Map of looop iterators to all symbols defined in that scope

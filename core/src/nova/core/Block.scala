@@ -1,14 +1,12 @@
 package nova.core
 
 import Freq._
-import nova.data.Effects
 
 case class Block[R](
   inputs:  Seq[Sym[_]], // External inputs to this block
   stms:    Seq[Sym[_]], // All statements in this scope (linearized graph)
   result:  Sym[R],      // The symbolic result of this block
   effects: Effects,     // All external effects of this block
-  impure:  Seq[Sym[_]], // Symbols with effects in this block
   options: BlockOptions // Other settings for this block
 ) {
   def temp: Freq = options.temp

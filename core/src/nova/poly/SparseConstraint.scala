@@ -1,7 +1,6 @@
 package nova.poly
 
 import forge.tags._
-import forge.tags.stateful
 import nova.lang.I32
 
 case class SparseConstraint(cols: Map[I32,Int], c: Int, tp: ConstraintType) extends SparseVectorLike {

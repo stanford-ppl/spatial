@@ -1,5 +1,7 @@
 package forge.implicits
 
+import scala.collection.mutable
+
 /**
   * General helper methods for various data structures in Scala.
   */
@@ -52,6 +54,16 @@ object collections {
     def pairs: Iterator[(A,A)] = x match {
       case m0 :: y => y.iterator.map{m1 => (m0,m1) } ++ y.pairs
       case _ => Iterator.empty
+    }
+  }
+
+  implicit class HashMapOps[K,V](map: mutable.HashMap[K,V]) {
+    def getOrElseAdd(key: K, value: () => V): V = map.get(key) match {
+      case Some(v) => v
+      case None =>
+        val v = value()
+        map += (key -> v)
+        v
     }
   }
 

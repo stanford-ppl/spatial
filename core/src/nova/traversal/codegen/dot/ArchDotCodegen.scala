@@ -14,7 +14,6 @@ import scala.language.implicitConversions
 import scala.collection.mutable.{HashMap, ListBuffer, Set}
 
 case class ArchDotCodegen(IR: State) extends Codegen with DotCommon {
-  override val name: String = "Arch Dot Printer"
   override def filename: String = s"ArchGraph.${ext}"
   override def ext = s"fdp.$lang"
 

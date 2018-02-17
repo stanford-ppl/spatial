@@ -10,8 +10,6 @@ import nova.core.Invert._
 import scala.collection.mutable.ArrayBuffer
 
 case class PipeInserter(IR: State) extends MutateTransformer {
-  override val name = "Pipe Inserter"
-
   private class Stage(val inner: Boolean) {
     val nodes  = ArrayBuffer[Sym[_]]()
     def outer: Boolean = !inner

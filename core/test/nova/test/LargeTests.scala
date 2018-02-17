@@ -43,5 +43,5 @@ object BitTest extends Test {
 }
 
 object LargeTests extends Testbench { val tests = Tests{
-  //'BitTest - test(BitTest)
+  'BitTest - test(BitTest)
 }}

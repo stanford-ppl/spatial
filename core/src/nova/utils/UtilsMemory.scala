@@ -1,7 +1,6 @@
 package nova.utils
 
 import forge.tags._
-import forge.tags.stateful
 import nova.core._
 import nova.data._
 import nova.lang._

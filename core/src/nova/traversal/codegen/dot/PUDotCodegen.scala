@@ -13,7 +13,6 @@ import scala.language.implicitConversions
 import scala.collection.mutable.{HashMap, ListBuffer, Set}
 
 case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
-  override val name: String = "PU Dot Printer"
   override def filename: String = s"PUGraph.${ext}"
   override def ext = s"dot.$lang"
 

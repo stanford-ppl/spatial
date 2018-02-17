@@ -1,7 +1,9 @@
 package nova.traversal
 
-import forge.{Instrument, NoInstrument}
 import nova.core._
+
+import forge.implicits.readable._
+import java.io.PrintStream
 
 /**
   * Common trait for all passes which can be run by the compiler,
@@ -13,8 +15,8 @@ import nova.core._
 trait Pass { self =>
   val IR: State
   final implicit def __IR: State = IR
-  def name: String = self.getClass.toString
-  def logFile: String = state.paddedPass + " " + name + ".log"
+  def name: String = r"${self.getClass}".split('.').last
+  def logFile: String = state.paddedPass + "_" + name + ".log"
 
   var enWarn: Option[Boolean] = None
   var enError: Option[Boolean] = None
@@ -34,7 +36,6 @@ trait Pass { self =>
   /** Performance debugging **/
   var lastTime  = 0.0f
   var totalTime = 0.0f
-  protected lazy val instrument: Instrument = new NoInstrument("top")
 
   /** Run method - called internally from compiler **/
   final def run[R](block: Block[R]): Block[R] = if (shouldRun) {

@@ -5,6 +5,7 @@ package memories
 import forge.tags._
 import nova.core._
 import nova.node._
+import nova.implicits.views._
 
 import scala.collection.mutable
 

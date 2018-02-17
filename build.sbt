@@ -1,6 +1,7 @@
 val nova_version = "1.0"
-val scala_version     = "2.12.4"
+val scala_version     = "2.12.4" //"2.13.0-M3"
 val paradise_version  = "2.1.0"
+
 
 name := "nova"
 scalaVersion := scala_version
@@ -10,11 +11,13 @@ val common = Seq(
   scalaVersion := scala_version,
   version := nova_version,
   nativeLinkStubs := true,
+  //crossScalaVersions := Seq("2.12.4", "2.13.0-M3"),
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scala_version, // Reflection
-    "com.lihaoyi" %%% "utest" % "0.6.0" % "test"        // Testing
+    "com.lihaoyi" % "utest_2.12" % "0.6.3"
+    //"com.lihaoyi" %% "utest" % "0.6.3" % "test"         // Testing
   ),
 
   /** Scalac Options **/

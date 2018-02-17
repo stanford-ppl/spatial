@@ -17,8 +17,12 @@ private[forge] object instrument {
     def instrument(df: DefDef) = df.modifyBody{body => q"instrument(${df.nameLiteral}){ $body }"}
 
     val tree = annottees.head match {
-      case cls: ClassDef  => cls.mapMethods(instrument)
-      case obj: ModuleDef => obj.mapMethods(instrument)
+      case cls: ClassDef  =>
+        cls.mapMethods(instrument).mixIn(tq"forge.Instrumented")
+
+      case obj: ModuleDef =>
+        obj.mapMethods(instrument).mixIn(tq"forge.Instrumented")
+
       case _ => invalidAnnotationUse("@instrument", "objects", "defs")
     }
     tree

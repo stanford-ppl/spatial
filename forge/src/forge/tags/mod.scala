@@ -19,11 +19,9 @@ object mod {
 
     val tree = annottees.head match {
       case cls: ClassDef =>
+        val names = cls.constructorArgs.head.map(_.name)
 
-        cls.asCaseClass.injectMethod{(name,tp) =>
-          val names = cls.constructorArgs.head.map(_.name)
-          q"final override def names = Seq(..$names)"
-        }
+        cls.asCaseClass.injectMethod(q"final override def names = Seq(..$names)")
 
       case t =>
         __c.error(__c.enclosingPosition, "@mod annotation can only be used on classes.")

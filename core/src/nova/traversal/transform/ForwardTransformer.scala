@@ -87,7 +87,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
 
   override protected def preprocess[S](block: Block[S]): Block[S] = {
     subst = Map.empty
-    state.defCache = Map.empty
+    state.cache = Map.empty
     super.preprocess(block)
   }
 }

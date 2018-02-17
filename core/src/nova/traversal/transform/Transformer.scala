@@ -97,6 +97,7 @@ abstract class Transformer extends Pass {
   }
 
   final protected def removeSym(sym: Sym[_]): Unit = {
-    state.context = state.context.filterNot(_ == sym)
+    state.scope = state.scope.filterNot(_ == sym)
+    state.impure = state.impure.filterNot(_ == sym)
   }
 }

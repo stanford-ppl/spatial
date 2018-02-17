@@ -23,12 +23,8 @@ object op {
         val updates = names.zip(fnames).map{case (name,fname) => q"$name = $fname" }
 
         cls.asCaseClass.withVarParams
-           .injectMethod {(_,_) =>
-             q"override def mirror(f:Tx) = new $name[..$targs](..$fnames)"
-           }
-           .injectMethod{(_,_) =>
-             q"override def update(f:Tx) = { ..$updates }"
-           }
+           .injectMethod(q"override def mirror(f:Tx) = new $name[..$targs](..$fnames)")
+           .injectMethod(q"override def update(f:Tx) = { ..$updates }")
 
       case t =>
         __c.error(__c.enclosingPosition, "@op can only be used on class definitions")

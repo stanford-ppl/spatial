@@ -4,11 +4,11 @@ import forge.tags._
 import forge.utils.escapeConst
 import forge.implicits.terminal._
 import forge.io.files
+import forge.io.stream.createStream
 
 import java.io.PrintStream
-import java.nio.file.{Files, Paths}
 
-trait Printing {
+class Printing {
   def ctx(implicit localCtx: SrcCtx): SrcCtx = localCtx
   def state(implicit localState: State): State = localState
   def config(implicit localState: State): Config = localState.config
@@ -83,11 +83,6 @@ trait Printing {
     case Def.Const(c)    => s"${escapeConst(c)}"
     case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
     case Def.Node(id,op) => s"x$id = $op"
-  }
-
-  @stateful def createStream(dir: String, filename: String): PrintStream = {
-    Files.createDirectories(Paths.get(dir))
-    new PrintStream(dir + files.sep + filename)
   }
 
   @stateful def setupStream(dir: String, filename: String): String = {
@@ -173,17 +168,5 @@ trait Printing {
     dbgs(s" - Type: ${lhs.tp}")
     dbgs(s" - SrcCtx: ${lhs.ctx}")
     metadata.all(lhs).foreach{case (k,m) => dbgss(s" - $k: $m") }
-  }
-
-
-  def readable(x: Any): String = x match {
-    case x: Tuple3[_,_,_] => s"${readable(x._1)} = ${readable(x._2)} [inputs = ${readable(x._3)}]"
-    case c: Class[_]      => c.getName.split('$').last.replace("class ", "").split('.').last
-    case _ =>
-      if (x == null) "null" else x.toString
-  }
-
-  implicit class CompilerReportHelper(sc: StringContext) {
-    def c(args: Any*): String = sc.raw(args.map(readable): _*).stripMargin
   }
 }

@@ -10,8 +10,6 @@ import nova.utils._
 import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 
 case class GlobalAllocation(IR: State) extends MutateTransformer {
-  override val name = "Global Allocation"
-
   val memoryPMUs = HashMap[Sym[_],VPMU]()
   def getPMU(mem: Sym[_]): VPMU = memoryPMUs.getOrElse(mem, throw new Exception(s"No PMU has been created for $mem"))
 

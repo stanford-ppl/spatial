@@ -1,15 +1,12 @@
 package forge
 
+import java.io.PrintStream
+
 import forge.implicits.terminal._
+import forge.implicits.collections._
 
 import scala.collection.mutable
 
-class NoInstrument(override val top: String = "") extends Instrument(top) {
-  @inline override def apply[A](name: String)(blk: => A): A = blk
-
-  @inline override def dump(title: => String): Unit = {}
-  @inline override def reset(): Unit = {}
-}
 
 class Instrument(val top: String = "") {
   var scope: String = top
@@ -17,7 +14,7 @@ class Instrument(val top: String = "") {
 
   @inline def apply[A](name: String)(blk: => A): A = {
     val prev = scope.split('.')
-    if (prev.contains(name)) { // Don't double count recursive calls
+    if (prev.contains(name)) { // Don't double count recursive calls (we're already timing this)
       blk
     }
     else {
@@ -33,36 +30,38 @@ class Instrument(val top: String = "") {
     }
   }
 
-  private def subcats(cat: String, keys: Set[String], depth: Int): Set[String] = {
+  private def subcats(cat: String, keys: Iterable[String], depth: Int): Iterable[String] = {
     keys.filter(key => key.startsWith(cat) && key.count(_ == '.') == depth+1)
+        .toSeq.sortBy(key => -times.getOrElse(key,-1L) )
   }
 
-  private def dumpCategory(cat: String, keys: Set[String], tab: Int = 0): Unit = {
+  private def dumpCategory(cat: String, keys: Iterable[String])(implicit out: PrintStream): Unit = {
     val depth = cat.count(_ == '.')
     val parent = cat.split('.').dropRight(1).mkString(".")
-    times.get(cat).foreach{time =>
-      val parentTime = times.getOrElse(parent, time)
-
-      Console.out.info("  "*tab + s"$cat: ${time/1000.0}s (" + "%.2f".format(time.toDouble/parentTime*100) + "%)")
-    }
-    subcats(cat, keys, depth).foreach(dumpCategory(_,keys,tab+1))
+    val subs = subcats(cat, keys, depth)
+    val total = subs.map(times.getOrElse(_,0L)).sum
+    val time = Math.max(times.getOrElse(cat,0L), total)
+    times(cat) = time
+    val parentTime = if (depth == 0) time else times.getOrElse(parent, time)
+    out.info(/*"  "*depth +*/ s"$cat: ${time/1000.0}s (" + "%.2f".format(time.toDouble/parentTime*100) + "%)")
+    subs.foreach(dumpCategory(_,keys))
   }
 
-  @inline def dump(title: => String): Unit = {
-    Console.out.info(title)
+  private def topKeys: Iterable[String] = top match {
+    case "" =>
+      val keys = times.keys
+      val minDepth = keys.map{key => key.count(_ == '.') }.min
+      keys.filter{key => key.count(_ == '.') == minDepth }
 
-    val keys = times.keySet.toSet
-    if (top != "") {
-      val subs = subcats(top,keys,0)
-      val total = subs.toList.map{times.getOrElse(_,0L)}.sum
-      times(top) = total
-      dumpCategory(top, keys + top)
-    }
-    else {
-      val minDepth = keys.map { key => key.count(_ == '.') }.min
-      val starts = keys.filter { key => key.count(_ == '.') == minDepth }
-      starts.foreach { cat => dumpCategory(cat, keys) }
-    }
+    case t => Seq(t)
+  }
+  def totalTime: Long = topKeys.map{times.apply}.maxOrElse(0)
+
+  def dump(title: => String, out: PrintStream = Console.out): Unit = {
+    out.info(title)
+    val top = topKeys
+    val keys = times.keys ++ top
+    top.foreach{cat => dumpCategory(cat, keys)(out) }
   }
 
   @inline def reset(): Unit = {

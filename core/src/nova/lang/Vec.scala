@@ -7,16 +7,17 @@ import forge.utils.plural
 import nova.core._
 import nova.node._
 
-case class Vec[A:Bits](private val len: Int)(implicit val tV: Bits[Vec[A]]) extends Bits[Vec[A]] {
+case class Vec[A:Bits](private val len: Int) extends Bits[Vec[A]] {
+  private implicit lazy val tV: Vec[A] = this.selfTp
+  def length: Int = tV.len
+
   val tA: Bits[A] = tbits[A]
   type AI = tA.I
   override type I = Array[AI]
+  def nBits: Int = tA.nBits * length
 
   override def fresh: Vec[A] = new Vec[A](0)
 
-  def length: Int = tp.extract.len
-
-  override def nBits: Int = tA.nBits * length
 
   @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ tA.zero }:_*)
   @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(length-1){ tA.zero} :+ tA.one :_*)
@@ -69,11 +70,11 @@ case class Vec[A:Bits](private val len: Int)(implicit val tV: Bits[Vec[A]]) exte
   /**
     * Returns a new vector with this vector's elements in reverse order.
     */
-  @api def reverse: Vec[A] = stage(VecReverse(this)(tA, this.tp.extract))
+  @api def reverse: Vec[A] = stage(VecReverse(this))
 }
 
 object Vec {
-  def tp[A:Bits](len: Int): Vec[A] = (new Vec(len)(tbits[A],null)).asType
+  def tp[A:Bits](len: Int): Vec[A] = (new Vec(len)).asType
 
   /**
     * Creates a little-endian vector from the given N elements

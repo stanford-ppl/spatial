@@ -13,7 +13,6 @@ import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
 
 case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
-  override val name: String = "IR Dot Printer"
   override def filename: String = s"IRGraph.$ext"
   override def ext = s"dot.$lang"
 

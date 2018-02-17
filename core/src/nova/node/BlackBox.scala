@@ -1,7 +1,7 @@
 package nova.node
 
 import forge.tags._
-import nova.data._
+import nova.core._
 import nova.lang._
 
 sealed abstract class BlackBox extends Control {

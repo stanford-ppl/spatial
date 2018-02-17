@@ -10,12 +10,20 @@ import nova.traversal.analysis._
 import nova.traversal.transform._
 import nova.traversal.codegen.dot._
 
-trait StaticTraversals extends Compiler {
-  val rewrites = new RewriteRules {}
-  val flows = new FlowRules {}
+abstract class StaticTraversals extends Compiler {
+  new RewriteRules {}
+  new FlowRules {}
 
   val isPIR = false
   val isArchModel = false
+
+  private implicit class BlockOps[R](block: Block[R]) {
+    def ==>(pass: Pass): Block[R] = runPass(pass, block)
+    def ==>(pass: (Boolean,Pass)): Block[R] = if (pass._1) runPass(pass._2,block) else block
+  }
+  private implicit class BooleanOps(x: Boolean) {
+    def ?(pass: Pass): (Boolean,Pass) = (x,pass)
+  }
 
   def runPasses[R](block: Block[R]): Unit = {
     implicit val isl: ISL = ISL()
@@ -56,6 +64,8 @@ trait StaticTraversals extends Compiler {
         puDotCodegen ==>
         irDotCodegen
     }
+
+    isl.shutdown(100)
   }
 
 }

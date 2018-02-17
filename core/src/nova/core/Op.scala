@@ -1,6 +1,5 @@
 package nova.core
 
-import nova.data.Effects
 import Freq._
 import Filters._
 import forge.recursive
@@ -36,7 +35,7 @@ abstract class Op[+R:Type] extends Product with Serializable {
   // All dependents of bound syms up until but not including the binding Def make up the majority of a scope
   // NOTE: Tempting to use productIterator here too, but note that Bound values can be inputs
   // Default: All effects included in all scopes associated with this Def
-  def binds: Seq[Sym[_]] = blocks.flatMap(_.impure)
+  def binds: Seq[Sym[_]] = blocks.flatMap(_.effects.antideps.map(_.sym))
 
   /** Alias hints -- used to check/disallow unsafe mutable aliasing **/
   // Aliases: inputs to this Def which *may* equal to the output of this Def

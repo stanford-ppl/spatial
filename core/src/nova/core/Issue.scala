@@ -1,7 +1,6 @@
 package nova.core
 
 import forge.tags._
-import forge.tags.stateful
 
 /**
   * Issues are problems that need resolving in the compiler.

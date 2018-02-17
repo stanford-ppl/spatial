@@ -1,6 +1,7 @@
 package forge.tags
 
 import forge.utils.conj
+import forge.implicits.collections._
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
@@ -36,38 +37,6 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
 
   def makeType(name: String): Tree = makeType(name, Nil)
 
-  def injectClassMethod(
-    cls: ClassDef,
-    errorIfExists: Boolean,
-    method: (String, Tree) => Tree
-  ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,_)) = cls
-    val (fieldsX, methods) = cls.fieldsAndMethods
-
-    val fields = fieldsFix(fieldsX)
-    val body = fields ++ methods
-
-    val fieldNames = fields.map(_.name)
-    val methodNames = methods.map(_.name)
-    val names = fieldNames ++ methodNames
-    val tp = makeType(name,tparams)
-    val newMethod = method(name,tp)
-
-    val methodName = newMethod match {
-      case d: DefDef => d.name
-      case _ =>
-        __c.abort(__c.enclosingPosition, "Inject method did not return a def.")
-    }
-    if (!names.contains(methodName)) {
-      ClassDef(mods,TypeName(name),tparams,Template(parents,self,body :+ newMethod))
-    }
-    else if (errorIfExists) {
-      __c.error(__c.enclosingPosition, s"Could not inject method $methodName to class - method already defined")
-      cls
-    }
-    else cls
-  }
-
   def isWildcardType(tp: Tree, str: String): Boolean = tp match {
     case ExistentialTypeTree(AppliedTypeTree(Ident(TypeName(`str`)), List(Ident(TypeName(arg)))), _) => arg.startsWith("_$")
     case _ => false
@@ -95,16 +64,17 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
   }
 
   trait NamedOps {
-    def name: String
-    def nameLiteral: Literal = Literal(Constant(name))
+    def nameTerm: TermName
+    def nameStr: String
+    def nameLiteral: Literal = Literal(Constant(nameStr))
   }
 
   implicit class ValDefOps(v: ValDef) extends NamedOps {
-    val ValDef(mods,TermName(name),tpTree,rhs) = v
+    val ValDef(mods,nameTerm@TermName(nameStr),tpTree,rhs) = v
 
     def tp: Option[Tree] = if (tpTree == EmptyTree) None else Some(tpTree)
 
-    def asVar: ValDef = ValDef(mods.withMutable,TermName(name),tpTree,rhs)
+    def asVar: ValDef = ValDef(mods.withMutable,nameTerm,tpTree,rhs)
 
     def hasType(types: Seq[Tree]): Boolean = types.exists{tp => tp equalsStructure tpTree }
   }
@@ -116,14 +86,14 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
 
   implicit class DefDefOps(df: DefDef) extends NamedOps {
     val DefDef(mods:    Modifiers,
-               nameTerm@TermName(name: String),
+               nameTerm@TermName(nameStr: String),
                tparams, // List[TypeDef],
                paramss, // List[List[ValDef]],
                retTp,   // Tree
                body     // Tree
               ) = df
 
-    def hasImplicits: Boolean = paramss.lastOption.exists(_.exists{_.mods.isImplicit})
+    def hasImplicits: Boolean = paramss.lastOption.iterator.flatten.exists(_.mods.isImplicit)
     def implicits: Option[List[ValDef]] = if (hasImplicits) Some(paramss.last) else None
 
     def injectImplicit(name: String, types: Tree*): DefDef = {
@@ -143,51 +113,70 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
     }
   }
 
-  trait TemplateOps {
+  trait TemplateOps[A] {
+    def cls: A
     def template: Template
     lazy val Template(
       parents,   // List[Tree]
       selfType,  // ValDef
-      body       // List[Tree] (ValDefs and DefDefs)
+      __body     // List[Tree] (ValDefs and DefDefs)
     ) = template
+    lazy val fields: List[ValDef] = fieldsFix(__body.collect{case x: ValDef => x })
+    lazy val methods: List[DefDef] = __body.collect{case x: DefDef => x }
+    lazy val body: List[Tree] = fields ++ methods
 
-    def fieldsAndMethods: (List[ValDef],List[DefDef]) = {
-      val fields  = body.collect{case x: ValDef => x }
-      val methods = body.collect{case x: DefDef => x }
-      (fields,methods)
-    }
+    def fieldsAndMethods: (List[ValDef],List[DefDef]) = (fields, methods)
+    def fieldAndMethodNames: List[String] = fields.map(_.nameStr) ++ methods.map(_.nameStr)
 
-    def fields: List[ValDef]  = fieldsAndMethods._1
-    def methods: List[DefDef] = fieldsAndMethods._2
     def constructors: List[DefDef] = methods.filter(_.name == termNames.CONSTRUCTOR)
     def nonConstructorMethods: List[DefDef] = methods.filterNot(_.name == termNames.CONSTRUCTOR)
 
     def constructor: Option[DefDef] = constructors.headOption
     def constructorArgs: List[List[ValDef]] = constructor.map{d =>  d.paramss }.getOrElse(Nil)
+
+    def injectField(tree: Tree): A = tree match {
+      case v: ValDef => injectField(v)
+      case _ => __c.abort(__c.enclosingPosition, "Non-field passed to injectField")
+    }
+    def injectMethod(tree: Tree): A = tree match {
+      case m: DefDef => injectMethod(m)
+      case _ => __c.abort(__c.enclosingPosition, "Non-method passed to injectMethod")
+    }
+
+    def injectField(field: ValDef): A = {
+      if (!fieldAndMethodNames.contains(field.nameStr)) copyWithBody(body :+ field) else cls
+    }
+
+    def injectMethod(method: DefDef): A = {
+      if (!fieldAndMethodNames.contains(method.nameStr)) copyWithBody(body :+ method) else cls
+    }
+
+    def mapFields(func: ValDef => ValDef): A = copyWithBody(fields.map(func) ++ methods)
+    def mapMethods(func: DefDef => DefDef): A = copyWithBody(constructors ++ fields ++ nonConstructorMethods.map(func))
+
+    def copyWithTemplate(template: Template): A
+    def copyWithBody(body: List[Tree]): A = copyWithTemplate(Template(parents,selfType,body))
+    def copyWithParents(parents: List[Tree]): A = copyWithTemplate(Template(parents,selfType,body))
+
+    def mixIn(parent: Tree*): A = {
+      if (!parents.cross(parent).exists{case (p,t) => p equalsStructure t})
+        copyWithParents(parents :+ parent.head)
+      else
+        cls
+    }
   }
 
-  implicit class ClassOps(cls: ClassDef) extends TemplateOps with NamedOps {
+  implicit class ClassOps(val cls: ClassDef) extends TemplateOps[ClassDef] with NamedOps {
     val ClassDef(
       mods:    Modifiers,
-      nameTerm@TypeName(name: String),
+      nameType@TypeName(nameStr: String),
       tparams,  // List[Tree]
       template: Template
     ) = cls
 
-    def injectMethod(method: (String, Tree) => Tree): ClassDef = {
-      injectClassMethod(cls, errorIfExists = false, method)
-    }
-//    def optionalInjectMethod(method: (String,Tree) => Tree): ClassDef = {
-//      injectClassMethod(cls, errorIfExists = false, method)
-//    }
+    val nameTerm = nameType.toTermName
+    def copyWithTemplate(template: Template): ClassDef = ClassDef(mods,nameType,tparams,template)
 
-    def mapFields(func: ValDef => ValDef): ClassDef = {
-      modifyClassFields(cls,func)
-    }
-    def mapMethods(func: DefDef => DefDef): ClassDef = {
-      val methods = nonConstructorMethods.map(func)
-      ClassDef(mods,nameTerm,tparams,Template(parents,selfType,fields ++ constructors ++ methods))
-    }
     def withVarParams: ClassDef = {
       val params = constructorArgs.head.map(_.name)
       cls.mapFields{
@@ -199,23 +188,20 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
     def typeArgs: List[Tree] = tparams.map{tp => Ident(tp.name)}
 
     def callConstructor(args: Tree*): Tree = {
-      makeDefCall(name,tparams,List(args.toList))
+      makeDefCall(nameStr,tparams,List(args.toList))
     }
 
     def asCaseClass: ClassDef = ClassDef(mods.withCase,cls.name,tparams,template)
   }
 
-  implicit class ModuleOps(mf: ModuleDef) extends TemplateOps with NamedOps {
+  implicit class ModuleOps(val cls: ModuleDef) extends TemplateOps[ModuleDef] with NamedOps {
     val ModuleDef(
       mods: Modifiers,
-      nameTerm @ TermName(name: String),
+      nameTerm @ TermName(nameStr: String),
       template: Template
-    ) = mf
+    ) = cls
 
-    def mapMethods(func: DefDef => DefDef): ModuleDef = {
-      val methods = nonConstructorMethods.map(func)
-      ModuleDef(mods, nameTerm, Template(parents,selfType,fields ++ constructors ++ methods))
-    }
+    def copyWithTemplate(template: Template): ModuleDef = ModuleDef(mods, nameTerm, template)
   }
 
   def invalidAnnotationUse(name: String, allowed: String*): Nothing = {

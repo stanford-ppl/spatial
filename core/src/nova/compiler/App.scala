@@ -3,11 +3,11 @@ package nova.compiler
 import nova.core._
 import nova.lang.Void
 
-abstract class App extends Compiler with StaticTraversals {
+abstract class App extends StaticTraversals {
 
   def main(): Void
 
-  def stageProgram(args: Array[String]): Block[_] = {
+  def stage(args: Array[String]): Block[_] = {
     val block = stageBlock{ main() }
     block
   }

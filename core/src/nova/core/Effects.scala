@@ -1,10 +1,6 @@
-package nova.data
+package nova.core
 
 import forge.tags._
-import forge.tags.stateful
-import nova.core._
-
-case class AntiDeps(syms: Seq[Sym[_]]) extends AnalysisData[AntiDeps]
 
 case class Effects(
   unique:  Boolean = false,           // Should not be CSEd
@@ -14,7 +10,8 @@ case class Effects(
   mutable: Boolean = false,           // Allocates a mutable structure
   throws:  Boolean = false,           // May throw exceptions (speculative execution may be unsafe)
   reads:   Set[Sym[_]] = Set.empty,   // Reads given mutable symbols
-  writes:  Set[Sym[_]] = Set.empty    // Writes given mutable symbols
+  writes:  Set[Sym[_]] = Set.empty,   // Writes given mutable symbols
+  antideps: Seq[Impure] = Nil         // Anti-dependencies
 ) extends AnalysisData[Effects] {
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(
@@ -75,30 +72,22 @@ object Effects {
   def Reads(x: Set[Sym[_]]) = Effects(reads = x)
 }
 
-
-
-object Effectful {
-  @stateful def unapply(x: Sym[_]): Option[(Effects,Seq[Sym[_]])] = {
-    val deps = depsOf(x)
+case class Impure(sym: Sym[_], effects: Effects)
+object Impure {
+  @stateful def unapply(x: Sym[_]): Option[(Sym[_],Effects)] = {
     val effects = effectsOf(x)
-    if (effects.isPure && deps.isEmpty) None else Some((effects,deps))
+    if (effects.isPure && effects.antideps.isEmpty) None else Some((x,effects))
   }
 }
 
-object depsOf {
-  @stateful def apply(x: Sym[_]): Seq[Sym[_]] = metadata[AntiDeps](x).map(_.syms).getOrElse(Nil)
-  @stateful def update(x: Sym[_], deps: Seq[Sym[_]]): Unit = metadata.add(x, AntiDeps(deps))
+@data object effectsOf {
+  def apply(s: Sym[_]): Effects = metadata[Effects](s).getOrElse(Effects.Pure)
+  def update(s: Sym[_], e: Effects): Unit = metadata.add(s, e)
 }
 
-object effectsOf {
-  @stateful def apply(s: Sym[_]): Effects = metadata[Effects](s).getOrElse(Effects.Pure)
-  @stateful def update(s: Sym[_], e: Effects): Unit = metadata.add(s, e)
+@data object antidepsOf {
+  def apply(x: Sym[_]): Seq[Impure] = effectsOf(x).antideps
 }
-
-object isMutable {
-  @stateful def apply(s: Sym[_]): Boolean = effectsOf(s).isMutable
-
+@data object isMutable {
+  def apply(s: Sym[_]): Boolean = effectsOf(s).isMutable
 }
-
-
-

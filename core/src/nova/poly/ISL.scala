@@ -21,7 +21,7 @@ case class ISL()(implicit state: State) {
     needsInit = false
   }
   def startup(): Unit = init()
-  def shutdown(): Unit = proc.kill()
+  def shutdown(wait: Long = 0): Unit = { proc.kill(wait) }
 
   def nonEmpty(constraint: SparseConstraint): Boolean = !isEmpty(constraint)
   def isEmpty(constraint: SparseConstraint): Boolean = isEmpty(ConstraintMatrix(Set(constraint)))

@@ -16,7 +16,8 @@ class State {
   def nextId(): Int = { id += 1; id }
 
   /** List of effectful statements in the current scope **/
-  var context: Seq[Sym[_]] = _
+  var scope: Seq[Sym[_]] = _
+  var impure: Seq[Impure] = _
 
   /** Alias caches **/
   val shallowAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
@@ -24,7 +25,7 @@ class State {
   val aliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
 
   /** Definition cache used for CSE **/
-  var defCache: Map[Op[_], Sym[_]] = Map.empty
+  var cache: Map[Op[_], Sym[_]] = Map.empty
 
   /** Graph Metadata **/
   val globals: GlobalMetadata = new GlobalMetadata
@@ -69,11 +70,12 @@ class State {
   def reset(): Unit = {
     config.reset()
     id = -1
-    context = Nil
+    scope = Nil
+    impure = Nil
+    cache = Map.empty
     shallowAliasCache.clear()
     deepAliasCache.clear()
     aliasCache.clear()
-    defCache = Map.empty
     globals.reset()
     pass = 1
     logTab = 0
@@ -91,11 +93,12 @@ class State {
   def copyTo(target: State): Unit = {
     this.config.copyTo(target.config)
     target.id = this.id
-    target.context = this.context
+    target.scope = this.scope
+    target.impure = this.impure
+    target.cache = this.cache
     target.shallowAliasCache ++= this.shallowAliasCache
     target.deepAliasCache ++= this.deepAliasCache
     target.aliasCache ++= this.aliasCache
-    target.defCache = this.defCache
     globals.copyTo(target.globals)
     target.pass = this.pass
     target.logTab = this.logTab

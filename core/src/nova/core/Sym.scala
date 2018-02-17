@@ -2,6 +2,7 @@ package nova.core
 
 import forge.tags._
 import forge.utils.escapeConst
+import forge.implicits.readable._
 import forge.{SrcCtx => Ctx}
 
 import nova.lang.{Bit,Text}
@@ -14,11 +15,16 @@ sealed abstract class Type[A](implicit private val ev: A <:< Top[A]) { this: Pro
   def fresh: A
   def freshSym: Sym[A]
 
-  @inline final def extract: A = this.asInstanceOf[A]
+  //@inline final def extract: A = this.asInstanceOf[A]
   final def view[B[_]<:Type[_]](value: B[A]): B[A] = value match {
     case t: Top[_] if this <:< t.tp => this.asInstanceOf[B[A]]
     case t: Top[_] => throw new Exception(s"Cannot view $this as a ${t.tp} ($this has type ${this.tp})")
-    case _ => throw new Exception(c"Cannot view $this as a ${value.getClass}")
+    case _ => throw new Exception(r"Cannot view $this as a ${value.getClass}")
+  }
+  final def viewAs[B](value: B): B = value match {
+    case t: Top[_] if this <:< t.tp => this.asInstanceOf[B]
+    case t: Top[_] => throw new Exception(s"Cannot view $this as a ${t.tp} ($this has type ${this.tp})")
+    case _ => throw new Exception(r"Cannot view $this as a ${value.getClass}")
   }
   def tp: Type[A]
   def isType: Boolean
@@ -68,6 +74,7 @@ sealed trait Sym[+A] extends Product with Serializable { self =>
   final def isSymbol: Boolean = rhs.isNode
   final def c: Option[I] = rhs.getValue
   final def op: Option[Op[A]] = rhs.getOp
+  @rig final def effects: Effects = effectsOf(this)
 
   final def dataInputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
 }
@@ -75,6 +82,8 @@ sealed trait Sym[+A] extends Product with Serializable { self =>
 
 abstract class Top[A](implicit ev: A <:< Top[A]) extends Type[A] with Sym[A] {
   type I
+
+  final def selfTp: A = this.tp.viewAs[A](me)
 
   final override def freshSym: Sym[A] = {
     if (!this.isType) throw new Exception(s"Fresh call from non-Type evidence $this")

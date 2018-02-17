@@ -1,7 +1,7 @@
 package nova.node
 
 import forge.tags._
-import nova.data.Effects
+import nova.core._
 import nova.lang._
 
 @op case class FltNeg[A:Flt](a: A) extends Primitive[A]

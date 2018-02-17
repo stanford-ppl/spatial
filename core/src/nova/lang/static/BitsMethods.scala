@@ -19,7 +19,7 @@ trait BitsMethods {
       * Gives a view of this vector of bits as the given type.
       */
     @api def recast[A:Bits]: A = {
-      Bits.checkMismatch(vec.tp.extract,tbits[A], "recastUnchecked")
+      Bits.checkMismatch(vec.selfTp, tbits[A], "recastUnchecked")
       vec.recastUnchecked[A]
     }
 

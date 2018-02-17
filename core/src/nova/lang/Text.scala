@@ -3,6 +3,7 @@ package nova.lang
 import forge.tags._
 import nova.core._
 import nova.node._
+import nova.implicits.views._
 
 case class Text() extends Top[Text] {
   override type I = String

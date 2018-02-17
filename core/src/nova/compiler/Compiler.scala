@@ -2,14 +2,16 @@ package nova.compiler
 
 import forge.io.files
 import forge.utils.plural
-
+import forge.Instrument
+import forge.Instrumented
 import nova.core._
 import nova.traversal.Pass
 import nova.traversal.transform.Transformer
 
-trait Compiler { self =>
+abstract class Compiler { self =>
   protected var IR: State = new State
   final implicit def __IR: State = IR
+  private val instrument = new Instrument()
 
   def name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
   protected val testbench: Boolean = false
@@ -42,22 +44,11 @@ trait Compiler { self =>
     bug(s"  ${config.logDir}${config.name}_exception.log")
   }
 
-  def stageProgram(args: Array[String]): Block[_]
+  def stage(args: Array[String]): Block[_]
   def settings(): Unit = { }
   def runPasses[R](b: Block[R]): Unit
 
-  var timingLog: String = ""
-  private var passes = Set[Pass]()
-
-  implicit class BlockOps[R](block: Block[R]) {
-    def ==>(pass: Pass): Block[R] = runPass(pass, block)
-    def ==>(pass: (Boolean,Pass)): Block[R] = if (pass._1) runPass(pass._2,block) else block
-  }
-  implicit class BooleanOps(x: Boolean) {
-    def ?(pass: Pass): (Boolean,Pass) = (x,pass)
-  }
-
-  final def runPass[R](t: Pass, block: Block[R]): Block[R] = {
+  final def runPass[R](t: Pass, block: Block[R]): Block[R] = instrument(t.name){
     if (t.isInstanceOf[Transformer]) {
       globals.clearBeforeTransform()
     }
@@ -72,50 +63,22 @@ trait Compiler { self =>
     checkBugs(t.name)
     checkErrors(t.name)
 
-    val v = IR.config.logLevel
-    IR.config.logLevel = 2
-    inLog(timingLog) {
-      dbg(s"  ${t.name}: " + "%.4f".format(t.lastTime / 1000))
-    }
-    IR.config.logLevel = v
-
     // Mirror after transforming
     t match {case f: Transformer => globals.mirrorAfterTransform(f); case _ => }
-    passes += t
 
     result
   }
 
-
-  def compileProgram(args: Array[String]): Unit = {
-    files.deleteExts(config.logDir, ".log")
-    msg(s"Compiling ${config.name} to ${config.genDir}")
-    if (config.enLog) msg(s"Logging ${config.name} to ${config.logDir}")
-
-    val startTime = System.currentTimeMillis()
-    //if (config.enDbg) echoConfig()
-    val block = withLog(config.logDir, "0000 Staging.log"){ stageProgram(args) }
-
-    // Exit now if errors were found during staging
+  final def stageProgram(args: Array[String]): Block[_] = instrument("Staging"){
+    val block = withLog(config.logDir, "0000 Staging.log"){ stage(args) }
     checkBugs("staging")
-    checkErrors("staging")
+    checkErrors("staging") // Exit now if errors were found during staging
+    block
+  }
 
-    timingLog = setupStream(IR.config.logDir, "9999 Timing.log")
+  final def compileProgram(args: Array[String]): Unit = instrument("compile"){
+    val block = stageProgram(args)
     runPasses(block)
-
-    val time = (System.currentTimeMillis - startTime).toFloat
-
-    val v = IR.config.logLevel
-    IR.config.logLevel = 2
-    inLog(timingLog) {
-      dbg(s"  Total: " + "%.4f".format(time / 1000))
-      dbg(s"")
-      val totalTimes = passes.groupBy(_.name).mapValues{pass => pass.map(_.totalTime).sum }.toList.sortBy(_._2)
-      for (t <- totalTimes) {
-        dbg(s"  ${t._1}: " + "%.4f".format(t._2 / 1000))
-      }
-    }
-    IR.config.logLevel = v
   }
 
   final def echoConfig(): Unit = {
@@ -130,13 +93,9 @@ trait Compiler { self =>
     info(s"Enable verbose: ${config.enLog}")
   }
 
-  final def init(args: Array[String]): Unit = {
-    //val oldState = IR
-    IR = new State                      // Create a new, empty state
-
-    // TODO: Copy globals (created prior to the main method) to the new state's graph
-    //val globals = 0 until oldState.graph.firstNonGlobal
-    //oldState.graph.copyNodesTo(globals, IR.graph)
+  // TODO: Copy globals (created prior to the main method) to the new state's graph?
+  final def init(args: Array[String]): Unit = instrument("init"){
+    IR = new State                 // Create a new, empty state
 
     IR.config.init(args)           // Initialize the Config (from files)
     IR.config.name = name          // Set the default program name
@@ -144,18 +103,26 @@ trait Compiler { self =>
     IR.config.genDir = files.cwd + files.sep + "gen" + files.sep + name + files.sep
     IR.config.repDir = files.cwd + files.sep + "reports" + files.sep + name + files.sep
 
-    settings()                     // Override config with any DSL or App specific settings
+    settings()                     // Override config with any DSL or app-specific settings
+
+    msg(s"Compiling ${config.name} to ${config.genDir}")
+    if (config.enLog) msg(s"Logging ${config.name} to ${config.logDir}")
+
+    files.deleteExts(config.logDir, ".log")
+  }
+
+  def execute(args: Array[String]): Unit = instrument("nova"){
+    init(args)
+    compileProgram(args)
   }
 
   /**
     * The "real" entry point for the application
     */
-  final def main(args: Array[String]): Unit = {
-    val start = System.currentTimeMillis
-
+  def main(args: Array[String]): Unit = {
+    instrument.reset()
     try {
-      init(args)
-      compileProgram(args)
+      execute(args)
     }
     catch {
       case e @ CompilerBugs(stage,n) =>
@@ -170,18 +137,27 @@ trait Compiler { self =>
         onException(t)
         if (testbench) throw TestbenchFailure(s"Uncaught exception ${t.getMessage}")
     }
-    val time = (System.currentTimeMillis - start).toFloat
 
     checkWarnings()
     val tag = {
       if (IR.hadBugs || IR.hadErrors) s"[${Console.RED}failed${Console.RESET}]"
       else s"[${Console.GREEN}success${Console.RESET}]"
     }
-    msg(s"$tag Total time: " + "%.4f".format(time/1000) + " seconds")
+
+    instrument.dump("Nova Profiling Report", getOrCreateStream(config.logDir,"9999_Timing.log"))
+    Instrumented.set.foreach{i =>
+      val log = i.fullName.replace('.','_')
+      val heading = s"${i.instrumentName}: ${i.toString} (${i.hashCode()})"
+      val stream = getOrCreateStream(config.logDir,log + ".log")
+      i.dumpInstrument(heading, stream)
+      stream.println("\n")
+      info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
+      i.resetInstrument()
+    }
+
+    val time = instrument.totalTime
+    msg(s"$tag Total time: " + "%.4f".format(time/1000.0f) + " seconds")
 
     IR.streams.values.foreach{stream => stream.close() }
   }
-
 }
-
-

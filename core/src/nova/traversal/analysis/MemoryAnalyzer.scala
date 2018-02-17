@@ -8,7 +8,6 @@ import nova.poly.ISL
 import nova.traversal.analysis.banking._
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
-  override val name = "Memory Analyzer"
   private val strategy: BankingStrategy = ExhaustiveBanking()
 
   override protected def process[R](block: Block[R]): Block[R] = {

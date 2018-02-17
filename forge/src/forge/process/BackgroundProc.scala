@@ -1,6 +1,7 @@
 package forge.process
 
 import java.io._
+import java.util.concurrent.TimeUnit
 
 case class BackgroundProc(dir: String, args: String*) {
   private var reader: BufferedReader = _
@@ -51,7 +52,8 @@ case class BackgroundProc(dir: String, args: String*) {
     response
   }
 
-  def kill(): Unit = {
+  def kill(wait: Long = 0): Unit = {
     if (!(p eq null)) p.destroy()
+    if (wait > 0) p.waitFor(wait, TimeUnit.MILLISECONDS)
   }
 }

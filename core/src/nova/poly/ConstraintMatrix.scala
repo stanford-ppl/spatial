@@ -1,7 +1,6 @@
 package nova.poly
 
 import forge.tags._
-import forge.tags.stateful
 import forge.implicits.collections._
 import nova.data._
 import nova.lang.I32

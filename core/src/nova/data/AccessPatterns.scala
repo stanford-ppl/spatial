@@ -1,7 +1,6 @@
 package nova.data
 
 import forge.tags._
-import forge.tags.stateful
 import forge.implicits.collections._
 import nova.core._
 import nova.lang._

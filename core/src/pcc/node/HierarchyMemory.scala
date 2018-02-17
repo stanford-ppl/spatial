@@ -4,7 +4,7 @@ import pcc.core._
 import pcc.lang._
 
 /** Allocation of any black box **/
-abstract class Alloc[T:Sym] extends AccelOp[T]
+abstract class Alloc[T:Type] extends AccelOp[T]
 object Alloc {
   def unapply(x: Sym[_]): Option[Sym[_]] = x match {
     case Op(_: Alloc[_]) => Some(x)
@@ -13,13 +13,13 @@ object Alloc {
 }
 
 /** Memory allocation **/
-abstract class Memory[T:Sym] extends Alloc[T] {
+abstract class MemAlloc[T:Type] extends Alloc[T] {
   def dims: Seq[I32]
   def rank: Int = dims.length
 }
-object Memory {
+object MemAlloc {
   def unapply(x: Sym[_]): Option[Sym[_]] = x match {
-    case Op(_: Memory[_]) => Some(x)
+    case Op(_: MemAlloc[_]) => Some(x)
     case _ => None
   }
 }

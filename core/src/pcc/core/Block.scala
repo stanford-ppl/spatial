@@ -13,6 +13,10 @@ case class Block[R](
 ) {
   def temp: Freq = options.temp
 
+  def nestedStms: Set[Sym[_]] = stms.flatMap{s =>
+    s.op.map{o => o.blocks.flatMap(_.nestedStms) }.getOrElse(Nil)
+  }.toSet
+
   override def toString: String = {
     if (inputs.isEmpty) s"Block($result)" else s"""Block(${inputs.mkString("(", ",", ")")} => $result)"""
   }

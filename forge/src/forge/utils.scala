@@ -9,13 +9,13 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
   // Fix for bug where <caseaccessor> gets added to (private) implicit fields
   def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
     case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
-      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.PRIVATE)
+      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR)
       ValDef(flags, name, tp, rhs)
     case v => v
   }
 
   def makeTypeName(tp: TypeDef): Tree = {
-    val TypeDef(mods,TypeName(name),targs,_) = tp
+    val TypeDef(_,TypeName(name),targs,_) = tp
     makeType(name, targs)
   }
 
@@ -39,7 +39,7 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     errorIfExists: Boolean,
     method: (String, Tree) => Tree
   ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,bodyX)) = cls
+    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,_)) = cls
     val (fieldsX, methods) = cls.fieldsAndMethods
 
     val fields = fieldsFix(fieldsX)
@@ -75,7 +75,7 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
     cls: ClassDef,
     func: ValDef => ValDef
   ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,body)) = cls
+    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,_)) = cls
     val (fieldsX,methods) = cls.fieldsAndMethods
     val fields = fieldsFix(fieldsX)
     val fields2 = fields.map(func)
@@ -85,7 +85,7 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
 
   implicit class ValDefOps(v: ValDef) {
     def tp: Option[Tree] = {
-      val ValDef(_,name,tp,rhs) = v
+      val ValDef(_,_,tp,_) = v
       if (tp == EmptyTree) None else Some(tp)
     }
     def asVar: ValDef = {
@@ -130,6 +130,8 @@ case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
         case field => field
       }
     }
+
+    def typeArgs: List[Tree] = tparams.map{tp => Ident(tp.name)}
 
     def constructor: Option[DefDef] = methods.find{_.name == termNames.CONSTRUCTOR}
     def constructorArgs: List[List[ValDef]] = constructor.map{d =>  d.paramss }.getOrElse(Nil)

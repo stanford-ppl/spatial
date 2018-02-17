@@ -1,7 +1,8 @@
 package pcc.util
 
 import java.io.File
-import org.apache.commons.io.FileUtils
+import java.nio.file._
+import java.util.function.Consumer
 
 object files {
   def sep: String = java.io.File.separator
@@ -18,20 +19,46 @@ object files {
     }
   }
 
+  def deleteDirectory(file: File): Unit = {
+    for (file <- file.listFiles) deleteFiles(file)
+  }
+
   /**
     * Delete the given file (may be a directory)
     */
-  def deleteFiles(file: File): Unit = FileUtils.deleteQuietly(file)
+  def deleteFiles(file: File): Unit = {
+    if (file.isDirectory) deleteDirectory(file)
+    if (file.exists) file.delete()
+  }
 
   /**
     * Copy the file at src to the dst path
     */
-  def copyFile(src: String, dst: String): Unit = FileUtils.copyFile(new File(src), new File(dst))
+  def copyFile(src: String, dst: String): Unit = {
+    if (src == dst) throw new Exception(s"Source file $src and destination are the same.")
+    val srcFile = new File(src)
+    val dstFile = new File(dst)
+    if (dstFile.exists() && !dstFile.canWrite) throw new Exception(s"Destination $dst exists and cannot be written.")
+
+    Files.copy(Paths.get(src), Paths.get(dst))
+  }
 
   /**
     * Copy directory from source path to destination path
     */
-  def copyDir(srcDir: File, dstDir: File): Unit = FileUtils.copyDirectory(srcDir, dstDir)
-  def copyDir(srcDir: String, dstDir: String): Unit = copyDir(new File(srcDir), new File(dstDir))
+  def copyDir(srcDir: String, dstDir: String): Unit = {
+    if (srcDir == dstDir) throw new Exception(s"Source file $srcDir and destination are the same.")
+
+    val srcPath = Paths.get(srcDir)
+
+    object Copier extends Consumer[Path] {
+      override def accept(t: Path): Unit = {
+        val b = Paths.get(dstDir, t.toString.substring(srcDir.length()))
+        Files.copy(t, b, StandardCopyOption.REPLACE_EXISTING)
+      }
+    }
+
+    Files.walk(srcPath).forEach(Copier)
+  }
 
 }

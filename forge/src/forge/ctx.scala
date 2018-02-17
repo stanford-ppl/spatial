@@ -8,7 +8,7 @@ final class ctx extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro ctx.impl
 }
 
-object ctx {
+private[forge] object ctx {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
     import c.universe._
 

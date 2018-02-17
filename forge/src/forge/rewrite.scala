@@ -46,11 +46,11 @@ object rewrite {
 
         // TODO: Where to get implicit parameters from?
         val pf =
-          q"""val ${d.name}: PartialFunction[(Op[_],SrcCtx,State),Option[Any]] = {case (__op,__ctx,__state) =>
+          q"""val ${d.name}: PartialFunction[(Op[_],SrcCtx,State),Option[Sym[_]]] = {case (__op,__ctx,__state) =>
             val ${arg0.name} = __op.asInstanceOf[${arg0.tp.get}];
             implicit val ctx = __ctx;
             implicit val state = __state;
-            val func: PartialFunction[Op[_],Any] = ${d.rhs}
+            val func: PartialFunction[Op[_],Sym[_]] = ${d.rhs}
             if (func.isDefinedAt(${arg0.name})) Some(func.apply(${arg0.name})) else None
           }
           """

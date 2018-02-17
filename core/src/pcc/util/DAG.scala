@@ -21,7 +21,6 @@ object DAG {
     * Returns the least common ancestor (LCA) of two nodes in some directed, acyclic graph.
     * If the nodes share no common parent at any point in the tree, the LCA is undefined (None).
     * Also returns the paths from the least common ancestor to each node.
-    * The paths do not contain the LCA, as it may be undefined.
     */
   def LCAWithPaths[T](x: T, y: T)(parent: T => Option[T]): (Option[T], Seq[T], Seq[T]) = {
     val pathX = ancestors(x)(parent)
@@ -29,8 +28,8 @@ object DAG {
 
     // Choose last node where paths are the same
     val lca = pathX.zip(pathY).filter{case (a,b) => a == b}.lastOption.map(_._1)
-    val pathToX = pathX.drop(pathX.indexOf(lca)+1)
-    val pathToY = pathY.drop(pathY.indexOf(lca)+1)
+    val pathToX = pathX.drop(lca.map{pathX.indexOf}.getOrElse(0) + 1)
+    val pathToY = pathY.drop(lca.map{pathY.indexOf}.getOrElse(0) + 1)
     (lca,pathToX,pathToY)
   }
 

@@ -5,6 +5,7 @@ import java.io.PrintStream
 import pcc.core.SrcCtx
 
 object Report {
+  def plural(x: Int, sing: String): String = if (x == 1) sing else sing+"s"
   def plural(x: Int, sing: String, plur: String): String = if (x == 1) sing else plur
 
   implicit class PrintReport(out: PrintStream) {

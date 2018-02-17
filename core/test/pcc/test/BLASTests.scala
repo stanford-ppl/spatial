@@ -2,6 +2,7 @@ package pcc.test
 
 import pcc.lang._
 import pcc.lib._
+import utest._
 
 object GEMM extends Test {
   def main(): Void = Accel {
@@ -15,6 +16,6 @@ object GEMM extends Test {
   }
 }
 
-class BLASTests extends Tests {
-  "GEMM" should "compile" in { test(GEMM) }
-}
+object BLASTests extends Testbench { val tests = Tests {
+  'GEMM - test(GEMM)
+}}

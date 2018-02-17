@@ -20,7 +20,7 @@ abstract class MutateTransformer extends ForwardTransformer {
     * By default, the rule is to update the symbol's node in place.
     * @return the symbol which should replace lhs
     */
-  override def transform[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     update(lhs,rhs)
   }
 

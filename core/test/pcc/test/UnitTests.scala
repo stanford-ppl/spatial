@@ -1,6 +1,7 @@
 package pcc.test
 
 import pcc.lang._
+import utest._
 
 object NestedLoopTest extends Test {
   def main(): Void = Accel {
@@ -14,7 +15,6 @@ object NestedLoopTest extends Test {
   }
 }
 
-class UnitTests extends Tests {
-  "NestedLoopTest" should "compile" in { test(NestedLoopTest) }
-
-}
+object UnitTests extends Testbench { val tests = Tests {
+  'NestedLoopTest - test(NestedLoopTest)
+}}

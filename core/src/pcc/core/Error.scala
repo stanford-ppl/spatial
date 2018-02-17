@@ -1,16 +1,16 @@
 package pcc.core
 
-class LexerError(val ctx: SrcCtx, val msg: String) extends Error
-class ParserError(val ctx: SrcCtx, val msg: String) extends Error
+import scala.util.control.NoStackTrace
 
-class TypeError(val ctx: SrcCtx, val msg: String) extends Error
-class UserError(val ctx: SrcCtx, val msg: String) extends Error
+class LexerError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
+class ParserError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
 
-class PlacerError(val msg: String) extends Error
+class TypeError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
+class UserError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
+class PlacerError(val msg: String) extends Error with NoStackTrace
 class SearchFailure(override val msg: String) extends PlacerError(msg)
 
+case class TestbenchFailure(msg: String) extends Exception(msg) with NoStackTrace
 
-case class TestbenchFailure(msg: String) extends Error
-
-case class CompilerErrors(stage: String, n: Int) extends Error
-case class CompilerBugs(stage: String, n: Int) extends Error
+case class CompilerErrors(stage: String, n: Int) extends Error with NoStackTrace
+case class CompilerBugs(stage: String, n: Int) extends Error with NoStackTrace

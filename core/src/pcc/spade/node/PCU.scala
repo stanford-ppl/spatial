@@ -18,17 +18,17 @@ class PCUSpec(
   val vOuts   : List[Direction]  // Vector output directions
 ) extends PUSpec
 
-case class PCU(eid: Int) extends Box[PCU](eid) {
+case class PCU() extends Box[PCU] {
   override type I = this.type
+  override def fresh: PCU = new PCU
 
-  override def fresh(id: Int): PCU = PCU(id)
-  override def stagedClass: Class[PCU] = classOf[PCU]
+
 }
 object PCU {
-  implicit val pcu: PCU = PCU(-1)
+  implicit val pcu: PCU = (new PCU).asType
 
   @api def apply(spec: PCUSpec)(implicit wSize: Vec[Bit]): PCU = {
-    implicit val vSize: Vec[Vec[Bit]] = Vec[Vec[Bit]](-1, spec.nLanes, wSize)
+    implicit val vSize: Vec[Vec[Bit]] = Vec.tp[Vec[Bit]](spec.nLanes)
 
     val cIns  = Seq.fill(spec.nCIns){ bound[In[Bit]] }
     val cOuts = Seq.fill(spec.nCOuts){ bound[Out[Bit]] }

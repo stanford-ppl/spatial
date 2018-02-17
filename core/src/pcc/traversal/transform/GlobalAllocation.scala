@@ -5,6 +5,7 @@ import pcc.data._
 import pcc.lang._
 import pcc.node._
 import pcc.node.pir._
+import pcc.helpers._
 
 import scala.collection.mutable.{HashMap,HashSet,ArrayBuffer}
 
@@ -31,7 +32,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     controlData(ctrl).iters ++= data.iters
   }
 
-  protected def makePMU[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+  protected def makePMU[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     val mem = super.transform(lhs,rhs)
     val pmu = VPMU(Seq(mem))
     memoryPMUs += mem -> pmu
@@ -45,7 +46,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     super.preprocess(block)
   }
 
-  override def transform[A:Sym](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case SRAMNew(_) => makePMU(lhs,rhs)
     case FIFONew(_) => makePMU(lhs,rhs)
     case LIFONew(_) => makePMU(lhs,rhs)
@@ -60,13 +61,13 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     case _ => super.transform(lhs,rhs)
   }
 
-  protected def outerBlock[A:Sym](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
+  protected def outerBlock[A:Type](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
     val usedSyms = HashMap[Sym[_],Set[Sym[_]]]()
     def addUsed(x: Sym[_], using: Set[Sym[_]]): Unit = usedSyms(x) = usedSyms.getOrElse(x, Set.empty) ++ using
     var children = HashSet[Sym[_]]()
 
     block.stms.reverseIterator.foreach{
-      case Memory(_)  =>
+      case MemAlloc(_)  =>
       case Bus(_)     =>
       case Control(s) =>
         children += s
@@ -79,7 +80,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     // Stage the inner block, preserving only memory allocations and other controllers
     val blk = stageBlock {
       block.stms.foreach {
-        case Memory(s)  => visit(s)
+        case MemAlloc(s)  => visit(s)
         case Control(s) => visit(s)
         case Bus(s)     => visit(s)
         case s if usedSyms.contains(s) => usedSyms(s).foreach{c => addOuter(s, c) }
@@ -88,11 +89,11 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
       implicit val ctx: SrcCtx = block.result.ctx
       Void.c
     }
-    val psu = VSwitch(blk, iters)
+    val psu = VSwitch(blk, Seq(iters))
     stage(psu).asInstanceOf[Sym[A]]
   }
 
-  protected def innerBlock[A:Sym](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
+  protected def innerBlock[A:Type](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
     val parents = symParents(lhs)
     val edata = parents.map{p => controlData.getOrElse(p, CtrlData.empty) }
     val cdata = controlData.getOrElse(lhs, CtrlData.empty)
@@ -136,7 +137,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
           if (writersOf(mem).size == 1) addr.foreach{a => addWr(a, Set(mem)) }
         }
 
-      case Memory(s) if !s.isReg => memAllocs += s
+      case MemAlloc(s) if !s.isReg => memAllocs += s
 
       case s =>
         if (wrSyms.contains(s)) s.dataInputs.foreach{in => addWr(in,wrSyms(s)) }

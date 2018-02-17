@@ -3,6 +3,7 @@ package pcc.test
 import pcc.lang._
 //import pcc.lang.pir.{In, Out}
 import pcc.spade.node._
+import utest._
 
 object ArchModel_Simple extends Test {
   override val isPIR = true
@@ -42,7 +43,7 @@ object ArchModel_Simple extends Test {
   val SRAM_SIZE_WORDS = SRAM_SIZE_BYTES / 4
 
   def main(): Void = {
-    implicit val wSize: Vec[Bit] = Vec(-1, pmuSpec.nLanes, bits[Bit])  // word width
+    implicit val wSize: Vec[Bit] = Vec.tp(pmuSpec.nLanes)  // word width
     def getPMU(x: Int, y: Int) = {
       val m = PMU(pmuSpec).op.get.asInstanceOf[PMUModule]
       m.x = x
@@ -74,6 +75,6 @@ object ArchModel_Simple extends Test {
   }
 }
 
-class ArchModelTests extends Tests {
-  "ArchModel_Simple" should "compile" in { test(ArchModel_Simple) }
-}
+object ArchModelTests extends Testbench { val tests = Tests {
+  'ArchModel_Simple - test(ArchModel_Simple)
+}}

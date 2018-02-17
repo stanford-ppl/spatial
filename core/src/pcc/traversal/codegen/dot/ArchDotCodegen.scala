@@ -6,12 +6,12 @@ import pcc.core._
 import pcc.node._
 import pcc.lang.memories.SRAM
 import pcc.lang.Void
-import pcc.lang.pir.{In, Out}
-import pcc.node.pir.{Lanes, VectorBus}
+import pcc.lang.pir.{In, Lanes, Out}
+import pcc.node.pir.VectorBus
 import pcc.spade.node._
 
 import scala.language.implicitConversions
-import scala.collection.mutable.{ListBuffer, HashMap, Set}
+import scala.collection.mutable.{HashMap, ListBuffer, Set}
 
 case class ArchDotCodegen(IR: State) extends Codegen with DotCommon {
   override val name: String = "Arch Dot Printer"
@@ -36,17 +36,11 @@ case class ArchDotCodegen(IR: State) extends Codegen with DotCommon {
             .fill(white)
             .labelfontcolor(black)
 
-  def getNodeName(sym: Sym[_]) = sym match {
-    case p: PCU =>
-      val op = p.op.get.asInstanceOf[PCUModule]
-      s"PCU_${op.x}_${op.y}"
-    case p: PMU =>
-      val op = p.op.get.asInstanceOf[PMUModule]
-      s"PMU_${op.x}_${op.y}"
-    case _ =>
-      sym.op.map(o => o.productPrefix).getOrElse(sym.typeName) + s"_x${sym.id}"
+  override def getNodeName(sym: Sym[_]): String = sym match {
+    case Op(op: PCUModule) => s"PCU_${op.x}_${op.y}"
+    case Op(op: PMUModule) => s"PMU_${op.x}_${op.y}"
+    case _ => super.getNodeName(sym)
   }
-  def getBlockName[R](block: Block[R]) = "cluster_" + getNodeName(block.result)
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
     val subgraphAttr = DotAttr().style(filled)

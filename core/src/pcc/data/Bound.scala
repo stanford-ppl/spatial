@@ -7,7 +7,7 @@ abstract class Bound(x: Int) { def toInt: Int = x }
 case class Final(x: Int) extends Bound(x)
 case class Expect(x: Int) extends Bound(x)
 
-case class SymbolBound(bound: Bound) extends SimpleData[SymbolBound]
+case class SymbolBound(bound: Bound) extends FlowData[SymbolBound]
 @data object boundOf {
   def get(x: Sym[_]): Option[Bound] = x match {
     case Const(c: Int) => Some(Final(c))

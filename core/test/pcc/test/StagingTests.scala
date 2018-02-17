@@ -1,6 +1,7 @@
 package pcc.test
 
 import pcc.lang._
+import utest._
 
 object StageForeach extends Test {
   def main(): Void = Accel {
@@ -24,13 +25,13 @@ object StageUpdate extends Test {
       sram(i) = exp(i)
     }
     Foreach(0 until 32){i =>
-      println("i=">i>": ">sram(i))
+      println("i=" ++ i ++ ": " ++ sram(i))
     }
   }
 }
 
-class StagingTests extends Tests {
-  "StageForeach" should "compile" in { test(StageForeach) }
-  "StageMemories" should "compile" in { test(StageMemories) }
-  "StageUpdate" should "compile" in { test(StageUpdate) }
-}
+object StagingTests extends Testbench { val tests = Tests {
+  'StageForeach  - test(StageForeach)
+  'StageMemories - test(StageMemories)
+  'StageUpdate   - test(StageUpdate)
+}}

@@ -40,8 +40,8 @@ trait Traversal extends Pass { self =>
   }
   protected def visitBlock[R](block: Block[R]): Block[R] = visitBlock(block, {stms => stms.foreach(visit); block})
 
-  final protected def visit(lhs: Sym[_]): Unit = lhs.rhs match {
-    case Two(rhs) =>
+  final protected def visit(lhs: Sym[_]): Unit = lhs.op match {
+    case Some(rhs) =>
       visit(lhs, rhs)
       if (recurse == Always) rhs.blocks.foreach{blk => visitBlock(blk) }
     case _ => // Do nothing

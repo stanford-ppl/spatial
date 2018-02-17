@@ -6,16 +6,17 @@ import pcc.core._
 import pcc.node.pir._
 import pcc.util.Ptr
 
-case class Out[A](eid: Int, tA: Bits[A]) extends Bits[Out[A]](eid) {
+case class Out[A:Bits]() extends Bits[Out[A]] {
+  val tA: Bits[A] = tbits[A]
   override type I = Ptr[Any]
-  private implicit val bA: Bits[A] = tA
 
-  override def fresh(id: Int): Out[A] = Out(id, tA)
-  override def stagedClass: Class[Out[A]] = classOf[Out[A]]
-  override def bits: Int = tA.bits
+  override def fresh: Out[A] = new Out[A]
+  override def nBits: Int = tA.nBits
 
-  @api def zero: Out[A] = Out.c(Ptr(tA.zero))
-  @api def one: Out[A] = Out.c(Ptr(tA.one))
+  @rig def zero: Out[A] = Out.c(Ptr(tA.zero))
+  @rig def one: Out[A] = Out.c(Ptr(tA.one))
+  @rig def random(max: Option[Out[A]]): Out[A] = undefinedOp("random")
+
   @api def :=(x: A): Void = stage(WriteOut(this, x.asInstanceOf[Bits[A]]))
 
   @api def -->(in: In[A]): Void = { stage(ScalarBus(this,in)); void }
@@ -23,6 +24,6 @@ case class Out[A](eid: Int, tA: Bits[A]) extends Bits[Out[A]](eid) {
 }
 
 object Out {
-  implicit def tp[A:Bits]: Out[A] = Out(-1,bits[A])
-  @api def c[A:Bits](values: Ptr[Any]): Out[A] = const[Out[A]](values)
+  implicit def tp[A:Bits]: Out[A] = (new Out[A]).asType
+  def c[A:Bits](values: Ptr[Any]): Out[A] = const[Out[A]](values)
 }

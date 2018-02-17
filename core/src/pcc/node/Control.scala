@@ -11,10 +11,14 @@ import pcc.traversal.transform.Transformer
 @op case class AccelScope(block: Block[Void]) extends Pipeline {
   def ens: Seq[Bit] = Nil
   override def iters = Nil
+  override def bodies = Seq(Nil -> Seq(block))
+  override def cchains = Nil
 }
 
 @op case class UnitPipe(ens: Seq[Bit], block: Block[Void]) extends Pipeline {
   override def iters = Nil
+  override def bodies = Seq(Nil -> Seq(block))
+  override def cchains = Nil
 }
 
 @op case class OpForeach(

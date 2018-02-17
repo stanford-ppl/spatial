@@ -17,7 +17,7 @@ trait Scoping { this: Printing =>
     def clean(xs: Set[Sym[_]]) = xs diff allocs
     for (s@Effectful(u2, _) <- context) {
       if (u2.isMutable) allocs += s
-      effects = effects andThen u2.copy(reads = clean(u2.reads), writes = clean(u2.writes))
+      effects = effects andThen u2.copy(reads = clean(u2.reads), writes = clean(u2.writes), mutable = false)
     }
     effects
   }
@@ -49,6 +49,8 @@ trait Scoping { this: Printing =>
     state.defCache = saveCache
 
     val effects = summarizeScope(impure)
+    logs(s"Closing scope with result $result")
+    logs(s"Effects: $effects")
 
     Block[R](inputs,stms,result,effects,impure,options)
   }

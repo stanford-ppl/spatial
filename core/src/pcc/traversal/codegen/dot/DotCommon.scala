@@ -6,12 +6,11 @@ import pcc.core._
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
-import pcc.node.pir.{Lanes, VPCU, VPMU, VectorBus}
+import pcc.node.pir.{VPCU, VPMU, VectorBus}
 import pcc.spade.node.{PCUModule, PMUModule}
 
 trait DotCommon { this: Codegen =>
   private val regex = "\\[[0-9]*\\]".r
-
 
   def q(s: Any): String = regex.replaceAllIn(quoteOrRemap(s), "")
 
@@ -25,7 +24,7 @@ trait DotCommon { this: Codegen =>
   def rankdir = "BT"  // Direction in which graph is laid out
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     emit("digraph G {")
-    open
+    open()
     emit(s"rankdir=$rankdir;")
     emit("labelloc=\"t\"")
     emit(s"""label="${filename}"""")
@@ -35,12 +34,21 @@ trait DotCommon { this: Codegen =>
 
   override protected def postprocess[R](block: Block[R]): Block[R] = {
     edges.foreach {_()}
-    close
+    close()
     emit("}")
     block
   }
 
-  def getNodeColor(rhs: Op[_]) = rhs match {
+  def getNodeName(sym: Sym[_]): String = sym.rhs match {
+    case Def.TypeRef     => sym.toString
+    case Def.Const(c)    => s"$c"
+    case Def.Param(id,_) => s"${sym.tp}_x$id"
+    case Def.Bound(id)   => s"${sym.tp}_x$id"
+    case Def.Node(id,op) => s"${op.productPrefix}_x$id"
+  }
+  def getBlockName[R](block: Block[R]): String = "cluster_" + getNodeName(block.result)
+
+  def getNodeColor(rhs: Op[_]): Color = rhs match {
     case pcu: VPCU => indianred
     case pcu: PCUModule => indianred
     case pmu: VPMU => cadetblue
@@ -48,15 +56,16 @@ trait DotCommon { this: Codegen =>
     case _ => white
   }
 
+
   def emitSubgraph(attr: DotAttr)(f: => Any): Unit = {
     emit(s"subgraph cluster_${attr.attrMap("label")._1} {")
-    open
+    open()
     attr.attrMap.keys.foreach { k =>
       if (attr.attrMap(k)._2) emit(s"$k=${attr.attrMap(k)._1}")
       else emit(s"$k=${attr.attrMap(k)._1}")
     }
     f
-    close
+    close()
     emit("}")
   }
   def emitNode(n: Any, attr: DotAttr): Unit = {

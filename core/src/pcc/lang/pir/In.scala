@@ -6,22 +6,25 @@ import pcc.core._
 import pcc.node.pir._
 import pcc.util.Ptr
 
-case class In[A](eid: Int, tA: Bits[A]) extends Bits[In[A]](eid) {
+import scala.collection.mutable
+
+case class In[A:Bits]() extends Bits[In[A]] {
+  val tA: Bits[A] = tbits[A]
   override type I = Ptr[Any]
-  private implicit val bA: Bits[A] = tA
 
-  override def fresh(id: Int): In[A] = In(id, tA)
-  override def stagedClass: Class[In[A]] = classOf[In[A]]
-  override def bits: Int = tA.bits
+  override def fresh: In[A] = new In[A]
+  override def nBits: Int = tA.nBits
 
-  @api def zero: In[A] = In.c(Ptr(tA.zero))
-  @api def one: In[A] = In.c(Ptr(tA.one))
+  @rig def zero: In[A] = In.c(Ptr(tA.zero))
+  @rig def one: In[A] = In.c(Ptr(tA.one))
+  @rig def random(max: Option[In[A]]): In[A] = undefinedOp("random")
 
-  @api def read: A = stage(ReadIn(this,tA))
+  @api def read: A = stage(ReadIn(this))
 }
 
 object In {
-  implicit def tp[A:Bits]: In[A] = In(-1,bits[A])
-  @api def c[A:Bits](values: Ptr[Any]): In[A] = const[In[A]](values)
-}
+  private lazy val types = new mutable.HashMap[Bits[_],In[_]]()
 
+  implicit def tp[A:Bits]: In[A] = types.getOrElseUpdate(tbits[A],(new In[A]).asType).asInstanceOf[In[A]]
+  def c[A:Bits](values: Ptr[Any]): In[A] = const[In[A]](values)
+}

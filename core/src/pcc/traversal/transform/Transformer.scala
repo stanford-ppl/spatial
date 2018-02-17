@@ -49,27 +49,32 @@ abstract class Transformer extends Pass {
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
     dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
-    val data = metadata.all(src).flatMap{case (_,m) => mirror(m) : Option[Metadata[_]] }
+    val data = metadata.all(src).filterNot{case (_,m) => m.skipOnTransform }
+                                .flatMap{case (_,m) => mirror(m) : Option[Metadata[_]] }
     metadata.addAll(dest, data)
   }
 
   final protected def transferMetadataIfNew[A](lhs: Sym[A])(tx: => Sym[A]): (Sym[A], Boolean) = {
     val lhs2 = tx
-    if (lhs.isSymbol && lhs2.isSymbol && lhs.id <= lhs2.id) {
+    val shouldTransfer = (lhs.rhs.getID,lhs2.rhs.getID) match {
+      case (Some(id1),Some(id2)) => id1 <= id2
+      case _ => true
+    }
+    if (shouldTransfer) {
       transferMetadata(lhs -> lhs2)
       (lhs2, true)
     }
     else (lhs2, false)
   }
 
-  final def mirror[M<:Metadata[_]](m: M): Option[M] = Option(m.mirror(f)).map(_.asInstanceOf[M])
+  final def mirror(m: Metadata[_]): Option[Metadata[_]] = Option(m.mirror(f)).map(_.asInstanceOf[Metadata[_]])
 
   def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
-    implicit val tA: Sym[A] = rhs.tR
+    implicit val tA: Type[A] = rhs.tR
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Mirror]")
     val (lhs2,_) = try {
-      transferMetadataIfNew(lhs){ stage(rhs.mirror(f)).asSym }
+      transferMetadataIfNew(lhs){ tA.viewAsSym(stage(rhs.mirror(f))) }
     }
     catch {case t: Throwable =>
       bug(s"An error occurred while mirroring $lhs = $rhs")

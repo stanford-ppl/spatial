@@ -1,58 +1,147 @@
 package pcc.core
 
 import forge._
-import pcc.lang.Text
-import pcc.util.Tri._
-import pcc.util.Types._
+import pcc.lang.{Bit,Text}
 import pcc.util.escapeConst
 
-abstract class Sym[A](eid: Int)(implicit ev: A<:<Sym[A]) extends Product { self =>
+import scala.annotation.unchecked.uncheckedVariance
+import scala.collection.mutable
+
+sealed abstract class Type[A](implicit private val ev: A <:< Top[A]) { this: Product =>
   type I
-  final protected def me: A = this.asInstanceOf[A]
-  private var _rhs: Tri[I,Op[A]] = Nix
-  private var isFixed: Boolean = true
+  def fresh: A
+  def freshSym: Sym[A]
+
+  @inline final def extract: A = this.asInstanceOf[A]
+  final def view[B[_]<:Type[_]](value: B[A]): B[A] = value match {
+    case t: Top[_] if this <:< t.tp => this.asInstanceOf[B[A]]
+    case t: Top[_] => throw new Exception(s"Cannot view $this as a ${t.tp} ($this has type ${this.tp})")
+    case _ => throw new Exception(c"Cannot view $this as a ${value.getClass}")
+  }
+  def tp: Type[A]
+  def isType: Boolean
+  def viewAsSym(a: A @ uncheckedVariance): Sym[A] = ev(a)
+  def viewAsTop(a: A @ uncheckedVariance): Top[A @ uncheckedVariance] = ev(a)
+  def isPrimitive: Boolean
+  def typeArgs: Seq[Type[_]] = Nil
+  def supertypes: Seq[Type[_]] = Nil
+
+  final def <:<(that: Type[_]): Boolean = this == that || supertypes.exists{s => s <:< that }
+  final def <:>(that: Type[_]): Boolean = this <:< that && that <:< this
+
+  final def typePrefix: String = this.productPrefix
+  final def typeName: String = this.typePrefix + (if (typeArgs.isEmpty) "" else "[" + typeArgs.mkString(",") + "]")
+}
+
+
+// TODO: The use of @uncheckedVariance here is a little scary, double check these
+// NOTE: Sym is covariant with A because Sym[B] <: Sym[A] if A <: B
+// See: https://docs.scala-lang.org/tour/variances.html
+sealed trait Sym[+A] extends Product with Serializable { self =>
+  type I
+  @inline final protected def me: A = this.asInstanceOf[A]
+  private var _rhs: Def[I,A @ uncheckedVariance] = Def.TypeRef
+  private var _tp: Type[A @ uncheckedVariance] = _
+  private[pcc] val data: mutable.Map[Class[_],Metadata[_]] = mutable.Map.empty
 
   var name: Option[String] = None
   var ctx: SrcCtx = SrcCtx.empty
   var prevNames: Seq[(String,String)] = Nil
 
-  final def fixed(): Unit = { isFixed = true }
-  final def asBound(): A = { _rhs = Nix; me }
-  final def asConst(c: Any): A = { _rhs = One(c.asInstanceOf[self.I]); isFixed = true; me }
-  final def asParam(c: Any): A = { _rhs = One(c.asInstanceOf[self.I]); isFixed = false; me }
-  final def asSymbol(rhs: Op[A]): A = { _rhs = Two(rhs); me }
-  final def isConst: Boolean = { _rhs.isOne && isFixed }
-  final def isParam: Boolean = { _rhs.isOne && isFixed }
-  final def isBound: Boolean = { id >= 0 && _rhs.isNix }
-  final def isSymbol: Boolean = { _rhs.isTwo }
-  final def isType: Boolean = { id < 0 }
-  final def rhs: Tri[I,Op[A]] = _rhs
-  final def c: Option[I] = _rhs.getOne
-  final def op: Option[Op[A]] = _rhs.getTwo
-  final def id: Int = eid
+  final def tp: Type[A @ uncheckedVariance] = if (this.isType) this.asInstanceOf[Type[A]] else _tp
+  final def rhs: Def[I, A @ uncheckedVariance] = _rhs
+
+  final private[pcc] def asType: A = { _rhs = Def.TypeRef; me }
+  final private[core] def asBound(id: Int): A = { _rhs = Def.Bound(id); me }
+  final private[core] def asConst(c: Any): A = { _rhs = Def.Const(c.asInstanceOf[self.I]); me }
+  final private[core] def asParam(id: Int, c: Any): A = { _rhs = Def.Param(id, c.asInstanceOf[self.I]); me }
+  final private[core] def asSymbol(id: Int, op: Op[A @uncheckedVariance]): A = { _rhs = Def.Node(id, op); me }
+  final private[core] def withType(t: Type[A @uncheckedVariance]): Sym[A] = { _tp = t; this }
+
+  final def isType: Boolean = rhs.isType
+  final def isConst: Boolean = rhs.isConst
+  final def isParam: Boolean = rhs.isParam
+  final def isValue: Boolean = rhs.isValue
+  final def isBound: Boolean = rhs.isBound
+  final def isSymbol: Boolean = rhs.isNode
+  final def c: Option[I] = rhs.getValue
+  final def op: Option[Op[A]] = rhs.getOp
 
   final def dataInputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
+}
 
-  final def viewAsSym(x: A): Sym[A] = ev(x)
-  final def asSym: Sym[A] = this
-  final def asType[T]: T = this.asInstanceOf[T]
 
-  override def toString: String = if (isType) this.typeName else _rhs match {
-    case One(c) => s"${escapeConst(c)}"
-    case Two(_) => s"x$id"
-    case Nix    => s"b$id"
+abstract class Top[A](implicit ev: A <:< Top[A]) extends Type[A] with Sym[A] {
+  type I
+
+  final override def freshSym: Sym[A] = {
+    if (!this.isType) throw new Exception(s"Fresh call from non-Type evidence $this")
+    ev(fresh).withType(this)
   }
 
-  def fresh(id: Int): A
-  def isPrimitive: Boolean
-  def typeArguments: List[Sym[_]] = Nil
-  def stagedClass: Class[A]
-  def typeName: String = productPrefix + (if (typeArguments.isEmpty) "" else typeArguments.map(_.typeName).mkString("[", ",", "]"))
+  @rig private def unrelated(that: Any): Unit = that match {
+    case t: Top[_] =>
+      warn(ctx, s"Comparison between unrelated types ${this.tp} and ${t.tp}")
+      warn(ctx)
+    case t =>
+      warn(ctx, s"Comparison between unrelated types ${this.tp} and ${t.getClass}")
+      warn(ctx)
+  }
 
-  final def <:<(that: Sym[_]): Boolean = isSubtype(this.stagedClass, that.stagedClass)
-  final def <:>(that: Sym[_]): Boolean = this <:< that && that <:< this
+  @api def nEql(that: Any): Bit = that match {
+    case t: Top[_] if t.tp <:> this.tp => this !== that.asInstanceOf[A]
+    case _ => unrelated(that); true
+  }
+  @api def isEql(that: Any): Bit = that match {
+    case t: Top[_] if t.tp <:> this.tp => this === that.asInstanceOf[A]
+    case _ => unrelated(that); false
+  }
 
-  @api def toText: Text = Text.textify(me)(this.asType[A],ctx,state)
+  @api def !==(that: A): Bit = !this.equals(that)    // FIXME: Correct default?
+  @api def ===(that: A): Bit = this.equals(that)   // FIXME: Correct default?
+
+  @api def ++(that: Any): Text = that match {
+    case t: Text   => Text.concat(this.toText, t)
+    case t: Top[_] => Text.concat(this.toText, t.toText)
+    case t => Text.concat(this.toText, Text.c(t.toString))
+  }
+  @api def toText: Text = Text.textify(me)(this.tp,ctx,state)
+
+
+  // TODO: rhs is a var, is this an issue?
+  final override def hashCode(): Int = this.rhs match {
+    case Def.Const(c)    => c.hashCode()
+    case Def.Param(id,_) => id
+    case Def.Node(id,_)  => id
+    case Def.Bound(id)   => id
+    case Def.TypeRef     => (typePrefix,typeArgs).hashCode()
+  }
+
+  final override def canEqual(x: Any): Boolean = x match {
+    case _: Top[_] => true
+    case _ => false
+  }
+
+  final override def equals(x: Any): Boolean = x match {
+    case that: Top[_] => (this.rhs, that.rhs) match {
+      case (Def.Const(a),     Def.Const(b))     => this.tp == that.tp && a == b
+      case (Def.Param(idA,_), Def.Param(idB,_)) => idA == idB
+      case (Def.Node(idA,_),  Def.Node(idB,_))  => idA == idB
+      case (Def.Bound(idA),   Def.Bound(idB))   => idA == idB
+      case (Def.TypeRef,      Def.TypeRef)      =>
+        this.typePrefix == that.typePrefix && this.typeArgs == that.typeArgs
+      case _ => false
+    }
+    case _ => false
+  }
+
+  final override def toString: String = rhs match {
+    case Def.Const(c)    => s"${escapeConst(c)}"
+    case Def.Param(id,c) => s"p$id (${escapeConst(c)})"
+    case Def.Node(id,_)  => s"x$id"
+    case Def.Bound(id)   => s"b$id"
+    case Def.TypeRef     => typeName
+  }
 }
 
 object Lit {

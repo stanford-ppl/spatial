@@ -2,32 +2,57 @@ package pcc.core.static
 
 import forge._
 import pcc.data.{Effects,isMutable,effectsOf,depsOf,Effectful}
-import pcc.util.{recursive,strMeta}
+import pcc.util.{recursive,strMeta,escapeConst}
 
 trait Staging { this: Printing =>
 
-  def typ[T:Sym]: Sym[T] = implicitly[Sym[T]]
-  def mtyp[A,B](x: Sym[A]): Sym[B] = x.asInstanceOf[Sym[B]]
+  def typ[A:Type]: Type[A] = implicitly[Type[A]]
+  def mtyp[A,B](tp: Type[A]): Type[B] = tp.asInstanceOf[Type[B]]
 
-  implicit def toSym[A:Sym](x: A): Sym[A] = typ[A].viewAsSym(x)
+  def const[A<:Sym[A]:Type](c: A#I): A = {
+    val tp = typ[A]
+    constant(tp)(c.asInstanceOf[tp.I])
+  }
+  def constant[A](tp: Type[A])(c: tp.I): A = {
+    val x = tp.freshSym.asConst(c)
+    val s = tp.viewAsSym(x)
+    //logs(c"${stm(s)} [constant] [type: ${s.tp}]")
+    x
+  }
 
-  @stateful def bound[T:Sym]: T = fresh(typ[T])
-  @stateful def const[T:Sym](c: Any): T = const(typ[T], c)
-  @stateful def param[T:Sym](c: Any): T = param(typ[T], c)
+  @stateful def bound[A:Type]: A = {
+    val x = typ[A].freshSym.asBound(state.nextId())
+    val s = typ[A].viewAsSym(x)
+    logs(c"${stm(s)} [bound] [type: ${s.tp}]")
+    x
+  }
 
-  @stateful def fresh[T](tp: Sym[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asBound()
-  @stateful def const[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asConst(c)
-  @stateful def param[T](tp: Sym[T], c: Any): T = tp.viewAsSym(tp.fresh(state.nextId())).asParam(c)
-  @stateful def symbol[T](tp: Sym[T], d: Op[T]): T = tp.viewAsSym(tp.fresh(state.nextId())).asSymbol(d)
+  @stateful def param[A<:Sym[A]:Type](c: A#I): A = {
+    val tp = typ[A]
+    parameter(tp)(c.asInstanceOf[tp.I])
+  }
+  @stateful def parameter[A](tp: Type[A])(c: tp.I): A = {
+    val x = tp.freshSym.asParam(state.nextId(), c)
+    val s = tp.viewAsSym(x)
+    logs(c"${stm(s)} [parameter] [type: ${s.tp}]")
+    x
+  }
+  @stateful def symbol[A](tp: Type[A], op: Op[A]): A = {
+    val x = tp.freshSym.asSymbol(state.nextId(), op)
+    val s = tp.viewAsSym(x)
+    logs(c"${stm(s)} [symbol] [type: ${s.tp}]")
+    x
+  }
 
-  @internal def register[T](op: Op[T], symbol: () => T): T = rewrites.apply(op) match {
+
+  @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.tR,ctx,state) match {
     case Some(s) => s
     case None    =>
       if (state == null) throw new Exception("Null state during staging")
 
       val (effects,deps) = allEffects(op)
 
-      def stageEffects(): T = {
+      def stageEffects(): R = {
         val lhs = symbol()
         val sym = op.tR.viewAsSym(lhs)
         if (effects != Effects.Pure) effectsOf(sym) = effects
@@ -41,7 +66,10 @@ trait Staging { this: Printing =>
         val immutables = effects.writes.filterNot(x => isMutable(x))
         val aliases = mutableAliases(op) diff effects.writes
 
-//        logs(s"$lhs = $op")
+//        logs(s"  aliases: ${aliasSyms(op)}")
+//        logs(s"  copies: ${copySyms(op)}")
+//        logs(s"  contains: ${containSyms(op)}")
+//        logs(s"  extracts: ${extractSyms(op)}")
 //        logs(s"  effects: $effects")
 //        logs(s"  deps: $deps")
 //        logs(s"  written immutables: $immutables")
@@ -74,17 +102,18 @@ trait Staging { this: Printing =>
           lhs
         }
         else {
-          symsWithSameEffects.head.asInstanceOf[T]
+          symsWithSameEffects.head.asInstanceOf[R]
         }
       }
       else stageEffects()
   }
 
-  @internal def restage[T](sym: Sym[T]): Sym[T] = sym match {
-    case Op(rhs) => sym.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
+  @rig def restage[T](sym: Sym[T]): Sym[T] = sym match {
+    case Op(rhs) => sym.tp.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
     case _ => sym
   }
-  @internal def stage[T](op: Op[T]): T = {
+  @rig def stage[T](op: Op[T]): T = {
+    logs(s"Staging $op with type evidence ${op.tR}")
     val t = register(op, () => symbol(op.tR,op))
     op.tR.viewAsSym(t).ctx = ctx
     t
@@ -95,7 +124,7 @@ trait Staging { this: Printing =>
   private def containSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.contains}(a)
   private def extractSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.extracts}(a)
   private def copySyms(a: Any): Set[Sym[_]]    = recursive.collectSets{case d: Op[_] => d.copies}(a)
-  private def noPrims(x: Set[Sym[_]]): Set[Sym[_]] = x.filter{s => !s.isPrimitive}
+  private def noPrims(x: Set[Sym[_]]): Set[Sym[_]] = x.filter{s => !s.tp.isPrimitive}
 
   @stateful def shallowAliases(x: Any): Set[Sym[_]] = {
     noPrims(aliasSyms(x)).flatMap { case Stm(s,d) => state.shallowAliasCache.getOrElseUpdate(s, shallowAliases(d)) + s } ++
@@ -153,7 +182,7 @@ trait Staging { this: Printing =>
     }
   }
 
-  @internal final def allEffects(d: Op[_]): (Effects, Seq[Sym[_]]) = {
+  @rig final def allEffects(d: Op[_]): (Effects, Seq[Sym[_]]) = {
     val mIns = mutableInputs(d)
     //val atomicEffects = propagateWrites(u)
 

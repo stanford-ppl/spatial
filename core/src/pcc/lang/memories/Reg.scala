@@ -8,36 +8,34 @@ import pcc.node._
 
 import scala.collection.mutable
 
-case class Reg[A](eid: Int, tA: Bits[A]) extends LocalMem[A,Reg](eid) {
-  type AI = tA.I
+case class Reg[A:Bits]() extends LocalMem[A,Reg] {
   override type I = Array[AI]
-  private implicit val bA: Bits[A] = tA
-
-  override def fresh(id: Int): Reg[A] = new Reg[A](id, tA)
-  override def stagedClass: Class[Reg[A]] = classOf[Reg[A]]
-  override def typeArguments: List[Sym[_]] = List(tA)
+  override def fresh: Reg[A] = new Reg[A]
 
   @api def :=(data: A): pcc.lang.Void = Reg.write(me, data, Nil)
   @api def value: A = Reg.read(me)
+
+  @api override def !==(that: Reg[A]): Bit = this.value.view[Bits] nEql that.value.view[Bits]
+  @api override def ===(that: Reg[A]): Bit = this.value.view[Bits] isEql that.value.view[Bits]
 }
 object Reg {
   private lazy val types = new mutable.HashMap[Bits[_],Reg[_]]()
-  implicit def tp[A:Bits]: Reg[A] = types.getOrElseUpdate(bits[A], new Reg[A](-1,bits[A])).asInstanceOf[Reg[A]]
+  implicit def tp[A:Bits]: Reg[A] = types.getOrElseUpdate(tbits[A], (new Reg[A]).asType).asInstanceOf[Reg[A]]
 
-  @api def apply[T:Bits]: Reg[T] = Reg.alloc[T](bits[T].zero)
-  @api def apply[T:Bits](reset: T): Reg[T] = Reg.alloc[T](reset)
+  @api def apply[A:Bits]: Reg[A] = Reg.alloc[A](zero[A])
+  @api def apply[A:Bits](reset: A): Reg[A] = Reg.alloc[A](reset)
 
-  @api def alloc[T:Bits](reset: T)(implicit ctx: SrcCtx, state: State): Reg[T] = stage(RegNew(reset))
-  @api def read[T:Bits](reg: Reg[T]): T = stage(RegRead(reg))
-  @api def write[T:Bits](reg: Reg[T], data: T, en: Seq[Bit] = Nil): Void = stage(RegWrite(reg,data,en))
+  @rig def alloc[A:Bits](reset: A)(implicit ctx: SrcCtx, state: State): Reg[A] = stage(RegNew(reset.view[Bits]))
+  @rig def read[A:Bits](reg: Reg[A]): A = stage(RegRead(reg))
+  @rig def write[A:Bits](reg: Reg[A], data: A, en: Seq[Bit] = Nil): Void = stage(RegWrite(reg,data.view[Bits],en))
 }
 
 object ArgIn {
-  @api def apply[T:Bits] = stage(ArgInNew(bits[T].zero))
+  @api def apply[A:Bits]: Reg[A] = stage(ArgInNew(zero[A].view[Bits]))
 }
 
 object ArgOut {
-  @api def apply[T:Bits] = stage(ArgOutNew(bits[T].zero))
+  @api def apply[A:Bits]: Reg[A] = stage(ArgOutNew(zero[A].view[Bits]))
 }
 
 

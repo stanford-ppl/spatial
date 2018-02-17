@@ -21,7 +21,7 @@ package object pir {
       throw CompilerErrors("Staging",state.errors)
   }
 
-  @api implicit def readInput[A:Bits](x: In[A]): A = stage(ReadIn(x,bits[A]))
+  @api implicit def readInput[A:Bits](x: In[A]): A = stage(ReadIn(x))
 
   implicit class OutBitOps(out: Out[Bit]) {
     @api def ~~>(in: In[Bit]): Void = { stage(ControlBus(out,in)); void }

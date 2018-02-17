@@ -2,7 +2,7 @@ package pcc.lang.static
 
 import forge._
 import pcc.core._
-import pcc.data.domainOf
+import pcc.data.rangeOf
 
 import scala.runtime.RichInt
 
@@ -12,7 +12,7 @@ trait LowerPriorityIntegerOps {
 
 trait LowPriorityIntegerOps extends LowerPriorityIntegerOps {
   //@api implicit def intToSeries(x: Int): Series = Series.alloc(Some(I32.c(x)),I32.c(x+1),None,None,isUnit=true)
-  @api implicit def i32ToSeries(x: I32): Series = Series.alloc(Some(x),x + I32.c(1), None, None, isUnit=true)
+  @api implicit def i32ToSeries(x: I32): Series = Series.alloc(start = x, end = x + I32.c(1), isUnit=true)
 
   @api implicit def IntToI32(x: Int): I32 = I32.c(x)
 }
@@ -23,16 +23,16 @@ trait Ints extends LowPriorityIntegerOps {
   // Note: Naming is important here to override the name in Predef.scala
   // Note: Need the ctx and state at the implicit class to avoid issues with currying
   implicit class intWrapper(x: Int)(implicit ctx: SrcCtx, state: State) {
-    def until(end: I32): Series = Series.alloc(Some(I32.c(x)), end, None, None)
-    def by(step: I32): Series = Series.alloc(None,I32.c(x),Some(step),None)
-    def par(p: I32): Series = Series.alloc(None, I32.c(x), None, Some(p))
+    def until(end: I32): Series = Series.alloc(start = I32.c(x), end = end)
+    def by(step: I32): Series = Series.alloc(end = I32.c(x), step = step)
+    def par(p: I32): Series = Series.alloc(end = I32.c(x), par = p)
 
-    def until(end: Int): Series = Series.alloc(Some(I32.c(x)), I32.c(end), None, None)
-    def by(step: Int): Series = Series.alloc(None, I32.c(x), Some(I32.c(step)), None)
-    def par(p: Int): Series = Series.alloc(None, I32.c(x), None, Some(I32.c(p)))
+    def until(end: Int): Series = Series.alloc(start = I32.c(x), end = I32.c(end))
+    def by(step: Int): Series = Series.alloc(end = I32.c(x), step = I32.c(step))
+    def par(p: Int): Series = Series.alloc(end = I32.c(x), par = I32.c(p))
 
-    def ::(start: I32): Series = Series.alloc(Some(start), I32.c(x), None, None)
-    def ::(start: Int): Series = Series.alloc(Some(I32.c(start)), I32.c(x), None, None)
+    def ::(start: I32): Series = Series.alloc(start = start, end = I32.c(x))
+    def ::(start: Int): Series = Series.alloc(start = I32.c(start), end = I32.c(x))
 
     /**
       * Creates a parameter with this value as the default, and the given range with a stride of 1.
@@ -53,9 +53,9 @@ trait Ints extends LowPriorityIntegerOps {
     //def to[B:Type](implicit cast: Cast[Int,B]): B = cast(x)
   }
 
-  @internal def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
+  @rig def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
     val p = I32.p(default)
-    domainOf(p) = (start, stride, end)
+    rangeOf(p) = (start, stride, end)
     p
   }
 

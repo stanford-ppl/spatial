@@ -2,6 +2,7 @@ package pcc.test
 
 import pcc.lang._
 import pcc.lang.pir._
+import utest._
 
 object PIR_LSTM extends Test {
   override val isPIR = true
@@ -220,7 +221,7 @@ object PIR_GEMM extends Test {
   }
 }
 
-class PIRTests extends Tests {
-  "PIR_GEMM" should "compile" in { test(PIR_GEMM) }
-  "PIR_LSTM" should "compile" in { test(PIR_LSTM) }
-}
+object PIRTests extends Testbench { val tests = Tests {
+  'PIR_GEMM - test(PIR_GEMM)
+  'PIR_LSTM - test(PIR_LSTM)
+}}

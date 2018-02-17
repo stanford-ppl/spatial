@@ -3,65 +3,22 @@ package pcc.lang
 import forge._
 import pcc.core._
 import pcc.node._
+import pcc.util.Invert._
 
 object Math {
-  @api def min[A:Num](a: A, b: A): A = a match {
-    case x: Fix[_] => stage(FixMin(a,b)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltMin(a,b)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"min is not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
-  }
-  @api def max[A:Num](a: A, b: A): A = a match {
-    case x: Fix[_] => stage(FixMax(a,b)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltMax(a,b)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"max is not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
+  @api def mux[A:Bits](s: Bit, a: A, b: A): A = stage(Mux(s,a.view[Bits],b.view[Bits]))
+
+  @api def sum[T:Num](xs: T*): T = if (xs.isEmpty) tnum[T].zero else reduce(xs:_*){_+_}
+  @api def product[T:Num](xs: T*): T = if (xs.isEmpty) tnum[T].one else reduce(xs:_*){_*_}
+
+  @api def reduce[T](xs: T*)(reduce: (T,T) => T): T = reduceTreeLevel(xs, reduce).head
+
+  @rig private def reduceTreeLevel[T](xs: Seq[T], reduce: (T,T) => T): Seq[T] = xs.length match {
+    case 0 => throw new Exception("Empty reduction level")
+    case 1 => xs
+    case len if len % 2 == 0 => reduceTreeLevel(List.tabulate(len/2){i => reduce( xs(2*i), xs(2*i+1)) }, reduce)
+    case len => reduceTreeLevel(List.tabulate(len/2){i => reduce( xs(2*i), xs(2*i+1)) } :+ xs.last, reduce)
   }
 
-  @api def sigmoid[A:Num](a: A): A = a match {
-    case x: Fix[_] => stage(FixSig(a)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltSig(a)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"sigmoid not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
-  }
-  @api def exp[A:Num](a: A): A = a match {
-    case x: Fix[_] => stage(FixExp(a)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltExp(a)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"exp not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
-  }
-  @api def log[A:Num](a: A): A = a match {
-    case x: Fix[_] => stage(FixLog(a)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltLog(a)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"log not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
-  }
-  @api def sqrt[A:Num](a: A): A = a match {
-    case x: Fix[_] => stage(FixSqt(a)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltSqt(a)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"sqrt not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
-  }
-  @api def abs[A:Num](a: A): A = a match {
-    case x: Fix[_] => stage(FixAbs(a)(x.asType[Fix[A]]))
-    case x: Flt[_] => stage(FltAbs(a)(x.asType[Flt[A]]))
-    case _ =>
-      error(ctx, s"abs not defined for inputs of type ${num[A].typeName}")
-      error(ctx)
-      bound[A]
-  }
 
-  @api def mux[A:Bits](s: Bit, a: A, b: A): A = stage(Mux(s,a,b))
 }

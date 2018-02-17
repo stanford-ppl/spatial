@@ -26,7 +26,6 @@ class State {
   var defCache: Map[Op[_], Sym[_]] = Map.empty
 
   /** Graph Metadata **/
-  val metadata:  GraphMetadata = new GraphMetadata
   val globals: GlobalMetadata = new GlobalMetadata
 
   /** Compiler passes **/
@@ -62,6 +61,10 @@ class State {
   def hadBugs: Boolean = bugs > 0
   def logBug(): Unit = { bugs += 1 }
 
+  /** Back-edges **/
+  var issues: Set[Issue] = Set.empty
+  def hasIssues: Boolean = issues.nonEmpty
+
   def reset(): Unit = {
     config.reset()
     id = -1
@@ -70,7 +73,6 @@ class State {
     deepAliasCache.clear()
     aliasCache.clear()
     defCache = Map.empty
-    metadata.reset()
     globals.reset()
     pass = 1
     logTab = 0
@@ -82,6 +84,7 @@ class State {
     warnings = 0
     errors = 0
     bugs = 0
+    issues = Set.empty
   }
 
   def copyTo(target: State): Unit = {
@@ -92,7 +95,6 @@ class State {
     target.deepAliasCache ++= this.deepAliasCache
     target.aliasCache ++= this.aliasCache
     target.defCache = this.defCache
-    metadata.copyTo(target.metadata)
     globals.copyTo(target.globals)
     target.pass = this.pass
     target.logTab = this.logTab

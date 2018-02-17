@@ -6,15 +6,15 @@ import pcc.core._
 import pcc.node._
 import pcc.lang.memories.SRAM
 import pcc.lang.Void
-import pcc.lang.pir.{In, Out}
-import pcc.node.pir.{Lanes, VPCU, VPMU}
+import pcc.lang.pir.{In, Out, Lanes}
+import pcc.node.pir.{VPCU, VPMU}
 
 import scala.language.implicitConversions
 import scala.collection.mutable.{ListBuffer, Map, Set}
 
 case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   override val name: String = "IR Dot Printer"
-  override def filename: String = s"IRGraph.${ext}"
+  override def filename: String = s"IRGraph.$ext"
   override def ext = s"dot.$lang"
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
@@ -33,9 +33,6 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
             .color(black)
             .fill(white)
             .labelfontcolor(black)
-
-  def getNodeName(sym: Sym[_]) = sym.op.map(o => o.productPrefix).getOrElse(sym.typeName) + s"_x${sym.id}"
-  def getBlockName[R](block: Block[R]) = "cluster_" + getNodeName(block.result)
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
     val subgraphAttr = DotAttr().style(filled)
@@ -105,7 +102,7 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   }
 
   override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    println(s"[IRDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
+    dbgs(s"[IRDotCodegen] visit $lhs, $rhs, binds: ${rhs.binds}")
 
     if (needsSubgraph(rhs)) {
       emitSubgraph(getSubgraphAttr(lhs, rhs)) { visitCommon(lhs, rhs) }

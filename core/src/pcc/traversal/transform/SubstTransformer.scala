@@ -28,12 +28,12 @@ abstract class SubstTransformer extends Transformer {
     */
   def register[A,B](orig: A, sub: B, unsafe: Boolean = allowUnsafeSubst): Unit = (orig,sub) match {
     case (s1: Sym[_], s2: Sym[_]) =>
-      if (s2 <:< s1 || unsafe) subst += s1 -> s2
-      else throw new Exception(s"Substitution $s1 -> $s2: ${s2.typeName} is not a subtype of ${s1.typeName}")
+      if (s2.tp <:< s1.tp || unsafe) subst += s1 -> s2
+      else throw new Exception(s"Substitution $s1 -> $s2: ${s2.tp} is not a subtype of ${s1.tp}")
 
     case (b1: Block[_], b2: Block[_]) =>
-      if (b2.result <:< b1.result || unsafe) blockSubst += b1 -> b2
-      else throw new Exception(s"Substitution $b1 -> $b2: ${b2.result.typeName} is not a subtype of ${b1.result.typeName}")
+      if (b2.result.tp <:< b1.result.tp || unsafe) blockSubst += b1 -> b2
+      else throw new Exception(s"Substitution $b1 -> $b2: ${b2.result.tp} is not a subtype of ${b1.result.tp}")
 
     case _ => throw new Exception(s"Cannot register ${orig.getClass}, ${sub.getClass}")
   }

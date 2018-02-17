@@ -1,17 +1,19 @@
 package pcc.test
 
 import pcc.lang._
-import org.scalatest.{FlatSpec, Matchers}
 import pcc.compiler
+import utest._
 
 abstract class Test extends compiler.App {
   override protected val testbench = true
 }
 
 
-abstract class Tests extends FlatSpec with Matchers {
+abstract class Testbench extends TestSuite {
   type Fail = pcc.core.TestbenchFailure
-  val args = Array("--vv")
+  val defaultArgs = Array("-vv")
 
-  def test(x: compiler.App, args: Array[String] = args): Unit = x.main(args)
+  def test(x: compiler.App, args: Array[String] = defaultArgs) = {
+    x.main(args)
+  }
 }

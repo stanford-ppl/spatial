@@ -6,10 +6,12 @@ import pcc.util.Freq._
 import Filters._
 import pcc.traversal.transform.Transformer
 
-abstract class Op[T:Sym] extends Product with Serializable {
+import scala.annotation.unchecked.uncheckedVariance
+
+abstract class Op[+R:Type] extends Product with Serializable {
   final type Tx = Transformer
 
-  def tR: Sym[T] = implicitly[Sym[T]]
+  def tR: Type[R @ uncheckedVariance] = implicitly[Type[R]]
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies **/
   // Inputs: symbol dataflow dependencies for this Def.
@@ -40,7 +42,7 @@ abstract class Op[T:Sym] extends Product with Serializable {
   // Aliases: inputs to this Def which *may* equal to the output of this Def
   // E.g. y = if (cond) a else b: aliases should return a and b
   // Default: All inputs which have the same type as an output
-  def aliases: Seq[Sym[_]] = inputs.collect{case s if s <:> tR => s}
+  def aliases: Seq[Sym[_]] = inputs.collect{case s if s.tp <:> tR => s}
 
   // Contains: inputs which may be returned when dereferencing the output of this Def
   // E.g. y = Array(x): contains should return x
@@ -61,7 +63,7 @@ abstract class Op[T:Sym] extends Product with Serializable {
   /** Effects **/
   def effects: Effects = blocks.map(_.effects).fold(Effects.Pure){(a,b) => a andAlso b }
 
-  def mirror(f:Tx): Op[T] = throw new Exception(s"Use @op annotation or override mirror method for node class $productPrefix")
+  def mirror(f:Tx): Op[R] = throw new Exception(s"Use @op annotation or override mirror method for node class $productPrefix")
   def update(f:Tx): Unit  = throw new Exception(s"Use @op annotation or override update method for node class $productPrefix")
 }
 

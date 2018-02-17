@@ -1,1 +1,1 @@
-name := "pcc-core"
+name := "nova-core"

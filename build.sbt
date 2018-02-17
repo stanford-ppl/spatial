@@ -1,14 +1,14 @@
-val pcc_version = "1.0"
+val nova_version = "1.0"
 val scala_version     = "2.12.4"
 val paradise_version  = "2.1.0"
 
-name := "pcc"
+name := "nova"
 scalaVersion := scala_version
-version := pcc_version
+version := nova_version
 
 val common = Seq(
   scalaVersion := scala_version,
-  version := pcc_version,
+  version := nova_version,
   nativeLinkStubs := true,
 
   /** External Libraries (e.g. maven dependencies) **/
@@ -53,7 +53,8 @@ val common = Seq(
 
 
 /** Projects **/
+lazy val emul  = project.settings(common)
 lazy val forge = project.settings(common)
-lazy val core  = project.settings(common).dependsOn(forge)
+lazy val core  = project.settings(common).dependsOn(forge, emul)
 
 addCommandAlias("make", "compile")

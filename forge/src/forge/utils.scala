@@ -1,148 +1,56 @@
 package forge
 
-import scala.reflect.macros.blackbox
-import scala.language.experimental.macros
+import implicits.collections._
 
-case class utils[Ctx <: blackbox.Context](ctx: Ctx) {
-  import ctx.universe._
+/** Miscellaneous Utilities **/
+object utils {
 
-  // Fix for bug where <caseaccessor> gets added to (private) implicit fields
-  def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
-    case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
-      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR)
-      ValDef(flags, name, tp, rhs)
-    case v => v
+  /**
+    * Returns an iterator over the multi-dimensional space `dims`.
+    * If dims is empty, trivially returns an iterator with only one element (Nil)
+    */
+  def multiLoop(dims: Seq[Int]): Iterator[Seq[Int]] = {
+    val ndims = dims.length
+    val prods = List.tabulate(ndims) { i => dims.slice(i + 1, ndims).product }
+    val total = dims.product
+    (0 until total).iterator.map{x => Seq.tabulate(ndims){d => (x / prods(d)) % dims(d) } }
+  }
+  def multiLoopWithIndex(dims: Seq[Int]): Iterator[(Seq[Int],Int)] = multiLoop(dims).zipWithIndex
+
+  def escapeString(raw: String): String = "\"" + raw.flatMap(escapeChar) + "\""
+  def escapeChar(raw: Char): String = raw match {
+    case '\b' => "\\b"
+    case '\t' => "\\t"
+    case '\n' => "\\n"
+    case '\f' => "\\f"
+    case '\r' => "\\r"
+    case '"'  => "\\\""
+    case '\'' => "\\\'"
+    case '\\' => "\\\\"
+    case c    if c.isControl => "\\0" + Integer.toOctalString(c.toInt)
+    case c    => String.valueOf(c)
   }
 
-  def makeTypeName(tp: TypeDef): Tree = {
-    val TypeDef(_,TypeName(name),targs,_) = tp
-    makeType(name, targs)
+  def plural(x: Int, sing: String): String = if (x == 1) sing else sing+"s"
+  def plural(x: Int, sing: String, plur: String): String = if (x == 1) sing else plur
+  def conj(xs: Seq[String]): String = {
+    if (xs.isEmpty) ""
+    else if (xs.lengthIs(1)) xs.head
+    else if (xs.lengthIs(2)) xs.head + " and " + xs.last
+    else xs.dropRight(1).mkString(", ") + ", and " + xs.last
   }
 
-  def makeType(name: String, targs: List[TypeDef]): Tree = {
-    val init = Ident(TypeName(name))
-    if (targs.isEmpty) init else AppliedTypeTree(init, targs.map(makeTypeName))
+  def escapeConst(x: Any): String = x match {
+    case c: String => escapeString(c)
+    case c: Char => escapeChar(c)
+    case c => c.toString
   }
 
-  def makeDefCall(name: String, targs: List[TypeDef], argss: List[List[Tree]]): Tree = {
-    val call = Ident(TermName(name))
-    val fullCall = if (targs.isEmpty) call else {
-      TypeApply(call, targs.map(makeTypeName))
-    }
-    argss.foldLeft(fullCall){(call,args) => Apply(call,args) }
+  def getStackTrace(start: Int, end: Int): String = {
+    val curThread = Thread.currentThread()
+    val trace = curThread.getStackTrace
+    trace.slice(start,end).map("" + _).mkString("\n")
   }
 
-  def makeType(name: String): Tree = makeType(name, Nil)
-
-  def injectClassMethod(
-    cls: ClassDef,
-    errorIfExists: Boolean,
-    method: (String, Tree) => Tree
-  ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,_)) = cls
-    val (fieldsX, methods) = cls.fieldsAndMethods
-
-    val fields = fieldsFix(fieldsX)
-    val body = fields ++ methods
-
-    val fieldNames = fields.map(_.name)
-    val methodNames = methods.map(_.name)
-    val names = fieldNames ++ methodNames
-    val tp = makeType(name,tparams)
-    val newMethod = method(name,tp)
-
-    val methodName = newMethod match {
-      case d: DefDef => d.name
-      case _ =>
-        ctx.abort(ctx.enclosingPosition, "Inject method did not return a def.")
-    }
-    if (!names.contains(methodName)) {
-      ClassDef(mods,TypeName(name),tparams,Template(parents,self,body :+ newMethod))
-    }
-    else if (errorIfExists) {
-      ctx.error(ctx.enclosingPosition, s"Could not inject method $methodName to class - method already defined")
-      cls
-    }
-    else cls
-  }
-
-  def isWildcardType(tp: Tree, str: String): Boolean = tp match {
-    case ExistentialTypeTree(AppliedTypeTree(Ident(TypeName(`str`)), List(Ident(TypeName(arg)))), _) => arg.startsWith("_$")
-    case _ => false
-  }
-
-  def modifyClassFields(
-    cls: ClassDef,
-    func: ValDef => ValDef
-  ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,_)) = cls
-    val (fieldsX,methods) = cls.fieldsAndMethods
-    val fields = fieldsFix(fieldsX)
-    val fields2 = fields.map(func)
-    val body2 = fields2 ++ methods
-    ClassDef(mods,TypeName(name),tparams,Template(parents,self,body2))
-  }
-
-  implicit class ValDefOps(v: ValDef) {
-    def tp: Option[Tree] = {
-      val ValDef(_,_,tp,_) = v
-      if (tp == EmptyTree) None else Some(tp)
-    }
-    def asVar: ValDef = {
-      val ValDef(mods,name,tp,rhs) = v
-      ValDef(Modifiers(mods.flags | Flag.MUTABLE),name,tp,rhs)
-    }
-  }
-
-  implicit class DefDefOps(df: DefDef) {
-    def paramss: List[List[ValDef]] = {
-      val DefDef(_,_,_,pss,_,_) = df
-      pss
-    }
-  }
-
-  implicit class ClassOps(cls: ClassDef) {
-    val ClassDef(mods,TypeName(nameStr),tparams, impl @ Template(parents,selfType,body)) = cls
-
-    def injectMethod(method: (String, Tree) => Tree): ClassDef = {
-      injectClassMethod(cls, errorIfExists = false, method)
-    }
-//    def optionalInjectMethod(method: (String,Tree) => Tree): ClassDef = {
-//      injectClassMethod(cls, errorIfExists = false, method)
-//    }
-
-    def fieldsAndMethods: (List[ValDef],List[DefDef]) = {
-      val fields  = body.collect{case x: ValDef => x }
-      val methods = body.collect{case x: DefDef => x }
-      (fields,methods)
-    }
-
-    def fields: List[ValDef]  = fieldsAndMethods._1
-    def methods: List[DefDef] = fieldsAndMethods._2
-
-    def modifyFields(func: ValDef => ValDef): ClassDef = {
-      modifyClassFields(cls,func)
-    }
-    def withVarParams: ClassDef = {
-      val params = constructorArgs.head.map(_.name)
-      cls.modifyFields{
-        case field if params.contains(field.name) => field.asVar
-        case field => field
-      }
-    }
-
-    def typeArgs: List[Tree] = tparams.map{tp => Ident(tp.name)}
-
-    def constructor: Option[DefDef] = methods.find{_.name == termNames.CONSTRUCTOR}
-    def constructorArgs: List[List[ValDef]] = constructor.map{d =>  d.paramss }.getOrElse(Nil)
-
-    def callConstructor(args: Tree*): Tree = {
-      makeDefCall(nameStr,tparams,List(args.toList))
-    }
-
-    def asCaseClass: ClassDef = {
-      ClassDef(Modifiers(mods.flags | Flag.CASE),cls.name,tparams,impl)
-    }
-  }
-
+  def getStackTrace: String = getStackTrace(1, 5)
 }

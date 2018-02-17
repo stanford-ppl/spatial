@@ -1,6 +1,6 @@
-all: pcc
+all: nova
 
-pcc:
+nova:
 	bash bin/make-isl.sh	
 	sbt compile
 

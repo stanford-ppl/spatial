@@ -1,13 +1,23 @@
 package forge.tags
 
-import forge.utils.conj
+import forge.util.conj
 import forge.implicits.collections._
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
+private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
   import __c.universe._
+
+  def methodCall(recOpt: Option[Tree], methName: String, args: List[List[Tree]], targs: List[Tree] = Nil): Tree = {
+    val calleeName = TermName(methName)
+    val callee = recOpt match {
+      case Some(rec) => Select(rec, calleeName)
+      case None      => Ident(calleeName)
+    }
+    val calleeAndTargs: Tree = typeApply(callee, targs)
+    args.foldLeft(calleeAndTargs) { Apply(_, _) }
+  }
 
   // Fix for bug where <caseaccessor> gets added to (private) implicit fields
   def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
@@ -19,12 +29,14 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
 
   def makeTypeName(tp: TypeDef): Tree = {
     val TypeDef(_,TypeName(name),targs,_) = tp
-    makeType(name, targs)
+    typeApply(name, targs)
   }
-
-  def makeType(name: String, targs: List[TypeDef]): Tree = {
+  def typeApply(select: Tree, targs: List[Tree]): Tree = {
+    if (targs.isEmpty) select else TypeApply(select,targs)
+  }
+  def typeApply(name: String, targs: List[TypeDef]): Tree = {
     val init = Ident(TypeName(name))
-    if (targs.isEmpty) init else AppliedTypeTree(init, targs.map(makeTypeName))
+    typeApply(init, targs)
   }
 
   def makeDefCall(name: String, targs: List[TypeDef], argss: List[List[Tree]]): Tree = {
@@ -35,7 +47,7 @@ private[forge] case class MacroUtils[Ctx <: blackbox.Context](__c: Ctx) {
     argss.foldLeft(fullCall){(call,args) => Apply(call,args) }
   }
 
-  def makeType(name: String): Tree = makeType(name, Nil)
+  def makeType(name: String): Tree = typeApply(name, Nil)
 
   def isWildcardType(tp: Tree, str: String): Boolean = tp match {
     case ExistentialTypeTree(AppliedTypeTree(Ident(TypeName(`str`)), List(Ident(TypeName(arg)))), _) => arg.startsWith("_$")

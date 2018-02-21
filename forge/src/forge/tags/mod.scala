@@ -13,7 +13,7 @@ final class mod extends StaticAnnotation {
 }
 object mod {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val util = MacroUtils[c.type](c)
+    val util = new MacroUtils[c.type](c)
     import c.universe._
     import util._
 
@@ -24,11 +24,11 @@ object mod {
         cls.asCaseClass.injectMethod(q"final override def names = Seq(..$names)")
 
       case t =>
-        __c.error(__c.enclosingPosition, "@mod annotation can only be used on classes.")
+        c.error(c.enclosingPosition, "@mod annotation can only be used on classes.")
         t
     }
 
-    __c.info(__c.enclosingPosition, showCode(tree), force = true)
+    c.info(c.enclosingPosition, showCode(tree), force = true)
     tree
   }
 }

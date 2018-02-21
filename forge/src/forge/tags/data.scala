@@ -10,7 +10,7 @@ final class data extends StaticAnnotation {
 
 object data {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val utils = MacroUtils(c)
+    val utils = new MacroUtils(c)
     import utils._
     import c.universe._
     annottees.head match {

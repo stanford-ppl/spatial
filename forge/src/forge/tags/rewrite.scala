@@ -10,25 +10,25 @@ final class rewrite extends StaticAnnotation {
 
 object rewrite {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val util = MacroUtils[c.type](c)
+    val util = new MacroUtils[c.type](c)
     import c.universe._
     import util._
 
     annottees.head match {
       case _:DefDef =>
-      case _ => __c.error(__c.enclosingPosition, "@rewrite can only be used on defs")
+      case _ => c.error(c.enclosingPosition, "@rewrite can only be used on defs")
     }
     def incorrectSignature(): Unit = {
-      __c.error(__c.enclosingPosition, "@rewrite def must have signature 'def name(rhs: T): Unit")
+      c.error(c.enclosingPosition, "@rewrite def must have signature 'def name(rhs: T): Unit")
     }
     def noImplicitsAllowed(): Unit = {
-      __c.error(__c.enclosingPosition, "@rewrite def cannot have implicit parameters")
+      c.error(c.enclosingPosition, "@rewrite def cannot have implicit parameters")
     }
     def noTypeParametersAllowed(): Unit = {
-      __c.error(__c.enclosingPosition, "@rewrite def cannot have type parameters")
+      c.error(c.enclosingPosition, "@rewrite def cannot have type parameters")
     }
 
-    val tree = api.impl(__c)(annottees:_*) match {
+    val tree = api.impl(c)(annottees:_*) match {
       case d: DefDef =>
         val paramss = d.paramss
         if (paramss.length != 2) incorrectSignature()
@@ -40,7 +40,7 @@ object rewrite {
         val name = Literal(Constant(d.name.toString))
         d.rhs match {
           case Match(_,_) =>
-          case _ => __c.error(__c.enclosingPosition, "@rewrite rule must be a partial function")
+          case _ => c.error(c.enclosingPosition, "@rewrite rule must be a partial function")
         }
 
         // TODO: Where to get implicit parameters from?
@@ -55,12 +55,12 @@ object rewrite {
           """
         val add =
           q"""
-             nova.core.rewrites.add($name,${d.name})
+             core.rewrites.add($name,${d.name})
            """
         q"$pf; $add"
 
       case t =>
-        __c.error(__c.enclosingPosition, "@rewrite can only be used on defs")
+        c.error(c.enclosingPosition, "@rewrite can only be used on defs")
         t
     }
     //c.info(c.enclosingPosition, showCode(tree), force = true)

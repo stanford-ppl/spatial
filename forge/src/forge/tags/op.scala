@@ -10,7 +10,7 @@ final class op extends StaticAnnotation {
 
 object op {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val util = MacroUtils[c.type](c)
+    val util = new MacroUtils[c.type](c)
     import c.universe._
     import util._
 
@@ -27,7 +27,7 @@ object op {
            .injectMethod(q"override def update(f:Tx) = { ..$updates }")
 
       case t =>
-        __c.error(__c.enclosingPosition, "@op can only be used on class definitions")
+        c.error(c.enclosingPosition, "@op can only be used on class definitions")
         t
     }
     //c.info(c.enclosingPosition, showCode(tree), force = true)

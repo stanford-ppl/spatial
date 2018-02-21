@@ -3,7 +3,7 @@ val scala_version     = "2.12.4" //"2.13.0-M3"
 val paradise_version  = "2.1.0"
 
 
-name := "nova"
+name := "novac"
 scalaVersion := scala_version
 version := nova_version
 
@@ -56,8 +56,10 @@ val common = Seq(
 
 
 /** Projects **/
-lazy val emul  = project.settings(common)
-lazy val forge = project.settings(common)
-lazy val core  = project.settings(common).dependsOn(forge, emul)
+lazy val emul    = project.settings(common)
+lazy val forge   = project.settings(common)
+lazy val core    = project.settings(common).dependsOn(forge)
+lazy val nova    = project.settings(common).dependsOn(forge, emul, core)
+lazy val novac   = (project in file(".")).settings(common).dependsOn(nova)
 
 addCommandAlias("make", "compile")

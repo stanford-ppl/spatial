@@ -13,11 +13,11 @@ final class stateful extends StaticAnnotation {
 
 private[forge] object stateful {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val util = MacroUtils[c.type](c)
+    val util = new MacroUtils[c.type](c)
     import util._
     import c.universe._
 
-    def injectState(df: DefDef) = df.injectImplicit("state", tq"nova.core.State", tq"State")
+    def injectState(df: DefDef) = df.injectImplicit("state", tq"core.State", tq"State")
 
     val tree = annottees.head match {
       case df: DefDef    => injectState(df)

@@ -10,19 +10,19 @@ final class flow extends StaticAnnotation {
 
 object flow {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val util = MacroUtils[c.type](c)
+    val util = new MacroUtils[c.type](c)
     import c.universe._
     import util._
 
     annottees.head match {
       case _:DefDef =>
-      case _ => __c.error(__c.enclosingPosition, "@flow can only be used on defs")
+      case _ => c.error(c.enclosingPosition, "@flow can only be used on defs")
     }
     def incorrectSignature(): Unit = {
-      __c.error(__c.enclosingPosition, "@flow def must have signature 'def name(lhs: Sym[_], rhs: Op[_]): Unit")
+      c.error(c.enclosingPosition, "@flow def must have signature 'def name(lhs: Sym[_], rhs: Op[_]): Unit")
     }
 
-    val tree = api.impl(__c)(annottees:_*) match {
+    val tree = api.impl(c)(annottees:_*) match {
       case d: DefDef =>
         val paramss = d.paramss
         if (paramss.length != 2) incorrectSignature()
@@ -46,7 +46,7 @@ object flow {
           """
         val add =
           q"""
-             nova.core.flows.add($name,${d.name})
+             core.flows.add($name,${d.name})
            """
         q"$pf; $add"
 

@@ -14,7 +14,7 @@ final class api extends StaticAnnotation {
 
 private[forge] object api {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val utils = MacroUtils[c.type](c)
+    val utils = new MacroUtils[c.type](c)
     import utils._
     import c.universe._
 

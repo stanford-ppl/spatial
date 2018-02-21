@@ -10,7 +10,7 @@ final class ctx extends StaticAnnotation {
 
 private[forge] object ctx {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
-    val util = MacroUtils[c.type](c)
+    val util = new MacroUtils[c.type](c)
     import util._
     import c.universe._
 

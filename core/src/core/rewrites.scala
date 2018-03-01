@@ -26,7 +26,7 @@ object rewrites {
     val tuple = (op,ctx,state)
     if (pf.isDefinedAt(tuple)) {
       pf.apply(tuple) match {
-        case Some(s) if s.tp <:< typ[A] => Some(s.asInstanceOf[A])
+        case Some(s) if s.tp <:< Type[A] => Some(s.asInstanceOf[A])
         case _ => None
       }
     }

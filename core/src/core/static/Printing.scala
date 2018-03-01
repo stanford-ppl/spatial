@@ -1,4 +1,5 @@
-package core.static
+package core
+package static
 
 import forge.tags._
 import forge.util.escapeConst
@@ -8,7 +9,7 @@ import forge.io.stream.createStream
 
 import java.io.PrintStream
 
-class Printing {
+trait Printing {
   def ctx(implicit localCtx: SrcCtx): SrcCtx = localCtx
   def state(implicit localState: State): State = localState
   def config(implicit localState: State): Config = localState.config
@@ -78,11 +79,12 @@ class Printing {
   @stateful def logs(x: => Any): Unit = if (config.enLog) state.log.println("  "*state.logTab + x)
 
   def stm(lhs: Sym[_]): String = lhs.rhs match {
-    case Def.TypeRef     => s"$lhs"
     case Def.Bound(id)   => s"b$id"
     case Def.Const(c)    => s"${escapeConst(c)}"
     case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
     case Def.Node(id,op) => s"x$id = $op"
+    case Def.Error(id)   => s"e$id <error>"
+    case Def.TypeRef     => lhs.tp.typeName
   }
 
   @stateful def setupStream(dir: String, filename: String): String = {
@@ -166,7 +168,7 @@ class Printing {
       dbgs(s" - Aliases: $aliases")
     }
     dbgs(s" - Type: ${lhs.tp}")
-    dbgs(s" - SrcCtx: ${lhs.ctx}")
+    dbgs(s" - SrcCtx: ${lhs.src}")
     metadata.all(lhs).foreach{case (k,m) => dbgss(s" - $k: $m") }
   }
 }

@@ -45,7 +45,7 @@ trait Traversal extends Pass { self =>
     case _ => // Do nothing
   }
 
-  protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
+  protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     if (recurse == Default) rhs.blocks.foreach{blk => visitBlock(blk) }
   }
 

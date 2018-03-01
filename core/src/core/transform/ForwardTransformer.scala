@@ -2,7 +2,6 @@ package core
 package transform
 
 import core.passes.Traversal
-import core.implicits.mtypes._
 
 abstract class ForwardTransformer extends SubstTransformer with Traversal {
   override val recurse = Recurse.Never
@@ -72,8 +71,10 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     inlineBlockWith(block){stms => stms.foreach(visit); f(block.result) }
   }
 
-  final override protected def visit(lhs: Sym[_], rhs: Op[_]): Unit = {
-    createSubstRule(lhs.asInstanceOf[Sym[Any]], rhs.asInstanceOf[Op[Any]])(lhs.mtp, lhs.ctx)
+  final override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
+    implicit val ctx: SrcCtx = lhs.src
+    implicit val typ: Type[A] = lhs.tp
+    createSubstRule(lhs, rhs)
   }
 
   final override protected def visitBlock[R](block: Block[R]): Block[R] = {

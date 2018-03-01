@@ -1,0 +1,3 @@
+package forge
+
+trait AppState

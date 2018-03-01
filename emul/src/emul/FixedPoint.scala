@@ -136,6 +136,7 @@ object FixedPoint {
   def fromInt(x: Int): FixedPoint = FixedPoint(x, FixFormat(true,32,0))
   def fromLong(x: Long): FixedPoint = FixedPoint(x, FixFormat(true,64,0))
 
+  def apply(x: Boolean, fmt: FixFormat): FixedPoint = FixedPoint(if (x) 1 else 0,fmt)
   def apply(x: Byte, fmt: FixFormat): FixedPoint = FixedPoint.clamped(BigInt(x) << fmt.fbits, valid=true, fmt)
   def apply(x: Short, fmt: FixFormat): FixedPoint = FixedPoint.clamped(BigInt(x) << fmt.fbits, valid=true, fmt)
   def apply(x: Int, fmt: FixFormat): FixedPoint = FixedPoint.clamped(BigInt(x) << fmt.fbits, valid=true, fmt)

@@ -7,10 +7,10 @@ import core.transform.Transformer
 
 import scala.annotation.unchecked.uncheckedVariance
 
-abstract class Op[+R:Type] extends Product with Serializable {
+abstract class Op[+R:Type] extends Serializable with Product {
   final type Tx = Transformer
 
-  def tR: Type[R @ uncheckedVariance] = implicitly[Type[R]]
+  def tR: Type[R @ uncheckedVariance] = Type[R]
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies **/
   // Inputs: symbol dataflow dependencies for this Def.
@@ -35,13 +35,13 @@ abstract class Op[+R:Type] extends Product with Serializable {
   // All dependents of bound syms up until but not including the binding Def make up the majority of a scope
   // NOTE: Tempting to use productIterator here too, but note that Bound values can be inputs
   // Default: All effects included in all scopes associated with this Def
-  def binds: Seq[Sym[_]] = blocks.flatMap(_.effects.antideps.map(_.sym))
+  def binds: Seq[Sym[_]] = blocks.flatMap(_.effects.antiDeps.map(_.sym))
 
   /** Alias hints -- used to check/disallow unsafe mutable aliasing **/
   // Aliases: inputs to this Def which *may* equal to the output of this Def
   // E.g. y = if (cond) a else b: aliases should return a and b
   // Default: All inputs which have the same type as an output
-  def aliases: Seq[Sym[_]] = inputs.collect{case s if s.tp <:> tR => s}
+  def aliases: Seq[Sym[_]] = inputs.collect{case s if s.tp =:= tR => s}
 
   // Contains: inputs which may be returned when dereferencing the output of this Def
   // E.g. y = Array(x): contains should return x
@@ -67,9 +67,9 @@ abstract class Op[+R:Type] extends Product with Serializable {
 }
 
 object Op {
-  def unapply[A](x: Sym[A]): Option[Op[A]] = x.op
+  def unapply[A](x: Exp[_,A]): Option[Op[A]] = x.op
 }
 
 object Stm {
-  def unapply[A](x: Sym[A]): Option[(Sym[A],Op[A])] = Op.unapply(x).map{rhs => (x,rhs) }
+  def unapply[A](x: Exp[_,A]): Option[(Sym[A],Op[A])] = Op.unapply(x).map{rhs => (x,rhs) }
 }

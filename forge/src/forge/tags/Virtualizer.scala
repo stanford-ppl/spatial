@@ -9,6 +9,7 @@ import scala.reflect.macros.blackbox
   *
   * === Covered features ===
   * {{{
+  *   val x = e              =>       val x = e; __valName(x, "x")
   *   var x = e              =>       var x = __newVar(e)
   *   if (c) t else e        =>       __ifThenElse(c, t, e)
   *   return t               =>       __return(t)
@@ -48,7 +49,6 @@ import scala.reflect.macros.blackbox
   * {{{
   *   try b catch c          =>       __tryCatch(b, c, f)
   *   throw e                =>       __throw(e)
-  *   case class C { ... }   =>       ???
   *   Nothing                =>       ???
   *   Null                   =>       ???
   * }}}
@@ -83,20 +83,28 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
       // TODO: Name mangling is nice and elegant, but becomes an issue when we assume we've mangled
       // names which actually haven't been changed. Would need to come up with a solution to check to see
       // if a name's been mangled that also respects scoping (and potentially incremental compilation?)
-      /*
-      case ValDef(mods, sym, tpt, rhs) if mods.hasFlag(Flag.MUTABLE) =>
-        // Mangle Var name to make readVar calls happen explicitly
-        val s = TermName(sym+"$v")
-        // leaving it a var makes it easier to revert when custom __newVar isn't supplied
-        val v = ValDef(mods, s, tpt, liftFeature(None, "__newVar", List(rhs)))
-        val d = DefDef(mods, sym, Nil, Nil, tpt, liftFeature(None, "__readVar", List(Ident(s))))
 
-        List(v, d)
-      */
+      case ValDef(mods, term@TermName(name), tpt, rhs) if mods.hasFlag(Flag.MUTABLE) && !mods.hasFlag(Flag.PARAMACCESSOR) =>
+        tpt match {
+          case EmptyTree =>
+            __c.abort(__c.enclosingPosition, "Missing type for var declaration.")
+          case _ =>
+        }
+        // Mangle Var name to make readVar calls happen explicitly
+        val s = TermName(name+"$v")
+        val vtyp = tq"forge.VarLike[$tpt]"
+        val asgn = TermName(name+"_=")
+        // leaving it a var makes it easier to revert when custom __newVar isn't supplied
+        val v = ValDef(mods, s, vtyp, call(None, "__newVar", List(rhs)))
+        val d = DefDef(mods, term, Nil, Nil, tpt, call(None, "__readVar", List(Ident(s))))
+        val a = q"$mods def $asgn(v: $tpt) = __assign($s, v)"
+
+        //DefDef(mods, asgn, Nil, Nil, EmptyTree, call(None, "__assign", List(Ident(s))))
+        List(v, d, a)
+
       case v@ValDef(mods, term@TermName(name), _, _) if !mods.hasFlag(Flag.PARAMACCESSOR) =>
         val vdef = transform(v)
-        val regv = Apply(Ident(TermName("__valDef")), List(Ident(term), Literal(Constant(name))))
-
+        val regv = methodCall(None, "__valName", List(List(Ident(term), Literal(Constant(name)))),Nil)
         List(vdef, regv)
 
       case _ => List(transform(tree))
@@ -116,19 +124,27 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
 
           Block(stms2.dropRight(1), stms2.last)
 
+        //case sym @ Ident(TermName(name)) =>
+        //  methodCall(None, "__use", List(List(sym)), Nil)
 
         /* Variables */
-        case ValDef(mods, sym, tpt, rhs) if mods.hasFlag(Flag.MUTABLE) =>
+        //case ValDef(mods, sym, tpt, rhs) if mods.hasFlag(Flag.MUTABLE) =>
           // TODO: What about case like:
           // var x: Option[Int] = None
           // x = Some(3)
           // __newVar: Var[Option[Int]]
-          ValDef(mods, sym, tpt, call(None, "__newVar", List(rhs)))
+          //ValDef(mods, sym, tpt, call(None, "__newVar", List(rhs)))
 
-        case Assign(lhs, rhs) =>
+        //case Assign(lhs, rhs) =>
           // liftFeature(None, "__assign", List(Ident(lhs+"$v"), rhs))   // Name mangling version
 
-          call(None, "__assign", List(lhs, rhs))
+          //call(None, "__assign", List(lhs, rhs))
+
+        case Function(params,body) =>
+          val named = params.collect{case ValDef(_,term@TermName(name),_,_) =>
+            Apply(Ident(TermName("__valName")), List(Ident(term), Literal(Constant(name))))
+          }
+          Function(params, q"..$named; ${transform(body)}")
 
         // Don't rewrite +=, -=, *=, and /=. This restricts the return value to Unit
         // in the case where the compiler/DSL author chooses to use implicit classes rather
@@ -162,19 +178,16 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
           List()), Literal(Constant(()))))) if label == sym => // do while(){}
           call(None, "__doWhile", List(cond, body))
 
-        case Try(block, catches, finalizer) => {
-          __c.warning(tree.pos, "virtualization of try/catch expressions is not supported.")
+        case Try(block, catches, finalizer) =>
+          __c.warning(tree.pos, "Staging of try/catch is not supported.")
           super.transform(tree)
-        }
 
-        case Throw(expr) => {
-          __c.warning(tree.pos, "virtualization of throw expressions is not supported.")
-          super.transform(tree)
-        }
+        case Throw(expr) =>
+          call(None, "__throw", List(expr))
 
         /* Special case + for String literals */
 
-        // only virtualize `+` to `infix_+` if lhs is a String *literal* (we can't look at types!)
+        // only stage `+` to `infix_+` if lhs is a String *literal* (we can't look at types!)
         // NOFIX: this pattern does not work for: `string + unstaged + staged`
         case Apply(Select(qual @ Literal(Constant(s: String)), TermName("$plus")), List(arg)) =>
           call(None, "infix_$plus", List(qual, arg))

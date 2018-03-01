@@ -253,6 +253,7 @@ object FloatPoint {
   def fromFloat(x: Float): FloatPoint = FloatPoint(x, FloatFmt)
   def fromDouble(x: Double): FloatPoint = FloatPoint(x, DoubleFmt)
 
+  def apply(x: Boolean, fmt: FltFormat): FloatPoint = FloatPoint(if (x) 1 else 0, fmt)
   def apply(x: Byte, fmt: FltFormat): FloatPoint = FloatPoint.clamped(Value(BigDecimal(x)), valid=true, fmt)
   def apply(x: Short, fmt: FltFormat): FloatPoint = FloatPoint.clamped(Value(BigDecimal(x)), valid=true, fmt)
   def apply(x: Int, fmt: FltFormat): FloatPoint = FloatPoint.clamped(Value(BigDecimal(x)), valid=true, fmt)

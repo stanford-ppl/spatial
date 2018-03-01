@@ -1,49 +1,23 @@
-package core.static
+package core
+package static
 
 import forge.tags._
 import forge.recursive
-import forge.implicits.readable._
 import forge.implicits.collections._
 
+import scala.annotation.unchecked.{uncheckedVariance => uV}
+
 trait Staging { this: Printing =>
+  def const[A<:Sym[A]:Type](c: A#I): A = Type[A]._new(Def.Const(c))
+  def const[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Const(c))
 
-  def typ[A:Type]: Type[A] = implicitly[Type[A]]
-  def mtyp[A,B](tp: Type[A]): Type[B] = tp.asInstanceOf[Type[B]]
+  @stateful def param[A<:Sym[A]:Type](c: A#I): A = Type[A]._new(Def.Param(state.nextId(),c))
+  @stateful def param[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Param(state.nextId(),c))
 
-  def const[A<:Sym[A]:Type](c: A#I): A = {
-    val tp = typ[A]
-    constant(tp)(c.asInstanceOf[tp.I])
-  }
-  def constant[A](tp: Type[A])(c: tp.I): A = {
-    val x = tp.freshSym.asConst(c)
-    val s = tp.viewAsSym(x)
-    //logs(c"${stm(s)} [constant] [type: ${s.tp}]")
-    x
-  }
+  @stateful def err[A:Type]: A = Type[A]._new(Def.Error[A](state.nextId()))
+  @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()))
 
-  @stateful def bound[A:Type]: A = {
-    val x = typ[A].freshSym.asBound(state.nextId())
-    val s = typ[A].viewAsSym(x)
-    logs(r"${stm(s)} [bound] [type: ${s.tp}]")
-    x
-  }
-
-  @stateful def param[A<:Sym[A]:Type](c: A#I): A = {
-    val tp = typ[A]
-    parameter(tp)(c.asInstanceOf[tp.I])
-  }
-  @stateful def parameter[A](tp: Type[A])(c: tp.I): A = {
-    val x = tp.freshSym.asParam(state.nextId(), c)
-    val s = tp.viewAsSym(x)
-    logs(r"${stm(s)} [parameter] [type: ${s.tp}]")
-    x
-  }
-  @stateful def symbol[A](tp: Type[A], op: Op[A]): A = {
-    val x = tp.freshSym.asSymbol(state.nextId(), op)
-    val s = tp.viewAsSym(x)
-    logs(r"${stm(s)} [symbol] [type: ${s.tp}]")
-    x
-  }
+  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = tp._new(Def.Node(state.nextId(),op))
 
   /**
     * Correctness checks:
@@ -65,12 +39,12 @@ trait Staging { this: Printing =>
 
     if (aliases.nonEmpty) {
       error(ctx, "Illegal sharing of mutable objects: ")
-      (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
+      (aliases + sym).foreach{alias => error(s"${alias.src}:  symbol ${stm(alias)} defined here") }
     }
     if (immutables.nonEmpty) {
       error(ctx, "Illegal mutation of immutable symbols")
       immutables.foreach{s =>
-        error(s"${s.ctx}:  symbol ${stm(s)} defined here")
+        error(s"${s.src}:  symbol ${stm(s)} defined here")
         dbgs(s"${stm(s)}")
         strMeta(s)
       }
@@ -89,35 +63,37 @@ trait Staging { this: Printing =>
 
       def stageEffects(addToCache: Boolean): R = {
         val lhs = symbol()
-        val sym = op.tR.viewAsSym(lhs)
+        val sym = op.tR.boxed(lhs)
 
         checkAliases(sym,effects)
         runFlows(sym,op)
 
-        state.scope +:= sym // prepend
+        state.scope :+= sym // Append (effective constant time for Vector)
         if (!effects.isPure) state.impure +:= Impure(sym,effects)
         if (effects != Effects.Pure) effectsOf(sym) = effects
         if (mayCSE) state.cache += op -> sym
         lhs
       }
-      state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {
+      state.cache.get(op).filter{s => mayCSE && effectsOf(s) == effects} match {
         case Some(s) if s.tp <:< op.tR => s.asInstanceOf[R]
         case None => stageEffects(addToCache = mayCSE)
       }
   }
 
-  @rig def restage[T](sym: Sym[T]): Sym[T] = sym match {
-    case Op(rhs) => sym.tp.viewAsSym(register(rhs, () => sym.asInstanceOf[T]))
+  @rig def restage[R](sym: Sym[R]): Sym[R] = sym match {
+    case Op(rhs) =>
+      val lhs: R = register[R](rhs, () => sym.unbox)
+      sym.tp.boxed(lhs)
     case _ => sym
   }
-  @rig def stage[T](op: Op[T]): T = {
+  @rig def stage[R](op: Op[R]): R = {
     logs(s"Staging $op with type evidence ${op.tR}")
     val t = register(op, () => symbol(op.tR,op))
-    op.tR.viewAsSym(t).ctx = ctx
+    op.tR.boxed(t).src = ctx
     t
   }
 
-
+  // TODO: Performance bottleneck here
   private def aliasSyms(a: Any): Set[Sym[_]]   = recursive.collectSets{case s: Sym[_] => Set(s) case d: Op[_] => d.aliases }(a)
   private def containSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.contains}(a)
   private def extractSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.extracts}(a)
@@ -189,6 +165,6 @@ trait Staging { this: Printing =>
 
     val effects = if (mIns.isEmpty) d.effects else d.effects andAlso Effects.Reads(mIns)
     val deps = effectDependencies(effects)
-    effects.copy(antideps = deps)
+    effects.copy(antiDeps = deps)
   }
 }

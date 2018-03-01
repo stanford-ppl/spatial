@@ -35,7 +35,7 @@ abstract class MutateTransformer extends ForwardTransformer {
     * TODO: This has a small inefficiency where metadata created through flows is immediately mirrored
     */
   def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
-    implicit val ctx: SrcCtx = lhs.ctx
+    implicit val ctx: SrcCtx = lhs.src
     //logs(s"$lhs = $rhs [Update]")
     try {
       rhs.update(f)

@@ -38,30 +38,31 @@ trait EmbeddedControls {
   // currently a bug precluding the use of "by-name" parameters in
   // macros (See [[https://issues.scala-lang.org/browse/SI-5778]]).
 
-  // Control structures
+  /** Val definitions **/
+  // TODO: Way to have this not conflict with staged variable creation?
+  def __newVar[T](init: T): VarLike[T] = new forge.Ptr[T](init)
+  def __assign[T](lhs: VarLike[T], rhs: T): Unit = lhs.__assign(rhs)
+  def __readVar[T](v: VarLike[T]): T = v.__read
+
+  def __valName(init: Any, name: String): Unit = ()
+
+  //  def __lazyValDef[T](init: T): T = macro lazyValDefImpl[T]
+  //  def __valDef[T](init: T): T = macro valDefImpl[T]
+
+  /** Control structures **/
   def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T = macro ifThenElseImpl[T]
   def __return(expr: Any): Nothing = macro returnImpl
   def __whileDo(cond: Boolean, body: Unit): Unit = macro whileDoImpl
   def __doWhile(body: Unit, cond: Boolean): Unit = macro doWhileImpl
 
-  // TODO: Way to have this not conflict with staged variable creation?
-  //def __newVar[T](init: T): T = macro newVarImpl[T]
-
-  def __readVar[T](v: T): T = macro readVarImpl[T] // different than LMS var! TODO: Never explicitly created!
-  def __assign[T](lhs: T, rhs: T): Unit = macro assignImpl[T]
-
-  def __valDef(init: Any, name: String): Unit = macro valDefImpl
+  def __throw(t: Throwable): Unit = macro throwImpl
 
   // def __match[A,R](selector: A, cases: Seq[A => R]): R = macro matchImpl[A,R]
   // def __typedCase[A,T,R](bind: T, guard: Boolean, body: R): A => R = macro typedCaseImpl[A,T,R]
 
-  //  def __lazyValDef[T](init: T): T = macro lazyValDefImpl[T]
-  //  def __valDef[T](init: T): T = macro valDefImpl[T]
-
-
-  // Poor man's infix methods for `Any` methods
+  /** `Any` Infix Methods **/
   def infix_+(x1: String, x2: Any): String = macro string_+
-  def infix_+(x1: Any, x2: Any): Any = macro any_+ // don't know the return type => should actually never be produced by LanguageVirtualization
+  def infix_+(x1: Any, x2: Any): Any = macro any_+ // don't know the return type => should actually never be produced by Virtualizer
   def infix_==(x1: Any, x2: Any): Boolean = macro any_==
   def infix_!=(x1: Any, x2: Any): Boolean = macro any_!=
   def infix_##(x: Any): Int = macro any_##
@@ -72,7 +73,7 @@ trait EmbeddedControls {
   def infix_toString(x: Any): String = macro any_toString
   def infix_getClass(x: Any): Class[_] = macro any_getClass
 
-  // Poor man's infix methods for `AnyRef` methods
+  /** `AnyRef` Infix Methods **/
   def infix_eq(x1: AnyRef, x2: AnyRef): Boolean = macro anyRef_eq
   def infix_ne(x1: AnyRef, x2: AnyRef): Boolean = macro anyRef_ne
   def infix_notify(x: AnyRef): Unit = macro anyRef_notify
@@ -94,7 +95,29 @@ trait EmbeddedControls {
   */
 private object EmbeddedControls {
 
-  // Control structures
+  /** Val/Var Definitions **/
+  def newVarImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = {
+    import c.universe._
+    c.Expr(q"new Ptr($init)")
+  }
+
+  def readVarImpl[T](c: whitebox.Context)(v: c.Expr[T]): c.Expr[T] = v
+
+  def valNameImpl(c: whitebox.Context)(init: c.Expr[Any], name: c.Expr[String]): c.Expr[Unit] = {
+    import c.universe._
+    c.Expr(q"()")
+  }
+
+  def assignImpl[T](c: whitebox.Context)(lhs: c.Expr[T], rhs: c.Expr[T]): c.Expr[Unit] = {
+    import c.universe._
+    c.Expr(q"$lhs = $rhs")
+  }
+
+  //
+  //  def lazyValDefImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = init
+
+
+  /** Control structures **/
 
   def ifThenElseImpl[T](c: whitebox.Context)(
     cond: c.Expr[Boolean], thenBr: c.Expr[T], elseBr: c.Expr[T]): c.Expr[T] = {
@@ -108,82 +131,54 @@ private object EmbeddedControls {
     c.Expr(q"return $expr")
   }
 
-  def assignImpl[T](c: whitebox.Context)(lhs: c.Expr[T], rhs: c.Expr[T]): c.Expr[Unit] = {
-    import c.universe._
-    c.Expr(q"$lhs = $rhs")
-  }
-
-  def whileDoImpl(c: whitebox.Context)(
-    cond: c.Expr[Boolean], body: c.Expr[Unit]): c.Expr[Unit] = {
-
+  def whileDoImpl(c: whitebox.Context)(cond: c.Expr[Boolean], body: c.Expr[Unit]): c.Expr[Unit] = {
     import c.universe._
     c.Expr(q"while ($cond) $body")
   }
 
-  def doWhileImpl(c: whitebox.Context)(
-    body: c.Expr[Unit], cond: c.Expr[Boolean]): c.Expr[Unit] = {
-
+  def doWhileImpl(c: whitebox.Context)(body: c.Expr[Unit], cond: c.Expr[Boolean]): c.Expr[Unit] = {
     import c.universe._
     c.Expr(q"do $body while ($cond)")
   }
 
-  def newVarImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = init
-
-  def readVarImpl[T](c: whitebox.Context)(v: c.Expr[T]): c.Expr[T] = v
-
-  def valDefImpl(c: whitebox.Context)(init: c.Expr[Any], name: c.Expr[String]): c.Expr[Unit] = {
+  def throwImpl(c: whitebox.Context)(t: c.Expr[Throwable]): c.Expr[Nothing] = {
     import c.universe._
-    c.Expr(q"()")
+    c.Expr(q"throw $t")
   }
 
-  //
-  //  def lazyValDefImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = init
+  /** `Any` Infix Methods **/
 
-  // Poor man's infix methods for `Any` methods
-
-  def string_+(c: whitebox.Context)(
-    x1: c.Expr[String], x2: c.Expr[Any]): c.Expr[String] = {
-
+  def string_+(c: whitebox.Context)(x1: c.Expr[String], x2: c.Expr[Any]): c.Expr[String] = {
     import c.universe._
     c.Expr(q"$x1.+($x2)")
   }
 
-  def any_+(c: whitebox.Context)(
-    x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Any] = {
-
+  def any_+(c: whitebox.Context)(x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Any] = {
     import c.universe._
     c.Expr(q"$x1.+($x2)")
   }
 
-  def any_==(c: whitebox.Context)(
-    x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Boolean] = {
-
+  def any_==(c: whitebox.Context)(x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Boolean] = {
     import c.universe._
     c.Expr(q"$x1.==($x2)")
   }
 
-  def any_!=(c: whitebox.Context)(
-    x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Boolean] = {
-
+  def any_!=(c: whitebox.Context)(x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Boolean] = {
     import c.universe._
     c.Expr(q"$x1.!=($x2)")
   }
 
   def any_##(c: whitebox.Context)(x: c.Expr[Any]): c.Expr[Int] = {
-
     import c.universe._
     c.Expr(q"$x.##()")
   }
 
-  def any_equals(c: whitebox.Context)(
-    x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Boolean] = {
-
+  def any_equals(c: whitebox.Context)(x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[Boolean] = {
     import c.universe._
     c.Expr(q"$x1.equals($x2)")
   }
 
   def any_hashCode(c: whitebox.Context)(x: c.Expr[Any]): c.Expr[Int] = {
-
     import c.universe._
     c.Expr(q"$x.hashCode()")
   }
@@ -203,82 +198,64 @@ private object EmbeddedControls {
   }
 
   def any_toString(c: whitebox.Context)(x: c.Expr[Any]): c.Expr[String] = {
-
     import c.universe._
     c.Expr(q"$x.toString()")
   }
 
   import scala.language.existentials
   def any_getClass(c: whitebox.Context)(x: c.Expr[Any]): c.Expr[Class[_$1]] forSome { type _$1 } = {
-
     import c.universe._
     c.Expr(q"$x.getClass()")
   }
 
-  // Poor man's infix methods for `AnyRef` methods
+  /** `AnyRef` Infix Methods **/
 
-  def anyRef_eq(c: whitebox.Context)(
-    x1: c.Expr[AnyRef], x2: c.Expr[AnyRef]): c.Expr[Boolean] = {
-
+  def anyRef_eq(c: whitebox.Context)(x1: c.Expr[AnyRef], x2: c.Expr[AnyRef]): c.Expr[Boolean] = {
     import c.universe._
     c.Expr(q"$x1.eq($x2)")
   }
 
-  def anyRef_ne(c: whitebox.Context)(
-    x1: c.Expr[AnyRef], x2: c.Expr[AnyRef]): c.Expr[Boolean] = {
-
+  def anyRef_ne(c: whitebox.Context)(x1: c.Expr[AnyRef], x2: c.Expr[AnyRef]): c.Expr[Boolean] = {
     import c.universe._
     c.Expr(q"$x1.ne($x2)")
   }
 
   def anyRef_notify(c: whitebox.Context)(x: c.Expr[AnyRef]): c.Expr[Unit] = {
-
     import c.universe._
     c.Expr(q"$x.notify()")
   }
 
   def anyRef_notifyAll(c: whitebox.Context)(x: c.Expr[AnyRef]): c.Expr[Unit] = {
-
     import c.universe._
     c.Expr(q"$x.notifyAll()")
   }
 
-  def anyRef_synchronized[T](c: whitebox.Context)(
-    x: c.Expr[AnyRef], body: c.Expr[T]): c.Expr[T] = {
-
+  def anyRef_synchronized[T](c: whitebox.Context)(x: c.Expr[AnyRef], body: c.Expr[T]): c.Expr[T] = {
     import c.universe._
     c.Expr(q"$x.synchronized($body)")
   }
 
   def anyRef_wait0(c: whitebox.Context)(x: c.Expr[AnyRef]): c.Expr[Unit] = {
-
     import c.universe._
     c.Expr(q"$x.wait()")
   }
 
-  def anyRef_wait1(c: whitebox.Context)(
-    x: c.Expr[AnyRef], timeout: c.Expr[Long]): c.Expr[Unit] = {
-
+  def anyRef_wait1(c: whitebox.Context)(x: c.Expr[AnyRef], timeout: c.Expr[Long]): c.Expr[Unit] = {
     import c.universe._
     c.Expr(q"$x.wait($timeout)")
   }
 
-  def anyRef_wait2(c: whitebox.Context)(
-    x: c.Expr[AnyRef], timeout: c.Expr[Long],
-    nanos: c.Expr[Int]): c.Expr[Unit] = {
-
+  def anyRef_wait2(c: whitebox.Context)(x: c.Expr[AnyRef], timeout: c.Expr[Long], nanos: c.Expr[Int]): c.Expr[Unit] = {
     import c.universe._
     c.Expr(q"$x.wait($timeout, $nanos)")
   }
 
   def anyRef_clone(c: whitebox.Context)(x: c.Expr[AnyRef]): c.Expr[AnyRef] = {
-
     import c.universe._
     c.Expr(q"$x.clone()")
   }
 
   def anyRef_finalize(c: whitebox.Context)(x: c.Expr[AnyRef]): c.Expr[Unit] = {
-
     import c.universe._
     c.Expr(q"$x.finalize()")
   }

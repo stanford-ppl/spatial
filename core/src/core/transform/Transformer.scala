@@ -70,10 +70,12 @@ abstract class Transformer extends Pass {
 
   def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.tR
-    implicit val ctx: SrcCtx = lhs.ctx
+    implicit val ctx: SrcCtx = lhs.src
     //logs(s"$lhs = $rhs [Mirror]")
     val (lhs2,_) = try {
-      transferMetadataIfNew(lhs){ tA.viewAsSym(stage(rhs.mirror(f))) }
+      transferMetadataIfNew(lhs){
+        tA.boxed(stage(rhs.mirror(f)))
+      }
     }
     catch {case t: Throwable =>
       bug(s"An error occurred while mirroring $lhs = $rhs")
@@ -97,6 +99,6 @@ abstract class Transformer extends Pass {
 
   final protected def removeSym(sym: Sym[_]): Unit = {
     state.scope = state.scope.filterNot(_ == sym)
-    state.impure = state.impure.filterNot(_ == sym)
+    state.impure = state.impure.filterNot(_.sym == sym)
   }
 }

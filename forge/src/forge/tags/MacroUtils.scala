@@ -15,9 +15,15 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       case Some(rec) => Select(rec, calleeName)
       case None      => Ident(calleeName)
     }
-    val calleeAndTargs: Tree = typeApply(callee, targs)
+    val calleeAndTargs: Tree = targsCall(callee, targs)
     args.foldLeft(calleeAndTargs) { Apply(_, _) }
   }
+
+  def targsCall(select: Tree, targs: List[Tree]): Tree = {
+    if (targs.nonEmpty) TypeApply(select, targs) else select
+  }
+
+  def targsType(select: TypeName, targs: List[Tree]): Tree = tq"$select[..$targs]"
 
   // Fix for bug where <caseaccessor> gets added to (private) implicit fields
   def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
@@ -27,43 +33,9 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     case v => v
   }
 
-  def makeTypeName(tp: TypeDef): Tree = {
-    val TypeDef(_,TypeName(name),targs,_) = tp
-    typeApply(name, targs)
-  }
-  def typeApply(select: Tree, targs: List[Tree]): Tree = {
-    if (targs.isEmpty) select else TypeApply(select,targs)
-  }
-  def typeApply(name: String, targs: List[TypeDef]): Tree = {
-    val init = Ident(TypeName(name))
-    typeApply(init, targs)
-  }
-
-  def makeDefCall(name: String, targs: List[TypeDef], argss: List[List[Tree]]): Tree = {
-    val call = Ident(TermName(name))
-    val fullCall = if (targs.isEmpty) call else {
-      TypeApply(call, targs.map(makeTypeName))
-    }
-    argss.foldLeft(fullCall){(call,args) => Apply(call,args) }
-  }
-
-  def makeType(name: String): Tree = typeApply(name, Nil)
-
   def isWildcardType(tp: Tree, str: String): Boolean = tp match {
     case ExistentialTypeTree(AppliedTypeTree(Ident(TypeName(`str`)), List(Ident(TypeName(arg)))), _) => arg.startsWith("_$")
     case _ => false
-  }
-
-  def modifyClassFields(
-    cls: ClassDef,
-    func: ValDef => ValDef
-  ): ClassDef = {
-    val ClassDef(mods,TypeName(name),tparams,Template(parents,self,_)) = cls
-    val (fieldsX,methods) = cls.fieldsAndMethods
-    val fields = fieldsFix(fieldsX)
-    val fields2 = fields.map(func)
-    val body2 = fields2 ++ methods
-    ClassDef(mods,TypeName(name),tparams,Template(parents,self,body2))
   }
 
   implicit class ModiferOps(x: Modifiers) {
@@ -81,6 +53,10 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     def nameLiteral: Literal = Literal(Constant(nameStr))
   }
 
+  implicit class SigOps(vs: List[ValDef]) {
+    def isImplicit: Boolean = vs.exists(_.isImplicit)
+  }
+
   implicit class ValDefOps(v: ValDef) extends NamedOps {
     val ValDef(mods,nameTerm@TermName(nameStr),tpTree,rhs) = v
 
@@ -89,6 +65,8 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     def asVar: ValDef = ValDef(mods.withMutable,nameTerm,tpTree,rhs)
 
     def hasType(types: Seq[Tree]): Boolean = types.exists{tp => tp equalsStructure tpTree }
+
+    def isImplicit: Boolean = mods.hasFlag(Flag.IMPLICIT)
   }
   object Param {
     def impl(name: String, tp: Tree, rhs: Tree = EmptyTree): ValDef = {
@@ -119,13 +97,15 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       DefDef(mods,nameTerm,tparams,paramss2,retTp,body)
     }
 
+    def isConstructor: Boolean = nameTerm == termNames.CONSTRUCTOR
+
     def modifyBody(func: Tree => Tree): DefDef = {
       val body2 = func(body)
       DefDef(mods,nameTerm,tparams,paramss,retTp,body2)
     }
   }
 
-  trait TemplateOps[A] {
+  trait Templated[A] {
     def cls: A
     def template: Template
     lazy val Template(
@@ -135,7 +115,8 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     ) = template
     lazy val fields: List[ValDef] = fieldsFix(__body.collect{case x: ValDef => x })
     lazy val methods: List[DefDef] = __body.collect{case x: DefDef => x }
-    lazy val body: List[Tree] = fields ++ methods
+    lazy val other: List[Tree] = __body.filter{case _:ValDef|_:DefDef => false; case _ => true }
+    lazy val body: List[Tree] = fields ++ methods ++ other
 
     def fieldsAndMethods: (List[ValDef],List[DefDef]) = (fields, methods)
     def fieldAndMethodNames: List[String] = fields.map(_.nameStr) ++ methods.map(_.nameStr)
@@ -144,16 +125,11 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     def nonConstructorMethods: List[DefDef] = methods.filterNot(_.name == termNames.CONSTRUCTOR)
 
     def constructor: Option[DefDef] = constructors.headOption
-    def constructorArgs: List[List[ValDef]] = constructor.map{d =>  d.paramss }.getOrElse(Nil)
+    def constructorArgs: List[List[ValDef]] = constructor.map{d => d.paramss }.getOrElse(Nil)
 
-    def injectField(tree: Tree): A = tree match {
-      case v: ValDef => injectField(v)
-      case _ => __c.abort(__c.enclosingPosition, "Non-field passed to injectField")
-    }
-    def injectMethod(tree: Tree): A = tree match {
-      case m: DefDef => injectMethod(m)
-      case _ => __c.abort(__c.enclosingPosition, "Non-method passed to injectMethod")
-    }
+    def injectStm(tree: Tree): A = copyWithBody(tree +: body)
+
+    def injectStmLast(tree: Tree): A = copyWithBody(body :+ tree)
 
     def injectField(field: ValDef): A = {
       if (!fieldAndMethodNames.contains(field.nameStr)) copyWithBody(body :+ field) else cls
@@ -163,8 +139,15 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       if (!fieldAndMethodNames.contains(method.nameStr)) copyWithBody(body :+ method) else cls
     }
 
-    def mapFields(func: ValDef => ValDef): A = copyWithBody(fields.map(func) ++ methods)
-    def mapMethods(func: DefDef => DefDef): A = copyWithBody(constructors ++ fields ++ nonConstructorMethods.map(func))
+    def mapFields(func: ValDef => ValDef): A = copyWithBody(body.map{
+      case v: ValDef => func(v)
+      case x => x
+    })
+
+    def mapMethods(func: DefDef => DefDef): A = copyWithBody(body.map{
+      case d: DefDef if !d.isConstructor => func(d)
+      case x => x
+    })
 
     def copyWithTemplate(template: Template): A
     def copyWithBody(body: List[Tree]): A = copyWithTemplate(Template(parents,selfType,body))
@@ -178,7 +161,7 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     }
   }
 
-  implicit class ClassOps(val cls: ClassDef) extends TemplateOps[ClassDef] with NamedOps {
+  implicit class ClassOps(val cls: ClassDef) extends Templated[ClassDef] with NamedOps {
     val ClassDef(
       mods:    Modifiers,
       nameType@TypeName(nameStr: String),
@@ -186,7 +169,7 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       template: Template
     ) = cls
 
-    val nameTerm = nameType.toTermName
+    lazy val nameTerm = nameType.toTermName
     def copyWithTemplate(template: Template): ClassDef = ClassDef(mods,nameType,tparams,template)
 
     def withVarParams: ClassDef = {
@@ -200,13 +183,13 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     def typeArgs: List[Tree] = tparams.map{tp => Ident(tp.name)}
 
     def callConstructor(args: Tree*): Tree = {
-      makeDefCall(nameStr,tparams,List(args.toList))
+      methodCall(None, nameStr, List(args.toList), tparams)
     }
 
     def asCaseClass: ClassDef = ClassDef(mods.withCase,cls.name,tparams,template)
   }
 
-  implicit class ModuleOps(val cls: ModuleDef) extends TemplateOps[ModuleDef] with NamedOps {
+  implicit class ModuleOps(val cls: ModuleDef) extends Templated[ModuleDef] with NamedOps {
     val ModuleDef(
       mods: Modifiers,
       nameTerm @ TermName(nameStr: String),
@@ -218,6 +201,25 @@ private[forge] class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
 
   def invalidAnnotationUse(name: String, allowed: String*): Nothing = {
     __c.abort(__c.enclosingPosition, s"@$name annotation can only be used on ${conj(allowed)}")
+  }
+
+  implicit class TreeOps(tree: Tree) {
+    def asObject: ModuleDef = tree match {
+      case md: ModuleDef => md
+      case _ => throw new Exception("tree was not an object definition")
+    }
+    def asClass: ClassDef = tree match {
+      case cd: ClassDef => cd
+      case _ => throw new Exception("tree was not a class definition")
+    }
+    def asDef: DefDef = tree match {
+      case dd: DefDef => dd
+      case _ => throw new Exception("tree was not a def definition")
+    }
+    def asVal: ValDef = tree match {
+      case vd: ValDef => vd
+      case _ => throw new Exception("tree was not a val definition")
+    }
   }
 
 }

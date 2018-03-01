@@ -1,6 +1,5 @@
 package core
 
-import forge.implicits.terminal._
 import forge.io.files
 
 class Config {
@@ -33,7 +32,7 @@ class Config {
     * v < 1:  Basic logging is disabled
     * v < 2:  Verbose logging is disabled
     */
-  def setVerbosity(v: Int): Unit = {
+  def setV(v: Int): Unit = {
     enWarn = v >= 0
     enError = v >= 0
     enInfo = v >= 0
@@ -43,39 +42,20 @@ class Config {
   def enLog: Boolean = logLevel >= 2
   def enDbg: Boolean = logLevel >= 1
 
-  def parse(args: Array[String]): Unit = args.foreach{
-    case "-q"  => setVerbosity(0)
-    case "-qq" => setVerbosity(-1)
-    case "-v"  => setVerbosity(1)
-    case "-vv" => setVerbosity(2)
-    case x => System.out.warn(s"Unrecognized argument $x")
-  }
-
-  val helpText: String =
-    s"""
-       |Verbosity:
-       | -q       Disable background logging
-       | -qq      Disable logging and console printing
-       | -v       Enable basic background logging
-       | -vv      Enable verbose logging
-     """.stripMargin
-
-  def help(): Unit = {
-    System.out.println(helpText)
-  }
-
   /** Paths **/
   var name: String = "App"
   var logDir: String = files.cwd + files.sep + "logs" + files.sep + name + files.sep
   var genDir: String = files.cwd + files.sep + "gen" + files.sep + name + files.sep
   var repDir: String = files.cwd + files.sep + "reports" + files.sep + name + files.sep
 
+  /** Testing **/
+  var test: Boolean = false
+
   /** Banking **/
   var enableBufferCoalescing: Boolean = true
 
   def create: Config = new Config
 
-  def init(args: Array[String]): Unit = parse(args)
 
   def reset(): Unit = {
     enWarn = true

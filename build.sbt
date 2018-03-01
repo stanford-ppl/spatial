@@ -1,23 +1,19 @@
 val nova_version = "1.0"
-val scala_version     = "2.12.4" //"2.13.0-M3"
+val scala_version     = "2.12.4" //"0.6.0-RC1"
 val paradise_version  = "2.1.0"
-
-
-name := "novac"
-scalaVersion := scala_version
-version := nova_version
 
 val common = Seq(
   scalaVersion := scala_version,
   version := nova_version,
-  nativeLinkStubs := true,
+  //nativeLinkStubs := true,
   //crossScalaVersions := Seq("2.12.4", "2.13.0-M3"),
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scala_version, // Reflection
-    "com.lihaoyi" % "utest_2.12" % "0.6.3"
-    //"com.lihaoyi" %% "utest" % "0.6.3" % "test"         // Testing
+    "org.scala-lang" % "scala-reflect" % scala_version,                  // Reflection
+    //"com.lihaoyi" % "utest_2.12" % "0.6.3",
+    ("com.lihaoyi" %% "utest" % "0.6.3" % "test"), //.withDottyCompat(),  // Testing
+    ("com.github.scopt" %% "scopt" % "3.7.0") //.withDottyCompat()       // Command line args
   ),
 
   /** Scalac Options **/
@@ -56,10 +52,8 @@ val common = Seq(
 
 
 /** Projects **/
-lazy val emul    = project.settings(common)
-lazy val forge   = project.settings(common)
-lazy val core    = project.settings(common).dependsOn(forge)
-lazy val nova    = project.settings(common).dependsOn(forge, emul, core)
-lazy val novac   = (project in file(".")).settings(common).dependsOn(nova)
+lazy val emul  = project.settings(common)
+lazy val forge = project.settings(common)
+lazy val core  = project.settings(common).dependsOn(forge)
+lazy val nova  = (project in file(".")).settings(common ++ Seq(name := "nova")).dependsOn(forge, emul, core)
 
-addCommandAlias("make", "compile")

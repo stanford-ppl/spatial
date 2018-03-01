@@ -11,7 +11,7 @@ case class Effects(
   throws:  Boolean = false,           // May throw exceptions (speculative execution may be unsafe)
   reads:   Set[Sym[_]] = Set.empty,   // Reads given mutable symbols
   writes:  Set[Sym[_]] = Set.empty,   // Writes given mutable symbols
-  antideps: Seq[Impure] = Nil         // Anti-dependencies
+  antiDeps: Seq[Impure] = Nil         // Anti-dependencies
 ) extends AnalysisData[Effects] {
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(
@@ -76,7 +76,7 @@ case class Impure(sym: Sym[_], effects: Effects)
 object Impure {
   @stateful def unapply(x: Sym[_]): Option[(Sym[_],Effects)] = {
     val effects = effectsOf(x)
-    if (effects.isPure && effects.antideps.isEmpty) None else Some((x,effects))
+    if (effects.isPure && effects.antiDeps.isEmpty) None else Some((x,effects))
   }
 }
 
@@ -86,7 +86,7 @@ object Impure {
 }
 
 @data object antidepsOf {
-  def apply(x: Sym[_]): Seq[Impure] = effectsOf(x).antideps
+  def apply(x: Sym[_]): Seq[Impure] = effectsOf(x).antiDeps
 }
 @data object isMutable {
   def apply(s: Sym[_]): Boolean = effectsOf(s).isMutable

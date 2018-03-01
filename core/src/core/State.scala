@@ -6,7 +6,7 @@ import forge.io.NullOutputStream
 
 import scala.collection.mutable
 
-class State {
+class State extends forge.AppState {
   /** Config **/
   val config: Config = new Config
 
@@ -16,8 +16,14 @@ class State {
   def nextId(): Int = { id += 1; id }
 
   /** List of effectful statements in the current scope **/
-  var scope: Seq[Sym[_]] = _
-  var impure: Seq[Impure] = _
+  var scope: Vector[Sym[_]] = _   // TODO: Should be empty?
+  var impure: Vector[Impure] = _
+
+  /** Set the scope to be empty. Should not mutate current value. **/
+  def newScope(): Unit = {
+    scope = Vector.empty
+    impure = Vector.empty
+  }
 
   /** Alias caches **/
   val shallowAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
@@ -70,8 +76,8 @@ class State {
   def reset(): Unit = {
     config.reset()
     id = -1
-    scope = Nil
-    impure = Nil
+    scope = null  // TODO: Should be empty?
+    impure = null
     cache = Map.empty
     shallowAliasCache.clear()
     deepAliasCache.clear()

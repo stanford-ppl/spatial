@@ -1,0 +1,30 @@
+package pir.lang
+
+import core._
+import forge.Ptr
+import forge.tags._
+import pir.node.{ScalarBus, VectorBus, WriteOut}
+
+import spatial.lang._
+
+@ref class Out[A:Bits] extends Bits[Out[A]] with Ref[Ptr[Any],Out[A]] {
+  // --- Infix methods
+  @api def :=(x: A): Void = stage(WriteOut(this, x.asInstanceOf[Bits[A]]))
+
+  @api def -->(in: In[A]): Void = { stage(ScalarBus(this,in)); void }
+  @api def ==>(in: In[A]): Void = { stage(VectorBus(this,in)); void }
+
+  // --- Typeclass Methods
+  val tA: Bits[A] = Bits[A]
+  val box: Out[A] <:< Bits[Out[A]] = implicitly[Out[A] <:< Bits[Out[A]]]
+  override def isPrimitive: Boolean = true
+  override def nbits: Int = tA.nbits
+
+  @rig def zero: Out[A] = Out.c(new Ptr(tA.zero))
+  @rig def one: Out[A] = Out.c(new Ptr(tA.one))
+  @rig def random(max: Option[Out[A]]): Out[A] = undefinedOp("random")
+}
+
+object Out {
+  def c[A:Bits](values: Ptr[Any]): Out[A] = const[Out[A]](values)
+}

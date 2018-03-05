@@ -16,7 +16,7 @@ import spatial.node._
   def isPrimitive: Boolean = true
 }
 object Text {
-  def c(x: String): Text = const[Text](x)
+  def c(x: String): Text = uconst[Text](x)
 
   @rig def concat(a: Text, b: Text): Text = stage(TextConcat(a,b))
 }

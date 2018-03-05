@@ -23,9 +23,7 @@ object Control {
 }
 
 /** Control nodes which take explicit enable signals. **/
-abstract class EnControl[R:Type] extends Control[R] {
-  def ens: Seq[Bit]
-}
+abstract class EnControl[R:Type] extends Control[R] with Enabled[R]
 
 /** Nodes with bodies which execute at least once. **/
 abstract class Pipeline[R:Type] extends EnControl[R]

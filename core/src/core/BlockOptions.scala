@@ -1,11 +1,12 @@
 package core
 
+import core.schedule.Scheduler
+
 case class BlockOptions(
-  temp: Freq.Freq,
-  isol: Boolean,
-  seal: Boolean
+  temp: Freq.Freq = Freq.Normal,
+  sched: Option[Scheduler] = None
 )
 object BlockOptions {
-  lazy val Normal = BlockOptions(Freq.Normal, isol = false, seal = false)
-  lazy val Sealed = BlockOptions(Freq.Cold,   isol = false, seal = true)
+  lazy val Normal = BlockOptions(Freq.Normal, None)
+  lazy val Sealed = BlockOptions(Freq.Cold,   None)
 }

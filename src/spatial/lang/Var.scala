@@ -14,7 +14,7 @@ import spatial.node._
   @rig def __sassign(x: A): Unit = Var.assign(this, x)
 }
 object Var {
-  @api def read[A](v: Var[A]): A = stage(ReadVar(v)(v.tA))
-  @api def assign[A](v: Var[A], x: A): Void = stage(AssignVar(v,x)(v.tA))
-  @api def alloc[A:Type](init: Option[A]): Var[A] = stage(NewVar[A](init))
+  @api def read[A](v: Var[A]): A = stage(VarRead(v)(v.tA))
+  @api def assign[A](v: Var[A], x: A): Void = stage(VarAssign(v,x)(v.tA))
+  @api def alloc[A:Type](init: Option[A]): Var[A] = stage(VarNew[A](init))
 }

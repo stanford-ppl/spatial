@@ -21,4 +21,8 @@ trait Casting {
   }
 
   @rig def cast[A,B](a: A)(implicit cast: Cast[A,B]): B = cast.apply(a)
+
+  implicit class SelfType[A<:Ref[_,_]](x: A) {
+    def selfType: A = x.tp.asInstanceOf[A]
+  }
 }

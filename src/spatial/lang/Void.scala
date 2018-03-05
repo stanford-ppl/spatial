@@ -12,5 +12,5 @@ import forge.tags._
   override def isPrimitive: Boolean = true
 }
 object Void {
-  def c: Void = const[Void](())
+  def c: Void = uconst[Void](())
 }

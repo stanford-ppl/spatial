@@ -2,24 +2,25 @@ package spatial.lang
 
 import forge.tags._
 import core._
+import emul.FixedPointRange
 import spatial.node._
 
 /** Types **/
-@ref class Counter extends Top[Counter] with Ref[Range,Counter] {
+@ref class Counter[A:Num] extends Top[Counter[A]] with Ref[FixedPointRange,Counter[A]] {
   override def isPrimitive: Boolean = false
-
-  @rig def from(c: Any, checked: Boolean): Option[Counter] = c match {
-    //case s: Series[_] => Counter.from(series)
-    case r: Range  => Some(Counter(r.start,r.end,r.step,I32.c(1)))
-    case _ => None
-  }
 }
 object Counter {
-  @api def apply(start: I32, end: I32, step: I32 = I32.c(1), par: I32 = I32.c(1)): Counter = {
-    stage(CounterNew(start, end, step, par))
+  @api def apply[A:Num](
+    start: A,
+    end:   A,
+    step:  A = null,
+    par:   I32 = I32(1)
+  ): Counter[A] = {
+    val stride: A = Option(step).getOrElse(Num[A].one)
+    stage(CounterNew[A](start, end, stride, par))
   }
 
-  @rig def from(series: Series[I32]): Counter = {
+  @rig def from[A:Num](series: Series[A]): Counter[A] = {
     val Series(start,end,step,par,_) = series
     Counter(start,end,step,par)
   }

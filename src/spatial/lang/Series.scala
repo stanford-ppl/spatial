@@ -3,7 +3,7 @@ package spatial.lang
 import core._
 import emul.FixedPoint
 import forge.tags._
-import forge.implicits.collections._
+import utils.implicits.collections._
 
 case class Series[A:Num](start: A, end: A, step: A, par: I32, isUnit: Boolean = false)(implicit ev: A <:< Num[A]) {
   def tp: Num[A] = Num[A]
@@ -28,7 +28,7 @@ case class Series[A:Num](start: A, end: A, step: A, par: I32, isUnit: Boolean = 
   }
 }
 object Series {
-  implicit class SeriesOps(series: Series[I32]) {
+  /*implicit class SeriesOps(series: Series[I32]) {
     @api def apply(func: I32 => Void): Void = Foreach(series)(func)
-  }
+  }*/
 }

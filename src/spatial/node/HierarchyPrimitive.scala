@@ -4,7 +4,7 @@ import spatial.lang._
 
 import forge.tags._
 import core._
-import nova.data.Expect
+import spatial.data.Expect
 
 /** Nodes with non-zero latency, no internal state, which can be conditionally executed **/
 abstract class Primitive[R:Type] extends AccelOp[R] {
@@ -16,20 +16,18 @@ abstract class Primitive[R:Type] extends AccelOp[R] {
   val isTransient: Boolean = false
 }
 object Primitive {
-  def unapply[R](x: Sym[R]): Option[Sym[R]] = x match {
+  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
     case Op(_:Primitive[_]) => Some(x)
     case _ => None
   }
 }
 object Transient {
-  @stateful def unapply[R](x: Sym[R]): Option[Sym[R]] = x match {
+  @stateful def unapply(x: Sym[_]): Option[Sym[_]] = x match {
     case Op(p:Primitive[_]) if p.isTransient => Some(x)
     case Expect(_) => Some(x)
     case _ => None
   }
 }
 
-abstract class EnPrimitive[R:Type] extends Primitive[R] {
-  def ens: Seq[Bit]
-}
+abstract class EnPrimitive[R:Type] extends Primitive[R] with Enabled[R]
 

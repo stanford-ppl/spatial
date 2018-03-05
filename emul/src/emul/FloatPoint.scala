@@ -169,6 +169,11 @@ class FloatPoint(val value: FloatValue, val valid: Boolean, val fmt: FltFormat) 
   def !==(that: FloatPoint): Bool = Bool(this.value != that.value, this.valid && that.valid)
   def ===(that: FloatPoint): Bool = Bool(this.value == that.value, this.valid && that.valid)
 
+  def <(that: Int): Boolean = (this < FloatPoint(that, this.fmt)).value
+  def <=(that: Int): Boolean = (this <= FloatPoint(that, this.fmt)).value
+  def >(that: Int): Boolean = (this > FloatPoint(that, this.fmt)).value
+  def >=(that: Int): Boolean = (this >= FloatPoint(that, this.fmt)).value
+  def !==(that: Int): Boolean = (this !== FloatPoint(that, this.fmt)).value
   def ===(that: Int): Boolean = this.value == FloatPoint(that,fmt).value
 
   def toBigDecimal: BigDecimal = value match {

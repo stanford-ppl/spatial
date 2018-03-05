@@ -1,11 +1,11 @@
 package spatial.lang
 package static
 
-trait SpatialStatics extends Lifts with Casts
+trait SpatialStatics extends Lifts with Casts with utils.Overloads
   with StaticBits
-  with StaticOverloads
   with StaticMath
   with StaticMisc
+  with StaticTransfers
 
 /** Internal view of Spatial **/
 trait InternalStatics extends SpatialStatics with InternalAliases

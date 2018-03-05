@@ -2,15 +2,21 @@ package core
 
 import Freq._
 import Filters._
-import forge.recursive
 import core.transform.Transformer
+import utils.recursive
 
 import scala.annotation.unchecked.uncheckedVariance
 
-abstract class Op[+R:Type] extends Serializable with Product {
+/** Any staged operation.
+  *
+  * @tparam R The staged return type of the operation
+  *
+  * NOTE: Op is NOT covariant with R - strange things happen with pattern matching if it is.
+  */
+abstract class Op[R:Type] extends Serializable with Product {
   final type Tx = Transformer
 
-  def tR: Type[R @ uncheckedVariance] = Type[R]
+  def tR: Type[R] = Type[R]
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies **/
   // Inputs: symbol dataflow dependencies for this Def.
@@ -56,7 +62,6 @@ abstract class Op[+R:Type] extends Serializable with Product {
   // Copies: inputs which, when dereferenced, may return the same pointer as dereferencing the output of this Def
   // E.g. y = ArrayCopy(x): copies should return x
   // Default: no symbols
-  // TODO: In LMS, why is this different default than aliases?
   def copies: Seq[Sym[_]] = Nil
 
   /** Effects **/

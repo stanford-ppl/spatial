@@ -217,7 +217,8 @@ object FixedPoint {
   def unbiased(bits: BigInt, valid: Boolean, fmt: FixFormat, saturate: Boolean = false): FixedPoint = {
     val biased = bits >> 4
     val remainder = (bits & 0xF).toFloat / 16.0f
-    val rand = scala.util.Random.nextFloat() // TODO: This is actually heavier than it needs to be
+    // TODO[5]: RNG here for unbiased rounding is actually heavier than it needs to be
+    val rand = scala.util.Random.nextFloat()
     val add = rand + remainder
     val value = if (add >= 1 && biased >= 0) biased + 1  else if (add >= 1 && biased < 0) biased - 1 else biased
     if (!saturate) FixedPoint.clamped(value, valid, fmt)

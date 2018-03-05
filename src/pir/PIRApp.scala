@@ -1,9 +1,9 @@
 package pir
 
 import core._
+import core.passes.IRPrinter
 import nova.compiler.DSLApp
-import nova.traversal._
-import nova.traversal.codegen.dot._
+import nova.codegen.dot.{IRDotCodegen, PUDotCodegen}
 
 trait PIRApp extends DSLApp {
 

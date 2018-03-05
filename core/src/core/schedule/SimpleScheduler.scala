@@ -2,6 +2,8 @@ package core
 package schedule
 
 class SimpleScheduler extends Scheduler {
+  def mustMotion = false
+
   /** Returns the schedule of the given scope. **/
   override def apply[R](
     inputs:  Seq[Sym[_]],

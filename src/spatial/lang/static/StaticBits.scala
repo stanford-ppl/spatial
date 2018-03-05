@@ -2,22 +2,31 @@ package spatial.lang
 package static
 
 import forge.tags._
-import forge.util.overloads._
 import core._
 
-import spatial.node.{BitsAsData,Mux}
+import spatial.node.{BitsAsData,Mux,OneHotMux}
 
 trait StaticBits { this: SpatialStatics =>
+  @api def mux[A](s: Bit, a: Bits[A], b: Bits[A]): A = {
+    implicit val tA: Bits[A] = a.selfType
+    stage(Mux(s,a,b))
+  }
+  @api def mux[A,B](s: Bit, a: Bits[A], b: Lift[B]): A = {
+    implicit val tA: Bits[A] = a.selfType
+    stage(Mux(s, a, tA.from(b.orig)))
+  }
+  @api def mux[A,B](s: Bit, a: Lift[A], b: Bits[B]): B = {
+    implicit val tB: Bits[B] = b.selfType
+    stage(Mux(s, tB.from(a.orig), b))
+  }
   @api def mux[A:Bits](s: Bit, a: Lift[A], b: Lift[A]): A = {
     stage(Mux(s,a.unbox,b.unbox))
   }
-  /*@api def mux[A,B](s: Bit, a: A, b: B)(implicit ov: Overload1): Vec[Bit] = {
-    val nBits = Math.max(Bits[A].nBits, Bits[B].nBits)
-    implicit val tV: Vec[Bit] = Vec.tp[Bit](nBits)
-    val bitsA = a.as[Vec[Bit]]
-    val bitsB = b.as[Vec[Bit]]
-    stage(Mux(s,bitsA,bitsB))
-  }*/
+
+  @api def oneHotMux[A:Bits](sels: Seq[Bit], vals: Seq[A]): A = {
+    stage(OneHotMux(sels,vals.map{s => boxBits(s) }))
+  }
+
 
   @api def zero[A:Bits]: A = Bits[A].zero
   @api def one[A:Bits]: A = Bits[A].one

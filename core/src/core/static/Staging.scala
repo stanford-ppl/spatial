@@ -2,19 +2,30 @@ package core
 package static
 
 import forge.tags._
-import forge.recursive
-import forge.implicits.collections._
+import utils.implicits.collections._
+import utils.recursive
 
 import scala.annotation.unchecked.{uncheckedVariance => uV}
 
 trait Staging { this: Printing =>
-  def const[A<:Sym[A]:Type](c: A#I): A = Type[A]._new(Def.Const(c))
-  def const[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Const(c))
+  /** Create a checked parameter (implicit state required) **/
+  @stateful def param[A<:Sym[A]:Type](c: A#L, checked: Boolean = true): A = Type[A].from(c, checked, isParam = true)
 
-  @stateful def param[A<:Sym[A]:Type](c: A#I): A = Type[A]._new(Def.Param(state.nextId(),c))
-  @stateful def param[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Param(state.nextId(),c))
+  /** Create a checked constant (implicit state required) **/
+  @stateful def const[A<:Sym[A]:Type](c: A#L, checked: Boolean = true): A = Type[A].from(c, checked)
+
+  /** Create an unchecked constant (no implicit state required) **/
+  def uconst[A<:Sym[A]:Type](c: A#L): A = _const[A](c)
+
+  private[core] def _const[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Const(c))
+  private[core] def _const[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Const(c))
+
+  @stateful private[core] def _param[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Param(state.nextId(),c))
+  @stateful private[core] def _param[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Param(state.nextId(),c))
 
   @stateful def err[A:Type]: A = Type[A]._new(Def.Error[A](state.nextId()))
+  @stateful def err_[A](tp: Type[A]): A = tp._new(Def.Error[A](state.nextId()))
+
   @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()))
 
   @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = tp._new(Def.Node(state.nextId(),op))
@@ -51,13 +62,20 @@ trait Staging { this: Printing =>
     }
   }
 
-  @rig def runFlows(sym: Sym[_], op: Op[_]): Unit = flows.apply(sym, op)
+  @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = flows.apply(sym, op)
 
 
   @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.tR,ctx,state) match {
     case Some(s) => s
-    case None    =>
-      if (state == null) throw new Exception("Null state during staging")
+    case None if state == null =>
+      // General operations in object/trait constructors are currently disallowed
+      // because it can mess up namespaces in the output code
+      // TODO[6]: Allow global namespace operations?
+      error(ctx, "Only constant declarations are allowed in the global namespace.")
+      error(ctx)
+      err_[R](op.tR)
+
+    case None =>
       val effects = allEffects(op)
       val mayCSE = effects.mayCSE
 

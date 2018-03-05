@@ -1,9 +1,8 @@
 package core
 
-import forge.io.files
+import utils.io.files
 
 class Config {
-
   /** Verbosity **/
   var enWarn: Boolean = true
   var enError: Boolean = true

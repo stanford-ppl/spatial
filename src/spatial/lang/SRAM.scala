@@ -10,23 +10,23 @@ import spatial.node._
   @api def dim(d: Int): I32 = SRAM.dim(this,d)
   @api def rank: I32 = SRAM.rank(this)
 
-  @api def apply(addr: I32*): A = SRAM.read(this,addr,Nil)
-  @api def update(i: I32, data: A): Void = SRAM.write(this,data,Seq(i),Nil)
-  @api def update(i: I32, j: I32, data: A): Void = SRAM.write(this,data,Seq(i,j),Nil)
-  @api def update(i: I32, j: I32, k: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k),Nil)
-  @api def update(i: I32, j: I32, k: I32, l: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k,l),Nil)
+  @api def apply(addr: I32*): A = SRAM.read(this,addr)
+  @api def update(i: I32, data: A): Void = SRAM.write(this,data,Seq(i))
+  @api def update(i: I32, j: I32, data: A): Void = SRAM.write(this,data,Seq(i,j))
+  @api def update(i: I32, j: I32, k: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k))
+  @api def update(i: I32, j: I32, k: I32, l: I32, data: A): Void = SRAM.write(this,data,Seq(i,j,k,l))
 
   // --- Typeclass Methods
   val tA: Bits[A] = Bits[A]
-  override val ev: SRAM[A] <:< LocalMem[A,SRAM] = implicitly[SRAM[A] <:< LocalMem[A,SRAM]]
+  override val evMem: SRAM[A] <:< LocalMem[A,SRAM] = implicitly[SRAM[A] <:< LocalMem[A,SRAM]]
 }
 object SRAM {
   @api def apply[A:Bits](dims: I32*): SRAM[A] = stage(SRAMNew(dims))
 
-  @rig def dim(sram: SRAM[_], d: Int): I32 = stage(SRAMDim(sram, d))
-  @rig def rank(sram: SRAM[_]): I32 = stage(SRAMRank(sram))
+  @rig def dim(sram: SRAM[_], d: Int): I32 = stage(MemDim(sram, d))
+  @rig def rank(sram: SRAM[_]): I32 = stage(MemRank(sram))
 
-  @rig def read[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Seq[Bit]): A = stage(SRAMRead(sram,addr,ens))
-  @rig def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Seq[Bit]): Void = stage(SRAMWrite(sram,data,addr,ens))
+  @rig def read[A:Bits](sram: SRAM[A], addr: Seq[I32], ens: Set[Bit] = Set.empty): A = stage(SRAMRead(sram,addr,ens))
+  @rig def write[A:Bits](sram: SRAM[A], data: A, addr: Seq[I32], ens: Set[Bit] = Set.empty): Void = stage(SRAMWrite(sram,data,addr,ens))
 }
 

@@ -2,8 +2,8 @@ package nova.compiler
 
 import core._
 import core.passes.Pass
-import nova.data.FlowRules
-import nova.rewrites.RewriteRules
+import spatial.data.FlowRules
+import spatial.rewrites.RewriteRules
 import spatial.lang.Void
 
 trait DSLApp extends Compiler {

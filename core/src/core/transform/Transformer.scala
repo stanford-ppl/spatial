@@ -28,7 +28,7 @@ abstract class Transformer extends Pass {
 
   protected def transformSym[T](sym: Sym[T]): Sym[T]
   protected def transformBlock[T](block: Block[T]): Block[T] = {
-    stageLambdaN(f(block.inputs))({ inlineBlock(block) }, block.options)
+    stageScope(f(block.inputs),block.options){ inlineBlock(block) }
   }
 
   protected def inlineBlock[T](block: Block[T]): Sym[T]
@@ -74,7 +74,7 @@ abstract class Transformer extends Pass {
     //logs(s"$lhs = $rhs [Mirror]")
     val (lhs2,_) = try {
       transferMetadataIfNew(lhs){
-        tA.boxed(stage(rhs.mirror(f)))
+        tA.boxed(stage( mirrorNode(rhs) ))
       }
     }
     catch {case t: Throwable =>
@@ -84,6 +84,8 @@ abstract class Transformer extends Pass {
     //logs(s"${stm(lhs2)}")
     lhs2
   }
+
+  def mirrorNode[A](rhs: Op[A]): Op[A] = rhs.mirror(f)
 
   final def mirrorProduct[T<:Product](x: T): T = {
     // Note: this only works if the case class has no implicit parameters!

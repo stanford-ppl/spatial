@@ -4,55 +4,62 @@ import forge.tags._
 import core._
 import spatial.lang._
 
-abstract class FltOp2[F:FltFmt,R:Type] extends Primitive[R] {
-  lazy val fmt: FltFmt[F] = FltFmt[F]
+abstract class FltOp2[M:INT,E:INT,R:Type] extends Primitive[R] {
+  lazy val fmt: FltFmt[M,E] = FltFmt[M,E]
 }
-abstract class FltOp1[F:FltFmt] extends FltOp2[F,Flt[F]]
+abstract class FltOp1[M:INT,E:INT] extends FltOp2[M,E,Flt[M,E]]
 
-@op case class FltNeg[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltAdd[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltSub[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltMul[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltDiv[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltMod[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltLst[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp2[F,Bit]
-@op case class FltLeq[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp2[F,Bit]
-@op case class FltEql[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp2[F,Bit]
-@op case class FltNeq[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp2[F,Bit]
+@op case class FltNeg[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltAdd[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltSub[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltMul[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltDiv[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltMod[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltLst[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp2[M,E,Bit]
+@op case class FltLeq[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp2[M,E,Bit]
+@op case class FltEql[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp2[M,E,Bit]
+@op case class FltNeq[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp2[M,E,Bit]
 
-@op case class FltMin[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltMax[F:FltFmt](a: Flt[F], b: Flt[F]) extends FltOp1[F]
-@op case class FltAbs[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltCeil[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltFloor[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltPow[F:FltFmt](b: Flt[F], e: Flt[F]) extends FltOp1[F]
-@op case class FltExp[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltLn[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltSqrt[F:FltFmt](a: Flt[F]) extends FltOp1[F]
+@op case class FltMin[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltMax[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltAbs[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltCeil[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltFloor[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltPow[M:INT,E:INT](b: Flt[M,E], e: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltExp[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltLn[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltSqrt[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 
-@op case class FltSin[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltCos[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltTan[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltSinh[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltCosh[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltTanh[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltAsin[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltAcos[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltAtan[F:FltFmt](a: Flt[F]) extends FltOp1[F]
+@op case class FltSin[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltCos[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltTan[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltSinh[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltCosh[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltTanh[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltAsin[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltAcos[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltAtan[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 
-@op case class FltInvSqrt[F:FltFmt](a: Flt[F]) extends FltOp1[F]
-@op case class FltSigmoid[F:FltFmt](a: Flt[F]) extends FltOp1[F]
+@op case class FltInvSqrt[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltSigmoid[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 
-@op case class FltToFlt[F1:FltFmt,F2:FltFmt](a: Flt[F1], f2: FltFmt[F2]) extends FltOp2[F1,Flt[F2]]
-@op case class FltToFix[F1:FltFmt,F2:FixFmt](a: Flt[F1], f2: FixFmt[F2]) extends FltOp2[F1,Fix[F2]]
+@op case class FltToFlt[M1:INT,E1:INT,M2:INT,E2:INT](
+    a: Flt[M1,E1],
+    f2: FltFmt[M2,E2])
+  extends FltOp2[M1,E1,Flt[M2,E2]]
 
-@op case class TextToFlt[F:FltFmt](t: Text, fm: FltFmt[F]) extends FltOp1[F] {
+@op case class FltToFix[M1:INT,E1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Flt[M1,E1],
+    f2: FixFmt[S2,I2,F2])
+  extends FltOp2[M1,E1,Fix[S2,I2,F2]]
+
+@op case class TextToFlt[M:INT,E:INT](t: Text, fm: FltFmt[M,E]) extends FltOp1[M,E] {
   override val debugOnly: Boolean = true
 }
-@op case class FltToText[F:FltFmt](a: Flt[F]) extends FltOp2[F,Text] {
+@op case class FltToText[M:INT,E:INT](a: Flt[M,E]) extends FltOp2[M,E,Text] {
   override val debugOnly: Boolean = true
 }
 
-@op case class FltRandom[F:FltFmt](max: Option[Flt[F]]) extends FltOp1[F] {
+@op case class FltRandom[M:INT,E:INT](max: Option[Flt[M,E]]) extends FltOp1[M,E] {
   override def effects: Effects = Effects.Simple
 }

@@ -2,7 +2,7 @@ package forge
 
 import forge.tags.SrcCtxMacro
 
-case class SrcCtx(dir: String, file: String, line: Int, column: Int, content: Option[String]) {
+case class SrcCtx(dir: String, file: String, line: Int, column: Int, content: Option[String]) extends utils.Ctx {
   override def toString = s"$file:$line:$column"
 }
 

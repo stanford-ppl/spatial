@@ -1,5 +1,7 @@
 package forge.tags
 
+import utils.tags.MacroUtils
+
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.language.experimental.macros
@@ -21,7 +23,8 @@ object mod {
       case cls: ClassDef =>
         val names = cls.constructorArgs.head.map(_.name)
 
-        cls.asCaseClass.injectMethod(q"final override def names = Seq(..$names)")
+        //cls.asCaseClass.injectMethod(q"final override def names = Seq(..$names)")
+        cls
 
       case t =>
         c.error(c.enclosingPosition, "@mod annotation can only be used on classes.")

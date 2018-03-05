@@ -1,5 +1,7 @@
 package core
 
+import scala.annotation.unchecked.{uncheckedVariance => uV}
+
 sealed abstract class Def[+A,+B] {
   def isValue: Boolean = isConst || isParam
   def isConst: Boolean = false
@@ -10,7 +12,7 @@ sealed abstract class Def[+A,+B] {
   def isType: Boolean = false
 
   def getValue: Option[A] = None
-  def getOp: Option[Op[B]] = None
+  def getOp: Option[Op[B@uV]] = None
   def getID: Option[Int] = None
 }
 object Def {

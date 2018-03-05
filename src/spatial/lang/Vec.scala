@@ -3,8 +3,8 @@ package spatial.lang
 import core._
 import emul.{FixedPoint, Number}
 import forge.tags._
-import forge.math.ReduceTree
-import forge.util.plural
+import utils.math.ReduceTree
+import utils.plural
 
 import spatial.node._
 
@@ -14,7 +14,7 @@ import spatial.node._
   override val box: Vec[A] <:< (Arith[Vec[A]] with Bits[Vec[A]]) = implicitly[Vec[A] <:< (Arith[Vec[A]] with Bits[Vec[A]])]
   private implicit val evv: A <:< Bits[A] = tA.box
 
-  // TODO: These are all quite expensive for large vectors
+  // TODO[4]: These are all quite expensive for large vectors
   @api def elems: List[A] = List.tabulate(length){i => this.apply(i) }
   @api def map[B:Bits](func: A => B): Vec[B] = Vec.LeastFirst(elems.map(func):_*)
   @api def zip[B:Bits,R:Bits](that: Vec[B])(func: (A,B) => R): Vec[R] = {
@@ -37,7 +37,7 @@ import spatial.node._
     err[Vec[A]]
   }
 
-  // TODO: This is a bit hacky - is there a better way to define these?
+  // TODO[5]: This is a bit hacky - is there a better way to define these?
   @api def unary_-(): Vec[A] = arith("negation"){a => this.map(a.neg) }
   @api def +(b: Vec[A]): Vec[A] = arith("addition"){a => this.zip(b)(a.add) }
   @api def -(b: Vec[A]): Vec[A] = arith("subtraction"){a => this.zip(b)(a.sub) }

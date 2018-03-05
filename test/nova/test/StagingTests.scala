@@ -5,7 +5,7 @@ import utest._
 
 @spatial object StageForeach {
   def main(): Void = Accel {
-    (0::32){i => println("Hi") }
+    Foreach(0::32){i => println("Hi") }
   }
 }
 

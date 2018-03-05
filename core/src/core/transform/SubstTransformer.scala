@@ -38,8 +38,7 @@ abstract class SubstTransformer extends Transformer {
 
   override protected def transformBlock[T](block: Block[T]): Block[T] = blockSubst.get(block) match {
     case Some(block2) => block2.asInstanceOf[Block[T]]
-    case None =>
-      stageLambdaN(f(block.inputs))({ inlineBlock(block) }, block.options)
+    case None => stageScope(f(block.inputs),block.options){ inlineBlock(block) }
   }
 
 

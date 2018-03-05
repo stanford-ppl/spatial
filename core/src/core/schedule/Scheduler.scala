@@ -4,6 +4,9 @@ package schedule
 import scala.collection.mutable
 
 trait Scheduler {
+  /** If true overrides the compiler's current code motioning flag. **/
+  def mustMotion: Boolean
+
   /**
     * Computes an *external* summary for a sequence of nodes
     * (Ignores reads/writes on data allocated within the scope)

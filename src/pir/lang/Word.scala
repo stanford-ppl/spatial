@@ -19,5 +19,5 @@ import spatial.lang._
 }
 
 object Word {
-  def c(x: Any): Word = const[Word](x)
+  def c(x: Any): Word = uconst[Word](x)
 }

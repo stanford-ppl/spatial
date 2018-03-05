@@ -20,11 +20,11 @@ import spatial.lang._
   override def isPrimitive: Boolean = true
   override def nbits: Int = tA.nbits
 
-  @rig def zero: Out[A] = Out.c(new Ptr(tA.zero))
-  @rig def one: Out[A] = Out.c(new Ptr(tA.one))
+  @rig def zero: Out[A] = const[Out[A]](new Ptr(tA.zero))
+  @rig def one: Out[A] = const[Out[A]](new Ptr(tA.one))
   @rig def random(max: Option[Out[A]]): Out[A] = undefinedOp("random")
 }
 
 object Out {
-  def c[A:Bits](values: Ptr[Any]): Out[A] = const[Out[A]](values)
+
 }

@@ -19,6 +19,13 @@ abstract class Number extends Equals {
     }.toArray
   }
 
+  def <(that: Int): Boolean
+  def <=(that: Int): Boolean
+  def >(that: Int): Boolean
+  def >=(that: Int): Boolean
+  def ===(that: Int): Boolean
+  def !==(that: Int): Boolean
+
   override def canEqual(that: Any): Boolean = that match {
     case _: Byte => true
     case _: Short => true

@@ -30,16 +30,14 @@ abstract class MutateTransformer extends ForwardTransformer {
     metadata.addAll(sym, data)
   }
 
-  /**
-    * Mutate this symbol's node with the current substitution rules
-    * TODO: This has a small inefficiency where metadata created through flows is immediately mirrored
-    */
+  /** Mutate this symbol's node with the current substitution rules. **/
   def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val ctx: SrcCtx = lhs.src
     //logs(s"$lhs = $rhs [Update]")
     try {
-      rhs.update(f)
+      updateNode(rhs)
       val lhs2 = restage(lhs)
+      // TODO[5]: Small inefficiency where metadata created through flows is immediately mirrored
       if (lhs2 == lhs) updateMetadata(lhs2)
       lhs2
     }
@@ -49,6 +47,8 @@ abstract class MutateTransformer extends ForwardTransformer {
       throw t
     }
   }
+
+  def updateNode[A](node: Op[A]): Unit = node.update(f)
 
   /**
     * Visit and transform each statement in the given block.

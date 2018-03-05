@@ -1,5 +1,7 @@
 package forge.tags
 
+import utils.tags.MacroUtils
+
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.language.experimental.macros
@@ -36,14 +38,13 @@ object rewrite {
         else if (paramss(1).length != 2) noImplicitsAllowed()
         else if (d.tparams.nonEmpty) noTypeParametersAllowed()
 
-        val arg0 = paramss.head.apply(0)
+        val arg0 = paramss.head.head
         val name = Literal(Constant(d.name.toString))
         d.rhs match {
           case Match(_,_) =>
           case _ => c.error(c.enclosingPosition, "@rewrite rule must be a partial function")
         }
 
-        // TODO: Where to get implicit parameters from?
         val pf =
           q"""val ${d.name}: PartialFunction[(Op[_],SrcCtx,State),Option[Sym[_]]] = {case (__op,__ctx,__state) =>
             val ${arg0.name} = __op.asInstanceOf[${arg0.tp.get}];

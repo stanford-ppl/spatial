@@ -3,12 +3,14 @@ package static
 
 import core._
 import forge.tags._
-import forge.util.overloads._
-import nova.data.rangeOf
+import utils.Overloads._
+import spatial.data.rangeOf
 
 trait LiftsPriority3 { this: Lifts =>
   import scala.collection.immutable.WrappedString
   implicit def stringToWrappedString(x: String): WrappedString = new WrappedString(x)
+
+
 }
 
 trait LiftsPriority2 { this: Lifts =>
@@ -19,26 +21,28 @@ trait LiftsPriority2 { this: Lifts =>
   implicit def short2RichShort(x: Short): RichShort = new RichShort(x)
   implicit def int2RichInt(x: Int): RichInt = new RichInt(x)
   implicit def long2RichLong(x: Long): RichLong = new RichLong(x)
-
-  @api implicit def FixFromFloat[F:FixFmt](c: Float): Fix[F] = c.to[Fix[F]]
-  @api implicit def FixFromDouble[F:FixFmt](c: Double): Fix[F] = c.to[Fix[F]]
-
   implicit def stringToStringOps(x: String): StringOps = new StringOps(x)
+
+  // Using Lift[A] is always lowest priority
+  @rig implicit def liftBoolean(b: Boolean): Lift[Bit] = new Lift(b,b.to[Bit])
+  @rig implicit def liftByte(b: Byte): Lift[I8] = new Lift[I8](b,b.to[I8])
+  @rig implicit def liftShort(b: Short): Lift[I16] = new Lift[I16](b,b.to[I16])
+  @rig implicit def liftInt(b: Int): Lift[I32] = new Lift[I32](b,b.to[I32])
+  @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
+  @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
+  @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
 }
 
 trait LiftsPriority1 extends LiftsPriority2 { this: Lifts =>
-  @api implicit def FixFromInt[F:FixFmt](c: Int): Fix[F] = c.to[Fix[F]]
 
-  @api implicit def FltFromByte[F:FltFmt](c: Byte): Flt[F] = c.to[Flt[F]]
-  @api implicit def FltFromShort[F:FltFmt](c: Short): Flt[F] = c.to[Flt[F]]
-  @api implicit def FltFromLong[F:FltFmt](c: Long): Flt[F] = c.to[Flt[F]]
-
-  @api implicit def SeriesFromFix[F:FixFmt](x: Fix[F]): Series[Fix[F]] = Series[Fix[F]](x, x+1, 1, 1, isUnit=true)
+  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = {
+    Series[Fix[S,I,F]](x, x+1, 1, 1, isUnit=true)
+  }
 
   // Shadows Predef method
   @api implicit def wrapString(x: String): Text = Text.c(x)
 
-  @rig implicit def selfLift[A:Type](a: A): Lift[A] = new Lift[A](a)
+  @api implicit def FixFromInt[S:BOOL,I:INT,F:INT](c: Int): Fix[S,I,F] = c.to[Fix[S,I,F]]
 }
 
 trait Lifts extends LiftsPriority1 {
@@ -55,18 +59,25 @@ trait Lifts extends LiftsPriority1 {
 
   // --- Implicits defs
 
+  @api implicit def FixFromFloat[S:BOOL,I:INT,F:INT](c: Float): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FixFromDouble[S:BOOL,I:INT,F:INT](c: Double): Fix[S,I,F] = c.to[Fix[S,I,F]]
+
+  @api implicit def FltFromByte[M:INT,E:INT](c: Byte): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def FltFromShort[M:INT,E:INT](c: Short): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def FltFromLong[M:INT,E:INT](c: Long): Flt[M,E] = c.to[Flt[M,E]]
+
   @api implicit def BitFromBoolean(c: Boolean): Bit = c.to[Bit]
 
-  @api implicit def FixFromByte[F:FixFmt](c: Byte): Fix[F] = c.to[Fix[F]]
-  @api implicit def FixFromShort[F:FixFmt](c: Short): Fix[F] = c.to[Fix[F]]
-  @api implicit def FixFromLong[F:FixFmt](c: Long): Fix[F] = c.to[Fix[F]]
+  @api implicit def FixFromByte[S:BOOL,I:INT,F:INT](c: Byte): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FixFromShort[S:BOOL,I:INT,F:INT](c: Short): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FixFromLong[S:BOOL,I:INT,F:INT](c: Long): Fix[S,I,F] = c.to[Fix[S,I,F]]
 
-  @api implicit def FltFromFloat[F:FltFmt](c: Float): Flt[F] = c.to[Flt[F]]
-  @api implicit def FltFromDouble[F:FltFmt](c: Double): Flt[F] = c.to[Flt[F]]
+  @api implicit def FltFromFloat[M:INT,E:INT](c: Float): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def FltFromDouble[M:INT,E:INT](c: Double): Flt[M,E] = c.to[Flt[M,E]]
 
   @api implicit def VoidFromUnit(c: Unit): Void = Void.c
 
-  @api implicit def SeriesToCounter(x: Series[I32]): Counter = Counter.from(x)
+  @api implicit def SeriesToCounter[S:BOOL,I:INT,F:INT](x: Series[Fix[S,I,F]]): Counter[Fix[S,I,F]] = Counter.from(x)
 
 
   @rig def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
@@ -93,7 +104,7 @@ trait Lifts extends LiftsPriority1 {
   @rig implicit def ShortWrapper(b: Short): ShortWrapper = new ShortWrapper(b)
 
   class IntWrapper(x: Int)(implicit ctx: SrcCtx, state: State) {
-    def until(end: I32): Series[I32] = Series[I32](I32.c(x), end, I32.c(1), I32.c(1))
+    def until(end: I32): Series[I32] = Series[I32](I32(x), end, I32(1), I32(1))
     def by(step: I32): Series[I32] = Series[I32](1, x, step, 1)
     def par(p: I32): Series[I32] = Series[I32](1, x, 1, p)
 
@@ -119,7 +130,8 @@ trait Lifts extends LiftsPriority1 {
       */
     def apply(range: ((Int, Int), Int))(implicit ov2: Overload1): I32 = createParam(x, range._1._1, range._1._2, range._2)
 
-
+    def to(end: Int): Series[I32] = Series[I32](x, end+1, 1, 1)
+    def to(end: I32): Series[I32] = Series[I32](x, end+1, 1, 1)
     def to[B](implicit cast: Cast[Int,B]): B = cast(x)
   }
   @rig implicit def intWrapper(x: Int): IntWrapper = new IntWrapper(x)
@@ -142,61 +154,54 @@ trait Lifts extends LiftsPriority1 {
   @api implicit def augmentString(x: String): Text = Text.c(x)
 
   // --- Boolean
-  @rig implicit def liftBoolean(b: Boolean): Lift[Bit] = new Lift(b.to[Bit])
   class Cvt_Boolean_Bit extends Lifter[Boolean,Bit]
-  class Cvt_Boolean_Fix[F:FixFmt] extends Lifter[Boolean,Fix[F]]
-  class Cvt_Boolean_Flt[F:FltFmt] extends Lifter[Boolean,Flt[F]]
+  class Cvt_Boolean_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Boolean,Fix[S,I,F]]
+  class Cvt_Boolean_Flt[M:INT,E:INT] extends Lifter[Boolean,Flt[M,E]]
 
   implicit lazy val castBooleanToBit: Cast[Boolean,Bit] = Right(new Cvt_Boolean_Bit)
-  implicit def CastBooleanToFix[F:FixFmt]: Cast[Boolean,Fix[F]] = Right(new Cvt_Boolean_Fix[F])
-  implicit def CastBooleanToFlt[F:FltFmt]: Cast[Boolean,Flt[F]] = Right(new Cvt_Boolean_Flt[F])
+  implicit def CastBooleanToFix[S:BOOL,I:INT,F:INT]: Cast[Boolean,Fix[S,I,F]] = Right(new Cvt_Boolean_Fix[S,I,F])
+  implicit def CastBooleanToFlt[M:INT,E:INT]: Cast[Boolean,Flt[M,E]] = Right(new Cvt_Boolean_Flt[M,E])
 
 
   // --- Byte
-  @rig implicit def liftByte(b: Byte): Lift[I8] = new Lift[I8](b.to[I8])
-  class Cvt_Byte_Fix[F:FixFmt] extends Lifter[Byte,Fix[F]]
-  class Cvt_Byte_Flt[F:FltFmt] extends Lifter[Byte,Flt[F]]
-  implicit def CastByteToFix[F:FixFmt]: Cast[Byte,Fix[F]] = Right(new Cvt_Byte_Fix[F])
-  implicit def CastByteToFlt[F:FltFmt]: Cast[Byte,Flt[F]] = Right(new Cvt_Byte_Flt[F])
+  class Cvt_Byte_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Byte,Fix[S,I,F]]
+  class Cvt_Byte_Flt[M:INT,E:INT] extends Lifter[Byte,Flt[M,E]]
+  implicit def CastByteToFix[S:BOOL,I:INT,F:INT]: Cast[Byte,Fix[S,I,F]] = Right(new Cvt_Byte_Fix[S,I,F])
+  implicit def CastByteToFlt[M:INT,E:INT]: Cast[Byte,Flt[M,E]] = Right(new Cvt_Byte_Flt[M,E])
 
 
   // --- Short
-  @rig implicit def liftShort(b: Short): Lift[I16] = new Lift[I16](b.to[I16])
-  class Cvt_Short_Fix[F:FixFmt] extends Lifter[Short,Fix[F]]
-  class Cvt_Short_Flt[F:FltFmt] extends Lifter[Short,Flt[F]]
-  implicit def CastShortToFix[F:FixFmt]: Cast[Short,Fix[F]] = Right(new Cvt_Short_Fix[F])
-  implicit def CastShortToFlt[F:FltFmt]: Cast[Short,Flt[F]] = Right(new Cvt_Short_Flt[F])
+  class Cvt_Short_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Short,Fix[S,I,F]]
+  class Cvt_Short_Flt[M:INT,E:INT] extends Lifter[Short,Flt[M,E]]
+  implicit def CastShortToFix[S:BOOL,I:INT,F:INT]: Cast[Short,Fix[S,I,F]] = Right(new Cvt_Short_Fix[S,I,F])
+  implicit def CastShortToFlt[M:INT,E:INT]: Cast[Short,Flt[M,E]] = Right(new Cvt_Short_Flt[M,E])
 
 
   // --- Int
-  @rig implicit def liftInt(b: Int): Lift[I32] = new Lift[I32](b.to[I32])
-  class Cvt_Int_Fix[F:FixFmt] extends Lifter[Int,Fix[F]]
-  class Cvt_Int_Flt[F:FltFmt] extends Lifter[Int,Flt[F]]
-  implicit def CastIntToFix[F:FixFmt]: Cast[Int,Fix[F]] = Right(new Cvt_Int_Fix[F])
-  implicit def CastIntToFlt[F:FltFmt]: Cast[Int,Flt[F]] = Right(new Cvt_Int_Flt[F])
+  class Cvt_Int_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Int,Fix[S,I,F]]
+  class Cvt_Int_Flt[M:INT,E:INT] extends Lifter[Int,Flt[M,E]]
+  implicit def CastIntToFix[S:BOOL,I:INT,F:INT]: Cast[Int,Fix[S,I,F]] = Right(new Cvt_Int_Fix[S,I,F])
+  implicit def CastIntToFlt[M:INT,E:INT]: Cast[Int,Flt[M,E]] = Right(new Cvt_Int_Flt[M,E])
 
 
   // --- Long
-  @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b.to[I64])
-  class Cvt_Long_Fix[F:FixFmt] extends Lifter[Long,Fix[F]]
-  class Cvt_Long_Flt[F:FltFmt] extends Lifter[Long,Flt[F]]
-  implicit def CastLongToFix[F:FixFmt]: Cast[Long,Fix[F]] = Right(new Cvt_Long_Fix[F])
-  implicit def CastLongToFlt[F:FltFmt]: Cast[Long,Flt[F]] = Right(new Cvt_Long_Flt[F])
+  class Cvt_Long_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Long,Fix[S,I,F]]
+  class Cvt_Long_Flt[M:INT,E:INT] extends Lifter[Long,Flt[M,E]]
+  implicit def CastLongToFix[S:BOOL,I:INT,F:INT]: Cast[Long,Fix[S,I,F]] = Right(new Cvt_Long_Fix[S,I,F])
+  implicit def CastLongToFlt[M:INT,E:INT]: Cast[Long,Flt[M,E]] = Right(new Cvt_Long_Flt[M,E])
 
 
   // --- Float
-  @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b.to[F32])
-  class Cvt_Float_Fix[F:FixFmt] extends Lifter[Float,Fix[F]]
-  class Cvt_Float_Flt[F:FltFmt] extends Lifter[Float,Flt[F]]
-  implicit def CastFloatToFix[F:FixFmt]: Cast[Float,Fix[F]] = Right(new Cvt_Float_Fix[F])
-  implicit def CastFloatToFlt[F:FltFmt]: Cast[Float,Flt[F]] = Right(new Cvt_Float_Flt[F])
+  class Cvt_Float_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Float,Fix[S,I,F]]
+  class Cvt_Float_Flt[M:INT,E:INT] extends Lifter[Float,Flt[M,E]]
+  implicit def CastFloatToFix[S:BOOL,I:INT,F:INT]: Cast[Float,Fix[S,I,F]] = Right(new Cvt_Float_Fix[S,I,F])
+  implicit def CastFloatToFlt[M:INT,E:INT]: Cast[Float,Flt[M,E]] = Right(new Cvt_Float_Flt[M,E])
 
 
   // --- Double
-  @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b.to[F64])
-  class Cvt_Double_Fix[F:FixFmt] extends Lifter[Double,Fix[F]]
-  class Cvt_Double_Flt[F:FltFmt] extends Lifter[Double,Flt[F]]
-  implicit def CastDoubleToFix[F:FixFmt]: Cast[Double,Fix[F]] = Right(new Cvt_Double_Fix[F])
-  implicit def CastDoubleToFlt[F:FltFmt]: Cast[Double,Flt[F]] = Right(new Cvt_Double_Flt[F])
+  class Cvt_Double_Fix[S:BOOL,I:INT,F:INT] extends Lifter[Double,Fix[S,I,F]]
+  class Cvt_Double_Flt[M:INT,E:INT] extends Lifter[Double,Flt[M,E]]
+  implicit def CastDoubleToFix[S:BOOL,I:INT,F:INT]: Cast[Double,Fix[S,I,F]] = Right(new Cvt_Double_Fix[S,I,F])
+  implicit def CastDoubleToFlt[M:INT,E:INT]: Cast[Double,Flt[M,E]] = Right(new Cvt_Double_Flt[M,E])
 
 }

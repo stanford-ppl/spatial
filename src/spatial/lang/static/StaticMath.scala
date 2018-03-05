@@ -3,7 +3,7 @@ package static
 
 import core._
 import forge.tags._
-import forge.math.ReduceTree
+import utils.math.ReduceTree
 
 trait StaticMath {
 

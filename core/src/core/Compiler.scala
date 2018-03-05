@@ -2,11 +2,9 @@ package core
 
 import core.passes.Pass
 import core.transform.Transformer
-
-import forge.{Instrument, Instrumented}
-import forge.io.files
-import forge.util.plural
-import forge.implicits.terminal._
+import utils.io.files
+import utils.{Instrumented, Instrument, plural}
+import utils.implicits.terminal._
 
 trait Compiler { self =>
   protected var IR: State = new State
@@ -103,9 +101,11 @@ trait Compiler { self =>
     cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<app>]")
   }
 
-  // TODO: Copy globals (created prior to the main method) to the new state's graph?
+  def initConfig(): Config = new Config
+
   final def init(args: Array[String]): Unit = instrument("init"){
     IR = new State                 // Create a new, empty state
+    IR.config = initConfig()
     IR.config.name = name          // Set the default program name
     IR.config.logDir = files.cwd + files.sep + "logs" + files.sep + name + files.sep
     IR.config.genDir = files.cwd + files.sep + "gen" + files.sep + name + files.sep

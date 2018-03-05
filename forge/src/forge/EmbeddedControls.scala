@@ -39,7 +39,6 @@ trait EmbeddedControls {
   // macros (See [[https://issues.scala-lang.org/browse/SI-5778]]).
 
   /** Val definitions **/
-  // TODO: Way to have this not conflict with staged variable creation?
   def __newVar[T](init: T): VarLike[T] = new forge.Ptr[T](init)
   def __assign[T](lhs: VarLike[T], rhs: T): Unit = lhs.__assign(rhs)
   def __readVar[T](v: VarLike[T]): T = v.__read
@@ -261,8 +260,8 @@ private object EmbeddedControls {
   }
 
 
-  // TODO: move me and add hook for lms
-  // TODO: revert import statement to blackbox macros when this is moved
+  // TODO[5]: move me and add hook for lms
+  // TODO[5]: revert import statement to blackbox macros when this is moved
   def anyVal_+[A<:AnyVal, B<:AnyVal](c: whitebox.Context)(lhs: c.Expr[A], rhs: c.Expr[B])(implicit ta: c.WeakTypeTag[A], tb: c.WeakTypeTag[B]): c.Expr[AnyVal] = {
     import c.universe._
 

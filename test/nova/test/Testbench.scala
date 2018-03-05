@@ -1,7 +1,7 @@
 package nova.test
 
 import nova.compiler.DSLApp
-import forge.implicits.readable._
+import utils.implicits.Readable._
 import utest._
 
 abstract class Testbench extends TestSuite {

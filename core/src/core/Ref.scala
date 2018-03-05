@@ -1,8 +1,8 @@
 package core
 
 import forge.tags._
-import forge.implicits.readable._
-import forge.util.{escapeConst,isSubtype}
+import utils.implicits.Readable._
+import utils.{escapeConst,isSubtype}
 
 import scala.collection.mutable
 import scala.annotation.unchecked.{uncheckedVariance => uV}
@@ -15,7 +15,7 @@ import scala.reflect.ClassTag
   * Note that ExpType is NOT covariant with A
   */
 abstract class ExpType[+C,A](implicit ev: A <:< Ref[C,A]) extends Serializable with Equals {
-  type I = C@uV
+  type L = C@uV
   def tp: ExpType[C,A]
   val boxed: A <:< Ref[C,A] = ev
 
@@ -79,13 +79,17 @@ abstract class ExpType[+C,A](implicit ev: A <:< Ref[C,A]) extends Serializable w
   @rig final def from(c: Any, checked: Boolean = true, isParam: Boolean = false): A = {
     implicit val tA: Type[A] = this
     (cnst(c,checked),isParam) match {
-      case (Some(x),true)  => param(this, x)
-      case (Some(x),false) => const(this, x)
+      case (Some(x),true)  => _param(this, x)
+      case (Some(x),false) => _const(this, x)
       case (None,_) =>
         error(ctx, s"Cannot convert ${c.getClass} to a ${this.tp}")
         error(ctx)
         err[A]
     }
+  }
+  final def uconst(c: C@uV): A = {
+    implicit val tA: Type[A] = this
+    _const(this, c)
   }
 }
 
@@ -99,8 +103,8 @@ abstract class ExpType[+C,A](implicit ev: A <:< Ref[C,A]) extends Serializable w
   *   3. A parameter of type C (mutable literal value, no defining node)
   *   4. The result of an operation of type S (has a defining node)
   */
-trait Exp[+C,+A] extends Serializable with Equals { self =>
-  type I = C@uV
+sealed trait Exp[+C,+A] extends Serializable with Equals { self =>
+  type L = C@uV
   def unbox: A
 
   private[core] var _tp: ExpType[C@uV,A@uV] = _
@@ -112,7 +116,7 @@ trait Exp[+C,+A] extends Serializable with Equals { self =>
     else _tp
   }
 
-  final def selfType: A = tp.asInstanceOf[A]
+  //final def selfType: A = tp.asInstanceOf[A]
 
   private var _rhs: Def[C@uV,A@uV] = _
   private[core] def rhs_=(rhs: Def[C@uV, A@uV]): Unit = { _rhs = rhs }
@@ -136,7 +140,7 @@ trait Exp[+C,+A] extends Serializable with Equals { self =>
   final def isSymbol: Boolean = rhs.isNode
   final def isType: Boolean = rhs.isType
   final def c: Option[C] = rhs.getValue
-  final def op: Option[Op[A]] = rhs.getOp
+  final def op: Option[Op[A@uV]] = rhs.getOp
 
   /** Returns data dependencies of this symbol. **/
   final def inputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
@@ -155,7 +159,7 @@ trait Exp[+C,+A] extends Serializable with Equals { self =>
   * All staged types should mix in this trait last.
   */
 trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
-  override type I = C@uV
+  override type L = C@uV
 
   final override def hashCode(): Int = this.rhs match {
     case Def.Const(c)    => c.hashCode()

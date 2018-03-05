@@ -1,5 +1,7 @@
 package forge.tags
 
+import utils.tags.MacroUtils
+
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
@@ -78,12 +80,11 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
       methodCall(receiver.map(transform), name, List(args.map(transform)), targs)
     }
 
-    // Call for transforming Blocks. Allows expanding a single statement to multiple statements within a given scope
+    /** Call for transforming Blocks.
+      *
+      * Allows expanding a single statement to multiple statements within a given scope.
+      */
     private def transformStm(tree: Tree): List[Tree] = tree match {
-      // TODO: Name mangling is nice and elegant, but becomes an issue when we assume we've mangled
-      // names which actually haven't been changed. Would need to come up with a solution to check to see
-      // if a name's been mangled that also respects scoping (and potentially incremental compilation?)
-
       case ValDef(mods, term@TermName(name), tpt, rhs) if mods.hasFlag(Flag.MUTABLE) && !mods.hasFlag(Flag.PARAMACCESSOR) =>
         tpt match {
           case EmptyTree =>
@@ -121,24 +122,8 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
 
         case Block(stms, ret) =>
           val stms2 = stms.flatMap(transformStm) ++ transformStm(ret)
-
           Block(stms2.dropRight(1), stms2.last)
 
-        //case sym @ Ident(TermName(name)) =>
-        //  methodCall(None, "__use", List(List(sym)), Nil)
-
-        /* Variables */
-        //case ValDef(mods, sym, tpt, rhs) if mods.hasFlag(Flag.MUTABLE) =>
-          // TODO: What about case like:
-          // var x: Option[Int] = None
-          // x = Some(3)
-          // __newVar: Var[Option[Int]]
-          //ValDef(mods, sym, tpt, call(None, "__newVar", List(rhs)))
-
-        //case Assign(lhs, rhs) =>
-          // liftFeature(None, "__assign", List(Ident(lhs+"$v"), rhs))   // Name mangling version
-
-          //call(None, "__assign", List(lhs, rhs))
 
         case Function(params,body) =>
           val named = params.collect{case ValDef(_,term@TermName(name),_,_) =>

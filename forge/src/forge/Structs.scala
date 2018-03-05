@@ -2,9 +2,10 @@ package forge
 
 import scala.annotation.StaticAnnotation
 import scala.language.experimental.macros
-import scala.reflect.macros.blackbox //TODO: should be whitebox?
+import scala.reflect.macros.blackbox
 
 /** Annotation class for @struct macro annotation. */
+// TODO[2]: Update for new Exp/Type
 final class struct extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro StagedStructsMacro.impl
 }
@@ -112,7 +113,6 @@ object StagedStructsMacro {
             q"${Literal(Constant(termName.toString))} -> $termName.getOrElseCreate{$rhs}.s"
         }
 
-        // TODO: We assume for now that struct annotation is always used within a trait - any way to be more general?
 
         val mdef = q"def apply(...$argss)(implicit ctx: org.virtualized.SourceContext, state: argon.core.State): $className = struct[$className]( ..$body )(implicitly[argon.nodes.StructType[$className]], ctx, state)"
 

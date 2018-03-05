@@ -12,11 +12,11 @@ import spatial.lang._
   def nWords: Int = 16 // TODO
   def wWidth: Int = 32 // TODO
 
-  @rig def zero: Lanes = Lanes.c(Array.fill(nWords)(0))
-  @rig def one: Lanes = Lanes.c(Array.fill(nWords-1)(0) :+ 1)
+  @rig def zero: Lanes = const[Lanes](Array.fill(nWords)(0))
+  @rig def one: Lanes = const[Lanes](Array.fill(nWords-1)(0) :+ 1)
   @rig def random(max: Option[Lanes]): Lanes = undefinedOp("random")
 }
 
 object Lanes {
-  def c(values: Array[Any]): Lanes = const[Lanes](values)
+
 }

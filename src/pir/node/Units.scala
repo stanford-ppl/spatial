@@ -6,7 +6,7 @@ import spatial.lang._
 
 import core._
 import forge.tags._
-import nova.util.getCChains
+import spatial.util.getCChains
 
 import scala.collection.mutable
 
@@ -19,7 +19,7 @@ sealed abstract class ConfigBlackBox[T:Bits] extends Primitive[T]
 @op case class StreamConfig3[T:Bits](a1: T, a2: T, a3: T) extends ConfigBlackBox[T]
 @op case class StreamConfig4[T:Bits](a1: T, a2: T, a3: T, a4: T) extends ConfigBlackBox[T]
 
-@op case class CounterChainCopy(ctrs: Seq[Counter]) extends Alloc[CounterChain]
+@op case class CounterChainCopy(ctrs: Seq[Counter[_]]) extends Alloc[CounterChain]
 
 abstract class PU extends Control[Void] {
   def ins: mutable.Map[Int,In[_]]

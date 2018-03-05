@@ -1,7 +1,7 @@
 package core
 package passes
 
-import forge.implicits.readable._
+import utils.implicits.Readable._
 
 
 /**

@@ -44,7 +44,7 @@ abstract class AnalysisData[T] extends Metadata[T] { self =>
 }
 
 /** Shortcuts for metadata **/
-@data object metadata {
+object metadata {
   type Data = mutable.Map[Class[_],Metadata[_]]
 
   private def keyOf[M<:Metadata[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]

@@ -4,27 +4,31 @@ import forge.tags._
 import core._
 import spatial.lang._
 
-@op case class CounterNew(start: I32, end: I32, step: I32, par: I32) extends Alloc[Counter]
-@op case class CounterChainNew(counters: Seq[Counter]) extends Alloc[CounterChain]
+@op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
+  val nA: Num[A] = Num[A]
+}
+@op case class CounterChainNew(counters: Seq[Counter[_]]) extends Alloc[CounterChain]
 
 @op case class AccelScope(block: Block[Void]) extends Pipeline[Void] {
-  def ens: Seq[Bit] = Nil
   override def iters = Nil
   override def bodies = Seq(Nil -> Seq(block))
   override def cchains = Nil
+  override var ens: Set[Bit] = Set.empty
+  override def updateEn(f: Tx, addEns: Set[Bit]) = update(f)
+  override def mirrorEn(f: Tx, addEns: Set[Bit]) = mirror(f)
 }
 
-@op case class UnitPipe(ens: Seq[Bit], block: Block[Void]) extends Pipeline[Void] {
+@op case class UnitPipe(block: Block[Void], ens: Set[Bit]) extends Pipeline[Void] {
   override def iters = Nil
   override def bodies = Seq(Nil -> Seq(block))
   override def cchains = Nil
 }
 
 @op case class OpForeach(
-  ens:    Seq[Bit],
   cchain: CounterChain,
   block:  Block[Void],
-  iters:  Seq[I32]
+  iters:  Seq[I32],
+  ens:    Set[Bit]
 ) extends Loop[Void] {
   override def inputs = syms(ens) ++ syms(cchain) ++ syms(block)
   override def binds = super.binds ++ iters

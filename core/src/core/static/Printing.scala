@@ -2,10 +2,10 @@ package core
 package static
 
 import forge.tags._
-import forge.util.escapeConst
-import forge.implicits.terminal._
-import forge.io.files
-import forge.io.stream.createStream
+import utils.escapeConst
+import utils.implicits.terminal._
+import utils.io.files
+import utils.io.stream.createStream
 
 import java.io.PrintStream
 

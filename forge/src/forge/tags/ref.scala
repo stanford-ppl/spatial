@@ -1,5 +1,7 @@
 package forge.tags
 
+import utils.tags.MacroUtils
+
 import language.experimental.macros
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
@@ -26,7 +28,7 @@ private object ref {
       case List(v) => (v, Nil)
       case _ => c.abort(c.enclosingPosition, "Ref classes can have at most one explicit and one implicit parameter list")
     }
-    // TODO: Should check that @ref class A mixes in Ref[?,A]
+    // TODO[5]: Should check that @ref class A mixes in Ref[?,A]
 
     val name = cls.name
     val tparams = cls.tparams

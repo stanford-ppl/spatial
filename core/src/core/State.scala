@@ -2,27 +2,40 @@ package core
 
 import java.io.PrintStream
 
-import forge.io.NullOutputStream
+import utils.io.NullOutputStream
 
 import scala.collection.mutable
 
 class State extends forge.AppState {
   /** Config **/
-  val config: Config = new Config
+  var config: Config = _
+
+  /** Code Motion **/
+  private var _motionAllowed: Boolean = false
+  def mayMotion: Boolean = _motionAllowed
+  def enableMotion(): Unit = { _motionAllowed = true }
 
   /** Symbol IDs **/
   private var id: Int = -1
   def maxId: Int = id-1 // Inclusive
   def nextId(): Int = { id += 1; id }
 
-  /** List of effectful statements in the current scope **/
-  var scope: Vector[Sym[_]] = _   // TODO: Should be empty?
+  /** Statements in the current scope. **/
+  var scope: Vector[Sym[_]] = _
+
+  /** Effectful statements in the current scope. **/
   var impure: Vector[Impure] = _
 
-  /** Set the scope to be empty. Should not mutate current value. **/
-  def newScope(): Unit = {
+  /** Definition cache used for CSE **/
+  var cache: Map[Op[_], Sym[_]] = Map.empty
+
+  /** Set the scope to be empty. Should not mutate current value.
+    * NOTE: Should save and restore the scope surrounding this call.
+    */
+  def newScope(motion: Boolean): Unit = {
     scope = Vector.empty
     impure = Vector.empty
+    if (!motion) cache = Map.empty // Empty the CSE cache in case code motion is disabled
   }
 
   /** Alias caches **/
@@ -30,8 +43,6 @@ class State extends forge.AppState {
   val deepAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
   val aliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
 
-  /** Definition cache used for CSE **/
-  var cache: Map[Op[_], Sym[_]] = Map.empty
 
   /** Graph Metadata **/
   val globals: GlobalMetadata = new GlobalMetadata
@@ -76,7 +87,8 @@ class State extends forge.AppState {
   def reset(): Unit = {
     config.reset()
     id = -1
-    scope = null  // TODO: Should be empty?
+    // TODO[3]: Should scope be empty instead of null at start?
+    scope = null
     impure = null
     cache = Map.empty
     shallowAliasCache.clear()

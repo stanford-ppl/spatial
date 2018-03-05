@@ -1,8 +1,15 @@
 package spatial.node
 
 import core._
+import forge.tags._
+
 import spatial.lang._
 
-case class IfThenElse[T:Type](cond: Bit, thenBlk: Block[T], elseBlk: Block[T]) extends Op[T] {
+@op case class IfThenElse[T:Type](cond: Bit, thenBlk: Block[T], elseBlk: Block[T]) extends Control[T] {
+
   override def aliases: Seq[Sym[_]] = syms(thenBlk.result, elseBlk.result)
+
+  override def iters = Nil
+  override def cchains = Nil
+  override def bodies = Seq(Nil -> Seq(thenBlk,elseBlk))
 }

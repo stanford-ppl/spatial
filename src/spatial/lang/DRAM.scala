@@ -6,7 +6,7 @@ import spatial.node._
 
 @ref class DRAM[A:Bits] extends Top[DRAM[A]] with RemoteMem[A,DRAM] with Ref[Array[Any],DRAM[A]] {
   val tA: Bits[A] = Bits[A]
-  val ev: DRAM[A] <:< RemoteMem[A,DRAM] = implicitly[DRAM[A] <:< RemoteMem[A,DRAM]]
+  val evMem: DRAM[A] <:< RemoteMem[A,DRAM] = implicitly[DRAM[A] <:< RemoteMem[A,DRAM]]
 
   @api override def neql(that: DRAM[A]): Bit = {
     error(src, "Native comparison of DRAMs is unsupported. Use getMem to extract data.")

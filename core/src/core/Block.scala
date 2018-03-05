@@ -15,11 +15,17 @@ case class Block[R](
     s.op.map{o => o.blocks.flatMap(_.nestedStms) }.getOrElse(Nil)
   }.toSet
 
+  def nestedInputs: Set[Sym[_]] = nestedStmsAndInputs._2
+
+  def nestedStmsAndInputs: (Set[Sym[_]], Set[Sym[_]]) = {
+    val stms = this.nestedStms
+    val used = stms.flatMap(_.inputs) ++ inputs
+    val made = stms.flatMap{s => s +: s.op.map(_.binds).getOrElse(Nil) }
+    val ins  = (used diff made).filterNot(_.isValue)
+    (stms, ins)
+  }
+
   override def toString: String = {
     if (inputs.isEmpty) s"Block($result)" else s"""Block(${inputs.mkString("(", ",", ")")} => $result)"""
   }
-
-  // TODO: Use this if large blocks start to become a memory issue
-  // (recomputes impure statements in the block each time)
-  //def impure: Seq[Sym[_]] = stms.collect{case e@Effectful(eff,_) if !eff.isPure => e }
 }

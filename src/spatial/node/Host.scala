@@ -2,7 +2,7 @@ package spatial.node
 
 import forge.tags._
 import core._
-import nova.data._
+import spatial.data._
 import spatial.lang._
 
 @op case class PrintIf(en: Seq[Bit], x: Text) extends Primitive[Void] {

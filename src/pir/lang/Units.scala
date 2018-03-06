@@ -130,9 +130,9 @@ object PCU {
 }
 
 object PMU {
-  @api def apply[A](mem: SRAM[_]): PMUPtr = create(mem)
-  @api def apply[A](mem: FIFO[_]): PMUPtr = create(mem)
-  @api def apply[A](mem: LIFO[_]): PMUPtr = create(mem)
+  @api def apply[C[A]](mem: SRAM[_,C]): PMUPtr = create(mem)
+  @api def apply(mem: FIFO[_]): PMUPtr = create(mem)
+  @api def apply(mem: LIFO[_]): PMUPtr = create(mem)
 
   @api private def create(mem: Sym[_]): PMUPtr = {
     val pmu = VPMU(Seq(mem))

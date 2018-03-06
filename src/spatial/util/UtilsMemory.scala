@@ -10,7 +10,8 @@ import spatial.node._
 
 trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   implicit class SymMemories(x: Sym[_]) {
-    // Weird scalac issue is preventing x.isInstanceOf[LocalMem[_,_]]
+    // Weird scalac issue is preventing x.isInstanceOf[C[_,_]]?
+
     def isLocalMem: Boolean = x match {
       case _: LocalMem[_,_] => true
       case _ => false
@@ -24,7 +25,19 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     def isArgIn: Boolean = x.isInstanceOf[ArgIn[_]]
     def isArgOut: Boolean = x.isInstanceOf[ArgOut[_]]
 
-    def isSRAM: Boolean = x.isInstanceOf[SRAM[_]]
+    def isDRAM: Boolean = x match {
+      case _:DRAM[_,_] => true
+      case _ => false
+    }
+
+    def isSRAM: Boolean = x match {
+      case _: SRAM[_,_] => true
+      case _ => false
+    }
+    def isRegFile: Boolean = x match {
+      case _: RegFile[_,_] => true
+      case _ => false
+    }
     def isFIFO: Boolean = x.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = x.isInstanceOf[LIFO[_]]
 

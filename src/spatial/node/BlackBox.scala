@@ -10,9 +10,9 @@ sealed abstract class BlackBox extends Control[Void] {
 }
 @op case class GEMMBox[T:Num](
   cchain: CounterChain,
-  y:     SRAM[T],
-  a:     SRAM[T],
-  b:     SRAM[T],
+  y:     SRAM2[T],
+  a:     SRAM2[T],
+  b:     SRAM2[T],
   c:     T,
   alpha: T,
   beta:  T,

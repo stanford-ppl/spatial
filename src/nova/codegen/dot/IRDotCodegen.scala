@@ -13,7 +13,7 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   override def ext = s"dot.$lang"
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
-    case s: SRAM[_] => s"$s"
+    case s: SRAM[_,_] => s"$s"
     case s: Void => s"$s"
     case s: Lanes => s"$s"
     case s: Out[_] => s"$s"

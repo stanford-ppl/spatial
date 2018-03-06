@@ -174,7 +174,7 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
 
     /** Zero area cost **/
     case Transient(_)       => NoArea
-    case _:DRAMNew[_]       => NoArea // No hardware cost
+    case _:DRAMNew[_,_]     => NoArea // No hardware cost
     case GetDRAMAddress(_)  => NoArea // No hardware cost
 
     /** Memories **/
@@ -227,9 +227,11 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     case _:LIFOBankedPop[_]     => NoArea
 
     // SRAMs
-    case _:SRAMNew[_]            => areaOfMem(lhs)
-    case SRAMRead(mem,_,_)       => areaOfAccess(lhs, mem)
-    case SRAMWrite(mem,data,_,_) => areaOfAccess(lhs, mem)
+    case _:SRAMNew[_,_]          => areaOfMem(lhs)
+    case op:SRAMRead[_,_]        => areaOfAccess(lhs, op.mem)
+    case op:SRAMWrite[_,_]       => areaOfAccess(lhs, op.mem)
+    case op:SRAMBankedRead[_,_]  => areaOfAccess(lhs, op.mem)
+    case op:SRAMBankedWrite[_,_] => areaOfAccess(lhs, op.mem)
 
     // LineBuffer
 //    case op:LineBufferNew[_]    => areaOfSRAM(op.bT.length,constDimsOf(lhs),duplicatesOf(lhs))
@@ -244,27 +246,23 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     case _:RegWrite[_] => NoArea
     case _:RegReset[_] => NoArea
 
+    // ArgIn
+    case _:ArgInNew[_]  => areaOfReg(lhs)
+    case _:ArgInRead[_] => NoArea
+    case _:SetArgIn[_]  => NoArea
+
+    // ArgOut
+    case _:ArgOutNew[_]   => areaOfReg(lhs)
+    case _:ArgOutWrite[_] => NoArea
+    case _:GetArgOut[_]   => NoArea
+
     // Register File
-//    case rf:RegFileNew[_,_] =>
-//      val rank = constDimsOf(lhs).length
-//      val size = constDimsOf(lhs).product
-//      duplicatesOf(lhs).map{
-//        case BankedMemory(_,depth,isAccum) if rank == 1 => model("RegFile1D")("b" -> rf.bT.length, "d" -> depth, "c" -> size)
-//        case BankedMemory(_,depth,isAccum) if rank == 2 =>
-//          val r = constDimsOf(lhs).head
-//          var c = constDimsOf(lhs).apply(1)
-//          model("RegFile2D")("b" -> rf.bT.length, "d" -> depth, "r" -> r, "c" -> c)
-//        case _ =>
-//          miss(rank + "D RegFile (rule)")
-//          NoArea
-//      }.fold(NoArea){_+_}
-//
-//    case _:RegFileLoad[_]       => NoArea
-//    case _:ParRegFileLoad[_]    => NoArea
-//    case _:RegFileStore[_]      => NoArea
-//    case _:ParRegFileStore[_]   => NoArea
-//    case _:RegFileShiftIn[_]    => NoArea
-//    case _:ParRegFileShiftIn[_] => NoArea
+    case _:RegFileNew[_,_]         => NoArea
+    case _:RegFileRead[_,_]        => NoArea
+    case _:RegFileWrite[_,_]       => NoArea
+    case _:RegFileShiftIn[_,_]     => NoArea
+    case _:RegFileBankedRead[_,_]  => NoArea
+    case _:RegFileBankedWrite[_,_] => NoArea
 
     /** Primitives **/
     // Bit

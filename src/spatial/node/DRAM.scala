@@ -1,11 +1,14 @@
 package spatial.node
 
-import forge.tags._
 import core._
+import forge.tags._
+
 import spatial.lang._
 
-/** DRAM **/
-@op case class DRAMNew[A:Bits](dims: Seq[I32]) extends MemAlloc[DRAM[A]]
+@op case class DRAMNew[A:Bits,C[T]](
+    dims: Seq[I32]
+    )(implicit tp: Type[C[A]])
+  extends MemAlloc[C[A]]
 
-@op case class GetDRAMAddress[A:Bits](dram: DRAM[A]) extends Primitive[I64]
+@op case class GetDRAMAddress[A:Bits,C[T]](dram: DRAM[A,C]) extends Primitive[I64]
 

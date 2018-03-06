@@ -18,6 +18,7 @@ trait ISL {
   def startup(): Unit = init()
   def shutdown(wait: Long = 0): Unit = { proc.kill(wait) }
 
+  // This needs to be defined by the instantiator
   def domain[K](key: K): ConstraintMatrix[K]
 
   def nonEmpty[K](constraint: SparseConstraint[K]): Boolean = !isEmpty(constraint)

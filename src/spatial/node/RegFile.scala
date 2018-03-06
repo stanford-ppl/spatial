@@ -18,8 +18,8 @@ import spatial.lang._
 
 @op case class RegFileWrite[A:Bits,C[T]](
     mem:  RegFile[A,C],
-    addr: Seq[Idx],
     data: Bits[A],
+    addr: Seq[Idx],
     ens:  Set[Bit])
   extends Writer[A]
 

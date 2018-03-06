@@ -42,33 +42,61 @@ trait InternalAliases extends CustomBitWidths {
 
 trait ExternalAliases extends InternalAliases {
   type SpatialApp = spatial.SpatialApp
-
   type Top[A] = spatial.lang.Top[A]
 
   // --- Memories
 
-  type DRAM[T] = spatial.lang.DRAM[T]
+  type DRAM[A,C[T]] = spatial.lang.DRAM[A,C]
+  type DRAM1[A] = spatial.lang.DRAM1[A]
+  type DRAM2[A] = spatial.lang.DRAM2[A]
+  type DRAM3[A] = spatial.lang.DRAM3[A]
+  type DRAM4[A] = spatial.lang.DRAM4[A]
+  type DRAM5[A] = spatial.lang.DRAM5[A]
   lazy val DRAM = spatial.lang.DRAM
-  type SRAM[T] = spatial.lang.SRAM[T]
+
+  type SRAM[A,C[T]] = spatial.lang.SRAM[A,C]
+  type SRAM1[A] = spatial.lang.SRAM1[A]
+  type SRAM2[A] = spatial.lang.SRAM2[A]
+  type SRAM3[A] = spatial.lang.SRAM3[A]
+  type SRAM4[A] = spatial.lang.SRAM4[A]
+  type SRAM5[A] = spatial.lang.SRAM5[A]
   lazy val SRAM = spatial.lang.SRAM
-  type FIFO[T] = spatial.lang.FIFO[T]
+
+  type RegFile[A,C[T]] = spatial.lang.RegFile[A,C]
+  type RegFile1[A] = spatial.lang.RegFile1[A]
+  type RegFile2[A] = spatial.lang.RegFile2[A]
+  type RegFile3[A] = spatial.lang.RegFile3[A]
+  lazy val RegFile = spatial.lang.RegFile
+
+  type FIFO[A] = spatial.lang.FIFO[A]
   lazy val FIFO = spatial.lang.FIFO
-  type LIFO[T] = spatial.lang.LIFO[T]
+
+  type LIFO[A] = spatial.lang.LIFO[A]
   lazy val LIFO = spatial.lang.LIFO
-  type Reg[T] = spatial.lang.Reg[T]
+
+  type Reg[A] = spatial.lang.Reg[A]
   lazy val Reg = spatial.lang.Reg
+
+  type ArgIn[A] = spatial.lang.ArgIn[A]
   lazy val ArgIn = spatial.lang.ArgIn
+
+  type ArgOut[A] = spatial.lang.ArgOut[A]
   lazy val ArgOut = spatial.lang.ArgOut
+
+  // --- Primitives
 
   type Bit = spatial.lang.Bit
   lazy val Bit = spatial.lang.Bit
+
   type Void = spatial.lang.Void
   lazy val Void = spatial.lang.Void
+
   type Text = spatial.lang.Text
   lazy val Text = spatial.lang.Text
 
   type Fix[S,I,F] = spatial.lang.Fix[S,I,F]
   lazy val Fix = spatial.lang.Fix
+
   type Flt[M,E] = spatial.lang.Flt[M,E]
   lazy val Flt = spatial.lang.Flt
 
@@ -77,8 +105,10 @@ trait ExternalAliases extends InternalAliases {
 
   type Series[A] = spatial.lang.Series[A]
   lazy val Series = spatial.lang.Series
+
   type Counter[F] = spatial.lang.Counter[F]
   lazy val Counter = spatial.lang.Counter
+
   type CounterChain = spatial.lang.CounterChain
   lazy val CounterChain = spatial.lang.CounterChain
 }

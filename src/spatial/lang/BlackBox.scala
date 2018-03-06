@@ -10,9 +10,9 @@ object BlackBox {
     * Output is computed between [i,i+lenI), [j,j+lenJ)
     */
   @api def GEMM[T:Num](
-    y: SRAM[T],
-    a: SRAM[T],
-    b: SRAM[T],
+    y: SRAM2[T],
+    a: SRAM2[T],
+    b: SRAM2[T],
     c: T,
     alpha: T,
     beta: T,

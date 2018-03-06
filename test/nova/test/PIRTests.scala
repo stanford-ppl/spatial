@@ -18,7 +18,7 @@ import utest._
 
     val par = 4
 
-    def getWeightPMUs(s: => SRAM[I32]) = {
+    def getWeightPMUs(s: => SRAM2[I32]) = {
       List.fill(par) {
         val pmu = PMU(s)
         pmu.read(Seq(0::STAGES::M, 0::LANES::N, 0::LANES::K, 0::STAGES, LANES par LANES)){case Seq(i,j,k,ii,kk) =>
@@ -55,7 +55,7 @@ import utest._
       }
     }
 
-    def getResultPMU(s: SRAM[I32]) = {
+    def getResultPMU(s: SRAM2[I32]) = {
       val pmu = PMU(s)
       pmu.write(Seq(0::STAGES::M,0::LANES::N, 0::STAGES, LANES par LANES)){case Seq(i,j,ii,jj) =>
         val addr = (i+ii)*M + j + jj

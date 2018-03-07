@@ -15,11 +15,11 @@ case class SwitchOptimizer(IR: State) extends MutateTransformer with AccelTraver
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
     case Switch(selects,body) =>
-      val scs = f(selects).zip(body.stms).filter{case (Lit(FALSE),_) => false; case _ => true }
+      val scs = f(selects).zip(body.stms).filter{case (Const(FALSE),_) => false; case _ => true }
       val sels = scs.map(_._1)
       val stms = scs.map(_._2).map(_.asInstanceOf[A])
       val cases = stms.collect{case Op(op:SwitchCase[_]) => op.asInstanceOf[SwitchCase[A]]  }
-      val trueConds = sels.zipWithIndex.collect{case (Lit(TRUE),i) => i }
+      val trueConds = sels.zipWithIndex.collect{case (Const(TRUE),i) => i }
 
       if (trueConds.length == 1) {
         val cas = cases.apply(trueConds.head).body

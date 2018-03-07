@@ -9,7 +9,7 @@ import forge.tags._
   @api override def eql(that: Void): Bit = true
 
   // --- Typeclass Methods
-  override def isPrimitive: Boolean = true
+  override protected val __isPrimitive: Boolean = true
 }
 object Void {
   def c: Void = uconst[Void](())

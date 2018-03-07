@@ -13,10 +13,10 @@ import spatial.node._
   @api override def toText: Text = this
 
   // --- Typeclass Methods
-  def isPrimitive: Boolean = true
+  override protected val __isPrimitive: Boolean = true
 }
 object Text {
   def c(x: String): Text = uconst[Text](x)
 
-  @rig def concat(a: Text, b: Text): Text = stage(TextConcat(a,b))
+  @rig def concat(a: Text, b: Text): Text = stage(TextConcat(Seq(a,b)))
 }

@@ -1,8 +1,12 @@
 package spatial.lang
 package static
 
+import core._
 import forge.tags._
-import spatial.internal.{printIf,assertIf}
+import utils.implicits.collections._
+
+import spatial.internal.{assertIf, printIf}
+import spatial.node.TextConcat
 
 trait StaticDebugsExternal { this: ExternalStatics =>
   @api def println(v: Any): Void = v match {
@@ -19,18 +23,16 @@ trait StaticDebugsExternal { this: ExternalStatics =>
   @api def assert(cond: Bit): Void = assertIf(Nil,cond,None)
   @api def assert(cond: Bit, msg: Text): Void = assertIf(Nil,cond,Some(msg))
 
-  @rig def convertToText(x: Any): Text = x match {
-    case t: Top[_] => t.toText
-    case t         => t.toString
-  }
-
   implicit class Quoting(sc: StringContext) {
     @api def r(args: Any*): Text = {
-      val quoted = args.map(convertToText)
-      sc.parts.foldLeft((Text.c(""),0)){
-        case ((str,i),"") => (str ++ quoted(i), i+1)
-        case ((str,i), p) => (str ++ p, i)
-      }._1
+      val quotedArgs = args.toArray.map{
+        case t: Top[_] => t.toText
+        case t         => Text.c(t.toString)
+      }
+      val quotedParts = sc.parts.map(Text.c)
+
+      val str = quotedParts.interleave(quotedArgs)
+      stage(TextConcat(str))
     }
   }
 }

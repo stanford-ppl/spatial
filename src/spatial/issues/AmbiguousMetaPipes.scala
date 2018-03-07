@@ -8,7 +8,7 @@ case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) 
   @stateful override def onUnresolved(traversal: String): Unit = {
     error(s"Ambiguous metapipes for readers/writers of $mem defined here:")
     error(stm(mem))
-    error(mem.src)
+    error(mem.ctx)
     mps.foreach{case (pipe,accs) =>
       error(s"  metapipe: $pipe ")
       error(s"  accesses: ")
@@ -18,7 +18,7 @@ case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) 
         error("")
       }
       error(stm(pipe.sym))
-      error(pipe.sym.src)
+      error(pipe.sym.ctx)
       error("")
     }
     state.logError()

@@ -20,14 +20,14 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case GetArgOut(_) if inHw =>
-      error(lhs.src, "Reading ArgOuts within Accel is disallowed.")
+      error(lhs.ctx, "Reading ArgOuts within Accel is disallowed.")
       error("Use a Reg to store intermediate values.")
-      error(lhs.src)
+      error(lhs.ctx)
 
     case SetArgIn(arg,_) if inHw =>
-      error(lhs.src, "Writing ArgIn within Accel is disallowed.")
+      error(lhs.ctx, "Writing ArgIn within Accel is disallowed.")
       error("Use a Reg to store intermediate values.")
-      error(lhs.src)
+      error(lhs.ctx)
 
     case AccelScope(block) => inAccel {
       val (stms,rawInputs) = block.nestedStmsAndInputs
@@ -37,24 +37,24 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
         error("One or more values were defined on the host but used in Accel without explicit transfer.")
         error("Use DRAMs with setMem to transfer data to the accelerator.")
         illegalUsed.take(5).foreach{case (in,use) =>
-          error(in.src, s"Value ${in.name.getOrElse("defined here")}")
-          error(in.src)
-          error(use.src,s"First use in Accel occurs here.", noError = true)
-          error(use.src)
+          error(in.ctx, s"Value ${in.name.getOrElse("defined here")}")
+          error(in.ctx)
+          error(use.ctx,s"First use in Accel occurs here.", noError = true)
+          error(use.ctx)
         }
         if (illegalUsed.size > 5) error(s"(${illegalUsed.size - 5} values elided)")
       }
     }
 
-    case CounterNew(_,_,Const(step: Number),_) if step === 0 =>
-      error(lhs.src, "Counter has step size of 0.")
+    case CounterNew(_,_,Literal(step: Number),_) if step === 0 =>
+      error(lhs.ctx, "Counter has step size of 0.")
       error("This will create a counter with infinite iterations, which is probably not what you wanted.")
       error("(If this is what you wanted, use the forever counter '*' notation instead.)")
       error(lhs)
 
     case RegNew(init) if !init.isConst =>
-      error(lhs.src, "Reset values of registers must be constants.")
-      error(lhs.src)
+      error(lhs.ctx, "Reset values of registers must be constants.")
+      error(lhs.ctx)
 
     case _ => super.visit(lhs, rhs)
   }

@@ -9,26 +9,26 @@ import scala.annotation.unchecked.{uncheckedVariance => uV}
 
 trait Staging { this: Printing =>
   /** Create a checked parameter (implicit state required) **/
-  @stateful def param[A<:Sym[A]:Type](c: A#L, checked: Boolean = true): A = Type[A].from(c, checked, isParam = true)
+  @stateful def param[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
 
   /** Create a checked constant (implicit state required) **/
-  @stateful def const[A<:Sym[A]:Type](c: A#L, checked: Boolean = true): A = Type[A].from(c, checked)
+  @stateful def const[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked)
 
   /** Create an unchecked constant (no implicit state required) **/
-  def uconst[A<:Sym[A]:Type](c: A#L): A = _const[A](c)
+  def uconst[A<:Sym[A]:Type](c: A#L): A = Type[A].uconst(c)
 
-  private[core] def _const[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Const(c))
-  private[core] def _const[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Const(c))
+  private[core] def _const[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Const(c), SrcCtx.empty)
+  private[core] def _const[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Const(c), SrcCtx.empty)
 
-  @stateful private[core] def _param[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Param(state.nextId(),c))
-  @stateful private[core] def _param[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Param(state.nextId(),c))
+  @stateful private[core] def _param[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Param(state.nextId(),c), ctx)
+  @stateful private[core] def _param[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Param(state.nextId(),c), ctx)
 
-  @stateful def err[A:Type]: A = Type[A]._new(Def.Error[A](state.nextId()))
-  @stateful def err_[A](tp: Type[A]): A = tp._new(Def.Error[A](state.nextId()))
+  @stateful def err[A:Type]: A = Type[A]._new(Def.Error[A](state.nextId()), ctx)
+  @stateful def err_[A](tp: Type[A]): A = tp._new(Def.Error[A](state.nextId()), ctx)
 
-  @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()))
+  @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
 
-  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = tp._new(Def.Node(state.nextId(),op))
+  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = tp._new(Def.Node(state.nextId(),op), ctx)
 
   /**
     * Correctness checks:
@@ -50,12 +50,12 @@ trait Staging { this: Printing =>
 
     if (aliases.nonEmpty) {
       error(ctx, "Illegal sharing of mutable objects: ")
-      (aliases + sym).foreach{alias => error(s"${alias.src}:  symbol ${stm(alias)} defined here") }
+      (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
     }
     if (immutables.nonEmpty) {
       error(ctx, "Illegal mutation of immutable symbols")
       immutables.foreach{s =>
-        error(s"${s.src}:  symbol ${stm(s)} defined here")
+        error(s"${s.ctx}:  symbol ${stm(s)} defined here")
         dbgs(s"${stm(s)}")
         strMeta(s)
       }
@@ -65,7 +65,7 @@ trait Staging { this: Printing =>
   @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = flows.apply(sym, op)
 
 
-  @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.tR,ctx,state) match {
+  @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.R,ctx,state) match {
     case Some(s) => s
     case None if state == null =>
       // General operations in object/trait constructors are currently disallowed
@@ -73,7 +73,7 @@ trait Staging { this: Printing =>
       // TODO[6]: Allow global namespace operations?
       error(ctx, "Only constant declarations are allowed in the global namespace.")
       error(ctx)
-      err_[R](op.tR)
+      err_[R](op.R)
 
     case None =>
       val effects = allEffects(op)
@@ -81,7 +81,7 @@ trait Staging { this: Printing =>
 
       def stageEffects(addToCache: Boolean): R = {
         val lhs = symbol()
-        val sym = op.tR.boxed(lhs)
+        val sym = op.R.boxed(lhs)
 
         checkAliases(sym,effects)
         runFlows(sym,op)
@@ -93,7 +93,7 @@ trait Staging { this: Printing =>
         lhs
       }
       state.cache.get(op).filter{s => mayCSE && effectsOf(s) == effects} match {
-        case Some(s) if s.tp <:< op.tR => s.asInstanceOf[R]
+        case Some(s) if s.tp <:< op.R => s.asInstanceOf[R]
         case None => stageEffects(addToCache = mayCSE)
       }
   }
@@ -105,9 +105,9 @@ trait Staging { this: Printing =>
     case _ => sym
   }
   @rig def stage[R](op: Op[R]): R = {
-    logs(s"Staging $op with type evidence ${op.tR}")
-    val t = register(op, () => symbol(op.tR,op))
-    op.tR.boxed(t).src = ctx
+    logs(s"Staging $op with type evidence ${op.R}")
+    val t = register(op, () => symbol(op.R,op))
+    op.R.boxed(t).ctx = ctx
     t
   }
 

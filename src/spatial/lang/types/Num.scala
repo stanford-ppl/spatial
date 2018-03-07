@@ -10,8 +10,7 @@ trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   val box: A <:< Num[A]
   private implicit val evv: A <:< Num[A] = box
   private implicit lazy val tA: Num[A] = this.selfType
-
-  override def isPrimitive: Boolean = true
+  override protected val __isPrimitive: Boolean = true
 
   @rig def one: A = this.from(1)
   @rig def zero: A = this.from(0)

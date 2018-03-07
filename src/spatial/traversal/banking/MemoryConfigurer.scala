@@ -22,8 +22,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   def configure(): Unit = {
     dbg("\n\n--------------------------------")
-    dbg(s"${mem.src}: Inferring instances for memory $mem")
-    dbg(mem.src.content.getOrElse(""))
+    dbg(s"${mem.ctx}: Inferring instances for memory $mem")
+    dbg(mem.ctx.content.getOrElse(""))
     val readers = readersOf(mem)
     val writers = writersOf(mem)
     resetData(readers, writers)
@@ -46,8 +46,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   protected def summarize(instances: Seq[Instance]): Unit = {
     dbg(s"\n\nSUMMARY for memory $mem")
-    dbg(s"${mem.src}: ${stm(mem)}")
-    dbg(mem.src.content.getOrElse(""))
+    dbg(s"${mem.ctx}: ${stm(mem)}")
+    dbg(mem.ctx.content.getOrElse(""))
     dbg("\n\n--------------------------------")
     instances.zipWithIndex.foreach{case (inst,i) =>
       dbg(s"  Instance #$i")

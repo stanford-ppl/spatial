@@ -26,13 +26,39 @@ abstract class Number extends Equals {
   def ===(that: Int): Boolean
   def !==(that: Int): Boolean
 
+  def ===(that: Long): Boolean
+  def ===(that: Float): Boolean
+  def ===(that: Double): Boolean
+
   override def canEqual(that: Any): Boolean = that match {
-    case _: Byte => true
-    case _: Short => true
-    case _: Int => true
-    case _: Long => true
-    case _: Float => true
+    case _: Char   => true
+    case _: Byte   => true
+    case _: Short  => true
+    case _: Int    => true
+    case _: Long   => true
+    case _: Float  => true
     case _: Double => true
+    case _: java.lang.Character => true
+    case _: java.lang.Byte    => true
+    case _: java.lang.Short   => true
+    case _: java.lang.Integer => true
+    case _: java.lang.Long    => true
+    case _: java.lang.Float   => true
+    case _: java.lang.Double  => true
+    case _: String => true
+    case _: Symbol => true
+    case _ => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case x: java.lang.Character => this.equals(x.toChar)
+    case x: java.lang.Byte    => this.equals(x.toByte)
+    case x: java.lang.Short   => this.equals(x.toShort)
+    case x: java.lang.Integer => this.equals(x.toInt)
+    case x: java.lang.Long    => this.equals(x.toLong)
+    case x: java.lang.Float   => this.equals(x.toFloat)
+    case x: java.lang.Double  => this.equals(x.toDouble)
+    case x: Symbol            => this.equals(x.name.toString)
     case _ => false
   }
 
@@ -43,6 +69,11 @@ abstract class Number extends Equals {
   def toFloat: Float
   def toDouble: Double
   def toBigDecimal: BigDecimal
+
+  def isExactInt: Boolean = this === this.toInt
+  def isExactLong: Boolean = this === this.toLong
+  def isExactFloat: Boolean = this === this.toFloat
+  def isExactDouble: Boolean = this === this.toDouble
 }
 
 object Number {
@@ -63,7 +94,9 @@ object Number {
   def max(x: FixedPoint, y: FixedPoint): FixedPoint = if ((x > y).value) x else y
 
   // TODO: These all rely on Double implementation right now
+  def inv(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / x
   def sqrt(x: FixedPoint): FixedPoint = FixedPoint(Math.sqrt(x.toDouble), x.fmt).withValid(x.valid)
+  def invSqrt(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / sqrt(x)
   def exp(x: FixedPoint): FixedPoint = FixedPoint(Math.exp(x.toDouble), x.fmt).withValid(x.valid)
   def log(x: FixedPoint): FixedPoint = FixedPoint(Math.log(x.toDouble), x.fmt).withValid(x.valid)
   def pow(x: FixedPoint, exp: FixedPoint) = FixedPoint(Math.pow(x.toDouble, exp.toDouble), x.fmt).withValid(x.valid)
@@ -77,6 +110,7 @@ object Number {
   def acos(x: FixedPoint): FixedPoint = FixedPoint(Math.acos(x.toDouble), x.fmt).withValid(x.valid)
   def atan(x: FixedPoint): FixedPoint = FixedPoint(Math.atan(x.toDouble), x.fmt).withValid(x.valid)
 
+  def sigmoid(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / (exp(-x) + 1)
 
   def ceil(x: FloatPoint): FloatPoint = x.value match {
     case NaN      => x

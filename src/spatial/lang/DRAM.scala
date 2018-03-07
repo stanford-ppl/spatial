@@ -8,14 +8,17 @@ abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends
   val tA: Bits[A] = Bits[A]
   def rank: Int
 
+  /** Returns the 64-bit address of this DRAM **/
+  @api def address: I64 = stage(GetDRAMAddress(me))
+
   @api override def neql(that: C[A]): Bit = {
-    error(src, "Native comparison of DRAMs is unsupported. Use getMem to extract data.")
-    error(src)
+    error(this.ctx, "Native comparison of DRAMs is unsupported. Use getMem to extract data.")
+    error(this.ctx)
     super.neql(that)
   }
   @api override def eql(that: C[A]): Bit = {
-    error(src, "Native comparision of DRAMs is unsupported. Use getMem to extract data.")
-    error(src)
+    error(this.ctx, "Native comparision of DRAMs is unsupported. Use getMem to extract data.")
+    error(this.ctx)
     super.eql(that)
   }
 }
@@ -61,4 +64,5 @@ object DRAM {
 @ref class DRAM5[A:Bits] extends DRAM[A,DRAM5] with Ref[Array[Any],DRAM5[A]] {
   def rank: Int = 5
 }
+
 

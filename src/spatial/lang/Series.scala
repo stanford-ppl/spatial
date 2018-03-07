@@ -12,9 +12,10 @@ case class Series[A:Num](start: A, end: A, step: A, par: I32, isUnit: Boolean = 
 
   def par(p: I32): Series[A] = Series[A](start, end, step, p, isUnit=false)
 
+  @api def length: A = (end - start + step - Num[A].from(1))/step
+
   @api def meta: Range = (start,end,step,par) match {
-    case (Const(s:FixedPoint),Const(e:FixedPoint),Const(stride:FixedPoint),_) =>
-      Range(s.toInt,e.toInt,stride.toInt)
+    case (Literal(s:Int),Literal(e:Int),Literal(stride:Int),_) => Range(s,e,stride)
     case _ =>
       val s = if (!start.isConst) "start" else ""
       val e = if (!end.isConst) "end" else ""

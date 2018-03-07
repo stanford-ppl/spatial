@@ -40,8 +40,9 @@ private object ref {
 
     val cls2 = cls.injectMethod(q"private def cargs: Seq[Any] = Seq(..$cnames)".asDef)
                   .injectMethod(q"override protected def fresh = new $name[..$targs](..$vnames)".asDef)
-                  .injectMethod(q"override def typePrefix = ${cls.nameLiteral}".asDef)
-                  .injectMethod(q"override def typeArgs = cargs.collect{case t: Type[_] => t}".asDef)
+                  .injectField(q"override protected val __typePrefix = ${cls.nameLiteral}".asVal)
+                  .injectField(q"override protected val __typeArgs = cargs.collect{case t: Type[_] => t}".asVal)
+                  .injectField(q"override protected val __typeParams = Seq(..$inames).filter{case t: Type[_] => false; case _ => true}".asVal)
 
     val obj2 = (vargs, iargs) match {
       case (Nil,Nil) => obj.injectField(q"implicit val tp: $fullName = (new $name[..$targs]).asType".asVal)

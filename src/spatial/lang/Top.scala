@@ -11,11 +11,11 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
 
   @rig protected def unrelated(that: Any): Unit = that match {
     case t: Ref[_,_] =>
-      warn(src, r"Comparison between unrelated types ${this.tp} and ${t.tp}")
-      warn(src)
+      warn(this.ctx, r"Comparison between unrelated types ${this.tp} and ${t.tp}")
+      warn(this.ctx)
     case t =>
-      warn(src, r"Comparison between unrelated types ${this.tp} and ${t.getClass}")
-      warn(src)
+      warn(this.ctx, r"Comparison between unrelated types ${this.tp} and ${t.getClass}")
+      warn(this.ctx)
   }
 
   @api def !==(that: Any): Bit = this match {

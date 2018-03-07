@@ -5,6 +5,9 @@ import core.schedule.Schedule
 import forge.tags._
 import spatial.lang._
 
+/** Custom scheduler for Switch nodes.
+  * The scheduler always motions all operations except SwitchCases out of the Switch body
+  */
 object SwitchScheduler extends core.schedule.Scheduler {
   override def mustMotion: Boolean = true
 
@@ -26,12 +29,20 @@ object SwitchScheduler extends core.schedule.Scheduler {
   }
 }
 
+/** A single case within a Switch statement
+  * NOTE: SwitchCase should never exist outside a Switch
+  * @param body The operations done in the given case
+  */
 @op case class SwitchCase[R:Type](body: Block[R]) extends Control[R] {
   def iters = Nil
   def cchains = Nil
   def bodies = Seq(Nil -> Seq(body))
 }
 
+/** A (nestable) hardware case matching statement
+  * @param selects Associated conditions for each SwitchCase
+  * @param body A list of [[SwitchCase]]s
+  */
 @op case class Switch[R:Type](selects: Seq[Bit], body: Block[R]) extends Control[R] {
   def iters = Nil
   def cchains = Nil

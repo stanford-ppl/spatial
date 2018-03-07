@@ -17,7 +17,7 @@ import spatial.lang._
   // --- Typeclass Methods
   val tA: Bits[A] = Bits[A]
   val box: Out[A] <:< Bits[Out[A]] = implicitly[Out[A] <:< Bits[Out[A]]]
-  override def isPrimitive: Boolean = true
+  override val __isPrimitive: Boolean = true
   override def nbits: Int = tA.nbits
 
   @rig def zero: Out[A] = const[Out[A]](new Ptr(tA.zero))

@@ -72,7 +72,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
   }
 
   final override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
-    implicit val ctx: SrcCtx = lhs.src
+    implicit val ctx: SrcCtx = lhs.ctx
     implicit val typ: Type[A] = lhs.tp
     createSubstRule(lhs, rhs)
   }

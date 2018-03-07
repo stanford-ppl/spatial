@@ -9,42 +9,30 @@ import spatial.node._
 abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends LocalMem[A,C] {
   val tA: Bits[A] = Bits[A]
   def rank: Int
+  /** Returns the total capacity (in elements) of this SRAM. **/
   @api def size: I32 = product(dims:_*)
+  /** Returns the dimensions of this SRAM as a Sequence. **/
   @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
-  @api def rows: I32 = dim0
-  @api def cols: I32 = dim1
-  @api def dim0: I32 = dims.head
+  @api def dim0: I32 = dims.indexOrElse(0, I32(1))
   @api def dim1: I32 = dims.indexOrElse(1, I32(1))
   @api def dim2: I32 = dims.indexOrElse(2, I32(1))
+  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
+  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 
   /** Returns the value at `addr`.
-    * The number of indices should match the rank of this SRAM.
+    * The number of indices should match the SRAM's rank.
     */
-  @api def apply(pos: Idx): A = applyAddr(Seq(pos))
-  @api def apply(row: Idx, col: Idx): A = applyAddr(Seq(row,col))
-  @api def apply(d0: Idx, d1: Idx, d2: Idx): A = applyAddr(Seq(d0,d1,d2))
-  @api def apply(d0: Idx, d1: Idx, d2: Idx, d3: Idx): A = applyAddr(Seq(d0,d1,d2,d3))
-  @api def apply(d0: Idx, d1: Idx, d2: Idx, d3: Idx, d4: Idx): A = applyAddr(Seq(d0,d1,d2,d3,d4))
-
-
-  /** Updates the value at `addr` to `data`.
-    * The number of indices should match the rank of this SRAM.
-    */
-  @api def update(pos: Idx, data: A): Void = updateAddr(Seq(pos), data)
-  @api def update(row: Idx, col: Idx, data: A): Void = updateAddr(Seq(row,col), data)
-  @api def update(d0: Idx, d1: Idx, d2: Idx, data: A): Void = updateAddr(Seq(d0,d1,d2), data)
-  @api def update(d0: Idx, d1: Idx, d2: Idx, d3: Idx, data: A): Void = updateAddr(Seq(d0,d1,d2,d3), data)
-  @api def update(d0: Idx, d1: Idx, d2: Idx, d3: Idx, d4: Idx, data: A): Void = updateAddr(Seq(d0,d1,d2,d3,d4), data)
-
-
-  @rig private def applyAddr(addr: Seq[Idx]): A = {
+  @api def read(addr: Seq[Idx]): A = {
     checkDims(addr.length)
-    stage(SRAMRead(this,addr,Set.empty))
+    stage(SRAMRead[A,C](me,addr,Set.empty))
   }
 
-  @rig private def updateAddr(addr: Seq[Idx], data: A): Void = {
+  /** Updates the value at `addr` to `data`.
+    * The number of indices should match the SRAM's rank.
+    */
+  @api def write(addr: Seq[Idx], data: A): Void = {
     checkDims(addr.length)
-    stage(SRAMWrite(this,data,addr,Set.empty))
+    stage(SRAMWrite[A,C](me,data,addr,Set.empty))
   }
 
   @rig private def checkDims(given: Int): Unit = {
@@ -76,25 +64,61 @@ object SRAM {
 /** A 1-dimensional [[SRAM]] with elements of type [[A]]. **/
 @ref class SRAM1[A:Bits] extends SRAM[A,SRAM1] with Ref[Array[Any],SRAM1[A]] {
   def rank: Int = 1
+  @api def length: I32 = dim0
+  @api override def size: I32 = dim0
+
+  @api def apply(pos: Idx): A = stage(SRAMRead(this,Seq(pos),Set.empty))
+
+  /** Updates the value at `pos` to `data`. **/
+  @api def update(pos: Idx, data: A): Void = stage(SRAMWrite(this,data,Seq(pos),Set.empty))
 }
 
 /** A 2-dimensional [[SRAM]] with elements of type [[A]]. **/
 @ref class SRAM2[A:Bits] extends SRAM[A,SRAM2] with Ref[Array[Any],SRAM2[A]] {
   def rank: Int = 2
+  @api def rows: I32 = dim0
+  @api def cols: I32 = dim1
+
+  /** Returns the value at (`row`, `col`). **/
+  @api def apply(row: Idx, col: Idx): A = stage(SRAMRead(this,Seq(row,col),Set.empty))
+
+  /** Updates the value at (`row`,`col`) to `data`. **/
+  @api def update(row: Idx, col: Idx, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
 }
 
 /** A 3-dimensional [[SRAM]] with elements of type [[A]]. **/
 @ref class SRAM3[A:Bits] extends SRAM[A,SRAM3] with Ref[Array[Any],SRAM3[A]] {
   def rank: Int = 3
+
+  /** Returns the value at (`d0`,`d1`,`d2`). **/
+  @api def apply(d0: Idx, d1: Idx, d2: Idx): A = stage(SRAMRead(this,Seq(d0,d1,d2),Set.empty))
+
+  /** Updates the value at (`d0`,`d1`,`d2`) to `data`. **/
+  @api def update(d0: Idx, d1: Idx, d2: Idx, data: A): Void = stage(SRAMWrite(this,data,Seq(d0,d1,d2), Set.empty))
 }
 
 /** A 4-dimensional [[SRAM]] with elements of type [[A]]. **/
 @ref class SRAM4[A:Bits] extends SRAM[A,SRAM4] with Ref[Array[Any],SRAM4[A]] {
   def rank: Int = 4
+
+  /** Returns the value at (`d0`,`d1`,`d2`,`d3`). **/
+  @api def apply(d0: Idx, d1: Idx, d2: Idx, d3: Idx): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3),Set.empty))
+
+  /** Updates the value at (`d0`,`d1`,`d2`,`d3`) to `data`. **/
+  @api def update(d0: Idx, d1: Idx, d2: Idx, d3: Idx, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3), Set.empty))
+
 }
 
 /** A 5-dimensional [[SRAM]] with elements of type [[A]]. **/
 @ref class SRAM5[A:Bits] extends SRAM[A,SRAM5] with Ref[Array[Any],SRAM5[A]] {
   def rank: Int = 5
+
+  /** Returns the value at (`d0`,`d1`,`d2`,`d3`,`d4`). **/
+  @api def apply(d0: Idx, d1: Idx, d2: Idx, d3: Idx, d4: Idx): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
+
+  /** Updates the value at (`d0`,`d1`,`d2`,`d3`,`d4`) to `data`. **/
+  @api def update(d0: Idx, d1: Idx, d2: Idx, d3: Idx, d4: Idx, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3,d4), Set.empty))
 }
+
+
 

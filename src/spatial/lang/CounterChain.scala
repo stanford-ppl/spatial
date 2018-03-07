@@ -7,7 +7,7 @@ import pir.node.CounterChainCopy
 
 /** Types **/
 @ref class CounterChain extends Top[CounterChain] with Ref[Array[Range],CounterChain] {
-  override def isPrimitive: Boolean = false
+  override protected val __isPrimitive: Boolean = false
 }
 object CounterChain {
   implicit val tp: CounterChain = (new CounterChain).asType

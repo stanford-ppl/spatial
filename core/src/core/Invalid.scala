@@ -3,7 +3,9 @@ package core
 import forge.tags._
 
 @ref class Invalid(msg: String) extends Ref[Nothing,Invalid] {
-  override def isPrimitive: Boolean = false
+  override protected val __isPrimitive: Boolean = false
 }
 
-object Invalid extends Invalid("")
+object Invalid extends Invalid("") {
+  this.rhs = Def.TypeRef
+}

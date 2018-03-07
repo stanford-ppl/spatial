@@ -38,13 +38,17 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
   def ===(that: Int): Boolean = (this === FixedPoint(that, this.fmt)).value
   def !==(that: Int): Boolean = (this !== FixedPoint(that, this.fmt)).value
 
+  def ===(that: Long): Boolean = (this === FixedPoint(that, this.fmt)).value
+  def ===(that: Float): Boolean = (this === FixedPoint(that, this.fmt)).value
+  def ===(that: Double): Boolean = (this === FixedPoint(that, this.fmt)).value
+
   def bits: Array[Bool] = Array.tabulate(fmt.bits){i => Bool(value.testBit(i)) }
 
 
-  def <+>(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value + that.value, this.valid && that.valid, fmt)
-  def <->(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value - that.value, this.valid && that.valid, fmt)
-  def <*>(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value * that.value) >> fmt.bits, this.valid && that.valid, fmt)
-  def </>(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value << fmt.bits) / that.value, this.valid && that.valid, fmt)
+  def +!(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value + that.value, this.valid && that.valid, fmt)
+  def -!(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value - that.value, this.valid && that.valid, fmt)
+  def *!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value * that.value) >> fmt.bits, this.valid && that.valid, fmt)
+  def /!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value << fmt.bits) / that.value, this.valid && that.valid, fmt)
 
   def *&(that: FixedPoint): FixedPoint = {
     FixedPoint.unbiased(((this.value << 2) * (that.value << 2)) >> fmt.fbits, this.valid && that.valid, fmt)
@@ -52,10 +56,10 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
   def /&(that: FixedPoint): FixedPoint = valueOrX {
     FixedPoint.unbiased((this.value << fmt.fbits+4) / that.value, this.valid && that.valid, fmt)
   }
-  def <*&>(that: FixedPoint): FixedPoint = {
+  def *&!(that: FixedPoint): FixedPoint = {
     FixedPoint.unbiased((this.value << 2) * (that.value << 2) >> fmt.fbits, this.valid && that.valid, fmt, saturate = true)
   }
-  def </&>(that: FixedPoint): FixedPoint = valueOrX {
+  def /&!(that: FixedPoint): FixedPoint = valueOrX {
     FixedPoint.unbiased((this.value << fmt.fbits+4) / that.value, this.valid && that.valid, fmt, saturate = true)
   }
 
@@ -108,6 +112,9 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
     }
   } else "X"
 
+  def is1s: Boolean = this.bits.forall(_.value)
+
+
   override def hashCode(): Int = (value,valid,fmt).hashCode()
 
   override def canEqual(that: Any): Boolean = that match {
@@ -126,7 +133,10 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
       val fmt = this.fmt combine that.fmt
       (this.toFixedPoint(fmt) === that.toFixedPoint(fmt)).value
     case that: FixedPoint => (this === that).value
-    case _ => false
+    case that: String => this.toString == that  // TODO[4]: Always correct to compare based on string?
+    case _ =>
+      println(s"No comparison available to ${that.getClass}")
+      false
   }
 }
 

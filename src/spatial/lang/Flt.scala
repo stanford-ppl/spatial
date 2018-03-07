@@ -6,19 +6,21 @@ import forge.tags._
 
 import spatial.node._
 
-class FltFmt[M,E](val m: INT[M], val e: INT[E]) {
+case class FltFmt[M,E](m: INT[M], e: INT[E]) {
   def sign: Boolean = true
   def mbits: Int = m.v
   def ebits: Int = e.v
   def toEmul: FltFormat = FltFormat(mbits-1,ebits)
+  override def toString: String = s"$m,$e"
 }
 object FltFmt {
-  def apply[M:INT,E:INT]: FltFmt[M,E] = new FltFmt[M,E](INT[M],INT[E])
+  def from[M:INT,E:INT]: FltFmt[M,E] = new FltFmt[M,E](INT[M],INT[E])
 }
 
 @ref class Flt[M:INT,E:INT] extends Top[Flt[M,E]] with Num[Flt[M,E]] with Ref[FloatPoint,Flt[M,E]] {
   override val box = implicitly[Flt[M,E] <:< Num[Flt[M,E]]]
-  lazy val fmt = FltFmt[M,E]
+  lazy val fmt = FltFmt.from[M,E]
+
   def mbits: Int = fmt.mbits
   def ebits: Int = fmt.ebits
   def nbits: Int = mbits + ebits
@@ -67,23 +69,32 @@ object FltFmt {
   @rig def sigmoid(a: Flt[M,E]): Flt[M,E] = stage(FltSigmoid(a))
 
   lazy val efmt: FltFormat = fmt.toEmul
-  @rig override def cnst(c: Any, checked: Boolean = true): Option[FloatPoint] = c match {
-    case x: BigDecimal => withCheck(FloatPoint(x,efmt),checked){ _.toBigDecimal == x }
-    case x: BigInt     => withCheck(FloatPoint(x,efmt),checked){ _.toBigDecimal == BigDecimal(x) }
-    case x: Boolean    => Some(FloatPoint(x,efmt))
-    case x: Char       => withCheck(FloatPoint(x,efmt),checked){ _.toInt == x }
-    case x: Byte       => withCheck(FloatPoint(x,efmt),checked){ _.toByte == x }
-    case x: Short      => withCheck(FloatPoint(x,efmt),checked){ _.toShort == x }
-    case x: Int        => withCheck(FloatPoint(x,efmt),checked){ _.toInt == x }
-    case x: Long       => withCheck(FloatPoint(x,efmt),checked){ _.toLong == x }
-    case x: Float      => withCheck(FloatPoint(x,efmt),checked){ _.toFloat == x }
-    case x: Double     => withCheck(FloatPoint(x,efmt),checked){ _.toDouble == x }
-    case x: String     => withCheck(FloatPoint(x,efmt),checked){ _.toBigDecimal == BigDecimal(x) }
-    case x: FixedPoint => withCheck(x.toFloatPoint(efmt),checked){ _.toFixedPoint(x.fmt) == x }
-    case x: FloatPoint if x.fmt == efmt => Some(x)
-    case x: FloatPoint => withCheck(x.toFloatPoint(efmt),checked){ _.toFloatPoint(x.fmt) == x }
-    case _ => None
+  override protected def value(c: Any) = c match {
+    case x: BigDecimal => withCheck(FloatPoint(x,efmt)){ _.toBigDecimal == x }
+    case x: BigInt     => withCheck(FloatPoint(x,efmt)){ _.toBigDecimal == BigDecimal(x) }
+    case x: Boolean    => Some(FloatPoint(x,efmt),true)
+    case x: Char       => withCheck(FloatPoint(x,efmt)){ _.toInt == x }
+    case x: Byte       => withCheck(FloatPoint(x,efmt)){ _.toByte == x }
+    case x: Short      => withCheck(FloatPoint(x,efmt)){ _.toShort == x }
+    case x: Int        => withCheck(FloatPoint(x,efmt)){ _.toInt == x }
+    case x: Long       => withCheck(FloatPoint(x,efmt)){ _.toLong == x }
+    case x: Float      => withCheck(FloatPoint(x,efmt)){ _.toFloat == x }
+    case x: Double     => withCheck(FloatPoint(x,efmt)){ _.toDouble == x }
+    case x: String     => withCheck(FloatPoint(x,efmt)){ _.toBigDecimal == BigDecimal(x) }
+    case x: FixedPoint => withCheck(x.toFloatPoint(efmt)){ _.toFixedPoint(x.fmt) == x }
+    case x: FloatPoint if x.fmt == efmt => Some(x,true)
+    case x: FloatPoint => withCheck(x.toFloatPoint(efmt)){ _.toFloatPoint(x.fmt) == x }
+    case _ => super.value(c)
   }
+  override protected def extract: Option[Any] = this.c match {
+    case Some(x) if x.isExactInt => Some(x.toInt)
+    case Some(x) if x.isExactLong => Some(x.toLong)
+    case Some(x) if x.isExactFloat => Some(x.toFloat)
+    case Some(x) if x.isExactDouble => Some(x.toDouble)
+    case c => c
+  }
+
+  @api override def toText: Text = stage(FltToText(this))
 }
 
 object Flt {

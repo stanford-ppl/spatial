@@ -6,7 +6,7 @@ import spatial.lang._
 
 @ref class Lanes extends Bits[Lanes] with Ref[Any,Lanes] {
   val box: Lanes <:< Bits[Lanes] = implicitly[Lanes <:< Bits[Lanes]]
-  override def isPrimitive: Boolean = true
+  override val __isPrimitive: Boolean = true
   override def nbits: Int = nWords * wWidth
 
   def nWords: Int = 16 // TODO

@@ -5,7 +5,7 @@ import core._
 import spatial.lang._
 
 abstract class FltOp2[M:INT,E:INT,R:Type] extends Primitive[R] {
-  lazy val fmt: FltFmt[M,E] = FltFmt[M,E]
+  lazy val fmt: FltFmt[M,E] = FltFmt.from[M,E]
 }
 abstract class FltOp1[M:INT,E:INT] extends FltOp2[M,E,Flt[M,E]]
 

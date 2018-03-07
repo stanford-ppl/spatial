@@ -88,7 +88,6 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
         case s if usedSyms.contains(s) => usedSyms(s).foreach{c => addOuter(s, c) }
         case s => dbgs(s"Dropping ${stm(s)}")
       }
-      implicit val ctx: SrcCtx = block.result.src
       void
     }
     val psu = VSwitch(blk, Seq(iters))

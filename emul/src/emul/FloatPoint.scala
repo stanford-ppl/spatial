@@ -176,6 +176,10 @@ class FloatPoint(val value: FloatValue, val valid: Boolean, val fmt: FltFormat) 
   def !==(that: Int): Boolean = (this !== FloatPoint(that, this.fmt)).value
   def ===(that: Int): Boolean = this.value == FloatPoint(that,fmt).value
 
+  def ===(that: Long): Boolean = this.value == FloatPoint(that,fmt).value
+  def ===(that: Float): Boolean = this.value == FloatPoint(that,fmt).value
+  def ===(that: Double): Boolean = this.value == FloatPoint(that,fmt).value
+
   def toBigDecimal: BigDecimal = value match {
     case Zero(_) => BigDecimal(0)
     case Value(v) => v
@@ -243,6 +247,7 @@ class FloatPoint(val value: FloatValue, val valid: Boolean, val fmt: FltFormat) 
       (this.toFloatPoint(fmt) === that.toFloatPoint(fmt)).value
 
     case that: FloatPoint => (this === that).value
+    case that: String => this.toString == that  // TODO[4]: Always correct to compare based on string?
     case _ => false
   }
 
@@ -463,7 +468,7 @@ object FloatPoint {
     * @param fmt The format for the fixed point number being generated
     */
   def random(fmt: FltFormat): FloatPoint = {
-    //FIXME: Uses Double right now
+    //TODO[2]: Uses Double right now
     FloatPoint(scala.util.Random.nextDouble(), fmt)
   }
 

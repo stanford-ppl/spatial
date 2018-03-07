@@ -57,24 +57,24 @@ import spatial.node._
     * The range must be statically known, and must have a stride of 1.
     */
   @api def apply(s: Series[I32]): Vec[A] = (s.start, s.end, s.step) match {
-    case (Lit(x1),Lit(x2),Lit(c)) =>
+    case (Const(x1),Const(x2),Const(c)) =>
       if (c !== 1) {
-        error(src, "Strides for vector slice are currently unsupported.")
-        error(src)
+        error(this.ctx, "Strides for vector slice are currently unsupported.")
+        error(this.ctx)
         Vec.empty[A]
       }
       else {
         val msb = Number.max(x1, x2).toInt
         val lsb = Number.min(x1, x2).toInt
         if (msb - lsb == 0) {
-          warn(src, "Empty vector slice.")
-          warn(src)
+          warn(this.ctx, "Empty vector slice.")
+          warn(this.ctx)
         }
         Vec.slice(this, msb, lsb)
       }
     case _ =>
-      error(src, "Apply range for bit slicing must be statically known.")
-      error(src)
+      error(this.ctx, "Apply range for bit slicing must be statically known.")
+      error(this.ctx)
       Vec.empty[A]
   }
 
@@ -95,7 +95,7 @@ import spatial.node._
   @api override def eql(that: Vec[A]): Bit = this.zip(that){(a,b) => a.eql(b) }.reduce{_&&_}
 
   // --- Typeclass Methods
-  override def isPrimitive: Boolean = false
+  override protected val __isPrimitive: Boolean = false
   override def nbits: Int = tA.nbits * length
 
   @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ tA.zero }:_*)

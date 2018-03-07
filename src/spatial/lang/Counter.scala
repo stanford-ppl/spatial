@@ -7,7 +7,7 @@ import spatial.node._
 
 /** Types **/
 @ref class Counter[A:Num] extends Top[Counter[A]] with Ref[FixedPointRange,Counter[A]] {
-  override def isPrimitive: Boolean = false
+  override protected val __isPrimitive: Boolean = false
 }
 object Counter {
   @api def apply[A:Num](

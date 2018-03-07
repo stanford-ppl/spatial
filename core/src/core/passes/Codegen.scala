@@ -22,7 +22,7 @@ trait Codegen extends Traversal {
 
   protected def quote(s: Ref[_,_]): String = s.rhs match {
     case Def.TypeRef    => remap(s)
-    case Def.Const(c)   => quoteConst(s.tp, c)
+    case Def.Const(c)     => quoteConst(s.tp, c)
     case Def.Param(_,c) => quoteConst(s.tp, c)
     case Def.Bound(id)  => s"b$id"
     case Def.Node(id,_) => named(s,id)
@@ -30,15 +30,15 @@ trait Codegen extends Traversal {
   }
 
   protected def quoteOrRemap(arg: Any): String = arg match {
-    case p: Seq[_]   => p.map(quoteOrRemap).mkString(", ")  // By default, comma separate Seq
-    case s: Set[_]   => s.map(quoteOrRemap).mkString(", ")
-    case e: Ref[_,_] => quote(e)
-    case s: String => s
-    case c: Int => c.toString
-    case b: Boolean => b.toString
-    case l: Long => l.toString
+    case p: Seq[_]     => p.map(quoteOrRemap).mkString(", ")  // By default, comma separate Seq
+    case s: Set[_]     => s.map(quoteOrRemap).mkString(", ")
+    case e: Ref[_,_]   => quote(e)
+    case s: String     => s
+    case c: Int        => c.toString
+    case b: Boolean    => b.toString
+    case l: Long       => l.toString + "L"
     case l: BigDecimal => l.toString
-    case l: BigInt => l.toString
+    case l: BigInt     => l.toString
     case _ => throw new RuntimeException(s"[$name] Could not quote or remap $arg (${arg.getClass})")
   }
 

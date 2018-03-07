@@ -79,7 +79,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       val parents = ctrlParents(parentOf(x))
       val innerParents: Seq[Ctrl] = parents.take(parents.indexOf(ctrl))
       val switches = innerParents.filter{p => isSwitch(p.sym) }
-      switches.isEmpty && x.enables.forall{case Const(c: Boolean) => c; case _ => false }
+      switches.isEmpty && x.enables.forall{case Const(c) => c.value; case _ => false }
     }
 
     /**

@@ -3,9 +3,8 @@ package core
 import Freq._
 import Filters._
 import core.transform.Transformer
+import forge.tags.rig
 import utils.recursive
-
-import scala.annotation.unchecked.uncheckedVariance
 
 /** Any staged operation.
   *
@@ -15,8 +14,9 @@ import scala.annotation.unchecked.uncheckedVariance
   */
 abstract class Op[R:Type] extends Serializable with Product {
   final type Tx = Transformer
+  val R: Type[R] = Type[R]
 
-  def tR: Type[R] = Type[R]
+  def expInputs: Seq[Sym[_]] = recursive.collectSeqs(expsFunc)(productIterator)
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies **/
   // Inputs: symbol dataflow dependencies for this Def.
@@ -47,7 +47,7 @@ abstract class Op[R:Type] extends Serializable with Product {
   // Aliases: inputs to this Def which *may* equal to the output of this Def
   // E.g. y = if (cond) a else b: aliases should return a and b
   // Default: All inputs which have the same type as an output
-  def aliases: Seq[Sym[_]] = inputs.collect{case s if s.tp =:= tR => s}
+  def aliases: Seq[Sym[_]] = inputs.collect{case s if s.tp =:= R => s}
 
   // Contains: inputs which may be returned when dereferencing the output of this Def
   // E.g. y = Array(x): contains should return x
@@ -67,6 +67,7 @@ abstract class Op[R:Type] extends Serializable with Product {
   /** Effects **/
   def effects: Effects = blocks.map(_.effects).fold(Effects.Pure){(a,b) => a andAlso b }
 
+  @rig def rewrite: R = null.asInstanceOf[R]
   def mirror(f:Tx): Op[R] = throw new Exception(s"Use @op annotation or override mirror method for node class $productPrefix")
   def update(f:Tx): Unit  = throw new Exception(s"Use @op annotation or override update method for node class $productPrefix")
 }

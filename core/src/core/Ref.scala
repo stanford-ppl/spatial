@@ -2,11 +2,11 @@ package core
 
 import forge.tags._
 import utils.implicits.Readable._
-import utils.{escapeConst,isSubtype}
+import utils.{escapeConst, isSubtype}
 
 import scala.collection.mutable
 import scala.annotation.unchecked.{uncheckedVariance => uV}
-import scala.reflect.ClassTag
+import scala.reflect.{ClassTag,classTag}
 
 /** Staged type evidence.
   *
@@ -14,82 +14,78 @@ import scala.reflect.ClassTag
   *
   * Note that ExpType is NOT covariant with A
   */
-abstract class ExpType[+C,A](implicit ev: A <:< Ref[C,A]) extends Serializable with Equals {
+abstract class ExpType[+C:ClassTag,A](implicit protected[core] val evRef: A <:< Ref[C,A]) extends Serializable with Equals {
   type L = C@uV
-  def tp: ExpType[C,A]
-  val boxed: A <:< Ref[C,A] = ev
 
-  protected def me: A = this.unbox
-  def unbox: A = this.asInstanceOf[A]
+  protected def me: A = this.asInstanceOf[A]
 
-  /** Returns the name of this type **/
-  def typePrefix: String = r"${this.getClass}"
 
   /** True if this type is a primitive **/
-  def isPrimitive: Boolean
+  protected def __isPrimitive: Boolean
+
+  /** Returns the name of this type **/
+  protected def __typePrefix: String = r"${this.getClass}"
 
   /** Returns a list of the type arguments of this staged type. **/
-  def typeArgs: Seq[Type[_]] = throw new Exception(s"Override typeArgs or use the @ref annotation in $typePrefix")
+  protected def __typeArgs: Seq[Type[_]] = throw new Exception(s"Override typeArgs or use the @ref annotation in ${__typePrefix}")
+  protected def __typeParams: Seq[Any] = Nil
+
+  final private[core] def _typePrefix: String = __typePrefix
+  final private[core] def _isPrimitive: Boolean = __isPrimitive
+  final private[core] def _typeArgs: Seq[Type[_]] = __typeArgs
+  final private[core] def _typeParams: Seq[Any] = __typeParams
 
   /** Returns a new (raw) staged value of type A. **/
-  protected def fresh: A = throw new Exception(s"Override fresh or use @ref annotation in $typePrefix")
-  final private[core] def _new(d: Def[C@uV,A@uV]): A = {val v = fresh; v.tp = this; v.rhs = d; v }
-
-  /** View this staged value or type as B[A]. **/
-  final def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A@uV] = {
-    if (isSubtype(this.getClass,tag.runtimeClass)) this.asInstanceOf[B[A]]
-    else throw new Exception(s"Cannot view $this (${this.tp}) as a ${tag.runtimeClass}")
+  protected def fresh: A = throw new Exception(s"Override fresh or use @ref annotation in ${__typePrefix}")
+  final private[core] def _new(d: Def[C@uV,A@uV], ctx: SrcCtx): A = {
+    val v = fresh
+    evRef(v).tp = this.tp
+    evRef(v).rhs = d
+    evRef(v).ctx = ctx
+    v
   }
 
-  /** View this staged value or type as a B[A] if it is a subtype of B, None otherwise. **/
-  final def getView[B[_]](implicit ev: ClassTag[B[_]]): Option[B[A@uV]] = {
-    if (isSubtype(this.getClass,ev.runtimeClass)) Some(this.asInstanceOf[B[A]]) else None
-  }
-
-  /**
-    * Returns true if this type is a subtype of that type.
-    */
-  final def <:<(that: ExpType[_,_]): Boolean = this =:= that || isSubtype(this.getClass,that.getClass)
-
-  /**
-    * Returns true if this type is equivalent to that type.
-    */
-  final def =:=(that: ExpType[_,_]): Boolean = {
-    this.typePrefix == that.typePrefix && this.typeArgs == that.typeArgs
-  }
-
-  /**
-    * Returns the full name of this type.
-    */
-  final def typeName: String = {
-    typePrefix + (if (typeArgs.isEmpty) "" else "[" + typeArgs.mkString(",") + "]")
-  }
-
-  @rig def withCheck[T](x: T, checked: Boolean)(eql: T => Boolean): Option[T] = {
-    if (checked && !eql(x)) {
-      error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent value ${escapeConst(x)}.")
-      error(s"""Use the explicit annotation "${escapeConst(x)}.to[${this.tp}]" to ignore this error.""")
-      error(ctx)
+  /** Returns a value along with a flag for whether the conversion is exact. **/
+  final protected def withCheck[T](x: => T)(eql: T => Boolean): Option[(T,Boolean)] = {
+    try {
+      val v = x
+      Some((v,eql(v)))
     }
-    Some(x)
+    catch {case _: Throwable => None }
   }
 
-  @rig def cnst(c: Any, checked: Boolean = true): Option[C] = None
+  protected def value(c: Any): Option[(C,Boolean)] = c match {
+    case x: java.lang.Character => this.value(x.toChar)
+    case x: java.lang.Byte    => this.value(x.toByte)
+    case x: java.lang.Short   => this.value(x.toShort)
+    case x: java.lang.Integer => this.value(x.toInt)
+    case x: java.lang.Long    => this.value(x.toLong)
+    case x: java.lang.Float   => this.value(x.toFloat)
+    case x: java.lang.Double  => this.value(x.toDouble)
+    case _ if isSubtype(c.getClass,classTag[C].runtimeClass) => Some((c.asInstanceOf[C],true))
+    case _ => None
+  }
+  final private[core] def __value(c: Any): Option[C] = value(c).map(_._1)
 
-  @rig final def from(c: Any, checked: Boolean = true, isParam: Boolean = false): A = {
-    implicit val tA: Type[A] = this
-    (cnst(c,checked),isParam) match {
-      case (Some(x),true)  => _param(this, x)
-      case (Some(x),false) => _const(this, x)
-      case (None,_) =>
-        error(ctx, s"Cannot convert ${c.getClass} to a ${this.tp}")
+  /** Create a checked value from the given constant
+    * Value may be either a constant or a parameter
+    */
+  @rig final def from(c: Any, checked: Boolean = false, isParam: Boolean = false): A = value(c) match {
+    case Some((v,exact)) =>
+      if (!exact && checked) {
+        error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent value ${escapeConst(c)}.")
+        error(s"""Use the explicit annotation "${escapeConst(c)}.to[${this.tp}]" to ignore this error.""")
         error(ctx)
-        err[A]
-    }
-  }
-  final def uconst(c: C@uV): A = {
-    implicit val tA: Type[A] = this
-    _const(this, c)
+      }
+
+      if (isParam) _param(this, v)
+      else         _const(this, v)
+
+    case None =>
+      implicit val tA: Type[A] = this
+      error(ctx, r"Cannot convert ${escapeConst(c)} with type ${c.getClass} to a ${this.tp}")
+      error(ctx)
+      err[A]
   }
 }
 
@@ -105,51 +101,21 @@ abstract class ExpType[+C,A](implicit ev: A <:< Ref[C,A]) extends Serializable w
   */
 sealed trait Exp[+C,+A] extends Serializable with Equals { self =>
   type L = C@uV
-  def unbox: A
 
   private[core] var _tp: ExpType[C@uV,A@uV] = _
-  private[core] def tp_=(tp: ExpType[C@uV,A@uV]): Unit = { _tp = tp }
-  final def tp: ExpType[C,A@uV] = {
-    if (_rhs == null) throw new Exception(r"Val references to tp in ${this.getClass} should be lazy")
-    else if (this.isType) this.asInstanceOf[ExpType[C,A]]
-    else if (_tp == null) throw new Exception(r"Val references to tp in ${this.getClass} should be lazy")
-    else _tp
-  }
-
-  //final def selfType: A = tp.asInstanceOf[A]
-
-  private var _rhs: Def[C@uV,A@uV] = _
-  private[core] def rhs_=(rhs: Def[C@uV, A@uV]): Unit = { _rhs = rhs }
-  final def rhs: Def[C,A] = {
-    if (_rhs == null) throw new Exception(r"Val references to rhs in ${this.getClass} should be lazy")
-    else _rhs
-  }
-
-  final def asType: A = { _rhs = Def.TypeRef; this.asInstanceOf[A] }
-
+  private[core] var _rhs: Def[C@uV,A@uV] = _
   private[core] val data: mutable.Map[Class[_],Metadata[_]] = mutable.Map.empty
 
-  var name: Option[String] = None
-  var src: SrcCtx = SrcCtx.empty
-  var prevNames: Seq[(String,String)] = Nil
+  private[core] var _name: Option[String] = None
+  private[core] var _ctx: SrcCtx = SrcCtx.empty
+  private[core] var _prevNames: Seq[(String,String)] = Nil
 
-  final def isConst: Boolean = rhs.isConst
-  final def isParam: Boolean = rhs.isParam
-  final def isValue: Boolean = rhs.isValue
-  final def isBound: Boolean = rhs.isBound
-  final def isSymbol: Boolean = rhs.isNode
-  final def isType: Boolean = rhs.isType
-  final def c: Option[C] = rhs.getValue
-  final def op: Option[Op[A@uV]] = rhs.getOp
-
-  /** Returns data dependencies of this symbol. **/
-  final def inputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
-
-  /** Returns non-data, effect dependencies of this symbol. **/
-  @stateful final def antiDeps: Seq[Sym[_]] = effectsOf(this).antiDeps.map(_.sym)
-
-  /** Returns all scheduling dependencies of this symbol. **/
-  @stateful final def allDeps: Seq[Sym[_]] = inputs ++ antiDeps
+  /** Extract the constant value of the symbol as a Scala primitive
+    * This is a hack to get around the fact it is impossible to make new classes
+    * with value equality with Int, Long, Float, Double, etc.
+    */
+  protected def extract: Option[Any] = this.c
+  private[core] def __extract: Option[Any] = extract
 }
 
 
@@ -167,14 +133,14 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
     case Def.Node(id,_)  => id
     case Def.Bound(id)   => id
     case Def.Error(id)   => id
-    case Def.TypeRef     => (typePrefix,typeArgs).hashCode()
+    case Def.TypeRef     => (_typePrefix,_typeArgs).hashCode()
   }
 
   final override def canEqual(that: Any): Boolean = that.isInstanceOf[Ref[_,_]]
 
   final override def equals(x: Any): Boolean = x match {
     case that: Ref[_,_] => (this.rhs, that.rhs) match {
-      case (Def.Const(a),     Def.Const(b))     => this.tp == that.tp && a == b
+      case (Def.Const(a),     Def.Const(b))     => this.tp =:= that.tp && a == b
       case (Def.Param(idA,_), Def.Param(idB,_)) => idA == idB
       case (Def.Node(idA,_),  Def.Node(idB,_))  => idA == idB
       case (Def.Bound(idA),   Def.Bound(idB))   => idA == idB
@@ -185,13 +151,13 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
     case _ => false
   }
 
-  final override def toString: String = rhs match {
-    case Def.Const(c)    => s"${escapeConst(c)}"
+  final override def toString: String = this.rhs match {
+    case Def.Const(c)    => s"Lit(${escapeConst(c)})"
     case Def.Param(id,c) => s"p$id (${escapeConst(c)})"
     case Def.Node(id,_)  => s"x$id"
     case Def.Bound(id)   => s"b$id"
     case Def.Error(_)    => s"<error>"
-    case Def.TypeRef     => typeName
+    case Def.TypeRef     => expTypeOps(this).typeName
   }
 }
 

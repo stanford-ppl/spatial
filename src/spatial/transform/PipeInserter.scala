@@ -102,27 +102,27 @@ case class PipeInserter(IR: State) extends MutateTransformer {
   }, block.options)
 
   def regFrom[A](s: Bits[A]): Reg[A] = {
-    implicit val ctx: SrcCtx = s.src
+    implicit val ctx: SrcCtx = s.ctx
     implicit val tA: Bits[A] = s.tp.view[Bits]
     Reg.alloc[A](s.zero)
   }
   def regRead[A](x: Reg[A]): Sym[A] = {
-    implicit val ctx: SrcCtx = x.src
+    implicit val ctx: SrcCtx = x.ctx
     implicit val tA: Bits[A] = x.tA
     tA.box(Reg.read(x))
   }
   def regWrite[A](x: Reg[A], data: Bits[A]): Unit = {
-    implicit val ctx: SrcCtx = x.src
+    implicit val ctx: SrcCtx = x.ctx
     Reg.write(x,data)
   }
 
   def varFrom[A](s: Sym[A]): Var[A] = {
-    implicit val ctx: SrcCtx = s.src
+    implicit val ctx: SrcCtx = s.ctx
     implicit val tA: Type[A] = s.tp
     Var.alloc[A](None)
   }
   def varRead[A](x: Var[A]): Sym[A] = {
-    implicit val ctx: SrcCtx = x.src
+    implicit val ctx: SrcCtx = x.ctx
     implicit val tA: Type[A] = x.tA
     Var.read(x)
   }

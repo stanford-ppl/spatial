@@ -7,7 +7,6 @@ import spatial.node._
 
 trait CastsPriority2 {
   implicit def boxNum[A:Num](x: A): Num[A] = Num[A].box(x)
-
 }
 
 trait CastsPriority1 extends CastsPriority2 {
@@ -22,6 +21,7 @@ trait CastsPriority1 extends CastsPriority2 {
 
 trait Casts extends CastsPriority1 { this: SpatialStatics =>
   implicit def boxSym[A:Type](x: A): Sym[A] = Type[A].boxed(x)
+  implicit class BoxSym[A:Type](x: A) extends core.static.ExpMiscOps[Any,A](x)
 
   implicit class CastType[A:Type](x: A) {
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
@@ -45,15 +45,15 @@ trait Casts extends CastsPriority1 { this: SpatialStatics =>
   //=== Fix ===//
 
   class Cvt_Fix_Fix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT] extends CastFunc[Fix[S1,I1,F1],Fix[S2,I2,F2]] {
-    @rig def apply(x: Fix[S1,I1,F1]): Fix[S2,I2,F2] = stage(FixToFix(x, FixFmt[S2,I2,F2]))
-    @rig override def getLeft(x: Fix[S2,I2,F2]): Option[Fix[S1,I1,F1]] = Some(stage(FixToFix(x, FixFmt[S1,I1,F1])))
+    @rig def apply(x: Fix[S1,I1,F1]): Fix[S2,I2,F2] = stage(FixToFix(x, FixFmt.from[S2,I2,F2]))
+    @rig override def getLeft(x: Fix[S2,I2,F2]): Option[Fix[S1,I1,F1]] = Some(stage(FixToFix(x, FixFmt.from[S1,I1,F1])))
   }
   implicit def CastFixToFix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT]: Cast[Fix[S1,I1,F1],Fix[S2,I2,F2]] = {
     Right(new Cvt_Fix_Fix[S1,I1,F1,S2,I2,F2])
   }
 
   class Cvt_Text_Fix[S:BOOL,I:INT,F:INT] extends Cast2Way[Text,Fix[S,I,F]] {
-    @rig def apply(x: Text): Fix[S,I,F] = stage(TextToFix(x,FixFmt[S,I,F]))
+    @rig def apply(x: Text): Fix[S,I,F] = stage(TextToFix(x,FixFmt.from[S,I,F]))
     @rig def applyLeft(x: Fix[S,I,F]): Text = stage(FixToText(x))
   }
   implicit def CastTextToFix[S:BOOL,I:INT,F:INT]: Cast[Text,Fix[S,I,F]] = Right(new Cvt_Text_Fix[S,I,F])
@@ -62,15 +62,15 @@ trait Casts extends CastsPriority1 { this: SpatialStatics =>
   //=== Flt ===//
 
   class Cvt_Flt_Flt[M1:INT,E1:INT,M2:INT,E2:INT] extends CastFunc[Flt[M1,E1],Flt[M2,E2]] {
-    @rig def apply(x: Flt[M1,E1]): Flt[M2,E2] = stage(FltToFlt(x, FltFmt[M2,E2]))
-    @rig override def getLeft(x: Flt[M2,E2]): Option[Flt[M1,E1]] = Some(stage(FltToFlt(x, FltFmt[M1,E1])))
+    @rig def apply(x: Flt[M1,E1]): Flt[M2,E2] = stage(FltToFlt(x, FltFmt.from[M2,E2]))
+    @rig override def getLeft(x: Flt[M2,E2]): Option[Flt[M1,E1]] = Some(stage(FltToFlt(x, FltFmt.from[M1,E1])))
   }
   implicit def CastFltToFlt[M1:INT,E1:INT,M2:INT,E2:INT]: Cast[Flt[M1,E1],Flt[M2,E2]] = {
     Right(new Cvt_Flt_Flt[M1,E1,M2,E2])
   }
 
   class Cvt_Text_Flt[M:INT,E:INT] extends Cast2Way[Text,Flt[M,E]] {
-    @rig def apply(x: Text): Flt[M,E] = stage(TextToFlt(x,FltFmt[M,E]))
+    @rig def apply(x: Text): Flt[M,E] = stage(TextToFlt(x,FltFmt.from[M,E]))
     @rig def applyLeft(x: Flt[M,E]): Text = stage(FltToText(x))
   }
   implicit def CastTextToFlt[M:INT,E:INT]: Cast[Text,Flt[M,E]] = Right(new Cvt_Text_Flt[M,E])
@@ -78,8 +78,8 @@ trait Casts extends CastsPriority1 { this: SpatialStatics =>
 
 
   class Cvt_Fix_Flt[S1:BOOL,I1:INT,F1:INT,M2:INT,E2:INT] extends Cast2Way[Fix[S1,I1,F1],Flt[M2,E2]] {
-    @rig def apply(a: Fix[S1,I1,F1]): Flt[M2,E2] = stage(FixToFlt(a,FltFmt[M2,E2]))
-    @rig def applyLeft(b: Flt[M2,E2]): Fix[S1,I1,F1] = stage(FltToFix(b,FixFmt[S1,I1,F1]))
+    @rig def apply(a: Fix[S1,I1,F1]): Flt[M2,E2] = stage(FixToFlt(a,FltFmt.from[M2,E2]))
+    @rig def applyLeft(b: Flt[M2,E2]): Fix[S1,I1,F1] = stage(FltToFix(b,FixFmt.from[S1,I1,F1]))
   }
   implicit def CastFixToFlt[S1:BOOL,I1:INT,F1:INT,M2:INT,E2:INT]: Cast[Fix[S1,I1,F1],Flt[M2,E2]] = Right(new Cvt_Fix_Flt[S1,I1,F1,M2,E2])
   implicit def CastFltToFix[M1:INT,E1:INT,S2:BOOL,I2:INT,F2:INT]: Cast[Flt[M1,E1],Fix[S2,I2,F2]] = Left(new Cvt_Fix_Flt[S2,I2,F2,M1,E1])

@@ -1,6 +1,7 @@
 package utils.implicits
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 /**
   * General helper methods for various data structures in Scala.
@@ -10,6 +11,16 @@ object collections {
   implicit class SeqHelpers[A](x: Seq[A]) {
     def get(i: Int): Option[A] = if (i >= 0 && i < x.length) Some(x(i)) else None
     def indexOrElse(i: Int, els: => A): A = if (i >= 0 && i < x.length) x(i) else els
+
+    private def inter(left: Boolean, x: Seq[A], y: Seq[A]): Seq[A] = (left,x,y) match {
+      case (_, Nil, Nil)   => Nil
+      case (true, Nil, _)  => y
+      case (true, _, _)    => x.head +: inter(!left, x.tail, y)
+      case (false, _, Nil) => x
+      case (false, _, _)   => y.head +: inter(!left, x, y.tail)
+    }
+
+    def interleave(y: Seq[A])(implicit tag: ClassTag[A]): Seq[A] = inter(left=true,x,y)
 
     /** Returns a new Map from elements in x to func(x)  **/
     def mapping[B](func: A => B): Map[A,B] = x.map{x => x -> func(x) }.toMap
@@ -28,6 +39,15 @@ object collections {
       * Equivalent to (but faster than) x.length > len
       */
     def lengthMoreThan(len: Int): Boolean = x.lengthCompare(len) > 0
+
+    def mapFind[B](func: A => Option[B]): Option[B] = {
+      var res: Option[B] = None
+      val iter = x.iterator
+      while (res.isEmpty && iter.hasNext) {
+        res = func(iter.next())
+      }
+      res
+    }
   }
 
   implicit class IterableHelpers[A](x: Iterable[A]) {

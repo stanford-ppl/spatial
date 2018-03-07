@@ -168,7 +168,7 @@ trait Printing {
       dbgs(s" - Aliases: $aliases")
     }
     dbgs(s" - Type: ${lhs.tp}")
-    dbgs(s" - SrcCtx: ${lhs.src}")
+    dbgs(s" - SrcCtx: ${lhs.ctx}")
     metadata.all(lhs).foreach{case (k,m) => dbgss(s" - $k: $m") }
   }
 }

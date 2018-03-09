@@ -1,10 +1,9 @@
 package spatial.node
 
-import core.Effects
 import forge.tags._
 import spatial.lang._
 
-@op case class ArgInNew[A:Bits](init: Bits[A]) extends MemAlloc[ArgIn[A]] {
+@op case class ArgInNew[A:Bits](init: Bits[A]) extends MemAlloc[A,ArgIn] {
   def dims = Nil
 }
 

@@ -6,9 +6,10 @@ import utils.implicits.Readable._
 import utils.implicits.terminal._
 import utils.isSubtype
 import utest._
+import utils.io.CaptureStream
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.{ClassTag,classTag}
+import scala.reflect.{ClassTag, classTag}
 
 trait Requirements {
 
@@ -25,6 +26,16 @@ trait Requirements {
       failed += Seq(ctx + ": " + msg, r"Expected $gold, got $res")
     }
   }
+
+  def reqWarn(calc: => Any, expect: String, msg: => String)(implicit ctx: SrcCtx, state: State): Unit = {
+    val capture = new CaptureStream(state.out)
+    withOut(capture){ calc }
+    val lines = capture.dump.split("\n")
+    if (!lines.exists{line => line.contains("warn") && line.contains(expect)}) {
+      failed += Seq(ctx + ": " + msg, s"Expected warning $expect")
+    }
+  }
+
   def complete(): Unit = {
     if (failed.nonEmpty) {
       failed.foreach{msg =>
@@ -34,6 +45,7 @@ trait Requirements {
       throw core.TestbenchFailure(s"Test failed ${failed.length} requirements")
     }
   }
+
 }
 
 abstract class Testbench extends TestSuite {

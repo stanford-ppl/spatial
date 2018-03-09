@@ -4,18 +4,18 @@ import core._
 import forge.tags._
 import spatial.lang._
 
-@op case class RegNew[T:Bits](init: Bits[T]) extends MemAlloc[Reg[T]] {
+@op case class RegNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] {
   def dims = Nil
 }
 
-@op case class RegWrite[T:Bits](
-    mem:  Reg[T],
-    data: Bits[T],
+@op case class RegWrite[A:Bits](
+    mem:  Reg[A],
+    data: Bits[A],
     ens:  Set[Bit])
-  extends Enqueuer[T]
+  extends Enqueuer[A]
 
 
-@op case class RegRead[T:Bits](mem: Reg[T]) extends Reader[T,T] {
+@op case class RegRead[A:Bits](mem: Reg[A]) extends Reader[A,A] {
   override val isTransient = true
   // Register read never takes enables
   override var ens: Set[Bit] = Set.empty
@@ -24,4 +24,4 @@ import spatial.lang._
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)
 }
 
-@op case class RegReset[T:Bits](mem: Reg[T], ens: Set[Bit]) extends Resetter[T]
+@op case class RegReset[A:Bits](mem: Reg[A], ens: Set[Bit]) extends Resetter[A]

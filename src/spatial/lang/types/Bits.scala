@@ -15,7 +15,7 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
   /**
     * Returns the given bit in this value.
     * 0 corresponds to the least significant bit (LSB).
-    **/
+    */
   @api def bit(i: Int): Bit = this.asBits.apply(i)
 
   /**

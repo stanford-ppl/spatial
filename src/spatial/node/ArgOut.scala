@@ -4,7 +4,7 @@ import core._
 import forge.tags._
 import spatial.lang._
 
-@op case class ArgOutNew[A:Bits](init: Bits[A]) extends MemAlloc[ArgOut[A]] {
+@op case class ArgOutNew[A:Bits](init: Bits[A]) extends MemAlloc[A,ArgOut] {
   def dims = Nil
 }
 

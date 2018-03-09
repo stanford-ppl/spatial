@@ -16,14 +16,14 @@ trait Printing {
 
   @stateful def raiseIssue(issue: Issue): Unit = state.issues += issue
 
-  /** Compiler Generated Files (reports, codegen, etc.) **/
+  /** Compiler Generated Files (reports, codegen, etc.) */
   @stateful def open(): Unit = { state.genTab += 1 }
   @stateful def open(x: => Any): Unit = { emit(x); open() }
   @stateful def emit(x: => Any): Unit = if (config.enGen) state.gen.println("  "*state.genTab + x)
   @stateful def close(): Unit = { state.genTab -= 1 }
   @stateful def close(x: => Any): Unit = { emit(x); close() }
 
-  /** Compiler Info Messages **/
+  /** Compiler Info Messages */
   @stateful def info(x: => Any): Unit = if (config.enInfo) state.out.info(x)
   @stateful def info(ctx: SrcCtx): Unit = if (config.enInfo) state.out.info(ctx)
   @stateful def info(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enInfo) state.out.info(ctx,showCaret)
@@ -31,7 +31,7 @@ trait Printing {
     if (config.enInfo) state.out.info(ctx, x)
   }
 
-  /** Compiler Warnings **/
+  /** Compiler Warnings */
   @stateful def warn(x: => Any): Unit = if (config.enWarn) state.out.warn(x)
   @stateful def warn(ctx: SrcCtx): Unit = if (config.enWarn) state.out.warn(ctx)
   @stateful def warn(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enWarn) state.out.warn(ctx,showCaret)
@@ -40,7 +40,7 @@ trait Printing {
     if (!noWarning) state.logWarning()
   }
 
-  /** Compiler Errors **/
+  /** Compiler Errors */
   @stateful def error(x: => Any): Unit = if (config.enError) state.out.error(x)
   @stateful def error(ctx: SrcCtx): Unit = if (config.enError) state.out.error(ctx)
   @stateful def error(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enError) state.out.error(ctx,showCaret)
@@ -50,7 +50,7 @@ trait Printing {
     if (!noError) state.logError()
   }
 
-  /** Compiler Bugs **/
+  /** Compiler Bugs */
   @stateful def bug(x: => Any): Unit = state.out.bug(x)
   @stateful def bug(ctx: SrcCtx): Unit = state.out.bug(ctx)
   @stateful def bug(ctx: SrcCtx, showCaret: Boolean): Unit = state.out.bug(ctx,showCaret)
@@ -60,10 +60,10 @@ trait Printing {
   }
 
 
-  /** Generic Terminal Printing **/
+  /** Generic Terminal Printing */
   @stateful def msg(x: => Any): Unit = if (config.enInfo) state.out.println(x)
 
-  /** Debugging **/
+  /** Debugging */
   @stateful def dbg(x: => Any): Unit = if (config.enDbg) state.log.println(x)
   @stateful def dbgs(x: => Any): Unit = if (config.enDbg) state.log.println("  "*state.logTab + x)
   @stateful def dbgss(x: => Any): Unit = if (config.enDbg) {
@@ -157,6 +157,9 @@ trait Printing {
     inStream(config.enGen, () => createStream(dir,filename), blk, () => state.gen, {s => state.gen = s}, _.close())
   }
 
+  @stateful def withOut[T](stream: PrintStream)(blk: => T): T = {
+    inStream(enable = true, () => stream, blk, () => state.out, {s => state.out = s}, _.close())
+  }
   @stateful def withOut[T](dir: String, filename: String)(blk: => T): T = {
     inStream(enable = true, () => createStream(dir,filename), blk, () => state.out, {s => state.out = s}, _.close())
   }

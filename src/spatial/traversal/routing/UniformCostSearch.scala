@@ -21,7 +21,7 @@ trait UniformCostSearch {
    * Call finPass when a route is found. If finPass is succeeded, return mapping from finPass.
    * If finPass fails, continue find routes. Throw exception when no route is found
    * @return mapping
-   **/
+   */
   @stateful def uniformCostSearch[S, A, C:Ordering, M](
     start:    S,
     isEnd:    S => Boolean,
@@ -70,7 +70,7 @@ trait UniformCostSearch {
 
   /**
    * Find list of nodes reachable from start
-   **/
+   */
   @stateful def uniformCostSpan[S,A,C:Ordering](
     start:    S,
     zeroCost: C,

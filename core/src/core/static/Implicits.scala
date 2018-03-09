@@ -16,37 +16,37 @@ class ExpTypeLowPriority[C,A](t: ExpType[C,A]) {
 class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
   lazy val boxed: A <:< Ref[C,A] = tp.evRef
 
-  /** Create an (optionally checked) parameter **/
+  /** Create an (optionally checked) parameter */
   @rig final def param(c: Any, checked: Boolean = false): A = tp.from(c, checked, isParam = true)
 
-  /** Create a (optionally checked) constant **/
+  /** Create a (optionally checked) constant */
   @rig final def const(c: Any, checked: Boolean = false): A = tp.from(c, checked)
 
-  /** Create an unchecked constant (no implicit state required) **/
+  /** Create an unchecked constant (no implicit state required) */
   final def uconst(c: C): A = _const(tp, tp.__value(c).getOrElse(throw new Exception(s"Invalid constant $c for type $tp")))
 
 
-  /** View the staged value or type as B[A]. **/
+  /** View the staged value or type as B[A]. */
   def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {
     if (isSubtype(tp.getClass,tag.runtimeClass)) tp.asInstanceOf[B[A]]
     else throw new Exception(s"Cannot view $tp (${tp.tp}) as a ${tag.runtimeClass}")
   }
 
-  /** View the staged value or type as a B[A] if it is a subtype of B, None otherwise. **/
+  /** View the staged value or type as a B[A] if it is a subtype of B, None otherwise. */
   def getView[B[_]](implicit ev: ClassTag[B[_]]): Option[B[A]] = {
     if (isSubtype(tp.getClass,ev.runtimeClass)) Some(tp.asInstanceOf[B[A]]) else None
   }
 
-  /** Returns true if the type is a subtype of that type. **/
+  /** Returns true if the type is a subtype of that type. */
   def <:<(that: ExpType[_,_]): Boolean = this =:= that || isSubtype(tp.getClass,that.getClass)
 
-  /** Returns true if the type is equivalent to that type. **/
+  /** Returns true if the type is equivalent to that type. */
   def =:=(that: ExpType[_,_]): Boolean = {
     tp._typePrefix == that._typePrefix && tp._typeArgs == that._typeArgs &&
                                           tp._typeParams == that._typeParams
   }
 
-  /** Returns the full name of the type. **/
+  /** Returns the full name of the type. */
   def typeName: String = {
     tp._typePrefix + (if (tp._typeArgs.isEmpty) "" else "[" + tp._typeArgs.mkString(",") + "]") +
       (if (tp._typeParams.isEmpty) "" else "[" + tp._typeParams.mkString(",") + "]")
@@ -95,13 +95,13 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   def c: Option[C] = rhs.getValue
   def op: Option[Op[A]] = rhs.getOp
 
-  /** Returns data dependencies of the symbol. **/
+  /** Returns data dependencies of the symbol. */
   final def inputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
 
-  /** Returns non-data, effect dependencies of the symbol. **/
+  /** Returns non-data, effect dependencies of the symbol. */
   @stateful final def antiDeps: Seq[Sym[_]] = effectsOf(exp).antiDeps.map(_.sym)
 
-  /** Returns all scheduling dependencies of the symbol. **/
+  /** Returns all scheduling dependencies of the symbol. */
   @stateful final def allDeps: Seq[Sym[_]] = inputs ++ antiDeps
 }
 

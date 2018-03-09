@@ -4,16 +4,16 @@ import core._
 import forge.tags._
 import spatial.lang._
 
-/** An allocation of a subclass C of [[RegFile]] with elements of type [[A]].
+/** An allocation of a subclass C of RegFile with elements of type A.
   * @param dims The dimensions of the memory
   */
 @op case class RegFileNew[A:Bits,C[T]](
     dims:  Seq[I32],
     inits: Option[Seq[A]]
     )(implicit cT: Type[C[A]])
-  extends MemAlloc[C[A]]
+  extends MemAlloc[A,C]
 
-/** Read of a single element from a [[RegFile]].
+/** Read of a single element from a RegFile.
   * @param mem The memory instance being read
   * @param addr The N-dimensional address
   * @param ens Associated read enable(s)
@@ -24,7 +24,7 @@ import spatial.lang._
     ens:  Set[Bit])
   extends Reader[A,A]
 
-/** Write of a single element to a [[RegFile]].
+/** Write of a single element to a RegFile.
   * @param mem The memory instance being written
   * @param data The element being written
   * @param addr The N-dimensional address
@@ -37,7 +37,7 @@ import spatial.lang._
     ens:  Set[Bit])
   extends Writer[A]
 
-/** Shift of a single element into a 1-dimensional slice of [[RegFile]]
+/** Shift of a single element into a 1-dimensional slice of RegFile
   * @param mem The memory instance being written
   * @param data The element being written
   * @param addr The N-dimensional address identifying the 1-dimensional slice
@@ -56,7 +56,7 @@ import spatial.lang._
   extends EnqueuerLike[A]
 
 
-/** Reset of a [[RegFile]].
+/** Reset of a RegFile.
   * @param mem The memory instance being reset
   * @param ens Associated enable(s)
   */
@@ -75,7 +75,7 @@ import spatial.lang._
 //  len:  Int
 //) extends VectorEnqueuer[A]
 
-/** A banked read of a vector of elements from a [[RegFile]].
+/** A banked read of a vector of elements from a RegFile.
   * @param mem the RegFile being read
   * @param bank the (optionally multi-dimensional) bank address(es) for each vector element
   * @param ofs the bank offset for each vector element
@@ -89,7 +89,7 @@ import spatial.lang._
     )(implicit val vT: Vec[A])
   extends BankedReader[A]
 
-/** A banked write of a vector of elements to an [[RegFile]].
+/** A banked write of a vector of elements to an RegFile.
   * @param mem the RegFile being written
   * @param data the vector of data being written to the RegFile
   * @param bank the (optionally multi-dimensional) bank address(es) for each vector element

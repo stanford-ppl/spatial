@@ -20,13 +20,13 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[core] val evRef: A <:< 
   protected def me: A = this.asInstanceOf[A]
 
 
-  /** True if this type is a primitive **/
+  /** True if this type is a primitive */
   protected def __isPrimitive: Boolean
 
-  /** Returns the name of this type **/
+  /** Returns the name of this type */
   protected def __typePrefix: String = r"${this.getClass}"
 
-  /** Returns a list of the type arguments of this staged type. **/
+  /** Returns a list of the type arguments of this staged type. */
   protected def __typeArgs: Seq[Type[_]] = throw new Exception(s"Override typeArgs or use the @ref annotation in ${__typePrefix}")
   protected def __typeParams: Seq[Any] = Nil
 
@@ -35,7 +35,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[core] val evRef: A <:< 
   final private[core] def _typeArgs: Seq[Type[_]] = __typeArgs
   final private[core] def _typeParams: Seq[Any] = __typeParams
 
-  /** Returns a new (raw) staged value of type A. **/
+  /** Returns a new (raw) staged value of type A. */
   protected def fresh: A = throw new Exception(s"Override fresh or use @ref annotation in ${__typePrefix}")
   final private[core] def _new(d: Def[C@uV,A@uV], ctx: SrcCtx): A = {
     val v = fresh
@@ -45,7 +45,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[core] val evRef: A <:< 
     v
   }
 
-  /** Returns a value along with a flag for whether the conversion is exact. **/
+  /** Returns a value along with a flag for whether the conversion is exact. */
   final protected def withCheck[T](x: => T)(eql: T => Boolean): Option[(T,Boolean)] = {
     try {
       val v = x
@@ -152,7 +152,7 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
   }
 
   final override def toString: String = this.rhs match {
-    case Def.Const(c)    => s"Lit(${escapeConst(c)})"
+    case Def.Const(c)    => s"Const(${escapeConst(c)})"
     case Def.Param(id,c) => s"p$id (${escapeConst(c)})"
     case Def.Node(id,_)  => s"x$id"
     case Def.Bound(id)   => s"b$id"

@@ -3,7 +3,7 @@ package spatial.node
 import core._
 import spatial.lang._
 
-/** Memory accesses **/
+/** Memory accesses */
 abstract class Access {
   def mem:  Sym[_]
   def addr: Seq[Idx]
@@ -22,7 +22,7 @@ case class BankedRead(mem: Sym[_], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[
 case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends BankedAccess
 
 
-/** Status read of a memory **/
+/** Status read of a memory */
 abstract class StatusRead[R:Type] extends EnPrimitive[R] {
   def mem: Sym[_]
 }
@@ -41,7 +41,7 @@ object StatusRead {
 }
 
 
-/** Any access of a memory **/
+/** Any access of a memory */
 abstract class Accessor[A:Type,R:Type] extends EnPrimitive[R] {
   val tA: Type[A] = Type[A]
   def mem:  Sym[_]
@@ -60,7 +60,7 @@ object Accessor {
   def unapply(x: Sym[_]): Option[(Option[Write],Option[Read])] = x.op.flatMap(Accessor.unapply)
 }
 
-/** Any read of a memory **/
+/** Any read of a memory */
 abstract class Reader[A:Type,R:Type] extends Accessor[A,R] {
   def localRead = Some(Read(mem,addr,ens))
   def localWrite: Option[Write] = None
@@ -74,10 +74,10 @@ object Reader {
   def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(Reader.unapply)
 }
 
-/** Any dequeue-like operation from a memory **/
+/** Any dequeue-like operation from a memory */
 abstract class DequeuerLike[A:Type,R:Type] extends Reader[A,R]
 
-/** An address-less dequeue operation. **/
+/** An address-less dequeue operation. */
 abstract class Dequeuer[A:Type,R:Type] extends DequeuerLike[A,R] {
   def addr: Seq[Idx] = Nil
 }
@@ -91,7 +91,7 @@ object Dequeuer {
 }
 
 
-/** Any write to a memory **/
+/** Any write to a memory */
 abstract class Writer[A:Type] extends Accessor[A,Void] {
   override def effects: Effects = Effects.Writes(mem)
 
@@ -108,10 +108,10 @@ object Writer {
   def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(Writer.unapply)
 }
 
-/** Any enqueue-like operation to a memory **/
+/** Any enqueue-like operation to a memory */
 abstract class EnqueuerLike[A:Type] extends Writer[A]
 
-/** An address-less enqueue operation. **/
+/** An address-less enqueue operation. */
 abstract class Enqueuer[A:Type] extends Writer[A] {
   def addr: Seq[Idx] = Nil
 }
@@ -126,7 +126,7 @@ object Enqueuer {
 
 
 
-/** Banked accessors **/
+/** Banked accessors */
 abstract class BankedAccessor[A:Type,R:Type] extends EnPrimitive[R] {
   val tA: Type[A] = Type[A]
   def bankedRead: Option[BankedRead]

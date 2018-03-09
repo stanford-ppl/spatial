@@ -6,7 +6,7 @@ import forge.Ptr
 
 import spatial.node._
 
-@ref class ArgIn[A:Bits] extends LocalMem[A,ArgIn] with RemoteMem[A,ArgIn] with Ref[Ptr[Any],ArgIn[A]] {
+@ref class ArgIn[A:Bits] extends LocalMem0[A,ArgIn] with RemoteMem[A,ArgIn] with Ref[Ptr[Any],ArgIn[A]] {
   val tA: Bits[A] = Bits[A]
   private implicit val evA: A <:< Bits[A] = Bits[A].box
   override val evMem = implicitly[ArgIn[A] <:< (LocalMem[A,ArgIn] with RemoteMem[A,ArgIn])]

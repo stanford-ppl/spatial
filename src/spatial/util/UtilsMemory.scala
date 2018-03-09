@@ -106,19 +106,19 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   }
 
 
-  /** Returns the statically defined rank (number of dimensions) of the given memory. **/
+  /** Returns the statically defined rank (number of dimensions) of the given memory. */
   def rankOf(mem: Sym[_]): Int = mem match {
-    case Op(m: MemAlloc[_]) => m.rank
+    case Op(m: MemAlloc[_,_]) => m.rank
     case _ => throw new Exception(s"Could not statically determine the rank of $mem")
   }
 
-  /** Returns the statically defined staged dimensions (symbols) of the given memory. **/
+  /** Returns the statically defined staged dimensions (symbols) of the given memory. */
   def dimsOf(mem: Sym[_]): Seq[I32] = mem match {
-    case Op(m: MemAlloc[_]) => m.dims
+    case Op(m: MemAlloc[_,_]) => m.dims
     case _ => throw new Exception(s"Could not statically determine the dimensions of $mem")
   }
 
-  /** Returns constant values of the dimensions of the given memory. **/
+  /** Returns constant values of the dimensions of the given memory. */
   def constDimsOf(mem: Sym[_]): Seq[Int] = {
     val dims = dimsOf(mem)
     if (dims.forall{case Expect(c) => true; case _ => false}) {

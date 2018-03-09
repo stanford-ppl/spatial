@@ -13,7 +13,7 @@ trait NovaVirtualization extends forge.EmbeddedControls {
     case _ => super.__valName(init, name)
   }
 
-  /** Control structures **/
+  /** Control structures */
   //def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T =
   //def __return(expr: Any): Nothing =
   //def __whileDo(cond: Boolean, body: Unit): Unit =
@@ -21,7 +21,7 @@ trait NovaVirtualization extends forge.EmbeddedControls {
 
   //def __throw(t: Throwable): Unit =
 
-//  /** `Any` Infix Methods **/
+//  /** `Any` Infix Methods */
 //  def infix_+(x1: String, x2: Any): String =
 //  def infix_+(x1: Any, x2: Any): Any =
 //  def infix_==(x1: Any, x2: Any): Boolean =
@@ -34,7 +34,7 @@ trait NovaVirtualization extends forge.EmbeddedControls {
 //  def infix_toString(x: Any): String =
 //  def infix_getClass(x: Any): Class[_] =
 //
-//  /** `AnyRef` Infix Methods **/
+//  /** `AnyRef` Infix Methods */
 //  def infix_eq(x1: AnyRef, x2: AnyRef): Boolean =
 //  def infix_ne(x1: AnyRef, x2: AnyRef): Boolean =
 //  def infix_notify(x: AnyRef): Unit =

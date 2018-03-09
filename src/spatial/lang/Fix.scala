@@ -53,6 +53,8 @@ object FixFmt {
   @api override def neql(that: Fix[S,I,F]): Bit = stage(FixNeq(this,that))
   @api override def eql(that: Fix[S,I,F]): Bit = stage(FixEql(this,that))
 
+  @rig def toSeries: Series[Fix[S,I,F]] = Series[Fix[S,I,F]](this, this+1, 1, 1, isUnit=true)
+
   // --- Typeclass Methods
   @rig def random(max: Option[Fix[S,I,F]]): Fix[S,I,F] = stage(FixRandom(max))
 
@@ -106,20 +108,20 @@ object FixFmt {
 
   def uconst(c: Int): Fix[S,I,F] = uconst(FixedPoint.fromInt(c))
 
-  /** Returns a string of ones interpreted as this value's format. **/
+  /** Returns a string of ones interpreted as this value's format. */
   def ones: Fix[S,I,F] = {
     uconst(FixedPoint.fromBits(Array.fill(nbits){emul.Bool(true)}, fmt.toEmul))
   }
-  /** Returns the minimum integer value representable by this number's format. **/
+  /** Returns the minimum integer value representable by this number's format. */
   def minInt: Fix[S,I,F] = uconst(fmt.toEmul.MIN_INTEGRAL_VALUE_FP)
 
-  /** Returns the maximum integer value representable by this number's format. **/
+  /** Returns the maximum integer value representable by this number's format. */
   def maxInt: Fix[S,I,F] = uconst(fmt.toEmul.MAX_INTEGRAL_VALUE_FP)
 
-  /** Returns the minimum value representable by this number's format. **/
+  /** Returns the minimum value representable by this number's format. */
   def minValue: Fix[S,I,F] = uconst(fmt.toEmul.MAX_VALUE_FP)
 
-  /** Returns the maximum value representable by this number's format. **/
+  /** Returns the maximum value representable by this number's format. */
   def maxValue: Fix[S,I,F] = uconst(fmt.toEmul.MIN_VALUE_FP)
 
   @api override def toText: Text = stage(FixToText(this))

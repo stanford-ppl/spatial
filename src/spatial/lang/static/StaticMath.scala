@@ -7,13 +7,13 @@ import utils.math.ReduceTree
 
 trait StaticMath {
 
-  /** Creates a sum reduction tree of a fixed number of numeric elements. **/
+  /** Creates a sum reduction tree of a fixed number of numeric elements. */
   @api def sum[T:Num](xs: T*): T = if (xs.isEmpty) Num[T].zero else reduce(xs:_*){_+_}
 
-  /** Creates a product reduction tree for a fixed number of numeric elements. **/
+  /** Creates a product reduction tree for a fixed number of numeric elements. */
   @api def product[T:Num](xs: T*): T = if (xs.isEmpty) Num[T].one else reduce(xs:_*){_*_}
 
-  /** Creates a reduction tree for a fixed number of elements. **/
+  /** Creates a reduction tree for a fixed number of elements. */
   @api def reduce[T](xs: T*)(reduce: (T,T) => T): T = ReduceTree(xs:_*)(reduce)
 
   @api def min[A:Num](a: A, b: A): A = Num[A].min(a,b)

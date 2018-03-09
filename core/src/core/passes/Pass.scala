@@ -32,11 +32,11 @@ trait Pass { self =>
   }
   def init(): Unit = { needsInit = false }
 
-  /** Performance debugging **/
+  /** Performance debugging */
   var lastTime  = 0.0f
   var totalTime = 0.0f
 
-  /** Run method - called internally from compiler **/
+  /** Run method - called internally from compiler */
   final def run[R](block: Block[R]): Block[R] = if (shouldRun) {
     state.pass += 1
     config.withVerbosity(
@@ -56,6 +56,6 @@ trait Pass { self =>
     }
   } else block
 
-  /** Called to execute this pass. Override to implement custom IR processing **/
+  /** Called to execute this pass. Override to implement custom IR processing */
   protected def process[R](block: Block[R]): Block[R]
 }

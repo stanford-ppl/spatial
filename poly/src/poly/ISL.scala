@@ -47,13 +47,13 @@ trait ISL {
     nonEmpty(equal.andDomain)
   }
 
-  /** True if the space of addresses in a is statically known to include all of the addresses in b. **/
+  /** True if the space of addresses in a is statically known to include all of the addresses in b. */
   def isSuperset[K](a: SparseMatrix[K], b: SparseMatrix[K]): Boolean = {
     // TODO[3) Implement isSuperset in ISL. (Used for reaching write calculation)
     false
   }
 
-  /** True if the space of addresses in a and b may have at least one element in common. **/
+  /** True if the space of addresses in a and b may have at least one element in common. */
   def intersects[K](a: SparseMatrix[K], b: SparseMatrix[K]): Boolean = {
     // TODO[3) Implement intersects in ISL. (Used for reaching write calculation)
     true

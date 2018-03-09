@@ -5,9 +5,15 @@ import forge.tags._
 
 import spatial.lang._
 
-sealed abstract class BlackBox extends Control[Void] {
-  override def effects: Effects = Effects.Simple
+abstract class BlackBox extends Control[Void]
+
+/** Black box which must be expanded early in compiler (after initial analyses). */
+abstract class EarlyBlackBox extends BlackBox {
+  override def cchains = Nil
+  override def iters = Nil
+  override def bodies = Nil
 }
+
 @op case class GEMMBox[T:Num](
   cchain: CounterChain,
   y:     SRAM2[T],

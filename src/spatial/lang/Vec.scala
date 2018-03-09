@@ -124,7 +124,7 @@ object Vec {
     * Creates a little-endian vector from the given N elements
     * The first element is the most significant word (vector index N-1).
     * The last element is the least significant word (vector index of 0).
-    **/
+    */
   @api def LittleEndian[A:Bits](elems: A*): Vec[A] = fromSeq(elems.reverse)
 
   /**
@@ -132,14 +132,14 @@ object Vec {
     * Creates a little-endian vector from the given N elements
     * The first element is the most significant word (vector index N-1).
     * The last element is the least significant word (vector index of 0).
-    **/
+    */
   @api def LeastLast[A:Bits](elems: A*): Vec[A] = fromSeq(elems.reverse)
 
   /**
     * Creates a big-endian vector from the given N elements.
     * The first element is the least significant word (vector index 0).
     * The last element is the most significant word (vector index of N-1).
-    **/
+    */
   @api def BigEndian[A:Bits](elems: A*): Vec[A] = fromSeq(elems)
 
   /**
@@ -147,7 +147,7 @@ object Vec {
     * Creates a big-endian vector from the given N elements.
     * The first element is the least significant word (vector index 0).
     * The last element is the most significant word (vector index of N-1).
-    **/
+    */
   @api def LeastFirst[A:Bits](elems: A*): Vec[A] = fromSeq(elems)
 
   /**

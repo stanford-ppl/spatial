@@ -8,7 +8,7 @@ import spatial.node._
 
 import scala.collection.mutable
 
-@ref class Reg[A:Bits] extends LocalMem[A,Reg] with StagedVarLike[A] with Ref[Ptr[Any],Reg[A]] {
+@ref class Reg[A:Bits] extends LocalMem0[A,Reg] with StagedVarLike[A] with Ref[Ptr[Any],Reg[A]] {
   val tA: Bits[A] = Bits[A]
   private implicit val evA: A <:< Bits[A] = Bits[A].box
   override val evMem: Reg[A] <:< LocalMem[A,Reg] = implicitly[Reg[A] <:< LocalMem[A,Reg]]

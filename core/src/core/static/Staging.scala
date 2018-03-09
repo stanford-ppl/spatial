@@ -8,13 +8,13 @@ import utils.recursive
 import scala.annotation.unchecked.{uncheckedVariance => uV}
 
 trait Staging { this: Printing =>
-  /** Create a checked parameter (implicit state required) **/
+  /** Create a checked parameter (implicit state required) */
   @stateful def param[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
 
-  /** Create a checked constant (implicit state required) **/
+  /** Create a checked constant (implicit state required) */
   @stateful def const[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked)
 
-  /** Create an unchecked constant (no implicit state required) **/
+  /** Create an unchecked constant (no implicit state required) */
   def uconst[A<:Sym[A]:Type](c: A#L): A = Type[A].uconst(c)
 
   private[core] def _const[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Const(c), SrcCtx.empty)

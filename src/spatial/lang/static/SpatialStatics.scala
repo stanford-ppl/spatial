@@ -7,13 +7,13 @@ trait SpatialStatics extends Lifts with Casts with utils.Overloads
   with StaticMisc
   with StaticTransfers
 
-/** Internal view of Spatial **/
+/** Internal view of Spatial */
 trait InternalStatics extends SpatialStatics with InternalAliases
 
-/** External view for extending DSLs **/
+/** External view for extending DSLs */
 trait ExtensionStatics extends InternalStatics with ExternalAliases
 
-/** Application view **/
+/** Application view */
 trait ExternalStatics extends ExtensionStatics with SpatialVirtualization
   with StaticDebugsExternal
 {

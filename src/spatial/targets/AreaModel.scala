@@ -163,7 +163,7 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
   }
 
   @stateful def areaOfNode(lhs: Sym[_], rhs: Op[_]): Area = {try { rhs match {
-    /** Non-synthesizable nodes **/
+    /** Non-synthesizable nodes */
     case _:PrintIf          => NoArea
     case _:AssertIf         => NoArea
     case _:GenericToText[_] => NoArea
@@ -172,12 +172,12 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     case _:VarRead[_]       => NoArea
     case _:VarAssign[_]     => NoArea
 
-    /** Zero area cost **/
+    /** Zero area cost */
     case Transient(_)       => NoArea
     case _:DRAMNew[_,_]     => NoArea // No hardware cost
     case GetDRAMAddress(_)  => NoArea // No hardware cost
 
-    /** Memories **/
+    /** Memories */
     case op: CounterNew[_] =>
       val par = boundOf(op.par).toInt
       val bits = op.nA.nbits
@@ -264,7 +264,7 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     case _:RegFileBankedRead[_,_]  => NoArea
     case _:RegFileBankedWrite[_,_] => NoArea
 
-    /** Primitives **/
+    /** Primitives */
     // Bit
     case Not(_)     => model("BitNot")()
     case And(_,_)   => model("BitAnd")()
@@ -387,7 +387,7 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     //case DelayLine(depth, _)   => areaOfDelayLine(depth,nbits(lhs),1)
 
 
-    /** Control Structures **/
+    /** Control Structures */
     case _:AccelScope          => areaOfControl(lhs)
     case _:UnitPipe            => areaOfControl(lhs)
     //case _:ParallelPipe        => model("Parallel")("n" -> nStages(lhs))
@@ -432,7 +432,7 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
   /**
     * Returns the area resources for a delay line with the given width (in bits) and length (in cycles)
     * Models delays as registers for short delays, BRAM for long ones
-    **/
+    */
   @stateful def areaOfDelayLine(length: Int, width: Int, par: Int): Area = {
     val nregs = width*length
     // TODO[4]: Should fix this cutoff point to something more real

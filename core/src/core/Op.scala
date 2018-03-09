@@ -18,7 +18,7 @@ abstract class Op[R:Type] extends Serializable with Product {
 
   def expInputs: Seq[Sym[_]] = recursive.collectSeqs(expsFunc)(productIterator)
 
-  /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies **/
+  /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies */
   // Inputs: symbol dataflow dependencies for this Def.
   // Default: All symbols in the Def's case class constructor AND scope (block/lambda) results
   def inputs: Seq[Sym[_]] = recursive.collectSeqs(symsFunc)(productIterator)
@@ -43,7 +43,7 @@ abstract class Op[R:Type] extends Serializable with Product {
   // Default: All effects included in all scopes associated with this Def
   def binds: Seq[Sym[_]] = blocks.flatMap(_.effects.antiDeps.map(_.sym))
 
-  /** Alias hints -- used to check/disallow unsafe mutable aliasing **/
+  /** Alias hints -- used to check/disallow unsafe mutable aliasing */
   // Aliases: inputs to this Def which *may* equal to the output of this Def
   // E.g. y = if (cond) a else b: aliases should return a and b
   // Default: All inputs which have the same type as an output
@@ -64,7 +64,7 @@ abstract class Op[R:Type] extends Serializable with Product {
   // Default: no symbols
   def copies: Seq[Sym[_]] = Nil
 
-  /** Effects **/
+  /** Effects */
   def effects: Effects = blocks.map(_.effects).fold(Effects.Pure){(a,b) => a andAlso b }
 
   @rig def rewrite: R = null.asInstanceOf[R]

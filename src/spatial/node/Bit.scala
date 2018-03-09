@@ -11,7 +11,7 @@ abstract class BitOp1 extends BitOp2[Bit]
 abstract class BitBinary(override val unstaged: (Bool,Bool) => Bool) extends BitOp1 with Binary[emul.Bool,Bit]
 abstract class BitUnary(override val unstaged: Bool => Bool) extends BitOp1 with Unary[emul.Bool,Bit]
 
-/** Bit **/
+/** Bit */
 @op case class Not(a: Bit) extends BitUnary(a => !a) {
   @rig override def rewrite: Bit = a match {
     case Op(Not(x)) => x

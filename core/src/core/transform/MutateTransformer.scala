@@ -30,7 +30,7 @@ abstract class MutateTransformer extends ForwardTransformer {
     metadata.addAll(sym, data)
   }
 
-  /** Mutate this symbol's node with the current substitution rules. **/
+  /** Mutate this symbol's node with the current substitution rules. */
   def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Update]")

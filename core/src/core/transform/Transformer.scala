@@ -8,7 +8,10 @@ import scala.collection.mutable
 abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
+  // Default rules for mirroring
+  // NOTE: This doesn't currently work for mirroring Products with implicit constructor arguments
   def apply[T](x: T): T = (x match {
+    case x: Mirrorable[_] => x.mirror(f)
     case x: Sym[_]    => transformSym(x.asInstanceOf[Sym[T]])
     case x: Block[_]  => transformBlock(x)
     case x: Option[_] => x.map{this.apply}
@@ -17,10 +20,14 @@ abstract class Transformer extends Pass {
     case x: mutable.Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
     case x: Product     => mirrorProduct(x)
     case x: Iterable[_] => x.map{this.apply}
+    case x: Char => x
+    case x: Byte => x
+    case x: Short => x
     case x: Int => x
     case x: Long => x
     case x: Float => x
     case x: Double => x
+    case x: Boolean => x
     case _ => throw new Exception(s"No rule for mirroring ${x.getClass}")
   }).asInstanceOf[T]
 

@@ -38,7 +38,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
   }
 
-  /** True if this is a valid banking strategy for the given sets of access matrices. **/
+  /** True if this is a valid banking strategy for the given sets of access matrices. */
   def isValidBanking(banking: Seq[ModBanking], grps: Set[Seq[SparseMatrix[Idx]]]): Boolean = {
     // TODO[2]: This may not be correct in all cases, need to verify!
     val banks = banking.map(_.nBanks).product

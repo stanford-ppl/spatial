@@ -2,7 +2,7 @@ package core
 
 import forge.tags._
 
-/** A binary operation; takes two inputs of type R and returns a value of type R. **/
+/** A binary operation; takes two inputs of type R and returns a value of type R. */
 trait Binary[C,R<:Exp[C,R]] extends Op[R] {
   private implicit val tp: Type[R] = R
   assert(this.productIterator.length == 2, s"Binary op $productPrefix has ${this.productIterator.length} != 2 inputs!")
@@ -19,16 +19,16 @@ trait Binary[C,R<:Exp[C,R]] extends Op[R] {
     */
   def identity: Option[R] = None
 
-  /** Returns true if `x` is an absorber for this operation. **/
+  /** Returns true if `x` is an absorber for this operation. */
   def isAbsorber(x: R): Boolean = absorber.contains(x)
 
-  /** Returns true if `x` is an identity for this operation. **/
+  /** Returns true if `x` is an identity for this operation. */
   def isIdentity(x: R): Boolean = identity.contains(x)
 
-  /** True if this operation is associative. **/
+  /** True if this operation is associative. */
   def isAssociative: Boolean = false
 
-  /** An optional reference to an unstaged implementation of this op. **/
+  /** An optional reference to an unstaged implementation of this op. */
   def unstaged: (C, C) => C = null
 
   @rig override def rewrite: R = (a,b) match {
@@ -37,16 +37,6 @@ trait Binary[C,R<:Exp[C,R]] extends Op[R] {
     case (a, _) if isAbsorber(a.unbox) => a.unbox
     case (a, b) if isIdentity(a.unbox) => b.unbox
     case (a, b) if isIdentity(b.unbox) => a.unbox
-    case _ =>
-//      logs(s"Did not rewrite binary $this: ")
-//      logs(s"  $a: type: ${a.tp.typeName}, const: ${a.c.map(_.getClass)}")
-//      logs(s"      isIdentity: ${isIdentity(a.unbox)}, isAbsorber: ${isAbsorber(a.unbox)}")
-//
-//      logs(s"  $b: type: ${b.tp.typeName}, const: ${b.c.map(_.getClass)}")
-//      logs(s"      isIdentity: ${isIdentity(b.unbox)}, isAbsorber: ${isAbsorber(b.unbox)}")
-//
-//      logs(s"identity: $identity, type: ${identity.map(_.tp)}, const: ${identity.flatMap(_.c.map(_.getClass))}")
-//      logs(s"absorber: $absorber, type: ${absorber.map(_.tp)}, const: ${absorber.flatMap(_.c.map(_.getClass))}")
-      super.rewrite
+    case _ => super.rewrite
   }
 }

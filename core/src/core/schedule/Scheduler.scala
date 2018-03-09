@@ -4,7 +4,7 @@ package schedule
 import scala.collection.mutable
 
 trait Scheduler {
-  /** If true overrides the compiler's current code motioning flag. **/
+  /** If true overrides the compiler's current code motioning flag. */
   def mustMotion: Boolean
 
   /**
@@ -25,7 +25,7 @@ trait Scheduler {
     effects.copy(reads = effects.reads diff allocs, writes = effects.writes diff allocs, antiDeps = impure)
   }
 
-  /** Returns the schedule of the given scope. **/
+  /** Returns the schedule of the given scope. */
   def apply[R](
     inputs:  Seq[Sym[_]],
     result:  Sym[R],

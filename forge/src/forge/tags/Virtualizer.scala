@@ -114,7 +114,7 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
 
     override def transform(tree: Tree): Tree = atPos(tree.pos) {
       tree match {
-        /* Attempt to stage vars in both class bodies and blocks **/
+        /* Attempt to stage vars in both class bodies and blocks */
         case Template(parents, selfType, bodyList) =>
           val body = bodyList.flatMap(transformStm)
 

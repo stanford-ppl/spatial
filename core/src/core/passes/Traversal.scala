@@ -16,7 +16,7 @@ trait Traversal extends Pass { self =>
   val recurse: Recurse = Default   // Recursive traversal of IR hierarchy
 
   // --- Methods
-  /** Run a single traversal, including pre- and post- processing **/
+  /** Run a single traversal, including pre- and post- processing */
   final protected def runSingle[R](b: Block[R]): Block[R] = {
     val b2 = preprocess(b)
     val b3 = visitBlock(b2)

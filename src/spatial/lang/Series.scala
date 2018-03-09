@@ -5,10 +5,20 @@ import emul.FixedPoint
 import forge.tags._
 import utils.implicits.collections._
 
-case class Series[A:Num](start: A, end: A, step: A, par: I32, isUnit: Boolean = false)(implicit ev: A <:< Num[A]) {
-  def tp: Num[A] = Num[A]
+import scala.annotation.unchecked.{uncheckedVariance => uV}
 
-  def ::(start2: A): Series[A] = Series[A](start2, end, start, par, isUnit=false)
+case class Series[+A:Num](
+    start: A,
+    end:   A,
+    step:  A,
+    par:   I32,
+    isUnit: Boolean = false
+    )(implicit ev: A <:< Num[A])
+  extends Mirrorable[Series[_]] {
+
+  def tp: Num[A@uV] = Num[A]
+
+  def ::(start2: A@uV): Series[A] = Series[A](start2, end, start, par, isUnit=false)
 
   def par(p: I32): Series[A] = Series[A](start, end, step, p, isUnit=false)
 
@@ -27,9 +37,6 @@ case class Series[A:Num](start: A, end: A, step: A, par: I32, isUnit: Boolean = 
       error(ctx)
       Range(0, 0, 1)
   }
-}
-object Series {
-  /*implicit class SeriesOps(series: Series[I32]) {
-    @api def apply(func: I32 => Void): Void = Foreach(series)(func)
-  }*/
+
+  def mirror(f:Tx): Series[_] = Series[A](f(start),f(end),f(step),f(par),isUnit)
 }

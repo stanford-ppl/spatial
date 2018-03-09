@@ -24,7 +24,7 @@ trait LinearAlgebra {
     Foreach(M par MP, N par NP){(i,j) => Y(i,j) = getA(i,j) }
   }
 
-  /** Broadcast scalar C version **/
+  /** Broadcast scalar C version */
   def gemm[T:Num](
     Y:      SRAM2[T],
     A:      SRAM2[T],

@@ -20,7 +20,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   extends FixOp1[S,I,F]
      with Unary[FixedPoint,Fix[S,I,F]]
 
-/** Negation of a fixed point value **/
+/** Negation of a fixed point value */
 @op case class FixNeg[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](a => -a) {
   @rig override def rewrite: Fix[S,I,F] = a match {
     case Op(FixNeg(x)) => x
@@ -28,7 +28,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Bitwise inversion of a fixed point value **/
+/** Bitwise inversion of a fixed point value */
 @op case class FixInv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](a => ~a) {
   @rig override def rewrite: Fix[S, I, F] = a match {
     case Op(FixInv(x)) => x
@@ -36,34 +36,34 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Bitwise AND of two fixed point values **/
+/** Bitwise AND of two fixed point values */
 @op case class FixAnd[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_&_) {
   override def absorber: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def identity: Option[Fix[S,I,F]] = Some(a.ones)
   override def isAssociative: Boolean = true
 }
 
-/** Bitwise OR of two fixed point values **/
+/** Bitwise OR of two fixed point values */
 @op case class FixOr[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_|_) {
   override def absorber: Option[Fix[S,I,F]] = Some(a.ones)
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def isAssociative: Boolean = true
 }
 
-/** Bitwise XOR of two fixed point values **/
+/** Bitwise XOR of two fixed point values */
 @op case class FixXor[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_^_) {
   override def absorber: Option[Fix[S,I,F]] = Some(a.ones)
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def isAssociative: Boolean = true
 }
 
-/** Fixed point addition **/
+/** Fixed point addition */
 @op case class FixAdd[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_+_) {
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def isAssociative: Boolean = true
 }
 
-/** Fixed point subtraction **/
+/** Fixed point subtraction */
 @op case class FixSub[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_-_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (_, Literal(0)) => a
@@ -72,17 +72,17 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point multiplication **/
+/** Fixed point multiplication */
 @op case class FixMul[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_*_) {
   override def absorber: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(1))
   override def isAssociative: Boolean = true
 }
 
-/** Fixed point division **/
+/** Fixed point division */
 @op case class FixDiv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_/_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (_, Literal(0)) =>
+    case (_, Literal(0)) if state.isStaging =>
       warn(ctx, s"Constant division by 0")
       warn(ctx)
       null
@@ -93,10 +93,10 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point modulus **/
+/** Fixed point modulus */
 @op case class FixMod[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_%_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (_, Literal(0)) =>
+    case (_, Literal(0)) if state.isStaging =>
       warn(ctx, s"Constant modulus by 0")
       warn(ctx)
       null
@@ -105,7 +105,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point arithmetic shift left **/
+/** Fixed point arithmetic shift left */
 @op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x << y)
@@ -113,7 +113,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point arithmetic shift right **/
+/** Fixed point arithmetic shift right */
 @op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >> y)
@@ -121,7 +121,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point logical (unsigned) shift right **/
+/** Fixed point logical (unsigned) shift right */
 @op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >>> y)
@@ -129,7 +129,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point less than comparison **/
+/** Fixed point less than comparison */
 @op case class FixLst[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x < y)
@@ -137,7 +137,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point less than or equal comparison **/
+/** Fixed point less than or equal comparison */
 @op case class FixLeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x <= y)
@@ -145,7 +145,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point equality comparison **/
+/** Fixed point equality comparison */
 @op case class FixEql[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x === y)
@@ -153,7 +153,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point inequality comparison **/
+/** Fixed point inequality comparison */
 @op case class FixNeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x !== y)
@@ -161,21 +161,21 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point select minimum **/
+/** Fixed point select minimum */
 @op case class FixMin[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](Number.min) {
   override def absorber: Option[Fix[S,I,F]] = Some(a.minValue)
   override def identity: Option[Fix[S,I,F]] = Some(a.maxValue)
   override def isAssociative: Boolean = true
 }
 
-/** Fixed point select maximum **/
+/** Fixed point select maximum */
 @op case class FixMax[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](Number.max) {
   override def absorber: Option[Fix[S,I,F]] = Some(a.maxValue)
   override def identity: Option[Fix[S,I,F]] = Some(a.minValue)
   override def isAssociative: Boolean = true
 }
 
-/** Fixed point absolute value **/
+/** Fixed point absolute value */
 @op case class FixAbs[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.abs) {
   @rig override def rewrite: Fix[S,I,F] = a match {
     case x if !BOOL[S].v => x // Unsigned absolute value
@@ -183,7 +183,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point ceiling (round away from 0) **/
+/** Fixed point ceiling (round away from 0) */
 @op case class FixCeil[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.ceil) {
   @rig override def rewrite: Fix[S,I,F] = a match {
     case x if INT[F].v == 0 => x // Ceiling of integer
@@ -191,7 +191,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point floor (round towards 0) **/
+/** Fixed point floor (round towards 0) */
 @op case class FixFloor[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.floor) {
   @rig override def rewrite: Fix[S,I,F] = a match {
     case x if INT[F].v == 0 => x // floor of integer
@@ -199,7 +199,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point power (a raised to power b) **/
+/** Fixed point power (a raised to power b) */
 @op case class FixPow[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](Number.pow) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (_, Literal(0))    => R.from(1)
@@ -211,44 +211,44 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point exponential (Euler's number raised to power a) **/
+/** Fixed point exponential (Euler's number raised to power a) */
 @op case class FixExp[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.exp)
 
-/** Fixed point natural log **/
+/** Fixed point natural log */
 @op case class FixLn[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.log)
 
-/** Fixed point square root **/
+/** Fixed point square root */
 @op case class FixSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.sqrt)
 
-/** Fixed point sine **/
+/** Fixed point sine */
 @op case class FixSin[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.sin)
 
-/** Fixed point cosine **/
+/** Fixed point cosine */
 @op case class FixCos[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.cos)
 
-/** Fixed point tangent **/
+/** Fixed point tangent */
 @op case class FixTan[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.tan)
 
-/** Fixed point hyperbolic sine **/
+/** Fixed point hyperbolic sine */
 @op case class FixSinh[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.sinh)
 
-/** Fixed point hyperbolic cosine **/
+/** Fixed point hyperbolic cosine */
 @op case class FixCosh[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.cosh)
 
-/** Fixed point hyperbolic tangent **/
+/** Fixed point hyperbolic tangent */
 @op case class FixTanh[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.tanh)
 
 @op case class FixAsin[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.asin)
 @op case class FixAcos[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.acos)
 @op case class FixAtan[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.atan)
 
-/** Fixed point inverse square root **/
+/** Fixed point inverse square root */
 @op case class FixInvSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.invSqrt)
 
-/** Fixed point sigmoid **/
+/** Fixed point sigmoid */
 @op case class FixSigmoid[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.sigmoid)
 
-/** Fixed point type conversion **/
+/** Fixed point type conversion */
 @op case class FixToFix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
     a:  Fix[S1,I1,F1],
     f2: FixFmt[S2,I2,F2])
@@ -261,7 +261,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point type conversion to floating point **/
+/** Fixed point type conversion to floating point */
 @op case class FixToFlt[S1:BOOL,I1:INT,F1:INT,M2:INT,E2:INT](
     a:  Fix[S1,I1,F1],
     f2: FltFmt[M2,E2])
@@ -272,7 +272,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point parsing from text **/
+/** Fixed point parsing from text */
 @op case class TextToFix[S:BOOL,I:INT,F:INT](t: Text, f: FixFmt[S,I,F]) extends FixOp1[S,I,F] {
   override val debugOnly: Boolean = true
 
@@ -282,7 +282,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Fixed point conversion to text **/
+/** Fixed point conversion to text */
 @op case class FixToText[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixOp2[S,I,F,Text] {
   override val debugOnly: Boolean = true
 
@@ -297,7 +297,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 
-/** Saturating and Unbiased Rounding Math **/
+/** Saturating and Unbiased Rounding Math */
 // TODO[5]: Is saturating and unbiased math associative?
 @op case class SatAdd[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_+!_) {
   override def identity: Option[Fix[S, I, F]] = Some(R.uconst(0))
@@ -315,7 +315,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 @op case class SatDiv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_/!_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (_, Literal(0)) =>
+    case (_, Literal(0)) if state.isStaging =>
       warn(ctx, "Constant division by zero")
       warn(ctx)
       null
@@ -330,7 +330,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 @op case class UnbDiv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_/&_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (_, Literal(0)) =>
+    case (_, Literal(0)) if state.isStaging =>
       warn(ctx, "Constant division by zero")
       warn(ctx)
       null
@@ -345,7 +345,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 @op case class UnbSatDiv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_/&!_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (_, Literal(0)) =>
+    case (_, Literal(0)) if state.isStaging =>
       warn(ctx, "Constant division by zero")
       warn(ctx)
       null

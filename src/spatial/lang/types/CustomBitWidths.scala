@@ -150,7 +150,7 @@ trait _126 extends INT[_126] { val v = 126 }
 trait _127 extends INT[_127] { val v = 127 }
 trait _128 extends INT[_128] { val v = 128 }
 
-/** Hack for working with customized bit widths, since Scala doesn't support integers as template parameters **/
+/** Hack for working with customized bit widths, since Scala doesn't support integers as template parameters */
 object BOOL {
   def apply[T:BOOL]: BOOL[T] = implicitly[BOOL[T]]
 

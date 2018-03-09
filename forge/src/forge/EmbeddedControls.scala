@@ -38,7 +38,7 @@ trait EmbeddedControls {
   // currently a bug precluding the use of "by-name" parameters in
   // macros (See [[https://issues.scala-lang.org/browse/SI-5778]]).
 
-  /** Val definitions **/
+  /** Val definitions */
   def __newVar[T](init: T): VarLike[T] = new forge.Ptr[T](init)
   def __assign[T](lhs: VarLike[T], rhs: T): Unit = lhs.__assign(rhs)
   def __readVar[T](v: VarLike[T]): T = v.__read
@@ -48,7 +48,7 @@ trait EmbeddedControls {
   //  def __lazyValDef[T](init: T): T = macro lazyValDefImpl[T]
   //  def __valDef[T](init: T): T = macro valDefImpl[T]
 
-  /** Control structures **/
+  /** Control structures */
   def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T = macro ifThenElseImpl[T]
   def __return(expr: Any): Nothing = macro returnImpl
   def __whileDo(cond: Boolean, body: Unit): Unit = macro whileDoImpl
@@ -59,7 +59,7 @@ trait EmbeddedControls {
   // def __match[A,R](selector: A, cases: Seq[A => R]): R = macro matchImpl[A,R]
   // def __typedCase[A,T,R](bind: T, guard: Boolean, body: R): A => R = macro typedCaseImpl[A,T,R]
 
-  /** `Any` Infix Methods **/
+  /** `Any` Infix Methods */
   def infix_+(x1: String, x2: Any): String = macro string_+
   def infix_+(x1: Any, x2: Any): Any = macro any_+ // don't know the return type => should actually never be produced by Virtualizer
   def infix_==(x1: Any, x2: Any): Boolean = macro any_==
@@ -72,7 +72,7 @@ trait EmbeddedControls {
   def infix_toString(x: Any): String = macro any_toString
   def infix_getClass(x: Any): Class[_] = macro any_getClass
 
-  /** `AnyRef` Infix Methods **/
+  /** `AnyRef` Infix Methods */
   def infix_eq(x1: AnyRef, x2: AnyRef): Boolean = macro anyRef_eq
   def infix_ne(x1: AnyRef, x2: AnyRef): Boolean = macro anyRef_ne
   def infix_notify(x: AnyRef): Unit = macro anyRef_notify
@@ -94,7 +94,7 @@ trait EmbeddedControls {
   */
 private object EmbeddedControls {
 
-  /** Val/Var Definitions **/
+  /** Val/Var Definitions */
   def newVarImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = {
     import c.universe._
     c.Expr(q"new Ptr($init)")
@@ -116,7 +116,7 @@ private object EmbeddedControls {
   //  def lazyValDefImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = init
 
 
-  /** Control structures **/
+  /** Control structures */
 
   def ifThenElseImpl[T](c: whitebox.Context)(
     cond: c.Expr[Boolean], thenBr: c.Expr[T], elseBr: c.Expr[T]): c.Expr[T] = {
@@ -145,7 +145,7 @@ private object EmbeddedControls {
     c.Expr(q"throw $t")
   }
 
-  /** `Any` Infix Methods **/
+  /** `Any` Infix Methods */
 
   def string_+(c: whitebox.Context)(x1: c.Expr[String], x2: c.Expr[Any]): c.Expr[String] = {
     import c.universe._
@@ -207,7 +207,7 @@ private object EmbeddedControls {
     c.Expr(q"$x.getClass()")
   }
 
-  /** `AnyRef` Infix Methods **/
+  /** `AnyRef` Infix Methods */
 
   def anyRef_eq(c: whitebox.Context)(x1: c.Expr[AnyRef], x2: c.Expr[AnyRef]): c.Expr[Boolean] = {
     import c.universe._

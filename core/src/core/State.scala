@@ -7,26 +7,26 @@ import utils.io.NullOutputStream
 import scala.collection.mutable
 
 class State extends forge.AppState {
-  /** Config **/
+  /** Config */
   var config: Config = _
 
-  /** Code Motion **/
+  /** Code Motion */
   private var _motionAllowed: Boolean = false
   def mayMotion: Boolean = _motionAllowed
   def enableMotion(): Unit = { _motionAllowed = true }
 
-  /** Symbol IDs **/
+  /** Symbol IDs */
   private var id: Int = -1
   def maxId: Int = id-1 // Inclusive
   def nextId(): Int = { id += 1; id }
 
-  /** Statements in the current scope. **/
+  /** Statements in the current scope. */
   var scope: Vector[Sym[_]] = _
 
-  /** Effectful statements in the current scope. **/
+  /** Effectful statements in the current scope. */
   var impure: Vector[Impure] = _
 
-  /** Definition cache used for CSE **/
+  /** Definition cache used for CSE */
   var cache: Map[Op[_], Sym[_]] = Map.empty
 
   /** Set the scope to be empty. Should not mutate current value.
@@ -38,21 +38,22 @@ class State extends forge.AppState {
     if (!motion) cache = Map.empty // Empty the CSE cache in case code motion is disabled
   }
 
-  /** Alias caches **/
+  /** Alias caches */
   val shallowAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
   val deepAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
   val aliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
 
 
-  /** Graph Metadata **/
+  /** Graph Metadata */
   val globals: GlobalMetadata = new GlobalMetadata
 
-  /** Compiler passes **/
+  /** Compiler passes */
   var pass: Int = 0
   def paddedPass: String = paddedPass(pass)
   def paddedPass(pass: Int): String = { val p = pass.toString; "0"*(4 - p.length) + p }
+  def isStaging: Boolean = pass == 0
 
-  /** Logging / Streams **/
+  /** Logging / Streams */
   var logTab: Int = 0
   var genTab: Int = 0
   var out: PrintStream = Console.out
@@ -60,27 +61,27 @@ class State extends forge.AppState {
   var gen: PrintStream = new PrintStream(new NullOutputStream)
   val streams = new mutable.HashMap[String, PrintStream]
 
-  /** Infos **/
+  /** Infos */
   var infos: Int = 0
   def hadInfos: Boolean = infos > 0
   def logInfo(): Unit = { infos += 1 }
 
-  /** Warnings **/
+  /** Warnings */
   var warnings: Int = 0
   def hadWarnings: Boolean = warnings > 0
   def logWarning(): Unit = { warnings += 1 }
 
-  /** Errors **/
+  /** Errors */
   var errors: Int = 0
   def hadErrors: Boolean = errors > 0
   def logError(): Unit = { errors += 1 }
 
-  /** Bugs **/
+  /** Bugs */
   var bugs: Int = 0
   def hadBugs: Boolean = bugs > 0
   def logBug(): Unit = { bugs += 1 }
 
-  /** Back-edges **/
+  /** Back-edges */
   var issues: Set[Issue] = Set.empty
   def hasIssues: Boolean = issues.nonEmpty
 

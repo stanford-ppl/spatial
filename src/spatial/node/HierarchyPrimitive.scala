@@ -6,7 +6,7 @@ import forge.tags._
 import core._
 import spatial.data.Expect
 
-/** Nodes with non-zero latency, no internal state, which can be conditionally executed **/
+/** Nodes with non-zero latency, no internal state, which can be conditionally executed */
 abstract class Primitive[R:Type] extends AccelOp[R] {
   /** If true, has no corresponding resources in hardware.
     * Exists only as a compiler construct for typing purposes, etc.

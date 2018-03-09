@@ -115,7 +115,7 @@ trait UtilsControl {
     * Coarse-grained pipeline distance:
     *   If the LCA controller of a and b is a metapipeline, the pipeline distance
     *   is the distance between the respective controllers for a and b. Otherwise zero.
-    **/
+    */
   @stateful def LCAWithCoarseDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithCoarseDistance(parentOf(a),parentOf(b))
   @stateful def LCAWithCoarseDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     val (lca,dist) = LCAWithDistance(a,b)

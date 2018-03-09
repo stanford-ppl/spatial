@@ -11,7 +11,7 @@ import spatial.lang._
 object SwitchScheduler extends core.schedule.Scheduler {
   override def mustMotion: Boolean = true
 
-  /** Returns the schedule of the given scope. **/
+  /** Returns the schedule of the given scope. */
   override def apply[R](
     inputs:  Seq[Sym[_]],
     result:  Sym[R],

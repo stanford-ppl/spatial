@@ -8,6 +8,7 @@ trait InternalAliases extends CustomBitWidths {
   type FixPt[S,I,F] = spatial.lang.Fix[S,I,F]
   type I[W] = FixPt[TRUE,W,_0]
   type Idx = I[_]
+  type Rng = spatial.lang.Series[Idx]
 
   type I64 = FixPt[TRUE,_64,_0]
   type I32 = FixPt[TRUE,_32,_0]
@@ -24,6 +25,13 @@ trait InternalAliases extends CustomBitWidths {
 
   type Mem[A,C[_]] = spatial.lang.types.Mem[A,C]
   type LocalMem[A,C[_]] = spatial.lang.types.LocalMem[A,C]
+  type LocalMem0[A,C[T]<:LocalMem0[T,C]] = spatial.lang.types.LocalMem0[A,C]
+  type LocalMem1[A,C[T]<:LocalMem1[T,C]] = spatial.lang.types.LocalMem1[A,C]
+  type LocalMem2[A,C[T]<:LocalMem2[T,C]] = spatial.lang.types.LocalMem2[A,C]
+  type LocalMem3[A,C[T]<:LocalMem3[T,C]] = spatial.lang.types.LocalMem3[A,C]
+  type LocalMem4[A,C[T]<:LocalMem4[T,C]] = spatial.lang.types.LocalMem4[A,C]
+  type LocalMem5[A,C[T]<:LocalMem5[T,C]] = spatial.lang.types.LocalMem5[A,C]
+
   type RemoteMem[A,C[_]] = spatial.lang.types.RemoteMem[A,C]
   
   type Bits[T] = spatial.lang.types.Bits[T]

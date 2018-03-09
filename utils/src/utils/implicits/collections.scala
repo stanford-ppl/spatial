@@ -22,7 +22,7 @@ object collections {
 
     def interleave(y: Seq[A])(implicit tag: ClassTag[A]): Seq[A] = inter(left=true,x,y)
 
-    /** Returns a new Map from elements in x to func(x)  **/
+    /** Returns a new Map from elements in x to func(x)  */
     def mapping[B](func: A => B): Map[A,B] = x.map{x => x -> func(x) }.toMap
 
     /** Returns true if the length of x is exactly len, false otherwise.
@@ -51,7 +51,7 @@ object collections {
   }
 
   implicit class IterableHelpers[A](x: Iterable[A]) {
-    /** Returns a new Map from elements in x to func(x)  **/
+    /** Returns a new Map from elements in x to func(x)  */
     def mapping[B](func: A => B): Map[A,B] = x.map{x => x -> func(x) }.toMap
 
     def maxByOrElse[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.maxBy(f)

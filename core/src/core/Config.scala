@@ -3,7 +3,7 @@ package core
 import utils.io.files
 
 class Config {
-  /** Verbosity **/
+  /** Verbosity */
   var enWarn: Boolean = true
   var enError: Boolean = true
   var enInfo: Boolean = true
@@ -41,16 +41,16 @@ class Config {
   def enLog: Boolean = logLevel >= 2
   def enDbg: Boolean = logLevel >= 1
 
-  /** Paths **/
+  /** Paths */
   var name: String = "App"
   var logDir: String = files.cwd + files.sep + "logs" + files.sep + name + files.sep
   var genDir: String = files.cwd + files.sep + "gen" + files.sep + name + files.sep
   var repDir: String = files.cwd + files.sep + "reports" + files.sep + name + files.sep
 
-  /** Testing **/
+  /** Testing */
   var test: Boolean = false
 
-  /** Banking **/
+  /** Banking */
   var enableBufferCoalescing: Boolean = true
 
   def create: Config = new Config

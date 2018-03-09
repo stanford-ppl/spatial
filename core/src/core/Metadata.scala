@@ -9,7 +9,7 @@ import scala.collection.mutable
 abstract class Metadata[T] { self =>
   final type Tx = Transformer
 
-  /** If null, transformers will drop this metadata during mirroring. **/
+  /** If null, transformers will drop this metadata during mirroring. */
   def mirror(f: Tx): T
 
   final def key: Class[_] = self.getClass
@@ -43,7 +43,7 @@ abstract class AnalysisData[T] extends Metadata[T] { self =>
   override def mirror(f: Tx): T = null.asInstanceOf[T]
 }
 
-/** Shortcuts for metadata **/
+/** Shortcuts for metadata */
 object metadata {
   type Data = mutable.Map[Class[_],Metadata[_]]
 

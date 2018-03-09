@@ -53,17 +53,17 @@ object Literal {
   }
 }
 
-/** Used to match on or extract the constant value of this symbol if it is constant (not a parameter) **/
+/** Used to match on or extract the constant value of this symbol if it is constant (not a parameter) */
 object Const {
   def unapply[C,A](x: Exp[C,A]): Option[C] = if (x.isConst) x.c else None
 }
 
-/** Used to match on or extract the constant value of this symbol if it is a parameter (not a constant) **/
+/** Used to match on or extract the constant value of this symbol if it is a parameter (not a constant) */
 object Param {
   def unapply[C,A](x: Exp[C,A]): Option[C] = if (x.isParam) x.c else None
 }
 
-/** Used to match on or extract the constant value of this symbol if it is a parameter or constant **/
+/** Used to match on or extract the constant value of this symbol if it is a parameter or constant */
 object Value {
   def unapply[C,A](x: Exp[C,A]): Option[C] = x.c
 }

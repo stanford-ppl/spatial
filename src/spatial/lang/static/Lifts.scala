@@ -35,9 +35,7 @@ trait LiftsPriority2 { this: Lifts =>
 
 trait LiftsPriority1 extends LiftsPriority2 { this: Lifts =>
 
-  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = {
-    Series[Fix[S,I,F]](x, x+1, 1, 1, isUnit=true)
-  }
+  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 
   // Shadows Predef method
   @api implicit def wrapString(x: String): Text = Text.c(x)

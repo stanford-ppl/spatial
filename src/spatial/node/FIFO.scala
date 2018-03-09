@@ -4,7 +4,7 @@ import core._
 import forge.tags._
 import spatial.lang._
 
-@op case class FIFONew[A:Bits](depth: I32) extends MemAlloc[FIFO[A]] {
+@op case class FIFONew[A:Bits](depth: I32) extends MemAlloc[A,FIFO] {
   def dims = Seq(depth)
 }
 

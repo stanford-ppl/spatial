@@ -24,7 +24,7 @@ object SwitchScheduler extends core.schedule.Scheduler {
     val (keepI,motionI) = impure.partition(_.sym.op.exists(_.isInstanceOf[SwitchCase[_]]))
     val effects = summarizeScope(keepI)
     val result = keep.last.asInstanceOf[Sym[R]]
-    val block = Block[R](inputs,keep,result,effects,options)
+    val block = new Block[R](inputs,keep,result,effects,options)
     Schedule(block,motion,motionI)
   }
 }

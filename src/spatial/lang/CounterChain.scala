@@ -12,7 +12,7 @@ import pir.node.CounterChainCopy
 object CounterChain {
   implicit val tp: CounterChain = (new CounterChain).asType
 
-  @api def apply(ctrs: Counter[_]*): CounterChain = stage(CounterChainNew(ctrs))
+  @api def apply(ctrs: Seq[Counter[_]]): CounterChain = stage(CounterChainNew(ctrs))
   @rig def copy(ctrs: Counter[_]*): CounterChain = stage(CounterChainCopy(ctrs))
 }
 

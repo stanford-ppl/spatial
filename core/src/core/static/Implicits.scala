@@ -60,6 +60,7 @@ class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
 
 class ExpMiscOps[C,A](exp: Exp[C,A]) {
   def unbox: A = exp.asInstanceOf[A]
+  def asSym: Sym[A] = exp
 
   private[core] def tp_=(tp: ExpType[C,A]): Unit = { exp._tp = tp }
   def tp: ExpType[C,A] = {

@@ -41,19 +41,21 @@ trait UtilsControl {
 
   implicit class CounterChainHelperOps(x: CounterChain) {
     def ctrs: Seq[Counter[_]] = cchainDef(x).counters
+    def pars: Seq[I32] = ctrs.map(_.ctrPar)
   }
 
   implicit class CounterHelperOps[F](x: Counter[F]) {
-    def start: F = ctrDef(x).start.unbox
-    def step: F = ctrDef(x).step.unbox
-    def end: F = ctrDef(x).end.unbox
+    def start: Sym[F] = ctrDef(x).start
+    def step: Sym[F] = ctrDef(x).step
+    def end: Sym[F] = ctrDef(x).end
     def ctrPar: I32 = ctrDef(x).par
+    def isForever: Boolean = x.op.exists(_.isInstanceOf[ForeverNew])
   }
 
   implicit class IndexHelperOps[W](i: I[W]) {
-    @stateful def ctrStart: I[W] = ctrOf(i).start
-    @stateful def ctrStep: I[W] = ctrOf(i).step
-    @stateful def ctrEnd: I[W] = ctrOf(i).end
+    @stateful def ctrStart: I[W] = ctrOf(i).start.unbox
+    @stateful def ctrStep: I[W] = ctrOf(i).step.unbox
+    @stateful def ctrEnd: I[W] = ctrOf(i).end.unbox
     @stateful def ctrPar: I32 = ctrOf(i).ctrPar
     @stateful def ctrParOr1: Int = ctrOf.get(i).map(_.ctrPar.toInt).getOrElse(1)
   }

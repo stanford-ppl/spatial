@@ -70,5 +70,8 @@ abstract class SubstTransformer extends Transformer {
       scope
     }
   }
+  def isolateSubstWith[A](rules: Map[Sym[_],Sym[_]])(scope: => A): A = {
+    isolateSubstWith(rules.toSeq:_*){ scope }
+  }
 
 }

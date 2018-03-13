@@ -14,7 +14,7 @@ class SimpleScheduler extends Scheduler {
     allowMotion: Boolean
   ): Schedule[R] = {
     val effects = summarizeScope(impure)
-    val block = Block[R](inputs,scope,result,effects,options)
+    val block = new Block[R](inputs,scope,result,effects,options)
     Schedule(block, Nil)
   }
 }

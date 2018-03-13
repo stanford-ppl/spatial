@@ -24,7 +24,22 @@ import utest._
   }
 }
 
+@spatial object SparseTransfer1D {
+  def main(): Void = {
+    val dram256 = DRAM[F32](256)
+    val addr128 = DRAM[I32](128)
+
+    Accel {
+      val sram1 = SRAM[F32](128)
+      val addr  = SRAM[I32](128)
+
+      addr load addr128
+      sram1 gather dram256(addr)
+    }
+  }
+}
+
 object TransferTests extends Testbench { val tests = Tests {
   'DenseTransfer1D - test(DenseTransfer1D)
-
+  'SparseTransfer1D - test(SparseTransfer1D)
 }}

@@ -3,6 +3,7 @@ package spatial.util
 import core._
 import forge.tags._
 import spatial.lang._
+import spatial.data._
 
 trait UtilsIR {
   /** Returns the number of bits of data the given symbol represents. */
@@ -34,7 +35,10 @@ trait UtilsIR {
     }
   }
 
-  implicit class ParamHelpers(x: I32) {
-    def toInt: Int = x.c.map(_.toInt).getOrElse{throw new Exception(s"Cannot convert symbol $x to a constant")}
+  implicit class ParamHelpers(x: Sym[_]) {
+    def toInt: Int = x match {
+      case Expect(c) => c
+      case _ => throw new Exception(s"Cannot convert symbol $x to a constant Int")
+    }
   }
 }

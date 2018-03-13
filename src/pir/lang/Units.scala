@@ -58,7 +58,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
       val indices = ranges.map{_ => bound[I32] }
       val block = stageBlock{
         val ctrs = ranges.map{r => Counter.from(r) }
-        CounterChain(ctrs:_*)
+        CounterChain(ctrs)
         val addr = path(indices)
         stage(Addr(addr))
       }
@@ -78,7 +78,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
       val indices = ranges.map{_ => bound[I32] }
       val block = stageBlock{
         val ctrs = ranges.map{r => Counter.from(r) }
-        CounterChain(ctrs:_*)
+        CounterChain(ctrs)
         val (addr,data) = path(indices)
         stage(Addr(addr))
         stage(Data(data))
@@ -116,7 +116,7 @@ object PCU {
       val indices = ranges.map{_ => bound[I32] }
       val block = stageBlock {
         val ctrs = ranges.map{r => Counter.from(r) }
-        CounterChain(ctrs: _*)
+        CounterChain(ctrs)
         datapath(indices)
       }
       val pcu = VPCU(block, Seq(indices))

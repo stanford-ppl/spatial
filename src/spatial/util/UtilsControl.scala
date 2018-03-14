@@ -2,9 +2,11 @@ package spatial.util
 
 import core._
 import spatial.data._
-import spatial.issues.AmbiguousMetaPipes
 import spatial.lang._
 import spatial.node._
+import spatial.internal.spatialConfig
+import spatial.issues.AmbiguousMetaPipes
+
 import forge.tags._
 import utils.implicits.collections._
 import utils.DAG
@@ -42,6 +44,9 @@ trait UtilsControl {
   implicit class CounterChainHelperOps(x: CounterChain) {
     def ctrs: Seq[Counter[_]] = cchainDef(x).counters
     def pars: Seq[I32] = ctrs.map(_.ctrPar)
+    def shouldFullyUnroll: Boolean = ctrs.forall(_.shouldFullyUnroll)
+    def mayFullyUnroll: Boolean = ctrs.forall(_.mayFullyUnroll)
+    def isUnit: Boolean = ctrs.forall(_.isUnit)
   }
 
   implicit class CounterHelperOps[F](x: Counter[F]) {
@@ -50,6 +55,27 @@ trait UtilsControl {
     def end: Sym[F] = ctrDef(x).end
     def ctrPar: I32 = ctrDef(x).par
     def isForever: Boolean = x.op.exists(_.isInstanceOf[ForeverNew])
+    def nIters: Option[Bound] = (start,step,end) match {
+      case (Final(min), Final(stride), Final(max)) =>
+        Some(Final(Math.ceil((max - min).toDouble / stride).toInt))
+
+      case (Expect(min), Expect(stride), Expect(max)) =>
+        Some(Expect(Math.ceil((max - min).toDouble / stride).toInt))
+
+      case _ => None
+    }
+    def shouldFullyUnroll: Boolean = (nIters,ctrPar) match {
+      case (Some(Final(nIter)), Final(par)) => par >= nIter
+      case _ => false
+    }
+    def mayFullyUnroll: Boolean = (nIters,ctrPar) match {
+      case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+      case _ => false
+    }
+    def isUnit: Boolean = nIters match {
+      case (Some(Final(1))) => true
+      case _ => false
+    }
   }
 
   implicit class IndexHelperOps[W](i: I[W]) {

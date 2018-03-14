@@ -114,7 +114,7 @@ case class Memory(
 
   @api def bankSelects[T:IntLike](addr: Seq[T]): Seq[T] = banking.map(_.bankSelect(addr))
 
-  @api def bankOffset[T:IntLike,C[_]](mem: LocalMem[_,C], addr: Seq[T]): T = {
+  @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
     val w = dimsOf(mem).map(_.toInt)
     val D = rankOf(mem)
@@ -149,10 +149,17 @@ object Memory {
 }
 
 case class Duplicates(d: Seq[Memory]) extends StableData[Duplicates]
+/** Pre-unrolling duplicates (one or more Memory instances per node) */
 object duplicatesOf {
   def get(x: Sym[_]): Option[Seq[Memory]] = metadata[Duplicates](x).map(_.d)
   def apply(x: Sym[_]): Seq[Memory] = duplicatesOf.get(x).getOrElse{throw new Exception(s"No duplicates defined for $x")}
   def update(x: Sym[_], d: Seq[Memory]): Unit = metadata.add(x, Duplicates(d))
+}
+/** Post-unrolling duplicates (exactly one Memory instance per node) */
+object memInfo {
+  def get(x: Sym[_]): Option[Memory] = duplicatesOf.get(x).flatMap(_.headOption)
+  def apply(x: Sym[_]): Memory = memInfo.get(x).getOrElse{throw new Exception(s"No memory info defined for $x") }
+  def update(x: Sym[_], d: Memory): Unit = metadata.add(x, Duplicates(Seq(d)))
 }
 
 
@@ -185,4 +192,6 @@ object portsOf {
     val map = portsOf.get(x).getOrElse(Map.empty)
     portsOf.add(x, map + (uid -> port))
   }
+
+
 }

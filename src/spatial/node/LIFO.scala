@@ -21,17 +21,16 @@ import spatial.lang._
 @op case class LIFONumel[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusRead[I32]
 
 @op case class LIFOBankedPush[A:Bits](
-  mem:  LIFO[A],
-  data: Seq[Sym[A]],
-  enss: Seq[Set[Bit]]
-)(implicit val vA: Vec[A])
+    mem:  LIFO[A],
+    data: Seq[Sym[A]],
+    enss: Seq[Set[Bit]])
   extends BankedEnqueue[A]
 
 
 @op case class LIFOBankedPop[A:Bits](
-  mem:  LIFO[A],
-  enss: Seq[Set[Bit]]
-)(implicit val vA: Vec[A])
+    mem:  LIFO[A],
+    enss: Seq[Set[Bit]]
+    )(implicit val vA: Type[Vec[A]])
   extends BankedDequeue[A]
 
 

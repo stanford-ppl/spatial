@@ -21,7 +21,7 @@ trait Scoping {
     // TODO[2]: Add code motion scheduler when enabled
     lazy val defaultSched = if (state.mayMotion) SimpleScheduler else SimpleScheduler
     val scheduler = options.sched.getOrElse(defaultSched)
-    if (state == null) throw new Exception("Null state during stageScope")
+    if (state eq null) throw new Exception("Null state during stageScope")
 
     val saveImpure = state.impure
     val saveScope  = state.scope

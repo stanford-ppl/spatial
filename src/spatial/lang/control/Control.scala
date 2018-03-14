@@ -15,7 +15,7 @@ class Directives(options: CtrlOpt) extends ForeachClass(options) {
 
   @rig protected def unit_pipe(func: => Void): Void = {
     val block = stageBlock{ func }
-    val pipe = stage(UnitPipe(block, ens = Set.empty))
+    val pipe = stage(UnitPipe(Set.empty, block))
     options.set(pipe)
     pipe
   }

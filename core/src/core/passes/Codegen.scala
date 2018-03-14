@@ -22,11 +22,11 @@ trait Codegen extends Traversal {
 
   protected def quote(s: Ref[_,_]): String = s.rhs match {
     case Def.TypeRef    => remap(s)
-    case Def.Const(c)     => quoteConst(s.tp, c)
+    case Def.Const(c)   => quoteConst(s.tp, c)
     case Def.Param(_,c) => quoteConst(s.tp, c)
     case Def.Bound(id)  => s"b$id"
     case Def.Node(id,_) => named(s,id)
-    case Def.Error(_)   => throw new Exception(s"[$name] Error symbol in codegen")
+    case Def.Error(_,_) => throw new Exception(s"[$name] Error symbol in codegen")
   }
 
   protected def quoteOrRemap(arg: Any): String = arg match {

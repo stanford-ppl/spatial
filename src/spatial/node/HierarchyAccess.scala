@@ -1,6 +1,7 @@
 package spatial.node
 
 import core._
+import forge.tags._
 import spatial.lang._
 
 /** Memory accesses */
@@ -26,12 +27,6 @@ case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs:
 abstract class StatusRead[R:Type] extends EnPrimitive[R] {
   def mem: Sym[_]
 }
-
-abstract class Resetter[A:Type] extends EnPrimitive[Void] {
-  val tA: Type[A] = Type[A]
-  def mem: Sym[_]
-}
-
 object StatusRead {
   def unapply(x: Op[_]): Option[(Sym[_],Set[Bit])] = x match {
     case a: StatusRead[_] => Some((a.mem,a.ens))
@@ -40,12 +35,28 @@ object StatusRead {
   def unapply(x: Sym[_]): Option[(Sym[_],Set[Bit])] = x.op.flatMap(StatusRead.unapply)
 }
 
+/** Reset of a memory */
+abstract class Resetter[A:Type] extends EnPrimitive[Void] {
+  val tA: Type[A] = Type[A]
+  def mem: Sym[_]
+}
+object Resetter {
+  def unapply(x: Op[_]): Option[(Sym[_],Set[Bit])] = x match {
+    case a: Resetter[_] => Some((a.mem,a.ens))
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Set[Bit])] = x.op.flatMap(Resetter.unapply)
+}
+
+
+
 
 /** Any access of a memory */
-abstract class Accessor[A:Type,R:Type] extends EnPrimitive[R] {
-  val tA: Type[A] = Type[A]
+abstract class Accessor[A:Bits,R:Type] extends EnPrimitive[R] {
+  val A: Bits[A] = Bits[A]
   def mem:  Sym[_]
   def addr: Seq[Idx]
+  def dataOpt: Option[Sym[_]] = localWrite.map(_.data)
   def localRead: Option[Read]
   def localWrite: Option[Write]
   def localAccesses: Set[Access] = (localRead ++ localWrite).toSet
@@ -61,7 +72,7 @@ object Accessor {
 }
 
 /** Any read of a memory */
-abstract class Reader[A:Type,R:Type] extends Accessor[A,R] {
+abstract class Reader[A:Bits,R:Bits] extends Accessor[A,R] {
   def localRead = Some(Read(mem,addr,ens))
   def localWrite: Option[Write] = None
 }
@@ -75,10 +86,10 @@ object Reader {
 }
 
 /** Any dequeue-like operation from a memory */
-abstract class DequeuerLike[A:Type,R:Type] extends Reader[A,R]
+abstract class DequeuerLike[A:Bits,R:Bits] extends Reader[A,R]
 
 /** An address-less dequeue operation. */
-abstract class Dequeuer[A:Type,R:Type] extends DequeuerLike[A,R] {
+abstract class Dequeuer[A:Bits,R:Bits] extends DequeuerLike[A,R] {
   def addr: Seq[Idx] = Nil
 }
 
@@ -92,7 +103,7 @@ object Dequeuer {
 
 
 /** Any write to a memory */
-abstract class Writer[A:Type] extends Accessor[A,Void] {
+abstract class Writer[A:Bits] extends Accessor[A,Void] {
   override def effects: Effects = Effects.Writes(mem)
 
   def data: Sym[_]
@@ -109,10 +120,10 @@ object Writer {
 }
 
 /** Any enqueue-like operation to a memory */
-abstract class EnqueuerLike[A:Type] extends Writer[A]
+abstract class EnqueuerLike[A:Bits] extends Writer[A]
 
 /** An address-less enqueue operation. */
-abstract class Enqueuer[A:Type] extends Writer[A] {
+abstract class Enqueuer[A:Bits] extends Writer[A] {
   def addr: Seq[Idx] = Nil
 }
 
@@ -125,50 +136,6 @@ object Enqueuer {
 }
 
 
-
-/** Banked accessors */
-abstract class BankedAccessor[A:Type,R:Type] extends EnPrimitive[R] {
-  val tA: Type[A] = Type[A]
-  def bankedRead: Option[BankedRead]
-  def bankedWrite: Option[BankedWrite]
-  final var ens: Set[Bit] = Set.empty
-
-  def mem: Sym[_]
-  def bank: Seq[Seq[Idx]]
-  def ofs: Seq[Idx]
-  var enss: Seq[Set[Bit]]
-
-  override def mirrorEn(f: Tx, addEns: Set[Bit]): Op[R] = {
-    enss = enss.map{ens => ens ++ addEns}
-    this.mirror(f)
-  }
-  override def updateEn(f: Tx, addEns: Set[Bit]): Unit = {
-    enss = enss.map{ens => ens ++ addEns}
-    this.update(f)
-  }
-}
-
-abstract class BankedReader[T:Type](implicit vT: Type[Vec[T]]) extends BankedAccessor[T,Vec[T]] {
-  def bankedRead = Some(BankedRead(mem,bank,ofs,enss))
-  def bankedWrite: Option[BankedWrite] = None
-}
-
-abstract class BankedDequeue[T:Type](implicit vT: Type[Vec[T]]) extends BankedReader[T] {
-  def bank: Seq[Seq[Idx]] = Nil
-  def ofs: Seq[Idx] = Nil
-}
-
-
-abstract class BankedWriter[T:Type] extends BankedAccessor[T,Void] {
-  def data: Seq[Sym[_]]
-  def bankedRead: Option[BankedRead] = None
-  def bankedWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
-}
-
-abstract class BankedEnqueue[T:Type] extends BankedWriter[T] {
-  def bank: Seq[Seq[Idx]] = Nil
-  def ofs: Seq[Idx] = Nil
-}
 
 
 

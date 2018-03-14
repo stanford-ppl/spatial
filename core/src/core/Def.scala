@@ -19,7 +19,7 @@ object Def {
   case object TypeRef extends Def[Nothing,Nothing] {
     override def isType: Boolean = true
   }
-  case class Error[B](id: Int) extends Def[Nothing,B] {
+  case class Error[B](id: Int, msg: String) extends Def[Nothing,B] {
     override def isError: Boolean = true
   }
   case class Bound[B](id: Int) extends Def[Nothing,B] {

@@ -22,7 +22,7 @@ import spatial.node._
       implicit val tV: Vec[R] = Vec.bits[R](length)
       error(ctx,s"Mismatched vector lengths. Expected length $length, got ${that.length}.")
       error(ctx)
-      err[Vec[R]]
+      err[Vec[R]]("Mismatched vector")
     }
     else {
       Vec.LeastFirst(this.elems.zip(that.elems).map{case (a,b) => func(a,b) }:_*)
@@ -34,7 +34,7 @@ import spatial.node._
     implicit val tV: Vec[A] = Vec.bits[A](length)
     error(ctx, s"Arithmetic $name is not defined for ${this.tp}")
     error(ctx)
-    err[Vec[A]]
+    err[Vec[A]]("Undefined arithmetic vector operation")
   }
 
   // TODO[5]: This is a bit hacky - is there a better way to define these?

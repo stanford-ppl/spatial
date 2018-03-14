@@ -113,4 +113,26 @@ abstract class Transformer extends Pass {
     state.scope = state.scope.filterNot(_ == sym)
     state.impure = state.impure.filterNot(_.sym == sym)
   }
+
+  implicit class BlockOps[R](block: Block[R]) {
+    def inline(): R = { val func = blockToFunction0(block, copy=true); func() }
+    def toFunction0: () => R = blockToFunction0(block, copy=true)
+  }
+  implicit class Lambda1Ops[A,R](lambda1: Lambda1[A,R]) {
+    def reapply(a: A): R = { val func = lambda1ToFunction1(lambda1, copy=true); func(a) }
+    def toFunction1: A => R = lambda1ToFunction1(lambda1, copy=true)
+  }
+  implicit class Lambda2Ops[A,B,R](lambda2: Lambda2[A,B,R]) {
+    def reapply(a: A, b: B): R = { val func = lambda2ToFunction2(lambda2, copy=true); func(a,b) }
+    def toFunction2: (A, B) => R = lambda2ToFunction2(lambda2, copy=true)
+  }
+  implicit class Lambda3Ops[A,B,C,R](lambda3: Lambda3[A,B,C,R]) {
+    def reapply(a: A, b: B, c: C): R = { val func = lambda3ToFunction3(lambda3, copy=true); func(a,b,c) }
+    def toFunction3: (A, B, C) => R = lambda3ToFunction3(lambda3, copy=true)
+  }
+
+  protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = () => inlineBlock(b).unbox
+  protected def lambda1ToFunction1[A,R](b: Lambda1[A,R], copy: Boolean): A => R
+  protected def lambda2ToFunction2[A,B,R](b: Lambda2[A,B,R], copy: Boolean): (A,B) => R
+  protected def lambda3ToFunction3[A,B,C,R](b: Lambda3[A,B,C,R], copy: Boolean): (A,B,C) => R
 }

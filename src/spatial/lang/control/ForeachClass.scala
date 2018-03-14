@@ -21,6 +21,6 @@ class ForeachClass(opt: CtrlOpt) {
   @api def apply(ctrs: Seq[Counter[I32]])(func: Seq[I32] => Void): Void = {
     val iters  = ctrs.map{_ => bound[I32] }
     val cchain = CounterChain(ctrs)
-    stage(OpForeach(cchain, stageBlock{ func(iters) }, iters, Set.empty))
+    stage(OpForeach(Set.empty, cchain, stageBlock{ func(iters) }, iters))
   }
 }

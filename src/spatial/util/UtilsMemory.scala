@@ -176,8 +176,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   }
 
   @stateful def reachingWrites(reads: Set[AccessMatrix], writes: Set[AccessMatrix], isGlobal: Boolean)(implicit isl: ISL): Set[AccessMatrix] = {
-    // TODO[5]: Hack, return all writers for global memories for now
-    if (isGlobal) return writes
+    // TODO[5]: Hack, return all writers for global/unread memories for now
+    if (isGlobal || reads.isEmpty) return writes
 
     var remainingWrites: Set[AccessMatrix] = writes
     var reachingWrites: Set[AccessMatrix] = Set.empty

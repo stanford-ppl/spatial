@@ -22,17 +22,23 @@ import spatial.lang._
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = mirror(f)
 }
 
-@op case class UnitPipe(block: Block[Void], ens: Set[Bit]) extends Pipeline[Void] {
+@op case class UnitPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
+  override def iters = Nil
+  override def bodies = Seq(Nil -> Seq(block))
+  override def cchains = Nil
+}
+
+@op case class ParallelPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
   override def bodies = Seq(Nil -> Seq(block))
   override def cchains = Nil
 }
 
 @op case class OpForeach(
+  ens:    Set[Bit],
   cchain: CounterChain,
   block:  Block[Void],
-  iters:  Seq[I32],
-  ens:    Set[Bit]
+  iters:  Seq[I32]
 ) extends Loop[Void] {
   def cchains = Seq(cchain -> iters)
   def bodies = Seq(iters -> Seq(block))
@@ -40,33 +46,35 @@ import spatial.lang._
 
 
 @op case class OpReduce[A](
+  ens:    Set[Bit],
   cchain: CounterChain,
   accum:  Reg[A],
   map:    Block[A],
   load:   Lambda1[Reg[A],A],
   reduce: Lambda2[A,A,A],
   store:  Lambda2[Reg[A],A,Void],
-  ident:  Option[Bits[A]],
-  fold:   Option[Bits[A]],
-  iters:  List[I32],
-  ens:    Set[Bit],
+  ident:  Option[A],
+  fold:   Option[A],
+  iters:  List[I32]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def cchains = Seq(cchain -> iters)
   override def bodies  = Seq(iters -> Seq(map,load,reduce,store))
 }
 
 @op case class MemReduceBlackBox[A,C[T]](
+  ens:       Set[Bit],
   cchainMap: CounterChain,
   accum:     C[A],
   map:       Block[C[A]],
   reduce:    Lambda2[A,A,A],
-  ident:     Option[Bits[A]],
+  ident:     Option[A],
   fold:      Boolean,
   itersMap:  Seq[I32]
-)(implicit val A: Bits[A], C: LocalMem[A,C]) extends EarlyBlackBox
+)(implicit val A: Bits[A], val C: LocalMem[A,C]) extends EarlyBlackBox
 
 
 @op case class OpMemReduce[A,C[T]](
+  ens:       Set[Bit],
   cchainMap: CounterChain,
   cchainRed: CounterChain,
   accum:     C[A],
@@ -75,12 +83,11 @@ import spatial.lang._
   loadAcc:   Lambda1[C[A],A],
   reduce:    Lambda2[A,A,A],
   storeAcc:  Lambda2[C[A],A,Void],
-  ident:     Option[Bits[A]],
+  ident:     Option[A],
   fold:      Boolean,
   itersMap:  Seq[I32],
-  itersRed:  Seq[I32],
-  ens:       Set[Bit],
-)(implicit val A: Bits[A], C: LocalMem[A,C]) extends Loop[Void] {
+  itersRed:  Seq[I32]
+)(implicit val A: Bits[A], val C: LocalMem[A,C]) extends Loop[Void] {
   override def iters: Seq[I32] = itersMap ++ itersRed
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
@@ -91,11 +98,11 @@ import spatial.lang._
 }
 
 @op case class StateMachine[A](
+  ens:       Set[Bit],
   start:     Bits[A],
   notDone:   Lambda1[A,Bit],
   action:    Lambda1[A,Void],
-  nextState: Lambda1[A,A],
-  ens:       Set[Bit],
+  nextState: Lambda1[A,A]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def iters: Seq[I32] = Nil
   override def cchains = Nil
@@ -104,22 +111,22 @@ import spatial.lang._
 
 
 @op case class UnrolledForeach(
+  ens:     Set[Bit],
   cchain:  CounterChain,
   func:    Block[Void],
   iterss:  Seq[Seq[I32]],
-  validss: Seq[Seq[Bit]],
-  ens:     Set[Bit],
+  validss: Seq[Seq[Bit]]
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
   override def bodiess = Seq(iterss -> Seq(func))
 }
 
 @op case class UnrolledReduce(
+  ens:     Set[Bit],
   cchain:  CounterChain,
   func:    Block[Void],
   iterss:  Seq[Seq[I32]],
-  validss: Seq[Seq[Bit]],
-  ens:     Set[Bit],
+  validss: Seq[Seq[Bit]]
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
   override def bodiess = Seq(iterss -> Seq(func))

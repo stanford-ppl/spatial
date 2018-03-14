@@ -138,27 +138,27 @@ trait Compiler { self =>
     */
   def main(args: Array[String]): Unit = {
     instrument.reset()
+    var failure: Option[Throwable] = None
     try {
       execute(args)
     }
     catch {
-      case e @ CompilerBugs(stage,n) =>
+      case CompilerBugs(stage,n) =>
         onException(new Exception(s"$n compiler ${plural(n,"bug")} during pass $stage"))
-        if (config.test) throw TestbenchFailure(s"$n compiler ${plural(n,"bug")} during pass $stage")
+        failure = Some(TestbenchFailure(s"$n compiler ${plural(n,"bug")} during pass $stage"))
 
-      case e @ CompilerErrors(stage,n) =>
+      case CompilerErrors(stage,n) =>
         error(s"${IR.errors} ${plural(n,"error")} found during $stage")
-        if (config.test) throw TestbenchFailure(s"$n ${plural(n,"error")} found during $stage")
+        failure = Some(TestbenchFailure(s"$n ${plural(n,"error")} found during $stage"))
 
       case t: Throwable =>
         onException(t)
-        if (config.test) throw t
-        //if (config.test) throw TestbenchFailure(s"Uncaught exception ${t.getMessage}")
+        failure = Some(TestbenchFailure(s"Uncaught exception ${t.getMessage} (${t.getCause})"))
     }
 
     checkWarnings()
     val tag = {
-      if (IR.hadBugs || IR.hadErrors) s"[${Console.RED}failed${Console.RESET}]"
+      if (IR.hadBugs || IR.hadErrors || failure.nonEmpty) s"[${Console.RED}failed${Console.RESET}]"
       else s"[${Console.GREEN}success${Console.RESET}]"
     }
 
@@ -177,5 +177,7 @@ trait Compiler { self =>
     msg(s"$tag Total time: " + "%.4f".format(time/1000.0f) + " seconds")
 
     IR.streams.values.foreach{stream => stream.close() }
+
+    if (config.test && failure.nonEmpty) throw failure.get
   }
 }

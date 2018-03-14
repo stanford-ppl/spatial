@@ -3,7 +3,7 @@ package spatial.traversal
 import core._
 import utils.implicits.collections._
 import utils.multiLoop
-import poly.{ConstraintMatrix, SparseConstraint, SparseMatrix}
+import poly._
 import spatial.data._
 import spatial.lang._
 import spatial.util._
@@ -68,7 +68,7 @@ trait AccessExpansion {
     val iMap = is.zipWithIndex.toMap
     val matrix = getAccessCompactMatrix(access, addr, pattern)
 
-    /*multiLoop(ps).map{uid =>
+    multiLoop(ps).map{uid =>
       val mat = matrix.map{vec =>
         val xsOrig: Seq[Idx] = vec.cols.keys.toSeq
         val components: Seq[(Int,Idx,Int,Option[Idx])] = xsOrig.map{x =>
@@ -95,14 +95,13 @@ trait AccessExpansion {
         val as = components.map(_._1)
         val xs = components.map(_._2)
         val c  = components.map(_._3).sum + vec.c
-        val lI = components.collect{case (a,x,b,i) if !i.contains(x) => x -> i }.toMap
+        val lI = components.collectAsMap{case (_,x,_,i) if !i.contains(x) => (x, i): (Idx,Option[Idx]) }  // Scala really doesn't like Option with wildcards
         SparseVector[Idx](xs.zip(as).toMap, c, lI)
       }
       val amat = AccessMatrix(access, mat, uid ++ vecID)
       amat.keys.foreach{x => getOrAddDomain(x) }
       amat
-    }.toSeq*/
-    Seq(AccessMatrix(access, matrix, Nil))
+    }.toSeq
   }
 
 }

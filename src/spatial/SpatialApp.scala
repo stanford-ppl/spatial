@@ -40,6 +40,7 @@ trait SpatialApp extends DSLApp {
     lazy val switchTransformer = SwitchTransformer(state)
     lazy val switchOptimizer   = SwitchOptimizer(state)
     lazy val pipeInserter      = PipeInserter(state)
+    lazy val unrollTransformer = UnrollingTransformer(state)
 
     lazy val globalAllocation = GlobalAllocation(state)
 
@@ -58,6 +59,9 @@ trait SpatialApp extends DSLApp {
       accessAnalyzer ==>
       printer ==>
       memoryAnalyzer ==>
+      printer ==>
+      unrollTransformer ==>
+      printer ==>
       //globalAllocation ==>
       //printer ==>
       //puDotCodegen ==>

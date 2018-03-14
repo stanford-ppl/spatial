@@ -44,7 +44,7 @@ trait DotCommon { this: Codegen =>
     case Def.Param(id,_) => s"${sym.tp}_x$id"
     case Def.Bound(id)   => s"${sym.tp}_x$id"
     case Def.Node(id,op) => s"${op.productPrefix}_x$id"
-    case Def.Error(_)    => throw new Exception("Error symbol")
+    case Def.Error(_,_)  => throw new Exception("Error symbol")
   }
   def getBlockName[R](block: Block[R]): String = "cluster_" + getNodeName(block.result)
 

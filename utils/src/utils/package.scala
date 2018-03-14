@@ -54,7 +54,7 @@ package object utils {
 
   def isSubtype(x: java.lang.Class[_], cls: java.lang.Class[_]): Boolean = {
     if ((x == cls) || x.getInterfaces.contains(cls)) true
-    else if (x.getSuperclass == null && x.getInterfaces.length == 0) false
+    else if ((x.getSuperclass eq null) && x.getInterfaces.isEmpty) false
     else {
       val superIsSub = if (x.getSuperclass != null) isSubtype(x.getSuperclass, cls) else false
       superIsSub || x.getInterfaces.exists(s=>isSubtype(s,cls))

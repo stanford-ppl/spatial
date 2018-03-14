@@ -33,7 +33,12 @@ trait InternalAliases extends CustomBitWidths {
   type LocalMem5[A,C[T]<:LocalMem5[T,C]] = spatial.lang.types.LocalMem5[A,C]
 
   type RemoteMem[A,C[_]] = spatial.lang.types.RemoteMem[A,C]
-  
+
+  type DRAMx[A] = spatial.lang.DRAM[A,C forSome{ type C[T] }]
+  type SRAMx[A] = spatial.lang.SRAM[A,C forSome{ type C[T] }]
+  type RegFilex[A] = spatial.lang.RegFile[A,C forSome{ type C[T] }]
+  type LUTx[A] = spatial.lang.LUT[A,C forSome{ type C[T] }]
+
   type Bits[T] = spatial.lang.types.Bits[T]
   lazy val Bits = spatial.lang.types.Bits
   type Order[T] = spatial.lang.types.Order[T]
@@ -69,6 +74,13 @@ trait ExternalAliases extends InternalAliases {
   type SRAM4[A] = spatial.lang.SRAM4[A]
   type SRAM5[A] = spatial.lang.SRAM5[A]
   lazy val SRAM = spatial.lang.SRAM
+
+  type LUT[A,C[T]] = spatial.lang.LUT[A,C]
+  type LUT1[A] = spatial.lang.LUT1[A]
+  type LUT2[A] = spatial.lang.LUT2[A]
+  type LUT3[A] = spatial.lang.LUT3[A]
+  type LUT4[A] = spatial.lang.LUT4[A]
+  type LUT5[A] = spatial.lang.LUT5[A]
 
   type RegFile[A,C[T]] = spatial.lang.RegFile[A,C]
   type RegFile1[A] = spatial.lang.RegFile1[A]

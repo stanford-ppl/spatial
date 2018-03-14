@@ -1,6 +1,6 @@
 package spatial.lang.types
 
-sealed trait BOOL[T] {
+trait BOOL[T] {
   val v: Boolean
   override def equals(x: Any): Boolean = x match {
     case that: BOOL[_] => this.v == that.v
@@ -8,7 +8,7 @@ sealed trait BOOL[T] {
   }
   override def toString: String = if (v) "TRUE" else "FALSE"
 }
-sealed trait INT[T] {
+trait INT[T] {
   val v: Int
   override def equals(x: Any): Boolean = x match {
     case that: INT[_] => this.v == that.v
@@ -153,6 +153,7 @@ trait _128 extends INT[_128] { val v = 128 }
 /** Hack for working with customized bit widths, since Scala doesn't support integers as template parameters */
 object BOOL {
   def apply[T:BOOL]: BOOL[T] = implicitly[BOOL[T]]
+  def from[T](x: Boolean): BOOL[T] = new BOOL[T] { val v: Boolean = x }
 
   implicit lazy val BOOL_TRUE: BOOL[TRUE] = new TRUE {}
   implicit lazy val BOOL_FALSE: BOOL[FALSE] = new FALSE {}

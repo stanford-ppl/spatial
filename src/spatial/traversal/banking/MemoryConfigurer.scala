@@ -55,8 +55,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     }
   }
 
-  /**
-    * Complete memory analysis by adding banking and buffering metadata to the memory and
+  /** Complete memory analysis by adding banking and buffering metadata to the memory and
     * all associated accesses.
     */
   protected def finalize(instances: Seq[Instance]): Unit = {
@@ -64,17 +63,20 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     duplicatesOf(mem) = duplicates
 
     instances.zipWithIndex.foreach{case (inst, id) =>
-      (inst.reads.iterator.flatten ++ inst.writes.iterator.flatten).foreach{rd =>
-        portsOf.add(rd.access, rd.unroll, inst.ports(rd))
-        dispatchOf.add(rd.access, rd.unroll, id)
+      (inst.reads.iterator.flatten ++ inst.writes.iterator.flatten).foreach{a =>
+        portsOf.add(a.access, a.unroll, inst.ports(a))
+        dispatchOf.add(a.access, a.unroll, id)
+        dbgs(s"  Added port ${inst.ports(a)} to ${a.access} {${a.unroll.mkString(",")}}")
+        dbgs(s"  Added dispatch $id to ${a.access} {${a.unroll.mkString(",")}}")
       }
     }
   }
 
-  /**
-    * Group accesses on this memory by
-    *   1. Control: If any two accesses must occur simultaneously to the same bank, they are potentially grouped together
-    *   2. Space: If these two accesses are guaranteed to be bankable (they never hit the same address), they are grouped together
+  /** Group accesses on this memory by
+    * 1. Control: If any two accesses must occur simultaneously to the same bank, they are
+    *    potentially grouped together
+    * 2. Space: If these two accesses are guaranteed to be bankable (they never hit the same
+    *    address), they are grouped together
     */
   protected def groupAccesses(accesses: Set[AccessMatrix], tp: String): Set[Set[AccessMatrix]] = {
     val groups = ArrayBuffer[Set[AccessMatrix]]()
@@ -105,17 +107,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     else Seq(Instance.Unit(rank))
   }
 
-  /**
-    * Returns an approximation of the cost for the given banking strategy.
-    */
+  /** Returns an approximation of the cost for the given banking strategy. */
   def cost(banking: Seq[Banking], depth: Int): Int = {
     val totalBanks = banking.map(_.nBanks).product
     depth * totalBanks
   }
 
-  /**
-    * Compute the mux IDs for accesses that occur in parallel.
-    */
+  /** Computes the mux IDs for accesses that occur in parallel. */
   protected def computePorts(groups: Set[Set[AccessMatrix]], bufPorts: Map[Sym[_],Option[Int]]): Map[AccessMatrix,Port] = {
     var ports: Map[AccessMatrix,Port] = Map.empty
     val seqGrps = groups.toSeq
@@ -150,8 +148,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     else None
   }
 
-  /**
-    * Should not attempt to merge instances if any of the following conditions hold:
+  /** Should not attempt to merge instances if any of the following conditions hold:
     *   1. The two instances have a common LCA controller
     *   2. The two instances result in hierarchical buffers (for now)
     *   3. Either instance is a Fold or Buffer "accumulator"
@@ -167,8 +164,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     else None
   }
 
-  /**
-    * Should not complete merging instances if any of the following hold:
+  /** Should not complete merging instances if any of the following hold:
     *   1. The merge was not successful
     *   2. The merge results in a multi-ported N-buffer (if this is disabled)
     *   3. The merged instance costs more than the total cost of the two separate instances
@@ -180,9 +176,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     else None
   }
 
-  /**
-    * Greedily banks and merges groups of readers into memory instances.
-    */
+  /** Greedily banks and merges groups of readers into memory instances. */
   protected def mergeReadGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
     val instances = ArrayBuffer[Instance]()
 
@@ -219,8 +213,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     instances
   }
 
-  /**
-    * Greedily banks and merges groups of writers into memory instances.
+  /** Greedily banks and merges groups of writers into memory instances.
     * Only used if the memory has no readers.
     */
   protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {

@@ -1,8 +1,9 @@
 package spatial.util
 
+import core._
 import emul.FixedPoint
 import forge.tags._
-import spatial.lang.{Fix,I32}
+import spatial.lang._
 
 abstract class IntLike[A] {
   @api def plus(a: A, b: A): A
@@ -32,6 +33,36 @@ object IntLike {
     @api def divide(a: I32, b: I32): I32 = a / b
     @api def modulus(a: I32, b: I32): I32 = a % b
     def fromInt(a: Int): I32 = I32(a)
+  }
+
+  implicit object IdxIsIntLike extends IntLike[Idx] {
+    @rig private def map[S,I](a: Idx, b: Idx)(func: (Fix[S,I,_0],Fix[S,I,_0]) => Fix[S,I,_0]): Idx = {
+      val fmt = a.fmt merge b.fmt
+      class IA extends INT[IA]{ val v: Int = a.fmt.ibits }
+      class IB extends INT[IB]{ val v: Int = b.fmt.ibits }
+      class IC extends INT[IC]{ val v: Int = fmt.ibits }
+      class SA extends BOOL[SA]{ val v: Boolean = a.fmt.sign }
+      class SB extends BOOL[SB]{ val v: Boolean = b.fmt.sign }
+      class SC extends BOOL[SC]{ val v: Boolean = fmt.sign }
+
+      implicit val SA: BOOL[SA] = new SA
+      implicit val SB: BOOL[SB] = new SB
+      implicit val SC: BOOL[SC] = new SC
+      implicit val IA: INT[IA] = new IA
+      implicit val IB: INT[IB] = new IB
+      implicit val IC: INT[IC] = new IC
+      implicit val A: Type[Fix[SA,IA,_0]] = new Fix[SA,IA,_0].asType
+      implicit val B: Type[Fix[SB,IB,_0]] = new Fix[SB,IB,_0].asType
+      val aa = a.asInstanceOf[Fix[SA,IA,_0]].to[Fix[SC,IC,_0]].asInstanceOf[Fix[S,I,_0]]
+      val bb = b.asInstanceOf[Fix[SB,IB,_0]].to[Fix[SC,IC,_0]].asInstanceOf[Fix[S,I,_0]]
+      func(aa,bb).asInstanceOf[Idx]
+    }
+    @api def plus(a: Idx, b: Idx): Idx =  map[Any,Any](a,b)(_+_)
+    @api def minus(a: Idx, b: Idx): Idx = map[Any,Any](a,b)(_-_)
+    @api def times(a: Idx, b: Idx): Idx = map[Any,Any](a,b)(_*_)
+    @api def divide(a: Idx, b: Idx): Idx = map[Any,Any](a,b)(_/_)
+    @api def modulus(a: Idx, b: Idx): Idx = map[Any,Any](a,b)(_%_)
+    def fromInt(a: Int): Idx = I32(a)
   }
 
   implicit object FixedPointIsIntLike extends IntLike[FixedPoint] {

@@ -14,10 +14,12 @@ object Alloc {
 }
 
 /** Memory allocation */
-abstract class MemAlloc[A:Type,C[T]](
+abstract class MemAlloc[A:Bits,C[T]](
     mutable: Boolean = true
     )(implicit C: Type[C[A]])
   extends Alloc[C[A]] {
+
+  val A: Bits[A] = Bits[A]
 
   def dims: Seq[I32]
   def rank: Int = dims.length

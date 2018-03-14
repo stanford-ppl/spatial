@@ -83,7 +83,7 @@ trait Printing {
     case Def.Const(c)    => s"${escapeConst(c)}"
     case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
     case Def.Node(id,op) => s"x$id = $op"
-    case Def.Error(id)   => s"e$id <error>"
+    case Def.Error(id,_) => s"e$id <error>"
     case Def.TypeRef     => lhs.tp.typeName
   }
 

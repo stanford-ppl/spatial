@@ -3,9 +3,9 @@ package control
 
 import core._
 import forge.tags._
+import spatial.node.OpReduce
 
-protected class ReduceAccum[A](accum: Option[Reg[A]], zero: Option[A], fold: Option[A], opt: CtrlOpt) {
-  @rig private def acc(implicit A: Bits[A]): Reg[A] = accum.getOrElse(Reg[A])
+protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Option[A], opt: CtrlOpt) {
 
   /** 1 dimensional reduction **/
   @api def apply(domain: Counter[I32])(map: I32 => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
@@ -23,7 +23,18 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], zero: Option[A], fold: Opt
 
   /** N dimensional reduction **/
   @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
-    ???
+    val acc = accum.getOrElse(Reg[A])
+    val cchain = CounterChain(domain)
+    val lA = bound[A]
+    val rA = bound[A]
+    val iters  = List.fill(domain.length){ bound[I32] }
+    val mapBlk = stageBlock{ map(iters) }
+    val ldBlk  = stageLambda1(acc){ acc.value }
+    val redBlk = stageLambda2(lA,rA){ reduce(lA,rA) }
+    val stBlk  = stageLambda2(acc,redBlk.result){ acc := redBlk.result.unbox }
+    val pipe = stage(OpReduce[A](Set.empty,cchain,acc,mapBlk,ldBlk,redBlk,stBlk,ident,init,iters))
+    opt.set(pipe)
+    acc
   }
 }
 protected class ReduceConstant[A](a: Lift[A], isFold: Boolean, opt: CtrlOpt) {

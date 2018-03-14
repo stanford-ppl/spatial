@@ -86,7 +86,7 @@ import spatial.lang._
     bank: Seq[Seq[Idx]],
     ofs:  Seq[Idx],
     enss: Seq[Set[Bit]]
-    )(implicit val vT: Vec[A])
+    )(implicit val vT: Type[Vec[A]])
   extends BankedReader[A]
 
 /** A banked write of a vector of elements to an RegFile.

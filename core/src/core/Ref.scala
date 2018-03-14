@@ -85,7 +85,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[core] val evRef: A <:< 
       implicit val tA: Type[A] = this
       error(ctx, r"Cannot convert ${escapeConst(c)} with type ${c.getClass} to a ${this.tp}")
       error(ctx)
-      err[A]
+      err[A]("Invalid constant")
   }
 }
 
@@ -132,7 +132,7 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
     case Def.Param(id,_) => id
     case Def.Node(id,_)  => id
     case Def.Bound(id)   => id
-    case Def.Error(id)   => id
+    case Def.Error(id,_) => id
     case Def.TypeRef     => (_typePrefix,_typeArgs).hashCode()
   }
 
@@ -144,7 +144,7 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
       case (Def.Param(idA,_), Def.Param(idB,_)) => idA == idB
       case (Def.Node(idA,_),  Def.Node(idB,_))  => idA == idB
       case (Def.Bound(idA),   Def.Bound(idB))   => idA == idB
-      case (Def.Error(idA),   Def.Error(idB))   => idA == idB
+      case (Def.Error(idA,_), Def.Error(idB,_)) => idA == idB
       case (Def.TypeRef,      Def.TypeRef)      => this =:= that
       case _ => false
     }
@@ -156,7 +156,7 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
     case Def.Param(id,c) => s"p$id (${escapeConst(c)})"
     case Def.Node(id,_)  => s"x$id"
     case Def.Bound(id)   => s"b$id"
-    case Def.Error(_)    => s"<error>"
+    case Def.Error(_,_)  => s"<error>"
     case Def.TypeRef     => expTypeOps(this).typeName
   }
 }

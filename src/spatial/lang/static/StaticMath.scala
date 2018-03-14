@@ -36,4 +36,16 @@ trait StaticMath {
   @api def atan[A:Num](a: A): A = Num[A].atan(a)
   @api def sigmoid[A:Num](a: A): A = Num[A].sigmoid(a)
 
+
+  implicit class SeqMathOps[A](xs: Seq[A]) {
+    @api def reduceTree(f: (A,A) => A): A = reduce(xs:_*)(f)
+    @api def sumTree(f: (A,A) => A)(implicit A: Num[A]): A = sum(xs:_*)
+    @api def prodTree(f: (A,A) => A)(implicit A: Num[A]): A = product(xs:_*)
+  }
+
+  implicit class SeqBitOps(xs: Seq[Bit]) {
+    @api def andTree: Bit = xs.reduceTree(_&&_)
+    @api def orTree: Bit = xs.reduceTree(_||_)
+  }
+
 }

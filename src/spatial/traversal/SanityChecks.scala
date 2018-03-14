@@ -18,6 +18,19 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
        .flatMap{in => stms.find(_.inputs.contains(in)).map{use => (in,use) }}
   }
 
+  def busWidthCheck(tp: Bits[_], bus: Bus, mem: String): Unit = {
+    if (tp.nbits < bus.length) {
+      warn(ctx, s"Bus length is greater than size of $mem type.")
+      warn(s"Hardware will drive only the first ${tp.nbits} bits of the bus.")
+      warn(ctx)
+    }
+    else if (tp.nbits > bus.length) {
+      warn(ctx, s"Bus length is smaller than size of $mem type.")
+      warn(s"Hardware will use only the first ${tp.nbits} bits in the word")
+      warn(ctx)
+    }
+  }
+
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case GetArgOut(_) if inHw =>
       error(lhs.ctx, "Reading ArgOuts within Accel is disallowed.")
@@ -55,6 +68,17 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
     case RegNew(init) if !init.isConst =>
       error(lhs.ctx, "Reset values of registers must be constants.")
       error(lhs.ctx)
+
+    case op @ StreamInNew(bus)  => busWidthCheck(op.A,bus,"StreamIn")
+    case op @ StreamOutNew(bus) => busWidthCheck(op.A,bus,"StreamOut")
+
+    case LUTNew(dims,elems) =>
+      val size = dims.map(_.toInt).product
+      if (elems.length != size) {
+        // TODO[5]: This could be downgraded to a warning if we fill zeros in here
+        error(ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
+        error(ctx)
+      }
 
     case _ => super.visit(lhs, rhs)
   }

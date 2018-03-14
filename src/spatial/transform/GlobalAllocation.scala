@@ -70,7 +70,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
 
     block.stms.reverseIterator.foreach{
       case MemAlloc(_)  =>
-      case Bus(_)     =>
+      case ICBus(_)     =>
       case Control(s) =>
         children += s
         s.inputs.foreach{in => addUsed(in, Set(s)) }
@@ -83,8 +83,8 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     val blk: Block[Void] = stageBlock {
       block.stms.foreach {
         case MemAlloc(s)  => visit(s)
-        case Control(s) => visit(s)
-        case Bus(s)     => visit(s)
+        case Control(s)   => visit(s)
+        case ICBus(s)     => visit(s)
         case s if usedSyms.contains(s) => usedSyms(s).foreach{c => addOuter(s, c) }
         case s => dbgs(s"Dropping ${stm(s)}")
       }

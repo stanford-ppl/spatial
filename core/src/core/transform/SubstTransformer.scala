@@ -74,4 +74,41 @@ abstract class SubstTransformer extends Transformer {
     isolateSubstWith(rules.toSeq:_*){ scope }
   }
 
+  def isolateIf[A](cond: Boolean)(block: => A): A = {
+    val save = subst
+    val result = block
+    if (cond) subst = save
+    result
+  }
+
+  final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
+    () => isolateIf(copy){
+      inlineBlock(b).unbox
+    }
+  }
+  final override protected def lambda1ToFunction1[A,R](lambda1: Lambda1[A,R], copy: Boolean): A => R = {
+    {a: A => isolateIf(copy) {
+      register(lambda1.input -> a)
+      val block = blockToFunction0(lambda1, copy)
+      block()
+    }}
+  }
+  final override protected def lambda2ToFunction2[A,B,R](lambda2: Lambda2[A,B,R], copy: Boolean): (A,B) => R = {
+    {(a: A, b: B) => isolateIf(copy) {
+      register(lambda2.inputA -> a)
+      register(lambda2.inputB -> b)
+      val block = blockToFunction0(lambda2, copy)
+      block()
+    }}
+  }
+  final override protected def lambda3ToFunction3[A,B,C,R](lambda3: Lambda3[A,B,C,R], copy: Boolean): (A,B,C) => R = {
+    { (a: A, b: B, c: C) => isolateIf(copy) {
+      register(lambda3.inputA -> a)
+      register(lambda3.inputB -> b)
+      register(lambda3.inputC -> c)
+      val block = blockToFunction0(lambda3, copy)
+      block()
+    }}
+  }
+
 }

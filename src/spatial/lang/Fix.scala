@@ -10,6 +10,10 @@ case class FixFmt[S,I,F](s: BOOL[S], i: INT[I], f: INT[F]) {
   def ibits: Int = i.v
   def fbits: Int = f.v
   def toEmul: FixFormat = FixFormat(sign,ibits,fbits)
+  def merge(that: FixFmt[_,_,_]): FixFmt[_,_,_] = {
+    val fmt = this.toEmul.combine(that.toEmul)
+    new FixFmt(BOOL.from(fmt.sign),INT.from(fmt.ibits),INT.from(fmt.fbits))
+  }
   override def toString: String = s"$s,$i,$f"
 }
 object FixFmt {

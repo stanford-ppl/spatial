@@ -23,12 +23,16 @@ trait Staging { this: Printing =>
   @stateful private[core] def _param[A<:Sym[A]:Type](c: A#L): A = Type[A]._new(Def.Param(state.nextId(),c), ctx)
   @stateful private[core] def _param[C,A](tp: ExpType[C,A], c: C): A = tp._new(Def.Param(state.nextId(),c), ctx)
 
-  @stateful def err[A:Type]: A = Type[A]._new(Def.Error[A](state.nextId()), ctx)
-  @stateful def err_[A](tp: Type[A]): A = tp._new(Def.Error[A](state.nextId()), ctx)
+  @stateful def err[A:Type](msg: String): A = Type[A]._new(Def.Error[A](state.nextId(),msg), ctx)
+  @stateful def err_[A](tp: Type[A], msg: String): A = tp._new(Def.Error[A](state.nextId(),msg), ctx)
 
   @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
 
-  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = tp._new(Def.Node(state.nextId(),op), ctx)
+  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = {
+    if (state eq null) throw new Exception(s"Staging in null state scope")
+    if (tp eq null) throw new Exception(s"Staging with null type")
+    tp._new(Def.Node(state.nextId(),op), ctx)
+  }
 
   /**
     * Correctness checks:
@@ -67,13 +71,13 @@ trait Staging { this: Printing =>
 
   @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.R,ctx,state) match {
     case Some(s) => s
-    case None if state == null =>
+    case None if state eq null =>
       // General operations in object/trait constructors are currently disallowed
       // because it can mess up namespaces in the output code
       // TODO[6]: Allow global namespace operations?
       error(ctx, "Only constant declarations are allowed in the global namespace.")
       error(ctx)
-      err_[R](op.R)
+      err_[R](op.R, "Invalid declaration in global namespace")
 
     case None =>
       val effects = allEffects(op)
@@ -105,7 +109,6 @@ trait Staging { this: Printing =>
     case _ => sym
   }
   @rig def stage[R](op: Op[R]): R = {
-    logs(s"Staging $op with type evidence ${op.R}")
     val t = register(op, () => symbol(op.R,op))
     op.R.boxed(t).ctx = ctx
     t

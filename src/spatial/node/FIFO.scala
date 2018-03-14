@@ -24,15 +24,14 @@ import spatial.lang._
 @op case class FIFOBankedEnq[A:Bits](
     mem:  FIFO[A],
     data: Seq[Sym[A]],
-    enss: Seq[Set[Bit]]
-    )(implicit val vA: Vec[A])
+    enss: Seq[Set[Bit]])
   extends BankedEnqueue[A]
 
 
 @op case class FIFOBankedDeq[A:Bits](
     mem:  FIFO[A],
     enss: Seq[Set[Bit]]
-    )(implicit val vA: Vec[A])
+    )(implicit val vA: Type[Vec[A]])
   extends BankedDequeue[A]
 
 

@@ -9,8 +9,9 @@ object Readable {
   private def readable(x: Any): String = x match {
     case c: Class[_] => c.getName.split('$').last.replace("class ", "").replace("package","").split('.').filterNot(_ == "").mkString(".")
     case r: Readable => r.readable
-    case _ =>
-      if (x == null) "null" else x.toString
+    case x: AnyRef =>
+      if (x eq null) "null" else x.toString
+    case _ => x.toString
   }
 
   implicit class ReadablePrinter(sc: StringContext) {

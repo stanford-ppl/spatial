@@ -25,6 +25,8 @@ object collections {
     /** Returns a new Map from elements in x to func(x)  */
     def mapping[B](func: A => B): Map[A,B] = x.map{x => x -> func(x) }.toMap
 
+    def collectAsMap[B,C](func: PartialFunction[A,(B,C)]): Map[B,C] = x.collect(func).toMap
+
     /** Returns true if the length of x is exactly len, false otherwise.
       * Equivalent to (but faster than) x.length == len
       */

@@ -9,22 +9,16 @@ import spatial.util._
 import spatial.internal.spatialConfig
 import spatial.traversal.AccelTraversal
 
-abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
-  /*
-   * Options when transforming a statement:
-   *   0. Remove it: s -> Nil. Statement will not appear in resulting graph.
-   *   1. Update it: s -> List(s). Statement will not change except for inputs.
-   *   2. Subst. it: s -> List(s'). Substitution s' will appear instead.
-   *   3. Expand it: s -> List(a,b,c). Substitutions will appear instead.
-   *                                   Downstream users must specify which subst. to use.
-   */
-  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
-    case _ => super.transform(lhs, rhs)
-  }
+/** Options when transforming a statement:
+  *   0. Remove it: s -> Nil. Statement will not appear in resulting graph.
+  *   1. Update it: s -> List(s). Statement will not change except for inputs.
+  *   2. Subst. it: s -> List(s'). Substitution s' will appear instead.
+  *   3. Expand it: s -> List(a,b,c). Substitutions will appear instead.
+  *                                   Downstream users must specify which subst. to use.
+  */
+abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
-  /**
-    * Valid bits - tracks all valid bits associated with the current scope to handle edge cases
+  /** Valid bits - tracks all valid bits associated with the current scope to handle edge cases
     * e.g. cases where parallelization is not an even divider of counter max
     */
   private var validBits: Set[Bit] = Set.empty
@@ -36,11 +30,10 @@ abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
     result
   }
 
-  // Sequence of valid bits associated with current unrolling scope
+  /** Set of valid bits associated with current unrolling scope */
   def enables: Set[Bit] = validBits
 
-  /**
-    * Unroll numbers - gives the unroll index of each pre-unrolled (prior to transformer) index
+  /** Unroll numbers - gives the unroll index of each pre-unrolled (prior to transformer) index
     * Used to determine which duplicate a particular memory access should be associated with
     */
   var unrollNum: Map[Idx, Int] = Map.empty
@@ -52,8 +45,7 @@ abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
     result
   }
 
-  /**
-    * Memory duplicate substitution rules - gives a mapping from a pre-unrolled memory
+  /** Memory duplicate substitution rules - gives a mapping from a pre-unrolled memory
     * and dispatch index to an unrolled memory instance
     */
   var memories: Map[(Sym[_], Int), Sym[_]] = Map.empty
@@ -65,8 +57,7 @@ abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
     result
   }
 
-  /**
-    * Clone functions - used to add extra rules (primarily for metadata) during unrolling
+  /** Clone functions - used to add extra rules (primarily for metadata) during unrolling
     * Applied directly after mirroring
     */
   var cloneFuncs: List[Sym[_] => Unit] = Nil
@@ -79,32 +70,83 @@ abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
 
     result
   }
+
+  /** Lanes tracking duplications in this scope */
+  var lanes: Unroller = UnitUnroller(false)
+  def inLanes[T](l: Unroller)(scope: => T): T = {
+    val saveLanes = lanes
+    lanes = l
+    val result = scope
+    lanes = saveLanes
+    result
+  }
+
+  def unroll[A](block: Block[A], lanes: Unroller): List[A] = inLanes(lanes){
+    inlineBlock(block)
+    lanes.map{_ => f(block.result).unbox }
+  }
+
+  def unroll[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
+    if (isControl(rhs)) duplicateController(lhs,rhs)
+    else lanes.duplicate(lhs,rhs)
+  }
+
+  def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = {
+    cloneOp(lhs,rhs)
+  }
+
+  /** Duplicate the controller using the given call-by-name unroll function.
+    * Duplication is done based on the global Unroller helper instance lanes.
+    */
+  final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A]): List[Sym[_]] = {
+    dbgs(s"Duplicating controller:")
+    dbgs(s"$lhs = $rhs")
+    def duplicate() = transferMetadataIfNew(lhs){ unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]] }._1
+    if (lanes.size > 1) {
+      val block = stageBlock {
+        lanes.foreach{p =>
+          dbgs(s"$lhs duplicate ${p+1}/${lanes.size}")
+          duplicate()
+        }
+      }
+      val lhs2 = stage(ParallelPipe(enables,block))
+      lanes.unify(lhs, lhs2)
+    }
+    else {
+      dbgs(s"$lhs duplicate 1/1")
+      val first = lanes.inLane(0){ duplicate() }
+      lanes.unify(lhs, first)
+    }
+  }
+
+  final override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+    case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+    case _ =>
+      val duplicates: List[Sym[_]] = if (isControl(rhs)) duplicateController(lhs,rhs) else unroll(lhs, rhs)
+      if (duplicates.length == 1) duplicates.head.asInstanceOf[Sym[A]]
+      else err[A](s"Undefined duplicate of $lhs")
+  }
+
+
   def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = duringClone{e =>
-    if (spatialConfig.enablePIR && !isInner) reduceType(e) = None
+    if (spatialConfig.noInnerLoopUnroll && !isInner) reduceType(e) = None
     else reduceType(e) = red
   }{ blk }
 
-  def unroll[T](lhs: Sym[T], rhs: Op[T], lanes: Unroller)(implicit ctx: SrcCtx): List[Sym[_]] = {
-    logs(s"Duplicating $lhs = $rhs")
-    lanes.duplicate(lhs, rhs)
-  }
 
-  def unroll[R](block: Block[R]): Sym[R] = {
-    val lanes = UnitUnroller(true)
-    dbgs(s"Unroll: block $block")
-    block.stms.foreach{case Stm(lhs,rhs) =>
-      unroll(lhs, rhs.asInstanceOf[Op[Any]], lanes)(lhs.ctx)
+  override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
+    inlineBlockWith(block){stms =>
+      stms.foreach{case Stm(lhs,rhs) => unroll(lhs,rhs.asInstanceOf[Op[Any]])(lhs.tp,lhs.ctx) }
+      lanes.inLane(0){ f(block.result) }
     }
-    dbgs(s"Unroll: end of block $block")
-    lanes.map{_ => f(block.result) }.head // List of duplicates for the original result of this block
   }
 
   def cloneOp[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     val (lhs2, isNew) = transferMetadataIfNew(lhs){ mirror(lhs, rhs) }
     if (isNew) cloneFuncs.foreach{func => func(lhs2) }
 
-    logs(s"Cloning $lhs = $rhs")
-    logs(s"  Created ${stm(lhs2)}")
+    //logs(s"Cloning $lhs = $rhs")
+    //logs(s"  Created ${stm(lhs2)}")
     lhs2
   }
 
@@ -118,8 +160,7 @@ abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
   }
 
 
-  /**
-    * Helper objects for unrolling
+  /** Helper objects for unrolling
     * Tracks multiple substitution contexts in 'contexts' array
     **/
   trait Unroller {
@@ -227,7 +268,7 @@ abstract class ExpandTransformer extends MutateTransformer with AccelTraversal {
 
   case class PartialUnroller(cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     // HACK: Don't unroll inner loops for CGRA generation
-    val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.enablePIR) inds.map{_ => 1}
+    val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.noInnerLoopUnroll) inds.map{_ => 1}
     else cchain.pars.map(_.toInt)
 
     val fs: Seq[Boolean] = cchain.ctrs.map(_.isForever)

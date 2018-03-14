@@ -25,15 +25,29 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
 
   def targsType(select: TypeName, targs: List[Tree]): Tree = tq"$select[..$targs]"
 
-  // Fix for bug where <caseaccessor> gets added to (private) implicit fields
+  // Hack for scala bug #10589 where <caseaccessor> gets added to (private) implicit fields
   def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
-    case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.IMPLICIT) && mods.hasFlag(Flag.SYNTHETIC) =>
-      val flags = Modifiers(Flag.SYNTHETIC | Flag.IMPLICIT | Flag.PARAMACCESSOR)
+    case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) &&
+                                     mods.hasFlag(Flag.PARAMACCESSOR) &&
+                                     mods.hasFlag(Flag.IMPLICIT) &&
+                                     mods.hasFlag(Flag.LOCAL) &&
+                                     mods.hasFlag(Flag.PROTECTED) =>
+
+      val flags = Modifiers(Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.LOCAL | Flag.PROTECTED)
       ValDef(flags, name, tp, rhs)
 
-    case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) && mods.hasFlag(Flag.PRIVATE) && mods.hasFlag(Flag.IMPLICIT) =>
-      val flags = Modifiers(Flag.PRIVATE | Flag.IMPLICIT)
+    case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) &&
+                                     mods.hasFlag(Flag.PARAMACCESSOR) &&
+                                     mods.hasFlag(Flag.PRIVATE) &&
+                                     mods.hasFlag(Flag.IMPLICIT) &&
+                                     mods.hasFlag(Flag.LOCAL) =>
+      val flags = Modifiers(Flag.PRIVATE | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.LOCAL)
       ValDef(flags, name, tp, rhs)
+
+    case f if f.mods.hasFlag(Flag.IMPLICIT) =>
+      __c.info(__c.enclosingPosition, showRaw(f), force = true)
+      __c.info(__c.enclosingPosition, showCode(f), force = true)
+      f
 
     case v => v
   }

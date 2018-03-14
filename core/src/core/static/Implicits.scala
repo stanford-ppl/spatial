@@ -64,15 +64,15 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
 
   private[core] def tp_=(tp: ExpType[C,A]): Unit = { exp._tp = tp }
   def tp: ExpType[C,A] = {
-    if (exp._rhs == null) throw new Exception(r"Val references to tp in ${exp.getClass} should be lazy")
+    if (exp._rhs eq null) throw new Exception(r"Val references to tp in ${exp.getClass} should be lazy")
     else if (exp.isType) exp.asInstanceOf[ExpType[C,A]]
-    else if (exp._tp == null) throw new Exception(r"Val references to tp in ${exp.getClass} should be lazy")
+    else if (exp._tp eq null) throw new Exception(r"Val references to tp in ${exp.getClass} should be lazy")
     else exp._tp
   }
 
   private[core] def rhs_=(rhs: Def[C, A]): Unit = { exp._rhs = rhs }
   def rhs: Def[C,A] = {
-    if (exp._rhs == null) throw new Exception(r"Val references to rhs in ${exp.getClass} should be lazy")
+    if (exp._rhs eq null) throw new Exception(r"Val references to rhs in ${exp.getClass} should be lazy")
     else exp._rhs
   }
 

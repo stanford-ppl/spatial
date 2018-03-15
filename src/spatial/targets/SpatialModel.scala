@@ -13,13 +13,15 @@ abstract class SpatialModel[F[A]<:Fields[A,F]] extends NodeParams {
   final var target: HardwareTarget = _
   final type ResModel  = Model[NodeModel,F]
   final type Resources = Model[Double,F]
+  final def DSP_CUTOFF: Int = target.DSP_CUTOFF
 
   val FILE_NAME: String
   val RESOURCE_NAME: String
   def FIELDS: Array[String]
   implicit def RESOURCE_FIELDS: F[Double]
   implicit def MODEL_FIELDS: F[NodeModel]
-  private def NONE: Resources = Model.zero[Double,F]
+  def NONE: Resources = Model.zero[Double,F]
+  def NO_MODEL: ResModel = Model.zero[NodeModel,F]
 
   private var missing: Set[String] = Set[String]()
   private var needsInit: Boolean = true
@@ -69,7 +71,7 @@ abstract class SpatialModel[F[A]<:Fields[A,F]] extends NodeParams {
     val resource = Try(Source.fromResource("models/" + FILE_NAME).getLines())
     val direct = Try{
       val SPATIAL_HOME = sys.env("SPATIAL_HOME")
-      Source.fromFile(SPATIAL_HOME + "/spatial/core/resources/models/" + FILE_NAME).getLines()
+      Source.fromFile(SPATIAL_HOME + "/models/" + FILE_NAME).getLines()
     }
     val file: Option[Iterator[String]] = {
       if (resource.isSuccess) Some(resource.get)

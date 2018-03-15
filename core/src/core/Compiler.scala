@@ -48,8 +48,10 @@ trait Compiler { self =>
   }
 
   def stage(args: Array[String]): Block[_]
-  def settings(): Unit = { }
+
   def runPasses[R](b: Block[R]): Unit
+
+
 
   final def runPass[R](t: Pass, block: Block[R]): Block[R] = instrument(t.name){
     if (t.isInstanceOf[Transformer]) {
@@ -95,19 +97,28 @@ trait Compiler { self =>
 
   type CLIParser = scopt.OptionParser[Unit]
   def defineOpts(cli: CLIParser): Unit = {
+    cli.note("Verbosity")
     cli.opt[Unit]("qq").action{(_,_)=> config.setV(-1) }.text("Quiet Mode: No logging or console printing")
     cli.opt[Unit]('q',"quiet").action{(_,_)=> config.setV(0) }.text("User Mode: No background logging [default]")
     cli.opt[Unit]('v',"verbose").action{(_,_) => config.setV(1)}.text("Dev Mode: Basic logging")
     cli.opt[Unit]("vv").action{(_,_) => config.setV(2) }.text("Debug Mode: All logging and metrics")
 
-    cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.")
-
+    cli.note("")
+    cli.note("Output")
     cli.opt[String]('n',"name").action{(n,_) => config.name = n }.text("Set application name [<app>]")
     cli.opt[String]('o',"out").action{(d,_) => config.genDir = d }.text("Set output directory [./gen/<name>]")
     cli.opt[String]('l',"log").action{(d,_) => config.logDir = d }.text("Set log directory [./logs/<name>]")
     cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<name>]")
+    cli.opt[Unit]("nonaming").action{(_,_) => config.naming = false }.text("Disable verbose naming")
+
+    cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.").hidden()
+    cli.help("X").hidden()
   }
 
+  /** Called after initial command-line argument parsing has finished. */
+  def settings(): Unit = { }
+
+  /** Override to create a custom Config instance */
   def initConfig(): Config = new Config
 
   final def init(args: Array[String]): Unit = instrument("init"){

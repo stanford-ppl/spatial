@@ -12,14 +12,16 @@ import spatial.node._
 import spatial.util._
 
 abstract class AreaModel extends SpatialModel[AreaFields] {
-  implicit def RESOURCE_FIELDS: AreaFields[Double] = target.AREA_FIELDS
-  implicit def MODEL_FIELDS: AreaFields[NodeModel] = target.AMODEL_FIELDS
+  val FILE_NAME: String = target.name.replaceAll(" ", "_") + "_Area.csv"
+  val RESOURCE_NAME: String = "Area"
+  final def FIELDS: Array[String] = target.AFIELDS
+  final implicit def RESOURCE_FIELDS: AreaFields[Double] = target.AREA_FIELDS
+  final implicit def MODEL_FIELDS: AreaFields[NodeModel] = target.AMODEL_FIELDS
 
   def RegArea(n: Int, bits: Int): Area = model("Reg")("b"->bits, "d"->1) * n
   def MuxArea(n: Int, bits: Int): Area = model("Mux")("b"->bits) * n // TODO: Not sure if this is always right
 
   final def NoArea: Area = Area.empty[Double]
-  final def DSP_CUTOFF: Int = target.DSP_CUTOFF
 
   @stateful def apply(e: Sym[_], inHwScope: Boolean, inReduce: Boolean): Area = e.op match {
     case Some(d) => areaOf(e, d, inHwScope, inReduce)
@@ -219,6 +221,6 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     area
   }
 
-  @stateful def summarize(area: Area): Area
+  @stateful def summarize(area: Area): (Area, String)
 }
 

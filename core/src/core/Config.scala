@@ -54,6 +54,9 @@ class Config {
   var memlog: Boolean = false
   def enMemLog: Boolean = enLog || memlog
 
+  /** Codegen **/
+  var naming: Boolean = true
+
   def create: Config = new Config
 
   def reset(): Unit = {

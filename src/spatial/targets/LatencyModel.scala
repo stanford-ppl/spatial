@@ -5,12 +5,12 @@ import models._
 import forge.tags._
 import spatial.internal.spatialConfig
 
-abstract class LatencyModel extends SpatialModel[LatencyFields] {
-  val FILE_NAME: String
-
-  final def DSP_CUTOFF: Int = target.DSP_CUTOFF
+class LatencyModel extends SpatialModel[LatencyFields] {
+  val FILE_NAME: String = target.name.replaceAll(" ", "_") + "_Latency.csv"
+  val RESOURCE_NAME: String = "Latency"
+  def FIELDS: Array[String] = target.LFIELDS
   final implicit def RESOURCE_FIELDS: LatencyFields[Double] = target.LATENCY_FIELDS
-  final implicit def MODEL_CONFIG: LatencyFields[NodeModel] = target.LMODEL_FIELDS
+  final implicit def MODEL_FIELDS: LatencyFields[NodeModel] = target.LMODEL_FIELDS
 
   @stateful def latencyOf(s: Sym[_], inReduce: Boolean): Double = {
     if (inReduce) latencyInReduce(s) else latencyOfNode(s)
@@ -41,5 +41,4 @@ abstract class LatencyModel extends SpatialModel[LatencyFields] {
     * only 1 injected by transformer
     */
   @stateful def builtInLatencyOfNode(s: Sym[_]): Double = model(s, "BuiltInLatency")
-
 }

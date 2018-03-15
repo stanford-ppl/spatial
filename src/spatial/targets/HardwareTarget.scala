@@ -3,17 +3,18 @@ package spatial.targets
 import models._
 
 abstract class HardwareTarget {
+  import HardwareTarget._
+  
   def name: String    // FPGA name
   def burstSize: Int  // Size of DRAM burst (in bits)
 
   val AFIELDS: Array[String] // Area resource fields
-  val LFIELDS: Array[String] // Latency resource fields
+  val LFIELDS: Array[String] = Array(RequiresRegs, RequiresInReduce, LatencyOf, LatencyInReduce, BuiltInLatency) // Latency resource fields
   val DSP_CUTOFF: Int        // Smallest integer addition (in bits) which uses DSPs
   var clockRate = 150.0f     // Frequency in MHz
   val baseCycles = 43000     // Number of cycles required for startup
   private var __areaModel: Option[AreaModel] = None
   private var __latencyModel: Option[LatencyModel] = None
-
 
   lazy implicit val AREA_FIELDS: AreaFields[Double] = AreaFields[Double](AFIELDS, 0.0)
   lazy implicit val LATENCY_FIELDS: LatencyFields[Double] = LatencyFields[Double](LFIELDS, 0.0)
@@ -37,7 +38,17 @@ abstract class HardwareTarget {
     __latencyModel.get
   }
 
-
   val memoryResources: List[MemoryResource]
   val defaultResource: MemoryResource
+
+  // Add this target to the list of supported targets upon object construction
+  Targets.targets += this
+}
+
+object HardwareTarget {
+  val RequiresRegs = "RequiresRegs"
+  val LatencyOf = "LatencyOf"
+  val LatencyInReduce = "LatencyInReduce"
+  val RequiresInReduce = "RequiresInReduce"
+  val BuiltInLatency = "BuiltInLatency"
 }

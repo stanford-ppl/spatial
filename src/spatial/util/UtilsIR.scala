@@ -18,6 +18,8 @@ trait UtilsIR {
   }
 
   implicit class SymUtils[A](x: Sym[A]) {
+    def consumers: Seq[Sym[_]] = consumersOf(x)
+
     def isIdx:  Boolean = x.tp match {
       case FixPtType(_,_,0) => true
       case _ => false
@@ -32,6 +34,17 @@ trait UtilsIR {
         val used = outs.flatMap{s => s.nestedInputs }
         used diff outs
       }.getOrElse(Set.empty)
+    }
+
+    def getNodesBetween(y: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
+      def dfs(frontier: Seq[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.toSet.flatMap{x: Sym[_] =>
+        if (scope.contains(x)) {
+          if (x == y) nodes + x
+          else dfs(x.allDeps, nodes + x)
+        }
+        else Set.empty[Sym[_]]
+      }
+      dfs(Seq(x),Set(x))
     }
   }
 

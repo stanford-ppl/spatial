@@ -2,6 +2,7 @@ package core
 package transform
 
 import core.passes.Pass
+import utils.tags.instrument
 
 import scala.collection.mutable
 
@@ -11,8 +12,8 @@ abstract class Transformer extends Pass {
   // Default rules for mirroring
   // NOTE: This doesn't currently work for mirroring Products with implicit constructor arguments
   def apply[T](x: T): T = (x match {
-    case x: Mirrorable[_]    => x.mirror(f)
-    case x: Sym[_]           => transformSym(x.asInstanceOf[Sym[T]])
+    case x: Mirrorable[_]    => mirrorMirrorable(x)
+    case x: Sym[_]           => transformSym(x)
     case x: Lambda1[a,_]     => transformBlock(x).asLambda1[a]
     case x: Lambda2[a,b,_]   => transformBlock(x).asLambda2[a,b]
     case x: Lambda3[a,b,c,_] => transformBlock(x).asLambda3[a,b,c]
@@ -97,6 +98,9 @@ abstract class Transformer extends Pass {
 
   def mirrorNode[A](rhs: Op[A]): Op[A] = rhs.mirror(f)
 
+  final def mirrorMirrorable(x: Mirrorable[_]): Mirrorable[_] = {
+    x.mirror(f).asInstanceOf[Mirrorable[_]]
+  }
   final def mirrorProduct[T<:Product](x: T): T = {
     // Note: this only works if the case class has no implicit parameters!
     val constructor = x.getClass.getConstructors.head

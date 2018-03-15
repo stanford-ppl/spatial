@@ -7,6 +7,9 @@ import spatial.node._
 import spatial.util._
 
 trait FlowRules {
+  @flow def consumers(a: Sym[_], op: Op[_]): Unit = {
+    a.inputs.foreach{in => consumersOf.add(in, a) }
+  }
 
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
     case MemAlloc(mem) if mem.isLocalMem => localMems += mem

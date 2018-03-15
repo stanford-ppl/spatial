@@ -6,10 +6,10 @@ import forge.tags._
 
 import spatial.lang._
 
-abstract class FixOp2[S:BOOL,I:INT,F:INT,R:Type] extends Primitive[R] {
+abstract class FixOp[S:BOOL,I:INT,F:INT,R:Type] extends Primitive[R] {
   lazy val fmt: FixFmt[S,I,F] = FixFmt.from[S,I,F]
 }
-abstract class FixOp1[S:BOOL,I:INT,F:INT] extends FixOp2[S,I,F,Fix[S,I,F]]
+abstract class FixOp1[S:BOOL,I:INT,F:INT] extends FixOp[S,I,F,Fix[S,I,F]]
 abstract class FixBinary[S:BOOL,I:INT,F:INT](
     override val unstaged: (FixedPoint, FixedPoint) => FixedPoint)
   extends FixOp1[S,I,F]
@@ -130,7 +130,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point less than comparison */
-@op case class FixLst[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
+@op case class FixLst[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x < y)
     case _ => super.rewrite
@@ -138,7 +138,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point less than or equal comparison */
-@op case class FixLeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
+@op case class FixLeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x <= y)
     case _ => super.rewrite
@@ -146,7 +146,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point equality comparison */
-@op case class FixEql[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
+@op case class FixEql[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x === y)
     case _ => super.rewrite
@@ -154,7 +154,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point inequality comparison */
-@op case class FixNeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp2[S,I,F,Bit] {
+@op case class FixNeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
   @rig override def rewrite: Bit = (a,b) match {
     case (Const(x), Const(y)) => R.from(x !== y)
     case _ => super.rewrite
@@ -252,7 +252,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixToFix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
     a:  Fix[S1,I1,F1],
     f2: FixFmt[S2,I2,F2])
-  extends FixOp2[S1,I1,F1,Fix[S2,I2,F2]] {
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
   override val isTransient = true
   @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
     case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
@@ -265,7 +265,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixToFlt[S1:BOOL,I1:INT,F1:INT,M2:INT,E2:INT](
     a:  Fix[S1,I1,F1],
     f2: FltFmt[M2,E2])
-  extends FixOp2[S1,I1,F1,Flt[M2,E2]] {
+  extends FixOp[S1,I1,F1,Flt[M2,E2]] {
   @rig override def rewrite: Flt[M2,E2] = a match {
     case Const(c) => const[Flt[M2,E2]](c.toFloatPoint(f2.toEmul))
     case _ => super.rewrite
@@ -283,7 +283,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point conversion to text */
-@op case class FixToText[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixOp2[S,I,F,Text] {
+@op case class FixToText[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixOp[S,I,F,Text] {
   override val debugOnly: Boolean = true
 
   @rig override def rewrite: Text = a match {

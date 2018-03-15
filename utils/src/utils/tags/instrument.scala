@@ -14,13 +14,17 @@ private[utils] object instrument {
     import util._
     import c.universe._
 
-    def instrument(df: DefDef) = df.modifyBody{body => q"instrument(${df.nameLiteral}){ $body }"}
+    def instrument(df: DefDef): DefDef = {
+      if (df.body != EmptyTree) df.modifyBody{body => q"instrument(${df.nameLiteral}){ $body }"}
+      else df
+    }
 
     val tree = annottees.head match {
-      case cls: ClassDef  => cls.mapMethods(instrument).mixIn(tq"utils.Instrumented")
-      case obj: ModuleDef => obj.mapMethods(instrument).mixIn(tq"utils.Instrumented")
+      case cls: ClassDef  => cls.mapMethods(m => instrument(m)).mixIn(tq"utils.Instrumented")
+      case obj: ModuleDef => obj.mapMethods(m => instrument(m)).mixIn(tq"utils.Instrumented")
       case _ => invalidAnnotationUse("@instrument", "objects", "defs")
     }
+    //c.info(c.enclosingPosition, showCode(tree), force = true)
     tree
   }
 }

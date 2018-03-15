@@ -44,10 +44,10 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       val flags = Modifiers(Flag.PRIVATE | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.LOCAL)
       ValDef(flags, name, tp, rhs)
 
-    case f if f.mods.hasFlag(Flag.IMPLICIT) =>
-      __c.info(__c.enclosingPosition, showRaw(f), force = true)
-      __c.info(__c.enclosingPosition, showCode(f), force = true)
-      f
+    //case f if f.mods.hasFlag(Flag.IMPLICIT) =>
+    //  __c.info(__c.enclosingPosition, showRaw(f), force = true)
+    //  __c.info(__c.enclosingPosition, showCode(f), force = true)
+    //  f
 
     case v => v
   }

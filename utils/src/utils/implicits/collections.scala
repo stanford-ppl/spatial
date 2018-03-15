@@ -82,7 +82,7 @@ object collections {
     }
   }
 
-  implicit class HashMapOps[K,V](map: mutable.HashMap[K,V]) {
+  implicit class HashMapOps[K,V](map: mutable.Map[K,V]) {
     def getOrElseAdd(key: K, value: () => V): V = map.get(key) match {
       case Some(v) => v
       case None =>

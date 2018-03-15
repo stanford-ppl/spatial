@@ -9,6 +9,7 @@ import spatial.issues.UnbankableGroup
 import spatial.data._
 import spatial.lang._
 import spatial.util._
+import spatial.internal.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -171,7 +172,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   protected def getMergeError(i1: Instance, i2: Instance, i3: Option[Instance]): Option[String] = {
     if (i3.isEmpty) Some("Banking conflict")
-    else if (i1.metapipe.isDefined && i2.metapipe.isDefined && !config.enableBufferCoalescing) Some("Buffer conflict")
+    else if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing) Some("Buffer conflict")
     else if (i3.get.cost > (i1.cost + i2.cost)) Some("Expensive")
     else None
   }

@@ -3,8 +3,21 @@ package static
 
 import core.schedule._
 import forge.tags._
+import utils.tags.instrument
 
 trait Scoping {
+
+  @inline private def reify[R](block: => Sym[R]): Sym[R] = block
+
+  @inline private def schedule[R](
+    inputs: Seq[Sym[_]],
+    result: Sym[R],
+    scope:  Seq[Sym[_]],
+    impure: Seq[Impure],
+    options: BlockOptions,
+    motion: Boolean,
+    scheduler: Scheduler
+  ): Schedule[R] = scheduler(inputs,result,scope,impure,options,motion)
 
   /** Stage the effects of an isolated scope with the given inputs.
     *
@@ -32,10 +45,10 @@ trait Scoping {
     // which isn't true in either of these cases
     state.newScope(motion)
 
-    val result = block
+    val result = reify(block)
     val scope  = state.scope
     val impure = state.impure
-    val sched = scheduler(inputs,result,scope,impure,options,motion)
+    val sched = schedule(inputs,result,scope,impure,options,motion,scheduler)
 
     state.cache  = saveCache
     state.scope  = saveScope

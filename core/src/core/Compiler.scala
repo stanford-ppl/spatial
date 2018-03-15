@@ -3,13 +3,14 @@ package core
 import core.passes.Pass
 import core.transform.Transformer
 import utils.io.files
-import utils.{Instrumented, Instrument, plural}
+import utils._
 import utils.implicits.terminal._
 
 trait Compiler { self =>
   protected var IR: State = new State
   final implicit def __IR: State = IR
   private val instrument = new Instrument()
+  private val memWatch = new MemoryLogger()
 
   val script: String
   val desc: String
@@ -22,6 +23,9 @@ trait Compiler { self =>
   }
 
   protected def onException(t: Throwable): Unit = {
+    if (state == null) throw t
+    if (config == null) throw t
+
     val trace = t.getStackTrace
     val oldLL = config.logLevel
     config.logLevel = 2
@@ -53,6 +57,7 @@ trait Compiler { self =>
     }
     val issuesBefore = state.issues
 
+    if (config.enMemLog) memWatch.note(t.name)
     if (config.enLog) info(s"Pass: ${t.name}")
     if (t.needsInit) t.init()
     val result = t.run(block)
@@ -75,7 +80,8 @@ trait Compiler { self =>
   }
 
   final def stageProgram(args: Array[String]): Block[_] = instrument("Staging"){
-    val block = withLog(config.logDir, "0000 Staging.log"){ stage(args) }
+    if (config.enMemLog) memWatch.note("Staging")
+    val block = withLog(config.logDir, "0000_Staging.log"){ stage(args) }
     checkBugs("staging")
     checkErrors("staging") // Exit now if errors were found during staging
     block
@@ -89,16 +95,17 @@ trait Compiler { self =>
 
   type CLIParser = scopt.OptionParser[Unit]
   def defineOpts(cli: CLIParser): Unit = {
-    cli.opt[Unit]('q',"quiet").action{(_,_)=> config.setV(0) }.text("Disable background logging")
-    cli.opt[Unit]("qq").action{(_,_)=> config.setV(-1) }.text("Disable logging and console printing")
-    cli.opt[Unit]('v',"verbose").action{(_,_) => config.setV(1)}.text("Enable basic logging")
-    cli.opt[Unit]("vv").action{(_,_) => config.setV(2) }.text("Enable verbose logging")
+    cli.opt[Unit]("qq").action{(_,_)=> config.setV(-1) }.text("Quiet Mode: No logging or console printing")
+    cli.opt[Unit]('q',"quiet").action{(_,_)=> config.setV(0) }.text("User Mode: No background logging [default]")
+    cli.opt[Unit]('v',"verbose").action{(_,_) => config.setV(1)}.text("Dev Mode: Basic logging")
+    cli.opt[Unit]("vv").action{(_,_) => config.setV(2) }.text("Debug Mode: All logging and metrics")
 
-    cli.opt[Unit]('t',"test").action{(_,_) => config.test = true }.text("Enable testbench mode")
+    cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.")
 
-    cli.opt[String]('o',"out").action{(d,_) => config.genDir = d }.text("Set output directory [./gen/<app>]")
-    cli.opt[String]('l',"log").action{(d,_) => config.logDir = d }.text("Set log directory [./logs/<app>]")
-    cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<app>]")
+    cli.opt[String]('n',"name").action{(n,_) => config.name = n }.text("Set application name [<app>]")
+    cli.opt[String]('o',"out").action{(d,_) => config.genDir = d }.text("Set output directory [./gen/<name>]")
+    cli.opt[String]('l',"log").action{(d,_) => config.logDir = d }.text("Set log directory [./logs/<name>]")
+    cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<name>]")
   }
 
   def initConfig(): Config = new Config
@@ -107,9 +114,6 @@ trait Compiler { self =>
     IR = new State                 // Create a new, empty state
     IR.config = initConfig()
     IR.config.name = name          // Set the default program name
-    IR.config.logDir = files.cwd + files.sep + "logs" + files.sep + name + files.sep
-    IR.config.genDir = files.cwd + files.sep + "gen" + files.sep + name + files.sep
-    IR.config.repDir = files.cwd + files.sep + "reports" + files.sep + name + files.sep
 
     val parser = new scopt.OptionParser[Unit](script){
       override def reportError(msg: String): Unit = { System.out.error(msg); IR.logError() }
@@ -120,6 +124,10 @@ trait Compiler { self =>
     defineOpts(parser)
     parser.parse(args, ())         // Initialize the Config (from commandline)
     settings()                     // Override config with any DSL or app-specific settings
+    IR.config.logDir = IR.config.logDir + files.sep + name + files.sep
+    IR.config.genDir = IR.config.genDir + files.sep + name + files.sep
+    IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
+
 
     msg(s"Compiling ${config.name} to ${config.genDir}")
     if (config.enLog) msg(s"Logging ${config.name} to ${config.logDir}")
@@ -130,6 +138,7 @@ trait Compiler { self =>
 
   def execute(args: Array[String]): Unit = instrument("nova"){
     init(args)
+    if (config.enMemLog) memWatch.start(config.logDir)
     compileProgram(args)
   }
 
@@ -162,15 +171,18 @@ trait Compiler { self =>
       else s"[${Console.GREEN}success${Console.RESET}]"
     }
 
-    instrument.dump("Nova Profiling Report", getOrCreateStream(config.logDir,"9999_Timing.log"))
-    Instrumented.set.foreach{i =>
-      val log = i.fullName.replace('.','_')
-      val heading = s"${i.instrumentName}: ${i.toString} (${i.hashCode()})"
-      val stream = getOrCreateStream(config.logDir,log + ".log")
-      i.dumpInstrument(heading, stream)
-      stream.println("\n")
-      info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
-      i.resetInstrument()
+    if (config.enMemLog) memWatch.finish()
+    if (config.enLog) {
+      instrument.dump("Nova Profiling Report", getOrCreateStream(config.logDir,"9999_Timing.log"))
+      Instrumented.set.foreach{i =>
+        val log = i.fullName.replace('.','_')
+        val heading = s"${i.instrumentName}: ${i.toString} (${i.hashCode()})"
+        val stream = getOrCreateStream(config.logDir,log + ".log")
+        i.dumpInstrument(heading, stream)
+        stream.println("\n")
+        info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
+        i.resetInstrument()
+      }
     }
 
     val time = instrument.totalTime

@@ -5,7 +5,7 @@ import core._
 import spatial.lang._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
-  val nA: Num[A] = Num[A]
+  val A: Num[A] = Num[A]
 }
 @op case class ForeverNew() extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique

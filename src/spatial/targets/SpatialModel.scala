@@ -3,12 +3,13 @@ package spatial.targets
 import core._
 import models._
 import forge.tags._
+import spatial.data.Expect
 import spatial.internal.spatialConfig
 
 import scala.io.Source
 import scala.util.Try
 
-abstract class SpatialModel[F[A]<:Fields[A,F]] {
+abstract class SpatialModel[F[A]<:Fields[A,F]] extends NodeParams {
   final var target: HardwareTarget = _
   final type ResModel  = Model[NodeModel,F]
   final type Resources = Model[Double,F]
@@ -42,6 +43,15 @@ abstract class SpatialModel[F[A]<:Fields[A,F]] {
       miss(s"$name (csv)" + params)
       NONE
     }
+  }
+  @stateful def model(sym: Sym[_], key: String): Double = model(sym).apply(key)
+
+  @stateful def model(sym: Sym[_]): Resources = sym match {
+    case Expect(_) => NONE
+    case Op(op) =>
+      val (name, params) = nodeParams(sym, op)
+      model(name)(params:_*)
+    case _ => NONE
   }
 
   @stateful def reportMissing(): Unit = {
@@ -94,5 +104,8 @@ abstract class SpatialModel[F[A]<:Fields[A,F]] {
       Map.empty
     }
   }
+
+
+
 
 }

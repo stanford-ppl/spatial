@@ -43,18 +43,18 @@ class Config {
 
   /** Paths */
   var name: String = "App"
-  var logDir: String = files.cwd + files.sep + "logs" + files.sep + name + files.sep
-  var genDir: String = files.cwd + files.sep + "gen" + files.sep + name + files.sep
-  var repDir: String = files.cwd + files.sep + "reports" + files.sep + name + files.sep
+  var logDir: String = files.cwd + files.sep + "logs"
+  var genDir: String = files.cwd + files.sep + "gen"
+  var repDir: String = files.cwd + files.sep + "reports"
 
   /** Testing */
   var test: Boolean = false
 
-  /** Banking */
-  var enableBufferCoalescing: Boolean = true
+  /** Enable memory usage logging **/
+  var memlog: Boolean = false
+  def enMemLog: Boolean = enLog || memlog
 
   def create: Config = new Config
-
 
   def reset(): Unit = {
     enWarn = true

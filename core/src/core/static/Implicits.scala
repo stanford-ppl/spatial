@@ -11,6 +11,17 @@ class ExpTypeLowPriority[C,A](t: ExpType[C,A]) {
   def unbox: A = tp.asInstanceOf[A]
   def isType: Boolean = t match {case ref: Ref[_,_] => ref.isType }
   def tp: ExpType[C,A] = if (isType) t else t match {case ref: Ref[_,_] => ref.tp.asInstanceOf[ExpType[C,A]] }
+
+  /** View the staged value or type as B[A]. */
+  def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {
+    if (isSubtype(tp.getClass,tag.runtimeClass)) tp.asInstanceOf[B[A]]
+    else throw new Exception(s"Cannot view $tp (${tp.tp}) as a ${tag.runtimeClass}")
+  }
+
+  /** View the staged value or type as a B[A] if it is a subtype of B, None otherwise. */
+  def getView[B[_]](implicit ev: ClassTag[B[_]]): Option[B[A]] = {
+    if (isSubtype(tp.getClass,ev.runtimeClass)) Some(tp.asInstanceOf[B[A]]) else None
+  }
 }
 
 class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
@@ -25,20 +36,11 @@ class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
   /** Create an unchecked constant (no implicit state required) */
   final def uconst(c: C): A = _const(tp, tp.__value(c).getOrElse(throw new Exception(s"Invalid constant $c for type $tp")))
 
-
-  /** View the staged value or type as B[A]. */
-  def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {
-    if (isSubtype(tp.getClass,tag.runtimeClass)) tp.asInstanceOf[B[A]]
-    else throw new Exception(s"Cannot view $tp (${tp.tp}) as a ${tag.runtimeClass}")
-  }
-
-  /** View the staged value or type as a B[A] if it is a subtype of B, None otherwise. */
-  def getView[B[_]](implicit ev: ClassTag[B[_]]): Option[B[A]] = {
-    if (isSubtype(tp.getClass,ev.runtimeClass)) Some(tp.asInstanceOf[B[A]]) else None
-  }
-
   /** Returns true if the type is a subtype of that type. */
-  def <:<(that: ExpType[_,_]): Boolean = this =:= that || isSubtype(tp.getClass,that.getClass)
+  def <:<(that: ExpType[_,_]): Boolean = {
+    // TODO[2]: isSubtype is a hack - need to fix this
+    this =:= that || isSubtype(tp.getClass,that.getClass)
+  }
 
   /** Returns true if the type is equivalent to that type. */
   def =:=(that: ExpType[_,_]): Boolean = {
@@ -98,12 +100,24 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
 
   /** Returns data dependencies of the symbol. */
   final def inputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
+  final def blocks: Seq[Block[_]] = op.map(_.blocks).getOrElse(Nil)
 
   /** Returns non-data, effect dependencies of the symbol. */
-  @stateful final def antiDeps: Seq[Sym[_]] = effectsOf(exp).antiDeps.map(_.sym)
+  final def antiDeps: Seq[Sym[_]] = effectsOf(exp).antiDeps.map(_.sym)
 
   /** Returns all scheduling dependencies of the symbol. */
-  @stateful final def allDeps: Seq[Sym[_]] = inputs ++ antiDeps
+  final def allDeps: Seq[Sym[_]] = inputs ++ antiDeps
+
+  /** View the staged value or type as B[A]. */
+  def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {
+    if (isSubtype(tp.getClass,tag.runtimeClass)) tp.asInstanceOf[B[A]]
+    else throw new Exception(s"Cannot view $tp (${tp.tp}) as a ${tag.runtimeClass}")
+  }
+
+  /** View the staged value or type as a B[A] if it is a subtype of B, None otherwise. */
+  def getView[B[_]](implicit ev: ClassTag[B[_]]): Option[B[A]] = {
+    if (isSubtype(tp.getClass,ev.runtimeClass)) Some(tp.asInstanceOf[B[A]]) else None
+  }
 }
 
 /** Defines implicit infix methods available on staged types and symbols

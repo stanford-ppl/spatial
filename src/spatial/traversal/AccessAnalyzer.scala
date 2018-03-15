@@ -160,7 +160,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
-    case Op(op@CounterNew(start,end,step,_)) if op.nA.isIdx =>
+    case Op(op@CounterNew(start,end,step,_)) if op.A.isIdx =>
       accessPatternOf(start) = Seq(getAddressPattern(start.asInstanceOf[Idx]))
       accessPatternOf(end)   = Seq(getAddressPattern(end.asInstanceOf[Idx]))
       accessPatternOf(step)  = Seq(getAddressPattern(step.asInstanceOf[Idx]))

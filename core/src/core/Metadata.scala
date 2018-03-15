@@ -9,25 +9,31 @@ import scala.collection.mutable
 abstract class Metadata[T] { self =>
   final type Tx = Transformer
 
-  /** If null, transformers will drop this metadata during mirroring. */
+  /** If null, transformers will drop this metadata during mirroring/updating. */
   def mirror(f: Tx): T
 
   final def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
 
+  /** If true:
+    *   Globals: Cleared PRIOR to transformation
+    *   Symbols: Dropped during symbol mirroring (but not updating)
+    */
   val skipOnTransform: Boolean = false
 }
 
-/**
-  * Once set, persists across transformers and during mirroring
+/** Globals: Persists across transformers (never dropped)
+  * Symbols: Persists across transformers (never dropped)
+  *
   * Primarily used for metadata which does not include symbols
   */
 abstract class StableData[T] extends Metadata[T] {
   override def mirror(f:Tx) = this.asInstanceOf[T]
 }
 
-/**
-  * Removed before transformer runs, but kept during mirroring
+/** Globals: Cleared PRIOR to transformation.
+  * Symbols: Dropped during mirroring but not updating.
+  *
   * Primarily used for metadata set by flow rules
   */
 abstract class FlowData[T] extends Metadata[T] {
@@ -35,9 +41,10 @@ abstract class FlowData[T] extends Metadata[T] {
   override val skipOnTransform: Boolean = true
 }
 
-/**
-  * Removed during/after transformer has run
-  * Primarily used for data which requires a new analysis to run before it is valid again
+/** Globals: Cleared AFTER transformation.
+  * Symbols: Dropped during mirroring and updating.
+  *
+  * Primarily used for data which requires a new flow/analysis to run before it is valid again
   */
 abstract class AnalysisData[T] extends Metadata[T] { self =>
   override def mirror(f: Tx): T = null.asInstanceOf[T]

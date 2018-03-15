@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 import spatial.internal.spatialConfig
+import utils.tags.instrument
 
 trait MemReduceUnrolling extends ReduceUnrolling {
 

@@ -9,16 +9,17 @@ sealed class Block[R](
   val effects: Effects,     // All external effects of this block
   val options: BlockOptions // Other settings for this block
 ) {
+  def tp: Type[R] = result.tp
   def temp: Freq = options.temp
 
-  def nestedStms: Set[Sym[_]] = stms.flatMap{s =>
+  def nestedStms: Seq[Sym[_]] = stms ++ stms.flatMap{s =>
     s.op.map{o => o.blocks.flatMap(_.nestedStms) }.getOrElse(Nil)
-  }.toSet
+  }
 
   def nestedInputs: Set[Sym[_]] = nestedStmsAndInputs._2
 
   def nestedStmsAndInputs: (Set[Sym[_]], Set[Sym[_]]) = {
-    val stms = this.nestedStms
+    val stms = this.nestedStms.toSet
     val used = stms.flatMap(_.inputs) ++ inputs
     val made = stms.flatMap{s => s +: s.op.map(_.binds).getOrElse(Nil) }
     val ins  = (used diff made).filterNot(_.isValue)

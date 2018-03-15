@@ -2,6 +2,7 @@ package spatial.transform.unrolling
 
 import core._
 import core.transform.MutateTransformer
+import utils.tags.instrument
 import spatial.data._
 import spatial.lang._
 import spatial.node._
@@ -252,7 +253,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
 
     def unifyUnsafe[A,B](orig: Sym[A], unrolled: Sym[B]): List[Sym[B]] = {
-      foreach{p => registerUnsafe(orig, unrolled) }
+      foreach{_ => register(orig -> unrolled) }
       List(unrolled)
     }
 

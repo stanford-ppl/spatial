@@ -14,11 +14,11 @@ import spatial.lang._
   def addr: Seq[Idx] = Nil
 }
 
-@op case class LIFOIsEmpty[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class LIFOIsFull[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class LIFOIsAlmostEmpty[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class LIFOIsAlmostFull[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class LIFONumel[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusRead[I32]
+@op case class LIFOIsEmpty[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class LIFOIsFull[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class LIFOIsAlmostEmpty[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class LIFOIsAlmostFull[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class LIFONumel[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusReader[I32]
 
 @op case class LIFOBankedPush[A:Bits](
     mem:  LIFO[A],

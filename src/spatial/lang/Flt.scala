@@ -107,15 +107,25 @@ object FltPtType {
     case _ => None
   }
 }
-object FloatType {
+object HalfType extends Flt[_11,_5] {
+  def unapply(x: Type[_]): Boolean = x match {
+    case FltPtType(11,5) => true
+    case _ => false
+  }
+  this.asType
+}
+
+object FloatType extends Flt[_24,_8] {
   def unapply(x: Type[_]): Boolean = x match {
     case FltPtType(24,8) => true
     case _ => false
   }
+  this.asType
 }
-object DoubleType {
+object DoubleType extends Flt[_53,_11] {
   def unapply(x: Type[_]): Boolean = x match {
     case FltPtType(53,11) => true
     case _ => false
   }
+  this.asType
 }

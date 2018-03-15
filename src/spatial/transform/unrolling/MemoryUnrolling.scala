@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 import spatial.internal.spatialConfig
+import utils.tags.instrument
 
 trait MemoryUnrolling extends UnrollingBase {
 
@@ -13,7 +14,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _: MemAlloc[_,_] if lhs.isRemoteMem => unrollGlobalMemory(lhs, rhs)
     case _: MemAlloc[_,_] if lhs.isLocalMem  => unrollMemory(lhs)
 
-    case op: StatusRead[_] => unrollStatus(lhs, op)
+    case op: StatusReader[_] => unrollStatus(lhs, op)
     case op: Resetter[_]   => unrollResetter(lhs, op)
     case op: Accessor[_,_] => unrollAccess(lhs, op)
 
@@ -39,7 +40,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Assumes that the memory being checked may have no more than one duplicate.
     * Status checks on duplicates memories are currently undefined.
     */
-  def unrollStatus[A](lhs: Sym[A], rhs: StatusRead[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
+  def unrollStatus[A](lhs: Sym[A], rhs: StatusReader[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     val mem = rhs.mem
     if (duplicatesOf(mem).length > 1) {
       warn(lhs.ctx, "Unrolling a status check node on a duplicated memory. Behavior is undefined.")

@@ -15,11 +15,11 @@ import spatial.lang._
   override def addr: Seq[Idx] = Nil
 }
 
-@op case class FIFOIsEmpty[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class FIFOIsFull[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class FIFOIsAlmostEmpty[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class FIFOIsAlmostFull[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusRead[Bit]
-@op case class FIFONumel[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusRead[I32]
+@op case class FIFOIsEmpty[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class FIFOIsFull[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class FIFOIsAlmostEmpty[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class FIFOIsAlmostFull[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusReader[Bit]
+@op case class FIFONumel[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends StatusReader[I32]
 
 @op case class FIFOBankedEnq[A:Bits](
     mem:  FIFO[A],

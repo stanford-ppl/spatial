@@ -2,6 +2,7 @@ package core
 package transform
 
 import core.passes.Traversal
+import utils.tags.instrument
 
 abstract class ForwardTransformer extends SubstTransformer with Traversal {
   override val recurse = Recurse.Never

@@ -9,6 +9,7 @@ case class FixFmt[S,I,F](s: BOOL[S], i: INT[I], f: INT[F]) {
   def sign: Boolean = s.v
   def ibits: Int = i.v
   def fbits: Int = f.v
+  def nbits: Int = ibits + fbits
   def toEmul: FixFormat = FixFormat(sign,ibits,fbits)
   def merge(that: FixFmt[_,_,_]): FixFmt[_,_,_] = {
     val fmt = this.toEmul.combine(that.toEmul)

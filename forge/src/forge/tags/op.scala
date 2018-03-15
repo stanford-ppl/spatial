@@ -42,7 +42,7 @@ object op {
             case _ => None
           }""".asDef)*/
 
-    c.info(c.enclosingPosition, showCode(cls2), force = true)
+    //c.info(c.enclosingPosition, showCode(cls2), force = true)
 
     q"..${List(cls2,obj2)}"
   }

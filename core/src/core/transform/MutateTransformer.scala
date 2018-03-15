@@ -1,6 +1,8 @@
 package core
 package transform
 
+import utils.tags.instrument
+
 abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
   override val allowOldSymbols: Boolean = true
@@ -31,7 +33,7 @@ abstract class MutateTransformer extends ForwardTransformer {
   }
 
   /** Mutate this symbol's node with the current substitution rules. */
-  def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
+  final def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Update]")
     try {

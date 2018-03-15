@@ -15,6 +15,7 @@ import utils.recursive
 abstract class Op[R:Type] extends Serializable with Product {
   final type Tx = Transformer
   val R: Type[R] = Type[R]
+  def name: String = productPrefix
 
   def expInputs: Seq[Sym[_]] = recursive.collectSeqs(expsFunc)(productIterator)
 

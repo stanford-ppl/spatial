@@ -12,6 +12,9 @@ import spatial.node._
 import spatial.util._
 
 abstract class AreaModel extends SpatialModel[AreaFields] {
+  implicit def RESOURCE_FIELDS: AreaFields[Double] = target.AREA_FIELDS
+  implicit def MODEL_FIELDS: AreaFields[NodeModel] = target.AMODEL_FIELDS
+
   def RegArea(n: Int, bits: Int): Area = model("Reg")("b"->bits, "d"->1) * n
   def MuxArea(n: Int, bits: Int): Area = model("Mux")("b"->bits) * n // TODO: Not sure if this is always right
 
@@ -149,7 +152,6 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
   }
 
   @stateful def nDups(e: Sym[_]): Int = duplicatesOf(e).length
-  @stateful def nStages(e: Sym[_]): Int = childrenOf(e).length
 
   @stateful def areaInReduce(e: Sym[_], d: Op[_]): Area = areaOfNode(e, d)
 
@@ -162,246 +164,25 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
     else NoArea
   }
 
-  @stateful def areaOfNode(lhs: Sym[_], rhs: Op[_]): Area = {try { rhs match {
+  @stateful def areaOfNode(lhs: Sym[_], rhs: Op[_]): Area = rhs match {
     /** Non-synthesizable nodes */
-    case _:PrintIf          => NoArea
-    case _:AssertIf         => NoArea
-    case _:GenericToText[_] => NoArea
-    case _:TextConcat       => NoArea
-    case _:VarNew[_]        => NoArea
-    case _:VarRead[_]       => NoArea
-    case _:VarAssign[_]     => NoArea
+    case op:Primitive[_] if op.debugOnly => NoArea
 
     /** Zero area cost */
     case Transient(_)       => NoArea
-    case _:DRAMNew[_,_]     => NoArea // No hardware cost
-    case GetDRAMAddress(_)  => NoArea // No hardware cost
-
-    /** Memories */
-    case op: CounterNew[_] =>
-      val par = boundOf(op.par).toInt
-      val bits = op.nA.nbits
-      model("Counter")("b" -> bits, "p" -> par)
-
-    case CounterChainNew(ctrs) => model("CounterChain")("n" -> ctrs.length)
+    case _:DRAMNew[_,_]     => NoArea
+    case GetDRAMAddress(_)  => NoArea
+    case _:SwitchCase[_]    => NoArea
 
     // LUTs
-    //case lut @ LUTNew(dims,elems) => model("LUT")("s" -> dims.product, "b" -> lut.bT.length) // TODO
-    //case _:LUTLoad[_] => NoArea // TODO
+    case lut @ LUTNew(dims,_) => model("LUT")("s" -> dims.map(_.toInt).product, "b" -> lut.A.nbits)
 
-    // Streams
-    // TODO: Need models for streams
-//    case _:StreamInNew[_]       => NoArea
-//    case _:StreamOutNew[_]      => NoArea
-//    case _:StreamRead[_]        => NoArea
-//    case _:ParStreamRead[_]     => NoArea
-//    case _:StreamWrite[_]       => NoArea
-//    case _:ParStreamWrite[_]    => NoArea
-//    case _:BufferedOutWrite[_]  => NoArea
+    case _:MemAlloc[_,_] if lhs.isLocalMem => areaOfMem(lhs)
+    case op:Accessor[_,_]       => areaOfAccess(lhs, op.mem)
+    case op:BankedAccessor[_,_] => areaOfAccess(lhs, op.mem)
+    case op:StatusReader[_]       => NoArea
 
-    // TODO: Account for parallelization
-    // FIFOs
-    case _:FIFONew[_]           => areaOfMem(lhs)
-    case _:FIFOEnq[_]           => NoArea
-    case _:FIFODeq[_]           => NoArea
-    case _:FIFOPeek[_]          => NoArea
-    case _:FIFONumel[_]         => NoArea
-    case _:FIFOIsAlmostEmpty[_] => NoArea
-    case _:FIFOIsAlmostFull[_]  => NoArea
-    case _:FIFOIsEmpty[_]       => NoArea
-    case _:FIFOIsFull[_]        => NoArea
-    case _:FIFOBankedDeq[_]     => NoArea
-    case _:FIFOBankedEnq[_]     => NoArea
-
-    // LIFOs
-    case _:LIFONew[_]           => areaOfMem(lhs)
-    case _:LIFOPush[_]          => NoArea
-    case _:LIFOPop[_]           => NoArea
-    case _:LIFOPeek[_]          => NoArea
-    case _:LIFONumel[_]         => NoArea
-    case _:LIFOIsAlmostEmpty[_] => NoArea
-    case _:LIFOIsAlmostFull[_]  => NoArea
-    case _:LIFOIsEmpty[_]       => NoArea
-    case _:LIFOIsFull[_]        => NoArea
-    case _:LIFOBankedPush[_]    => NoArea
-    case _:LIFOBankedPop[_]     => NoArea
-
-    // SRAMs
-    case _:SRAMNew[_,_]          => areaOfMem(lhs)
-    case op:SRAMRead[_,_]        => areaOfAccess(lhs, op.mem)
-    case op:SRAMWrite[_,_]       => areaOfAccess(lhs, op.mem)
-    case op:SRAMBankedRead[_,_]  => areaOfAccess(lhs, op.mem)
-    case op:SRAMBankedWrite[_,_] => areaOfAccess(lhs, op.mem)
-
-    // LineBuffer
-//    case op:LineBufferNew[_]    => areaOfSRAM(op.bT.length,constDimsOf(lhs),duplicatesOf(lhs))
-//    case _:LineBufferEnq[_]     => NoArea
-//    case _:ParLineBufferEnq[_]  => NoArea
-//    case _:LineBufferLoad[_]    => NoArea
-//    case _:ParLineBufferLoad[_] => NoArea
-
-    // Regs
-    case _:RegNew[_]   => areaOfReg(lhs)
-    case _:RegRead[_]  => NoArea
-    case _:RegWrite[_] => NoArea
-    case _:RegReset[_] => NoArea
-
-    // ArgIn
-    case _:ArgInNew[_]  => areaOfReg(lhs)
-    case _:ArgInRead[_] => NoArea
-    case _:SetArgIn[_]  => NoArea
-
-    // ArgOut
-    case _:ArgOutNew[_]   => areaOfReg(lhs)
-    case _:ArgOutWrite[_] => NoArea
-    case _:GetArgOut[_]   => NoArea
-
-    // Register File
-    case _:RegFileNew[_,_]         => NoArea
-    case _:RegFileRead[_,_]        => NoArea
-    case _:RegFileWrite[_,_]       => NoArea
-    case _:RegFileShiftIn[_,_]     => NoArea
-    case _:RegFileBankedRead[_,_]  => NoArea
-    case _:RegFileBankedWrite[_,_] => NoArea
-
-    /** Primitives */
-    // Bit
-    case Not(_)     => model("BitNot")()
-    case And(_,_)   => model("BitAnd")()
-    case Or(_,_)    => model("BitOr")()
-    case Xor(_,_)   => model("BitNeq")()
-    case Xnor(_,_)  => model("BitEql")()
-
-    // Fixed point
-    case FixNeg(_)   => model("FixNeg")("b" -> nbits(lhs))
-    case FixInv(_)   => model("FixInv")("b" -> nbits(lhs))
-    case FixAdd(_,_) => model("FixAdd")("b" -> nbits(lhs))
-    case FixSub(_,_) => model("FixSub")("b" -> nbits(lhs))
-    case FixMul(_,_) => nbits(lhs) match {
-      case n if n < DSP_CUTOFF => model("FixMulSmall")("b" -> n)
-      case n                   => model("FixMulBig")("b" -> n)
-    }
-    case FixDiv(_,_) => model("FixDiv")("b" -> nbits(lhs))
-    case FixMod(_,_) => model("FixMod")("b" -> nbits(lhs))
-    case FixLst(_,_)  => model("FixLt")("b" -> nbits(lhs))
-    case FixLeq(_,_) => model("FixLt")("b" -> nbits(lhs))
-    case FixNeq(_,_) => model("FixNeq")("b" -> nbits(lhs))
-    case FixEql(_,_) => model("FixEql")("b" -> nbits(lhs))
-    case FixAnd(_,_) => model("FixAnd")("b" -> nbits(lhs))
-    case FixOr(_,_)  => model("FixOr")("b" -> nbits(lhs))
-    case FixXor(_,_) => model("FixXor")("b" -> nbits(lhs))
-    case FixAbs(_)   => model("FixAbs")("b" -> nbits(lhs))
-
-    // Saturating and/or unbiased math
-    case SatAdd(_,_)    => model("SatAdd")("b" -> nbits(lhs))
-    case SatSub(_,_)    => model("SatSub")("b" -> nbits(lhs))
-    case SatMul(_,_)    => model("SatMul")("b" -> nbits(lhs))
-    case SatDiv(_,_)    => model("SatDiv")("b" -> nbits(lhs))
-    case UnbMul(_,_)    => model("UnbMul")("b" -> nbits(lhs))
-    case UnbDiv(_,_)    => model("UnbDiv")("b" -> nbits(lhs))
-    case UnbSatMul(_,_) => model("UnbSatMul")("b" -> nbits(lhs))
-    case UnbSatDiv(_,_) => model("UnbSatDiv")("b" -> nbits(lhs))
-
-    // Floating point
-    case FltNeg(_)   => lhs.tp match {
-      case FloatType()    => model("FloatNeg")()
-      case FltPtType(s,e) => model("FltNeg")("s" -> s, "e" -> e)
-    }
-    case FltAbs(_)   => lhs.tp match {
-      case FloatType()    => model("FloatAbs")()
-      case FltPtType(s,e) => model("FltAbs")("s" -> s, "e" -> e)
-    }
-    case FltAdd(_,_) => lhs.tp match {
-      case FloatType()    => model("FloatAdd")()
-      case FltPtType(s,e) => model("FltAdd")("s" -> s, "e" -> e)
-    }
-    case FltSub(_,_) => lhs.tp match {
-      case FloatType()    => model("FloatSub")()
-      case FltPtType(s,e) => model("FltSub")("s" -> s, "e" -> e)
-    }
-    case FltMul(_,_) => lhs.tp match {
-      case FloatType()    => model("FloatMul")()
-      case FltPtType(s,e) => model("FltMul")("s" -> s, "e" -> e)
-    }
-    case FltDiv(_,_) => lhs.tp match {
-      case FloatType()    => model("FloatDiv")()
-      case FltPtType(s,e) => model("FltDiv")("s" -> s, "e" -> e)
-    }
-    case FltLst(a,_)  => a.tp match {
-      case FloatType()    => model("FloatLt")()
-      case FltPtType(s,e) => model("FltLt")("s" -> s, "e" -> e)
-    }
-    case FltLeq(a,_) => a.tp match {
-      case FloatType()    => model("FloatLeq")()
-      case FltPtType(s,e) => model("FltLeq")("s" -> s, "e" -> e)
-    }
-    case FltNeq(a,_) => a.tp match {
-      case FloatType()    => model("FloatNeq")()
-      case FltPtType(s,e) => model("FltNeq")("s" -> s, "e" -> e)
-    }
-    case FltEql(a,_) => a.tp match {
-      case FloatType()    => model("FloatEql")()
-      case FltPtType(s,e) => model("FltEql")("s" -> s, "e" -> e)
-    }
-    case FltLn(_)   => lhs.tp match {
-      case FloatType()    => model("FloatLog")()
-      case FltPtType(s,e) => model("FltLog")("s" -> s, "e" -> e)
-    }
-    case FltExp(_)   => lhs.tp match {
-      case FloatType()    => model("FloatExp")()
-      case FltPtType(s,e) => model("FltExp")("s" -> s, "e" -> e)
-    }
-    case FltSqrt(_)  => lhs.tp match {
-      case FloatType()    => model("FloatSqrt")()
-      case FltPtType(s,e) => model("FltSqrt")("s" -> s, "e" -> e)
-    }
-
-    case FltToFix(x,_) => x.tp match {
-      case FloatType() => lhs.tp match {
-        case FixPtType(_,i,f) => model("FloatToFix")("b"->i,"f"->f)
-      }
-      case FltPtType(s,e) => lhs.tp match {
-        case FixPtType(_,i,f) => model("FltToFix")("s"->s,"e"->e,"b"->i,"f"->f)
-      }
-    }
-    case FixToFlt(x,_) => lhs.tp match {
-      case FloatType() => x.tp match {
-        case FixPtType(_,i,f) => model("FixToFloat")("b"->i,"f"->f)
-      }
-      case FltPtType(s,e) => x.tp match {
-        case FixPtType(_,i,f) => model("FixToFlt")("s"->s,"e"->e,"b"->i,"f"->f)
-      }
-    }
-
-    // Other
-    case Mux(_,_,_) => model("Mux")("b" -> nbits(lhs))
-    case _:FixMin[_,_,_] | _:FixMax[_,_,_] => model("FixLt")("b" -> nbits(lhs)) + model("Mux")("b" -> nbits(lhs))
-
-    case _:FltMin[_,_] | _:FltMax[_,_] => lhs.tp match {
-      case FloatType()      => model("FloatLt")() + model("Mux")("b" -> nbits(lhs))
-      case DoubleType()     => model("DoubleLt")() + model("Mux")("b" -> nbits(lhs))
-      case tp =>
-        miss(r"Mux on $tp (rule)")
-        NoArea
-    }
-    //case DelayLine(depth, _)   => areaOfDelayLine(depth,nbits(lhs),1)
-
-
-    /** Control Structures */
-    case _:AccelScope          => areaOfControl(lhs)
-    case _:UnitPipe            => areaOfControl(lhs)
-    //case _:ParallelPipe        => model("Parallel")("n" -> nStages(lhs))
-    case _:OpForeach           => areaOfControl(lhs)
-    //case _:OpReduce[_]         => areaOfControl(lhs)
-    //case _:OpMemReduce[_,_]    => areaOfControl(lhs)
-    //case _:UnrolledForeach     => areaOfControl(lhs)
-    //case _:UnrolledReduce[_,_] => areaOfControl(lhs)
-    case s:Switch[_] => lhs.tp match {
-      case Bits(bt) => model("SwitchMux")("n" -> s.cases.length, "b" -> bt.nbits)
-      case _        => model("Switch")("n" -> s.cases.length)
-    }
-    case _:SwitchCase[_]       => NoArea // Doesn't correspond to anything in hardware
-
+    case DelayLine(size,data) => areaOfDelayLine(size,nbits(data),1)
 
 //    case tx:DenseTransfer[_,_] if tx.isStore =>
 //      val d = if (tx.lens.length == 1) "1" else "2"
@@ -420,14 +201,8 @@ abstract class AreaModel extends SpatialModel[AreaFields] {
 //        case _ => model("UnalignedLoad"+d)("p"->p,"w"->w)
 //      }
 
-    case _ =>
-      miss(r"${rhs.getClass} (rule)")
-      NoArea
-  }}
-  catch {case e:Throwable =>
-    miss(r"${rhs.getClass}: " + e.getMessage)
-    NoArea
-  }}
+    case _ => model(lhs)
+  }
 
   /**
     * Returns the area resources for a delay line with the given width (in bits) and length (in cycles)

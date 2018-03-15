@@ -24,15 +24,15 @@ case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs:
 
 
 /** Status read of a memory */
-abstract class StatusRead[R:Type] extends EnPrimitive[R] {
+abstract class StatusReader[R:Type] extends EnPrimitive[R] {
   def mem: Sym[_]
 }
-object StatusRead {
+object StatusReader {
   def unapply(x: Op[_]): Option[(Sym[_],Set[Bit])] = x match {
-    case a: StatusRead[_] => Some((a.mem,a.ens))
+    case a: StatusReader[_] => Some((a.mem,a.ens))
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Set[Bit])] = x.op.flatMap(StatusRead.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Set[Bit])] = x.op.flatMap(StatusReader.unapply)
 }
 
 /** Reset of a memory */
@@ -87,6 +87,14 @@ object Reader {
 
 /** Any dequeue-like operation from a memory */
 abstract class DequeuerLike[A:Bits,R:Bits] extends Reader[A,R]
+
+object DequeuerLike {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {
+    case a: DequeuerLike[_,_] => a.localRead.map{rd => (rd.mem,rd.addr,rd.ens) }
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(DequeuerLike.unapply)
+}
 
 /** An address-less dequeue operation. */
 abstract class Dequeuer[A:Bits,R:Bits] extends DequeuerLike[A,R] {

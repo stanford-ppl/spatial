@@ -11,4 +11,5 @@ package object core extends static.Core {
   }
 
   def syms(a: Any*): Seq[Sym[_]] = core.Filters.syms(a:_*)
+  def exps(a: Any*): Seq[Sym[_]] = core.Filters.exps(a:_*)
 }

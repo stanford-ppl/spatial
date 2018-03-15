@@ -4,6 +4,7 @@ import core._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
+import utils.tags.instrument
 
 trait ForeachUnrolling extends UnrollingBase {
 
@@ -24,7 +25,7 @@ trait ForeachUnrolling extends UnrollingBase {
   )(implicit ctx: SrcCtx): Void = {
     dbgs(s"Fully unrolling foreach $lhs")
     val lanes = FullUnroller(cchain, iters, isInnerControl(lhs))
-    val blk   = inLanes(lanes){ f(func) }
+    val blk   = inLanes(lanes){ transformBlock(func) }
     val lhs2  = stage(UnitPipe(enables ++ ens, blk))
     dbgs(s"Created unit pipe ${stm(lhs2)}")
     lhs2
@@ -41,7 +42,7 @@ trait ForeachUnrolling extends UnrollingBase {
     val lanes = PartialUnroller(cchain, iters, isInnerControl(lhs))
     val is    = lanes.indices
     val vs    = lanes.indexValids
-    val blk   = inLanes(lanes){ f(func) }
+    val blk   = inLanes(lanes){ transformBlock(func) }
     val lhs2  = stage(UnrolledForeach(enables ++ ens, cchain, blk, is, vs))
     dbgs(s"Created foreach ${stm(lhs2)}")
     lhs2

@@ -5,10 +5,21 @@ import spatial.lang._
 
 /** A scheduling directive specified by the user. */
 sealed abstract class UserSchedule
-case object SeqPipe extends UserSchedule
-case object InnerPipe extends UserSchedule
-case object MetaPipe extends UserSchedule
-case object StreamPipe extends UserSchedule
+object UserSchedule {
+  case object Seq extends UserSchedule
+  case object Pipe extends UserSchedule
+  case object Stream extends UserSchedule
+}
+
+/** Scheduling determined by the compiler. */
+sealed abstract class ControlSchedule
+object ControlSchedule {
+  case object Seq extends ControlSchedule { override def toString = "Sequential" }
+  case object Pipe extends ControlSchedule { override def toString = "Pipeline" }
+  case object Stream extends ControlSchedule { override def toString = "Stream" }
+  case object Fork extends ControlSchedule { override def toString = "Fork" }
+  case object ForkJoin extends ControlSchedule { override def toString = "ForkJoin" }
+}
 
 /** The level of control within the hierarchy. */
 sealed abstract class ControlLevel
@@ -17,7 +28,7 @@ case object OuterControl extends ControlLevel
 
 case class Ctrl(sym: Sym[_], id: Int)
 
-/** Metadata holding a controller's level in the control hierarchy. */
+/** A controller's level in the control hierarchy. */
 case class CtrlLevel(level: ControlLevel) extends StableData[CtrlLevel]
 object levelOf {
   def get(x: Sym[_]): Option[ControlLevel] = metadata[CtrlLevel](x).map(_.level)
@@ -29,13 +40,20 @@ object isOuter {
   def update(x: Sym[_], isOut: Boolean): Unit = if (isOut) levelOf(x) = OuterControl else levelOf(x) = InnerControl
 }
 
+/** The control schedule determined by the compiler. */
+case class ControlScheduling(sched: ControlSchedule) extends StableData[ControlScheduling]
+object styleOf {
+  def get(x: Sym[_]): Option[ControlSchedule] = metadata[ControlScheduling](x).map(_.sched)
+  def apply(x: Sym[_]): ControlSchedule = styleOf.get(x).getOrElse{throw new Exception(s"Undefined schedule for $x")}
+  def update(x: Sym[_], sched: ControlSchedule): Unit = metadata.add(x, ControlScheduling(sched))
+}
 
-/** Metadata holding the control schedule annotated by the user, if any. */
-case class AnnotatedSchedule(sched: UserSchedule) extends StableData[AnnotatedSchedule]
+/** The control schedule annotated by the user, if any. */
+case class SchedulingDirective(sched: UserSchedule) extends StableData[SchedulingDirective]
 object userStyleOf {
-  def get(x: Sym[_]): Option[UserSchedule] = metadata[AnnotatedSchedule](x).map(_.sched)
+  def get(x: Sym[_]): Option[UserSchedule] = metadata[SchedulingDirective](x).map(_.sched)
   def apply(x: Sym[_]): UserSchedule = userStyleOf.get(x).getOrElse{throw new Exception(s"Undefined user schedule for $x") }
-  def update(x: Sym[_], sched: UserSchedule): Unit = metadata.add(x, AnnotatedSchedule(sched))
+  def update(x: Sym[_], sched: UserSchedule): Unit = metadata.add(x, SchedulingDirective(sched))
 }
 
 

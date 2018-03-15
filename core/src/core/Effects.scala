@@ -74,20 +74,20 @@ object Effects {
 
 case class Impure(sym: Sym[_], effects: Effects)
 object Impure {
-  @stateful def unapply(x: Sym[_]): Option[(Sym[_],Effects)] = {
+  def unapply(x: Sym[_]): Option[(Sym[_],Effects)] = {
     val effects = effectsOf(x)
     if (effects.isPure && effects.antiDeps.isEmpty) None else Some((x,effects))
   }
 }
 
-@data object effectsOf {
+object effectsOf {
   def apply(s: Sym[_]): Effects = metadata[Effects](s).getOrElse(Effects.Pure)
   def update(s: Sym[_], e: Effects): Unit = metadata.add(s, e)
 }
 
-@data object antidepsOf {
+object antidepsOf {
   def apply(x: Sym[_]): Seq[Impure] = effectsOf(x).antiDeps
 }
-@data object isMutable {
+object isMutable {
   def apply(s: Sym[_]): Boolean = effectsOf(s).isMutable
 }

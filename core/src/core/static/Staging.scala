@@ -4,8 +4,7 @@ package static
 import forge.tags._
 import utils.implicits.collections._
 import utils.recursive
-
-import scala.annotation.unchecked.{uncheckedVariance => uV}
+import utils.tags.instrument
 
 trait Staging { this: Printing =>
   /** Create a checked parameter (implicit state required) */
@@ -66,10 +65,10 @@ trait Staging { this: Printing =>
     }
   }
 
+  @rig def rewrite[R](op: Op[R]): Option[R] = rewrites.apply(op)(op.R,ctx,state)
   @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = flows.apply(sym, op)
 
-
-  @rig def register[R](op: Op[R], symbol: () => R): R = rewrites.apply(op)(op.R,ctx,state) match {
+  @rig def register[R](op: Op[R], symbol: () => R): R = rewrite(op) match {
     case Some(s) => s
     case None if state eq null =>
       // General operations in object/trait constructors are currently disallowed

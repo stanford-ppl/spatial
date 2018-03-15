@@ -1,6 +1,8 @@
 package core
 package transform
 
+import utils.tags.instrument
+
 abstract class SubstTransformer extends Transformer {
   val allowUnsafeSubst: Boolean = false
   val allowOldSymbols: Boolean = false
@@ -18,23 +20,30 @@ abstract class SubstTransformer extends Transformer {
     * Register an unsafe substitution rule.
     * where a' replaces a but a' is not a subtype of a.
     */
-  def registerUnsafe[A,B](rule: (A,B)): Unit = register(rule._1,rule._2,unsafe = true)
+  /*def registerUnsafe[A,B](rule: (A,B)): Unit = (rule._1, rule._2) match {
+    case (s1: Sym[_], s2: Sym[_])     => subst += s1 -> s2
+    case (b1: Block[_], b2: Block[_]) => blockSubst += b1 -> b2
+    case _ => throw new Exception(s"Cannot register ${rule._1.getClass} -> ${rule._2.getClass}")
+  }*/
+
+  //private def isTypeSafe[A,B](tpA: Type[A], tpB: Type[B]): Boolean = tpA =:= tpB
 
   /**
     * Register a substitution rule orig -> sub.
     * If unsafe is true, does not do type checking.
     */
-  def register[A,B](orig: A, sub: B, unsafe: Boolean = allowUnsafeSubst): Unit = (orig,sub) match {
-    case (s1: Sym[_], s2: Sym[_]) =>
-      if (s2.tp <:< s1.tp || unsafe) subst += s1 -> s2
-      else throw new Exception(s"Substitution $s1 -> $s2: ${s2.tp} is not a subtype of ${s1.tp}")
-
-    case (b1: Block[_], b2: Block[_]) =>
-      if (b2.result.tp <:< b1.result.tp || unsafe) blockSubst += b1 -> b2
-      else throw new Exception(s"Substitution $b1 -> $b2: ${b2.result.tp} is not a subtype of ${b1.result.tp}")
-
-    case _ => throw new Exception(s"Cannot register ${orig.getClass}, ${sub.getClass}")
+  def register[A,B](orig: A, sub: B, unsafe: Boolean = allowUnsafeSubst): Unit = (orig, sub) match {
+    case (s1: Sym[_], s2: Sym[_]) => subst += s1 -> s2
+    case (b1: Block[_], b2: Block[_]) => blockSubst += b1 -> b2
+    case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
   }
+  /*(orig,sub) match {
+    case (s1: Sym[_], s2: Sym[_]) if unsafe || isTypeSafe(s2.tp, s1.tp) => registerUnsafe(s1 -> s2)
+    case (s1: Sym[_], s2: Sym[_]) => throw new Exception(s"$s1 -> $s2: ${s2.tp} =/= ${s1.tp}")
+    case (b1: Block[_], b2: Block[_]) if unsafe || isTypeSafe(b2.tp, b1.tp) => registerUnsafe(b1 -> b2)
+    case (b1: Block[_], b2: Block[_]) => throw new Exception(s"$b1 -> $b2: ${b2.tp} =/= ${b1.tp}")
+    case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
+  }*/
 
   override protected def transformBlock[T](block: Block[T]): Block[T] = blockSubst.get(block) match {
     case Some(block2) => block2.asInstanceOf[Block[T]]

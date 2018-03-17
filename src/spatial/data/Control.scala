@@ -1,7 +1,10 @@
 package spatial.data
 
 import core._
+import forge.tags._
 import spatial.lang._
+import spatial.util._
+import utils.Tree
 
 /** A scheduling directive specified by the user. */
 sealed abstract class UserSchedule
@@ -26,7 +29,25 @@ sealed abstract class ControlLevel
 case object InnerControl extends ControlLevel
 case object OuterControl extends ControlLevel
 
-case class Ctrl(sym: Sym[_], id: Int)
+sealed abstract class Ctrl {
+  def s: Option[Sym[_]] = None
+  def id: Int
+  def parent: Ctrl
+  def ancestors: Seq[Ctrl] = Tree.ancestors(this){_.parent}
+  def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(this, stop){_.parent}
+  def ancestors(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](this, {c => c == stop}){_.parent}
+  @stateful def children: Seq[Ctrl]
+}
+case class Parent(sym: Sym[_], id: Int) extends Ctrl {
+  override def s: Option[Sym[_]] = Some(sym)
+  def parent: Ctrl = if (id != -1) Parent(sym,-1) else sym.parent
+  @stateful def children: Seq[Ctrl] = sym.children
+}
+case object Host extends Ctrl {
+  def id: Int = 0
+  def parent: Ctrl = Host
+  @stateful def children: Seq[Ctrl] = hwScopes.all
+}
 
 /** A controller's level in the control hierarchy. */
 case class CtrlLevel(level: ControlLevel) extends StableData[CtrlLevel]
@@ -58,20 +79,10 @@ object userStyleOf {
 
 
 /** Metadata holding a list of children within a controller. */
-case class Children(children: Seq[Sym[_]]) extends FlowData[Children]
-object childrenOf {
-  def apply(x: Sym[_]): Seq[Sym[_]] = metadata[Children](x).map(_.children).getOrElse(Nil)
-  def update(x: Sym[_], children: Seq[Sym[_]]): Unit = metadata.add(x, Children(children))
-}
-
+case class Children(children: Seq[Parent]) extends FlowData[Children]
 
 /** Metadata holding the parent of a controller within the controller hierarchy. */
-case class Parent(parent: Ctrl) extends FlowData[Parent]
-object parentOf {
-  def get(x: Sym[_]): Option[Ctrl] = metadata[Parent](x).map(_.parent)
-  def apply(x: Sym[_]): Ctrl = parentOf.get(x).getOrElse{throw new Exception(s"Undefined parent for $x") }
-  def update(x: Sym[_], parent: Ctrl): Unit = metadata.add(x, Parent(parent))
-}
+case class ParentController(parent: Ctrl) extends FlowData[ParentController]
 
 /** Metadata holding the counter associated with a loop iterator. */
 case class IndexCounter(ctr: Counter[_]) extends FlowData[IndexCounter]
@@ -83,4 +94,11 @@ object ctrOf {
     ctrOf.get(i).getOrElse{throw new Exception(s"No counter associated with $i") }
   }
   def update(i: Num[_], ctr: Counter[_]): Unit = metadata.add(i, IndexCounter(ctr))
+}
+
+
+/** All accelerator scopes in the program **/
+case class AccelScopes(scopes: Seq[Parent]) extends FlowData[AccelScopes]
+@data object hwScopes {
+  def all: Seq[Parent] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)
 }

@@ -18,7 +18,7 @@ trait UtilsIR {
   }
 
   implicit class SymUtils[A](x: Sym[A]) {
-    def consumers: Seq[Sym[_]] = consumersOf(x)
+    def consumers: Set[Sym[_]] = consumersOf(x)
 
     def isIdx:  Boolean = x.tp match {
       case FixPtType(_,_,0) => true

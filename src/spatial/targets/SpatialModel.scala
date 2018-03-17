@@ -9,8 +9,7 @@ import spatial.internal.spatialConfig
 import scala.io.Source
 import scala.util.Try
 
-abstract class SpatialModel[F[A]<:Fields[A,F]] extends NodeParams {
-  final var target: HardwareTarget = _
+abstract class SpatialModel[F[A]<:Fields[A,F]](target: HardwareTarget) extends NodeParams {
   final type ResModel  = Model[NodeModel,F]
   final type Resources = Model[Double,F]
   final def DSP_CUTOFF: Int = target.DSP_CUTOFF
@@ -31,7 +30,6 @@ abstract class SpatialModel[F[A]<:Fields[A,F]] extends NodeParams {
   def reset(): Unit = { missing = Set.empty }
 
   @stateful def init(): Unit = if (needsInit) {
-    target = spatialConfig.target
     models = loadModels()
     needsInit = false
   }

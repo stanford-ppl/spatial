@@ -65,6 +65,9 @@ trait AccessExpansion {
   ): Seq[AccessMatrix] = {
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrParOr1)
+
+    dbgs("Iterators: " + is.map{i => s"$i (${i.ctrParOr1})"}.mkString(", "))
+
     val iMap = is.zipWithIndex.toMap
     val matrix = getAccessCompactMatrix(access, addr, pattern)
 

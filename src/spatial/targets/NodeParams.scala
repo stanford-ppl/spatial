@@ -14,7 +14,7 @@ trait NodeParams {
   def sign(e: Sym[_]): Boolean = e.tp match {case FixPtType(s,_,_) => s; case _ => true }
 
   // TODO[1]: Arbitrary scheduling order
-  def nStages(e: Sym[_]): Int = childrenOf(e).length
+  @stateful def nStages(e: Sym[_]): Int = e.children.length
 
   @stateful def nodeParams(s: Sym[_], op: Op[_]): (String,Seq[(String,Double)]) = op match {
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))

@@ -41,10 +41,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Expect(_) => true
     case Op(RegRead(reg)) =>
       val loop = loops(i)
-      writersOf(reg).forall{writer =>
-        val lca = LCA(parentOf.get(writer),parentOf.get(x))
-        !lca.exists(_.sym == loop)
-      }
+      writersOf(reg).forall{writer => LCA(writer.parent,x.parent) != loop.toCtrl }
     case _ => !scopes(i).contains(x)
   }
 

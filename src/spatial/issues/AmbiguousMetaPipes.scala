@@ -3,6 +3,7 @@ package spatial.issues
 import core._
 import forge.tags._
 import spatial.data._
+import spatial.util._
 
 case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) extends Issue {
   @stateful override def onUnresolved(traversal: String): Unit = {
@@ -13,13 +14,15 @@ case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) 
       error(s"  metapipe: $pipe ")
       error(s"  accesses: ")
       accs.foreach{a =>
-        error(s"    ${stm(a._1)} [${parentOf(a._1)}]")
-        error(s"    ${stm(a._2)} [${parentOf(a._2)}]")
+        error(s"    ${stm(a._1)} [${a._1.parent}]")
+        error(s"    ${stm(a._2)} [${a._2.parent}]")
         error("")
       }
-      error(stm(pipe.sym))
-      error(pipe.sym.ctx)
-      error("")
+      pipe.s.foreach{sym =>
+        error(stm(sym))
+        error(sym.ctx)
+        error("")
+      }
     }
     state.logError()
   }

@@ -20,7 +20,7 @@ case class WARCycle(reader: Sym[_], writer: Sym[_], memory: Sym[_], symbols: Set
 
 /** Access-after-access (AAA) cycle: Time-multiplexed writes. **/
 case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
-  def symbols = accesses
+  def symbols: Set[Sym[_]] = accesses
 }
 
 
@@ -183,7 +183,7 @@ trait UtilsModeling {
     // This can create extra registers, but decreases the initiation interval of the cycle
     def reverseDFS(cur: Sym[_], cycle: Set[Sym[_]]): Unit = cur match {
       case s: Sym[_] if cycle contains cur =>
-        val forward = s.consumers.filter(dep => scope.contains(dep))
+        val forward = s.consumers intersect scope
         if (forward.nonEmpty) {
           if (verbose) dbgs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
 

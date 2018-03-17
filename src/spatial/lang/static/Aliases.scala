@@ -48,9 +48,17 @@ trait InternalAliases extends CustomBitWidths {
   type Num[T] = spatial.lang.types.Num[T]
   lazy val Num = spatial.lang.types.Num
 
-  lazy val Accel = spatial.lang.control.Accel
+  lazy val Accel   = spatial.lang.control.Accel
   lazy val Foreach = spatial.lang.control.Foreach
+  lazy val Reduce  = spatial.lang.control.Reduce
+  lazy val Fold    = spatial.lang.control.Fold
+  lazy val MemReduce = spatial.lang.control.MemReduce
+  lazy val MemFold   = spatial.lang.control.MemFold
+
   lazy val Pipe = spatial.lang.control.Pipe
+  lazy val Sequential = spatial.lang.control.Sequential
+  lazy val Stream = spatial.lang.control.Stream
+  lazy val Named = spatial.lang.control.Named
 }
 
 trait ExternalAliases extends InternalAliases {

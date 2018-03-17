@@ -9,11 +9,9 @@ import spatial.data.rangeOf
 trait LiftsPriority3 { this: Lifts =>
   import scala.collection.immutable.WrappedString
   implicit def stringToWrappedString(x: String): WrappedString = new WrappedString(x)
-
-
 }
 
-trait LiftsPriority2 { this: Lifts =>
+trait LiftsPriority2 extends LiftsPriority3 { this: Lifts =>
   import scala.runtime.{RichInt,RichByte,RichBoolean,RichShort,RichLong}
   import scala.collection.immutable.StringOps
   implicit def boolean2RichBoolean(x: Boolean): RichBoolean = new RichBoolean(x)
@@ -31,6 +29,7 @@ trait LiftsPriority2 { this: Lifts =>
   @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
   @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
   @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
+
 }
 
 trait LiftsPriority1 extends LiftsPriority2 { this: Lifts =>

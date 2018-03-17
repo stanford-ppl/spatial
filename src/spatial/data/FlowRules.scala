@@ -40,13 +40,18 @@ trait FlowRules {
     }
   }
 
-  @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = if (isControl(s)) {
-    val children = op.blocks.flatMap(_.stms.filter(isControl))
-    isOuter(s) = children.exists{s => !isBranch(s) || isOuterControl(s) } || isAccel(s)
-    childrenOf(s) = children
-    op.blocks.zipWithIndex.foreach{case (blk,id) =>
-      blk.stms.foreach{lhs => parentOf(lhs) = Ctrl(s,id) }
-    }
+  @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = op match {
+    case ctrl: Control[_] =>
+      val children = op.blocks.flatMap(_.stms.filter(isControl))
+      isOuter(s) = children.exists{s => !isBranch(s) || isOuterControl(s) } || isAccel(s)
+      s.children = children.map{c => Parent(c,-1) }
+      val bodies = ctrl.bodies
+      op.blocks.foreach{blk =>
+        val id = bodies.zipWithIndex.collectFirst{case (grp,i) if grp._2.contains(blk) => i }
+                       .getOrElse{throw new Exception(s"Block $blk is not associated with an ID in control $ctrl")}
+        blk.stms.foreach{lhs => lhs.parent = Parent(s,id) }
+      }
+    case _ => // Nothin'
   }
 
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {

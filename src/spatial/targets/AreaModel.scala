@@ -11,7 +11,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 
-abstract class AreaModel extends SpatialModel[AreaFields] {
+abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields](target) {
   val FILE_NAME: String = target.name.replaceAll(" ", "_") + "_Area.csv"
   val RESOURCE_NAME: String = "Area"
   final def FIELDS: Array[String] = target.AFIELDS

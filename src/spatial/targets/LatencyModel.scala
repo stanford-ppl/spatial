@@ -5,7 +5,7 @@ import models._
 import forge.tags._
 import spatial.internal.spatialConfig
 
-class LatencyModel extends SpatialModel[LatencyFields] {
+class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](target) {
   val FILE_NAME: String = target.name.replaceAll(" ", "_") + "_Latency.csv"
   val RESOURCE_NAME: String = "Latency"
   def FIELDS: Array[String] = target.LFIELDS

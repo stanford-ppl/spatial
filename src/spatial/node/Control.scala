@@ -58,7 +58,7 @@ import spatial.lang._
   iters:  List[I32]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def cchains = Seq(cchain -> iters)
-  override def bodies  = Seq(iters -> Seq(map,load,reduce,store))
+  override def bodies  = Seq(iters -> Seq(map,reduce), Nil -> Seq(load,store))
 }
 
 @op case class MemReduceBlackBox[A,C[T]](

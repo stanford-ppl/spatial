@@ -5,7 +5,11 @@ import core._
 import forge.tags._
 import spatial.node._
 
-trait CastsPriority2 {
+trait CastsPriority3 {
+
+}
+
+trait CastsPriority2 extends CastsPriority3 {
   implicit def boxNum[A:Num](x: A): Num[A] = Num[A].box(x)
 }
 
@@ -22,6 +26,11 @@ trait CastsPriority1 extends CastsPriority2 {
 trait Casts extends CastsPriority1 { this: SpatialStatics =>
   implicit def boxSym[A:Type](x: A): Sym[A] = Type[A].boxed(x)
   implicit class BoxSym[A:Type](x: A) extends core.static.ExpMiscOps[Any,A](x)
+
+
+  @api implicit def regRead[A:Bits](x: Reg[A]): A = x.value
+  @api implicit def argRead[A:Bits](x: ArgIn[A]): A = x.value
+
 
   implicit class CastType[A:Type](x: A) {
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)

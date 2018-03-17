@@ -6,10 +6,11 @@ import spatial.lang._
 import spatial.node._
 import spatial.internal.spatialConfig
 import spatial.issues.AmbiguousMetaPipes
-
 import forge.tags._
 import utils.implicits.collections._
-import utils.DAG
+import utils.Tree
+
+import scala.util.Try
 
 trait UtilsControl {
 
@@ -19,18 +20,31 @@ trait UtilsControl {
   }
 
   implicit class SymControl(x: Sym[_]) {
-    @stateful def getParent: Option[Ctrl] = parentOf.get(x)
-    @stateful def parent: Ctrl = parentOf(x)
+    def toCtrl: Ctrl = if (isControl(x)) Parent(x,-1) else x.parent
+
+    def parent: Ctrl = metadata[ParentController](x).map(_.parent).getOrElse(Host)
+    def parent_=(p: Ctrl): Unit = metadata.add(x, ParentController(p))
+
+    @stateful def children: Seq[Ctrl] = {
+      if (!isControl(x)) throw new Exception(s"Cannot get children of non-controller.")
+      metadata[Children](x).map(_.children).getOrElse(Nil)
+    }
+    def children_=(cs: Seq[Parent]): Unit = metadata.add(x, Children(cs))
+
+    def ancestors: Seq[Ctrl] = Tree.ancestors(x.toCtrl){_.parent}
+    def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = x.toCtrl.ancestors(stop)
+    def ancestors(stop: Ctrl): Seq[Ctrl] = x.toCtrl.ancestors(stop)
   }
 
   def getCChains(block: Block[_]): Seq[CounterChain] = getCChains(block.stms)
   def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}
 
-  def ctrlIters(ctrl: Ctrl): Seq[I32] = ctrl match {
-    case Ctrl(Op(loop: Loop[_]), -1) => loop.iters
-    case Ctrl(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
+  def ctrlIters(ctrl: Ctrl): Seq[I32] = Try(ctrl match {
+    case Host => Nil
+    case Parent(Op(loop: Loop[_]), -1) => loop.iters
+    case Parent(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
     case _ => Nil
-  }
+  }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
 
   def ctrDef[F](x: Counter[F]): CounterNew[F] = x match {
     case Op(c: CounterNew[_]) => c.asInstanceOf[CounterNew[F]]
@@ -91,14 +105,12 @@ trait UtilsControl {
     * Returns the least common ancestor (LCA) of the two controllers.
     * If the controllers have no ancestors in common, returns None.
     */
-  @stateful def LCA(a: Sym[_], b: Sym[_]): Option[Ctrl] = LCA(parentOf.get(a),parentOf.get(b))
-  @stateful def LCA(a: Ctrl, b: Ctrl): Option[Ctrl] = DAG.LCA(a, b){ctrlParent}
-  @stateful def LCA(a: Option[Ctrl], b: Option[Ctrl]): Option[Ctrl] = (a,b) match {
-    case (Some(c1),Some(c2)) => LCA(c1,c2)
-    case _ => None
-  }
+  def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.parent,b.parent)
+  def LCA(a: Ctrl, b: Ctrl): Ctrl= Tree.LCA(a, b){_.parent}
 
-  @stateful def LCAWithPaths(a: Ctrl, b: Ctrl): (Option[Ctrl], Seq[Ctrl], Seq[Ctrl]) = DAG.LCAWithPaths(a,b){ctrlParent}
+  def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {
+    Tree.LCAWithPaths(a,b){_.parent}
+  }
 
   /**
     * Returns the LCA between two controllers a and b along with their pipeline distance.
@@ -111,28 +123,26 @@ trait UtilsControl {
     *   The distance is undefined when the LCA is a xor b, or if a and b occur in parallel
     *   The distance is positive if a comes before b, negative otherwise
     */
-  @stateful def LCAWithDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithDistance(parentOf(a),parentOf(b))
+  @stateful def LCAWithDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithDistance(a.parent,b.parent)
   @stateful def LCAWithDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     if (a == b) (a,0)
     else {
       val (lca, pathA, pathB) = LCAWithPaths(a, b)
-      lca match {
-        case None => throw new Exception(s"Undefined distance between $a and $b (no LCA)")
-
-        case Some(parent) if isOuterControl(parent) && parent != a && parent != b  =>
-          val topA = pathA.find{c => c.sym != parent.sym }.get
-          val topB = pathB.find{c => c.sym != parent.sym }.get
-          //dbg(s"PathA: " + pathA.mkString(", "))
-          //dbg(s"PathB: " + pathB.mkString(", "))
-          //dbg(s"LCA: $parent")
-          // TODO[2]: Update with arbitrary children graph once defined
-          val idxA = childrenOf(parent.sym).indexOf(topA.sym)
-          val idxB = childrenOf(parent.sym).indexOf(topB.sym)
-          if (idxA < 0 || idxB < 0) throw new Exception(s"Undefined distance between $a and $b (idxA=$idxA,idxB=$idxB)")
-          val dist = idxB - idxA
-          (parent,dist)
-
-        case Some(parent) => (parent,0)
+      if (isOuterControl(lca) && lca != a && lca != b) {
+        val topA = pathA.find{c => c.s != lca.s }.get
+        val topB = pathB.find{c => c.s != lca.s }.get
+        //dbg(s"PathA: " + pathA.mkString(", "))
+        //dbg(s"PathB: " + pathB.mkString(", "))
+        //dbg(s"LCA: $lca")
+        // TODO[2]: Update with arbitrary children graph once defined
+        val idxA = lca.children.indexOf(topA)
+        val idxB = lca.children.indexOf(topB)
+        if (idxA < 0 || idxB < 0) throw new Exception(s"Undefined distance between $a and $b (idxA=$idxA,idxB=$idxB)")
+        val dist = idxB - idxA
+        (lca,dist)
+      }
+      else {
+        (lca, 0)
       }
     }
   }
@@ -144,7 +154,9 @@ trait UtilsControl {
     *   If the LCA controller of a and b is a metapipeline, the pipeline distance
     *   is the distance between the respective controllers for a and b. Otherwise zero.
     */
-  @stateful def LCAWithCoarseDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithCoarseDistance(parentOf(a),parentOf(b))
+  @stateful def LCAWithCoarseDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = {
+    LCAWithCoarseDistance(a.parent, b.parent)
+  }
   @stateful def LCAWithCoarseDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     val (lca,dist) = LCAWithDistance(a,b)
     val coarseDist = if (isOuterControl(lca) && isLoop(lca)) dist else 0
@@ -192,61 +204,17 @@ trait UtilsControl {
   }
 
 
-  /**
-    * Returns true if either this symbol is a loop or exists within a loop.
-    */
-  @stateful def isInLoop(s: Sym[_]): Boolean = isLoop(s) || ctrlParents(s).exists(isLoop)
-  @stateful def isInLoop(ctrl: Ctrl): Boolean = isLoop(ctrl) || ctrlParents(ctrl).exists(isLoop)
+  /** Returns true if either this symbol is a loop or exists within a loop. */
+  def isInLoop(s: Sym[_]): Boolean = isLoop(s) || s.ancestors.exists(isLoop)
+  def isInLoop(ctrl: Ctrl): Boolean = isLoop(ctrl) || ctrl.ancestors.exists(isLoop)
 
   /**
     * Returns true if symbols a and b occur in Parallel (but not metapipeline parallel).
     */
-  @stateful def areInParallel(a: Sym[_], b: Sym[_]): Boolean = {
+  def areInParallel(a: Sym[_], b: Sym[_]): Boolean = {
     val lca = LCA(a,b)
     // TODO[2]: Arbitrary dataflow graph for children
-    lca.exists{c => isInnerControl(c) }
-  }
-
-  /**
-    * Returns the controller parent of this controller
-    */
-  @stateful def ctrlParent(ctrl: Ctrl): Option[Ctrl] = ctrl.id match {
-    case -1 => parentOf.get(ctrl.sym)
-    case _  => Some(Ctrl(ctrl.sym, -1))
-  }
-
-  /**
-    * Returns the symbols of all ancestor controllers of this symbol
-    * Ancestors are ordered outermost to innermost
-    */
-  @stateful def symParents(sym: Sym[_], stop: Option[Sym[_]] = None): Seq[Sym[_]] = {
-    DAG.ancestors(sym, stop){p => parentOf.get(p).map(_.sym) }
-  }
-
-  /**
-    * Returns all ancestor controllers from this controller (inclusive) to optional stop (inclusive)
-    * Ancestors are ordered outermost to innermost
-    */
-  @stateful def ctrlParents(ctrl: Ctrl): Seq[Ctrl] = DAG.ancestors(ctrl,None){ctrlParent}
-  @stateful def ctrlParents(ctrl: Ctrl, stop: Option[Ctrl]): Seq[Ctrl] = DAG.ancestors(ctrl,stop){ctrlParent}
-  @stateful def ctrlParents(sym: Sym[_], stop: Option[Ctrl] = None): Seq[Ctrl] = {
-    parentOf.get(sym).map(p => ctrlParents(p,stop)).getOrElse(Nil)
-  }
-
-  /**
-    * Returns a list of controllers from the start (inclusive) to the end (exclusive).
-    * Controllers are ordered outermost to innermost.
-    */
-  @stateful def ctrlBetween(start: Option[Ctrl], end: Option[Ctrl]): Seq[Ctrl] = {
-    if (start.isEmpty) Nil
-    else {
-      val path = ctrlParents(start.get, end)
-      if (path.headOption == end) path.drop(1) else path
-    }
-  }
-
-  @stateful def ctrlBetween(access: Sym[_], mem: Sym[_]): Seq[Ctrl] = {
-    ctrlBetween(parentOf.get(access), parentOf.get(mem))
+    isInnerControl(lca) || isParallel(lca)
   }
 
 }

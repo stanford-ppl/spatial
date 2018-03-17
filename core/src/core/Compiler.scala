@@ -173,7 +173,9 @@ trait Compiler { self =>
 
       case t: Throwable =>
         onException(t)
-        failure = Some(TestbenchFailure(s"Uncaught exception ${t.getMessage} (${t.getCause})"))
+        val except = TestbenchFailure(s"Uncaught exception ${t.getMessage} (${t.getCause})")
+        except.setStackTrace(t.getStackTrace)
+        failure = Some(except)
     }
 
     checkWarnings()

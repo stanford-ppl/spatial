@@ -45,6 +45,7 @@ trait SpatialApp extends DSLApp {
     lazy val switchOptimizer   = SwitchOptimizer(state)
     lazy val pipeInserter      = PipeInserter(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
+    lazy val retiming          = RetimingTransformer(state)
 
     lazy val globalAllocation = GlobalAllocation(state)
 
@@ -66,6 +67,7 @@ trait SpatialApp extends DSLApp {
       printer ==>
       unrollTransformer ==>
       printer ==>
+      (cfg.enableRetiming ? retiming) ==>
       //globalAllocation ==>
       //printer ==>
       //puDotCodegen ==>
@@ -177,6 +179,8 @@ trait SpatialApp extends DSLApp {
         else {
           if (cfg.enableRetiming) {
             error(s"No target found with the name '${cfg.targetName}'.")
+            error(s"Available targets: ")
+            Targets.targets.foreach{t => error(s"  ${t.name}") }
             IR.logError()
           }
           else {
@@ -198,7 +202,8 @@ trait SpatialApp extends DSLApp {
       cfg.target = this.target
       cfg.targetName = cfg.target.name
     }
-
+    cfg.target.areaModel.init()
+    cfg.target.latencyModel.init()
   }
 
 }

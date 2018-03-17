@@ -56,7 +56,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       * Returns true if an execution of access a may occur before one of access b.
       */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
-      val (ctrl,dist) = LCAWithDistance(parentOf(b), parentOf(x))
+      val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
       dist <= 0 || (dist > 0 && isInLoop(ctrl))
     }
 
@@ -64,7 +64,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       * Returns true if an execution of access a may occur after one of access b
       */
     @stateful def mayFollow(b: Sym[_]): Boolean = {
-      val (ctrl,dist) = LCAWithDistance(parentOf(b), parentOf(x))
+      val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
       dist >= 0 || (dist < 0) && isInLoop(ctrl)
     }
 
@@ -76,11 +76,10 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       * NOTE: Usable only before unrolling (so enables will not yet include boundary conditions)
       */
     @stateful def mustOccurWithin(ctrl: Ctrl): Boolean = {
-      val parents = ctrlParents(parentOf(x))
-      val innerParents: Seq[Ctrl] = parents.take(parents.indexOf(ctrl))
-      val switches = innerParents.filter{p => isSwitch(p.sym) }
-      switches.isEmpty && x.enables.forall{case Const(c) => c.value; case _ => false }
-    }
+      val parents = x.ancestors(ctrl)
+      val enables = (x +: parents.flatMap(_.s)).flatMap(_.enables)
+      !parents.exists(isSwitch) && enables.forall{case Const(b) => b.value; case _ => false }
+     }
 
     /**
       * Returns true if access a must always come after access b, relative to some observer access p
@@ -97,7 +96,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     @stateful def mustFollow(b: Sym[_], p: Sym[_]): Boolean = {
       val (ctrlA,distA) = LCAWithDistance(x, p) // Positive if a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDistance(b, p) // Positive if b * p, negative otherwise
-      val ctrlAB = LCA(x,b).get
+      val ctrlAB = LCA(x,b)
       if      (distA > 0 && distB > 0) { distA < distB && x.mustOccurWithin(ctrlAB) }   // b a p
       else if (distA > 0 && distB < 0) { isInLoop(ctrlA) && x.mustOccurWithin(ctrlAB) } // a p b
       else if (distA < 0 && distB < 0) { distA < distB && isInLoop(ctrlA) && x.mustOccurWithin(ctrlAB) } // p b a
@@ -134,7 +133,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     * Iterators are ordered outermost to innermost.
     */
   @stateful def accessIterators(access: Sym[_], mem: Sym[_]): Seq[Idx] = {
-    (ctrlBetween(parentOf.get(access), parentOf.get(mem)).flatMap(ctrlIters) ++ ctrlIters(Ctrl(access,-1))).distinct
+    access.ancestors(stop = mem.parent).filter(_.id != -1).flatMap(ctrlIters)
   }
 
   /**

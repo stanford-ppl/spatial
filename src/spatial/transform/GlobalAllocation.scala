@@ -95,7 +95,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
   }
 
   protected def innerBlock[A:Type](lhs: Sym[A], block: Block[_], iters: Seq[I32]): Sym[A] = {
-    val parents = symParents(lhs)
+    val parents = lhs.ancestors.flatMap(_.s).distinct
     val edata = parents.map{p => controlData.getOrElse(p, CtrlData.empty) }
     val cdata = controlData.getOrElse(lhs, CtrlData.empty)
     val external = edata.flatMap(_.syms)
@@ -118,7 +118,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
       dataSyms.contains(x) || (!wrSyms.contains(x) && !rdSyms.contains(x) && !memAllocs.contains(x))
     }
     def isRemoteMemory(mem: Sym[_]): Boolean = !mem.isReg || {
-      accessesOf(mem).exists{access => parentOf(access).sym != lhs }
+      accessesOf(mem).exists{access => !access.parent.s.contains(lhs) }
     }
     scope.reverseIterator.foreach{
       case s @ Reader(mem,addr,_) =>

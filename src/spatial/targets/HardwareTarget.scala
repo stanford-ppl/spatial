@@ -40,9 +40,6 @@ abstract class HardwareTarget {
 
   val memoryResources: List[MemoryResource]
   val defaultResource: MemoryResource
-
-  // Add this target to the list of supported targets upon object construction
-  Targets.targets += this
 }
 
 object HardwareTarget {

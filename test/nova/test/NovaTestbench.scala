@@ -48,10 +48,11 @@ trait Requirements {
 
 }
 
-abstract class Testbench extends TestSuite {
+abstract class NovaTestbench extends TestSuite {
   type Fail = core.TestbenchFailure
+  val defaultArgs: Array[String] = Array.empty
 
-  def test(x: Any, args: Array[String] = Array("--vv", "--test")): Unit = {
+  def test(x: Any, args: Array[String] = defaultArgs): Unit = {
     x match {
       case x: DSLApp => x.main(args)
       case _ => throw new Exception(r"Don't know how to run test for ${x.getClass}")

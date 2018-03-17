@@ -5,7 +5,7 @@ import core._
 import forge.tags._
 import models._
 
-class XilinxAreaModel extends AreaModel {
+class XilinxAreaModel(target: XilinxDevice) extends AreaModel(target) {
   import XilinxDevice._
 
   @stateful override def summarize(area: Area): (Area, String) = {

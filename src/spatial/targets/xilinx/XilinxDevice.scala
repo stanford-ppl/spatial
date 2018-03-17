@@ -82,8 +82,8 @@ abstract class XilinxDevice extends HardwareTarget {
     else             Area(RAM64M->N) * Math.ceil(depth/64.0)
   }
 
-  protected def makeAreaModel: AreaModel = new XilinxAreaModel
-  protected def makeLatencyModel: LatencyModel = new LatencyModel
+  protected def makeAreaModel: AreaModel = new XilinxAreaModel(this)
+  protected def makeLatencyModel: LatencyModel = new LatencyModel(this)
 
 }
 object XilinxDevice {

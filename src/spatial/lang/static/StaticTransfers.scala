@@ -11,9 +11,13 @@ trait StaticTransfers {
   /**
     * Transfer a scalar value from the host to the accelerator through the ArgIn `reg`.
     */
-  @api def setArg[A](reg: ArgIn[A], value: A): Void = {
+  @api def setArg[A](reg: ArgIn[A], value: Lift[A]): Void = {
     implicit val bA: Bits[A] = reg.tA
-    stage(SetArgIn(reg,value))
+    stage(SetArgIn(reg,value.unbox))
+  }
+  @api def setArg[A](reg: ArgIn[A], value: Bits[A]): Void = {
+    implicit val bA: Bits[A] = reg.tA
+    stage(SetArgIn(reg,value.unbox))
   }
 
   /**

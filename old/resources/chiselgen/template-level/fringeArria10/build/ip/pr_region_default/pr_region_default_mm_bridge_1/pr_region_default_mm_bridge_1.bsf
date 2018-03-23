@@ -1,0 +1,225 @@
+/*
+WARNING: Do NOT edit the input and output ports in this file in a text
+editor if you plan to continue editing the block that represents it in
+the Block Editor! File corruption is VERY likely to occur.
+*/
+/*
+Copyright (C) 2017  Intel Corporation. All rights reserved.
+Your use of Intel Corporation's design tools, logic functions 
+and other software and tools, and its AMPP partner logic 
+functions, and any output files from any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Intel Program License 
+Subscription Agreement, the Intel Quartus Prime License Agreement,
+the Intel FPGA IP License Agreement, or other applicable license
+agreement, including, without limitation, that your use is for
+the sole purpose of programming logic devices manufactured by
+Intel and sold by Intel or its authorized distributors.  Please
+refer to the applicable agreement for further details.
+*/
+(header "symbol" (version "1.1"))
+(symbol
+	(rect 0 0 368 328)
+	(text "pr_region_default_mm_bridge_1" (rect 89 -1 219 11)(font "Arial" (font_size 10)))
+	(text "inst" (rect 8 312 20 324)(font "Arial" ))
+	(port
+		(pt 0 72)
+		(input)
+		(text "clk" (rect 0 0 10 12)(font "Arial" (font_size 8)))
+		(text "clk" (rect 4 61 22 72)(font "Arial" (font_size 8)))
+		(line (pt 0 72)(pt 112 72)(line_width 1))
+	)
+	(port
+		(pt 368 72)
+		(input)
+		(text "m0_waitrequest" (rect 0 0 62 12)(font "Arial" (font_size 8)))
+		(text "m0_waitrequest" (rect 287 61 371 72)(font "Arial" (font_size 8)))
+		(line (pt 368 72)(pt 256 72)(line_width 1))
+	)
+	(port
+		(pt 368 88)
+		(input)
+		(text "m0_readdata[511..0]" (rect 0 0 80 12)(font "Arial" (font_size 8)))
+		(text "m0_readdata[511..0]" (rect 270 77 384 88)(font "Arial" (font_size 8)))
+		(line (pt 368 88)(pt 256 88)(line_width 3))
+	)
+	(port
+		(pt 368 104)
+		(input)
+		(text "m0_readdatavalid" (rect 0 0 70 12)(font "Arial" (font_size 8)))
+		(text "m0_readdatavalid" (rect 280 93 376 104)(font "Arial" (font_size 8)))
+		(line (pt 368 104)(pt 256 104)(line_width 1))
+	)
+	(port
+		(pt 0 112)
+		(input)
+		(text "reset" (rect 0 0 20 12)(font "Arial" (font_size 8)))
+		(text "reset" (rect 4 101 34 112)(font "Arial" (font_size 8)))
+		(line (pt 0 112)(pt 112 112)(line_width 1))
+	)
+	(port
+		(pt 0 200)
+		(input)
+		(text "s0_burstcount[4..0]" (rect 0 0 77 12)(font "Arial" (font_size 8)))
+		(text "s0_burstcount[4..0]" (rect 4 189 118 200)(font "Arial" (font_size 8)))
+		(line (pt 0 200)(pt 112 200)(line_width 3))
+	)
+	(port
+		(pt 0 216)
+		(input)
+		(text "s0_writedata[511..0]" (rect 0 0 76 12)(font "Arial" (font_size 8)))
+		(text "s0_writedata[511..0]" (rect 4 205 124 216)(font "Arial" (font_size 8)))
+		(line (pt 0 216)(pt 112 216)(line_width 3))
+	)
+	(port
+		(pt 0 232)
+		(input)
+		(text "s0_address[31..0]" (rect 0 0 70 12)(font "Arial" (font_size 8)))
+		(text "s0_address[31..0]" (rect 4 221 106 232)(font "Arial" (font_size 8)))
+		(line (pt 0 232)(pt 112 232)(line_width 3))
+	)
+	(port
+		(pt 0 248)
+		(input)
+		(text "s0_write" (rect 0 0 33 12)(font "Arial" (font_size 8)))
+		(text "s0_write" (rect 4 237 52 248)(font "Arial" (font_size 8)))
+		(line (pt 0 248)(pt 112 248)(line_width 1))
+	)
+	(port
+		(pt 0 264)
+		(input)
+		(text "s0_read" (rect 0 0 33 12)(font "Arial" (font_size 8)))
+		(text "s0_read" (rect 4 253 46 264)(font "Arial" (font_size 8)))
+		(line (pt 0 264)(pt 112 264)(line_width 1))
+	)
+	(port
+		(pt 0 280)
+		(input)
+		(text "s0_byteenable[63..0]" (rect 0 0 82 12)(font "Arial" (font_size 8)))
+		(text "s0_byteenable[63..0]" (rect 4 269 124 280)(font "Arial" (font_size 8)))
+		(line (pt 0 280)(pt 112 280)(line_width 3))
+	)
+	(port
+		(pt 0 296)
+		(input)
+		(text "s0_debugaccess" (rect 0 0 67 12)(font "Arial" (font_size 8)))
+		(text "s0_debugaccess" (rect 4 285 88 296)(font "Arial" (font_size 8)))
+		(line (pt 0 296)(pt 112 296)(line_width 1))
+	)
+	(port
+		(pt 368 120)
+		(output)
+		(text "m0_burstcount[4..0]" (rect 0 0 81 12)(font "Arial" (font_size 8)))
+		(text "m0_burstcount[4..0]" (rect 269 109 383 120)(font "Arial" (font_size 8)))
+		(line (pt 368 120)(pt 256 120)(line_width 3))
+	)
+	(port
+		(pt 368 136)
+		(output)
+		(text "m0_writedata[511..0]" (rect 0 0 80 12)(font "Arial" (font_size 8)))
+		(text "m0_writedata[511..0]" (rect 267 125 387 136)(font "Arial" (font_size 8)))
+		(line (pt 368 136)(pt 256 136)(line_width 3))
+	)
+	(port
+		(pt 368 152)
+		(output)
+		(text "m0_address[31..0]" (rect 0 0 74 12)(font "Arial" (font_size 8)))
+		(text "m0_address[31..0]" (rect 277 141 379 152)(font "Arial" (font_size 8)))
+		(line (pt 368 152)(pt 256 152)(line_width 3))
+	)
+	(port
+		(pt 368 168)
+		(output)
+		(text "m0_write" (rect 0 0 36 12)(font "Arial" (font_size 8)))
+		(text "m0_write" (rect 320 157 368 168)(font "Arial" (font_size 8)))
+		(line (pt 368 168)(pt 256 168)(line_width 1))
+	)
+	(port
+		(pt 368 184)
+		(output)
+		(text "m0_read" (rect 0 0 36 12)(font "Arial" (font_size 8)))
+		(text "m0_read" (rect 323 173 365 184)(font "Arial" (font_size 8)))
+		(line (pt 368 184)(pt 256 184)(line_width 1))
+	)
+	(port
+		(pt 368 200)
+		(output)
+		(text "m0_byteenable[63..0]" (rect 0 0 86 12)(font "Arial" (font_size 8)))
+		(text "m0_byteenable[63..0]" (rect 262 189 382 200)(font "Arial" (font_size 8)))
+		(line (pt 368 200)(pt 256 200)(line_width 3))
+	)
+	(port
+		(pt 368 216)
+		(output)
+		(text "m0_debugaccess" (rect 0 0 70 12)(font "Arial" (font_size 8)))
+		(text "m0_debugaccess" (rect 279 205 363 216)(font "Arial" (font_size 8)))
+		(line (pt 368 216)(pt 256 216)(line_width 1))
+	)
+	(port
+		(pt 0 152)
+		(output)
+		(text "s0_waitrequest" (rect 0 0 59 12)(font "Arial" (font_size 8)))
+		(text "s0_waitrequest" (rect 4 141 88 152)(font "Arial" (font_size 8)))
+		(line (pt 0 152)(pt 112 152)(line_width 1))
+	)
+	(port
+		(pt 0 168)
+		(output)
+		(text "s0_readdata[511..0]" (rect 0 0 76 12)(font "Arial" (font_size 8)))
+		(text "s0_readdata[511..0]" (rect 4 157 118 168)(font "Arial" (font_size 8)))
+		(line (pt 0 168)(pt 112 168)(line_width 3))
+	)
+	(port
+		(pt 0 184)
+		(output)
+		(text "s0_readdatavalid" (rect 0 0 67 12)(font "Arial" (font_size 8)))
+		(text "s0_readdatavalid" (rect 4 173 100 184)(font "Arial" (font_size 8)))
+		(line (pt 0 184)(pt 112 184)(line_width 1))
+	)
+	(drawing
+		(text "clk" (rect 97 43 212 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "clk" (rect 117 67 252 144)(font "Arial" (color 0 0 0)))
+		(text "m0" (rect 257 43 526 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "waitrequest" (rect 205 67 476 144)(font "Arial" (color 0 0 0)))
+		(text "readdata" (rect 216 83 480 176)(font "Arial" (color 0 0 0)))
+		(text "readdatavalid" (rect 196 99 470 208)(font "Arial" (color 0 0 0)))
+		(text "burstcount" (rect 208 115 476 240)(font "Arial" (color 0 0 0)))
+		(text "writedata" (rect 215 131 484 272)(font "Arial" (color 0 0 0)))
+		(text "address" (rect 219 147 480 304)(font "Arial" (color 0 0 0)))
+		(text "write" (rect 233 163 496 336)(font "Arial" (color 0 0 0)))
+		(text "read" (rect 234 179 492 368)(font "Arial" (color 0 0 0)))
+		(text "byteenable" (rect 207 195 474 400)(font "Arial" (color 0 0 0)))
+		(text "debugaccess" (rect 198 211 462 432)(font "Arial" (color 0 0 0)))
+		(text "reset" (rect 83 83 196 179)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "reset" (rect 117 107 264 224)(font "Arial" (color 0 0 0)))
+		(text "s0" (rect 99 123 210 259)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "waitrequest" (rect 117 147 300 304)(font "Arial" (color 0 0 0)))
+		(text "readdata" (rect 117 163 282 336)(font "Arial" (color 0 0 0)))
+		(text "readdatavalid" (rect 117 179 312 368)(font "Arial" (color 0 0 0)))
+		(text "burstcount" (rect 117 195 294 400)(font "Arial" (color 0 0 0)))
+		(text "writedata" (rect 117 211 288 432)(font "Arial" (color 0 0 0)))
+		(text "address" (rect 117 227 276 464)(font "Arial" (color 0 0 0)))
+		(text "write" (rect 117 243 264 496)(font "Arial" (color 0 0 0)))
+		(text "read" (rect 117 259 258 528)(font "Arial" (color 0 0 0)))
+		(text "byteenable" (rect 117 275 294 560)(font "Arial" (color 0 0 0)))
+		(text "debugaccess" (rect 117 291 300 592)(font "Arial" (color 0 0 0)))
+		(text " pr_region_default_mm_bridge_1 " (rect 225 312 636 634)(font "Arial" ))
+		(line (pt 112 32)(pt 256 32)(line_width 1))
+		(line (pt 256 32)(pt 256 312)(line_width 1))
+		(line (pt 112 312)(pt 256 312)(line_width 1))
+		(line (pt 112 32)(pt 112 312)(line_width 1))
+		(line (pt 113 52)(pt 113 76)(line_width 1))
+		(line (pt 114 52)(pt 114 76)(line_width 1))
+		(line (pt 255 52)(pt 255 220)(line_width 1))
+		(line (pt 254 52)(pt 254 220)(line_width 1))
+		(line (pt 113 92)(pt 113 116)(line_width 1))
+		(line (pt 114 92)(pt 114 116)(line_width 1))
+		(line (pt 113 132)(pt 113 300)(line_width 1))
+		(line (pt 114 132)(pt 114 300)(line_width 1))
+		(line (pt 0 0)(pt 368 0)(line_width 1))
+		(line (pt 368 0)(pt 368 328)(line_width 1))
+		(line (pt 0 328)(pt 368 328)(line_width 1))
+		(line (pt 0 0)(pt 0 328)(line_width 1))
+	)
+)

@@ -1,0 +1,28 @@
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_TOOL_NAME "QsysPrimePro"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_TOOL_ENV "QsysPrimePro"
+set_global_assignment -library "ghrd_10as066n2_rst_bdg" -name SOPCINFO_FILE [file join $::quartus(qip_path) "ghrd_10as066n2_rst_bdg.sopcinfo"]
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name SLD_INFO "QSYS_NAME ghrd_10as066n2_rst_bdg HAS_SOPCINFO 1 GENERATION_ID 0"
+set_global_assignment -library "ghrd_10as066n2_rst_bdg" -name MISC_FILE [file join $::quartus(qip_path) "ghrd_10as066n2_rst_bdg.cmp"]
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_TARGETED_DEVICE_FAMILY "Arria 10"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_GENERATED_DEVICE_FAMILY "{Arria 10}"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_QSYS_MODE "STANDALONE"
+set_global_assignment -name SYNTHESIS_ONLY_QIP ON
+set_global_assignment -library "ghrd_10as066n2_rst_bdg" -name MISC_FILE [file join $::quartus(qip_path) "../ghrd_10as066n2_rst_bdg.ip"]
+
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_NAME "Z2hyZF8xMGFzMDY2bjJfcnN0X2JkZw=="
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_DISPLAY_NAME "c3lzdGVt"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_REPORT_HIERARCHY "On"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_VERSION "MS4w"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19HRU5FUkFUSU9OX0lE::MA==::QXV0byBHRU5FUkFUSU9OX0lE"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfRkFNSUxZ::QXJyaWEgMTA=::QXV0byBERVZJQ0VfRkFNSUxZ"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0U=::MTBBUzA2Nk4zRjQwRTJTRw==::QXV0byBERVZJQ0U="
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfU1BFRURHUkFERQ==::Mg==::QXV0byBERVZJQ0VfU1BFRURHUkFERQ=="
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfUkFURQ==::LTE=::QXV0byBDTE9DS19SQVRF"
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfRE9NQUlO::LTE=::QXV0byBDTE9DS19ET01BSU4="
+set_global_assignment -entity "ghrd_10as066n2_rst_bdg" -library "ghrd_10as066n2_rst_bdg" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfUkVTRVRfRE9NQUlO::LTE=::QXV0byBSRVNFVF9ET01BSU4="
+
+
+set_global_assignment -library "ghrd_10as066n2_rst_bdg" -name VERILOG_FILE [file join $::quartus(qip_path) "synth/ghrd_10as066n2_rst_bdg.v"]
+

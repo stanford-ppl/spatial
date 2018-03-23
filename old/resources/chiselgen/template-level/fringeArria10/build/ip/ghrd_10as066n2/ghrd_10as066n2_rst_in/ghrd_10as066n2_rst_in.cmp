@@ -1,0 +1,8 @@
+	component ghrd_10as066n2_rst_in is
+		port (
+			clk         : in  std_logic := 'X'; -- clk
+			in_reset_n  : in  std_logic := 'X'; -- reset_n
+			out_reset_n : out std_logic         -- reset_n
+		);
+	end component ghrd_10as066n2_rst_in;
+

@@ -1,0 +1,351 @@
+<hps>
+  <system>
+    <config name='VERSION' value='17.1' />
+    <config name='DEVICE_FAMILY' value='Arria 10' />
+    <config name='TIME_AND_DATE' value='Monday January, 15, 2018 - 02:59:48 PM PST' />
+    <config name='DMA_Enable' value='No No No No No No No No' />
+    <config name='eosc1_clk_hz' value='25000000.0' />
+    <config name='emac0_clk_hz' value='250000000' />
+    <config name='emac1_clk_hz' value='250000000' />
+    <config name='emac2_clk_hz' value='250000000' />
+    <config name='sdmmc_clk_hz' value='200000000' />
+    <config name='l3_main_free_clk_hz' value='200000000' />
+    <config name='h2f_user0_clk_hz' value='400000000' />
+    <config name='h2f_user1_clk_hz' value='400000000' />
+    <config name='tpiu_clk_hz' value='100000000' />
+    <config name='f2h_free_clk_hz' value='200000000' />
+    <config name='cb_intosc_ls_clk_hz' value='60000000' />
+  </system>
+  <fpga_interfaces>
+    <config name='F2H_AXI_SLAVE' used='true' />
+    <config name='H2F_AXI_MASTER' used='true' />
+    <config name='LWH2F_AXI_MASTER' used='true' />
+    <config name='F2SDRAM0_AXI_SLAVE' used='true' />
+    <config name='F2SDRAM1_AXI_SLAVE' used='false' />
+    <config name='F2SDRAM2_AXI_SLAVE' used='true' />
+  </fpga_interfaces>
+  <peripherals>
+    <peripheral name='rgmii0' used='true' />
+    <peripheral name='rgmii1' used='false' />
+    <peripheral name='rgmii2' used='false' />
+    <peripheral name='nand' used='false' />
+    <peripheral name='qspi' used='false'>
+      <config name='CONFIG_HPS_QSPI_CS2' value='0' />
+      <config name='CONFIG_HPS_QSPI_CS3' value='0' />
+      <config name='CONFIG_HPS_QSPI_CS4' value='0' />
+      <config name='CONFIG_HPS_QSPI_CS0' value='0' />
+      <config name='CONFIG_HPS_QSPI_CS1' value='0' />
+    </peripheral>
+    <peripheral name='sdmmc' used='true'>
+      <config name='CONFIG_HPS_SDMMC_BUSWIDTH' value='8' />
+    </peripheral>
+    <peripheral name='usb0' used='true' />
+    <peripheral name='usb1' used='false' />
+    <peripheral name='spim0' used='false' />
+    <peripheral name='spim1' used='true' />
+    <peripheral name='spis0' used='false' />
+    <peripheral name='spis1' used='false' />
+    <peripheral name='uart0' used='false'>
+      <config name='CONFIG_HPS_UART0_TX' value='0' />
+      <config name='CONFIG_HPS_UART0_RTS' value='0' />
+      <config name='CONFIG_HPS_UART0_CTS' value='0' />
+      <config name='CONFIG_HPS_UART0_RX' value='0' />
+    </peripheral>
+    <peripheral name='uart1' used='true'>
+      <config name='CONFIG_HPS_UART1_TX' value='1' />
+      <config name='CONFIG_HPS_UART1_RTS' value='0' />
+      <config name='CONFIG_HPS_UART1_CTS' value='0' />
+      <config name='CONFIG_HPS_UART1_RX' value='1' />
+    </peripheral>
+    <peripheral name='i2c0' used='false' />
+    <peripheral name='i2c1' used='true' />
+    <peripheral name='i2cemac0' used='false' />
+    <peripheral name='i2cemac1' used='false' />
+    <peripheral name='i2cemac2' used='false' />
+    <peripheral name='trace' used='true' />
+    <peripheral name='pll_clock_out' used='false' />
+  </peripherals>
+  <csr>
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_12.sel' value='12' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_11.sel' value='12' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_4.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_10.sel' value='12' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_5.sel' value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_6.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_9.sel' value='12' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_7.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_8.sel' value='10' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_8.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_6.sel' value='15' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_7.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_5.sel' value='15' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_9.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_4.sel' value='12' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_10.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_3.sel' value='15' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_11.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_2.sel' value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_12.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q4_1.sel' value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_13.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_12.sel' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_14.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_11.sel' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_15.sel' value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_16.sel' value='13' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.pinmux_dedicated_io_17.sel' value='13' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_10.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_8.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_9.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_7.sel' value='10' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_6.sel' value='15' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_5.sel' value='3' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_4.sel' value='3' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_3.sel' value='3' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_2.sel' value='3' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q3_1.sel' value='3' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_12.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_10.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_11.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_9.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_8.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_7.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_6.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_5.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_4.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_3.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_2.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q2_1.sel' value='4' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_12.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_11.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_10.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_9.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_8.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_7.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_6.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_5.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_4.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_3.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_2.sel' value='8' />
+    <config name='i_io48_pin_mux_shared_3v_io_grp.pinmux_shared_io_q1_1.sel' value='8' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_rgmii0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_rgmii1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_rgmii2_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_nand_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_qspi_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_sdmmc_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_usb0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_usb1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_spim0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_spim1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_spis0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_spis1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_uart0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_uart1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_i2c0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_i2c1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_i2cemac0_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_i2cemac1_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_i2cemac2_usefpga.sel' value='0' />
+    <config name='i_io48_pin_mux_fpga_interface_grp.pinmux_pll_clock_out_usefpga.sel' value='0' />
+    <config name='i_clk_mgr_alteragrp.nocclk.maincnt' value='11' />
+    <config name='i_clk_mgr_perpllgrp.vco1.denom' value='1' />
+    <config name='i_clk_mgr_mainpllgrp.cntr8clk.cnt' value='900' />
+    <config name='i_clk_mgr_perpllgrp.emacctl.emac2sel' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.cntr9clk.cnt' value='900' />
+    <config name='i_clk_mgr_mainpllgrp.cntr6clk.cnt' value='900' />
+    <config name='i_clk_mgr_alteragrp.mpuclk.pericnt' value='900' />
+    <config name='i_clk_mgr_alteragrp.mpuclk.maincnt' value='1' />
+    <config name='i_clk_mgr_perpllgrp.cntr3clk.cnt' value='900' />
+    <config name='i_clk_mgr_perpllgrp.cntr6clk.src' value='1' />
+    <config name='i_clk_mgr_mainpllgrp.cntr2clk.cnt' value='900' />
+    <config name='i_clk_mgr_mainpllgrp.nocdiv.l4mpclk' value='0' />
+    <config name='i_clk_mgr_perpllgrp.cntr4clk.src' value='1' />
+    <config name='i_clk_mgr_perpllgrp.emacctl.emac0sel' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.nocclk.cnt' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.nocdiv.l4spclk' value='2' />
+    <config name='i_clk_mgr_perpllgrp.gpiodiv.gpiodbclk' value='32000' />
+    <config name='i_clk_mgr_perpllgrp.cntr3clk.src' value='1' />
+    <config name='i_clk_mgr_perpllgrp.cntr8clk.src' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.vco1.numer' value='191' />
+    <config name='i_clk_mgr_perpllgrp.cntr8clk.cnt' value='900' />
+    <config name='i_clk_mgr_mainpllgrp.nocdiv.csatclk' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.nocdiv.cspdbgclk' value='1' />
+    <config name='i_clk_mgr_mainpllgrp.mpuclk.cnt' value='0' />
+    <config name='i_clk_mgr_perpllgrp.cntr5clk.cnt' value='499' />
+    <config name='i_clk_mgr_perpllgrp.cntr6clk.cnt' value='9' />
+    <config name='i_clk_mgr_perpllgrp.cntr5clk.src' value='1' />
+    <config name='i_clk_mgr_perpllgrp.cntr2clk.src' value='1' />
+    <config name='i_clk_mgr_mainpllgrp.nocdiv.cstraceclk' value='1' />
+    <config name='i_clk_mgr_mainpllgrp.nocdiv.l4mainclk' value='0' />
+    <config name='i_clk_mgr_clkmgr.testioctrl.periclksel' value='8' />
+    <config name='i_clk_mgr_mainpllgrp.cntr7clk.src' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.cntr7clk.cnt' value='900' />
+    <config name='i_clk_mgr_mainpllgrp.mpuclk.src' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.cntr5clk.cnt' value='900' />
+    <config name='i_clk_mgr_mainpllgrp.vco1.denom' value='1' />
+    <config name='i_clk_mgr_mainpllgrp.cntr9clk.src' value='0' />
+    <config name='i_clk_mgr_clkmgr.testioctrl.debugclksel' value='16' />
+    <config name='i_clk_mgr_mainpllgrp.nocclk.src' value='0' />
+    <config name='i_clk_mgr_perpllgrp.cntr2clk.cnt' value='7' />
+    <config name='i_clk_mgr_perpllgrp.emacctl.emac1sel' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.cntr3clk.cnt' value='900' />
+    <config name='i_clk_mgr_perpllgrp.vco0.psrc' value='0' />
+    <config name='i_clk_mgr_mainpllgrp.cntr4clk.cnt' value='900' />
+    <config name='i_clk_mgr_mainpllgrp.cntr15clk.cnt' value='900' />
+    <config name='i_clk_mgr_perpllgrp.vco1.numer' value='159' />
+    <config name='i_clk_mgr_clkmgr.testioctrl.mainclksel' value='8' />
+    <config name='i_clk_mgr_mainpllgrp.vco0.psrc' value='0' />
+    <config name='i_clk_mgr_alteragrp.nocclk.pericnt' value='900' />
+    <config name='i_clk_mgr_perpllgrp.cntr4clk.cnt' value='19' />
+    <config name='i_clk_mgr_perpllgrp.cntr7clk.cnt' value='900' />
+    <config name='i_clk_mgr_perpllgrp.cntr9clk.cnt' value='900' />
+  </csr>
+  <csr />
+  <!-- This section was added by Quartus Prime Version 17.1.0 Build 240 10/25/2017 SJ Pro Edition -->
+  <!-- Generated on Mon Jan 15 15:06:45 2018 -->
+  <csr>
+    <!-- OSC_CLK_1_HPS -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.pu_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.pd_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_1.pd_drv_strg'  value='10' />
+    <!-- nPOR_HPS -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.pu_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.pd_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_2.pd_drv_strg'  value='10' />
+    <!-- nRST_HPS -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.pu_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.pd_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_3.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D0~pad, HPS_DEDICATED_4, input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_4.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_CMD~pad, HPS_DEDICATED_5, input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_5.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_CLK~pad, BOOTSEL2/HPS_DEDICATED_6, NOT input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.input_buf_en' value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_6.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D1~pad, HPS_DEDICATED_7, input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_7.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D2~pad, HPS_DEDICATED_8, input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_8.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D3~pad, HPS_DEDICATED_9, input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_9.pd_drv_strg'  value='10' />
+    <!-- Unused pin 10 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.input_buf_en' value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.pu_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.pd_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.pu_drv_strg'  value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_10.pd_drv_strg'  value='0' />
+    <!-- Unused pin 11 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.input_buf_en' value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.pu_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.pd_slw_rt'    value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.pu_drv_strg'  value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_11.pd_drv_strg'  value='0' />
+    <!-- hps_sdio_D4~pad, HPS_DEDICATED_12, input, weak pull up enable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_12.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D5~pad, HPS_DEDICATED_13, input, weak pull up enable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_13.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D6~pad, HPS_DEDICATED_14, input, weak pull up enable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_14.pd_drv_strg'  value='10' />
+    <!-- hps_sdio_D7~pad, HPS_DEDICATED_15, input, weak pull up enable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.wk_pu_en'     value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_15.pd_drv_strg'  value='10' />
+    <!-- hps_uart1_TX~pad, HPS_DEDICATED_16, NOT input, weak pull up disable, is output, Fast Slew, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.input_buf_en' value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_16.pd_drv_strg'  value='10' />
+    <!-- hps_uart1_RX~pad, HPS_DEDICATED_17, input, weak pull up disable, Not Output, Default, 1_8 -->
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.rtrim'        value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.input_buf_en' value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.wk_pu_en'     value='0' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.pu_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.pd_slw_rt'    value='1' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.pu_drv_strg'  value='8' />
+    <config name='i_io48_pin_mux_dedicated_io_grp.configuration_dedicated_io_17.pd_drv_strg'  value='10' />
+    <config name='i_io48_pin_mux.configuration_dedicated_io_bank.voltage_sel_clkrst_io' value='1' />
+    <config name='i_io48_pin_mux.configuration_dedicated_io_bank.voltage_sel_peri_io'   value='1' />
+  </csr>
+  <option_flags>
+    <config name='chosen.early-release-fpga-config'  value='1' />
+  </option_flags>
+ <!-- End of the section generated by Quartus Prime -->
+</hps>

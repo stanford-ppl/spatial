@@ -57,6 +57,8 @@ class Config {
   /** Codegen **/
   var naming: Boolean = true
 
+  var enableAtomicWrites: Boolean = true
+
   def create: Config = new Config
 
   def reset(): Unit = {

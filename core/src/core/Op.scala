@@ -81,6 +81,10 @@ abstract class Op2[A:Type,R:Type] extends Op[R] { val A: Type[A] = Type[A] }
 abstract class Op3[A:Type,B:Type,R:Type] extends Op2[A,R] { val B: Type[B] = Type[B] }
 abstract class Op4[A:Type,B:Type,C:Type,R:Type] extends Op3[A,B,R] { val C: Type[C] = Type[C] }
 
+trait AtomicRead[M] {
+  def coll: Sym[M]
+}
+
 object Op {
   def unapply[A](x: Exp[_,A]): Option[Op[A]] = x.op
 }

@@ -79,3 +79,10 @@ import spatial.lang.host._
   override def aliases = Nil
 }
 
+@op case class ArrayMkString[A:Type](
+    array: Array[A],
+    start: Text,
+    delim: Text,
+    end:   Text)
+  extends Op2[A,Text]
+

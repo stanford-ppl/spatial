@@ -171,21 +171,39 @@ trait Staging { this: Printing =>
 
       val hazards = state.impure.filter{case Impure(s,e) => isWARHazard(e) || isAAWHazard(e) || (accesses contains s) }
       val simpleDep = if (effects.simple) state.impure.find{case Impure(s,e) => e.simple; case _ => false } else None // simple
-      val globalDep = state.impure.find{case Impure(s,e) => e.global; case _ => false } // global
+      val globalDep = state.impure.find{case Impure(_,e) => e.global; case _ => false } // global
 
       hazards ++ simpleDep ++ globalDep
     }
   }
 
   @rig final def allEffects(d: Op[_]): Effects = {
-    val mIns = mutableInputs(d)
-    //val atomicEffects = propagateWrites(u)
-
-    //logs(s"  mutable inputs = $mIns")
-    //logs(s"  actual writes = ${atomicEffects.writes}")
-
-    val effects = if (mIns.isEmpty) d.effects else d.effects andAlso Effects.Reads(mIns)
+    val effects = propagateWrites(d.effects) andAlso Effects.Reads(mutableInputs(d))
     val deps = effectDependencies(effects)
     effects.copy(antiDeps = deps)
+  }
+
+  /** Used to allow nested ("atomic") writes, which are reflected on the top mutable object
+    * rather than intermediates
+    *
+    * e.g.
+    *   val b = Array(1, 2, 3)
+    *   val a = MutableStruct(b, ...)
+    *   a.b(0) = 1
+    * Should become a write on (the mutable symbol) a instead of the immutable symbol resulting from a.b
+    */
+  @stateful final def recurseAtomicLookup(e: Sym[_]): Sym[_] = {
+    e.op.flatMap{case d: AtomicRead[_] => Some(d.coll); case _ => None}.getOrElse(e)
+  }
+  @stateful final def extractAtomicWrite(s: Sym[_]): Sym[_] = {
+    syms(recurseAtomicLookup(s)).headOption.getOrElse(s)
+  }
+
+  @stateful final def propagateWrites(effects: Effects): Effects = {
+    if (!config.enableAtomicWrites) effects
+    else {
+      val writes = effects.writes.map{s => extractAtomicWrite(s) }
+      effects.copy(writes = writes)
+    }
   }
 }

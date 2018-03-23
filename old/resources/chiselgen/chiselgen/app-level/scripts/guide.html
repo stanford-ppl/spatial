@@ -1,0 +1,288 @@
+
+<p><p><p>
+
+<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+  <TD><font size = "6">Instrumentation Guide<br><br>
+  <div data-role="collapsible">
+  <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+    <TD><font size = "6">Metapipe:<br>
+    <div data-role="collapsible">
+    <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+      <TD><font size = "6">View Sample Waveform:<br>
+      <div data-role="collapsible">
+      <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+
+
+      <font size = "2"><tt><pre>
+
+    <TD><font size = "6">Sample Waveform:<br><font size = "2"><tt><pre><font color="red">
+  parent_en ____|```````````````````````````````````````````````````````````````````````````````````````````````````````````````````|__
+<br></font>
+parent_done ________________________________________________________________________________________________________________________|__
+<font color="red">
+            5 cycles / iter
+                
+                <----->
+
+  child0_en ____|`````|___|`````|__________|`````|__________|`````|__________|`````|___________________________________________________
+<br>
+  child1_en ______________|`````````````|__|`````````````|__|`````````````|__|`````````````|__|`````````````|__________________________
+<br>
+  child2_en _______________________________|``|_____________|``|_____________|``|_____________|``|_____________|``|____________________
+<br>
+  child3_en ________________________________________________|```````|________|```````|________|```````|________|```````|__|```````|____
+<br></font>
+child0_done __________|_________|________________|________________|________________|___________________________________________________
+<br>
+child1_done ____________________________|________________|________________|________________|________________|__________________________
+<br>
+child2_done __________________________________|________________|________________|________________|________________|____________________
+<br>
+child3_done ________________________________________________________|________________|________________|________________|__________|____
+
+                                                                    ^                ^                ^                ^          ^
+       
+                                                                    |________________|________________|________________|__________|                     
+       
+                                                                                                      |                                      
+       
+                                                                                             5 iters/parent execution                                                                            
+
+</pre></tt>
+
+      </font>
+
+      </TABLE></div>
+      </TD>
+
+      <TD><font size = "6">View Sample Tree:<br>
+      <div data-role="collapsible">
+      <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+        <!--Begin Parent -->
+        <TD><b>Parent - <font color="red"> 64 cycles/iter<br><font size="2">(115 total cycles, 1 total iters)<br>[# iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+
+          <div data-role="collapsible">
+          <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+            <!--Begin Child0 -->
+            <TD><b>Child0 - <font color="red"> 5 cycles/iter<br><font size="2">(25 total cycles, 5 total iters)<br>[5 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child1 -->
+            <TD><b>Child1 - <font color="red"> 13 cycles/iter<br><font size="2">(65 total cycles, 5 total iters)<br>[5 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child2 -->
+            <TD><b>Child2 - <font color="red"> 2 cycles/iter<br><font size="2">(10 total cycles, 5 total iters)<br>[5 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child3 -->
+            <TD><b>Child3 - <font color="red"> 7 cycles/iter<br><font size="2">(35 total cycles, 5 total iters)<br>[5 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+
+        </TABLE></div>
+        </TD>
+        <!-- Close Parent -->
+
+
+      </TABLE></div>
+      </TD>
+      <!-- Close View Tree -->
+
+    </TABLE></div>
+    </TD>
+    <!-- Close Metapipe -->
+
+    <TD><font size = "6">Sequential:<br>
+    <div data-role="collapsible">
+    <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+      <TD><font size = "6">View Sample Waveform:<br>
+      <div data-role="collapsible">
+      <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+      <font size = "2"><tt><pre>
+
+    <TD><font size = "6">Sample Waveform:<br><font size = "2"><tt><pre><font color="red">
+  parent_en ____|```````````````````````````````````````````````````````````````````````````````````````````|_
+<br></font>
+parent_done ________________________________________________________________________________________________|_
+<font color="red">
+            5 cycles / iter
+                
+                <----->
+
+  child0_en ____|`````|________________________|`````|________________________|`````|_________________________
+<br>
+  child1_en _____________|`````````````|_______________|`````````````|________________|`````````````|_________
+<br>
+  child2_en ______________________________|``|__________________________|``|__________________________|``|____
+<br></font>
+child0_done __________|______________________________|______________________________|_________________________
+<br>
+child1_done ____________________________|____________________________|______________________________|_________
+<br>
+child2_done _________________________________|_____________________________|_____________________________|____
+
+                                             ^                             ^                             ^                     
+       
+                                             |_____________________________|_____________________________|                     
+       
+                                                               |                                      
+       
+                                                      3 iters/parent execution                                                                            
+
+</pre></tt>
+
+      </font>
+
+      </TABLE></div>
+      </TD>
+
+      <TD><font size = "6">View Sample Tree:<br>
+      <div data-role="collapsible">
+      <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+        <!--Begin Parent -->
+        <TD><b>Parent - <font color="red"> 91 cycles/iter<br><font size="2">(91 total cycles, 1 total iters)<br>[# iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+
+          <div data-role="collapsible">
+          <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+            <!--Begin Child0 -->
+            <TD><b>Child0 - <font color="red"> 5 cycles/iter<br><font size="2">(15 total cycles, 3 total iters)<br>[3 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child0 -->
+            <TD><b>Child1 - <font color="red"> 13 cycles/iter<br><font size="2">(39 total cycles, 3 total iters)<br>[3 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child0 -->
+            <TD><b>Child2 - <font color="red"> 2 cycles/iter<br><font size="2">(6 total cycles, 3 total iters)<br>[3 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+
+        </TABLE></div>
+        </TD>
+        <!-- Close Parent -->
+
+
+      </TABLE></div>
+      </TD>
+      <!-- Close View Tree -->
+
+    </TABLE></div>
+    </TD>
+    <!-- Close Sequential -->
+
+
+    <TD><font size = "6">Parallel:<br>
+    <div data-role="collapsible">
+    <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+
+      <TD><font size = "6">View Sample Waveform:<br>
+      <div data-role="collapsible">
+      <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+
+
+      <font size = "2"><tt><pre>
+
+    <TD><font size = "6">Sample Waveform:<br><font size = "2"><tt><pre><font color="red">
+  parent_en ____|````````````````|____|````````````````|____|````````````````|_____
+<br></font>
+parent_done _____________________|_____________________|_____________________|_____
+<font color="red">
+            5 cycles / iter
+                
+                <----->
+
+  child0_en ____|`````|________________|`````|_______________|`````|__________
+<br>
+  child1_en ____|`````````````|________|`````````````|_______|`````````````|__
+<br>
+  child2_en ____|``|___________________|``|__________________|``|_____________
+<br></font>
+child0_done __________|______________________|_____________________|__________
+<br>
+child1_done __________________|______________________|_____________________|__
+<br>
+child2_done _______|______________________|_____________________|_____________
+
+                   ^
+       
+                   |
+       
+                   |                                      
+       
+               1 iters/parent execution                                                                            
+
+</pre></tt>
+
+      </font>
+
+      </TABLE></div>
+      </TD>
+
+      <TD><font size = "6">View Sample Tree:<br>
+      <div data-role="collapsible">
+      <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+
+        <!--Begin Parent -->
+        <TD><b>Parent - <font color="red"> 16 cycles/iter<br><font size="2">(48 total cycles, 3 total iters)<br>[# iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+
+          <div data-role="collapsible">
+          <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+
+            <!--Begin Child0 -->
+            <TD><b>Child0 - <font color="red"> 5 cycles/iter<br><font size="2">(15 total cycles, 3 total iters)<br>[1 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child0 -->
+            <TD><b>Child1 - <font color="red"> 13 cycles/iter<br><font size="2">(39 total cycles, 3 total iters)<br>[1 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+            <!--Begin Child0 -->
+            <TD><b>Child2 - <font color="red"> 2 cycles/iter<br><font size="2">(6 total cycles, 3 total iters)<br>[1 iters/parent execution]</font></font></b></font><br><font size = "1">Counter: </font>
+            </TD>
+
+
+        </TABLE></div>
+        </TD>
+        <!-- Close Parent -->
+
+
+      </TABLE></div>
+      </TD>
+      <!-- Close View Tree -->
+
+    </TABLE></div>
+    </TD>
+    <!-- Close Parallel -->
+
+    <TD><font size = "6">Stream:<br>
+    <div data-role="collapsible">
+    <h4> </h4><TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">
+      TBD (Complicated to show)
+    </TABLE></div>
+    </TD>
+    <!-- Close Stream -->
+  </TABLE></div>
+  </TD>
+
+  </TABLE>

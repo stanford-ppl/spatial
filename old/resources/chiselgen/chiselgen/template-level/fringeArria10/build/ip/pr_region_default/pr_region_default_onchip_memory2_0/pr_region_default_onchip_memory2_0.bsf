@@ -1,0 +1,126 @@
+/*
+WARNING: Do NOT edit the input and output ports in this file in a text
+editor if you plan to continue editing the block that represents it in
+the Block Editor! File corruption is VERY likely to occur.
+*/
+/*
+Copyright (C) 2017  Intel Corporation. All rights reserved.
+Your use of Intel Corporation's design tools, logic functions 
+and other software and tools, and its AMPP partner logic 
+functions, and any output files from any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Intel Program License 
+Subscription Agreement, the Intel Quartus Prime License Agreement,
+the Intel FPGA IP License Agreement, or other applicable license
+agreement, including, without limitation, that your use is for
+the sole purpose of programming logic devices manufactured by
+Intel and sold by Intel or its authorized distributors.  Please
+refer to the applicable agreement for further details.
+*/
+(header "symbol" (version "1.1"))
+(symbol
+	(rect 0 0 256 296)
+	(text "pr_region_default_onchip_memory2_0" (rect 15 -1 171 11)(font "Arial" (font_size 10)))
+	(text "inst" (rect 8 280 20 292)(font "Arial" ))
+	(port
+		(pt 0 72)
+		(input)
+		(text "clk" (rect 0 0 10 12)(font "Arial" (font_size 8)))
+		(text "clk" (rect 4 61 22 72)(font "Arial" (font_size 8)))
+		(line (pt 0 72)(pt 96 72)(line_width 1))
+	)
+	(port
+		(pt 0 112)
+		(input)
+		(text "reset" (rect 0 0 20 12)(font "Arial" (font_size 8)))
+		(text "reset" (rect 4 101 34 112)(font "Arial" (font_size 8)))
+		(line (pt 0 112)(pt 96 112)(line_width 1))
+	)
+	(port
+		(pt 0 128)
+		(input)
+		(text "reset_req" (rect 0 0 38 12)(font "Arial" (font_size 8)))
+		(text "reset_req" (rect 4 117 58 128)(font "Arial" (font_size 8)))
+		(line (pt 0 128)(pt 96 128)(line_width 1))
+	)
+	(port
+		(pt 0 168)
+		(input)
+		(text "address[6..0]" (rect 0 0 51 12)(font "Arial" (font_size 8)))
+		(text "address[6..0]" (rect 4 157 82 168)(font "Arial" (font_size 8)))
+		(line (pt 0 168)(pt 96 168)(line_width 3))
+	)
+	(port
+		(pt 0 184)
+		(input)
+		(text "clken" (rect 0 0 20 12)(font "Arial" (font_size 8)))
+		(text "clken" (rect 4 173 34 184)(font "Arial" (font_size 8)))
+		(line (pt 0 184)(pt 96 184)(line_width 1))
+	)
+	(port
+		(pt 0 200)
+		(input)
+		(text "chipselect" (rect 0 0 37 12)(font "Arial" (font_size 8)))
+		(text "chipselect" (rect 4 189 64 200)(font "Arial" (font_size 8)))
+		(line (pt 0 200)(pt 96 200)(line_width 1))
+	)
+	(port
+		(pt 0 216)
+		(input)
+		(text "write" (rect 0 0 17 12)(font "Arial" (font_size 8)))
+		(text "write" (rect 4 205 34 216)(font "Arial" (font_size 8)))
+		(line (pt 0 216)(pt 96 216)(line_width 1))
+	)
+	(port
+		(pt 0 248)
+		(input)
+		(text "writedata[31..0]" (rect 0 0 57 12)(font "Arial" (font_size 8)))
+		(text "writedata[31..0]" (rect 4 237 100 248)(font "Arial" (font_size 8)))
+		(line (pt 0 248)(pt 96 248)(line_width 3))
+	)
+	(port
+		(pt 0 264)
+		(input)
+		(text "byteenable[3..0]" (rect 0 0 62 12)(font "Arial" (font_size 8)))
+		(text "byteenable[3..0]" (rect 4 253 100 264)(font "Arial" (font_size 8)))
+		(line (pt 0 264)(pt 96 264)(line_width 3))
+	)
+	(port
+		(pt 0 232)
+		(output)
+		(text "readdata[31..0]" (rect 0 0 57 12)(font "Arial" (font_size 8)))
+		(text "readdata[31..0]" (rect 4 221 94 232)(font "Arial" (font_size 8)))
+		(line (pt 0 232)(pt 96 232)(line_width 3))
+	)
+	(drawing
+		(text "clk1" (rect 76 43 176 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "clk" (rect 101 67 220 144)(font "Arial" (color 0 0 0)))
+		(text "reset1" (rect 62 83 160 179)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "reset" (rect 101 107 232 224)(font "Arial" (color 0 0 0)))
+		(text "reset_req" (rect 101 123 256 256)(font "Arial" (color 0 0 0)))
+		(text "s1" (rect 85 139 182 291)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "address" (rect 101 163 244 336)(font "Arial" (color 0 0 0)))
+		(text "clken" (rect 101 179 232 368)(font "Arial" (color 0 0 0)))
+		(text "chipselect" (rect 101 195 262 400)(font "Arial" (color 0 0 0)))
+		(text "write" (rect 101 211 232 432)(font "Arial" (color 0 0 0)))
+		(text "readdata" (rect 101 227 250 464)(font "Arial" (color 0 0 0)))
+		(text "writedata" (rect 101 243 256 496)(font "Arial" (color 0 0 0)))
+		(text "byteenable" (rect 101 259 262 528)(font "Arial" (color 0 0 0)))
+		(text " pr_region_default_onchip_memory2_0 " (rect 86 280 388 570)(font "Arial" ))
+		(line (pt 96 32)(pt 160 32)(line_width 1))
+		(line (pt 160 32)(pt 160 280)(line_width 1))
+		(line (pt 96 280)(pt 160 280)(line_width 1))
+		(line (pt 96 32)(pt 96 280)(line_width 1))
+		(line (pt 97 52)(pt 97 76)(line_width 1))
+		(line (pt 98 52)(pt 98 76)(line_width 1))
+		(line (pt 97 92)(pt 97 132)(line_width 1))
+		(line (pt 98 92)(pt 98 132)(line_width 1))
+		(line (pt 97 148)(pt 97 268)(line_width 1))
+		(line (pt 98 148)(pt 98 268)(line_width 1))
+		(line (pt 0 0)(pt 256 0)(line_width 1))
+		(line (pt 256 0)(pt 256 296)(line_width 1))
+		(line (pt 0 296)(pt 256 296)(line_width 1))
+		(line (pt 0 0)(pt 0 296)(line_width 1))
+	)
+)

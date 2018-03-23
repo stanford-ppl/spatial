@@ -1,0 +1,186 @@
+/*
+WARNING: Do NOT edit the input and output ports in this file in a text
+editor if you plan to continue editing the block that represents it in
+the Block Editor! File corruption is VERY likely to occur.
+*/
+/*
+Copyright (C) 2017  Intel Corporation. All rights reserved.
+Your use of Intel Corporation's design tools, logic functions 
+and other software and tools, and its AMPP partner logic 
+functions, and any output files from any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Intel Program License 
+Subscription Agreement, the Intel Quartus Prime License Agreement,
+the Intel FPGA IP License Agreement, or other applicable license
+agreement, including, without limitation, that your use is for
+the sole purpose of programming logic devices manufactured by
+Intel and sold by Intel or its authorized distributors.  Please
+refer to the applicable agreement for further details.
+*/
+(header "symbol" (version "1.1"))
+(symbol
+	(rect 0 0 432 448)
+	(text "ghrd_10as066n2_pr_region_controller_0" (rect 98 -1 258 11)(font "Arial" (font_size 10)))
+	(text "inst" (rect 8 432 20 444)(font "Arial" ))
+	(port
+		(pt 0 72)
+		(input)
+		(text "avl_csr_read" (rect 0 0 54 12)(font "Arial" (font_size 8)))
+		(text "avl_csr_read" (rect 4 61 76 72)(font "Arial" (font_size 8)))
+		(line (pt 0 72)(pt 160 72)(line_width 1))
+	)
+	(port
+		(pt 0 88)
+		(input)
+		(text "avl_csr_write" (rect 0 0 54 12)(font "Arial" (font_size 8)))
+		(text "avl_csr_write" (rect 4 77 82 88)(font "Arial" (font_size 8)))
+		(line (pt 0 88)(pt 160 88)(line_width 1))
+	)
+	(port
+		(pt 0 104)
+		(input)
+		(text "avl_csr_address[1..0]" (rect 0 0 87 12)(font "Arial" (font_size 8)))
+		(text "avl_csr_address[1..0]" (rect 4 93 130 104)(font "Arial" (font_size 8)))
+		(line (pt 0 104)(pt 160 104)(line_width 3))
+	)
+	(port
+		(pt 0 120)
+		(input)
+		(text "avl_csr_writedata[31..0]" (rect 0 0 94 12)(font "Arial" (font_size 8)))
+		(text "avl_csr_writedata[31..0]" (rect 4 109 148 120)(font "Arial" (font_size 8)))
+		(line (pt 0 120)(pt 160 120)(line_width 3))
+	)
+	(port
+		(pt 0 192)
+		(input)
+		(text "bridge_freeze0_illegal_request" (rect 0 0 119 12)(font "Arial" (font_size 8)))
+		(text "bridge_freeze0_illegal_request" (rect 4 181 184 192)(font "Arial" (font_size 8)))
+		(line (pt 0 192)(pt 160 192)(line_width 1))
+	)
+	(port
+		(pt 0 248)
+		(input)
+		(text "bridge_freeze1_illegal_request" (rect 0 0 118 12)(font "Arial" (font_size 8)))
+		(text "bridge_freeze1_illegal_request" (rect 4 237 184 248)(font "Arial" (font_size 8)))
+		(line (pt 0 248)(pt 160 248)(line_width 1))
+	)
+	(port
+		(pt 0 288)
+		(input)
+		(text "clock_clk" (rect 0 0 36 12)(font "Arial" (font_size 8)))
+		(text "clock_clk" (rect 4 277 58 288)(font "Arial" (font_size 8)))
+		(line (pt 0 288)(pt 160 288)(line_width 1))
+	)
+	(port
+		(pt 0 344)
+		(input)
+		(text "pr_handshake_start_ack" (rect 0 0 100 12)(font "Arial" (font_size 8)))
+		(text "pr_handshake_start_ack" (rect 4 333 136 344)(font "Arial" (font_size 8)))
+		(line (pt 0 344)(pt 160 344)(line_width 1))
+	)
+	(port
+		(pt 0 376)
+		(input)
+		(text "pr_handshake_stop_ack" (rect 0 0 99 12)(font "Arial" (font_size 8)))
+		(text "pr_handshake_stop_ack" (rect 4 365 130 376)(font "Arial" (font_size 8)))
+		(line (pt 0 376)(pt 160 376)(line_width 1))
+	)
+	(port
+		(pt 0 416)
+		(input)
+		(text "reset_reset" (rect 0 0 46 12)(font "Arial" (font_size 8)))
+		(text "reset_reset" (rect 4 405 70 416)(font "Arial" (font_size 8)))
+		(line (pt 0 416)(pt 160 416)(line_width 1))
+	)
+	(port
+		(pt 0 136)
+		(output)
+		(text "avl_csr_readdata[31..0]" (rect 0 0 94 12)(font "Arial" (font_size 8)))
+		(text "avl_csr_readdata[31..0]" (rect 4 125 142 136)(font "Arial" (font_size 8)))
+		(line (pt 0 136)(pt 160 136)(line_width 3))
+	)
+	(port
+		(pt 0 176)
+		(output)
+		(text "bridge_freeze0_freeze" (rect 0 0 89 12)(font "Arial" (font_size 8)))
+		(text "bridge_freeze0_freeze" (rect 4 165 130 176)(font "Arial" (font_size 8)))
+		(line (pt 0 176)(pt 160 176)(line_width 1))
+	)
+	(port
+		(pt 0 232)
+		(output)
+		(text "bridge_freeze1_freeze" (rect 0 0 88 12)(font "Arial" (font_size 8)))
+		(text "bridge_freeze1_freeze" (rect 4 221 130 232)(font "Arial" (font_size 8)))
+		(line (pt 0 232)(pt 160 232)(line_width 1))
+	)
+	(port
+		(pt 0 328)
+		(output)
+		(text "pr_handshake_start_req" (rect 0 0 99 12)(font "Arial" (font_size 8)))
+		(text "pr_handshake_start_req" (rect 4 317 136 328)(font "Arial" (font_size 8)))
+		(line (pt 0 328)(pt 160 328)(line_width 1))
+	)
+	(port
+		(pt 0 360)
+		(output)
+		(text "pr_handshake_stop_req" (rect 0 0 97 12)(font "Arial" (font_size 8)))
+		(text "pr_handshake_stop_req" (rect 4 349 130 360)(font "Arial" (font_size 8)))
+		(line (pt 0 360)(pt 160 360)(line_width 1))
+	)
+	(port
+		(pt 432 72)
+		(output)
+		(text "reset_source_reset" (rect 0 0 79 12)(font "Arial" (font_size 8)))
+		(text "reset_source_reset" (rect 332 61 440 72)(font "Arial" (font_size 8)))
+		(line (pt 432 72)(pt 272 72)(line_width 1))
+	)
+	(drawing
+		(text "avl_csr" (rect 119 43 280 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "read" (rect 165 67 354 144)(font "Arial" (color 0 0 0)))
+		(text "write" (rect 165 83 360 176)(font "Arial" (color 0 0 0)))
+		(text "address" (rect 165 99 372 208)(font "Arial" (color 0 0 0)))
+		(text "writedata" (rect 165 115 384 240)(font "Arial" (color 0 0 0)))
+		(text "readdata" (rect 165 131 378 272)(font "Arial" (color 0 0 0)))
+		(text "bridge_freeze0" (rect 73 147 230 307)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "freeze" (rect 165 171 366 352)(font "Arial" (color 0 0 0)))
+		(text "illegal_request" (rect 165 187 420 384)(font "Arial" (color 0 0 0)))
+		(text "bridge_freeze1" (rect 75 203 234 419)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "freeze" (rect 165 227 366 464)(font "Arial" (color 0 0 0)))
+		(text "illegal_request" (rect 165 243 420 496)(font "Arial" (color 0 0 0)))
+		(text "clock" (rect 132 259 294 531)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "clk" (rect 165 283 348 576)(font "Arial" (color 0 0 0)))
+		(text "pr_handshake" (rect 78 299 228 611)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "start_req" (rect 165 323 384 656)(font "Arial" (color 0 0 0)))
+		(text "start_ack" (rect 165 339 384 688)(font "Arial" (color 0 0 0)))
+		(text "stop_req" (rect 165 355 378 720)(font "Arial" (color 0 0 0)))
+		(text "stop_ack" (rect 165 371 378 752)(font "Arial" (color 0 0 0)))
+		(text "reset" (rect 131 387 292 787)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "reset" (rect 165 411 360 832)(font "Arial" (color 0 0 0)))
+		(text "reset_source" (rect 273 43 618 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "reset" (rect 247 67 524 144)(font "Arial" (color 0 0 0)))
+		(text " ghrd_10as066n2_pr_region_controller_0 " (rect 256 432 746 874)(font "Arial" ))
+		(line (pt 160 32)(pt 272 32)(line_width 1))
+		(line (pt 272 32)(pt 272 432)(line_width 1))
+		(line (pt 160 432)(pt 272 432)(line_width 1))
+		(line (pt 160 32)(pt 160 432)(line_width 1))
+		(line (pt 161 52)(pt 161 140)(line_width 1))
+		(line (pt 162 52)(pt 162 140)(line_width 1))
+		(line (pt 161 156)(pt 161 196)(line_width 1))
+		(line (pt 162 156)(pt 162 196)(line_width 1))
+		(line (pt 161 212)(pt 161 252)(line_width 1))
+		(line (pt 162 212)(pt 162 252)(line_width 1))
+		(line (pt 161 268)(pt 161 292)(line_width 1))
+		(line (pt 162 268)(pt 162 292)(line_width 1))
+		(line (pt 161 308)(pt 161 380)(line_width 1))
+		(line (pt 162 308)(pt 162 380)(line_width 1))
+		(line (pt 161 396)(pt 161 420)(line_width 1))
+		(line (pt 162 396)(pt 162 420)(line_width 1))
+		(line (pt 271 52)(pt 271 76)(line_width 1))
+		(line (pt 270 52)(pt 270 76)(line_width 1))
+		(line (pt 0 0)(pt 432 0)(line_width 1))
+		(line (pt 432 0)(pt 432 448)(line_width 1))
+		(line (pt 0 448)(pt 432 448)(line_width 1))
+		(line (pt 0 0)(pt 0 448)(line_width 1))
+	)
+)

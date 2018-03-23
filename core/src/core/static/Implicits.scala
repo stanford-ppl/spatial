@@ -103,10 +103,20 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   final def blocks: Seq[Block[_]] = op.map(_.blocks).getOrElse(Nil)
 
   /** Returns non-data, effect dependencies of the symbol. */
-  final def antiDeps: Seq[Sym[_]] = effectsOf(exp).antiDeps.map(_.sym)
+  final def antiDeps: Seq[Sym[_]] = effects.antiDeps.map(_.sym)
 
   /** Returns all scheduling dependencies of the symbol. */
   final def allDeps: Seq[Sym[_]] = inputs ++ antiDeps
+
+  /** Returns all symbols which uses this symbol as an input. **/
+  def consumers: Set[Sym[_]] = metadata[Consumers](exp).map(_.users).getOrElse(Set.empty)
+
+  /** Sets the consumers for this symbol. **/
+  def consumers_=(xs: Set[Sym[_]]): Unit = metadata.add(exp, Consumers(xs))
+
+  def effects: Effects = metadata[Effects](exp).getOrElse(Effects.Pure)
+  def effects_=(eff: Effects): Unit = metadata.add(exp, eff)
+  def isMutable: Boolean = effects.isMutable
 
   /** View the staged value or type as B[A]. */
   def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {

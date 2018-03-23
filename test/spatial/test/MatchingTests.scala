@@ -1,7 +1,6 @@
 package spatial.test
 
 import core._
-import nova.test.NovaTestbench
 import spatial.lang._
 import utest._
 

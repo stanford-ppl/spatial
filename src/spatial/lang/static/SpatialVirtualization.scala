@@ -23,16 +23,15 @@ trait SpatialVirtualization extends NovaVirtualization {
     ifThenElse(cond, () => thenBr, () => elseBr)
   }
 
-
-
-  /*@rig def __ifThenElse[A:Type](cond: Bit, thenBr: => A, elseBr: => A): A = {
-    ifThenElse(cond, () => thenBr, () => elseBr)
-  }*/
-
   @rig private def ifThenElse[A:Type](cond: Bit, thenBr: () => Sym[A], elseBr: () => Sym[A]): A = {
     val blkThen = stageBlock{ thenBr() }
     val blkElse = stageBlock{ elseBr() }
     stage(IfThenElse[A](cond,blkThen,blkElse))
   }
 
+
+  @rig def infix_+[A](x1: String, x2: A): Text = x2 match {
+    case t: Top[_] => Text(x1) ++ t.toText
+    case _ => Text(x1 + x2)
+  }
 }

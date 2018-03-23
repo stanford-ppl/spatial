@@ -27,9 +27,9 @@ trait StaticDebugsExternal { this: ExternalStatics =>
     @api def r(args: Any*): Text = {
       val quotedArgs = args.toArray.map{
         case t: Top[_] => t.toText
-        case t         => Text.c(t.toString)
+        case t         => Text(t.toString)
       }
-      val quotedParts = sc.parts.map(Text.c)
+      val quotedParts = sc.parts.map(Text.apply)
 
       val str = quotedParts.interleave(quotedArgs)
       stage(TextConcat(str))

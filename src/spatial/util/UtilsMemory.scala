@@ -41,6 +41,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     def isFIFO: Boolean = x.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = x.isInstanceOf[LIFO[_]]
 
+    def isStatusReader: Boolean = StatusReader.unapply(x).isDefined
     def isReader: Boolean = Reader.unapply(x).isDefined
     def isWriter: Boolean = Writer.unapply(x).isDefined
 

@@ -86,7 +86,9 @@ object Reader {
 }
 
 /** Any dequeue-like operation from a memory */
-abstract class DequeuerLike[A:Bits,R:Bits] extends Reader[A,R]
+abstract class DequeuerLike[A:Bits,R:Bits] extends Reader[A,R] {
+  override def effects: Effects = Effects.Writes(mem)
+}
 
 object DequeuerLike {
   def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {

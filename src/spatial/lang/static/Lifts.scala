@@ -37,7 +37,7 @@ trait LiftsPriority1 extends LiftsPriority2 { this: Lifts =>
   @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 
   // Shadows Predef method
-  @api implicit def wrapString(x: String): Text = Text.c(x)
+  @api implicit def wrapString(x: String): Text = Text(x)
 
   @api implicit def FixFromInt[S:BOOL,I:INT,F:INT](c: Int): Fix[S,I,F] = c.to[Fix[S,I,F]]
 }
@@ -150,7 +150,7 @@ trait Lifts extends LiftsPriority1 {
   }
   @rig implicit def doubleWrapper(b: Double): DoubleWrapper = new DoubleWrapper(b)
 
-  @api implicit def augmentString(x: String): Text = Text.c(x)
+  @api implicit def augmentString(x: String): Text = Text(x)
 
   // --- Boolean
   implicit lazy val castBooleanToBit: Cast[Boolean,Bit] = Right(new Lifter[Boolean,Bit])

@@ -1,7 +1,6 @@
 package spatial.test
 
-import _root_.spatial.lib._
-import nova.test.NovaTestbench
+import spatial.lib._
 import spatial.dsl._
 import utest._
 

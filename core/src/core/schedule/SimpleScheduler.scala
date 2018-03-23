@@ -1,6 +1,8 @@
 package core
 package schedule
 
+import scala.collection.mutable
+
 class SimpleScheduler extends Scheduler {
   def mustMotion = false
 
@@ -14,7 +16,16 @@ class SimpleScheduler extends Scheduler {
     allowMotion: Boolean
   ): Schedule[R] = {
     val effects = summarizeScope(impure)
-    val block = new Block[R](inputs,scope,result,effects,options)
+
+    val unused = mutable.HashSet.empty[Sym[_]]
+
+    scope.reverseIterator.foreach{s =>
+      val uses = s.consumers diff unused
+      if (uses.isEmpty && s.effects.isIdempotent) unused += s
+    }
+    val keep  = scope.filter{s => !unused.contains(s) }
+
+    val block = new Block[R](inputs,keep,result,effects,options)
     Schedule(block, Nil)
   }
 }

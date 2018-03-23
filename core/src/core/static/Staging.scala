@@ -39,7 +39,7 @@ trait Staging { this: Printing =>
     *   2. No mutation of immutable symbols
     */
   @rig def checkAliases(sym: Sym[_], effects: Effects): Unit = {
-    val immutables = effects.writes.filterNot(x => isMutable(x))
+    val immutables = effects.writes.filterNot(_.isMutable)
     val aliases = mutableAliases(op) diff effects.writes
 
     //        logs(s"  aliases: ${aliasSyms(op)}")
@@ -89,13 +89,14 @@ trait Staging { this: Printing =>
         checkAliases(sym,effects)
         runFlows(sym,op)
 
-        state.scope :+= sym // Append (effective constant time for Vector)
-        if (!effects.isPure) state.impure +:= Impure(sym,effects)
-        if (effects != Effects.Pure) effectsOf(sym) = effects
-        if (mayCSE) state.cache += op -> sym
+        state.scope :+= sym
+        if (effects.mayCSE)  state.cache += op -> sym               // Add to CSE cache
+        if (!effects.isPure) state.impure :+= Impure(sym,effects)   // Add to list of impure syms
+        if (!effects.isPure) sym.effects = effects                  // Register effects
+        op.inputs.foreach{in => in.consumers += sym }               // Register consumed
         lhs
       }
-      state.cache.get(op).filter{s => mayCSE && effectsOf(s) == effects} match {
+      state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {
         case Some(s) if s.tp <:< op.R => s.asInstanceOf[R]
         case None => stageEffects(addToCache = mayCSE)
       }
@@ -133,7 +134,7 @@ trait Staging { this: Printing =>
   @stateful final def allAliases(x: Any): Set[Sym[_]] = {
     shallowAliases(x) ++ deepAliases(x)
   }
-  @stateful final def mutableAliases(x: Any): Set[Sym[_]] = allAliases(x).filter(x => isMutable(x))
+  @stateful final def mutableAliases(x: Any): Set[Sym[_]] = allAliases(x).filter(_.isMutable)
   @stateful final def mutableInputs(d: Op[_]): Set[Sym[_]] = {
     val bounds = d.binds
     val actuallyReadSyms = d.reads diff bounds

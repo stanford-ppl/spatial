@@ -1,6 +1,5 @@
 package spatial.test
 
-import nova.test._
 import spatial.dsl._
 import utest._
 

@@ -71,7 +71,15 @@ abstract class Op[R:Type] extends Serializable with Product {
   @rig def rewrite: R = null.asInstanceOf[R]
   def mirror(f:Tx): Op[R] = throw new Exception(s"Use @op annotation or override mirror method for node class $productPrefix")
   def update(f:Tx): Unit  = throw new Exception(s"Use @op annotation or override update method for node class $productPrefix")
+
+  protected def cold(x: Any*): Seq[(Sym[_], Freq)] = syms(x).map{s => (s,Freq.Cold)}
+  protected def normal(x: Any*): Seq[(Sym[_],Freq)] = syms(x).map{s => (s,Freq.Normal) }
+  protected def hot(x: Any*): Seq[(Sym[_],Freq)] = syms(x).map{s => (s,Freq.Hot) }
 }
+
+abstract class Op2[A:Type,R:Type] extends Op[R] { val A: Type[A] = Type[A] }
+abstract class Op3[A:Type,B:Type,R:Type] extends Op2[A,R] { val B: Type[B] = Type[B] }
+abstract class Op4[A:Type,B:Type,C:Type,R:Type] extends Op3[A,B,R] { val C: Type[C] = Type[C] }
 
 object Op {
   def unapply[A](x: Exp[_,A]): Option[Op[A]] = x.op

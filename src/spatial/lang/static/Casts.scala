@@ -7,6 +7,15 @@ import spatial.node._
 
 trait CastsPriority3 {
 
+  implicit class AppendOps[A:Type](x: A)(implicit ctx: SrcCtx, state: State) {
+    def +(y: Any): Text = (x, y) match {
+      case (a: Top[_], b: Top[_]) => a.toText ++ b.toText
+      case (a, b: Top[_]) => Text(a.toString) ++ b.toText
+      case (a: Top[_], b) => a.toText ++ Text(b.toString)
+      case (a, b)         => Text(a.toString) ++ Text(b.toString)
+    }
+  }
+
 }
 
 trait CastsPriority2 extends CastsPriority3 {

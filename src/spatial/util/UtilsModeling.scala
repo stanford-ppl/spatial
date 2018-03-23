@@ -25,14 +25,24 @@ case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) exten
 
 
 trait UtilsModeling {
-
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
-    val schedule = block.nestedStms
-      .filter{e => e.isBits }
-
-    val result = (block +: schedule.flatMap{_.blocks}).flatMap{b => exps(b) }
-
+    val schedule = block.nestedStms.filter{e => e.isBits }
+    val result   = (block +: schedule.flatMap{_.blocks}).flatMap{b => exps(b) }
     (schedule, result)
+  }
+
+  /** Returns all nodes on all paths from start --> end, including start and end
+    * If there are no such paths, returns an empty set.
+    */
+  def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
+    def dfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+      if (scope.contains(x)) {
+        if (x == start) nodes + x
+        else dfs(x.allDeps.toSet, nodes + x)
+      }
+      else Set.empty[Sym[_]]
+    }
+    dfs(Set(end),Set(end))
   }
 
   @stateful def latencyModel: LatencyModel = spatialConfig.target.latencyModel
@@ -55,7 +65,7 @@ trait UtilsModeling {
   @stateful def latencyAndInterval(
     block:    Block[_],
     inReduce: Boolean = false,
-    verbose:  Boolean = true
+    verbose:  Boolean = false
   ): (Double, Double) = {
     val (latencies, cycles) = latenciesAndCycles(block, verbose = verbose)
     val scope = latencies.keySet
@@ -75,17 +85,68 @@ trait UtilsModeling {
   }
 
 
-  @stateful def latenciesAndCycles(block: Block[_], verbose: Boolean = true): (Map[Sym[_],Double], Set[Cycle]) = {
+  @stateful def latenciesAndCycles(block: Block[_], verbose: Boolean = false): (Map[Sym[_],Double], Set[Cycle]) = {
     val (schedule, result) = blockNestedScheduleAndResult(block)
     pipeLatencies(result, schedule, verbose = verbose)
   }
 
-  // TODO: This is an enormous method - can we break this up?
+  case class AccessPair(mem: Sym[_], access: Sym[_])
+  case class AccumTriple(mem: Sym[_], read: Sym[_], write: Sym[_])
+
+  case class ScopeAccumInfo(
+    readers: Map[Sym[_],Set[Sym[_]]], // Memory -> readers
+    writers: Map[Sym[_],Set[Sym[_]]], // Memory -> writers
+    accums:  Set[AccumTriple],
+    cycles:  mutable.Map[Sym[_], mutable.Set[AccumTriple]]
+  )
+
+  @stateful def findAccumCycles(scope: Set[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
+    val cycles = mutable.HashMap[Sym[_],mutable.Set[AccumTriple]]()
+    def addCycle(sym: Sym[_], triple: AccumTriple): Unit = {
+      val set = cycles.getOrElseAdd(sym, () => mutable.HashSet.empty)
+      set += triple
+    }
+
+    val readers = scope.collect{
+      case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
+      case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
+    }
+    val writers = scope.collect{
+      case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
+      case reader @ DequeuerLike(mem,_,_) => AccessPair(mem, reader)
+    }
+    val readersByMem = readers.groupBy(_.mem).mapValues(_.map(_.access))
+    val writersByMem = writers.groupBy(_.mem).mapValues(_.map(_.access))
+    val memories = readersByMem.keySet intersect writersByMem.keySet
+
+    val accums = memories.flatMap{mem =>
+      val rds = readersByMem(mem)
+      val wrs = writersByMem(mem)
+      rds.cross(wrs).flatMap{case (rd, wr) =>
+        lazy val triple = AccumTriple(mem, rd, wr)
+        val path = getAllNodesBetween(rd, wr, scope)
+        path.foreach{sym => addCycle(sym, triple) }
+
+        if (verbose && path.nonEmpty) {
+          dbgs("Found cycle between: ")
+          dbgs(s"  ${stm(wr)}")
+          dbgs(s"  ${stm(rd)}")
+          path.foreach{node => dbgs(s"    ${stm(node)}") }
+        }
+
+        if (path.nonEmpty) Some(triple) else None
+      }
+    }
+
+    ScopeAccumInfo(readersByMem, writersByMem, accums, cycles)
+  }
+
+
   @stateful def pipeLatencies(
     result:   Seq[Sym[_]],
     schedule: Seq[Sym[_]],
     oos:      Map[Sym[_],Double] = Map.empty,
-    verbose:  Boolean = true
+    verbose:  Boolean = false
   ): (Map[Sym[_],Double], Set[Cycle]) = {
 
     dbgs(s"----------------------------------")
@@ -93,49 +154,12 @@ trait UtilsModeling {
     schedule.foreach{e => dbgs(s"  ${stm(e)}")}
 
     val scope = schedule.toSet
-    val knownCycles = mutable.HashMap[Sym[_],Set[(Sym[_],Sym[_])]]()
 
-    // TODO: FifoDeq appears as Reader and DequeueLike.  Adds "fake" cycles but shouldn't impact final answer since we take max
-    val localReads  = scope.collect{case reader @ Reader(mem,_,_) => reader -> mem }
-    val localWrites = scope.collect{case writer @ Writer(mem,_,_,_) => writer -> mem
-                                    case reader @ DequeuerLike(mem,_,_) => reader -> mem
-                                   }
-    val localStatuses = scope.collect{case reader @ StatusReader(mem,_) => reader -> mem}
-
-    val localAccums = localWrites.flatMap{case (writer,writtenMem) =>
-      (localReads ++ localStatuses).flatMap{case (reader,readMem) =>
-        if (readMem == writtenMem) {
-          val path = writer.getNodesBetween(reader, scope)
-
-          path.foreach{sym =>
-            knownCycles += sym -> (knownCycles.getOrElse(sym, Set.empty[(Sym[_],Sym[_])]) + ((reader, writer)) )
-          }
-
-          if (verbose && path.nonEmpty) {
-            dbgs("Found cycle between: ")
-            dbgs(s"  ${stm(writer)}")
-            dbgs(s"  ${stm(reader)}")
-            path.foreach{node =>
-              dbgs(s"    ${stm(node)}")
-            }
-          }
-          else {
-            dbgs(s"No cycle between: ")
-            dbgs(s"  ${stm(writer)}")
-            dbgs(s"  ${stm(reader)}")
-          }
-
-          if (path.nonEmpty) {
-            Some((reader,writer,writtenMem))
-          }
-          else None
-        }
-        else None
-        //readMem == writtenMem && writer.dependsOn(reader)
-      }
-    }
-    val accumReads = localAccums.map(_._1)
-    val accumWrites = localAccums.map(_._2)
+    val accumInfo = findAccumCycles(scope,verbose)
+    val accums      = accumInfo.accums
+    val accumReads  = accums.map(_.read)
+    val accumWrites = accums.map(_.write)
+    val knownCycles = accumInfo.cycles
 
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
@@ -144,17 +168,16 @@ trait UtilsModeling {
 
     def fullDFS(cur: Sym[_]): Double = cur match {
       case Op(d) if scope.contains(cur) =>
-        val deps = scope intersect cur.allDeps.toSet // Handles effect scheduling, even though there's no data to pass
+        // Handles effect scheduling, even though there's no data to pass
+        val deps = scope intersect cur.allDeps.toSet
 
         if (deps.nonEmpty) {
           val dlys = deps.map{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
 
-          // Primitives are not allowed to be loops, so the latency of nested symbols must be some function of its blocks
-          // e.g. the max of all or the sum of all
+          // Primitives are not allowed to be loops, so the latency of nested symbols
+          // must be some function of its blocks, e.g. the max of all or the sum of all
           // (For now, all cases are just the max of all inputs)
-          val critical = d match {
-            case _ => dlys.max
-          }
+          val critical = d match {case _ => dlys.max }
 
           val cycleSyms = deps intersect cycles.keySet
           if (cycleSyms.nonEmpty) {
@@ -164,7 +187,8 @@ trait UtilsModeling {
 
           val inReduce = knownCycles.contains(cur)
 
-          val delay = critical + latencyOf(cur, inReduce) // TODO + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
+          // TODO[3]: + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
+          val delay = critical + latencyOf(cur, inReduce)
 
           if (verbose) dbgs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
@@ -208,7 +232,7 @@ trait UtilsModeling {
       // Perform forwards pass for normal data dependencies
       result.foreach{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
 
-      // TODO: What to do in case where a node is contained in multiple cycles?
+      // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
         if (verbose) dbgs(s"Cycle #$i: ")
@@ -216,48 +240,47 @@ trait UtilsModeling {
       }
     }
 
-    //val cycleSyms = accumWrites.flatMap{writer => cycles(writer) }
-
-    val warCycles = localAccums.map{case (reader,writer,mem) =>
+    val warCycles = accums.map{case AccumTriple(mem,reader,writer) =>
       val symbols = cycles(writer)
       val cycleLengthExact = paths(writer) - paths(reader)
-      val cycleLength = if (localStatuses.toList.map(_._1).contains(reader)) cycleLengthExact + 1.0 else cycleLengthExact // FIFO/Stack operations need extra cycle for status update (?)
+      // TODO[2]: FIFO/Stack operations need extra cycle for status update?
+      val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
       WARCycle(reader, writer, mem, symbols, cycleLength)
     }
 
-    def pushMultiplexedAccesses(accessors: Set[(Sym[_],Sym[_])]) = accessors.groupBy{_._2}.map{case (mem,accesses) =>
+    def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.map{case (mem,accesses) =>
       dbgs(s"Multiplexed accesses for memory $mem: ")
-      accesses.foreach{access => dbgs(s"  ${stm(access._1)}") }
+      accesses.foreach{access => dbgs(s"  ${stm(access)}") }
 
-      val muxPairs = accesses.map{x =>
-        // NOTE: After unrolling there should be only one mux index per access
-        // unless the common parent is a Switch
-        val muxes = portsOf(x._1).values.map(_.muxPort) //  muxIndexOf.getMem(x._1,x._2)
-        (x, paths.getOrElse(x._1,0.0), muxes.fold(0){Math.max})
+      // NOTE: After unrolling there should be only one mux index per access
+      // unless the common parent is a Switch
+      val muxPairs = accesses.map{access =>
+        val muxes = portsOf(access).values.map(_.muxPort)
+        (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
       }.toSeq
 
-      val length = muxPairs.map(_._3).fold(0){Math.max} + 1
+      val length = muxPairs.map(_._3).maxOrElse(0) + 1
 
       // Keep accesses with the same mux index together, even if they have different delays
       // TODO[1]: This isn't quite right - should order by common parent instead?
-      val groupedMuxPairs = muxPairs.groupBy(_._3)
-      val orderedMuxPairs = groupedMuxPairs.values.toList.sortBy{pairs => pairs.map(_._2).max }
+      val groupedMuxPairs = muxPairs.groupBy(_._3)  // Group by maximum mux port
+      val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
       var writeStage = 0.0
       orderedMuxPairs.foreach{pairs =>
         val dlys = pairs.map(_._2) :+ writeStage
         val writeDelay = dlys.max
         writeStage = writeDelay + 1
-        pairs.foreach{case (x, dly, _) =>
-          dbgs(s"Pushing ${stm(x._1)} to $writeDelay due to muxing")
-          paths(x._1) = writeDelay
+        pairs.foreach{case (access, dly, _) =>
+          dbgs(s"Pushing ${stm(access)} to $writeDelay due to muxing")
+          paths(access) = writeDelay
         }
       }
 
-      AAACycle(accesses.map(_._1), mem, length)
+      AAACycle(accesses, mem, length)
     }
 
-    val wawCycles = pushMultiplexedAccesses(localWrites)
-    val rarCycles = pushMultiplexedAccesses(localReads)
+    val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
+    val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
 
     if (verbose) {

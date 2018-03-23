@@ -79,6 +79,9 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   override def isAssociative: Boolean = true
 }
 
+/** Fixed fused multiply add */
+@op case class FixFMA[S:BOOL,I:INT,F:INT](m0: Fix[S,I,F], m1: Fix[S,I,F], add: Fix[S,I,F]) extends FixOp1[S,I,F]
+
 /** Fixed point division */
 @op case class FixDiv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_/_) {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {

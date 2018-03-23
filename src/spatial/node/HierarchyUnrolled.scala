@@ -31,12 +31,14 @@ abstract class BankedReader[T:Type](implicit vT: Type[Vec[T]]) extends BankedAcc
 }
 
 abstract class BankedDequeue[T:Type](implicit vT: Type[Vec[T]]) extends BankedReader[T] {
+  override def effects: Effects = Effects.Writes(mem)
   def bank: Seq[Seq[Idx]] = Nil
   def ofs: Seq[Idx] = Nil
 }
 
 
 abstract class BankedWriter[T:Type] extends BankedAccessor[T,Void] {
+  override def effects: Effects = Effects.Writes(mem)
   def data: Seq[Sym[_]]
   def bankedRead: Option[BankedRead] = None
   def bankedWrite = Some(BankedWrite(mem,data,bank,ofs,enss))

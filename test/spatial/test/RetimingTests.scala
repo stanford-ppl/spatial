@@ -1,6 +1,5 @@
 package spatial.test
 
-import nova.test.NovaTestbench
 import spatial.dsl._
 import utest._
 
@@ -63,9 +62,36 @@ import utest._
   }
 }
 
+@spatial object RetimeRandomTest {
+  def main(): Void = {
+    val x = ArgOut[Bit]
+    Accel {
+      val y = random[Bit]
+      x := !y
+    }
+    println(r"bit: $x")
+  }
+}
+
+@spatial object RetimeOffsetTest {
+  def main(): Void = {
+    Accel {
+      val sram = SRAM[I32](64)
+      val reg = Reg[I32](0)
+      Foreach(64 par 2){i =>
+        sram(i + reg.value) = i
+        reg := (reg.value+1)*5
+      }
+      Foreach(64 par 16){i => println(sram(i)) }
+    }
+  }
+}
+
 
 object RetimingTests extends Testbench { val tests = Tests {
   'SimpleRetimePipe - test(SimpleRetimePipe)
   'RetimeLoop - test(RetimeLoop)
   'NestedPipeTest - test(NestedPipeTest)
+  'RetimeRandomTest - test(RetimeRandomTest)
+  'RetimeOffsetTest - test(RetimeOffsetTest)
 }}

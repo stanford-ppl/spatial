@@ -29,9 +29,9 @@ case class Effects(
   def andThen(that: Effects): Effects = this.combine(that, m1 = false, m2 = true)
   def star: Effects = this.copy(mutable = false) // Pure orElse this
 
-  def isPure: Boolean = this == Effects.Pure || this == Effects.Sticky
+  def isPure: Boolean = this == Effects.Pure
   def isMutable: Boolean = mutable
-  def isIdempotent: Boolean = !simple && !global && !mutable && writes.isEmpty
+  def isIdempotent: Boolean = !simple && !global && !mutable && writes.isEmpty && !throws
   def mayCSE: Boolean = isIdempotent && !unique
 
   def mayWrite(ss: Set[Sym[_]]): Boolean = global || ss.exists { s => writes contains s }
@@ -75,19 +75,7 @@ object Effects {
 case class Impure(sym: Sym[_], effects: Effects)
 object Impure {
   def unapply(x: Sym[_]): Option[(Sym[_],Effects)] = {
-    val effects = effectsOf(x)
+    val effects = x.effects
     if (effects.isPure && effects.antiDeps.isEmpty) None else Some((x,effects))
   }
-}
-
-object effectsOf {
-  def apply(s: Sym[_]): Effects = metadata[Effects](s).getOrElse(Effects.Pure)
-  def update(s: Sym[_], e: Effects): Unit = metadata.add(s, e)
-}
-
-object antidepsOf {
-  def apply(x: Sym[_]): Seq[Impure] = effectsOf(x).antiDeps
-}
-object isMutable {
-  def apply(s: Sym[_]): Boolean = effectsOf(s).isMutable
 }

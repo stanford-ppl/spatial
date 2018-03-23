@@ -47,7 +47,12 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     result
   }
 
-  def scrubNoise(x: Double): Double = {if ( (x*1000) % 1 == 0) x else if ( (x*1000) % 1 < 0.5) (x*1000).toInt.toDouble/1000.0 else ((x*1000).toInt + 1).toDouble/1000.0 } // Round out to nearest 1/1000 because numbers like 1.1999999997 - 0.2 < 1.0 and screws things up
+  // Round out to nearest 1/1000 because numbers like 1.1999999997 - 0.2 < 1.0 and screws things up
+  def scrubNoise(x: Double): Double = {
+    if ( (x*1000) % 1 == 0) x
+    else if ( (x*1000) % 1 < 0.5) (x*1000).toInt.toDouble/1000.0
+    else ((x*1000).toInt + 1).toDouble/1000.0
+  }
   def requiresRegisters(x: Sym[_]): Boolean = latencyModel.requiresRegisters(x, cycles.contains(x))
   def retimingDelay(x: Sym[_]): Double = if (requiresRegisters(x)) latencyOf(x, cycles.contains(x)) else 0.0
 
@@ -134,7 +139,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
       // Ignore non-bit based values
       val inputs = bitBasedInputs(d) //diff d.blocks.flatMap(blk => exps(blk))
 
-      dbgs(s"[$criticalPath = ${delayOf(reader)} - ${latencyOf(reader,inReduce)}] ${stm(reader)}")
+      dbgs(s"[Arrive = Dly - Lat: $criticalPath = ${delayOf(reader)} - ${latencyOf(reader,inReduce)}] ${stm(reader)}")
       //logs(c"  " + inputs.map{in => c"in: ${delayOf(in)}"}.mkString(", ") + "[max: " + criticalPath + "]")
       inputs.flatMap{in =>
         val latency_required = scrubNoise(criticalPath)    // Target latency required upon reaching this reader

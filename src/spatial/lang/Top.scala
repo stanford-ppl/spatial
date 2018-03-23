@@ -46,7 +46,7 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
   @api def ++(that: Any): Text = that match {
     case t: Text   => Text.concat(this.toText, t)
     case t: Top[_] => Text.concat(this.toText, t.toText)
-    case t => Text.concat(this.toText, Text.c(t.toString))
+    case t => Text.concat(this.toText, Text(t.toString))
   }
 
   @api def toText: Text = stage(GenericToText(me)(this.selfType))

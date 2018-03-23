@@ -29,7 +29,7 @@ case class AffineMatrices(matrices: Seq[AccessMatrix]) extends AnalysisData[Affi
 }
 @data object affineMatricesOf {
   def get(access: Sym[_]): Option[Seq[AccessMatrix]] = metadata[AffineMatrices](access).map(_.matrices)
-  def apply(access: Sym[_]): Seq[AccessMatrix] = affineMatricesOf.get(access).getOrElse{throw new Exception(s"No affine matrices defined for $access")}
+  def apply(access: Sym[_]): Seq[AccessMatrix] = affineMatricesOf.get(access).getOrElse(Nil)
   def update(access: Sym[_], matrices: Seq[AccessMatrix]): Unit = metadata.add(access, AffineMatrices(matrices))
 }
 

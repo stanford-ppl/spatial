@@ -11,15 +11,13 @@ trait UtilsIR {
 
 
   @stateful def canMotion(stms: Seq[Sym[_]]): Boolean = {
-    stms.forall{s => !takesEnables(s) && effectsOf(s).isIdempotent }
+    stms.forall{s => !takesEnables(s) && s.effects.isIdempotent }
   }
   @stateful def shouldMotion(stms: Seq[Sym[_]], inHw: Boolean): Boolean = {
     canMotion(stms) && (inHw || stms.length == 1)
   }
 
   implicit class SymUtils[A](x: Sym[A]) {
-    def consumers: Set[Sym[_]] = consumersOf(x)
-
     def isIdx:  Boolean = x.tp match {
       case FixPtType(_,_,0) => true
       case _ => false
@@ -36,16 +34,7 @@ trait UtilsIR {
       }.getOrElse(Set.empty)
     }
 
-    def getNodesBetween(y: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
-      def dfs(frontier: Seq[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.toSet.flatMap{x: Sym[_] =>
-        if (scope.contains(x)) {
-          if (x == y) nodes + x
-          else dfs(x.allDeps, nodes + x)
-        }
-        else Set.empty[Sym[_]]
-      }
-      dfs(Seq(x),Set(x))
-    }
+
   }
 
   implicit class ParamHelpers(x: Sym[_]) {

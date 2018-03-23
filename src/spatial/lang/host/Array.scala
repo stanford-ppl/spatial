@@ -111,3 +111,25 @@ import spatial.node._
 
   @api override def toText: Text = this.mkString(", ")
 }
+
+object Array {
+  /** Returns an immutable Array with the given `size` and elements defined by `func`. */
+  @api def tabulate[A:Type](size: I32)(func: I32 => A): Array[A] = {
+    val i = bound[I32]
+    val funcBlk = stageLambda1(i){ func(i) }
+    stage(MapIndices(size, funcBlk))
+  }
+
+  /**
+    * Returns an immutable Array with the given `size` and elements defined by `func`.
+    * Note that while `func` does not depend on the index, it is still executed `size` times.
+    */
+  @api def fill[A:Type](size: I32)(func: => A): Array[A] = this.tabulate(size){ _ => func}
+
+  /** Returns an empty, mutable Array with the given `size`. */
+  @api def empty[A:Type](size: I32): Array[A] = stage(ArrayNew[A](size))
+
+  /** Returns an immutable Array with the given elements. */
+  @api def apply[A:Type](elements: A*): Array[A] = stage(ArrayFromSeq[A](elements.map{s => box(s)}))
+
+}

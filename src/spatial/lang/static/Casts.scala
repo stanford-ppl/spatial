@@ -33,7 +33,7 @@ trait CastsPriority1 extends CastsPriority2 {
 }
 
 trait Casts extends CastsPriority1 { this: SpatialStatics =>
-  implicit def boxTop[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
+  implicit def box[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
   implicit class BoxSym[A:Type](x: A) extends core.static.ExpMiscOps[Any,A](x)
 
 

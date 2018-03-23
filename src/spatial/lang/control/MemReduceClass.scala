@@ -11,22 +11,22 @@ protected class MemReduceAccum[A,C[T]](
   fold:  Boolean,
   opt:   CtrlOpt
 ) {
-  /** 1 dimensional memory reduction **/
+  /** 1 dimensional memory reduction */
   @api def apply(domain1: Counter[I32])(map: I32 => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     apply(Seq(domain1)){x => map(x(0)) }{reduce}
   }
 
-  /** 2 dimensional memory reduction **/
+  /** 2 dimensional memory reduction */
   @api def apply(domain1: Counter[I32], domain2: Counter[I32])(map: (I32,I32) => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     apply(Seq(domain1,domain2)){x => map(x(0),x(1)) }{reduce}
   }
 
-  /** 3 dimensional memory reduction **/
+  /** 3 dimensional memory reduction */
   @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32])(map: (I32,I32,I32) => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     apply(Seq(domain1,domain2,domain3)){x => map(x(0),x(1),x(2)) }{reduce}
   }
 
-  /** N dimensional memory reduction **/
+  /** N dimensional memory reduction */
   @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     val cchain = CounterChain(domain)
     val iters = List.fill(domain.length){ bound[I32] }

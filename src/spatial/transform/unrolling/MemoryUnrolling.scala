@@ -288,7 +288,7 @@ trait MemoryUnrolling extends UnrollingBase {
         }
   }
 
-  /** Helper classes for unrolling **/
+  /** Helper classes for unrolling */
   sealed abstract class UnrolledAccess[T] { def s: Seq[Sym[_]] }
   case class URead[T](v: Sym[T]) extends UnrolledAccess[T] { def s = Seq(v) }
   case class UVecRead[T](v: Vec[T])  extends UnrolledAccess[T] { def s = Seq(v) }

@@ -56,22 +56,22 @@ object metadata {
 
   private def keyOf[M<:Metadata[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]
 
-  def addAll(edge: Sym[_], data: Iterator[Metadata[_]]): Unit = data.foreach{m => edge.data += (m.key -> m) }
+  def addAll(edge: Sym[_], data: Iterator[Metadata[_]]): Unit = data.foreach{m => edge._data += (m.key -> m) }
   def addOrRemoveAll(edge: Sym[_], data: Iterator[(Class[_],Option[Metadata[_]])]): Unit = data.foreach{
-    case (key,Some(m)) => edge.data += (key -> m)
-    case (key,None)    => edge.data.remove(key)
+    case (key,Some(m)) => edge._data += (key -> m)
+    case (key,None)    => edge._data.remove(key)
   }
 
-  def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = edge.data += (m.key -> m)
+  def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: M): Unit = edge._data += (m.key -> m)
   def add[M<:Metadata[M]:Manifest](edge: Sym[_], m: Option[M]): Unit = m match {
-    case Some(data) => edge.data += (data.key -> data)
-    case None => edge.data.remove(keyOf[M])
+    case Some(data) => edge._data += (data.key -> data)
+    case None => edge._data.remove(keyOf[M])
   }
-  def all(edge: Sym[_]): Iterator[(Class[_],Metadata[_])] = edge.data.iterator
+  def all(edge: Sym[_]): Iterator[(Class[_],Metadata[_])] = edge._data.iterator
 
-  def clear[M<:Metadata[M]:Manifest](edge: Sym[_]): Unit = edge.data.remove(keyOf[M])
+  def clear[M<:Metadata[M]:Manifest](edge: Sym[_]): Unit = edge._data.remove(keyOf[M])
 
-  def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = edge.data.get(keyOf[M]).map(_.asInstanceOf[M])
+  def apply[M<:Metadata[M]:Manifest](edge: Sym[_]): Option[M] = edge._data.get(keyOf[M]).map(_.asInstanceOf[M])
 }
 
 @data object globals {

@@ -15,10 +15,10 @@ abstract class Cycle {
   def symbols: Set[Sym[_]]
 }
 
-/** Write-after-read (WAR) cycle: Standard read-accumulate loop. **/
+/** Write-after-read (WAR) cycle: Standard read-accumulate loop. */
 case class WARCycle(reader: Sym[_], writer: Sym[_], memory: Sym[_], symbols: Set[Sym[_]], length: Double) extends Cycle
 
-/** Access-after-access (AAA) cycle: Time-multiplexed writes. **/
+/** Access-after-access (AAA) cycle: Time-multiplexed writes. */
 case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
   def symbols: Set[Sym[_]] = accesses
 }

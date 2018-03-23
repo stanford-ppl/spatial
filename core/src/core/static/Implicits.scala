@@ -108,10 +108,10 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   /** Returns all scheduling dependencies of the symbol. */
   final def allDeps: Seq[Sym[_]] = inputs ++ antiDeps
 
-  /** Returns all symbols which uses this symbol as an input. **/
+  /** Returns all symbols which uses this symbol as an input. */
   def consumers: Set[Sym[_]] = metadata[Consumers](exp).map(_.users).getOrElse(Set.empty)
 
-  /** Sets the consumers for this symbol. **/
+  /** Sets the consumers for this symbol. */
   def consumers_=(xs: Set[Sym[_]]): Unit = metadata.add(exp, Consumers(xs))
 
   def effects: Effects = metadata[Effects](exp).getOrElse(Effects.Pure)

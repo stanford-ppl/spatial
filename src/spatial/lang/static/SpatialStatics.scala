@@ -11,10 +11,10 @@ trait SpatialStatics extends Lifts with Casts with utils.Overloads
 trait InternalStatics extends SpatialStatics with InternalAliases
 
 /** External view for extending DSLs */
-trait ExtensionStatics extends InternalStatics with ExternalAliases
+trait ExternalStatics extends InternalStatics with ExternalAliases
 
 /** Application view */
-trait ExternalStatics extends ExtensionStatics with SpatialVirtualization
+trait FrontendStatics extends ExternalStatics with SpatialVirtualization
   with StaticDebugsExternal
 {
   type SrcCtx = forge.SrcCtx

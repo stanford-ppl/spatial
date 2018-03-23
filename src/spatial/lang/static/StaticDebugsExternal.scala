@@ -8,7 +8,7 @@ import utils.implicits.collections._
 import spatial.internal.{assertIf, printIf}
 import spatial.node.TextConcat
 
-trait StaticDebugsExternal { this: ExternalStatics =>
+trait StaticDebugsExternal { this: FrontendStatics =>
   @api def println(v: Any): Void = v match {
     case t: Top[_] => printIf(Nil, t.toText ++ "\n")
     case t         => printIf(Nil, t.toString + "\n")

@@ -59,6 +59,13 @@ trait InternalAliases extends CustomBitWidths {
   lazy val Sequential = spatial.lang.control.Sequential
   lazy val Stream = spatial.lang.control.Stream
   lazy val Named = spatial.lang.control.Named
+
+  /** Host */
+  type Tensor1[A] = spatial.lang.host.Array[A]
+  type Tensor2[A] = spatial.lang.host.Matrix[A]
+  type Tensor3[A] = spatial.lang.host.Tensor3[A]
+  type Tensor4[A] = spatial.lang.host.Tensor4[A]
+  type Tensor5[A] = spatial.lang.host.Tensor5[A]
 }
 
 trait ExternalAliases extends InternalAliases {

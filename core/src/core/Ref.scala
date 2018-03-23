@@ -104,7 +104,7 @@ sealed trait Exp[+C,+A] extends Serializable with Equals { self =>
 
   private[core] var _tp: ExpType[C@uV,A@uV] = _
   private[core] var _rhs: Def[C@uV,A@uV] = _
-  private[core] val data: mutable.Map[Class[_],Metadata[_]] = mutable.Map.empty
+  private[core] val _data: mutable.Map[Class[_],Metadata[_]] = mutable.Map.empty
 
   private[core] var _name: Option[String] = None
   private[core] var _ctx: SrcCtx = SrcCtx.empty

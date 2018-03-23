@@ -60,7 +60,7 @@ trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
 trait Mem1[A,M1[T]] extends Mem[A,M1] {
   private implicit def M1: Type[M1[A]] = this.selfType
 
-  /** Returns a view of this memory at the addresses in the given `range`. **/
+  /** Returns a view of this memory at the addresses in the given `range`. */
   @api def apply(range: Rng): M1[A] = stage(MemDenseAlias[A,M1,M1](me,Seq(range)))
 }
 
@@ -117,38 +117,38 @@ trait Mem4[A,M1[T],M2[T],M3[T],M4[T]] extends Mem[A,M4] {
   private implicit def M3Type: Type[M3[A]] = M3
   private implicit def M4Type: Type[M4[A]] = this.selfType
 
-  /** Creates a view of a 1-dimensional, dense region of this memory. **/
+  /** Creates a view of a 1-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Idx, r: Idx, c: Rng): M1[A] = stage(MemDenseAlias[A,M4,M1](me, Seq(q.toSeries, p.toSeries, r.toSeries, c)))
-  /** Creates a view of a 1-dimensional, dense region of this memory. **/
+  /** Creates a view of a 1-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Idx, r: Rng, c: Idx): M1[A] = stage(MemDenseAlias[A,M4,M1](me, Seq(q.toSeries, p.toSeries, r, c.toSeries)))
-  /** Creates a view of a 1-dimensional, dense region of this memory. **/
+  /** Creates a view of a 1-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Rng, r: Idx, c: Idx): M1[A] = stage(MemDenseAlias[A,M4,M1](me, Seq(q.toSeries, p, r.toSeries, c.toSeries)))
-  /** Creates a view of a 1-dimensional, dense region of this memory. **/
+  /** Creates a view of a 1-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Idx, r: Idx, c: Idx): M1[A] = stage(MemDenseAlias[A,M4,M1](me, Seq(q, p.toSeries, r.toSeries, c.toSeries)))
 
-  /** Creates a view of a 2-dimensional, dense region of this memory. **/
+  /** Creates a view of a 2-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Idx, r: Rng, c: Rng): M2[A] = stage(MemDenseAlias[A,M4,M2](me, Seq(q.toSeries, p.toSeries, r, c)))
-  /** Creates a view of a 2-dimensional, dense region of this memory. **/
+  /** Creates a view of a 2-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Idx, r: Idx, c: Rng): M2[A] = stage(MemDenseAlias[A,M4,M2](me, Seq(q, p.toSeries, r.toSeries, c)))
-  /** Creates a view of a 2-dimensional, dense region of this memory. **/
+  /** Creates a view of a 2-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Rng, r: Idx, c: Idx): M2[A] = stage(MemDenseAlias[A,M4,M2](me, Seq(q, p, r.toSeries, c.toSeries)))
-  /** Creates a view of a 2-dimensional, dense region of this memory. **/
+  /** Creates a view of a 2-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Rng, r: Idx, c: Rng): M2[A] = stage(MemDenseAlias[A,M4,M2](me, Seq(q.toSeries, p, r.toSeries, c)))
-  /** Creates a view of a 2-dimensional, dense region of this memory. **/
+  /** Creates a view of a 2-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Idx, r: Rng, c: Idx): M2[A] = stage(MemDenseAlias[A,M4,M2](me, Seq(q, p.toSeries, r, c.toSeries)))
-  /** Creates a view of a 2-dimensional, dense region of this memory. **/
+  /** Creates a view of a 2-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Rng, r: Rng, c: Idx): M2[A] = stage(MemDenseAlias[A,M4,M2](me, Seq(q.toSeries, p, r, c.toSeries)))
 
-  /** Creates a view of a 3-dimensional, dense region of this memory. **/
+  /** Creates a view of a 3-dimensional, dense region of this memory. */
   @api def apply(q: Idx, p: Rng, r: Rng, c: Rng): M3[A] = stage(MemDenseAlias[A,M4,M3](me, Seq(q.toSeries, p, r, c)))
-  /** Creates a view of a 3-dimensional, dense region of this memory. **/
+  /** Creates a view of a 3-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Idx, r: Rng, c: Rng): M3[A] = stage(MemDenseAlias[A,M4,M3](me, Seq(q, p.toSeries, r, c)))
-  /** Creates a view of a 3-dimensional, dense region of this memory. **/
+  /** Creates a view of a 3-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Rng, r: Idx, c: Rng): M3[A] = stage(MemDenseAlias[A,M4,M3](me, Seq(q, p, r.toSeries, c)))
-  /** Creates a view of a 3-dimensional, dense region of this memory. **/
+  /** Creates a view of a 3-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Rng, r: Rng, c: Idx): M3[A] = stage(MemDenseAlias[A,M4,M3](me, Seq(q, p, r, c.toSeries)))
 
-  /** Creates a view of a 4-dimensional, dense region of this memory. **/
+  /** Creates a view of a 4-dimensional, dense region of this memory. */
   @api def apply(q: Rng, p: Rng, r: Rng, c: Rng): M4[A] = stage(MemDenseAlias[A,M4,M4](me, Seq(q, p, r, c)))
 }
 

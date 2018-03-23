@@ -97,7 +97,7 @@ object ctrOf {
 }
 
 
-/** All accelerator scopes in the program **/
+/** All accelerator scopes in the program */
 case class AccelScopes(scopes: Seq[Parent]) extends FlowData[AccelScopes]
 @data object hwScopes {
   def all: Seq[Parent] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)

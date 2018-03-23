@@ -1,6 +1,6 @@
 package spatial
 
-object dsl extends lang.static.ExternalStatics {
+object dsl extends lang.static.FrontendStatics {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag

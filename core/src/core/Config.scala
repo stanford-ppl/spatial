@@ -50,11 +50,11 @@ class Config {
   /** Testing */
   var test: Boolean = false
 
-  /** Enable memory usage logging **/
+  /** Enable memory usage logging */
   var memlog: Boolean = false
   def enMemLog: Boolean = enLog || memlog
 
-  /** Codegen **/
+  /** Codegen */
   var naming: Boolean = true
 
   var enableAtomicWrites: Boolean = true

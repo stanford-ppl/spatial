@@ -163,7 +163,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   /** Helper objects for unrolling
     * Tracks multiple substitution contexts in 'contexts' array
-    **/
+    */
   trait Unroller {
     type MemContext = ((Sym[_],Int), Sym[_])
 

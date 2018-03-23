@@ -38,7 +38,7 @@ abstract class XilinxDevice extends HardwareTarget {
   )
   val defaultResource: MemoryResource = BRAM_RESOURCE
 
-  /** Returns the depth of a BRAM for a given width **/
+  /** Returns the depth of a BRAM for a given width */
   def bramWordDepth(width: Int): Int = {
     if      (width == 1) 16384
     else if (width == 2) 8192
@@ -48,7 +48,7 @@ abstract class XilinxDevice extends HardwareTarget {
     else 512                   // Assume uses RAM36 TDP
   }
 
-  /** Returns the depth of a URAM for a given width **/
+  /** Returns the depth of a URAM for a given width */
   def uramWordDepth(width: Int): Int = 4096
 
   def uramMemoryModel(width: Int, depth: Int): Area = {

@@ -7,21 +7,21 @@ import spatial.node.OpReduce
 
 protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Option[A], opt: CtrlOpt) {
 
-  /** 1 dimensional reduction **/
+  /** 1 dimensional reduction */
   @api def apply(domain: Counter[I32])(map: I32 => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     apply(Seq(domain)){l => map(l.head) }{reduce}
   }
-  /** 2 dimensional reduction **/
+  /** 2 dimensional reduction */
   @api def apply(domain1: Counter[I32], domain2: Counter[I32])(map: (I32,I32) => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     apply(Seq(domain1,domain2)){l => map(l(0),l(1)) }{reduce}
   }
 
-  /** 3 dimensional reduction **/
+  /** 3 dimensional reduction */
   @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32])(map: (I32,I32,I32) => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     apply(Seq(domain1,domain2,domain3)){l => map(l(0),l(1),l(2)) }{reduce}
   }
 
-  /** N dimensional reduction **/
+  /** N dimensional reduction */
   @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     val acc = accum.getOrElse(Reg[A])
     val cchain = CounterChain(domain)
@@ -58,17 +58,17 @@ protected class ReduceConstant[A](a: Lift[A], isFold: Boolean, opt: CtrlOpt) {
 }
 
 protected class ReduceClass(opt: CtrlOpt) extends ReduceAccum(None, None, None, opt) {
-  /** Reduction with implicit accumulator **/
+  /** Reduction with implicit accumulator */
   def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero, isFold = false, opt)
 
-  /** Reduction with explicit accumulator **/
+  /** Reduction with explicit accumulator */
   def apply[T](accum: Reg[T]) = new ReduceAccum(Some(accum), None, None, opt)
 }
 
 protected class FoldClass(opt: CtrlOpt) {
-  /** Fold with implicit accumulator **/
+  /** Fold with implicit accumulator */
   def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero, isFold = true, opt)
 
-  /** Fold with explicit accumulator **/
+  /** Fold with explicit accumulator */
   def apply[A](accum: Reg[A]) = new MemFoldClass(opt).apply(accum)
 }

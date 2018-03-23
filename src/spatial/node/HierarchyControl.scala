@@ -40,7 +40,7 @@ abstract class Pipeline[R:Type] extends EnControl[R]
 abstract class Loop[R:Type] extends Pipeline[R]
 
 
-/** Unrolled loops **/
+/** Unrolled loops */
 abstract class UnrolledLoop[R:Type] extends Pipeline[R] {
   def iterss: Seq[Seq[I32]]
   def validss: Seq[Seq[Bit]]

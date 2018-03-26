@@ -22,7 +22,7 @@ trait ChiselGenRegFile extends ChiselGenSRAM {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegFileNew(dims, inits) =>
       val initVals = if (inits.isDefined) {
         getConstValues(inits.get).toList.map{a => src"${a}d"}.mkString(",")
@@ -199,7 +199,7 @@ trait ChiselGenRegFile extends ChiselGenSRAM {
     case PrintIf(_,_) =>
     case PrintlnIf(_,_) =>
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 

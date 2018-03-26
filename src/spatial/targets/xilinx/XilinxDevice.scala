@@ -1,7 +1,7 @@
 package spatial.targets
 package xilinx
 
-import core._
+import argon._
 import forge.tags._
 import models._
 

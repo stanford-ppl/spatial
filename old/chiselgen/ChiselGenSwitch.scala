@@ -6,7 +6,7 @@ import spatial.nodes._
 
 trait ChiselGenSwitch extends ChiselCodegen {
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     // case op@Switch(body,selects,cases) =>
     //   emit(s"// Switch with $body $selects $cases")
     //   emitBlock(body)
@@ -29,6 +29,6 @@ trait ChiselGenSwitch extends ChiselCodegen {
     //   emitBlock(body)
     //   // close("}")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

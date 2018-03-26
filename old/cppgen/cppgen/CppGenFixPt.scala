@@ -38,7 +38,7 @@ trait CppGenFixPt extends CppCodegen {
       case _ => super.needsFPType(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixLsh(x,y) => lhs.tp match {
         case FixPtType(s,d,f) if (f > 0) => emit(src"${lhs.tp} $lhs = $x * pow(2.,$y);")
         case _ => emit(src"${lhs.tp} $lhs = $x << $y;")
@@ -102,6 +102,6 @@ trait CppGenFixPt extends CppCodegen {
       emit(src"${lhs}[0] = $x;")
       emit(src"${lhs}[1] = '\0';")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

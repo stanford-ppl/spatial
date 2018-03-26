@@ -15,7 +15,7 @@ trait ExternalStatics extends InternalStatics with ExternalAliases
 
 /** Application view */
 trait FrontendStatics extends ExternalStatics with SpatialVirtualization
-  with StaticDebugsExternal
+  with StaticDebuggingExternal
 {
   type SrcCtx = forge.SrcCtx
   lazy val SrcCtx = forge.SrcCtx

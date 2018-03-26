@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 import utils.implicits.collections._
 
@@ -9,7 +9,7 @@ import spatial.lang.types._
 
 /** An N-dimensional register file */
 abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) extends LocalMem[A,C] {
-  val tA: Bits[A] = Bits[A]
+  val A: Bits[A] = Bits[A]
   protected def M1: Type[RegFile1[A]] = implicitly[Type[RegFile1[A]]]
   protected def M2: Type[RegFile2[A]] = implicitly[Type[RegFile2[A]]]
   protected def M3: Type[RegFile3[A]] = implicitly[Type[RegFile3[A]]]

@@ -1,7 +1,7 @@
 package nova.codegen.dot
 
-import core._
-import core.passes.Codegen
+import argon._
+import argon.codegen.Codegen
 import pir.lang._
 import pir.node._
 import spade.node._
@@ -11,7 +11,7 @@ import scala.collection.mutable.HashMap
 import scala.language.implicitConversions
 
 case class ArchDotCodegen(IR: State) extends Codegen with DotCommon {
-  override def filename: String = s"ArchGraph.$ext"
+  override def entryFile: String = s"ArchGraph.$ext"
   override def ext = s"fdp.$lang"
 
   override def rankdir = "LR"
@@ -198,9 +198,9 @@ $tableStr
 
     rhs match {
       case pcu: PCUModule =>
-        emitNode(getNodeName(lhs), getNodeAttr(lhs))
+        gen(getNodeName(lhs), getNodeAttr(lhs))
       case pmu: PMUModule =>
-        emitNode(getNodeName(lhs), getNodeAttr(lhs))
+        gen(getNodeName(lhs), getNodeAttr(lhs))
       case vb: VectorBus[_] =>
         emitEdge(getNodeName(boundsToPUMap(vb.out)), getNodeName(boundsToPUMap(vb.in)))
       case _ =>

@@ -22,7 +22,7 @@ trait ChiselGenAlteraVideo extends ChiselCodegen with FileDependencies {
 //  dependencies ::= FileDep("chiselgen", "altera-goodies/altera_up_avalon_video_dma_controller")
 
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AxiMSNew() =>
 
     case DecoderTemplateNew(popFrom, pushTo) => 
@@ -34,7 +34,7 @@ trait ChiselGenAlteraVideo extends ChiselCodegen with FileDependencies {
       decoders = decoders :+ lhs
       emit(src"io.dma_tomem_ios.stream_data(0) := ${popFrom}.io.out")
       emit(src"${popFrom}.io.pop := io.dma_tomem_ios.stream_valid(0)")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

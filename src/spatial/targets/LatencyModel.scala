@@ -1,6 +1,6 @@
 package spatial.targets
 
-import core._
+import argon._
 import models._
 import forge.tags._
 import spatial.internal.spatialConfig

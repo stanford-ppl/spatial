@@ -1,6 +1,6 @@
 package spatial.internal
 
-import core._
+import argon._
 import forge.tags._
 
 import spatial.node._

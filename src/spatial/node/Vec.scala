@@ -1,7 +1,7 @@
 package spatial.node
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 
 @op case class VecAlloc[T](elems: Seq[T])(implicit val tV: Vec[T]) extends Op[Vec[T]]

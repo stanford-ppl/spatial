@@ -10,7 +10,7 @@ trait CppGenIfThenElse extends CppGenArray {
     case _ => false
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case IfThenElse(cond, thenp, elsep) =>
       if (isVoidType(lhs.tp)) {
         emit(src"// This ifthenelse returns void, ignore the return")
@@ -29,7 +29,7 @@ trait CppGenIfThenElse extends CppGenArray {
       close("}")
 
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

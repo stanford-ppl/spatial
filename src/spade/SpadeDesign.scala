@@ -1,10 +1,9 @@
 package spade
 
-import core._
-import core.passes.IRPrinter
-import nova.compiler.DSLApp
+import argon.{DSLApp, _}
+import argon.passes.IRPrinter
 import nova.codegen._
-import nova.codegen.dot.{IRDotCodegen,ArchDotCodegen}
+import nova.codegen.dot.{ArchDotCodegen, IRDotCodegen}
 
 trait SpadeDesign extends DSLApp {
 

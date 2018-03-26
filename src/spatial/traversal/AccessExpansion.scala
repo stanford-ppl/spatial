@@ -1,6 +1,6 @@
 package spatial.traversal
 
-import core._
+import argon._
 import utils.implicits.collections._
 import utils.multiLoop
 import poly._

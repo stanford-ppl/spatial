@@ -1,12 +1,16 @@
 package spatial.node
 
-import core._
+import argon._
 import spatial.lang._
 
 /** An operation supported for acceleration */
 abstract class AccelOp[R:Type] extends Op[R] {
   /** If true, this node is only supported in host/debug mode, not hardware accel. */
   val debugOnly: Boolean = false
+}
+
+abstract class FringeNode[A:Bits,R:Type] extends AccelOp[R] {
+  val A: Bits[A] = Bits[A]
 }
 
 /** Nodes with implicit control signals/logic with internal state */

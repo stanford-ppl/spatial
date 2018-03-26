@@ -4,7 +4,7 @@ import pir.lang._
 import spatial.node.{Alloc, Primitive}
 import spatial.lang._
 
-import core._
+import argon._
 import forge.tags._
 
 sealed abstract class ICBus[A:Bits] extends Alloc[A]

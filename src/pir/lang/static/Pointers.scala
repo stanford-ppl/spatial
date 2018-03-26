@@ -3,7 +3,7 @@ package pir.lang.static
 import pir.node._
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 
 

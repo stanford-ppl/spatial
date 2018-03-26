@@ -1,7 +1,7 @@
 package spatial.transform
 
-import core._
-import core.transform.MutateTransformer
+import argon._
+import argon.transform.MutateTransformer
 import emul.{FALSE, TRUE}
 import spatial.node._
 import spatial.lang._

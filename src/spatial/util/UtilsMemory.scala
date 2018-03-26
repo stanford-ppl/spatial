@@ -1,6 +1,6 @@
 package spatial.util
 
-import core._
+import argon._
 import forge.tags._
 import utils.implicits.collections._
 import poly.ISL
@@ -40,6 +40,10 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     }
     def isFIFO: Boolean = x.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = x.isInstanceOf[LIFO[_]]
+
+    def isStreamIn: Boolean = x.isInstanceOf[StreamIn[_]]
+    def isStreamOut: Boolean = x.isInstanceOf[StreamOut[_]]
+    def isInternalStream: Boolean = (x.isStreamIn || x.isStreamOut) && x.parent != Host
 
     def isStatusReader: Boolean = StatusReader.unapply(x).isDefined
     def isReader: Boolean = Reader.unapply(x).isDefined
@@ -118,6 +122,11 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     case _ => throw new Exception(s"Could not statically determine the dimensions of $mem")
   }
 
+  def sizeOf(mem: Sym[_]): I32 = mem match {
+    case Op(m: MemAlloc[_,_]) if m.dims.size == 1 => m.dims.head
+    case _ => throw new Exception(s"Could not get static size of $mem")
+  }
+
   /** Returns constant values of the dimensions of the given memory. */
   def constDimsOf(mem: Sym[_]): Seq[Int] = {
     val dims = dimsOf(mem)
@@ -127,6 +136,16 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     else {
       throw new Exception(s"Could not get constant dimensions of $mem")
     }
+  }
+
+  def readWidths(mem: Sym[_]): Set[Int] = readersOf(mem).map{
+    case Op(read: BankedAccessor[_,_]) => read.width
+    case _ => 1
+  }
+
+  def writeWidths(mem: Sym[_]): Set[Int] = writersOf(mem).map{
+    case Op(write: BankedAccessor[_,_]) => write.width
+    case _ => 1
   }
 
   /**

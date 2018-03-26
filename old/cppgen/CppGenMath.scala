@@ -23,7 +23,7 @@ trait CppGenMath extends CppCodegen {
     case _ => "unk"
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixFMA(x, y, z)  => emit(src"${lhs.tp} $lhs = ($x * $y) + $z; // FixFMA")
     case FltFMA(x, y, z)  => emit(src"${lhs.tp} $lhs = ($x * $y) + $z; // FltFMA")
     case FixAbs(x)  => emit(src"${lhs.tp} $lhs = fabs($x);")
@@ -82,7 +82,7 @@ trait CppGenMath extends CppCodegen {
     case Min(a, b) => emit(src"${lhs.tp} $lhs = std::min($a,$b);")
     case Max(a, b) => emit(src"${lhs.tp} $lhs = std::max($a,$b);")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

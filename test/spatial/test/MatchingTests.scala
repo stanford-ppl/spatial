@@ -1,6 +1,6 @@
 package spatial.test
 
-import core._
+import argon._
 import spatial.lang._
 import utest._
 

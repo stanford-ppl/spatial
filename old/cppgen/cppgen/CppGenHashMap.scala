@@ -10,14 +10,14 @@ trait CppGenHashMap extends CppGenArrayExt {
   //   case _ => super.remap(tp)
   // }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]) = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]) = rhs match {
     case HashIndexApply(index, key) => 
       emit(src"${lhs.tp} $lhs = -1;")
       open(src"for (int ${lhs}_i = 0; ${lhs}_i < ${index}_size; ${lhs}_i++) {")
         emit(src"if ((*${index})[${lhs}_i] == ${key}) { $lhs = ${lhs}_i; }")
       close("}")
       emit(src"// assert(${lhs} > -1); // Allow index lookup errors")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFat(lhs: Seq[Sym[_]], rhs: Def) = rhs match {

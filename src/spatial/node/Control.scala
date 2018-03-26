@@ -1,7 +1,7 @@
 package spatial.node
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {

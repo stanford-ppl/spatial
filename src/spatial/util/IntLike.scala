@@ -1,6 +1,6 @@
 package spatial.util
 
-import core._
+import argon._
 import emul.FixedPoint
 import forge.tags._
 import spatial.lang._

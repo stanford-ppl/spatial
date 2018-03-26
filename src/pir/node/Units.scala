@@ -4,7 +4,7 @@ import pir.lang._
 import spatial.node.{Alloc, Control, Primitive}
 import spatial.lang._
 
-import core._
+import argon._
 import forge.tags._
 import spatial.util.getCChains
 

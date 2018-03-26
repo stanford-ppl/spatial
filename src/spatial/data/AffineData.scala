@@ -1,7 +1,7 @@
 package spatial.data
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 import spatial.util._
 import poly.{ConstraintMatrix, ISL, SparseMatrix}

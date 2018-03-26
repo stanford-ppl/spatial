@@ -94,9 +94,9 @@ object Number {
   def max(x: FixedPoint, y: FixedPoint): FixedPoint = if ((x > y).value) x else y
 
   // TODO: These all rely on Double implementation right now
-  def inv(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / x
+  def recip(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / x
   def sqrt(x: FixedPoint): FixedPoint = FixedPoint(Math.sqrt(x.toDouble), x.fmt).withValid(x.valid)
-  def invSqrt(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / sqrt(x)
+  def recipSqrt(x: FixedPoint): FixedPoint = FixedPoint(1,x.fmt) / sqrt(x)
   def exp(x: FixedPoint): FixedPoint = FixedPoint(Math.exp(x.toDouble), x.fmt).withValid(x.valid)
   def log(x: FixedPoint): FixedPoint = FixedPoint(Math.log(x.toDouble), x.fmt).withValid(x.valid)
   def pow(x: FixedPoint, exp: FixedPoint) = FixedPoint(Math.pow(x.toDouble, exp.toDouble), x.fmt).withValid(x.valid)
@@ -136,7 +136,9 @@ object Number {
   def max(x: FloatPoint, y: FloatPoint): FloatPoint = if ((x > y).value) x else y
 
   // TODO: These all rely on Double implementation right now
+  def recip(x: FloatPoint): FloatPoint = FloatPoint(1, x.fmt) / x
   def sqrt(x: FloatPoint): FloatPoint = FloatPoint(Math.sqrt(x.toDouble), x.fmt).withValid(x.valid)
+  def recipSqrt(x: FloatPoint): FloatPoint = FloatPoint(1, x.fmt) / sqrt(x)
   def exp(x: FloatPoint): FloatPoint = FloatPoint(Math.exp(x.toDouble), x.fmt).withValid(x.valid)
   def log(x: FloatPoint): FloatPoint = FloatPoint(Math.log(x.toDouble), x.fmt).withValid(x.valid)
   def pow(x: FloatPoint, exp: FloatPoint) = FloatPoint(Math.pow(x.toDouble, exp.toDouble), x.fmt).withValid(x.valid)

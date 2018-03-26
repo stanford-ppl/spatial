@@ -1,7 +1,7 @@
 package spatial.traversal
 
-import core._
-import core.passes.Traversal
+import argon._
+import argon.passes.Traversal
 import emul.Number
 
 import spatial.lang._

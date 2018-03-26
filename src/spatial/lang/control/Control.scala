@@ -1,7 +1,7 @@
 package spatial.lang
 package control
 
-import core._
+import argon._
 import forge.tags._
 import spatial.data._
 import spatial.node._

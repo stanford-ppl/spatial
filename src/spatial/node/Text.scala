@@ -1,7 +1,7 @@
 package spatial.node
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 
 /** Concatenation of Text parts. */
@@ -21,5 +21,6 @@ import spatial.lang._
 
 /** Generic conversion from any symbol to Text. */
 @op case class GenericToText[A:Type](a: Sym[A]) extends Primitive[Text] {
+  val A: Type[A] = Type[A]
   override val debugOnly: Boolean = true
 }

@@ -1,6 +1,6 @@
 package spatial.data
 
-import core._
+import argon._
 
 /** The delay of the given symbol from the start of its parent controller */
 case class MDelay(latency: Double) extends StableData[MDelay]

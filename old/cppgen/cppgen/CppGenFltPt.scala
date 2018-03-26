@@ -21,7 +21,7 @@ trait CppGenFltPt extends CppCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FltNeg(x)   => lhs.tp match {
 	case FloatType()  =>  emit(src"${lhs.tp} $lhs = -$x;")
 	case DoubleType()  =>  emit(src"${lhs.tp} $lhs = -$x;")
@@ -93,7 +93,7 @@ trait CppGenFltPt extends CppCodegen {
       }
 
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

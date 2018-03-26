@@ -438,7 +438,7 @@ trait ChiselGenSRAM extends ChiselCodegen {
     indices.zip(strides).map{case (i,s) => src"$i*$s" }.mkString(" + ") + ofs.map{o => src" + $o"}.getOrElse("")
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@SRAMNew(_) =>
       val dimensions = constDimsOf(lhs)
       duplicatesOf(lhs).zipWithIndex.foreach{ case (mem, i) => 
@@ -655,7 +655,7 @@ trait ChiselGenSRAM extends ChiselCodegen {
         emit(src"""${sram}_$i.connectWPort(${swap(lhs, WVec)}, List(${portsOf(lhs, sram, i)}))""")
       }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 

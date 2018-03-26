@@ -56,7 +56,7 @@ trait CppGenArray extends CppCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@ArrayNew(size)      => emitNewArray(lhs, lhs.tp, src"$size")
     case op@ArrayFromSeq(seq)   =>
       // TODO: Not sure if this is right
@@ -78,6 +78,6 @@ trait CppGenArray extends CppCodegen {
 
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

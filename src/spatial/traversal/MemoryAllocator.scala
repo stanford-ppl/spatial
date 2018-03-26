@@ -1,7 +1,7 @@
 package spatial.traversal
 
-import core._
-import core.passes.Pass
+import argon._
+import argon.passes.Pass
 import models._
 
 import spatial.data._

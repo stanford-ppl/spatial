@@ -36,7 +36,7 @@ trait ChiselGenDRAM extends ChiselGenSRAM with ChiselGenStructs {
     }
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMNew(dims,zero) =>
     dramsList = dramsList :+ lhs
       if (argMapping(lhs) == (-1,-1,-1)) {
@@ -233,7 +233,7 @@ trait ChiselGenDRAM extends ChiselGenSRAM with ChiselGenStructs {
       emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${symDelay(readersOf(ackStream).head.node)}.toInt", true)}""")
       emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 

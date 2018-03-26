@@ -15,7 +15,7 @@ trait ChiselGenBoolean extends ChiselCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Not(x)       => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(Bool())");emit(src"$lhs := !$x")
     case And(x,y)     => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(Bool())");emit(src"$lhs := $x && $y")
     case Or(x,y)      => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(Bool())");emit(src"$lhs := $x || $y")
@@ -23,6 +23,6 @@ trait ChiselGenBoolean extends ChiselCodegen {
     case XNor(x,y)    => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(Bool())");emit(src"$lhs := $x === $y")
     case RandomBoolean(x) => emit(src"val $lhs = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()")
     case StringToBoolean(x) => emit(src"val $lhs = $x.toBoolean")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

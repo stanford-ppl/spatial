@@ -1,7 +1,7 @@
 package spatial.data
 
 import forge.tags._
-import core._
+import argon._
 import emul.FixedPoint
 
 // TODO[2]: Bound is in terms of Int right now?

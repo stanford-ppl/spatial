@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 import forge.{AppState, Ptr, VarLike}
 import spatial.node._

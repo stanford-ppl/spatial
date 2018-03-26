@@ -17,7 +17,7 @@ trait CppGenDRAM extends CppGenSRAM {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case DRAMNew(dims, _) =>
       drams = drams :+ lhs
       emit(src"""uint64_t ${lhs} = c1->malloc(sizeof(${remapIntType(lhs.tp.typeArguments.head)}) * ${dims.map(quote).mkString("*")});""")
@@ -29,7 +29,7 @@ trait CppGenDRAM extends CppGenSRAM {
     // case Scatter(dram, local, addrs, ctr, i) => emit("// Do what?")
     // case BurstLoad(dram, fifo, ofs, ctr, i)  => emit("//found load")
     // case BurstStore(dram, fifo, ofs, ctr, i) => emit("//found store")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

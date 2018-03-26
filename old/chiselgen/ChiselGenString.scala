@@ -16,7 +16,7 @@ trait ChiselGenString extends ChiselCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ToString(x) => emit(src"val $lhs = $x.toString")
     case StringConcat(x,y) => emit(src"val $lhs = $x + $y")
     case StringEquals(x,y) => emit(src"val $lhs = $x == $y")
@@ -24,7 +24,7 @@ trait ChiselGenString extends ChiselCodegen {
     case StringSlice(a,b,c) => emit(src"""val $lhs = "don't care" """)
     case Char2Int(x) =>
       emit(src"val $lhs = ${x}(0).toInt.FP(true, 8, 0) // Assume we only convert constants")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

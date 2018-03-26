@@ -20,7 +20,7 @@ trait ChiselGenVector extends ChiselGenSRAM {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ListVector(elems)      => emit(src"val $lhs = Array($elems)")
     case VectorApply(vector, i) => emitGlobalWireMap(src"""$lhs""", src"""Wire(${newWire(lhs.tp)})"""); emit(src"$lhs := $vector.apply($i)")
     case VectorSlice(vector, start, end) => emit(src"val $lhs = $vector($start, $end)")
@@ -43,6 +43,6 @@ trait ChiselGenVector extends ChiselGenSRAM {
       case BooleanType()    => emit(src"val $lhs = $v // TODO: Need to do something fancy here?")
     }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

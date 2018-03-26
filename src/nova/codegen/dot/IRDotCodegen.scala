@@ -1,7 +1,7 @@
 package nova.codegen.dot
 
-import core._
-import core.passes.Codegen
+import argon._
+import argon.codegen.Codegen
 import pir.lang._
 import pir.node._
 import spatial.lang._
@@ -9,7 +9,7 @@ import spatial.lang._
 import scala.language.implicitConversions
 
 case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
-  override def filename: String = s"IRGraph.$ext"
+  override def entryFile: String = s"IRGraph.$ext"
   override def ext = s"dot.$lang"
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
@@ -76,13 +76,13 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   }
 
   private def visitCommon(lhs: Sym[_], rhs: Op[_]): Unit = {
-    emitNode(getNodeName(lhs), getNodeAttr(lhs))
+    gen(getNodeName(lhs), getNodeAttr(lhs))
     rhs.binds.foreach { b =>
-      emitNode(getNodeName(b), getNodeAttr(b))
+      gen(getNodeName(b), getNodeAttr(b))
       emitEdge(getNodeName(b), getNodeName(lhs))
     }
     rhs.inputs.foreach { in =>
-      if (in.isBound) emitNode(getNodeName(in), getNodeAttr(in))
+      if (in.isBound) gen(getNodeName(in), getNodeAttr(in))
       emitEdge(getNodeName(in), getNodeName(lhs))
     }
 

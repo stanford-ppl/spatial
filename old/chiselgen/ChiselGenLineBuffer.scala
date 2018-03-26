@@ -20,7 +20,7 @@ trait ChiselGenLineBuffer extends ChiselGenController {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     // TODO: Need to account for stride here
     case op@LineBufferNew(rows, cols, stride) =>
       appPropertyStats += HasLineBuffer
@@ -214,7 +214,7 @@ trait ChiselGenLineBuffer extends ChiselGenController {
       emit(src"${lb}_$i.io.data_in(0) := ${data}.raw")
       emit(src"${lb}_$i.io.w_en(0) := $en & ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${enableRetimeMatch(en, lhs)}.toInt")}")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   def getStreamAdjustment(c: Exp[Any]): String = {

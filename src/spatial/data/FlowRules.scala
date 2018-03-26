@@ -1,7 +1,7 @@
 package spatial.data
 
 import forge.tags._
-import core._
+import argon._
 import spatial.data._
 import spatial.node._
 import spatial.util._

@@ -2,7 +2,7 @@ package spatial.data
 
 import forge.tags._
 import utils.implicits.collections._
-import core._
+import argon._
 
 import spatial.lang.LocalMem
 import spatial.internal.spatialConfig

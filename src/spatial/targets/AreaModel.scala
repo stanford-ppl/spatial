@@ -1,6 +1,6 @@
 package spatial.targets
 
-import core._
+import argon._
 import forge.tags._
 import utils.math.{isPow2,log2}
 import utils.implicits.Readable._

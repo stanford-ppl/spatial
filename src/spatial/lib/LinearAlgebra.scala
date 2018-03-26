@@ -1,6 +1,6 @@
 package spatial.lib
 
-import core._
+import argon._
 import spatial.lang._
 
 trait LinearAlgebra {

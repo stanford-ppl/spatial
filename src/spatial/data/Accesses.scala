@@ -1,6 +1,6 @@
 package spatial.data
 
-import core._
+import argon._
 
 case class UnusedAccess(flag: Boolean) extends StableData[UnusedAccess]
 

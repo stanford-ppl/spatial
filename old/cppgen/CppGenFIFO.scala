@@ -20,7 +20,7 @@ trait CppGenFIFO extends CppCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case _ => super.emitNode(lhs, rhs)
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case _ => super.gen(lhs, rhs)
   }
 }

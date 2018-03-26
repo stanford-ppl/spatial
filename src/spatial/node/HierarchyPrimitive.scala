@@ -3,7 +3,7 @@ package spatial.node
 import spatial.lang._
 
 import forge.tags._
-import core._
+import argon._
 import spatial.data.Expect
 
 /** Nodes with non-zero latency, no internal state, which can be conditionally executed */

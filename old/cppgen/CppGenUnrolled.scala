@@ -37,7 +37,7 @@ trait CppGenUnrolled extends CppGenController {
     indices.zip(strides).map{case (i,s) => src"$i*$s"}.mkString(" + ")
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case UnrolledForeach(en, cchain,func,iters,valids) =>
       controllerStack.push(lhs)
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
@@ -58,6 +58,6 @@ trait CppGenUnrolled extends CppGenController {
 
     case ParFIFOEnq(fifo, data, ens) =>
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

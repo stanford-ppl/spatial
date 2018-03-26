@@ -1,6 +1,6 @@
 package spatial.data
 
-import core._
+import argon._
 import spatial.lang._
 
 /**

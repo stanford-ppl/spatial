@@ -1,6 +1,6 @@
 package spatial.issues
 
-import core._
+import argon._
 import forge.tags.stateful
 import spatial.data.AccessMatrix
 

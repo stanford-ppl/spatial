@@ -21,7 +21,7 @@ trait CppGenVector extends CppCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ListVector(elems)      => emit(src"${lhs.tp} $lhs = {" + elems.map(quote).mkString(",") + "};")
     case VectorApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector >> $i;")
     case VectorSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")
@@ -45,6 +45,6 @@ trait CppGenVector extends CppCodegen {
         emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
     }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

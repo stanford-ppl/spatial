@@ -1,21 +1,29 @@
 package utils.io
 
-import java.io.File
+import java.io.{File, PrintStream}
 import java.nio.file._
 import java.util.function.Consumer
+
+import scala.io.Source
 
 object files {
   def sep: String = java.io.File.separator
   def cwd: String = new java.io.File("").getAbsolutePath
 
   /**
-    * Delete all files in the given path which end in the extension `ext`
+    * Delete all files in the given path which end in the extension `ext`.
+    * If recursive is true, recursively delete files with this extension.
     */
-  def deleteExts(path: String, ext: String): Unit = {
-    val files: Array[String] = Option(new File(path).list).map(_.filter(_.endsWith(ext))).getOrElse(Array.empty)
+  def deleteExts(path: String, ext: String, recursive: Boolean = false): Unit = {
+    val files: Array[String] = Option(new File(path).list).getOrElse(Array.empty)
     files.foreach{filename =>
       val file = new File(path + java.io.File.separator + filename)
-      file.delete()
+      if (file.isDirectory && recursive) {
+        deleteExts(filename, ext, recursive)
+      }
+      else if (filename.endsWith("."+ext)) {
+        file.delete()
+      }
     }
   }
 
@@ -39,6 +47,7 @@ object files {
     val srcFile = new File(src)
     val dstFile = new File(dst)
     if (dstFile.exists() && !dstFile.canWrite) throw new Exception(s"Destination $dst exists and cannot be written.")
+    if (!srcFile.exists()) throw new Exception(s"Source for copy $src does not exist.")
 
     Files.copy(Paths.get(src), Paths.get(dst))
   }
@@ -59,6 +68,19 @@ object files {
     }
 
     Files.walk(srcPath).forEach(Copier)
+  }
+
+  /**
+    * Copy the resource file to the given destination
+    */
+  def copyResource(src: String, dest: String): Unit = {
+    val outFile = new File(dest)
+    outFile.mkdirs()
+    val out = new PrintStream(outFile)
+    val res = getClass.getResourceAsStream(src)
+    Source.fromInputStream(res).getLines().foreach{line => out.println(line) }
+    out.close()
+    res.close()
   }
 
 }

@@ -145,7 +145,7 @@ trait ChiselGenCounter extends ChiselGenSRAM with FileDependencies {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case CounterNew(start,end,step,par) => 
       emit(s"// $lhs = ($start to $end by $step par $par")
     case CounterChainNew(ctrs) => 
@@ -154,7 +154,7 @@ trait ChiselGenCounter extends ChiselGenSRAM with FileDependencies {
     case Forever() => 
       emit("// $lhs = Forever")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

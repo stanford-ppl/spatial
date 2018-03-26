@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import emul.Bool
 import forge.tags._
 

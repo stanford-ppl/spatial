@@ -1,7 +1,7 @@
 package spatial.node
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 
 abstract class FltOp[M:INT,E:INT,R:Type] extends Primitive[R] {
@@ -41,7 +41,8 @@ abstract class FltOp1[M:INT,E:INT] extends FltOp[M,E,Flt[M,E]]
 @op case class FltAcos[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltAtan[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 
-@op case class FltInvSqrt[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltRecip[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltRecipSqrt[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltSigmoid[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 
 @op case class FltToFlt[M1:INT,E1:INT,M2:INT,E2:INT](

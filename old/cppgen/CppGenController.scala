@@ -12,7 +12,7 @@ trait CppGenController extends CppCodegen {
   var instrumentCounters: List[(Exp[_], Int)] = List()
   var earlyExits: List[Exp[_]] = List()
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Hwblock(func,isForever) =>
       controllerStack.push(lhs)
       // Skip everything inside
@@ -132,7 +132,7 @@ trait CppGenController extends CppCodegen {
       emit(src"exit(1);")
       if (!emitEn) earlyExits = earlyExits :+ lhs
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }
 

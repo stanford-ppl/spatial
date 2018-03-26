@@ -16,7 +16,7 @@ trait CppGenBool extends CppCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Not(x)       => emit(src"bool $lhs = !$x;")
     case And(x,y)     => emit(src"bool $lhs = $x && $y;")
     case Or(x,y)      => emit(src"bool $lhs = $x || $y;")
@@ -37,6 +37,6 @@ trait CppGenBool extends CppCodegen {
         case _ =>          
       }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

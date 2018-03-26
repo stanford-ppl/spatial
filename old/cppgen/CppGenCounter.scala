@@ -21,11 +21,11 @@ trait CppGenCounter extends CppCodegen with FileDependencies {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case CounterNew(start,end,step,par) =>
     case CounterChainNew(ctrs) =>
     case Forever() => emit(s"// ${quote(lhs)} = Forever")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

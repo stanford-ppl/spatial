@@ -1,16 +1,15 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 import spatial.node._
 
 import scala.collection.mutable.MutableList
 
-@ref class LIFO[A:Bits]
-      extends Top[LIFO[A]]
+@ref class LIFO[A:Bits] extends Top[LIFO[A]]
          with LocalMem1[A,LIFO]
          with Ref[MutableList[Any],LIFO[A]] {
-  val tA: Bits[A] = Bits[A]
+  val A: Bits[A] = Bits[A]
   val evMem: LIFO[A] <:< LocalMem[A,LIFO] = implicitly[LIFO[A] <:< LocalMem[A,LIFO]]
 }
 object LIFO {

@@ -1,7 +1,7 @@
 package spatial.lang
 package static
 
-import core._
+import argon._
 import forge.tags._
 import utils.math.ReduceTree
 

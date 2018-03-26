@@ -1,7 +1,7 @@
 package spatial.traversal
 package banking
 
-import core._
+import argon._
 import poly.ISL
 import utils.implicits.collections._
 

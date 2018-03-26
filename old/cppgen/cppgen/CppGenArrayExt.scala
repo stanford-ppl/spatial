@@ -48,7 +48,7 @@ trait CppGenArrayExt extends CppGenArray {
     }
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArrayUpdate(array, i, data) => emitUpdate(array, data, src"$i", data.tp)
     case MapIndices(size, func, i)   =>
       emitNewArray(lhs, lhs.tp, src"$size")
@@ -149,6 +149,6 @@ trait CppGenArrayExt extends CppGenArray {
       }
 
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

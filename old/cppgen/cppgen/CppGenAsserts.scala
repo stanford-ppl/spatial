@@ -13,12 +13,12 @@ trait CppGenAsserts extends CppCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Assert(cond, m)       =>  
       val str = src"""${m.getOrElse("API assert failed with no message provided")}"""
       emit(src"""std::string $lhs = string_plus("\n=================\n", string_plus($str, "\n=================\n"));""")
       emit(src"""ASSERT($cond, ${lhs}.c_str());""")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

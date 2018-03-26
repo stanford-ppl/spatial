@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 import spatial.node._
 import spatial.lang.types._
@@ -8,7 +8,7 @@ import spatial.lang.types._
 import utils.implicits.collections._
 
 abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends Top[C[A]] with RemoteMem[A,C] {
-  val tA: Bits[A] = Bits[A]
+  val A: Bits[A] = Bits[A]
   protected def M1: Type[DRAM1[A]] = implicitly[Type[DRAM1[A]]]
   protected def M2: Type[DRAM2[A]] = implicitly[Type[DRAM2[A]]]
   protected def M3: Type[DRAM3[A]] = implicitly[Type[DRAM3[A]]]

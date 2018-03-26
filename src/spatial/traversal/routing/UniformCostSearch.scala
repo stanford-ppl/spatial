@@ -1,7 +1,7 @@
 package spatial.traversal.routing
 
 import forge.tags._
-import core._
+import argon._
 
 import scala.collection.mutable
 import scala.util.control.NoStackTrace

@@ -1,6 +1,6 @@
 package spatial.util
 
-import core._
+import argon._
 import spatial.data._
 import spatial.lang._
 import spatial.node._
@@ -34,7 +34,27 @@ trait UtilsControl {
     def ancestors: Seq[Ctrl] = Tree.ancestors(x.toCtrl){_.parent}
     def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = x.toCtrl.ancestors(stop)
     def ancestors(stop: Ctrl): Seq[Ctrl] = x.toCtrl.ancestors(stop)
+
+    def cchains: Seq[CounterChain] = x.op match {
+      case Some(op: Control[_]) => op.cchains.map(_._1).distinct
+      case _ => Nil
+    }
+
+    def isStreamPipe: Boolean = styleOf(x) == Sched.Stream
+    def isForever: Boolean = x.op match {
+      case Some(op: Control[_]) => x.cchains.exists(_.isForever)
+      case Some(op: CounterChainNew) => op.counters.exists(_.isForever)
+      case Some(_: ForeverNew) => true
+      case _ => false
+    }
+    def willRunForever: Boolean = x.isForever || x.children.exists(_.willRunForever)
   }
+  implicit class CtrlControl(x: Ctrl) {
+    def isStreamPipe: Boolean = x.s.exists(_.isStreamPipe)
+    def willRunForever: Boolean = x.s.exists(_.willRunForever)
+  }
+
+
 
   def getCChains(block: Block[_]): Seq[CounterChain] = getCChains(block.stms)
   def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}
@@ -68,7 +88,6 @@ trait UtilsControl {
     def step: Sym[F] = ctrDef(x).step
     def end: Sym[F] = ctrDef(x).end
     def ctrPar: I32 = ctrDef(x).par
-    def isForever: Boolean = x.op.exists(_.isInstanceOf[ForeverNew])
     def nIters: Option[Bound] = (start,step,end) match {
       case (Final(min), Final(stride), Final(max)) =>
         Some(Final(Math.ceil((max - min).toDouble / stride).toInt))

@@ -1,6 +1,6 @@
 package spatial.util
 
-import core._
+import argon._
 import forge.tags.stateful
 import utils.implicits.collections._
 import spatial.data._

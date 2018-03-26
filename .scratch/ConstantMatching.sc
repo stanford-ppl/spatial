@@ -1,4 +1,4 @@
-import core._
+import argon._
 import spatial.lang._
 
 val x = I32(32)

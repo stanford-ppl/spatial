@@ -1,14 +1,12 @@
 package spatial.lang
 package static
 
-import core._
+import argon.{ArgonVirtualization, _}
 import forge.tags._
 import utils.Overloads._
-import nova.compiler.NovaVirtualization
-
 import spatial.node.IfThenElse
 
-trait SpatialVirtualization extends NovaVirtualization {
+trait SpatialVirtualization extends ArgonVirtualization {
 
   @rig def __ifThenElse[A:Type](cond: Bit, thenBr: => Lift[A], elseBr: => Lift[A])(implicit ov0: Overload0): A = {
     ifThenElse(cond, () => thenBr.unbox, () => elseBr.unbox)

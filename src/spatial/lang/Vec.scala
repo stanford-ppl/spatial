@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import emul.{FixedPoint, Number}
 import forge.tags._
 import utils.math.ReduceTree
@@ -9,10 +9,10 @@ import utils.plural
 import spatial.node._
 
 @ref class Vec[A:Bits](val length: Int) extends Top[Vec[A]] with Ref[Array[Any],Vec[A]] with Arith[Vec[A]] with Bits[Vec[A]] {
-  val tA: Bits[A] = Bits[A]
-  val aA: Option[Arith[A]] = tA.getView[Arith]
+  val A: Bits[A] = Bits[A]
+  val aA: Option[Arith[A]] = A.getView[Arith]
   override val box: Vec[A] <:< (Arith[Vec[A]] with Bits[Vec[A]]) = implicitly[Vec[A] <:< (Arith[Vec[A]] with Bits[Vec[A]])]
-  private implicit val evv: A <:< Bits[A] = tA.box
+  private implicit val evv: A <:< Bits[A] = A.box
 
   // TODO[4]: These are all quite expensive for large vectors
   @api def elems: List[A] = List.tabulate(length){i => this.apply(i) }

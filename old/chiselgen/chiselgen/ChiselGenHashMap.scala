@@ -11,9 +11,9 @@ trait ChiselGenHashMap extends ChiselCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]) = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]) = rhs match {
     case HashIndexApply(index, key) => emit(src"val $lhs = $index.getOrElse($key, -1)")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFat(lhs: Seq[Sym[_]], rhs: Def) = rhs match {

@@ -1,6 +1,6 @@
 package spatial.data
 
-import core._
+import argon._
 import forge.tags._
 import utils.implicits.collections._
 import poly.SparseVector

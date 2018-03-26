@@ -50,7 +50,7 @@ trait ChiselGenFIFO extends ChiselGenSRAM {
   //   case _ => 1
   // }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FIFONew(_)   =>
       if (spatialConfig.useCheapFifos) {
         val size = constSizeOf(lhs)
@@ -162,6 +162,6 @@ trait ChiselGenFIFO extends ChiselGenSRAM {
     case FIFOAlmostFull(fifo) => emitGlobalWire(src"val $lhs = Wire(Bool())"); emit(src"$lhs := ${fifo}.io.almostFull")
     case FIFONumel(fifo) => emit(src"val $lhs = ${fifo}.io.numel")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

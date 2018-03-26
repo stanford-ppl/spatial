@@ -23,7 +23,7 @@ trait CppGenReg extends CppGenSRAM {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArgInNew(init)  => 
       argIns = argIns :+ lhs
       emit(src"${lhs.tp} $lhs = 0; // Initialize cpp argin ???")
@@ -37,7 +37,7 @@ trait CppGenReg extends CppGenSRAM {
       emit(src"${lhs.tp} $lhs = $reg;")
     case RegWrite(reg,v,en) => 
       emit(src"// $lhs $reg $v $en reg write")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

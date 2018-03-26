@@ -1,7 +1,7 @@
 package spatial.lang
 package static
 
-import core._
+import argon._
 import forge.tags._
 import spatial.node._
 
@@ -34,7 +34,7 @@ trait CastsPriority1 extends CastsPriority2 {
 
 trait Casts extends CastsPriority1 { this: SpatialStatics =>
   implicit def box[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
-  implicit class BoxSym[A:Type](x: A) extends core.static.ExpMiscOps[Any,A](x)
+  implicit class BoxSym[A:Type](x: A) extends argon.static.ExpMiscOps[Any,A](x)
 
 
   @api implicit def regRead[A:Bits](x: Reg[A]): A = x.value

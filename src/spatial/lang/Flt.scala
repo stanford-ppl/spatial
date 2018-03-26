@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import emul.{FloatPoint, FltFormat, FixedPoint}
 import forge.tags._
 

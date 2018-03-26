@@ -1,7 +1,7 @@
 package spatial.node
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 
 @op case class VarNew[T:Type](init: Option[T]) extends Alloc[Var[T]] {

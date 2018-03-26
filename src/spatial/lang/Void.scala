@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 
 @ref class Void extends Top[Void] with Ref[Unit,Void] {

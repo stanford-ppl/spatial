@@ -1,7 +1,6 @@
 package nova.test
 
-import core._
-import nova.compiler.DSLApp
+import argon.{DSLApp, _}
 import utils.implicits.Readable._
 import utils.implicits.terminal._
 import utils.isSubtype
@@ -42,14 +41,14 @@ trait Requirements {
         msg.foreach{x => Console.out.error(x) }
         Console.out.println("")
       }
-      throw core.TestbenchFailure(s"Test failed ${failed.length} requirements")
+      throw argon.TestbenchFailure(s"Test failed ${failed.length} requirements")
     }
   }
 
 }
 
 abstract class NovaTestbench extends TestSuite {
-  type Fail = core.TestbenchFailure
+  type Fail = argon.TestbenchFailure
   val defaultArgs: Array[String] = Array.empty
 
   def test(x: Any, args: Array[String] = defaultArgs): Unit = {

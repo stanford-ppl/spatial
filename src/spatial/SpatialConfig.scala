@@ -1,6 +1,6 @@
 package spatial
 
-import core.Config
+import argon.Config
 import spatial.dse.DSEMode
 import spatial.targets.HardwareTarget
 

@@ -2,7 +2,7 @@ package spatial.lang
 package control
 
 import forge.tags._
-import core._
+import argon._
 import spatial.node._
 
 protected class AccelClass(name: Option[String]) {

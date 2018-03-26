@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.{Ptr,VarLike}
 import forge.tags._
 import spatial.lang

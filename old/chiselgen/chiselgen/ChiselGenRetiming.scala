@@ -28,7 +28,7 @@ trait ChiselGenRetiming extends ChiselGenSRAM {
   }
 
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case DelayLine(size, data) =>
       // emit(src"""val $lhs = Utils.delay($data, $size)""")
       data match {
@@ -71,7 +71,7 @@ trait ChiselGenRetiming extends ChiselGenSRAM {
       emit(src"${shiftReg}.io.input.en := true.B //$en & ${parent}_datapath_en")*/
 
     case _ =>
-      super.emitNode(lhs, rhs)
+      super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

@@ -1,6 +1,6 @@
 package spatial.lang.control
 
-import core._
+import argon._
 import spatial.data._
 
 case class CtrlOpt(

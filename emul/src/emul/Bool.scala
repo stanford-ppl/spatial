@@ -31,6 +31,12 @@ object FALSE extends Bool(false, true)
 object TRUE  extends Bool(true, true)
 
 object Bool {
+  def from(str: String): Bool = str.toLowerCase match {
+    case "false" => FALSE
+    case "true" => TRUE
+    case _ if str.forall(_.isDigit) => Bool(str.toInt != 0)
+    case _ => throw new Exception(s"Cannot convert $str to Bool")
+  }
   def apply(value: Boolean): Bool = new Bool(value, valid=true)
   def apply(value: Boolean, valid: Boolean): Bool = new Bool(value, valid)
 }

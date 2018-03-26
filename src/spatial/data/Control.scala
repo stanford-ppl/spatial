@@ -1,6 +1,6 @@
 package spatial.data
 
-import core._
+import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.util._
@@ -15,13 +15,13 @@ object UserSchedule {
 }
 
 /** Scheduling determined by the compiler. */
-sealed abstract class ControlSchedule
-object ControlSchedule {
-  case object Seq extends ControlSchedule { override def toString = "Sequential" }
-  case object Pipe extends ControlSchedule { override def toString = "Pipeline" }
-  case object Stream extends ControlSchedule { override def toString = "Stream" }
-  case object Fork extends ControlSchedule { override def toString = "Fork" }
-  case object ForkJoin extends ControlSchedule { override def toString = "ForkJoin" }
+sealed abstract class Sched
+object Sched {
+  case object Seq extends Sched { override def toString = "Sequential" }
+  case object Pipe extends Sched { override def toString = "Pipeline" }
+  case object Stream extends Sched { override def toString = "Stream" }
+  case object Fork extends Sched { override def toString = "Fork" }
+  case object ForkJoin extends Sched { override def toString = "ForkJoin" }
 }
 
 /** The level of control within the hierarchy. */
@@ -62,11 +62,11 @@ object isOuter {
 }
 
 /** The control schedule determined by the compiler. */
-case class ControlScheduling(sched: ControlSchedule) extends StableData[ControlScheduling]
+case class ControlScheduling(sched: Sched) extends StableData[ControlScheduling]
 object styleOf {
-  def get(x: Sym[_]): Option[ControlSchedule] = metadata[ControlScheduling](x).map(_.sched)
-  def apply(x: Sym[_]): ControlSchedule = styleOf.get(x).getOrElse{throw new Exception(s"Undefined schedule for $x")}
-  def update(x: Sym[_], sched: ControlSchedule): Unit = metadata.add(x, ControlScheduling(sched))
+  def get(x: Sym[_]): Option[Sched] = metadata[ControlScheduling](x).map(_.sched)
+  def apply(x: Sym[_]): Sched = styleOf.get(x).getOrElse{throw new Exception(s"Undefined schedule for $x")}
+  def update(x: Sym[_], sched: Sched): Unit = metadata.add(x, ControlScheduling(sched))
 }
 
 /** The control schedule annotated by the user, if any. */

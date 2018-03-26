@@ -1,5 +1,5 @@
-val nova_version = "1.0"
-val scala_version     = "2.12.4" //"0.6.0-RC1"
+val nova_version      = "1.0"
+val scala_version     = "2.12.4"
 val paradise_version  = "2.1.0"
 
 name := "nova"
@@ -7,15 +7,12 @@ name := "nova"
 val common = Seq(
   scalaVersion := scala_version,
   version := nova_version,
-  //nativeLinkStubs := true,
-  //crossScalaVersions := Seq("2.12.4", "2.13.0-M3"),
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scala_version,                  // Reflection
-    //"com.lihaoyi" % "utest_2.12" % "0.6.3",
-    ("com.lihaoyi" %% "utest" % "0.6.3" % "test"), //.withDottyCompat(),  // Testing
-    ("com.github.scopt" %% "scopt" % "3.7.0") //.withDottyCompat()       // Command line args
+    "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
+    "com.lihaoyi" %% "utest" % "0.6.3" % "test",         // Testing
+    "com.github.scopt" %% "scopt" % "3.7.0"              // Command line args
   ),
 
   /** Scalac Options **/
@@ -59,6 +56,8 @@ lazy val emul   = project.settings(common)
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
-lazy val core   = project.settings(common).dependsOn(forge)
-lazy val nova   = (project in file(".")).settings(common).dependsOn(forge, emul, core, models, poly)
+lazy val argon  = project.settings(common).dependsOn(forge)
+lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
+
+lazy val nova   = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)
 

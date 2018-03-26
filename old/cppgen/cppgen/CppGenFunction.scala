@@ -22,7 +22,7 @@ trait CppGenFunction extends CppCodegen {
     case a@_ => src"${remap(a)} $e"
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FunDeclJJ$JJ$1to10(argII$II$1toJJ, block) =>
       val args = List(argII$II$1toJJ).map(arg).mkString(",")
       val rt = remap(block.result.tp)
@@ -39,6 +39,6 @@ trait CppGenFunction extends CppCodegen {
       val name = fun.name.get
       val args = List(argII$II$1toJJ).map(quote).mkString(",")
       emit(src"${lhs.tp} $lhs = $name($args);")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

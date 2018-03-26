@@ -19,7 +19,7 @@ private[forge] object stateful {
     import util._
     import c.universe._
 
-    def injectState(df: DefDef) = df.injectImplicit("state", tq"core.State", tq"State")
+    def injectState(df: DefDef) = df.injectImplicit("state", tq"argon.State", tq"State")
 
     val tree = annottees.head match {
       case df: DefDef    => injectState(df)

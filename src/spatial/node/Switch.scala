@@ -1,14 +1,14 @@
 package spatial.node
 
-import core._
-import core.schedule.Schedule
+import argon._
+import argon.schedule.Schedule
 import forge.tags._
 import spatial.lang._
 
 /** Custom scheduler for Switch nodes.
   * The scheduler always motions all operations except SwitchCases out of the Switch body
   */
-object SwitchScheduler extends core.schedule.Scheduler {
+object SwitchScheduler extends argon.schedule.Scheduler {
   override def mustMotion: Boolean = true
 
   /** Returns the schedule of the given scope. */

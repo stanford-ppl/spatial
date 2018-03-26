@@ -1,7 +1,7 @@
 package spatial.lang
 
 import forge.tags._
-import core._
+import argon._
 import spatial.node.CounterChainNew
 import pir.node.CounterChainCopy
 

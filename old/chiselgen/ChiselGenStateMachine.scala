@@ -12,7 +12,7 @@ trait ChiselGenStateMachine extends ChiselCodegen with ChiselGenController {
     case _ => super.name(s)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StateMachine(ens,start,notDone,action,nextState,state) =>
       val parent_kernel = controllerStack.head 
       controllerStack.push(lhs)
@@ -65,6 +65,6 @@ trait ChiselGenStateMachine extends ChiselCodegen with ChiselGenController {
       emitChildrenCxns(lhs, None, None, true)
       controllerStack.pop()
       
-    case _ => super.emitNode(lhs,rhs)
+    case _ => super.gen(lhs,rhs)
   }
 }

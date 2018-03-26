@@ -1,7 +1,7 @@
 package nova.codegen.dot
 
-import core._
-import core.passes.Codegen
+import argon._
+import argon.codegen.Codegen
 import pir.node.{VPCU, VPMU}
 import spade.node.{PCUModule, PMUModule}
 
@@ -26,7 +26,7 @@ trait DotCommon { this: Codegen =>
     open()
     emit(s"rankdir=$rankdir;")
     emit("labelloc=\"t\"")
-    emit(s"""label="${filename}"""")
+    emit(s"""label="${entryFile}"""")
     if (useOrtho) emit(s"splines=ortho")
     block
   }
@@ -68,14 +68,14 @@ trait DotCommon { this: Codegen =>
     close()
     emit("}")
   }
-  def emitNode(n: Any, attr: DotAttr): Unit = {
+  def gen(n: Any, attr: DotAttr): Unit = {
     if (!emittedNodes.contains(n)) {
       emit(src"""$n [${attr.list}];""")
       emittedNodes += n
     }
   }
-  def emitNode(n: Any, label: String): Unit = emitNode(n, DotAttr().label(label))
-  def emitNode(n: Any, label: Any, attr: DotAttr): Unit = emitNode(n, attr.label(label))
+  def gen(n: Any, label: String): Unit = gen(n, DotAttr().label(label))
+  def gen(n: Any, label: Any, attr: DotAttr): Unit = gen(n, attr.label(label))
 
   def emitEdge(from: Any, to: Any, attr: DotAttr): Unit = {
     edges += (() => emit(src"""$from -> $to ${if (attr.attrMap.nonEmpty) s"[${attr.list}]" else ""}"""))

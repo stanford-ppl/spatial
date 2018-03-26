@@ -1,6 +1,6 @@
 package spatial.node
 
-import core._
+import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.lang.host._

@@ -30,7 +30,7 @@ trait ChiselGenFltPt extends ChiselCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FltNeg(x)   => emit(src"val $lhs = -$x")
     case FltAdd(x,y) =>
       val regs = if (reduceCycleOf(lhs).nonEmpty) 0 else 12
@@ -71,7 +71,7 @@ trait ChiselGenFltPt extends ChiselCodegen {
       case DoubleType() => emit(src"val $lhs = $x.toDouble")
       case FloatType()  => emit(src"val $lhs = $x.toFloat")
     }
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

@@ -1,8 +1,8 @@
 package argon.codegen.cppgen
 
 import argon.core._
-import argon.codegen.StructCodegen
 import argon.nodes._
+import spatial.codegen.StructCodegen
 
 import scala.language.postfixOps
 import sys.process._
@@ -123,14 +123,14 @@ trait CppGenStruct extends CppCodegen with StructCodegen {
   }
   
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]) = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]) = rhs match {
     case e: StructAlloc[_] =>
       emit(src"${lhs.tp} $lhs = *(new ${e.mR}( " + e.elems.map(x => quote(x._2)).mkString(", ") + " ));")
 
     case FieldUpdate(struct, field, value) => emit(src"${lhs.tp} $lhs = $struct.set$field($value);")
     case FieldApply(struct, field)         => emit(src"${lhs.tp} $lhs = $struct.get$field();")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 

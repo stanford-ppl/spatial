@@ -1,12 +1,18 @@
 package spatial.lang
 package host
 
-import core._
+import argon._
 import forge.tags._
 import spatial.node._
 
 /** A two-dimensional matrix on the host */
 @ref class Matrix[A:Type] extends Struct[Matrix[A]] with Ref[scala.Array[Any],Matrix[A]] {
+  val A: Type[A] = Type[A]
+  def fields = Seq(
+    "data" -> Type[Array[A]],
+    "rows" -> Type[I32],
+    "cols" -> Type[I32]
+  )
 
   @rig def data: Array[A] = field[Array[A]]("data")
 

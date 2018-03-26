@@ -8,7 +8,7 @@ import spatial.nodes._
 
 trait CppGenFileIO extends CppCodegen  {
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case OpenFile(filename, isWr) => 
     	val dir = if (isWr) "o" else "i"
     	emit(src"""std::${dir}fstream ${lhs}_file (${filename}.c_str());""")
@@ -56,7 +56,7 @@ trait CppGenFileIO extends CppCodegen  {
     // case ReadBinaryFile[T:Type:Num](file: Exp[MBinaryFile])
     // case WriteBinaryFile[T:Type:Num](file:  Exp[MBinaryFile],len:   Exp[Index],value: Lambda1[Index, T],index: Bound[Index])
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 

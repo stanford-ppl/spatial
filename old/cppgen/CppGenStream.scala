@@ -7,7 +7,7 @@ import spatial.nodes._
 
 trait CppGenStream extends CppCodegen {
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 //    case StreamInNew(bus) => emit(s"$lhs = $bus // TODO: No idea what to connect this bus to, should expose periphal pins to something...")
 //    case StreamOutNew(bus) =>
 //      s"$bus" match {
@@ -18,7 +18,7 @@ trait CppGenStream extends CppCodegen {
     case BufferedOutNew(_, bus) => emit(s"// ${quote(lhs)} = $bus // TODO: No idea what to connect this bus to, should expose periphal pins to something...")
     case StreamInNew(bus) => emit(s"// ${quote(lhs)} = $bus // TODO: No idea what to connect this bus to, should expose periphal pins to something...")
     case StreamOutNew(bus) => emit(s"// ${quote(lhs)} = $bus // TODO: No idea what to connect this bus to, should expose periphal pins to something...")
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   

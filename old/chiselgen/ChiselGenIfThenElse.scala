@@ -5,7 +5,7 @@ import argon.nodes.IfThenElse
 
 trait ChiselGenIfThenElse extends ChiselCodegen {
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case IfThenElse(cond, thenp, elsep) =>
       open(src"val $lhs = {")
       open(src"if ($cond) { ")
@@ -16,7 +16,7 @@ trait ChiselGenIfThenElse extends ChiselCodegen {
       close("}")
       close("}")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

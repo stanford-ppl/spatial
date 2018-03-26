@@ -9,6 +9,10 @@ import scala.reflect.macros.blackbox
 class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
   import __c.universe._
 
+  def abort(msg: String): Nothing = __c.abort(__c.enclosingPosition, msg)
+  def error(msg: String): Unit = __c.error(__c.enclosingPosition, msg)
+  def info(msg: String): Unit = __c.info(__c.enclosingPosition, msg, force = true)
+
   def methodCall(recOpt: Option[Tree], methName: String, args: List[List[Tree]], targs: List[Tree] = Nil): Tree = {
     val calleeName = TermName(methName)
     val callee = recOpt match {
@@ -81,9 +85,12 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
 
     def tp: Option[Tree] = if (tpTree == EmptyTree) None else Some(tpTree)
 
+    def isVar: Boolean = mods.hasFlag(Flag.MUTABLE)
     def asVar: ValDef = ValDef(mods.withMutable,nameTerm,tpTree,rhs)
 
     def hasType(types: Seq[Tree]): Boolean = types.exists{tp => tp equalsStructure tpTree }
+
+    def withRHS(rhs: Tree): ValDef = ValDef(mods,nameTerm,tpTree,rhs)
 
     def isImplicit: Boolean = mods.hasFlag(Flag.IMPLICIT)
   }
@@ -188,6 +195,8 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       template: Template
     ) = cls
     lazy val nameTerm: TermName = nameType.toTermName
+
+    def fullName: Tree = targsType(cls.name,typeArgs)
 
     def copyWithTemplate(template: Template): ClassDef = ClassDef(mods,nameType,tparams,template)
 

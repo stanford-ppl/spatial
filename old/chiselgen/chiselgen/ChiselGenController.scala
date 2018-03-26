@@ -774,7 +774,7 @@ trait ChiselGenController extends ChiselGenCounter{
     }
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Hwblock(func,isForever) =>
       hwblock_sym = hwblock_sym :+ lhs.asInstanceOf[Exp[_]]
       controllerStack.push(lhs)
@@ -1025,7 +1025,7 @@ trait ChiselGenController extends ChiselGenCounter{
     case _:OpReduce[_] => throw new Exception("Should not be emitting chisel for Op ctrl node")
     case _:OpMemReduce[_,_] => throw new Exception("Should not be emitting chisel for Op ctrl node")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

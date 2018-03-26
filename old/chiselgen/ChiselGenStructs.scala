@@ -74,7 +74,7 @@ trait ChiselGenStructs extends ChiselGenSRAM {
   }
   
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case SimpleStruct(tuples)  =>
       val items = tuples.zipWithIndex.map{ case(t,i) => 
         val width = bitWidth(t._2.tp)
@@ -103,6 +103,6 @@ trait ChiselGenStructs extends ChiselGenSRAM {
         emit(src"val $lhs = ${struct}($msb, $lsb)")
       }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

@@ -12,7 +12,7 @@ final class ref extends StaticAnnotation {
 }
 
 /** Companion object implementing @ref macro annotation. */
-private object ref {
+object ref {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
     val util = new MacroUtils[c.type](c)
     import util._

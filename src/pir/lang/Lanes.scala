@@ -1,6 +1,6 @@
 package pir.lang
 
-import core._
+import argon._
 import forge.tags._
 import spatial.lang._
 

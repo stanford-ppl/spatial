@@ -2,7 +2,7 @@ package spatial.lang
 package types
 
 import forge.tags._
-import core._
+import argon._
 
 trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   // Fancy Scala trick: Promise evidence of A being a subclass of Num[A], use implicitly here

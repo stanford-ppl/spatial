@@ -1,11 +1,19 @@
 package spatial.util
 
-import core._
+import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.data._
 
-trait UtilsIR {
+trait UtilsIRLowPriority {
+  implicit class TypeUtils[A](x: Type[A]) {
+    def isNum:  Boolean = x.isInstanceOf[Num[_]]
+    def isBits: Boolean = x.isInstanceOf[Bits[_]]
+    def isVoid: Boolean = x.isInstanceOf[Void]
+  }
+}
+
+trait UtilsIR extends UtilsIRLowPriority {
   /** Returns the number of bits of data the given symbol represents. */
   def nbits(e: Sym[_]): Int = e.tp match {case Bits(bT) => bT.nbits; case _ => 0 }
 

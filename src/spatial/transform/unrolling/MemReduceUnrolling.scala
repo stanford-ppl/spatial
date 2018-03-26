@@ -1,6 +1,6 @@
 package spatial.transform.unrolling
 
-import core._
+import argon._
 import spatial.data._
 import spatial.lang._
 import spatial.node._

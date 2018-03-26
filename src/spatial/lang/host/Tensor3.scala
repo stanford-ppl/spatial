@@ -1,12 +1,19 @@
 package spatial.lang
 package host
 
-import core._
+import argon._
 import forge.tags._
-import spatial.node._
 
 /** A three-dimensional tensor on the host */
 @ref class Tensor3[A:Type] extends Struct[Tensor3[A]] with Ref[scala.Array[Any],Tensor3[A]] {
+  val A: Type[A] = Type[A]
+  def fields = Seq(
+    "data" -> Type[Array[A]],
+    "dim0" -> Type[I32],
+    "dim1" -> Type[I32],
+    "dim2" -> Type[I32]
+  )
+
   @rig def data: Array[A] = field[Array[A]]("data")
 
   /** Returns the first dimension of this Tensor3. */

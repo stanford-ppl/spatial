@@ -1,7 +1,7 @@
 package spatial.lang
 package types
 
-import core._
+import argon._
 import forge.tags._
 
 trait Order[A] extends Top[A] with Ref[Any,A] {

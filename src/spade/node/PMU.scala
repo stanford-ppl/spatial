@@ -1,6 +1,6 @@
 package spade.node
 
-import core._
+import argon._
 import forge.tags._
 
 import spatial.lang._

@@ -51,7 +51,7 @@ trait ChiselGenFILO extends ChiselGenSRAM {
   //   case _ => 1
   // }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FILONew(_)   =>
       val size = constSizeOf(lhs)
       // ASSERT that all pars are the same!
@@ -111,6 +111,6 @@ trait ChiselGenFILO extends ChiselGenSRAM {
     case FILOAlmostFull(fifo) => emit(src"val $lhs = ${fifo}.io.almostFull")
     case FILONumel(fifo) => emit(src"val $lhs = ${fifo}.io.numel")
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

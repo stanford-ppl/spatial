@@ -1,7 +1,7 @@
 package spade.node
 
 import forge.tags._
-import core._
+import argon._
 import spatial.lang._
 import pir.lang._
 

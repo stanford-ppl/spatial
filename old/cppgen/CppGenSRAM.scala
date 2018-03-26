@@ -61,7 +61,7 @@ trait CppGenSRAM extends CppCodegen {
     indices.zip(strides).map{case (i,s) => src"$i*$s" }.mkString(" + ") + ofs.map{o => src" + $o"}.getOrElse("")
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case _ => super.emitNode(lhs, rhs)
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case _ => super.gen(lhs, rhs)
   }
 }

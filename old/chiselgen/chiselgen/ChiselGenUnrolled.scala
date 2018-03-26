@@ -37,7 +37,7 @@ trait ChiselGenUnrolled extends ChiselGenController {
   }
 
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
       val parent_kernel = controllerStack.head
       controllerStack.push(lhs)
@@ -211,6 +211,6 @@ trait ChiselGenUnrolled extends ChiselGenController {
       controllerStack.pop()
 
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

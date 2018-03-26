@@ -45,7 +45,7 @@ trait ChiselGenReg extends ChiselGenSRAM {
     case _ => super.remap(tp)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArgInNew(init)  => 
       argIns = argIns :+ lhs.asInstanceOf[Sym[Reg[_]]]
     case ArgOutNew(init) => 
@@ -278,7 +278,7 @@ trait ChiselGenReg extends ChiselGenSRAM {
       }
 
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

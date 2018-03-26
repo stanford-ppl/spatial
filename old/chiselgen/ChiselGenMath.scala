@@ -24,7 +24,7 @@ trait ChiselGenMath extends ChiselGenSRAM {
     case _ => "unk"
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixMul(x,y) =>
       alphaconv_register(src"$lhs")
       emitGlobalWireMap(src"$lhs", src"Wire(${newWire(lhs.tp)})")
@@ -124,7 +124,7 @@ trait ChiselGenMath extends ChiselGenSRAM {
 //      case FloatType()  => emit(src"val $lhs = Utils.faccum($x)")
 //    }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
 }

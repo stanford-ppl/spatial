@@ -1,13 +1,13 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 import spatial.node._
 
 import scala.collection.mutable.Queue
 
 @ref class StreamIn[A:Bits] extends LocalMem0[A,StreamIn] with RemoteMem[A,StreamIn] with Ref[Queue[Any],StreamIn[A]] {
-  val tA: Bits[A] = Bits[A]
+  val A: Bits[A] = Bits[A]
   private implicit val evA: A <:< Bits[A] = Bits[A].box
   override val evMem = implicitly[StreamIn[A] <:< (LocalMem[A,StreamIn] with RemoteMem[A,StreamIn])]
 

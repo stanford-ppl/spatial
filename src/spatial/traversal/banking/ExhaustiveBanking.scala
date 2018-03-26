@@ -1,6 +1,6 @@
 package spatial.traversal.banking
 
-import core._
+import argon._
 import utils.implicits.collections._
 import utils.math.isPow2
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}

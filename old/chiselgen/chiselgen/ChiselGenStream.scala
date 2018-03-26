@@ -11,7 +11,7 @@ trait ChiselGenStream extends ChiselGenSRAM {
   var streamIns: List[Sym[Reg[_]]] = List()
   var streamOuts: List[Sym[Reg[_]]] = List()
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
       emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${readersOf(lhs).length}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
@@ -359,7 +359,7 @@ trait ChiselGenStream extends ChiselGenSRAM {
         }
       }
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

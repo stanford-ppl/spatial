@@ -1,6 +1,6 @@
 package spatial.node
 
-import core._
+import argon._
 import emul.{FixedPoint,Number}
 import forge.tags._
 
@@ -208,7 +208,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(0))    => R.from(1)
     case (Literal(1), _)    => a
     case (_, Literal(0.5))  => sqrt(a)
-    case (_, Literal(-0.5)) => stage(FixInvSqrt(a))
+    case (_, Literal(-0.5)) => stage(FixRecipSqrt(a))
     case (_, Literal(-1))   => stage(FixInv(a))
     case _ => super.rewrite
   }
@@ -245,8 +245,11 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixAcos[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.acos)
 @op case class FixAtan[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.atan)
 
+/** Fixed point reciprocal **/
+@op case class FixRecip[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recip)
+
 /** Fixed point inverse square root */
-@op case class FixInvSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.invSqrt)
+@op case class FixRecipSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recipSqrt)
 
 /** Fixed point sigmoid */
 @op case class FixSigmoid[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.sigmoid)

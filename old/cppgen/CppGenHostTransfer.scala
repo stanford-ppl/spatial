@@ -39,7 +39,7 @@ trait CppGenHostTransfer extends CppGenSRAM  {
 
   val jsonData = ListBuffer[JSONEntry]()
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case SetArg(reg, v) => 
       reg.tp.typeArguments.head match {
         case FixPtType(s,d,f) => 
@@ -142,7 +142,7 @@ trait CppGenHostTransfer extends CppGenSRAM  {
       jsonData.append(JSONEntry(name = s"$name", idx = argMapping(dram)._2, size = s"$size"))
 
 
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 
   override protected def emitFileFooter() {

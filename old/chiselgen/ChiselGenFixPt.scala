@@ -60,7 +60,7 @@ trait ChiselGenFixPt extends ChiselCodegen {
     case _ => super.quoteConst(c)
   }
 
-  override protected def emitNode(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixInv(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${newWireFix(lhs.tp)})");emit(src"${lhs}.r := (~$x).r")
     case FixNeg(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${newWireFix(lhs.tp)})");emit(src"${lhs}.r := (-$x).r")
     case FixAdd(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${newWireFix(lhs.tp)})");emit(src"${lhs}.r := ($x + $y).r")
@@ -129,6 +129,6 @@ trait ChiselGenFixPt extends ChiselCodegen {
       case LongType() => emit(src"val $lhs = $x.toLong")
       case _ => emit(src"val $lhs = $x // No rule for this")
     }
-    case _ => super.emitNode(lhs, rhs)
+    case _ => super.gen(lhs, rhs)
   }
 }

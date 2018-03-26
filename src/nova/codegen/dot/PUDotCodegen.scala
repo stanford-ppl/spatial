@@ -1,7 +1,7 @@
 package nova.codegen.dot
 
-import core._
-import core.passes.Codegen
+import argon._
+import argon.codegen.Codegen
 import pir.lang._
 import pir.node._
 import spatial.lang._
@@ -10,7 +10,7 @@ import scala.collection.mutable.HashMap
 import scala.language.implicitConversions
 
 case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
-  override def filename: String = s"PUGraph.${ext}"
+  override def entryFile: String = s"PUGraph.${ext}"
   override def ext = s"dot.$lang"
 
   override def rankdir = "LR"
@@ -130,9 +130,9 @@ pcu00 [shape=plaintext, label=<
 
     rhs match {
       case pcu: VPCU =>
-        emitNode(getNodeName(lhs), getNodeAttr(lhs))
+        gen(getNodeName(lhs), getNodeAttr(lhs))
       case pmu: VPMU =>
-        emitNode(getNodeName(lhs), getNodeAttr(lhs))
+        gen(getNodeName(lhs), getNodeAttr(lhs))
       case vb: VectorBus[_] =>
         emitEdge(getNodeName(boundsToPUMap(vb.out)), getNodeName(boundsToPUMap(vb.in)))
       case _ =>

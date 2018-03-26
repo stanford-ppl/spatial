@@ -1,6 +1,6 @@
 package spatial.node
 
-import core._
+import argon._
 import spatial.lang._
 
 trait Enabled[R] { this: Op[R] =>

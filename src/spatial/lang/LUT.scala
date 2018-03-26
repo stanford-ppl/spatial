@@ -1,6 +1,6 @@
 package spatial.lang
 
-import core._
+import argon._
 import forge.tags._
 import utils.implicits.collections._
 
@@ -8,7 +8,7 @@ import spatial.node._
 import spatial.lang.types._
 
 abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends LocalMem[A,C] {
-  val tA: Bits[A] = Bits[A]
+  val A: Bits[A] = Bits[A]
   protected def M1: Type[LUT1[A]] = implicitly[Type[LUT1[A]]]
   protected def M2: Type[LUT2[A]] = implicitly[Type[LUT2[A]]]
   protected def M3: Type[LUT3[A]] = implicitly[Type[LUT3[A]]]

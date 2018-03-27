@@ -1,17 +1,16 @@
 package spatial.codegen.scalagen
 
+import spatial.codegen.naming.NamedCodegen
+
 trait ScalaGenSpatial extends ScalaCodegen with ScalaFileGen
   with ScalaGenArray
   with ScalaGenBit
   with ScalaGenFixPt
   with ScalaGenFltPt
-  with ScalaGenHashMap
   with ScalaGenIfThenElse
   with ScalaGenStructs
-  with ScalaGenSpatialStruct
   with ScalaGenText
   with ScalaGenVoid
-  with ScalaGenFunction
   with ScalaGenVar
   with ScalaGenDebugging
   with ScalaGenLIFO
@@ -19,9 +18,7 @@ trait ScalaGenSpatial extends ScalaCodegen with ScalaFileGen
   with ScalaGenCounter
   with ScalaGenDRAM
   with ScalaGenFIFO
-  with ScalaGenHostTransfer
-  with ScalaGenMath
-  with ScalaGenRange
+  with ScalaGenArgs
   with ScalaGenReg
   with ScalaGenSRAM
   with ScalaGenUnrolled
@@ -32,7 +29,8 @@ trait ScalaGenSpatial extends ScalaCodegen with ScalaFileGen
   with ScalaGenFileIO
   with ScalaGenDelays
   with ScalaGenLUTs
-  with ScalaGenSwitch {
+  with ScalaGenSwitch
+  with NamedCodegen {
 
   override def copyDependencies(out: String): Unit = {
     dependencies ::= FileDep("scalagen", "Makefile", "../")

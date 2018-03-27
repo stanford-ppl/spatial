@@ -46,16 +46,16 @@ trait ScalaGenBits extends ScalaCodegen {
       emit(src"else { ${invalid(op.R)} }")
       close("}")
 
-    case e@DataAsBits(a) => e.A match {
+    case e@DataAsBits(a) => a.tp match {
       case FltPtType(_,_)   => emit(src"val $lhs = $a.bits")
       case FixPtType(_,_,_) => emit(src"val $lhs = $a.bits")
-      case _:Bit            => emit(src"val $lhs = Array[Bool]($a)")
+      case BitType()        => emit(src"val $lhs = Array[Bool]($a)")
     }
 
     case BitsAsData(v,a) => a match {
       case FltPtType(g,e)   => emit(src"val $lhs = FloatPoint.fromBits($v, FltFormat(${g-1},$e))")
       case FixPtType(s,i,f) => emit(src"val $lhs = FixedPoint.fromBits($v, FixFormat($s,$i,$f))")
-      case _: Bit           => emit(src"val $lhs = $v.head")
+      case BitType()        => emit(src"val $lhs = $v.head")
     }
 
     case _ => super.gen(lhs,rhs)

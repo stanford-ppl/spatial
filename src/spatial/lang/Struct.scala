@@ -4,9 +4,11 @@ import forge.tags._
 import argon._
 import spatial.node._
 
-abstract class Struct[T:Struct](implicit ev: T <:< Struct[T]) extends Top[T] with Ref[Nothing,T] {
+trait Struct[A] extends Top[A] with Ref[Nothing,A] {
   override val __isPrimitive = false
-  @rig def field[A:Type](name: String): A = Struct.field[T,A](me, name)
+  val box: A <:< Struct[A]
+  private implicit lazy val A: Struct[A] = this.selfType
+  @rig def field[F:Type](name: String): F = Struct.field[A,F](me, name)
 
   def fields: Seq[(String,ExpType[_,_])]
 }

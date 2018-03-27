@@ -16,7 +16,7 @@ trait ScalaGenFIFO extends ScalaGenMemories {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@FIFONew(size)    => emitMem(lhs, src"$lhs = new scala.collection.mutable.Queue[${op.A}] // size: $size")
+    case op@FIFONew(size)    => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Queue[${op.A}]") }
     case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.isEmpty")
     case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.size >= ${sizeOf(fifo)} ")
 
@@ -34,14 +34,14 @@ trait ScalaGenFIFO extends ScalaGenMemories {
     case op@FIFOBankedDeq(fifo, ens) =>
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) =>
-        emit(src"val a$i = if (${en.head} && $fifo.nonEmpty) $fifo.dequeue() else ${invalid(op.A)}")
+        emit(src"val a$i = if ($en && $fifo.nonEmpty) $fifo.dequeue() else ${invalid(op.A)}")
       }
       emit(src"Array[${op.A}](" + ens.indices.map{i => src"a$i"}.mkString(", ") + ")")
       close("}")
 
     case FIFOBankedEnq(fifo, data, ens) =>
       open(src"val $lhs = {")
-      ens.zipWithIndex.foreach{case (en,i) => emit(src"if (${en.head}) $fifo.enqueue(${data(i)})") }
+      ens.zipWithIndex.foreach{case (en,i) => emit(src"if ($en) $fifo.enqueue(${data(i)})") }
       close("}")
 
     case _ => super.gen(lhs, rhs)

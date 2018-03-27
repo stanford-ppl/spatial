@@ -13,11 +13,14 @@ trait ScalaGenDRAM extends ScalaGenMemories {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMNew(dims) =>
+    case op@DRAMNew(dims,zero) =>
+      emitMemObject(lhs){
+        val name = s""""${lhs.fullname}""""
+        emit(src"object $lhs extends Memory[${op.A}]($name, $zero)")
+      }
       val elementsPerBurst = spatialConfig.target.burstSize / op.A.nbits
-      open(src"val $lhs = {")
-        emit(src"""Array.fill(${dims.map(quote).mkString("*")} + $elementsPerBurst)($zero)""") //${invalid(op.mA)})""")
-      close("}")
+      val size = src"""${dims.map(quote).mkString("*")} + $elementsPerBurst"""
+      emit(src"$lhs.initMem($size)")
 
     case GetDRAMAddress(dram) =>
       emit(src"val $lhs = 0")

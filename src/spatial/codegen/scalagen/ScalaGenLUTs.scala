@@ -12,8 +12,8 @@ trait ScalaGenLUTs extends ScalaGenMemories {
     case _ => super.remap(tp)
   }
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@LUTNew(dims,elems) => emitMem(lhs, src"""$lhs = Array[${op.A}]($elems)""")
-
+    case op@LUTNew(_,elems) => emitBankedInitMem(lhs,Some(elems),op.A)
+    case op@LUTBankedRead(lut,bank,ofs,ens) => emitBankedLoad(lhs,lut,bank,ofs,ens)(op.A)
     case _ => super.gen(lhs, rhs)
   }
 

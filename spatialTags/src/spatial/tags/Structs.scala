@@ -18,16 +18,20 @@ final class struct extends StaticAnnotation {
   * Want possible type classes for struct to be generated here, based on the type classes defined/available in the DSL
   * This should eventually be generated from Forge (?), for now just outlining how it might work.
   */
-abstract class TypeclassMacro {
-  def generateLookup(c: blackbox.Context)(name: c.TypeName): Option[c.Tree]
-  def generateImplementation(c: blackbox.Context)(className: c.Tree): List[c.Tree]
+abstract class TypeclassMacro[Ctx <: blackbox.Context](val c: Ctx) {
+  import c.universe._
+  def implement(cls: ClassDef, obj: ModuleDef, fields: Seq[ValDef]): (ClassDef,ModuleDef)
 }
 
 
 object StagedStructsMacro {
-  val typeclasses: List[TypeclassMacro] = Nil //List(BitsTypeclassMacro, ArithsTypeclassMacro)
 
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
+    val typeclasses: Seq[TypeclassMacro[c.type]] = Seq(
+      new Bits[c.type](c),
+      new Arith[c.type](c)
+    )
+
     val utils = new MacroUtils[c.type](c)
     import utils._
     import c.universe._
@@ -39,10 +43,18 @@ object StagedStructsMacro {
     }
 
     val fields = cls.constructorArgs.head
-    val methods = cls.methods
+    val methods = cls.nonConstructorMethods.filterNot{_.mods.hasFlag(Flag.CASEACCESSOR) }
+    val parents: Seq[String] = cls.parents.collect{case Ident(TypeName(name)) => name }
 
-    if (fields.isEmpty) abort("Classes need at least one field in order to be transformed into an @struct.")
-    if (methods.nonEmpty) abort("@struct classes with methods are not yet supported.")
+    // TODO[5]: What to do if class has parents? Error?
+
+    if (fields.isEmpty) abort("Classes need at least one field in order to be transformed into a @struct.")
+    if (methods.nonEmpty) {
+      error(s"@struct class had ${methods.length} disallowed methods:\n" + methods.map{method =>
+        "  " + showCode(method.modifyBody(_ => EmptyTree))
+      }.mkString("\n"))
+      abort("@struct classes with methods are not yet supported")
+    }
     if (cls.tparams.nonEmpty) abort("@struct classes with type parameters are not yet supported")
     if (cls.fields.exists(_.isVar)) abort("@struct classes with var fields are not yet supported")
 
@@ -51,7 +63,7 @@ object StagedStructsMacro {
     val fieldOpts   = fields.map{field => field.withRHS(q"null") }
     val fieldOrElse = fields.map{field => q"Option(${field.name}).getOrElse{this.${field.name}}" }
 
-    var cls2 = q"class ${cls.name}[..${cls.tparams}]()".asClass
+    var cls2 = q"class ${cls.name}[..${cls.tparams}]() extends spatial.lang.Struct[${cls.fullName}]".asClass
     var obj2 = obj
     fields.foreach{field =>
       cls2 = cls2.injectMethod(
@@ -60,13 +72,16 @@ object StagedStructsMacro {
                 }""".asDef)
     }
     cls2 = {
-      cls2.injectField(q"val fields = Seq(..$fieldTypes)".asVal)
-          .mixIn(q"spatial.lang.Struct[${cls.fullName}]")
-          .mixIn(q"argon.Ref[Any,${cls.fullName}]")
+      cls2.injectField(q"lazy val fields = Seq(..$fieldTypes)".asVal)
+          .mixIn(tq"argon.Ref[Any,${cls.fullName}]")
           .injectMethod(
             q"""def copy(..$fieldOpts)(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
-                  className.toTermName.apply(..$fieldOrElse)(ctx, state)
+                  ${obj2.name}.apply(..$fieldOrElse)(ctx, state)
                 }""".asDef)
+          .injectField(q"""override val box = implicitly[${cls.fullName} <:< (
+                             spatial.lang.Struct[${cls.fullName}]
+                        with spatial.lang.types.Bits[${cls.fullName}]
+                        with spatial.lang.types.Arith[${cls.fullName}]) ]""".asVal)
     }
 
     obj2 = {
@@ -77,6 +92,16 @@ object StagedStructsMacro {
          """.asDef)
     }
 
-    forge.tags.ref.impl(c)(q"..${List(cls2,obj2)}")
+    val (cls3,obj3) = typeclasses.foldRight((cls2,obj2)){case (tc, (c,o)) =>
+      tc.implement(c, o, fields)
+    }
+
+    val (cls4, obj4) = forge.tags.ref.implement(c)(cls3, obj3)
+    val out = q"$cls4; $obj4"
+
+    info(showRaw(out))
+    info(showCode(out))
+
+    out
   }
 }

@@ -7,6 +7,7 @@ import spatial.node._
 
 /** A two-dimensional matrix on the host */
 @ref class Matrix[A:Type] extends Struct[Matrix[A]] with Ref[scala.Array[Any],Matrix[A]] {
+  override val box = implicitly[Matrix[A] <:< Struct[Matrix[A]]]
   val A: Type[A] = Type[A]
   def fields = Seq(
     "data" -> Type[Array[A]],

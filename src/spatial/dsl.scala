@@ -11,4 +11,7 @@ object dsl extends lang.static.FrontendStatics {
   }
   private object spatial extends AppTag("spatial", "SpatialApp")
 
+  final class struct extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl
+  }
 }

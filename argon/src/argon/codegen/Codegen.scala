@@ -1,6 +1,8 @@
 package argon
 package codegen
 
+import java.io.PrintStream
+
 import argon.passes.Traversal
 import utils.io.files
 
@@ -65,4 +67,6 @@ trait Codegen extends Traversal {
   }
 
   final override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = gen(lhs,rhs)
+
+  def kernel(sym: Sym[_]): PrintStream = getOrCreateStream(out, s"$sym.$ext")
 }

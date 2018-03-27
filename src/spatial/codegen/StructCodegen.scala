@@ -20,7 +20,7 @@ trait StructCodegen extends Codegen {
   protected def structName(tp: Struct[_], idx: Int): String
   protected def emitDataStructures(): Unit
 
-  override protected def postprocess[R](block: Block[R]): Unit = {
+  override protected def postprocess[R](block: Block[R]): Block[R] = {
     emitDataStructures()
     super.postprocess(block)
   }

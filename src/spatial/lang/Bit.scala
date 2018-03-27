@@ -43,3 +43,7 @@ import spatial.node._
 object Bit {
   def apply(x: Boolean): Bit = uconst[Bit](Bool(x))
 }
+
+object BitType {
+  def unapply(x: ExpType[_,_]): Boolean = x.isInstanceOf[Bit]
+}

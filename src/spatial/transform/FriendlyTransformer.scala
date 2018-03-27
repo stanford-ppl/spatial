@@ -32,7 +32,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
     }
 
     // Add ArgIns for DRAM dimensions
-    case DRAMNew(ds) =>
+    case DRAMNew(ds,_) =>
       val dims = f(ds)
       dimMapping ++= dims.distinct.map{
         case d @ Op(RegRead(reg)) if reg.isArgIn => d -> d

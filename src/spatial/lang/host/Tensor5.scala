@@ -7,6 +7,7 @@ import spatial.node._
 
 /** A 5-dimensional tensor on the host */
 @ref class Tensor5[A:Type] extends Struct[Tensor5[A]] with Ref[scala.Array[Any],Tensor5[A]] {
+  override val box = implicitly[Tensor5[A] <:< Struct[Tensor5[A]]]
   val A: Type[A] = Type[A]
   def fields = Seq(
     "data" -> Type[Array[A]],

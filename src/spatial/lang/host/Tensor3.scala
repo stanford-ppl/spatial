@@ -6,6 +6,7 @@ import forge.tags._
 
 /** A three-dimensional tensor on the host */
 @ref class Tensor3[A:Type] extends Struct[Tensor3[A]] with Ref[scala.Array[Any],Tensor3[A]] {
+  override val box = implicitly[Tensor3[A] <:< Struct[Tensor3[A]]]
   val A: Type[A] = Type[A]
   def fields = Seq(
     "data" -> Type[Array[A]],

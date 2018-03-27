@@ -9,7 +9,7 @@ import spatial.node._
 import scala.collection.mutable
 
 @ref class Reg[A:Bits] extends LocalMem0[A,Reg] with StagedVarLike[A] with Ref[Ptr[Any],Reg[A]] {
-  val tA: Bits[A] = Bits[A]
+  val A: Bits[A] = Bits[A]
   private implicit val evA: A <:< Bits[A] = Bits[A].box
   override val evMem: Reg[A] <:< LocalMem[A,Reg] = implicitly[Reg[A] <:< LocalMem[A,Reg]]
 
@@ -28,11 +28,11 @@ object Reg {
 
   @rig def alloc[A:Bits](reset: A): Reg[A] = stage(RegNew[A](reset))
   @rig def read[A](reg: Reg[A]): A = {
-    implicit val tA: Bits[A] = reg.tA
+    implicit val tA: Bits[A] = reg.A
     stage(RegRead(reg))
   }
   @rig def write[A](reg: Reg[A], data: Bits[A], en: Set[Bit] = Set.empty): Void = {
-    implicit val tA: Bits[A] = reg.tA
+    implicit val tA: Bits[A] = reg.A
     stage(RegWrite(reg,data,en))
   }
 }

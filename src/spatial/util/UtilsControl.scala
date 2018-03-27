@@ -47,14 +47,12 @@ trait UtilsControl {
       case Some(_: ForeverNew) => true
       case _ => false
     }
-    def willRunForever: Boolean = x.isForever || x.children.exists(_.willRunForever)
+    @stateful def willRunForever: Boolean = x.isForever || x.children.exists(_.willRunForever)
   }
   implicit class CtrlControl(x: Ctrl) {
     def isStreamPipe: Boolean = x.s.exists(_.isStreamPipe)
-    def willRunForever: Boolean = x.s.exists(_.willRunForever)
+    @stateful def willRunForever: Boolean = x.s.exists(_.willRunForever)
   }
-
-
 
   def getCChains(block: Block[_]): Seq[CounterChain] = getCChains(block.stms)
   def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}

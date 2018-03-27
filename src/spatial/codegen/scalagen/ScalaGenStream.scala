@@ -5,9 +5,9 @@ import spatial.lang._
 import spatial.node._
 
 trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
-  var streamIns: List[Sym[_]] = Nil
-  var streamOuts: List[Sym[_]] = Nil
-  var bufferedOuts: List[Sym[_]] = Nil
+  var streamIns: Set[Sym[_]] = Set.empty
+  var streamOuts: Set[Sym[_]] = Set.empty
+  var bufferedOuts: Set[Sym[_]] = Set.empty
 
   override protected def remap(tp: Type[_]): String = tp match {
     case tp: StreamIn[_]  => src"scala.collection.mutable.Queue[${tp.A}]"
@@ -66,73 +66,40 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@StreamInNew(bus)  =>
-      streamIns :+= lhs
-      emitMem(lhs, src"$lhs = new scala.collection.mutable.Queue[${op.A}]")
+      val name = lhs.name.map(_ + " (" + lhs.ctx + ")").getOrElse("defined at " + lhs.ctx)
+      streamIns += lhs
 
-      if (!bus.isInstanceOf[DRAMBus[_]]) {
-        val name = lhs.name.map(_ + " (" +lhs.ctx + ")").getOrElse("defined at " + lhs.ctx)
-        open(src"def populate_$lhs() = {")
-          emit(src"""print("Enter name of file to use for StreamIn $name: ")""")
-          emit(src"val filename = Console.readLine()")
-          open(src"try {")
-            emit(src"val source = scala.io.Source.fromFile(filename)")
-            open(src"source.getLines.foreach{line => ")
-              open(src"if (line.exists(_.isDigit)) {")
-                bitsFromString("elem", "line", op.A)
-                emit(src"$lhs.enqueue(elem)")
-              close("}")
-            close("}")
-          close("}")
-          open(src"catch {case e: Throwable => ")
-            emit(src"""println("There was a problem while opening the specified file for reading.")""")
-            emit(src"""println(e.getMessage)""")
-            emit(src"""e.printStackTrace()""")
-            emit(src"sys.exit(1)")
-          close("}")
-        close("}")
-        emit(src"populate_$lhs()")
+      emitMemObject(lhs){
+        open(src"""object $lhs extends StreamIn[${op.A}]("$name", {str => """)
+        bitsFromString("x", "str", op.A)
+        emit(src"x")
+        close(src"})")
       }
+      if (!bus.isInstanceOf[DRAMBus[_]]) emit(src"$lhs.initMem()")
 
     case op@StreamOutNew(bus) =>
-      streamOuts :+= lhs
-      emitMem(lhs, src"$lhs = new scala.collection.mutable.Queue[${op.A}]")
+      val name = lhs.name.map(_ + " (" +lhs.ctx + ")").getOrElse("defined at " + lhs.ctx)
+      streamOuts += lhs
 
-      if (!bus.isInstanceOf[DRAMBus[_]]) {
-        val name = lhs.name.map(_ + " (" +lhs.ctx + ")").getOrElse("defined at " + lhs.ctx)
-
-        emit(src"""print("Enter name of file to use for StreamOut $name: ")""")
-        emit(src"var ${lhs}_writer: java.io.PrintWriter = null")
-        open(src"try {")
-          emit(src"val filename = Console.readLine()")
-          emit(src"${lhs}_writer = new java.io.PrintWriter(new java.io.File(filename))")
-        close("}")
-        open("catch{ case e: Throwable => ")
-          emit(src"""println("There was a problem while opening the specified file for writing.")""")
-          emit(src"""println(e.getMessage)""")
-          emit(src"""e.printStackTrace()""")
-          emit(src"sys.exit(1)")
-        close("}")
-
-        open(src"def print_$lhs(): Unit = {")
-          open(src"$lhs.foreach{elem => ")
-            bitsToString("line", "elem", op.A)
-            emit(src"${lhs}_writer.println(line)")
-          close("}")
-          emit(src"${lhs}_writer.close()")
-        close("}")
+      emitMemObject(lhs){
+        open(src"""object $lhs extends StreamOut[${op.A}]("$name", {elem => """)
+        bitsToString("x", "elem", op.A)
+        emit(src"x")
+        close("})")
       }
+      if (!bus.isInstanceOf[DRAMBus[_]]) emit(src"$lhs.initMem()")
 
-    case op@StreamInBankedRead(strm, enss) =>
+    case op@StreamInBankedRead(strm, ens) =>
       open(src"val $lhs = {")
-      enss.zipWithIndex.foreach{case (en,i) =>
+      ens.zipWithIndex.foreach{case (en,i) =>
         emit(src"val a$i = if ($en && $strm.nonEmpty) $strm.dequeue() else ${invalid(op.A)}")
       }
-      emit(src"Array[${op.A}](" + enss.indices.map{i => src"a$i"}.mkString(", ") + ")")
+      emit(src"Array[${op.A}](" + ens.indices.map{i => src"a$i"}.mkString(", ") + ")")
       close("}")
 
-    case StreamOutBankedWrite(strm, data, enss) =>
+    case StreamOutBankedWrite(strm, data, ens) =>
       open(src"val $lhs = {")
-      enss.zipWithIndex.foreach{case (en,i) =>
+      ens.zipWithIndex.foreach{case (en,i) =>
         emit(src"if ($en) $strm.enqueue(${data(i)})")
       }
       close("}")

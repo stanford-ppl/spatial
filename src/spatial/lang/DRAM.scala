@@ -39,19 +39,19 @@ abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends
 }
 object DRAM {
   /** Allocates a 1-dimensional [[DRAM1]] with capacity of `length` elements of type A. */
-  @api def apply[A:Bits](length: I32): DRAM1[A] = stage(DRAMNew[A,DRAM1](Seq(length)))
+  @api def apply[A:Bits](length: I32): DRAM1[A] = stage(DRAMNew[A,DRAM1](Seq(length),zero[A]))
 
   /** Allocates a 2-dimensional [[DRAM2]] with `rows` x `cols` elements of type A. */
-  @api def apply[A:Bits](rows: I32, cols: I32): DRAM2[A] = stage(DRAMNew[A,DRAM2](Seq(rows,cols)))
+  @api def apply[A:Bits](rows: I32, cols: I32): DRAM2[A] = stage(DRAMNew[A,DRAM2](Seq(rows,cols),zero[A]))
 
   /** Allocates a 3-dimensional [[DRAM3]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): DRAM3[A] = stage(DRAMNew[A,DRAM3](Seq(d0,d1,d2)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): DRAM3[A] = stage(DRAMNew[A,DRAM3](Seq(d0,d1,d2),zero[A]))
 
   /** Allocates a 4-dimensional [[DRAM4]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32): DRAM4[A] = stage(DRAMNew[A,DRAM4](Seq(d0,d1,d2,d3)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32): DRAM4[A] = stage(DRAMNew[A,DRAM4](Seq(d0,d1,d2,d3),zero[A]))
 
   /** Allocates a 5-dimensional [[DRAM5]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): DRAM5[A] = stage(DRAMNew[A,DRAM5](Seq(d0,d1,d2,d3,d4)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): DRAM5[A] = stage(DRAMNew[A,DRAM5](Seq(d0,d1,d2,d3,d4),zero[A]))
 }
 
 /** A 1-dimensional [[DRAM]] with elements of type A. */

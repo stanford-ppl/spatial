@@ -5,9 +5,9 @@ import argon._
 import forge.tags._
 
 trait Arith[A] extends Top[A] with Ref[Any,A] {
-  val box: A <:< Arith[A]
-  private implicit val evv: A <:< Arith[A] = box
-  private implicit lazy val tA: Arith[A] = this.selfType
+  def box: A <:< Arith[A]
+  private implicit def evv: A <:< Arith[A] = box
+  private implicit def A: Arith[A] = this.selfType
 
   // --- Infix Methods
   @api def unary_-(): A

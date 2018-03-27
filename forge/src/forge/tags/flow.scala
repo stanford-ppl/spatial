@@ -38,7 +38,7 @@ object flow {
         val name = Literal(Constant(d.name.toString))
 
         val pf =
-          q"""val ${d.name}: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit] = {case (__sym,__op,__ctx,__state) =>
+          q"""val ${d.name}: PartialFunction[(Sym[_],Op[_],forge.SrcCtx,argon.State),Unit] = {case (__sym,__op,__ctx,__state) =>
             val ${arg0.name} = __sym;
             val ${arg1.name} = __op;
             implicit val ctx = __ctx;
@@ -48,7 +48,7 @@ object flow {
           """
         val add =
           q"""
-             core.flows.add($name,${d.name})
+             argon.flows.add($name,${d.name})
            """
         q"$pf; $add"
 

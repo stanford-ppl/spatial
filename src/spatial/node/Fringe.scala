@@ -12,7 +12,7 @@ import spatial.lang._
 @op case class FringeDenseStore[A:Bits,C[T]](
     dram:       DRAM[A,C],
     cmdStream:  StreamOut[BurstCmd],
-    dataStream: StreamOut[MTuple2[A,Bit]],
+    dataStream: StreamOut[Tup2[A,Bit]],
     ackStream:  StreamIn[Bit])
   extends FringeNode[A,Void]
 
@@ -24,7 +24,7 @@ import spatial.lang._
 
 @op case class FringeSparseStore[A:Bits,C[T]](
     dram:      DRAM[A,C],
-    cmdStream: StreamOut[MTuple2[A,I64]],
+    cmdStream: StreamOut[Tup2[A,I64]],
     ackStream: StreamIn[Bit])
   extends FringeNode[A,Void]
 

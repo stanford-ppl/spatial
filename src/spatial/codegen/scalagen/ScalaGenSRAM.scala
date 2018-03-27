@@ -13,27 +13,9 @@ trait ScalaGenSRAM extends ScalaGenMemories {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@SRAMNew(dims) => emitMem(lhs, src"""$lhs = Array.fill(${dims.map(quote).mkString("*")})(${invalid(op.A)})""")
-
-    case op@SRAMBankedRead(sram,inds,ens) =>
-      val dims = stagedDimsOf(sram)
-      open(src"val $lhs = {")
-      inds.indices.foreach{i =>
-        open(src"val a$i = {")
-        oobApply(op.mT,sram,lhs,inds(i)){ emit(src"""if (${ens(i)}) $sram.apply(${flattenAddress(dims, inds(i))}) else ${invalid(op.mT)}""") }
-        close("}")
-      }
-      emit(src"Array[${op.mT}](" + inds.indices.map{i => src"a$i"}.mkString(", ") + ")")
-      close("}")
-
-    case op@ParSRAMStore(sram,inds,data,ens) =>
-      val dims = stagedDimsOf(sram)
-      open(src"val $lhs = {")
-      inds.indices.foreach{i =>
-        oobUpdate(op.mT, sram, lhs,inds(i)){ emit(src"if (${ens(i)}) $sram.update(${flattenAddress(dims, inds(i))}, ${data(i)})") }
-      }
-      close("}")
-
+    case op: SRAMNew[_,_] => emitBankedInitMem(lhs, None, op.A)
+    case op@SRAMBankedRead(sram,bank,ofs,ens)       => emitBankedLoad(lhs,sram,bank,ofs,ens)(op.A)
+    case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitBankedStore(lhs,sram,data,bank,ofs,ens)(op.A)
     case _ => super.gen(lhs, rhs)
   }
 }

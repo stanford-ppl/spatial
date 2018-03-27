@@ -7,9 +7,9 @@ import forge.tags._
 import spatial.node._
 
 trait Bits[A] extends Top[A] with Ref[Any,A] {
-  val box: A <:< Bits[A]
-  private implicit val evv: A <:< Bits[A] = box
-  private implicit lazy val tA: Bits[A] = this.selfType
+  def box: A <:< Bits[A]
+  private implicit def evv: A <:< Bits[A] = box
+  private implicit def A: Bits[A] = this.selfType
 
   // --- Infix Methods
   /**
@@ -77,7 +77,13 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
 }
 
 object Bits {
-  def apply[A:Bits]: Bits[A] = implicitly[Bits[A]]
+  def apply[A:Bits]: Bits[A] = {
+    try { implicitly[Bits[A]] }
+    catch {case t:Throwable =>
+      fatal("Could not get bit evidence")
+      throw t
+    }
+  }
   def m[A,B](n: Bits[A]): Bits[B] = n.asInstanceOf[Bits[B]]
 
   def unapply[A](x: Type[A]): Option[Bits[A]] = x match {

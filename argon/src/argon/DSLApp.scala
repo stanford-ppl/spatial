@@ -11,10 +11,4 @@ trait DSLApp extends Compiler {
     def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
   }
 
-  def main(): Unit
-
-  def stage(args: Array[String]): Block[_] = {
-    val block = stageBlock{ main(); Invalid }
-    block
-  }
 }

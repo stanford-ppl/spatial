@@ -51,8 +51,8 @@ object IntLike {
       implicit val IA: INT[IA] = new IA
       implicit val IB: INT[IB] = new IB
       implicit val IC: INT[IC] = new IC
-      implicit val A: Type[Fix[SA,IA,_0]] = new Fix[SA,IA,_0].asType
-      implicit val B: Type[Fix[SB,IB,_0]] = new Fix[SB,IB,_0].asType
+      implicit val A: Type[Fix[SA,IA,_0]] = proto(new Fix[SA,IA,_0])
+      implicit val B: Type[Fix[SB,IB,_0]] = proto(new Fix[SB,IB,_0])
       val aa = a.asInstanceOf[Fix[SA,IA,_0]].to[Fix[SC,IC,_0]].asInstanceOf[Fix[S,I,_0]]
       val bb = b.asInstanceOf[Fix[SB,IB,_0]].to[Fix[SC,IC,_0]].asInstanceOf[Fix[S,I,_0]]
       func(aa,bb).asInstanceOf[Idx]

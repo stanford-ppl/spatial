@@ -81,13 +81,18 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   def name_=(str: Option[String]): Unit = { exp._name = str }
   def name: Option[String] = exp._name
 
+  def fullname: String = name match {
+    case Some(name) => s"$name ($exp)"
+    case None => s"$exp"
+  }
+  def _name: String = name.map{n => s"_$n"}.getOrElse("")
+  def nameOr(str: String): String = name.getOrElse(str).replace("$","")
+
   def ctx_=(ctx: SrcCtx): Unit = { exp._ctx = ctx }
   def ctx: SrcCtx = exp._ctx
 
   def prevNames_=(names: Seq[(String,String)]): Unit = { exp._prevNames = names }
   def prevNames: Seq[(String,String)] = exp._prevNames
-
-  def asType: A = { exp._rhs = Def.TypeRef; exp.asInstanceOf[A] }
 
   def isConst: Boolean = rhs.isConst
   def isParam: Boolean = rhs.isParam

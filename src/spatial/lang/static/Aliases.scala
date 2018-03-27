@@ -5,8 +5,6 @@ import spatial.lang.types.CustomBitWidths
 // No aliases of the form "type Foo = spatial.lang.Foo" (creates a circular reference)
 // Everything else is ok.
 trait InternalAliases extends CustomBitWidths {
-  type struct = spatial.tags.struct
-
   type FixPt[S,I,F] = spatial.lang.Fix[S,I,F]
   type I[W] = FixPt[TRUE,W,_0]
   type Idx = I[_]

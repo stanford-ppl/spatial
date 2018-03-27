@@ -5,14 +5,18 @@ import argon.passes.IRPrinter
 import nova.codegen.dot._
 import poly.{ConstraintMatrix, ISL}
 import spatial.data._
+import spatial.lang.Void
 import spatial.dse.DSEMode
 import spatial.targets.{HardwareTarget, Targets}
 import spatial.transform._
 import spatial.traversal._
 import spatial.internal.{spatialConfig => cfg}
+import spatial.rewrites.RewriteRules
 
 trait SpatialApp extends DSLApp {
   val target: HardwareTarget = null
+  val desc: String = "Spatial compiler"
+  val script: String = "spatial"
   private var overrideRetime = false
 
   private class SpatialISL extends ISL {
@@ -22,11 +26,17 @@ trait SpatialApp extends DSLApp {
     }
   }
 
+  def main(): Void
+
+  final def stage(args: Array[String]): Block[_] = stageBlock{ main() }
+
   override def initConfig(): Config = new SpatialConfig
 
   def runPasses[R](block: Block[R]): Unit = {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
+    new FlowRules{ }      // Register standard flow analysis rules
+    new RewriteRules{ }   // Register initial rewrite rules
 
     // --- Debug
     lazy val printer           = IRPrinter(state)

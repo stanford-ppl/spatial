@@ -112,7 +112,7 @@ object HalfType extends Flt[_11,_5] {
     case FltPtType(11,5) => true
     case _ => false
   }
-  this.asType
+  proto(this)
 }
 
 object FloatType extends Flt[_24,_8] {
@@ -120,12 +120,12 @@ object FloatType extends Flt[_24,_8] {
     case FltPtType(24,8) => true
     case _ => false
   }
-  this.asType
+  proto(this)
 }
 object DoubleType extends Flt[_53,_11] {
   def unapply(x: Type[_]): Boolean = x match {
     case FltPtType(53,11) => true
     case _ => false
   }
-  this.asType
+  proto(this)
 }

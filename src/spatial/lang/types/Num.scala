@@ -7,9 +7,9 @@ import argon._
 trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   // Fancy Scala trick: Promise evidence of A being a subclass of Num[A], use implicitly here
   // Fill in later using implicitly[A <:< Num[A]] on the concrete subclass
-  val box: A <:< Num[A]
-  private implicit val evv: A <:< Num[A] = box
-  private implicit lazy val tA: Num[A] = this.selfType
+  def box: A <:< Num[A]
+  private implicit def evv: A <:< Num[A] = box
+  private implicit def A: Num[A] = this.selfType
   override protected val __isPrimitive: Boolean = true
 
   @rig def one: A = this.from(1)

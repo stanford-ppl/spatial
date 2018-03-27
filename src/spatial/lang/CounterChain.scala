@@ -10,8 +10,6 @@ import pir.node.CounterChainCopy
   override protected val __isPrimitive: Boolean = false
 }
 object CounterChain {
-  implicit val tp: CounterChain = (new CounterChain).asType
-
   @api def apply(ctrs: Seq[Counter[_]]): CounterChain = stage(CounterChainNew(ctrs))
   @rig def copy(ctrs: Counter[_]*): CounterChain = stage(CounterChainCopy(ctrs))
 }

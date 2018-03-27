@@ -108,7 +108,7 @@ case class PipeInserter(IR: State) extends MutateTransformer {
   }
   def regRead[A](x: Reg[A]): Sym[A] = {
     implicit val ctx: SrcCtx = x.ctx
-    implicit val tA: Bits[A] = x.tA
+    implicit val tA: Bits[A] = x.A
     tA.box(Reg.read(x))
   }
   def regWrite[A](x: Reg[A], data: Bits[A]): Unit = {
@@ -123,11 +123,11 @@ case class PipeInserter(IR: State) extends MutateTransformer {
   }
   def varRead[A](x: Var[A]): Sym[A] = {
     implicit val ctx: SrcCtx = x.ctx
-    implicit val tA: Type[A] = x.tA
+    implicit val tA: Type[A] = x.A
     Var.read(x)
   }
   def varWrite[A](x: Var[A], data: Sym[A]): Unit = {
-    implicit val tA: Type[A] = x.tA
+    implicit val tA: Type[A] = x.A
     Var.assign(x,data.unbox)
   }
 

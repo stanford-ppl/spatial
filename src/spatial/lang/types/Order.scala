@@ -5,9 +5,9 @@ import argon._
 import forge.tags._
 
 trait Order[A] extends Top[A] with Ref[Any,A] {
-  val box: A <:< Order[A]
-  private implicit val evv: A <:< Order[A] = box
-  private implicit lazy val tA: Order[A] = this.selfType
+  def box: A <:< Order[A]
+  private implicit def evv: A <:< Order[A] = box
+  private implicit def A: Order[A] = this.selfType
 
   // --- Infix Methods
   @api def <(b: A): Bit

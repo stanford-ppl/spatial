@@ -20,6 +20,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       case _: RemoteMem[_,_] => true
       case _ => false
     }
+    def isMem: Boolean = isLocalMem || isRemoteMem
 
     def isReg: Boolean = x.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = x.isInstanceOf[ArgIn[_]]

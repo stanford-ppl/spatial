@@ -96,16 +96,16 @@ import spatial.node._
 
   // --- Typeclass Methods
   override protected val __isPrimitive: Boolean = false
-  override def nbits: Int = tA.nbits * length
+  override def nbits: Int = A.nbits * length
 
-  @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ tA.zero }:_*)
-  @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(length-1){ tA.zero} :+ tA.one :_*)
+  @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ A.zero }:_*)
+  @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(length-1){ A.zero} :+ A.one :_*)
   @rig def random(max: Option[Vec[A]]): Vec[A] = {
     if (max.isDefined && max.get.length != length) {
       error(ctx, s"Vector length mismatch. Expected $length ${plural(length,"word")}, got ${max.get.length}")
       error(ctx)
     }
-    val elems = Seq.tabulate(length){i => tA.random(max.map{vec => vec(i)}) }
+    val elems = Seq.tabulate(length){i => A.random(max.map{vec => vec(i)}) }
     Vec.LeastLast(elems:_*)
   }
 
@@ -117,8 +117,8 @@ import spatial.node._
 
 
 object Vec {
-  def bits[A:Bits](length: Int): Vec[A] = new Vec[A](length).asType
-  def arith[A](length: Int)(implicit ev: (Arith[A] with Bits[A])): Vec[A] = new Vec[A](length).asType
+  def bits[A:Bits](length: Int): Vec[A] = proto(new Vec[A](length))
+  def arith[A](length: Int)(implicit ev: (Arith[A] with Bits[A])): Vec[A] = proto(new Vec[A](length))
 
   /**
     * Creates a little-endian vector from the given N elements

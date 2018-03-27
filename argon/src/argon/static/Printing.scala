@@ -21,7 +21,8 @@ trait Printing {
   @stateful def open(x: => Any): Unit = { emit(x); open() }
   @stateful def emit(x: => Any): Unit = if (config.enGen) state.gen.println("  "*state.genTab + x)
   @stateful def close(): Unit = { state.genTab -= 1 }
-  @stateful def close(x: => Any): Unit = { emit(x); close() }
+  @stateful def close(x: => Any): Unit = { close(); emit(x) }
+  @stateful def closeopen(x: => Any): Unit = { close(); emit(x); open() }
 
   /** Compiler Info Messages */
   @stateful def info(x: => Any): Unit = if (config.enInfo) state.out.info(x)
@@ -48,6 +49,11 @@ trait Printing {
   @stateful def error(ctx: SrcCtx, x: => String, noError: Boolean): Unit = {
     if (config.enError) state.out.error(ctx, x)
     if (!noError) state.logError()
+  }
+
+  def fatal(x: => Any): Nothing = {
+    Console.out.error(x)
+    throw CompilerErrors("Staging", 1)
   }
 
   /** Compiler Bugs */

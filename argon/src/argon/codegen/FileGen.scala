@@ -17,8 +17,8 @@ trait FileGen extends Codegen {
     files.deleteExts(out, ext, recursive = true)
   }
 
-  def emitHeader(): Unit
-  def emitFooter(): Unit
+  def emitHeader(): Unit = { }
+  def emitFooter(): Unit = { }
 
   override protected def preprocess[R](b: Block[R]): Block[R] = {
     clearGen()

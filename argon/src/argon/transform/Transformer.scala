@@ -32,7 +32,10 @@ abstract class Transformer extends Pass {
     case x: Float => x
     case x: Double => x
     case x: Boolean => x
-    case _ => throw new Exception(s"No rule for mirroring ${x.getClass}")
+    case x: String => x
+    case _ =>
+      if (config.enDbg) warn(s"No explicit mirroring rule for type ${x.getClass}")
+      x
   }).asInstanceOf[T]
 
   def tx[T](block: Block[T]): () => T = () => inlineBlock(block).asInstanceOf[T]

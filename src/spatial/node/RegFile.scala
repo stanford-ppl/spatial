@@ -9,7 +9,7 @@ import spatial.lang._
   */
 @op case class RegFileNew[A:Bits,C[T]](
     dims:  Seq[I32],
-    inits: Option[Seq[A]]
+    inits: Option[Seq[Bits[A]]]
     )(implicit cT: Type[C[A]])
   extends MemAlloc[A,C]
 

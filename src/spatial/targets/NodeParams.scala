@@ -33,7 +33,7 @@ trait NodeParams {
     case op:CounterChainNew => ("CounterChain", Seq("n" -> op.counters.length))
 
     case _ if isControl(op) =>
-      val style = styleOf.get(s).getOrElse(ControlSchedule.Seq)
+      val style = styleOf.get(s).getOrElse(Sched.Seq)
       (style.toString, Seq("n" -> nStages(s)))
 
     case _ => (op.productPrefix, Nil)

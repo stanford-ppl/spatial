@@ -27,6 +27,7 @@ trait CastsPriority1 extends CastsPriority2 {
   implicit def boxOrder[A:Order](x: A): Order[A] = Order[A].box(x)
   implicit def boxArith[A:Arith](x: A): Arith[A] = Arith[A].box(x)
 
+
   implicit def selfCast[A:Type]: Cast[A,A] = Right(new CastFunc[A,A] {
     @rig def apply(a: A): A = a
   })
@@ -35,7 +36,6 @@ trait CastsPriority1 extends CastsPriority2 {
 trait Casts extends CastsPriority1 { this: SpatialStatics =>
   implicit def box[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
   implicit class BoxSym[A:Type](x: A) extends argon.static.ExpMiscOps[Any,A](x)
-
 
   @api implicit def regRead[A:Bits](x: Reg[A]): A = x.value
   @api implicit def argRead[A:Bits](x: ArgIn[A]): A = x.value

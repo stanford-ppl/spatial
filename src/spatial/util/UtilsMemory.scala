@@ -21,6 +21,14 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       case _ => false
     }
     def isMem: Boolean = isLocalMem || isRemoteMem
+    def isDenseAlias: Boolean = x.op.exists{
+      case _: MemDenseAlias[_,_,_] => true
+      case _ => false
+    }
+    def isSparseAlias: Boolean = x.op.exists{
+      case _: MemSparseAlias[_,_,_,_] => true
+      case _ => false
+    }
 
     def isReg: Boolean = x.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = x.isInstanceOf[ArgIn[_]]

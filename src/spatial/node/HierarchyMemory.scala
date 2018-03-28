@@ -33,7 +33,7 @@ object MemAlloc {
 }
 
 abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) extends Alloc[Alias[A]] {
-  def mem: Src[A]
+  def mem: Seq[Src[A]]
   def mutable: Boolean
   def A: Type[A]
   def Src: Type[Src[A]]
@@ -44,46 +44,63 @@ abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) ext
   *
   * @param mem The memory being aliased.
   * @param ranges View ranges for this alias.
-  * @param mutable True if this alias is mutable.
   * @param A The type of the element in the memory.
   * @param Src The type of the memory being aliased.
   * @param Alias The type of the alias (can be a different rank than the target).
   */
 @op case class MemDenseAlias[A,Src[T],Alias[T]](
-    mem:     Src[A],
-    ranges:  Seq[Series[Idx]],
-    mutable: Boolean = true
+    cond:    Seq[Bit],
+    mem:     Seq[Src[A]],
+    ranges:  Seq[Seq[Series[Idx]]]
   )(implicit
     val A:     Type[A],
     val Src:   Type[Src[A]],
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
-  def rank: Int = ranges.count(r => !r.isUnit)
+
+  def rank: Int = ranges.head.count(r => !r.isUnit)
+  val mutable = true
+}
+object MemDenseAlias {
+  @rig def apply[A,Src[T],Alias[T]](mem: Src[A], ranges: Seq[Series[Idx]])(implicit
+    A: Type[A],
+    Src: Type[Src[A]],
+    Alias: Type[Alias[A]]
+  ): MemDenseAlias[A,Src,Alias] = MemDenseAlias[A,Src,Alias](Seq(Bit(true)),Seq(mem),Seq(ranges))
 }
 
 /** A sparse alias of an allocated memory
   *
   * @param mem The memory being aliased.
   * @param addr The sparse addresses for this alias.
-  * @param mutable True if this alias is mutable.
   * @param A The type of element in this memory.
   * @param Addr The type of the memory holding the addresses.
   * @param Src The type of the memory being aliased.
   * @param Alias The type of the alias (can be different rank than the target, should be rank 1).
   */
 @op case class MemSparseAlias[A,Addr[T],Src[T],Alias[T]](
-    mem:  Src[A],
-    addr: Addr[Idx],
-    mutable: Boolean = true
+    cond: Seq[Bit],
+    mem:  Seq[Src[A]],
+    addr: Seq[Addr[Idx]]
   )(implicit
-    val A: Type[A],
-    val Addr: Type[Addr[Idx]],
-    val Src: Type[Src[A]],
+    val A:     Type[A],
+    val Addr:  Type[Addr[Idx]],
+    val Src:   Type[Src[A]],
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
   def rank: Int = 1
+  val mutable = true
 }
-
+object MemSparseAlias {
+  @rig def apply[A,Addr[T],Src[T],Alias[T]](mem: Src[A], addr: Addr[Idx])(implicit
+    A:     Type[A],
+    Addr:  Type[Addr[Idx]],
+    Src:   Type[Src[A]],
+    Alias: Type[Alias[A]]
+  ): MemSparseAlias[A,Addr,Src,Alias] = {
+    MemSparseAlias[A,Addr,Src,Alias](Seq(Bit(true)),Seq(mem),Seq(addr))
+  }
+}
 
 @op case class MemDim(mem: Sym[_], d: Int) extends Primitive[I32] {
   override val isTransient: Boolean = true

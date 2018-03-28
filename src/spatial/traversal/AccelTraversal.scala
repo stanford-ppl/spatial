@@ -1,6 +1,6 @@
 package spatial.traversal
 
-trait AccelTraversal {
+trait AccelTraversal extends argon.passes.Traversal {
   protected var inHw: Boolean = false
 
   protected def inAccel[A](blk: => A): A = {

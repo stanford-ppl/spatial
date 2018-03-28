@@ -30,11 +30,10 @@ trait LiftsPriority2 extends LiftsPriority3 { this: Lifts =>
   @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
   @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
 
+  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 }
 
 trait LiftsPriority1 extends LiftsPriority2 { this: Lifts =>
-
-  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 
   // Shadows Predef method
   @api implicit def wrapString(x: String): Text = Text(x)

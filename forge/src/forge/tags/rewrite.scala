@@ -54,10 +54,12 @@ object rewrite {
             if (func.isDefinedAt(${arg0.name})) Some(func.apply(${arg0.name})) else None
           }
           """
-        val add =
-          q"""
-             core.rewrites.add[${arg0.tp.get}]($name,${d.name})
-           """
+        val add = if (!showCode(arg0.tp.get).startsWith("Op[")) {
+          q"""IR.rewrites.add[${arg0.tp.get}]($name,${d.name})"""
+        }
+        else {
+          q"""IR.rewrites.addGlobal($name,${d.name})"""
+        }
         q"$pf; $add"
 
       case t =>

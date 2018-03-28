@@ -11,7 +11,7 @@ import spatial.targets.{HardwareTarget, Targets}
 import spatial.transform._
 import spatial.traversal._
 import spatial.internal.{spatialConfig => cfg}
-import spatial.rewrites.RewriteRules
+import spatial.rewrites.SpatialRewriteRules
 
 trait SpatialApp extends DSLApp {
   val target: HardwareTarget = null
@@ -31,12 +31,12 @@ trait SpatialApp extends DSLApp {
   final def stage(args: Array[String]): Block[_] = stageBlock{ main() }
 
   override def initConfig(): Config = new SpatialConfig
+  override def flows(): Unit = SpatialFlowRules(state)       // Register standard flow analysis rules
+  override def rewrites(): Unit = SpatialRewriteRules(state) // Register initial rewrite rules
 
   def runPasses[R](block: Block[R]): Unit = {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
-    new FlowRules{ }      // Register standard flow analysis rules
-    new RewriteRules{ }   // Register initial rewrite rules
 
     // --- Debug
     lazy val printer           = IRPrinter(state)

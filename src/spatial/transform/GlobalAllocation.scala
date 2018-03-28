@@ -53,7 +53,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     case FIFONew(_) => makePMU(lhs,rhs)
     case LIFONew(_) => makePMU(lhs,rhs)
 
-    case c: BlackBox => super.transform(lhs,rhs)
+    case c: BlackBox[_] => super.transform(lhs,rhs)
     case c: VPCU => super.transform(lhs,rhs)
     case c: VPMU => super.transform(lhs,rhs)
 

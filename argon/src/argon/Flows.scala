@@ -1,13 +1,15 @@
 package argon
 
-import forge.tags._
-
 import scala.collection.mutable.{ArrayBuffer,HashSet}
+
+trait FlowRules {
+  val IR: State
+}
 
 /**
   * Static object for capturing simple forward dataflow analyses
   */
-object flows {
+class Flows {
   private val rules = ArrayBuffer[(String,PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit])]()
   private val ruleNames = HashSet[String]()
 

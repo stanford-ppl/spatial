@@ -120,6 +120,8 @@ trait Compiler { self =>
 
   /** Override to create a custom Config instance */
   def initConfig(): Config = new Config
+  def flows(): Unit = { }
+  def rewrites(): Unit = { }
 
   final def init(args: Array[String]): Unit = instrument("init"){
     IR = new State                 // Create a new, empty state
@@ -145,6 +147,9 @@ trait Compiler { self =>
     if (config.test) info("Running in testbench mode")
 
     files.deleteExts(config.logDir, ".log")
+
+    flows()
+    rewrites()
   }
 
   def execute(args: Array[String]): Unit = instrument("nova"){

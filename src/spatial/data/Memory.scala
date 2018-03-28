@@ -91,6 +91,12 @@ object accumTypeOf {
 }
 
 
+case class AliasStart(start: () => Seq[Idx]) extends FlowData[AliasStart]
+case class AliasStride(stride: () => Seq[Idx]) extends FlowData[AliasStride]
+case class AliasEnd(end: () => Seq[Idx]) extends FlowData[AliasEnd]
+case class AliasPar(par: () => Seq[I32]) extends FlowData[AliasPar]
+case class AliasUnit(unit: () => Seq[Boolean]) extends FlowData[AliasUnit]
+
 /*case class Users(users: Set[Sym[_]]) extends ComplexData[Users]
 @data object usersOf {
   def apply(x: Sym[_]): Set[Sym[_]] = metadata[Users](x).map(_.)

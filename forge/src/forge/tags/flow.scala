@@ -48,7 +48,7 @@ object flow {
           """
         val add =
           q"""
-             argon.flows.add($name,${d.name})
+             IR.flows.add($name,${d.name})
            """
         q"$pf; $add"
 

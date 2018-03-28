@@ -65,8 +65,8 @@ trait Staging { this: Printing =>
     }
   }
 
-  @rig def rewrite[R](op: Op[R]): Option[R] = rewrites.apply(op)(op.R,ctx,state)
-  @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = flows.apply(sym, op)
+  @rig def rewrite[R](op: Op[R]): Option[R] = state.rewrites.apply(op)(op.R,ctx,state)
+  @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = state.flows.apply(sym, op)
 
   @rig def register[R](op: Op[R], symbol: () => R): R = rewrite(op) match {
     case Some(s) => s

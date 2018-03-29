@@ -1,0 +1,16 @@
+	component ghrd_10as066n2_hps_m is
+		port (
+			clk_clk              : in  std_logic                     := 'X';             -- clk
+			clk_reset_reset      : in  std_logic                     := 'X';             -- reset
+			master_address       : out std_logic_vector(31 downto 0);                    -- address
+			master_readdata      : in  std_logic_vector(31 downto 0) := (others => 'X'); -- readdata
+			master_read          : out std_logic;                                        -- read
+			master_write         : out std_logic;                                        -- write
+			master_writedata     : out std_logic_vector(31 downto 0);                    -- writedata
+			master_waitrequest   : in  std_logic                     := 'X';             -- waitrequest
+			master_readdatavalid : in  std_logic                     := 'X';             -- readdatavalid
+			master_byteenable    : out std_logic_vector(3 downto 0);                     -- byteenable
+			master_reset_reset   : out std_logic                                         -- reset
+		);
+	end component ghrd_10as066n2_hps_m;
+

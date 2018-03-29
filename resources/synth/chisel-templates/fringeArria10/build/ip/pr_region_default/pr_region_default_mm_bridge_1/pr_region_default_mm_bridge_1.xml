@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deploy
+ date="2017.12.21.15:04:11"
+ outputDirectory="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/pr_region_default/pr_region_default_mm_bridge_1/">
+ <perimeter>
+  <parameter
+     name="AUTO_GENERATION_ID"
+     type="Integer"
+     defaultValue="0"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_UNIQUE_ID"
+     type="String"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_FAMILY"
+     type="String"
+     defaultValue="Arria 10"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE"
+     type="String"
+     defaultValue="10AS066N3F40E2SG"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_SPEEDGRADE"
+     type="String"
+     defaultValue="2"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_CLOCK_RATE"
+     type="Long"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_CLOCK_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_RESET_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_M0_ADDRESS_MAP"
+     type="AddressMap"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_M0_ADDRESS_WIDTH"
+     type="AddressWidthType"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <interface name="clk" kind="clock" start="0">
+   <property name="clockRate" value="0" />
+   <property name="externallyDriven" value="false" />
+   <property name="ptfSchematicName" value="" />
+   <port name="clk" direction="input" role="clk" width="1" />
+  </interface>
+  <interface name="m0" kind="avalon" start="1">
+   <property name="adaptsTo" value="" />
+   <property name="addressGroup" value="0" />
+   <property name="addressUnits" value="SYMBOLS" />
+   <property name="alwaysBurstMaxBurst" value="false" />
+   <property name="associatedClock" value="clk" />
+   <property name="associatedReset" value="reset" />
+   <property name="bitsPerSymbol" value="8" />
+   <property name="burstOnBurstBoundariesOnly" value="false" />
+   <property name="burstcountUnits" value="WORDS" />
+   <property name="constantBurstBehavior" value="false" />
+   <property name="dBSBigEndian" value="false" />
+   <property name="doStreamReads" value="false" />
+   <property name="doStreamWrites" value="false" />
+   <property name="holdTime" value="0" />
+   <property name="interleaveBursts" value="false" />
+   <property name="isAsynchronous" value="false" />
+   <property name="isBigEndian" value="false" />
+   <property name="isReadable" value="false" />
+   <property name="isWriteable" value="false" />
+   <property name="linewrapBursts" value="true" />
+   <property name="maxAddressWidth" value="32" />
+   <property name="maximumPendingReadTransactions" value="0" />
+   <property name="maximumPendingWriteTransactions" value="0" />
+   <property name="minimumReadLatency" value="1" />
+   <property name="minimumResponseLatency" value="1" />
+   <property name="prSafe" value="false" />
+   <property name="readLatency" value="0" />
+   <property name="readWaitTime" value="1" />
+   <property name="registerIncomingSignals" value="false" />
+   <property name="registerOutgoingSignals" value="false" />
+   <property name="setupTime" value="0" />
+   <property name="timingUnits" value="Cycles" />
+   <property name="waitrequestAllowance" value="0" />
+   <property name="writeWaitTime" value="0" />
+   <port name="m0_waitrequest" direction="input" role="waitrequest" width="1" />
+   <port name="m0_readdata" direction="input" role="readdata" width="512" />
+   <port
+       name="m0_readdatavalid"
+       direction="input"
+       role="readdatavalid"
+       width="1" />
+   <port name="m0_burstcount" direction="output" role="burstcount" width="5" />
+   <port name="m0_writedata" direction="output" role="writedata" width="512" />
+   <port name="m0_address" direction="output" role="address" width="32" />
+   <port name="m0_write" direction="output" role="write" width="1" />
+   <port name="m0_read" direction="output" role="read" width="1" />
+   <port name="m0_byteenable" direction="output" role="byteenable" width="64" />
+   <port name="m0_debugaccess" direction="output" role="debugaccess" width="1" />
+  </interface>
+  <interface name="reset" kind="reset" start="0">
+   <property name="associatedClock" value="clk" />
+   <property name="synchronousEdges" value="DEASSERT" />
+   <port name="reset" direction="input" role="reset" width="1" />
+  </interface>
+  <interface name="s0" kind="avalon" start="0">
+   <property name="addressAlignment" value="DYNAMIC" />
+   <property name="addressGroup" value="0" />
+   <property name="addressSpan" value="4294967296" />
+   <property name="addressUnits" value="SYMBOLS" />
+   <property name="alwaysBurstMaxBurst" value="false" />
+   <property name="associatedClock" value="clk" />
+   <property name="associatedReset" value="reset" />
+   <property name="bitsPerSymbol" value="8" />
+   <property name="bridgedAddressOffset" value="0" />
+   <property name="bridgesToMaster" value="pr_region_default_mm_bridge_1.m0" />
+   <property name="burstOnBurstBoundariesOnly" value="false" />
+   <property name="burstcountUnits" value="WORDS" />
+   <property name="constantBurstBehavior" value="false" />
+   <property name="explicitAddressSpan" value="0" />
+   <property name="holdTime" value="0" />
+   <property name="interleaveBursts" value="false" />
+   <property name="isBigEndian" value="false" />
+   <property name="isFlash" value="false" />
+   <property name="isMemoryDevice" value="false" />
+   <property name="isNonVolatileStorage" value="false" />
+   <property name="linewrapBursts" value="true" />
+   <property name="maximumPendingReadTransactions" value="4" />
+   <property name="maximumPendingWriteTransactions" value="0" />
+   <property name="minimumReadLatency" value="1" />
+   <property name="minimumResponseLatency" value="1" />
+   <property name="minimumUninterruptedRunLength" value="1" />
+   <property name="prSafe" value="false" />
+   <property name="printableDevice" value="false" />
+   <property name="readLatency" value="0" />
+   <property name="readWaitStates" value="0" />
+   <property name="readWaitTime" value="0" />
+   <property name="registerIncomingSignals" value="false" />
+   <property name="registerOutgoingSignals" value="false" />
+   <property name="setupTime" value="0" />
+   <property name="timingUnits" value="Cycles" />
+   <property name="transparentBridge" value="false" />
+   <property name="waitrequestAllowance" value="0" />
+   <property name="wellBehavedWaitrequest" value="false" />
+   <property name="writeLatency" value="0" />
+   <property name="writeWaitStates" value="0" />
+   <property name="writeWaitTime" value="0" />
+   <port name="s0_waitrequest" direction="output" role="waitrequest" width="1" />
+   <port name="s0_readdata" direction="output" role="readdata" width="512" />
+   <port
+       name="s0_readdatavalid"
+       direction="output"
+       role="readdatavalid"
+       width="1" />
+   <port name="s0_burstcount" direction="input" role="burstcount" width="5" />
+   <port name="s0_writedata" direction="input" role="writedata" width="512" />
+   <port name="s0_address" direction="input" role="address" width="32" />
+   <port name="s0_write" direction="input" role="write" width="1" />
+   <port name="s0_read" direction="input" role="read" width="1" />
+   <port name="s0_byteenable" direction="input" role="byteenable" width="64" />
+   <port name="s0_debugaccess" direction="input" role="debugaccess" width="1" />
+  </interface>
+ </perimeter>
+ <entity
+   kind="pr_region_default_mm_bridge_1"
+   version="1.0"
+   name="pr_region_default_mm_bridge_1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="-1" />
+  <parameter name="AUTO_GENERATION_ID" value="0" />
+  <parameter name="AUTO_DEVICE" value="10AS066N3F40E2SG" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="AUTO_M0_ADDRESS_MAP" value="" />
+  <parameter name="AUTO_CLK_RESET_DOMAIN" value="-1" />
+  <parameter name="AUTO_CLK_CLOCK_DOMAIN" value="-1" />
+  <parameter name="AUTO_M0_ADDRESS_WIDTH" value="-1" />
+  <parameter name="AUTO_UNIQUE_ID" value="" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/pr_region_default/pr_region_default_mm_bridge_1/synth/pr_region_default_mm_bridge_1.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/pr_region_default/pr_region_default_mm_bridge_1/synth/pr_region_default_mm_bridge_1.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/pr_region_default/pr_region_default_mm_bridge_1.ip" />
+  </sourceFiles>
+  <childSourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/merlin/altera_avalon_mm_bridge/altera_avalon_mm_bridge_hw.tcl" />
+  </childSourceFiles>
+  <messages>
+   <message level="Info" culprit="pr_region_default_mm_bridge_1">"Generating: pr_region_default_mm_bridge_1"</message>
+   <message level="Info" culprit="pr_region_default_mm_bridge_1">"Generating: altera_avalon_mm_bridge"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avalon_mm_bridge"
+   version="17.1"
+   name="altera_avalon_mm_bridge">
+  <parameter name="MAX_BURST_SIZE" value="16" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/pr_region_default/pr_region_default_mm_bridge_1/altera_avalon_mm_bridge_171/synth/altera_avalon_mm_bridge.v"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/pr_region_default/pr_region_default_mm_bridge_1/altera_avalon_mm_bridge_171/synth/altera_avalon_mm_bridge.v"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/merlin/altera_avalon_mm_bridge/altera_avalon_mm_bridge_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator instantiator="pr_region_default_mm_bridge_1" as="mm_bridge_1" />
+  <messages>
+   <message level="Info" culprit="pr_region_default_mm_bridge_1">"Generating: altera_avalon_mm_bridge"</message>
+  </messages>
+ </entity>
+</deploy>

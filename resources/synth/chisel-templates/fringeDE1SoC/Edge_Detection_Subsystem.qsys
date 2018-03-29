@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags=""
+   categories="System" />
+ <parameter name="bonusData"><![CDATA[bonusData 
+{
+   element Chroma_Filter
+   {
+      datum _sortIndex
+      {
+         value = "3";
+         type = "int";
+      }
+   }
+   element Chroma_Upsampler
+   {
+      datum _sortIndex
+      {
+         value = "5";
+         type = "int";
+      }
+   }
+   element Edge_Detection
+   {
+      datum _sortIndex
+      {
+         value = "4";
+         type = "int";
+      }
+   }
+   element Edge_Detection_Router_Controller
+   {
+      datum _sortIndex
+      {
+         value = "2";
+         type = "int";
+      }
+   }
+   element Sys_Clk
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+   element Video_Stream_Merger
+   {
+      datum _sortIndex
+      {
+         value = "6";
+         type = "int";
+      }
+   }
+   element Video_Stream_Splitter
+   {
+      datum _sortIndex
+      {
+         value = "1";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="5CSEMA5F31C6" />
+ <parameter name="deviceFamily" value="Cyclone V" />
+ <parameter name="deviceSpeedGrade" value="6" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="false" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface
+   name="edge_detection_control_slave"
+   internal="Edge_Detection_Router_Controller.s1"
+   type="avalon"
+   dir="end" />
+ <interface name="sys_clk" internal="Sys_Clk.clk_in" type="clock" dir="end" />
+ <interface
+   name="sys_reset"
+   internal="Sys_Clk.clk_in_reset"
+   type="reset"
+   dir="end" />
+ <interface
+   name="video_stream_sink"
+   internal="Video_Stream_Splitter.avalon_stream_router_sink"
+   type="avalon_streaming"
+   dir="end" />
+ <interface
+   name="video_stream_source"
+   internal="Video_Stream_Merger.avalon_stream_router_source"
+   type="avalon_streaming"
+   dir="start" />
+ <module
+   name="Chroma_Filter"
+   kind="altera_up_avalon_video_chroma_resampler"
+   version="16.1"
+   enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="input_type" value="YCrCb 444" />
+  <parameter name="output_type" value="Y only" />
+ </module>
+ <module
+   name="Chroma_Upsampler"
+   kind="altera_up_avalon_video_chroma_resampler"
+   version="16.1"
+   enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="input_type" value="Y only" />
+  <parameter name="output_type" value="YCrCb 444" />
+ </module>
+ <module
+   name="Edge_Detection"
+   kind="altera_up_avalon_video_edge_detection"
+   version="16.1"
+   enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="intensity" value="1" />
+  <parameter name="width" value="720" />
+ </module>
+ <module
+   name="Edge_Detection_Router_Controller"
+   kind="altera_avalon_pio"
+   version="16.1"
+   enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="0" />
+  <parameter name="direction" value="Output" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="1" />
+ </module>
+ <module name="Sys_Clk" kind="clock_source" version="16.1" enabled="1">
+  <parameter name="clockFrequency" value="50000000" />
+  <parameter name="clockFrequencyKnown" value="false" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="NONE" />
+ </module>
+ <module
+   name="Video_Stream_Merger"
+   kind="altera_up_avalon_video_stream_router"
+   version="16.1"
+   enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="color_bits" value="8" />
+  <parameter name="color_planes" value="3" />
+  <parameter name="router_type" value="Merge" />
+  <parameter name="sync" value="true" />
+ </module>
+ <module
+   name="Video_Stream_Splitter"
+   kind="altera_up_avalon_video_stream_router"
+   version="16.1"
+   enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="color_bits" value="8" />
+  <parameter name="color_planes" value="3" />
+  <parameter name="router_type" value="Split" />
+  <parameter name="sync" value="true" />
+ </module>
+ <connection
+   kind="avalon_streaming"
+   version="16.1"
+   start="Chroma_Filter.avalon_chroma_source"
+   end="Edge_Detection.avalon_edge_detection_sink" />
+ <connection
+   kind="avalon_streaming"
+   version="16.1"
+   start="Chroma_Upsampler.avalon_chroma_source"
+   end="Video_Stream_Merger.avalon_stream_router_sink_1" />
+ <connection
+   kind="avalon_streaming"
+   version="16.1"
+   start="Edge_Detection.avalon_edge_detection_source"
+   end="Chroma_Upsampler.avalon_chroma_sink" />
+ <connection
+   kind="avalon_streaming"
+   version="16.1"
+   start="Video_Stream_Splitter.avalon_stream_router_source_0"
+   end="Video_Stream_Merger.avalon_stream_router_sink_0" />
+ <connection
+   kind="avalon_streaming"
+   version="16.1"
+   start="Video_Stream_Splitter.avalon_stream_router_source_1"
+   end="Chroma_Filter.avalon_chroma_sink" />
+ <connection
+   kind="avalon_streaming"
+   version="16.1"
+   start="Video_Stream_Splitter.avalon_sync_source"
+   end="Video_Stream_Merger.avalon_sync_sink" />
+ <connection
+   kind="clock"
+   version="16.1"
+   start="Sys_Clk.clk"
+   end="Video_Stream_Splitter.clk" />
+ <connection
+   kind="clock"
+   version="16.1"
+   start="Sys_Clk.clk"
+   end="Edge_Detection_Router_Controller.clk" />
+ <connection
+   kind="clock"
+   version="16.1"
+   start="Sys_Clk.clk"
+   end="Chroma_Filter.clk" />
+ <connection
+   kind="clock"
+   version="16.1"
+   start="Sys_Clk.clk"
+   end="Edge_Detection.clk" />
+ <connection
+   kind="clock"
+   version="16.1"
+   start="Sys_Clk.clk"
+   end="Chroma_Upsampler.clk" />
+ <connection
+   kind="clock"
+   version="16.1"
+   start="Sys_Clk.clk"
+   end="Video_Stream_Merger.clk" />
+ <connection
+   kind="conduit"
+   version="16.1"
+   start="Video_Stream_Splitter.external_interface"
+   end="Edge_Detection_Router_Controller.external_connection">
+  <parameter name="endPort" value="" />
+  <parameter name="endPortLSB" value="0" />
+  <parameter name="startPort" value="" />
+  <parameter name="startPortLSB" value="0" />
+  <parameter name="width" value="0" />
+ </connection>
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Video_Stream_Splitter.reset" />
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Edge_Detection_Router_Controller.reset" />
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Chroma_Filter.reset" />
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Edge_Detection.reset" />
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Chroma_Upsampler.reset" />
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Video_Stream_Merger.reset" />
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>

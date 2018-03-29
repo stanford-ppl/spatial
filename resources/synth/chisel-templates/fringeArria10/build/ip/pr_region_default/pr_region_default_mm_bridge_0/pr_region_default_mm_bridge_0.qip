@@ -1,0 +1,61 @@
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_TOOL_NAME "QsysPrimePro"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_TOOL_ENV "QsysPrimePro"
+set_global_assignment -library "pr_region_default_mm_bridge_0" -name SOPCINFO_FILE [file join $::quartus(qip_path) "pr_region_default_mm_bridge_0.sopcinfo"]
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name SLD_INFO "QSYS_NAME pr_region_default_mm_bridge_0 HAS_SOPCINFO 1 GENERATION_ID 0"
+set_global_assignment -library "pr_region_default_mm_bridge_0" -name MISC_FILE [file join $::quartus(qip_path) "pr_region_default_mm_bridge_0.cmp"]
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_TARGETED_DEVICE_FAMILY "Arria 10"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_GENERATED_DEVICE_FAMILY "{Arria 10}"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_QSYS_MODE "STANDALONE"
+set_global_assignment -name SYNTHESIS_ONLY_QIP ON
+set_global_assignment -library "pr_region_default_mm_bridge_0" -name MISC_FILE [file join $::quartus(qip_path) "../pr_region_default_mm_bridge_0.ip"]
+
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_NAME "YWx0ZXJhX2F2YWxvbl9tbV9icmlkZ2U="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_DISPLAY_NAME "QXZhbG9uLU1NIFBpcGVsaW5lIEJyaWRnZQ=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_AUTHOR "SW50ZWwgQ29ycG9yYXRpb24="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_VERSION "MTcuMQ=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_DESCRIPTION "SW5zZXJ0cyBhIHJlZ2lzdGVyIHN0YWdlIGluIHRoZSBBdmFsb24tTU0gY29tbWFuZCBhbmQgcmVzcG9uc2UgcGF0aHMuIEFjY2VwdHMgY29tbWFuZHMgb24gaXRzIEF2YWxvbi1NTSBzbGF2ZSBwb3J0IGFuZCBwcm9wYWdhdGVzIHRoZW0gdG8gaXRzIEF2YWxvbi1NTSBtYXN0ZXIgcG9ydC4="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "REFUQV9XSURUSA==::MzI=::RGF0YSB3aWR0aA=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "U1lNQk9MX1dJRFRI::OA==::U3ltYm9sIHdpZHRo"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "QUREUkVTU19XSURUSA==::MTA=::QWRkcmVzcyB3aWR0aA=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "U1lTSU5GT19BRERSX1dJRFRI::MTA=::U1lTSU5GT19BRERSX1dJRFRI"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "VVNFX0FVVE9fQUREUkVTU19XSURUSA==::MA==::VXNlIGF1dG9tYXRpY2FsbHktZGV0ZXJtaW5lZCBhZGRyZXNzIHdpZHRo"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "QVVUT19BRERSRVNTX1dJRFRI::MTA=::QXV0b21hdGljYWxseS1kZXRlcm1pbmVkIGFkZHJlc3Mgd2lkdGg="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "SERMX0FERFJfV0lEVEg=::MTA=::SERMX0FERFJfV0lEVEg="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "QUREUkVTU19VTklUUw==::U1lNQk9MUw==::QWRkcmVzcyB1bml0cw=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "QlVSU1RDT1VOVF9XSURUSA==::MQ==::QnVyc3Rjb3VudCB3aWR0aA=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "TUFYX0JVUlNUX1NJWkU=::MQ==::TWF4aW11bSBidXJzdCBzaXplICh3b3Jkcyk="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "TUFYX1BFTkRJTkdfUkVTUE9OU0VT::NA==::TWF4aW11bSBwZW5kaW5nIHJlYWQgdHJhbnNhY3Rpb25z"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "TElORVdSQVBCVVJTVFM=::MA==::TGluZSB3cmFwIGJ1cnN0cw=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "UElQRUxJTkVfQ09NTUFORA==::MQ==::UGlwZWxpbmUgY29tbWFuZCBzaWduYWxz"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "UElQRUxJTkVfUkVTUE9OU0U=::MQ==::UGlwZWxpbmUgcmVzcG9uc2Ugc2lnbmFscw=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_PARAMETER "VVNFX1JFU1BPTlNF::MA==::VXNlIEF2YWxvbiBUcmFuc2FjdGlvbiBSZXNwb25zZXM="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_GROUP "QmFzaWMgRnVuY3Rpb25zL0JyaWRnZXMgYW5kIEFkYXB0b3JzL01lbW9yeSBNYXBwZWQ="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cDovL3d3dy5hbHRlcmEuY29tL2xpdGVyYXR1cmUvaGIvcXRzL3FzeXNfc3lzdGVtX2NvbXBvbmVudHMucGRm"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cHM6Ly9kb2N1bWVudGF0aW9uLmFsdGVyYS5jb20vIy9saW5rL213aDE0MDk5NjAxODE2NDEvbXdoMTQwOTk1OTI3NTc0OQ=="
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cHM6Ly9kb2N1bWVudGF0aW9uLmFsdGVyYS5jb20vIy9saW5rL2hjbzE0MTY4MzYxNDU1NTUvaGNvMTQxNjgzNjY1MzIyMQ=="
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_NAME "cHJfcmVnaW9uX2RlZmF1bHRfbW1fYnJpZGdlXzA="
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_DISPLAY_NAME "c3lzdGVt"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_REPORT_HIERARCHY "On"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_VERSION "MS4w"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19HRU5FUkFUSU9OX0lE::MA==::QXV0byBHRU5FUkFUSU9OX0lE"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfRkFNSUxZ::QXJyaWEgMTA=::QXV0byBERVZJQ0VfRkFNSUxZ"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0U=::MTBBUzA2Nk4zRjQwRTJTRw==::QXV0byBERVZJQ0U="
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfU1BFRURHUkFERQ==::Mg==::QXV0byBERVZJQ0VfU1BFRURHUkFERQ=="
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfUkFURQ==::LTE=::QXV0byBDTE9DS19SQVRF"
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfRE9NQUlO::LTE=::QXV0byBDTE9DS19ET01BSU4="
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfUkVTRVRfRE9NQUlO::LTE=::QXV0byBSRVNFVF9ET01BSU4="
+set_global_assignment -entity "pr_region_default_mm_bridge_0" -library "pr_region_default_mm_bridge_0" -name IP_COMPONENT_PARAMETER "QVVUT19NMF9BRERSRVNTX1dJRFRI::LTE=::QXV0byBBRERSRVNTX1dJRFRI"
+
+
+set_global_assignment -library "altera_avalon_mm_bridge_171" -name VERILOG_FILE [file join $::quartus(qip_path) "altera_avalon_mm_bridge_171/synth/altera_avalon_mm_bridge.v"]
+set_global_assignment -library "pr_region_default_mm_bridge_0" -name VERILOG_FILE [file join $::quartus(qip_path) "synth/pr_region_default_mm_bridge_0.v"]
+
+
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_TOOL_NAME "altera_avalon_mm_bridge"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "altera_avalon_mm_bridge" -library "altera_avalon_mm_bridge_171" -name IP_TOOL_ENV "QsysPrimePro"
+

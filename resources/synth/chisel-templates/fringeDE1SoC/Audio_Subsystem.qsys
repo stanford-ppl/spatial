@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags=""
+   categories="" />
+ <parameter name="bonusData"><![CDATA[bonusData 
+{
+   element Audio
+   {
+      datum _sortIndex
+      {
+         value = "2";
+         type = "int";
+      }
+   }
+   element Audio_PLL
+   {
+      datum _sortIndex
+      {
+         value = "1";
+         type = "int";
+      }
+   }
+   element Sys_Clk
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="5CSEMA5F31C6" />
+ <parameter name="deviceFamily" value="Cyclone V" />
+ <parameter name="deviceSpeedGrade" value="6" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="false" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface
+   name="audio"
+   internal="Audio.external_interface"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="audio_clk"
+   internal="Audio_PLL.audio_clk"
+   type="clock"
+   dir="start" />
+ <interface
+   name="audio_irq"
+   internal="Audio.interrupt"
+   type="interrupt"
+   dir="end" />
+ <interface
+   name="audio_pll_ref_clk"
+   internal="Audio_PLL.ref_clk"
+   type="clock"
+   dir="end" />
+ <interface
+   name="audio_pll_ref_reset"
+   internal="Audio_PLL.ref_reset"
+   type="reset"
+   dir="end" />
+ <interface
+   name="audio_reset"
+   internal="Audio_PLL.reset_source"
+   type="reset"
+   dir="start" />
+ <interface
+   name="audio_slave"
+   internal="Audio.avalon_audio_slave"
+   type="avalon"
+   dir="end" />
+ <interface name="sys_clk" internal="Sys_Clk.clk_in" type="clock" dir="end" />
+ <interface
+   name="sys_reset"
+   internal="Sys_Clk.clk_in_reset"
+   type="reset"
+   dir="end" />
+ <module name="Audio" kind="altera_up_avalon_audio" version="16.1" enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="audio_in" value="true" />
+  <parameter name="audio_out" value="true" />
+  <parameter name="avalon_bus_type" value="Memory Mapped" />
+  <parameter name="dw" value="32" />
+ </module>
+ <module
+   name="Audio_PLL"
+   kind="altera_up_avalon_audio_pll"
+   version="16.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CSEMA5F31C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6" />
+  <parameter name="audio_clk_freq" value="12.288" />
+  <parameter name="device_family" value="Cyclone V" />
+  <parameter name="gui_refclk" value="50.0" />
+ </module>
+ <module name="Sys_Clk" kind="clock_source" version="16.1" enabled="1">
+  <parameter name="clockFrequency" value="50000000" />
+  <parameter name="clockFrequencyKnown" value="false" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="NONE" />
+ </module>
+ <connection kind="clock" version="16.1" start="Sys_Clk.clk" end="Audio.clk" />
+ <connection
+   kind="reset"
+   version="16.1"
+   start="Sys_Clk.clk_reset"
+   end="Audio.reset" />
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>

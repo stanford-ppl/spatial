@@ -1,0 +1,33 @@
+/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top_tb.v {1 {vlog -work work -stats=none /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top_tb.v
+Model Technology ModelSim - Intel FPGA Edition vlog 10.5b Compiler 2016.10 Oct  5 2016
+-- Compiling module Top_tb
+
+Top level modules:
+	Top_tb
+
+} {} {}} /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v {1 {vlog -work work -stats=none /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v
+Model Technology ModelSim - Intel FPGA Edition vlog 10.5b Compiler 2016.10 Oct  5 2016
+-- Compiling module FF
+-- Compiling module SingleCounter
+-- Compiling module Innerpipe
+-- Compiling module SRFF_sp
+-- Compiling module AccelTop
+-- Compiling module FF_1
+-- Compiling module MuxN
+-- Compiling module RegFile
+-- Compiling module FF_5
+-- Compiling module Depulser
+-- Compiling module FIFOArbiter
+-- Compiling module FIFOArbiter_1
+-- Compiling module Counter
+-- Compiling module FF_11
+-- Compiling module Counter_1
+-- Compiling module MAGCore
+-- Compiling module Fringe
+-- Compiling module FringeDE1SoC
+-- Compiling module Top
+
+Top level modules:
+	Top
+
+} {} {}}

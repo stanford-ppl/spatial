@@ -1,0 +1,5 @@
+QUARTUS_VERSION = "13.1"
+
+# Revisions
+
+PROJECT_REVISION = "DE1_SoC_Computer"

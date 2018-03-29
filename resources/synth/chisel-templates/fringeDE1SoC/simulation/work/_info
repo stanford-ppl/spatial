@@ -1,0 +1,450 @@
+m255
+K4
+z2
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+d/local/ssd/home/tianzhao/sp_comp/lite_avalon
+vAccelTop
+Z0 !s110 1490780097
+!i10b 1
+!s100 ;CNKL>?j`:8RdTYSNY7ez0
+ICLAXS4[Jk9Vfe0`47C3D53
+Z1 VDg1SIo80bB@j0V0VzS_@n1
+Z2 d/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation
+Z3 w1490778310
+Z4 8/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v
+Z5 F/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v
+L0 496
+Z6 OV;L;10.5b;63
+r1
+!s85 0
+31
+Z7 !s108 1490780097.000000
+Z8 !s107 /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v|
+Z9 !s90 -reportprogress|300|-work|work|-stats=none|/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v|
+!i113 1
+Z10 o-work work
+Z11 tCvgOpt 0
+n@accel@top
+vCounter
+R0
+!i10b 1
+!s100 89E`:`STEjE;;Ug1ELmP90
+I8UaUjfUa2GT<YzIEV`4:91
+R1
+R2
+R3
+R4
+R5
+L0 1224
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@counter
+vCounter_1
+R0
+!i10b 1
+!s100 jifebhI@SA70:TX3;2cRb1
+IlbC8C]7`Nao;VV_Pn]afk2
+R1
+R2
+R3
+R4
+R5
+L0 1320
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@counter_1
+vDepulser
+R0
+!i10b 1
+!s100 zC][F7hgFblDBWV6DIeDE3
+I:NPEQNRQHTTh2P_o3[5i<3
+R1
+R2
+R3
+R4
+R5
+L0 942
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@depulser
+vFF
+R0
+!i10b 1
+!s100 c>E797F5C0n02@NJRi^;C2
+IM7WC4j4iSi:cZ`1;1DUcR1
+R1
+R2
+R3
+R4
+R5
+L0 14
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@f@f
+vFF_1
+R0
+!i10b 1
+!s100 UDc7Ga:1k1K65[zH:S@a40
+IA9WVUZgai2DB<dYYSM2mG0
+R1
+R2
+R3
+R4
+R5
+L0 684
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@f@f_1
+vFF_11
+R0
+!i10b 1
+!s100 MTR`d;bV:AMNVIR[?lS[81
+IF^4]9gfNBB6T@YXlm?i2M2
+R1
+R2
+R3
+R4
+R5
+L0 1283
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@f@f_11
+vFF_5
+R0
+!i10b 1
+!s100 >ZPi@_N>kf_SF]YYCF1:<3
+IM07bHbC57CT^O_[DUF6151
+R1
+R2
+R3
+R4
+R5
+L0 905
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@f@f_5
+vFIFOArbiter
+R0
+!i10b 1
+!s100 K`FAW;Q:1RdFN2b1H]6>b1
+I0VmNGABRgGi99iCY7G2I<3
+R1
+R2
+R3
+R4
+R5
+L0 974
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@f@i@f@o@arbiter
+vFIFOArbiter_1
+R0
+!i10b 1
+!s100 LdfLnco<22;5PM9ccTR820
+IJ3BMeW^PkE;K0n5JidadK1
+R1
+R2
+R3
+R4
+R5
+L0 1099
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@f@i@f@o@arbiter_1
+vFringe
+R0
+!i10b 1
+!s100 ;UEI9G8c>O1383mOEk4k_3
+IIeTgBbD;=hWBPz[jbePGb3
+R1
+R2
+R3
+R4
+R5
+L0 1899
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@fringe
+vFringeDE1SoC
+R0
+!i10b 1
+!s100 <zzD5dDTW8Gg?Eef>BBVB3
+I5?H85PjZ`0Xe7hQ[5GUfD2
+R1
+R2
+R3
+R4
+R5
+L0 2204
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@fringe@d@e1@so@c
+vInnerpipe
+R0
+!i10b 1
+!s100 W34km_;Lmm[^26PFMRFD52
+ILg4V1>Jnn]DGlzIf1l3?X1
+R1
+R2
+R3
+R4
+R5
+L0 192
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@innerpipe
+vMAGCore
+R0
+!i10b 1
+!s100 2gdOlU^3Z1mQOLUeb]5<H0
+I<aaY[?]P2SS6]8b;3V6iO2
+R1
+R2
+R3
+R4
+R5
+L0 1379
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@m@a@g@core
+vMuxN
+R0
+!i10b 1
+!s100 bJT[<8D8Ao0PoLATc=7BG3
+I]dh_LQ5Qe1Lj>J9=Cn6_`0
+R1
+R2
+R3
+R4
+R5
+L0 721
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@mux@n
+vRegFile
+R0
+!i10b 1
+!s100 aD3e8bPoeW4lLQf6HM01d2
+INMjVG>El_NlY7U`iaNTe50
+R1
+R2
+R3
+R4
+R5
+L0 741
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@reg@file
+vSingleCounter
+R0
+!i10b 1
+!s100 of8[zGTz9Bm0TN6MJK_XP1
+I[j5V^A8I1]=OGf3iQekZ63
+R1
+R2
+R3
+R4
+R5
+L0 58
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@single@counter
+vSRFF_sp
+R0
+!i10b 1
+!s100 W7_YWb<mO8lm;LE_JkK?j2
+I`6QfdE@bCl;XJfB;kBnHQ2
+R1
+R2
+R3
+R4
+R5
+L0 447
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@s@r@f@f_sp
+vTop
+R0
+!i10b 1
+!s100 6L9;<dU@LT@nzE51LS3HV0
+IRMXjjZB<hgkk1[Z5PlDZa3
+R1
+R2
+R3
+R4
+R5
+L0 2495
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+n@top
+vTop_tb
+R0
+!i10b 1
+!s100 Pc2lgo2AT05OPPnT4TBP=2
+IRml8Z`2L8fZFJom:B7?Uf2
+R1
+R2
+w1490779925
+8/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top_tb.v
+F/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top_tb.v
+L0 1
+R6
+r1
+!s85 0
+31
+R7
+!s107 /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top_tb.v|
+!s90 -reportprogress|300|-work|work|-stats=none|/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top_tb.v|
+!i113 1
+R10
+R11
+n@top_tb

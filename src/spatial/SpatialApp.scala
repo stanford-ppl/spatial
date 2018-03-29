@@ -4,6 +4,8 @@ import argon.{DSLApp, _}
 import argon.passes.IRPrinter
 import nova.codegen.dot._
 import poly.{ConstraintMatrix, ISL}
+import spatial.codegen.scalagen._
+import spatial.codegen.cppgen._
 import spatial.data._
 import spatial.lang.Void
 import spatial.dse.DSEMode
@@ -59,7 +61,10 @@ trait SpatialApp extends DSLApp {
     lazy val globalAllocation = GlobalAllocation(state)
 
     // --- Codegen
+    // lazy val chiselCodegen = ChiselCodegen(state)
+    lazy val cppCodegen = CppGen(state)
     lazy val irDotCodegen = IRDotCodegen(state)
+    // lazy val treeCodegen = TreeCodegen(state)
     lazy val puDotCodegen = PUDotCodegen(state)
 
     block ==>
@@ -77,10 +82,13 @@ trait SpatialApp extends DSLApp {
       unrollTransformer ==>
       printer ==>
       (cfg.enableRetiming ? retiming) ==>
+      // (cfg.enableTree ? irTreeCodegen) ==>
+      // (cfg.enableSynth ? chiselCodegen) ==>
+      (cfg.enableSynth ? cppCodegen) ==>
+      (cfg.enableDot ? irDotCodegen)
       //globalAllocation ==>
       //printer ==>
       //puDotCodegen ==>
-      irDotCodegen
 
     isl.shutdown(100)
   }
@@ -178,6 +186,7 @@ trait SpatialApp extends DSLApp {
           warn("override val target = <device>")
           warn("Defaulting to 'Default' device.")
           IR.logWarning()
+          cfg.target = Targets.Default
         }
       }
       else {

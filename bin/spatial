@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+
+import glob
+import re
+from argparse import ArgumentParser
+import os, sys, datetime
+import subprocess
+from os.path import dirname, abspath
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+class SpatialArgumentParser(ArgumentParser):
+  
+  def print_help(self, file=None):
+    print("""
+spatial CLI for spatial
+Usage: spatial [options]
+
+  --help                   prints this usage text
+  -q, --quiet              disable background logging
+  -v, --verbose            enable verbose printout
+  -c, --clean              Reset output directory
+  -m, --multifile <value>  aggressiveness for splitting generated code files
+                            0 = no splitting or scoping
+                            1 = no splitting but yes scoping on inner pipes
+                            2 = no splitting but yes scoping everywhere
+                            3 <DEPRECATED> = splitting for inner pipes only
+                            4 = all blocks
+  -o, --out <value>        location of output directory. Default is ./gen/<appname>
+  -e, --emission <value>   Conservativeness when emitting nodes.
+                            0 = crash when emitNode is undefined (release mode)
+                            1 = warn when undefined
+                            2 = warn when undefined and report when node matched but outside backend rules
+  --synth                  enable codegen to chisel + cpp (Synthesis) (disable sim) [false]
+  --sim                    enable codegen to Scala (Simulation) (disable synth) [true]
+  --fpga <value>           Set name of FPGA target [Default]
+  --dse                    enables design space exploration [false]
+  --naming                 generates the debug name for all syms, rather than "x${s.id}" only'
+  --tree                   enables logging of controller tree for visualizing app structure
+  --dot                    enables dot generation
+  --withoutSrc             disable app source code copy to generated directory
+      """)
+  #sys.exit(0)
+
+
+def getSrcCode(opts, args):
+  outdir = "gen/" 
+  for arg in args:
+    if ("--out=" in arg):
+      outdir = arg.replace("--out=","")
+
+  outfile = open(os.path.join(os.getcwd(), './%s/%s/%s.ref' % (outdir, opts.app, opts.app)), 'w+')
+  os.chdir( "apps/src" )
+  found = False
+  for files in glob.glob( "*.scala" ):
+      f = open( files, 'r' )
+      for line in f:
+          if re.match("^@spatial object %s[ ]*{" % opts.app, line) is not None:
+            found = True
+          if (found):
+            outfile.write(line)
+          if (found and re.match("^}.*", line) is not None):
+            found = False
+  outfile.close()
+  os.chdir("../..")
+
+def main():
+  parser = SpatialArgumentParser()
+  parser.add_argument('app', type=str, help='name of application to run')
+
+  sbt_project = 'apps/'
+
+  (opts, args) = parser.parse_known_args()
+
+  java_cmd = "sbt -batch \"" + sbt_project + "runMain " + opts.app + " " + ' '.join(args) + "\""
+  print(java_cmd)
+
+  ecode = os.system(java_cmd)
+
+  if ecode != 0:
+    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Spatial compilation failed")
+  else:
+    if not any("--withoutSrc" in s for s in args):
+      getSrcCode(opts, args)
+    simScript = open(opts.app + ".sim", 'w')
+    simScript.write("#!/bin/bash\n\n")
+    simScript.write("cd gen/" + opts.app + "\n")
+    simScript.write("bash run.sh \"$@\"\n") 
+    simScript.close()
+
+    os.system("chmod u+x " + opts.app + ".sim")
+
+if __name__ == "__main__":
+    main()

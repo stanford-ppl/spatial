@@ -6,7 +6,7 @@ import spatial.data._
 import spatial.node._
 import spatial.util._
 
-trait FlowRules {
+case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
     case MemAlloc(mem) if mem.isLocalMem => localMems += mem
     case _ =>

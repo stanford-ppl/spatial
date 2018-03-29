@@ -12,8 +12,7 @@ case class Series[+A:Num](
     end:   A,
     step:  A,
     par:   I32,
-    isUnit: Boolean = false
-    )(implicit ev: A <:< Num[A])
+    isUnit: Boolean = false)
   extends Mirrorable[Series[_]] {
 
   def tp: Num[A@uV] = Num[A]
@@ -39,4 +38,5 @@ case class Series[+A:Num](
   }
 
   def mirror(f:Tx): Series[_] = Series[A](f(start),f(end),f(step),f(par),isUnit)
+  override def toString: String = s"Series($start, $end, $step, $par, $isUnit)"
 }

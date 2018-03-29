@@ -5,10 +5,14 @@ import utils.implicits.collections._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+trait RewriteRules {
+  val IR: State
+}
+
 /**
   * Static object for capturing rewrite rules
   */
-object rewrites {
+class Rewrites {
   type RewriteRule = PartialFunction[(Op[_],SrcCtx,State),Option[Sym[_]]]
 
   private def keyOf[A<:Op[_]:Manifest] = manifest[A].runtimeClass.asInstanceOf[Class[A]]
@@ -24,11 +28,13 @@ object rewrites {
   def rule(op: Op[_]): Seq[RewriteRule] = rules.getOrElse(op.getClass, Nil)
 
   def addGlobal(name: String, rule: RewriteRule): Unit = if (!names.contains(name)) {
+    Console.println(s"Registering global rewrite rule: $name")
     names += name
     globals += rule
   }
 
   def add[O<:Op[_]:Manifest](name: String, rule: RewriteRule): Unit = if (!names.contains(name)) {
+    Console.println(s"Registering rewrite rule: $name")
     names += name
     val key = keyOf[O]
     val pfs = rules.getOrElseAdd(key, () => ArrayBuffer.empty[RewriteRule])

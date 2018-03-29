@@ -29,39 +29,58 @@ import spatial.lang._
     forceAlign: Boolean = false,
     ens:        Set[Bit] = Set.empty
   )(implicit
-    val A: Bits[A],
+    val A:     Bits[A],
     val Local: Type[Local[A]],
-    val Dram: Type[Dram[A]])
-  extends EarlyBlackBox {
-  def isStore: Boolean = !isLoad
+    val Dram:  Type[Dram[A]])
+  extends EarlyBlackBox[Void] {
+    def isStore: Boolean = !isLoad
 
-  override def effects: Effects = if (isStore) Effects.Writes(dram) else Effects.Writes(local)
+    override def effects: Effects = if (isStore) Effects.Writes(dram) else Effects.Writes(local)
+    @rig def lower(): Void = {
+      if (isLoad) DenseTransfer.load(dram,local,forceAlign,ens)
+      else        DenseTransfer.store(dram,local,forceAlign,ens)
+    }
 }
 
-/** A sparse transfer between on-chip and off-chip memory.
-  * If isGather is true, this is a gather from off-chip memory to on-chip.
-  * Otherwise, this is a scatter from on-chip memory to off-chip memory.
-  *
-  * @tparam A The type of elements being loaded/stored
-  * @tparam Local The type of the on-chip memory.
-  * @param dram A sparse view of the off-chip memory
-  * @param local The instance of the on-chip memory
-  * @param isGather If true, this is a gather from off-chip. Otherwise, this is a scatter to off-chip.
-  * @param ens Explicit enable signals for this transfer
-  * @param bA Type evidence for the element
-  * @param tL Type evidence for the on-chip memory.
-  */
-@op case class SparseTransfer[A,Local[T]<:LocalMem[T,Local]](
-    dram:     DRAMSparseTile[A],
-    local:    Local[A],
-    isGather: Boolean,
-    ens:      Set[Bit] = Set.empty,
+object DenseTransfer {
+  @rig private def common[A,Dram[T]<:DRAM[T,Dram],Local[T]<:LocalMem[T,Local]](
+    dram:       Dram[A],
+    local:      Local[A],
+    forceAlign: Boolean,
+    ens:        Set[Bit]
+  )(transfer: => Void)(implicit
+    A:     Bits[A],
+    Local: Type[Local[A]],
+    Dram:  Type[Dram[A]]
+  ): Void = {
+
+
+
+  }
+
+  @rig def load[A,Dram[T]<:DRAM[T,Dram],Local[T]<:LocalMem[T,Local]](
+    dram:       Dram[A],
+    local:      Local[A],
+    forceAlign: Boolean,
+    ens:        Set[Bit]
   )(implicit
-    val bA:   Bits[A],
-    val tL:   Type[Local[A]])
-  extends EarlyBlackBox {
-  def isScatter: Boolean = !isGather
+    A:     Bits[A],
+    Local: Type[Local[A]],
+    Dram:  Type[Dram[A]]
+  ): Void = common(dram,local,forceAlign,ens){
 
-  override def effects: Effects = if (isScatter) Effects.Writes(dram) else Effects.Writes(local)
+  }
+
+  @rig def store[A,Dram[T]<:DRAM[T,Dram],Local[T]<:LocalMem[T,Local]](
+    dram:       Dram[A],
+    local:      Local[A],
+    forceAlign: Boolean,
+    ens:        Set[Bit]
+  )(implicit
+    A:     Bits[A],
+    Local: Type[Local[A]],
+    Dram:  Type[Dram[A]]
+  ): Void = common(dram,local,forceAlign,ens){
+
+  }
 }
-

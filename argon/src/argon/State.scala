@@ -15,6 +15,12 @@ class State extends forge.AppState {
   def mayMotion: Boolean = _motionAllowed
   def enableMotion(): Unit = { _motionAllowed = true }
 
+  /** Rewrite rules **/
+  val rewrites = new Rewrites
+
+  /** Flow rules **/
+  val flows = new Flows
+
   /** Symbol IDs */
   private var id: Int = -1
   def maxId: Int = id-1 // Inclusive

@@ -61,16 +61,29 @@ import spatial.lang._
   override def bodies  = Seq(iters -> Seq(map,reduce), Nil -> Seq(load,store))
 }
 
+/*@op case class MemAccum[A,C[T]]()
+
+@op case class MemCombine[A,C[T]](
+  mem:     C[A],
+  ldMem:   Lambda1[C[A],A],
+  combine: Lambda2[A,A,A],
+  ident:   Option[A],
+  fold:    Boolean,
+  iters:   Seq[I32]
+)(implicit val A: Bits[A], val C: LocalMem[A,C]) extends Primitive[A]*/
+
 @op case class MemReduceBlackBox[A,C[T]](
-  ens:       Set[Bit],
-  cchainMap: CounterChain,
-  accum:     C[A],
-  map:       Block[C[A]],
-  reduce:    Lambda2[A,A,A],
-  ident:     Option[A],
-  fold:      Boolean,
-  itersMap:  Seq[I32]
-)(implicit val A: Bits[A], val C: LocalMem[A,C]) extends EarlyBlackBox
+  ens:    Set[Bit],
+  cchain: CounterChain,
+  accum:  C[A],
+  map:    Block[C[A]],
+  reduce: Lambda2[A,A,A],
+  ident:  Option[A],
+  fold:   Boolean,
+  itersM: Seq[I32]
+)(implicit val A: Bits[A], val C: LocalMem[A,C]) extends EarlyBlackBox[Void] {
+  @rig def lower(): Void = { } // TODO[1]: Lower MemReduce
+}
 
 
 @op case class OpMemReduce[A,C[T]](

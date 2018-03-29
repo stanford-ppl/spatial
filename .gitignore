@@ -5,9 +5,10 @@
 /project/target/
 target/
 /.idea/
-/out/
+/out*/
 /gen/
 
+*.sim
 *.class
 *.iml
 *.ipr

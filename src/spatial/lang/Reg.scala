@@ -21,6 +21,9 @@ import scala.collection.mutable
   @rig def __sassign(x: A): Unit = Reg.write(this, x)
 
   // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = this.value
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = Reg.write(this, data, ens)
+  @rig def __reset(ens: Set[Bit]): Void = stage(RegReset(this,ens))
 }
 object Reg {
   @api def apply[A:Bits]: Reg[A] = Reg.alloc[A](zero[A])
@@ -31,9 +34,9 @@ object Reg {
     implicit val tA: Bits[A] = reg.A
     stage(RegRead(reg))
   }
-  @rig def write[A](reg: Reg[A], data: Bits[A], en: Set[Bit] = Set.empty): Void = {
+  @rig def write[A](reg: Reg[A], data: Bits[A], ens: Set[Bit] = Set.empty): Void = {
     implicit val tA: Bits[A] = reg.A
-    stage(RegWrite(reg,data,en))
+    stage(RegWrite(reg,data,ens))
   }
 }
 

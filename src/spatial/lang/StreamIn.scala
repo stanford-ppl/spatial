@@ -13,6 +13,15 @@ import scala.collection.mutable.Queue
 
   @api def value(): A = stage(StreamInRead(this,Set.empty))
   @api def value(en: Bit): A = stage(StreamInRead(this,Set(en)))
+
+  // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = this.value()
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = {
+    error(ctx, "Cannot write to StreamIn")
+    error(ctx)
+    err[Void]("Cannot write to StreamIn")
+  }
+  @rig def __reset(ens: Set[Bit]): Void = void
 }
 object StreamIn {
   @api def apply[A:Bits](bus: Bus): StreamIn[A] = stage(StreamInNew[A](bus))

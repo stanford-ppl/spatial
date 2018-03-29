@@ -29,7 +29,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   /** Returns the value at `addr`.
     * The number of indices should match the RegFile's rank.
     */
-  @api def read(addr: Seq[Idx]): A = {
+  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(RegFileRead[A,C](me,addr,Set.empty))
   }
@@ -37,7 +37,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   /** Updates the value at `addr` to `data`.
     * The number of indices should match the RegFile's rank.
     */
-  @api def write(addr: Seq[Idx], data: A): Void = {
+  @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
     stage(RegFileWrite[A,C](me,data,addr,Set.empty))
   }
@@ -48,6 +48,11 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
       error(ctx)
     }
   }
+
+  // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
+  @rig def __reset(ens: Set[Bit]): Void = void
 }
 object RegFile {
   /** Allocates a [[RegFile1]] with capacity for `length` elements of type A. */

@@ -30,7 +30,7 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
     * The number of indices should match the LUT's rank.
     * NOTE: Use the apply method if the LUT's rank is statically known.
     */
-  @api def read(addr: Seq[Idx]): A = {
+  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(LUTRead[A,C](me,addr,Set.empty))
   }
@@ -43,6 +43,13 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
   }
 
   // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = {
+    error(ctx, "Cannot write to LUT")
+    error(ctx)
+    err[Void]("Cannot write to LUT")
+  }
+  @rig def __reset(ens: Set[Bit]): Void = void
 }
 object LUT {
   /** Allocates a 1-dimensional [[LUT1]] with capacity of `length` elements of type A. */

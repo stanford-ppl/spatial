@@ -24,7 +24,8 @@ case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs:
 
 
 /** Status read of a memory */
-abstract class StatusReader[R:Type] extends EnPrimitive[R] {
+abstract class StatusReader[R:Bits] extends EnPrimitive[R] {
+  override val R: Bits[R] = Bits[R]
   def mem: Sym[_]
 }
 object StatusReader {

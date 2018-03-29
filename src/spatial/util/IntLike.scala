@@ -36,6 +36,7 @@ object IntLike {
   }
 
   implicit object IdxIsIntLike extends IntLike[Idx] {
+    // This is why we don't generally support mixed precision computation without explicit casting
     @rig private def map[S,I](a: Idx, b: Idx)(func: (Fix[S,I,_0],Fix[S,I,_0]) => Fix[S,I,_0]): Idx = {
       val fmt = a.fmt merge b.fmt
       class IA extends INT[IA]{ val v: Int = a.fmt.ibits }

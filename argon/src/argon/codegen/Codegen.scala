@@ -51,10 +51,11 @@ trait Codegen extends Traversal {
   }
 
   override protected def process[R](block: Block[R]): Block[R] = {
+    preprocess(block)
     inGen(out, entryFile) {
       gen(block)
     }
-    block
+    postprocess(block)
   }
 
   protected def gen(block: Block[_], withReturn: Boolean = false): Unit = {

@@ -121,7 +121,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
   /** Returns the statically defined rank (number of dimensions) of the given memory. */
   def rankOf(mem: Sym[_]): Int = mem match {
-    case Op(m: MemAlloc[_,_]) => m.rank
+    case Op(m: MemAlloc[_,_])   => m.rank
+    case Op(m: MemAlias[_,_,_]) => m.rank
     case _ => throw new Exception(s"Could not statically determine the rank of $mem")
   }
 

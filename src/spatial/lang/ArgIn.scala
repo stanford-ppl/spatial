@@ -12,6 +12,15 @@ import spatial.node._
   override val evMem = implicitly[ArgIn[A] <:< (LocalMem[A,ArgIn] with RemoteMem[A,ArgIn])]
 
   @api def value: A = stage(ArgInRead(this))
+
+  // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = this.value
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = {
+    error(ctx, "Cannot write to ArgIn")
+    error(ctx)
+    err[Void]("Cannot write to ArgIn")
+  }
+  @rig def __reset(ens: Set[Bit]): Void = void
 }
 object ArgIn {
   @api def apply[A:Bits]: ArgIn[A] = stage(ArgInNew(Bits[A].zero))

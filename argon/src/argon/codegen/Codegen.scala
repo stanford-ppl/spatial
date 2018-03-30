@@ -13,6 +13,37 @@ trait Codegen extends Traversal {
   def out: String = s"${config.genDir}${files.sep}${lang}${files.sep}"
   def entryFile: String = s"Main.$ext"
   var cliArgs: Map[Int,String] = Map.empty
+  protected var backend = ""
+  protected var scope = "host"
+
+  def enterAccel(): Unit = { 
+    if (backend == "cpp") config.enGen = false
+    scope = "accel" 
+  }
+  def exitAccel(): Unit = { 
+    if (backend == "cpp") config.enGen = true
+    scope = "host" 
+  }
+
+  def clearGen(): Unit = {
+    files.deleteExts(out, ext, recursive = true)
+  }
+
+  protected def emitEntry(block: Block[_]): Unit
+
+  def emitHeader(): Unit = { }
+  def emitFooter(): Unit = { }
+
+  override protected def preprocess[R](b: Block[R]): Block[R] = {
+    clearGen()
+    emitHeader()
+    super.preprocess(b)
+  }
+
+  override protected def postprocess[R](b: Block[R]): Block[R] = {
+    emitFooter()
+    super.postprocess(b)
+  }
 
   protected def nameMap(x: String): String = x
 

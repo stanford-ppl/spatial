@@ -4,9 +4,10 @@ import argon._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
+import spatial.internal.{spatialConfig => cfg}
 
 
-trait CppGenController extends CppGenCommon {
+trait CppGenAccel extends CppGenCommon {
 
   var instrumentCounters: List[(Sym[_], Int)] = List()
   var earlyExits: List[Sym[_]] = List()
@@ -17,29 +18,28 @@ trait CppGenController extends CppGenCommon {
       controllerStack.push(lhs)
       // Skip everything inside
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-       // toggleEn()
-      //  emitBlock(func)
-      //  toggleEn()
-      //  emit(s"// Register ArgIns and ArgIOs in case some are unused")
-      //  emit(s"c1->setNumArgIns(${argIns.length} + ${drams.length} + ${argIOs.length});")
-      //  emit(s"c1->setNumArgIOs(${argIOs.length});")
-      //  emit(s"c1->setNumArgOuts(${argOuts.length});")
-      //  emit(s"c1->setNumArgOutInstrs(2*${if (spatialConfig.enableInstrumentation) instrumentCounters.length else 0});")
-      //  emit(s"c1->setNumEarlyExits(${earlyExits.length});")
-      //  emit(s"""c1->flushCache(1024);""")
-      //  emit(s"time_t tstart = time(0);")
-      //  val memlist = if (setMems.nonEmpty) {s""", ${setMems.mkString(",")}"""} else ""
-      //  emit(s"c1->run();")
-      //  emit(s"time_t tend = time(0);")
-      //  emit(s"double elapsed = difftime(tend, tstart);")
-      //  emit(s"""std::cout << "Kernel done, test run time = " << elapsed << " ms" << std::endl;""")
-      //  emit(s"""c1->flushCache(1024);""")
-      //  controllerStack.pop()
+      enterAccel()
+      visitBlock(func)
+      exitAccel()
+      controllerStack.pop()
+      emit(s"// Register ArgIns and ArgIOs in case some are unused")
+      emit(s"c1->setNumArgIns(${argIns.length} + ${drams.length} + ${argIOs.length});")
+      emit(s"c1->setNumArgIOs(${argIOs.length});")
+      emit(s"c1->setNumArgOuts(${argOuts.length});")
+      emit(s"c1->setNumArgOutInstrs(2*${if (cfg.enableInstrumentation) instrumentCounters.length else 0});")
+      emit(s"c1->setNumEarlyExits(${earlyExits.length});")
+      emit(s"""c1->flushCache(1024);""")
+      emit(s"time_t tstart = time(0);")
+      emit(s"c1->run();")
+      emit(s"time_t tend = time(0);")
+      emit(s"double elapsed = difftime(tend, tstart);")
+      emit(s"""std::cout << "Kernel done, test run time = " << elapsed << " ms" << std::endl;""")
+      emit(s"""c1->flushCache(1024);""")
  
       //  if (earlyExits.length > 0) {
       //    emit("// Capture breakpoint-style exits")
       //    emit("bool early_exit = false;")
-      //    val numInstrs = if (spatialConfig.enableInstrumentation) {2*instrumentCounters.length} else 0
+      //    val numInstrs = if (cfg.enableInstrumentation) {2*instrumentCounters.length} else 0
       //    earlyExits.zipWithIndex.foreach{ case (b, i) =>
       //      emit(src"long ${b}_act = c1->getArg(${argIOs.length + argOuts.length + numInstrs + i}, false);")
       //      val msg = b match {
@@ -56,7 +56,7 @@ trait CppGenController extends CppGenCommon {
       //    emit("""if (!early_exit) {std::cout << "No breakpoints triggered :)" << std::endl;} """)
       //  }
  
-      //  if (spatialConfig.enableInstrumentation) {
+      //  if (cfg.enableInstrumentation) {
       //    emit(src"""std::ofstream instrumentation ("./instrumentation.txt");""")
  
       //    emit(s"// Need to instrument ${instrumentCounters}")
@@ -81,6 +81,62 @@ trait CppGenController extends CppGenCommon {
       //    emit(src"""instrumentation.close();""")
       //  }
       //  emit(src"// $lhs $reg $v $en reg write")
+
+    case ArgInRead(reg)    => 
+      emit(src"${lhs.tp} $lhs = $reg;")
+    case ArgOutWrite(reg,v,en) => 
+      emit(src"// $lhs $reg $v $en reg write")
+
+    case UnitPipe(_,func) => 
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+      visitBlock(func)
+      controllerStack.pop()
+
+    case ParallelPipe(ens,func) =>
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+      visitBlock(func)
+      controllerStack.pop()      
+
+    // case op@Switch(body,selects,cases) =>
+    //   controllerStack.push(lhs)
+    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+    //   cases.collect{case s: Sym[_] => stmOf(s)}.foreach{ stm => 
+    //     visitStm(stm)
+    //   }
+    //   controllerStack.pop()      
+
+    // case op@SwitchCase(body) =>
+    //   controllerStack.push(lhs)
+    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+    //   visitBlock(body)
+    //   controllerStack.pop()      
+
+    // case StateMachine(ens,start,notDone,action,nextState,state) =>
+    //   controllerStack.push(lhs)
+    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)    
+    //   visitBlock(notDone)
+    //   visitBlock(action)
+    //   visitBlock(nextState)
+    //   controllerStack.pop()
+
+    case ExitIf(en) => 
+      // Emits will only happen if outside the accel
+      emit(src"exit(1);")
+      if (scope == "accel") earlyExits = earlyExits :+ lhs
+
+    case AssertIf(en, cond, m) => 
+      // Emits will only happen if outside the accel
+      val str = src"""${m.getOrElse("API assert failed with no message provided")}"""
+      emit(src"""string $lhs = string_plus("\n=================\n", string_plus($str, "\n=================\n"));""")
+      emit(src"""if ($en) { ASSERT($cond, ${lhs}.c_str()); }""")
+      if (scope == "accel") earlyExits = earlyExits :+ lhs
+
+    case BreakpointIf(en) => 
+      // Emits will only happen if outside the accel
+      emit(src"exit(1);")
+      if (scope == "accel") earlyExits = earlyExits :+ lhs
       
     case _ => super.gen(lhs, rhs)
   }

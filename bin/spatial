@@ -52,12 +52,12 @@ Usage: spatial [options]
 
 
 def getSrcCode(opts, args):
-  outdir = "gen/" 
+  outdir = "gen/%s" % opts.app 
   for arg in args:
     if ("--out=" in arg):
       outdir = arg.replace("--out=","")
 
-  outfile = open(os.path.join(os.getcwd(), './%s/%s/%s.ref' % (outdir, opts.app, opts.app)), 'w+')
+  outfile = open(os.path.join(os.getcwd(), './%s/%s.ref' % (outdir, opts.app)), 'w+')
   os.chdir( "apps/src" )
   found = False
   for files in glob.glob( "*.scala" ):

@@ -13,6 +13,8 @@ case class PUDotCodegen(IR: State) extends Codegen with DotCommon {
   override def entryFile: String = s"PUGraph.${ext}"
   override def ext = s"dot.$lang"
 
+  def emitEntry(block: Block[_]): Unit = {}
+  
   override def rankdir = "LR"
   override def useOrtho = true
   override protected def quoteOrRemap(arg: Any): String = arg match {

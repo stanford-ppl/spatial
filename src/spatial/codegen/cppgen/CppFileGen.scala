@@ -1,11 +1,13 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.FileGen
+import argon.codegen.Codegen
 
-trait CppFileGen extends FileGen {
+trait CppFileGen extends Codegen {
 
-  override protected def emitEntry(block: Block[_]): Unit = {
+  backend = "cpp"
+
+  override  def emitHeader(): Unit = {
 
     inGen(out, "cpptypes.hpp") {
       emit("""#ifndef __CPPTYPES_H__
@@ -61,41 +63,47 @@ trait CppFileGen extends FileGen {
       emit("""FringeContext *c1 = new FringeContext("./verilog/accel.bit.bin");""")
       emit("""c1->load();""")
     }
-   
+  }
+  
+  override protected def emitEntry(block: Block[_]): Unit = {
     gen(block)
-    emit("delete c1;")
-    close("}")
-    emit("")
-    open("void printHelp() {")
-      val argInts = cliArgs.toSeq.map(_._1)
-      val argsList = if (argInts.nonEmpty) {
-        (0 to argInts.max).map{i =>
-          if (cliArgs.contains(i)) s"<$i- ${cliArgs(i)}>" else s"<$i - UNUSED>"
-        }.mkString(" ")
-      }
-      else {"<No input args>"}
-      emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
-	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
-	    emit(s"""exit(0)""")
-    close("}")
+  }
 
-    emit("")
-    open(src"""int main(int argc, char *argv[]) {""")
-      emit(src"""vector<string> *args = new vector<string>(argc-1);""")
-      open(src"""for (int i=1; i<argc; i++) {""")
-        emit(src"""(*args)[i-1] = std::string(argv[i]);""")
-        emit(src"""if (std::string(argv[i]) == "--help" | std::string(argv[i]) == "-h") {printHelp();}""")
+  override def emitFooter(): Unit = {
+    inGen(out, entryFile) {
+      emit("delete c1;")
+      close("}")
+      emit("")
+      open("void printHelp() {")
+        val argInts = cliArgs.toSeq.map(_._1)
+        val argsList = if (argInts.nonEmpty) {
+          (0 to argInts.max).map{i =>
+            if (cliArgs.contains(i)) s"<$i- ${cliArgs(i)}>" else s"<$i - UNUSED>"
+          }.mkString(" ")
+        }
+        else {"<No input args>"}
+        emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
+  	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
+  	    emit(s"""exit(0)""")
+      close("}")
+
+      emit("")
+      open(src"""int main(int argc, char *argv[]) {""")
+        emit(src"""vector<string> *args = new vector<string>(argc-1);""")
+        open(src"""for (int i=1; i<argc; i++) {""")
+          emit(src"""(*args)[i-1] = std::string(argv[i]);""")
+          emit(src"""if (std::string(argv[i]) == "--help" | std::string(argv[i]) == "-h") {printHelp();}""")
+        close(src"""}""")
+        emit(src"""int numThreads = 1;""")
+        emit(src"""char *env_threads = getenv("DELITE_NUM_THREADS");""")
+        emit(src"""if (env_threads != NULL) { numThreads = atoi(env_threads); } else {""")
+        emit(src"""  fprintf(stderr, "[WARNING]: DELITE_NUM_THREADS undefined, defaulting to 1\\n");""")
+        emit(src"""}""")
+        emit(src"""fprintf(stderr, "Executing with %d thread(s)\\n", numThreads);""")
+        emit(src"""Application(numThreads, args);""")
+        emit(src"""return 0;""")
       close(src"""}""")
-      emit(src"""int numThreads = 1;""")
-      emit(src"""char *env_threads = getenv("DELITE_NUM_THREADS");""")
-      emit(src"""if (env_threads != NULL) { numThreads = atoi(env_threads); } else {""")
-      emit(src"""  fprintf(stderr, "[WARNING]: DELITE_NUM_THREADS undefined, defaulting to 1\\n");""")
-      emit(src"""}""")
-      emit(src"""fprintf(stderr, "Executing with %d thread(s)\\n", numThreads);""")
-      emit(src"""Application(numThreads, args);""")
-      emit(src"""return 0;""")
-    close(src"""}""")
-
+    }
   }
 
 }

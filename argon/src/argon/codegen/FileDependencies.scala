@@ -37,7 +37,8 @@ trait FileDependencies extends Codegen {
       // Console.println("Looking at " + dir)
 
       def rename(e:String) = {
-        val path = e.split("/").drop(2)
+        val srcFolder = if (folder.startsWith("./")) folder.split("/") else {"./" + folder}.split("/")
+        val path = e.split("/").drop(srcFolder.length)
         if (outputPath.isDefined) {
           val sourceName = folder + "/" + path.dropRight(1).mkString("/")
           val outputName = outputPath.get + path.last
@@ -52,8 +53,8 @@ trait FileDependencies extends Codegen {
       io.Source.fromURL(getClass.getResource("/files_list")).mkString("")
         .split("\n")
         .filter(_.startsWith("./"+dir))
-        .map(rename)
-        .foreach(_.copy(out))
+        .map{d => rename(d)}
+        .foreach{f => f.copy(out)}
     }
   }
 

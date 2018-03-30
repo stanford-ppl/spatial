@@ -25,7 +25,7 @@ DEFINES=$(OBJECTS:.o=.d)
 
 CXXFLAGS=-DZCU -D__DELITE_CPP_STANDALONE__ -D__USE_STD_STRING__  -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 -O0 -g -march=armv8-a -mcpu=cortex-a53
 #CXXFLAGS=-DZCU -D__DELITE_CPP_STANDALONE__  -std=c++11
-LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm -L${HOST_SRC}/fringeZCU/xil_libs -lxil
+LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm # -L${HOST_SRC}/fringeZCU/xil_libs -lxil
 
 all: pre-build-checks Top
 

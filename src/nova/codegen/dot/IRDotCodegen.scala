@@ -12,6 +12,8 @@ case class IRDotCodegen(IR: State) extends Codegen with DotCommon {
   override def entryFile: String = s"IRGraph.$ext"
   override def ext = s"dot.$lang"
 
+  def emitEntry(block: Block[_]): Unit = {}
+
   override protected def quoteOrRemap(arg: Any): String = arg match {
     case s: SRAM[_,_] => s"$s"
     case s: Void => s"$s"

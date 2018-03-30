@@ -75,7 +75,8 @@ object files {
     */
   def copyResource(src: String, dest: String): Unit = {
     val outFile = new File(dest)
-    outFile.mkdirs()
+    val outPath = new File(dest.split("/").dropRight(1).mkString("/"))
+    outPath.mkdirs()
     val out = new PrintStream(outFile)
     val res = getClass.getResourceAsStream(src)
     Source.fromInputStream(res).getLines().foreach{line => out.println(line) }

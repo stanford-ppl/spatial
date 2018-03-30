@@ -1,0 +1,31 @@
+# Makefile for compiling the generated standalone C++
+# Need to correctly set below variables (TARGET, GENERATED_HOME)
+# Also assumes DELITE_HOME env variable is set
+
+# Set TARGET variable to the name of the generated cpp source
+TARGET = CGCompiler
+
+# Set the generated directory
+GENERATED_HOME = $(FORGE_HOME)/published/OptiML/generated
+
+# Set the number of threads for parallel execution
+NUM_THREADS = 1
+
+CC = g++
+CFLAGS = -std=c++0x -fopenmp -O3
+LDFLAGS = -fopenmp $(wildcard $(GENERATED_HOME)/libraries/cpp/*.so) 
+INCLUDES = -I$(GENERATED_HOME)/cpp/datastructures -I$(GENERATED_HOME)/cpp/kernels -I$(DELITE_HOME)/runtime/src/static/cpp
+SOURCES = $(TARGET).cpp $(DELITE_HOME)/runtime/src/static/cpp/DeliteStandaloneMain.cpp $(DELITE_HOME)/runtime/src/static/cpp/DeliteCpp.cpp
+OBJECTS = $(SOURCES:.cpp=.o)
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $(TARGET)
+
+%.o: %.cpp
+	$(CC) -c -O3 -D__DELITE_CPP_STANDALONE__ -DDELITE_CPP=$(NUM_THREADS) $(INCLUDES) $(CFLAGS) $< -o $@
+
+.PHONY: clean
+clean:
+	rm -f $(OBJECTS) $(TARGET)

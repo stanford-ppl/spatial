@@ -1,9 +1,9 @@
 package spatial.codegen.scalagen
 
 import argon._
-import argon.codegen.FileGen
+import argon.codegen.Codegen
 
-trait ScalaFileGen extends FileGen {
+trait ScalaFileGen extends Codegen {
 
   override protected def emitEntry(block: Block[_]): Unit = {
     open(src"object Main {")

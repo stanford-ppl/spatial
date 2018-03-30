@@ -14,6 +14,8 @@ case class ArchDotCodegen(IR: State) extends Codegen with DotCommon {
   override def entryFile: String = s"ArchGraph.$ext"
   override def ext = s"fdp.$lang"
 
+  def emitEntry(block: Block[_]): Unit = {}
+
   override def rankdir = "LR"
   override protected def quoteOrRemap(arg: Any): String = arg match {
     case s: SRAM[_,_] => s"$s"

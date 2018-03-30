@@ -11,6 +11,41 @@ import scala.collection.mutable.Queue
          with Ref[Queue[Any],FIFO[A]] {
   val A: Bits[A] = Bits[A]
   val evMem: FIFO[A] <:< LocalMem[A,FIFO] = implicitly[FIFO[A] <:< LocalMem[A,FIFO]]
+
+  /** Returns true when this FIFO contains no elements, false otherwise. **/
+  @api def isEmpty: Bit = stage(FIFOIsEmpty(this,Set.empty))
+
+  /** Returns true when this FIFO cannot fit any more elements, false otherwise. **/
+  @api def isFull: Bit = stage(FIFOIsFull(this,Set.empty))
+
+  /** Returns true when this FIFO contains exactly one element, false otherwise. **/
+  @api def isAlmostEmpty: Bit = stage(FIFOIsAlmostEmpty(this,Set.empty))
+
+  /** Returns true when this FIFO can fit exactly one more element, false otherwise. **/
+  @api def isAlmostFull: Bit = stage(FIFOIsAlmostFull(this,Set.empty))
+
+  /** Returns the number of elements currently in this FIFO. **/
+  @api def numel: I32 = stage(FIFONumel(this,Set.empty))
+
+  /** Creates an enqueue (write) port to this FIFO of `data`. **/
+  @api def enq(data: A): Void = this.enq(data, true)
+
+  /** Creates a conditional enqueue (write) port to this FIFO of `data` enabled by `en`. **/
+  @api def enq(data: A, en: Bit): Void = stage(FIFOEnq(this,data,Set(en)))
+
+  /** Creates a dequeue (destructive read) port to this FIFO. **/
+  @api def deq(): A = this.deq(true)
+
+  /** Creates a conditional dequeue (destructive read) port to this FIFO enabled by `en`. **/
+  @api def deq(en: Bit): A = stage(FIFODeq(this,Set(en)))
+
+  /** Creates a non-destructive read port to this FIFO. **/
+  @api def peek(): A = stage(FIFOPeek(this,Set.empty))
+
+  // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(FIFODeq(this,ens))
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = stage(FIFOEnq(this,data,ens))
+  @rig def __reset(ens: Set[Bit]): Void = void
 }
 object FIFO {
   @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))

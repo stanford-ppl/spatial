@@ -6,7 +6,11 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 
+import utils.implicits.collections._
+
 trait AliasRewrites extends RewriteRules {
+
+  // TODO[1]: Need to account for mismatched dimensions (happens when unit series are used)
 
   @rig def combineSeries(series1: Seq[Series[Idx]], series2: Seq[Series[Idx]]): Seq[Series[Idx]] = {
     def _combineSeries[A<:Exp[_,A]:IntLike](r1: Series[A], r2: Series[A]): Series[Idx] = {
@@ -21,7 +25,8 @@ trait AliasRewrites extends RewriteRules {
         case (p, Literal(1)) => p
         case _ => r1.par
       }
-      Series[Idx](start = start.asInstanceOf[Idx], end = end.asInstanceOf[Idx], step = step.asInstanceOf[Idx], par = par)
+      val unit = r1.isUnit || r2.isUnit
+      Series[Idx](start = start.asInstanceOf[Idx], end = end.asInstanceOf[Idx], step = step.asInstanceOf[Idx], par = par, isUnit = unit)
     }
 
     series2.zip(series1).map{case (r2, r1) => _combineSeries(r1, r2) }
@@ -58,8 +63,30 @@ trait AliasRewrites extends RewriteRules {
     else Invalid
   }
 
-  @rewrite def nested_alias(op: MemDenseAlias[_,C forSome{type C[_]},A forSome{type A[_]}]): Sym[_] = {
+  @rewrite def nested_dense_alias(op: MemDenseAlias[_,C forSome{type C[_]},A forSome{type A[_]}]): Sym[_] = {
     case op: MemDenseAlias[_,_,_] => rewriteDenseAlias(op)(op.A,op.Src,op.Alias,ctx,state)
+  }
+
+  @rewrite def mem_start(op: MemStart): Sym[_] = {
+    case MemStart(Op(alloc: MemAlloc[_,_]), d) => I32(0)
+  }
+  @rewrite def mem_step(op: MemStep): Sym[_] = {
+    case MemStep(Op(alloc: MemAlloc[_,_]), d) => I32(1)
+  }
+  @rewrite def mem_end(op: MemEnd): Sym[_] = {
+    case MemEnd(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
+  }
+  @rewrite def mem_par(op: MemPar): Sym[_] = {
+    case MemPar(Op(alloc: MemAlloc[_,_]), d) => I32(1)
+  }
+
+  @rewrite def mem_dim(op: MemDim): Sym[_] = {
+    case MemDim(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
+  }
+
+  @rewrite def mem_rank(op: MemRank): Sym[_] = {
+    case MemRank(Op(alloc: MemAlloc[_,_]))   => I32(alloc.rank)
+    case MemRank(Op(alias: MemAlias[_,_,_])) => I32(alias.rank)
   }
 
 }

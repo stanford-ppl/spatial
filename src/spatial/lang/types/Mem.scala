@@ -20,6 +20,10 @@ trait RemoteMem[A,C[_]] extends Mem[A,C] {
 trait LocalMem[A,C[_]] extends Mem[A,C] {
   val evMem: C[A] <:< LocalMem[A,C]
   private implicit val evv: C[A] <:< Mem[A,C] = evMem
+
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void
+  @rig def __reset(ens: Set[Bit]): Void
 }
 trait LocalMem0[A,C[T]<:LocalMem0[T,C]] extends LocalMem[A,C]
 trait LocalMem1[A,C[T]<:LocalMem1[T,C]] extends LocalMem[A,C] {

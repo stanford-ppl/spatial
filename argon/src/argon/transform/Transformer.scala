@@ -9,6 +9,10 @@ import scala.collection.mutable
 abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
+  object F {
+    def unapply[T](x: T): Option[T] = Some(f(x))
+  }
+
   // Default rules for mirroring
   // NOTE: This doesn't currently work for mirroring Products with implicit constructor arguments
   def apply[T](x: T): T = (x match {

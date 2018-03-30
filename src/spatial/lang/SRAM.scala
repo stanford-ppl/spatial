@@ -30,7 +30,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * The number of indices should match the SRAM's rank.
     * NOTE: Use the apply method if the SRAM's rank is statically known.
     */
-  @api def read(addr: Seq[Idx]): A = {
+  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(SRAMRead[A,C](me,addr,Set.empty))
   }
@@ -39,7 +39,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * The number of indices should match the SRAM's rank.
     * NOTE: Use the update method if the SRAM's rank is statically known.
     */
-  @api def write(addr: Seq[Idx], data: A): Void = {
+  @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
     stage(SRAMWrite[A,C](me,data,addr,Set.empty))
   }
@@ -52,6 +52,9 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   }
 
   // --- Typeclass Methods
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
+  @rig def __reset(ens: Set[Bit]): Void = void
 }
 object SRAM {
   /** Allocates a 1-dimensional [[SRAM1]] with capacity of `length` elements of type A. */

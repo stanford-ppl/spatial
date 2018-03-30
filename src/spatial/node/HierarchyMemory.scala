@@ -34,6 +34,7 @@ object MemAlloc {
 
 abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) extends Alloc[Alias[A]] {
   def mem: Seq[Src[A]]
+  def rank: Int
   def mutable: Boolean
   def A: Type[A]
   def Src: Type[Src[A]]
@@ -102,10 +103,9 @@ object MemSparseAlias {
   }
 }
 
-@op case class MemDim(mem: Sym[_], d: Int) extends Primitive[I32] {
-  override val isTransient: Boolean = true
-}
-
-@op case class MemRank(mem: Sym[_]) extends Primitive[I32] {
-  override val isTransient: Boolean = true
-}
+@op case class MemStart(mem: Sym[_], d: Int)extends Transient[I32]
+@op case class MemStep(mem: Sym[_], d: Int) extends Transient[I32]
+@op case class MemEnd(mem: Sym[_], d: Int) extends Transient[I32]
+@op case class MemPar(mem: Sym[_], d: Int) extends Transient[I32]
+@op case class MemDim(mem: Sym[_], d: Int) extends Transient[I32]
+@op case class MemRank(mem: Sym[_]) extends Transient[I32]

@@ -40,6 +40,8 @@ trait UtilsControl {
       case _ => Nil
     }
 
+    def isUnitPipe: Boolean = x.op.exists(_.isInstanceOf[UnitPipe])
+    def isAccelScope: Boolean = x.op.exists(_.isInstanceOf[AccelScope])
     def isStreamPipe: Boolean = styleOf(x) == Sched.Stream
     def isForever: Boolean = x.op match {
       case Some(op: Control[_]) => x.cchains.exists(_.isForever)

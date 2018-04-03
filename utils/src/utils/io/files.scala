@@ -1,6 +1,6 @@
 package utils.io
 
-import java.io.{File, PrintStream}
+import java.io.{File, InputStream, PrintStream, OutputStream}
 import java.nio.file._
 import java.util.function.Consumer
 
@@ -77,11 +77,14 @@ object files {
     val outFile = new File(dest)
     val outPath = new File(dest.split("/").dropRight(1).mkString("/"))
     outPath.mkdirs()
-    val out = new PrintStream(outFile)
-    val res = getClass.getResourceAsStream(src)
-    Source.fromInputStream(res).getLines().foreach{line => out.println(line) }
+    val in: InputStream = getClass.getResourceAsStream(src)
+    val out: OutputStream = new PrintStream(outFile)
+    var c: Int = 0
+    while ({c = in.read; c != -1}) {
+      out.write(c)
+    }
     out.close()
-    res.close()
+    in.close()
   }
 
 }

@@ -50,6 +50,20 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ => // Nothin'
   }
 
+  @flow def controlStyle(s: Sym[_], op: Op[_]): Unit = op match {
+    case _: ParallelPipe => styleOf(s) = Sched.ForkJoin
+    case _: Switch[_]    => styleOf(s) = Sched.Fork
+    case _: Control[_] =>
+      (userStyleOf.get(s), styleOf.get(s)) match {
+        case (None, None) if s.isUnitPipe || s.isAccelScope => styleOf(s) = Sched.Seq
+        case (None, None)        => styleOf(s) = Sched.Pipe
+        case (Some(s1), None)    => styleOf(s) = s1
+        case (None, Some(s1))    => styleOf(s) = s1
+        case (Some(_), Some(s2)) => styleOf(s) = s2  // Override user
+      }
+    case _ => // No schedule for non-control nodes
+  }
+
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
     case loop: Loop[_] =>
       loop.cchains.foreach{case (cchain,is) =>

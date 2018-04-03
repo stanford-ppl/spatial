@@ -21,17 +21,17 @@ class Directives(options: CtrlOpt) extends ForeachClass(options) {
   }
 }
 
-class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(UserSchedule.Pipe),ii)) {
+class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(Sched.Pipe),ii)) {
   /** "Pipelined" unit controller */
   @api def apply(func: => Void): Void = unit_pipe(func)
 
   def apply(ii: Int) = new Pipe(name, Some(ii))
 }
-class Stream(name: Option[String]) extends Directives(CtrlOpt(name,Some(UserSchedule.Stream))) {
+class Stream(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sched.Stream))) {
   /** "Streaming" unit controller */
   @api def apply(func: => Void): Void = unit_pipe(func)
 }
-class Sequential(name: Option[String]) extends Directives(CtrlOpt(name,Some(UserSchedule.Seq))) {
+class Sequential(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sched.Seq))) {
   /** "Sequential" unit controller */
   @api def apply(func: => Void): Void = unit_pipe(func)
 }

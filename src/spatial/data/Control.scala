@@ -6,15 +6,7 @@ import spatial.lang._
 import spatial.util._
 import utils.Tree
 
-/** A scheduling directive specified by the user. */
-sealed abstract class UserSchedule
-object UserSchedule {
-  case object Seq extends UserSchedule
-  case object Pipe extends UserSchedule
-  case object Stream extends UserSchedule
-}
-
-/** Scheduling determined by the compiler. */
+/** Control node schedule */
 sealed abstract class Sched
 object Sched {
   case object Seq extends Sched { override def toString = "Sequential" }
@@ -70,11 +62,11 @@ object styleOf {
 }
 
 /** The control schedule annotated by the user, if any. */
-case class SchedulingDirective(sched: UserSchedule) extends StableData[SchedulingDirective]
+case class SchedulingDirective(sched: Sched) extends StableData[SchedulingDirective]
 object userStyleOf {
-  def get(x: Sym[_]): Option[UserSchedule] = metadata[SchedulingDirective](x).map(_.sched)
-  def apply(x: Sym[_]): UserSchedule = userStyleOf.get(x).getOrElse{throw new Exception(s"Undefined user schedule for $x") }
-  def update(x: Sym[_], sched: UserSchedule): Unit = metadata.add(x, SchedulingDirective(sched))
+  def get(x: Sym[_]): Option[Sched] = metadata[SchedulingDirective](x).map(_.sched)
+  def apply(x: Sym[_]): Sched = userStyleOf.get(x).getOrElse{throw new Exception(s"Undefined user schedule for $x") }
+  def update(x: Sym[_], sched: Sched): Unit = metadata.add(x, SchedulingDirective(sched))
 }
 
 

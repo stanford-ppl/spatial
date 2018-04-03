@@ -6,6 +6,10 @@ import utils.io.files
 trait FileDependencies extends Codegen {
   var dependencies: List[CodegenDep] = Nil
 
+  lazy val files_list: Seq[String] = {
+    io.Source.fromURL(getClass.getResource("/files_list")).mkString("").split("\n")
+  }
+
   sealed trait CodegenDep {
     def copy(out: String): Unit
   }
@@ -36,7 +40,7 @@ trait FileDependencies extends Codegen {
       val dir = folder + "/" + name
       // Console.println("Looking at " + dir)
 
-      def rename(e:String) = {
+      def rename(e: String) = {
         val srcFolder = if (folder.startsWith("./")) folder.split("/") else {"./" + folder}.split("/")
         val path = e.split("/").drop(srcFolder.length)
         if (outputPath.isDefined) {
@@ -50,11 +54,9 @@ trait FileDependencies extends Codegen {
         }
       }
 
-      io.Source.fromURL(getClass.getResource("/files_list")).mkString("")
-        .split("\n")
-        .filter(_.startsWith("./"+dir))
-        .map{d => rename(d)}
-        .foreach{f => f.copy(out)}
+      files_list.filter(_.startsWith("./"+dir))
+                .map{d => rename(d)}
+                .foreach{f => f.copy(out)}
     }
   }
 

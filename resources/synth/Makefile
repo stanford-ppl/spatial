@@ -50,7 +50,7 @@ sim: sim-hw
 	ln -sf ${VERILATOR_SRC}/Top .
 
 sim-sw:
-	cp cpp/cpptypes.h cpp/datastructures
+	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
 	make -C ${VERILATOR_SRC}
@@ -58,7 +58,7 @@ sim-sw:
 
 sim-hw:
 	rm -rf ${VERILATOR_SRC}
-	cp cpp/cpptypes.h cpp/datastructures
+	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
 	cp chisel/template-level/fringeVCS/SRAMVerilogSim.v . || :
@@ -291,7 +291,7 @@ arria10-hw:
 
 arria10-sw:
 	cp scripts/arria10.mk cpp/Makefile
-	# cp cpp/cpptypes.h cpp/datastructures
+	# cp cpp/cpptypes.hpp cpp/datastructures
 	# cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	# cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
 	sed -i 's/ifndef ZYNQ/ifndef ARRIA10/g' ./cpp/TopHost.cpp
@@ -342,7 +342,7 @@ de1soc: de1soc-hw de1soc-sw
 
 de1soc-sw:
 	cp scripts/de1soc.mk cpp/Makefile
-	cp cpp/cpptypes.h cpp/datastructures
+	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/DE1SoC.h cpp/fringeDE1SoC/
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
@@ -375,7 +375,7 @@ vcs: vcs-hw vcs-sw
 
 vcs-sw:
 	cp scripts/vcs.mk cpp/Makefile
-	cp cpp/cpptypes.h cpp/datastructures
+	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
 	make -j8 -C cpp
@@ -424,7 +424,7 @@ xsim: xsim-hw xsim-sw
 
 xsim-sw:
 	cp scripts/xsim.mk cpp/Makefile
-	cp cpp/cpptypes.h cpp/datastructures
+	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
 	make -j8 -C cpp

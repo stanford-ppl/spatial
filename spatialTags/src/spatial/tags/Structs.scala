@@ -99,8 +99,8 @@ object StagedStructsMacro {
     val (cls4, obj4) = forge.tags.ref.implement(c)(cls3, obj3)
     val out = q"$cls4; $obj4"
 
-    info(showRaw(out))
-    info(showCode(out))
+    //info(showRaw(out))
+    //info(showCode(out))
 
     out
   }

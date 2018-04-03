@@ -18,10 +18,12 @@ trait Codegen extends Traversal {
 
   def enterAccel(): Unit = { 
     if (backend == "cpp") config.enGen = false
+    else if (backend == "accel") config.enGen = true
     scope = "accel" 
   }
   def exitAccel(): Unit = { 
     if (backend == "cpp") config.enGen = true
+    else if (backend == "accel") config.enGen = false
     scope = "host" 
   }
 

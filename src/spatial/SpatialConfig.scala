@@ -35,6 +35,7 @@ class SpatialConfig extends Config {
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
+  var compressWires = 0
   var enableAsyncMem = true
   var enableRetiming = true
 

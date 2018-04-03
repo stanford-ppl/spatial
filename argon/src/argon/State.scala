@@ -61,11 +61,15 @@ class State extends forge.AppState {
 
   /** Logging / Streams */
   var logTab: Int = 0
-  var genTab: Int = 0
+  var genTabs = new mutable.HashMap[PrintStream, Int]
   var out: PrintStream = Console.out
   var log: PrintStream = new PrintStream(new NullOutputStream)
   var gen: PrintStream = new PrintStream(new NullOutputStream)
   val streams = new mutable.HashMap[String, PrintStream]
+  def streamName: String = streams.map(_.swap).apply(gen)
+  def incGenTab: Unit = { genTabs(gen) = genTabs(gen) + 1 }
+  def decGenTab: Unit = { genTabs(gen) = genTabs(gen) - 1 }
+  def getGenTab: Int = { if (genTabs.contains(gen)) genTabs(gen) else {genTabs += gen -> 0; 0} }
 
   /** Infos */
   var infos: Int = 0
@@ -104,7 +108,7 @@ class State extends forge.AppState {
     globals.reset()
     pass = 1
     logTab = 0
-    genTab = 0
+    genTabs.clear()
     log = new PrintStream(new NullOutputStream)
     gen = new PrintStream(new NullOutputStream)
     streams.clear()
@@ -127,7 +131,7 @@ class State extends forge.AppState {
     globals.copyTo(target.globals)
     target.pass = this.pass
     target.logTab = this.logTab
-    target.genTab = this.genTab
+    target.genTabs = this.genTabs
     target.log = this.log
     target.gen = this.gen
     target.streams ++= this.streams

@@ -17,10 +17,10 @@ trait Printing {
   @stateful def raiseIssue(issue: Issue): Unit = state.issues += issue
 
   /** Compiler Generated Files (reports, codegen, etc.) */
-  @stateful def open(): Unit = { state.genTab += 1 }
+  @stateful def open(): Unit = { state.incGenTab }
   @stateful def open(x: => Any): Unit = { emit(x); open() }
-  @stateful def emit(x: => Any): Unit = if (config.enGen) state.gen.println("  "*state.genTab + x)
-  @stateful def close(): Unit = { state.genTab -= 1 }
+  @stateful def emit(x: => Any): Unit = if (config.enGen) state.gen.println("  "*state.getGenTab + x)
+  @stateful def close(): Unit = { state.decGenTab }
   @stateful def close(x: => Any): Unit = { close(); emit(x) }
   @stateful def closeopen(x: => Any): Unit = { close(); emit(x); open() }
 
@@ -108,6 +108,7 @@ trait Printing {
     else {
       val stream = createStream(dir, filename)
       state.streams += path -> stream
+      state.genTabs += stream -> 0
       stream
     }
   }

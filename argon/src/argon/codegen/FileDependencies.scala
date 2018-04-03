@@ -27,10 +27,16 @@ trait FileDependencies extends Codegen {
       try {
         files.copyResource(s"/$folder/$name", s"$out/$relPathApp")
       }
-      catch {case _: NullPointerException =>
-        bug(s"Cannot copy file dependency $this: ")
-        bug("  src: " + folder + "/" + name)
-        bug("  dst: " + out + relPathApp)
+      catch {
+        case _: NullPointerException =>
+          bug(s"Null Pointer: Cannot copy file dependency $this: ")
+          bug("  src: " + folder + "/" + name)
+          bug("  dst: " + out + relPathApp)
+        case x: Throwable => 
+          bug(s"Error $x")
+          bug(s"Cannot copy dependency:")
+          bug("  src: " + folder + "/" + name)
+          bug("  dst: " + out + relPathApp)
       }
     }
   }

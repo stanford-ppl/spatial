@@ -1,6 +1,6 @@
 package utils.io
 
-import java.io.{File, InputStream, PrintStream, OutputStream}
+import java.io._
 import java.nio.file._
 import java.util.function.Consumer
 
@@ -75,10 +75,10 @@ object files {
     */
   def copyResource(src: String, dest: String): Unit = {
     val outFile = new File(dest)
-    val outPath = new File(dest.split("/").dropRight(1).mkString("/"))
+    val outPath = new File(outFile.getParent)
     outPath.mkdirs()
     val in: InputStream = getClass.getResourceAsStream(src)
-    val out: OutputStream = new PrintStream(outFile)
+    val out: OutputStream = new FileOutputStream(outFile)
     var c: Int = 0
     while ({c = in.read; c != -1}) {
       out.write(c)

@@ -135,32 +135,25 @@ trait Printing {
   }
 
   @stateful def inLog[T](stream: PrintStream)(blk: => T): T = {
-    if (!config.enDbg) dbg(s"Ignoring logging for ${state.streams.find(_._2 == stream).map(_._1).getOrElse(stream.toString)}")
     inStream(config.enDbg, () => stream, blk, () => state.log, {s => state.log = s})
   }
   @stateful def inLog[T](dir: String, filename: String)(blk: => T): T = {
-    if (!config.enDbg) msg(s"Ignoring log for $dir$filename")
     inStream(config.enDbg, () => getOrCreateStream(dir,filename), blk, () => state.log, {s => state.log = s})
   }
   @stateful def inLog[T](path: String)(blk: => T): T = {
-    if (!config.enDbg) msg(s"Ignoring log for $path")
     inStream(config.enDbg, () => getStream(path), blk, () => state.log, {s => state.log = s})
   }
   @stateful def withLog[T](dir: String, filename: String)(blk: => T): T = {
-    if (!config.enDbg) msg(s"Ignoring log for $dir$filename")
     inStream(config.enDbg, () => createStream(dir,filename), blk, () => state.log, s => state.log = s, _.close())
   }
 
   @stateful def inGen[T](stream: PrintStream)(blk: => T): T = {
-    if (!config.enGen) dbg(s"Ignoring logging for ${state.streams.find(_._2 == stream).map(_._1).getOrElse(stream.toString)}")
     inStream(config.enGen, () => stream, blk, () => state.gen, {s => state.gen = s})
   }
   @stateful def inGen[T](dir: String, filename: String)(blk: => T): T = {
-    if (!config.enGen) msg(s"Ignoring gen for $dir$filename")
     inStream(config.enGen, () => getOrCreateStream(dir,filename), blk, () => state.gen, {s => state.gen = s})
   }
   @stateful def withGen[T](dir: String, filename: String)(blk: => T): T = {
-    if (!config.enGen) msg(s"Ignoring gen for $dir$filename")
     inStream(config.enGen, () => createStream(dir,filename), blk, () => state.gen, {s => state.gen = s}, _.close())
   }
 

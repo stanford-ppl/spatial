@@ -28,13 +28,11 @@ class Rewrites {
   def rule(op: Op[_]): Seq[RewriteRule] = rules.getOrElse(op.getClass, Nil)
 
   def addGlobal(name: String, rule: RewriteRule): Unit = if (!names.contains(name)) {
-    Console.println(s"Registering global rewrite rule: $name")
     names += name
     globals += rule
   }
 
   def add[O<:Op[_]:Manifest](name: String, rule: RewriteRule): Unit = if (!names.contains(name)) {
-    Console.println(s"Registering rewrite rule: $name")
     names += name
     val key = keyOf[O]
     val pfs = rules.getOrElseAdd(key, () => ArrayBuffer.empty[RewriteRule])

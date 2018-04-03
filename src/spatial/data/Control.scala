@@ -28,17 +28,17 @@ sealed abstract class Ctrl {
   def ancestors: Seq[Ctrl] = Tree.ancestors(this){_.parent}
   def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(this, stop){_.parent}
   def ancestors(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](this, {c => c == stop}){_.parent}
-  @stateful def children: Seq[Ctrl]
+  @stateful def children: Seq[Controller]
 }
-case class Parent(sym: Sym[_], id: Int) extends Ctrl {
+case class Controller(sym: Sym[_], id: Int) extends Ctrl {
   override def s: Option[Sym[_]] = Some(sym)
-  def parent: Ctrl = if (id != -1) Parent(sym,-1) else sym.parent
-  @stateful def children: Seq[Ctrl] = sym.children
+  def parent: Ctrl = if (id != -1) Controller(sym,-1) else sym.parent
+  @stateful def children: Seq[Controller] = sym.children
 }
 case object Host extends Ctrl {
   def id: Int = 0
   def parent: Ctrl = Host
-  @stateful def children: Seq[Ctrl] = hwScopes.all
+  @stateful def children: Seq[Controller] = hwScopes.all
 }
 
 /** A controller's level in the control hierarchy. */
@@ -71,7 +71,7 @@ object userStyleOf {
 
 
 /** Metadata holding a list of children within a controller. */
-case class Children(children: Seq[Parent]) extends FlowData[Children]
+case class Children(children: Seq[Controller]) extends FlowData[Children]
 
 /** Metadata holding the parent of a controller within the controller hierarchy. */
 case class ParentController(parent: Ctrl) extends FlowData[ParentController]
@@ -90,7 +90,7 @@ object ctrOf {
 
 
 /** All accelerator scopes in the program */
-case class AccelScopes(scopes: Seq[Parent]) extends FlowData[AccelScopes]
+case class AccelScopes(scopes: Seq[Controller]) extends FlowData[AccelScopes]
 @data object hwScopes {
-  def all: Seq[Parent] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)
+  def all: Seq[Controller] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)
 }

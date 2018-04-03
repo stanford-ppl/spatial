@@ -143,7 +143,7 @@ trait Compiler { self =>
 
 
     msg(s"Compiling ${config.name} to ${config.genDir}")
-    if (config.enLog) msg(s"Logging ${config.name} to ${config.logDir}")
+    if (config.enDbg) msg(s"Logging ${config.name} to ${config.logDir}")
     if (config.test) info("Running in testbench mode")
 
     files.deleteExts(config.logDir, ".log")
@@ -190,7 +190,7 @@ trait Compiler { self =>
     }
 
     if (config.enMemLog) memWatch.finish()
-    if (config.enLog) {
+    if (config.enDbg) {
       instrument.dump("Nova Profiling Report", getOrCreateStream(config.logDir,"9999_Timing.log"))
       Instrumented.set.foreach{i =>
         val log = i.fullName.replace('.','_')

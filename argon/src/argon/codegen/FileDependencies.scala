@@ -18,26 +18,33 @@ trait FileDependencies extends Codegen {
     def copy(out: String): Unit = {
       val outPathApp = outputPath.getOrElse(name)
       val relPathApp = relPath + outPathApp
+      try {
+        files.copyResource(s"/$folder/$name", s"$out/$relPathApp")
+      }
+      catch {case t: Throwable =>
+        bug(s"Error $t")
+        bug(s"Cannot copy dependency:")
+        bug("  src: " + folder + "/" + name)
+        bug("  dst: " + out + relPathApp)
+        throw t
+      }
       // Console.println("source: /" + folder + "/" + name)
       // Console.println("from: " + from)
       // Console.println("dest: " + out + relPathApp)
 
       //Console.println(folder + " " + out + " " + name + " " + dest)
       //Console.println(from)
-      try {
-        files.copyResource(s"/$folder/$name", s"$out/$relPathApp")
-      }
-      catch {
-        case _: NullPointerException =>
-          bug(s"Null Pointer: Cannot copy file dependency $this: ")
-          bug("  src: " + folder + "/" + name)
-          bug("  dst: " + out + relPathApp)
-        case x: Throwable => 
-          bug(s"Error $x")
-          bug(s"Cannot copy dependency:")
-          bug("  src: " + folder + "/" + name)
-          bug("  dst: " + out + relPathApp)
-      }
+      //try {
+
+//      }
+//      catch {
+//        case _: NullPointerException =>
+//          bug(s"Null Pointer: Cannot copy file dependency $this: ")
+//          bug("  src: " + folder + "/" + name)
+//          bug("  dst: " + out + relPathApp)
+//        case x: Throwable =>
+//
+//      }
     }
   }
 

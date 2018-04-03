@@ -40,12 +40,12 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case ctrl: Control[_] =>
       val children = op.blocks.flatMap(_.stms.filter(isControl))
       isOuter(s) = children.exists{s => !isBranch(s) || isOuterControl(s) } || isAccel(s)
-      s.children = children.map{c => Parent(c,-1) }
+      s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
       op.blocks.foreach{blk =>
         val id = bodies.zipWithIndex.collectFirst{case (grp,i) if grp._2.contains(blk) => i }
                        .getOrElse{throw new Exception(s"Block $blk is not associated with an ID in control $ctrl")}
-        blk.stms.foreach{lhs => lhs.parent = Parent(s,id) }
+        blk.stms.foreach{lhs => lhs.parent = Controller(s,id) }
       }
     case _ => // Nothin'
   }

@@ -20,16 +20,16 @@ trait UtilsControl {
   }
 
   implicit class SymControl(x: Sym[_]) {
-    def toCtrl: Ctrl = if (isControl(x)) Parent(x,-1) else x.parent
+    def toCtrl: Ctrl = if (isControl(x)) Controller(x,-1) else x.parent
 
     def parent: Ctrl = metadata[ParentController](x).map(_.parent).getOrElse(Host)
     def parent_=(p: Ctrl): Unit = metadata.add(x, ParentController(p))
 
-    @stateful def children: Seq[Ctrl] = {
+    @stateful def children: Seq[Controller] = {
       if (!isControl(x)) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](x).map(_.children).getOrElse(Nil)
     }
-    def children_=(cs: Seq[Parent]): Unit = metadata.add(x, Children(cs))
+    def children_=(cs: Seq[Controller]): Unit = metadata.add(x, Children(cs))
 
     def ancestors: Seq[Ctrl] = Tree.ancestors(x.toCtrl){_.parent}
     def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = x.toCtrl.ancestors(stop)
@@ -61,8 +61,8 @@ trait UtilsControl {
 
   def ctrlIters(ctrl: Ctrl): Seq[I32] = Try(ctrl match {
     case Host => Nil
-    case Parent(Op(loop: Loop[_]), -1) => loop.iters
-    case Parent(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
+    case Controller(Op(loop: Loop[_]), -1) => loop.iters
+    case Controller(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
     case _ => Nil
   }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
 

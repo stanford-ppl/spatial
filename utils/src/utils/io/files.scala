@@ -9,6 +9,8 @@ import scala.io.Source
 object files {
   def sep: String = java.io.File.separator
   def cwd: String = new java.io.File("").getAbsolutePath
+  final val BUFFER_SIZE: Int = 1024 * 4
+  final val EOF = -1
 
   /**
     * Delete all files in the given path which end in the extension `ext`.
@@ -75,13 +77,15 @@ object files {
     */
   def copyResource(src: String, dest: String): Unit = {
     val outFile = new File(dest)
-    val outPath = new File(outFile.getParent)
+    val outPath = outFile.getParentFile
     outPath.mkdirs()
-    val in: InputStream = getClass.getResourceAsStream(src)
+    val url = getClass.getResource(src)
+    val in: InputStream = url.openStream()
     val out: OutputStream = new FileOutputStream(outFile)
-    var c: Int = 0
-    while ({c = in.read; c != -1}) {
-      out.write(c)
+    val buffer = new Array[Byte](BUFFER_SIZE)
+    var n: Int = 0
+    while ({n = in.read(buffer); n != EOF}) {
+      out.write(buffer, 0, n)
     }
     out.close()
     in.close()

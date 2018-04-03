@@ -12,7 +12,10 @@ val common = Seq(
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
     "com.lihaoyi" %% "utest" % "0.6.3" % "test",         // Testing
-    "com.github.scopt" %% "scopt" % "3.7.0"
+    "com.github.scopt" %% "scopt" % "3.7.0",
+    // These are a bit bulky, leaving them out in favor of a stripped down version for now
+    //"org.apache.commons" % "commons-lang3" % "3.3.2",
+    //"commons-io" % "commons-io" % "2.5"
   ),
 
   /** Scalac Options **/

@@ -81,7 +81,7 @@ trait Compiler { self =>
     result
   }
 
-  final def stageProgram(args: Array[String]): Block[_] = instrument("Staging"){
+  final def stageProgram(args: Array[String]): Block[_] = instrument("staging"){
     if (config.enMemLog) memWatch.note("Staging")
     val block = withLog(config.logDir, "0000_Staging.log"){ stage(args) }
     checkBugs("staging")

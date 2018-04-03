@@ -48,6 +48,7 @@ object files {
     if (src == dst) throw new Exception(s"Source file $src and destination are the same.")
     val srcFile = new File(src)
     val dstFile = new File(dst)
+    dstFile.getParentFile.mkdirs()
     if (dstFile.exists() && !dstFile.canWrite) throw new Exception(s"Destination $dst exists and cannot be written.")
     if (!srcFile.exists()) throw new Exception(s"Source for copy $src does not exist.")
 

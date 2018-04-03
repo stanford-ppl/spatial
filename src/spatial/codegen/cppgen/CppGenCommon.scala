@@ -12,10 +12,10 @@ import utils.escapeString
 trait CppGenCommon extends CppCodegen { 
 
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
-  var argOuts: List[Sym[_]] = List()
-  var argIOs: List[Sym[_]] = List()
-  var argIns: List[Sym[_]] = List()
-  var drams: List[Sym[_]] = List()
+  var argOuts = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var drams = scala.collection.mutable.HashMap[Sym[_], Int]()
 
   override protected def remap(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => 
@@ -45,22 +45,23 @@ trait CppGenCommon extends CppCodegen {
   }
 
   var argHandleMap = scala.collection.mutable.HashMap[Sym[_], String]() // Map for tracking defs of nodes and if they get redeffed anywhere, we map it to a suffix
-  // def argHandle(d: Sym[_]): String = {
-  //   if (argHandleMap.contains(d)) {
-  //     argHandleMap(d)
-  //   } else {
-  //     val attempted_name = d.name.getOrElse(quote(d)).toUpperCase
-  //     if (argHandleMap.values.toList.contains(attempted_name)) {
-  //       val taken = argHandleMap.values.toList.filter(_.contains(attempted_name))
-  //       val given_name = attempted_name + "_dup" + taken.length
-  //       argHandleMap += (d -> given_name)
-  //       given_name
-  //     } else {
-  //       argHandleMap += (d -> attempted_name)
-  //       attempted_name
-  //     }
-  //   }
-  // }
+  def argHandle(d: Sym[_]): String = {
+    if (argHandleMap.contains(d)) {
+      argHandleMap(d)
+    } else {
+      val attempted_name = d.name.getOrElse(quote(d)).toUpperCase
+      if (argHandleMap.values.toList.contains(attempted_name)) {
+        val taken = argHandleMap.values.toList.filter(_.contains(attempted_name))
+        val given_name = attempted_name + "_dup" + taken.length
+        argHandleMap += (d -> given_name)
+        given_name
+      } else {
+        argHandleMap += (d -> attempted_name)
+        attempted_name
+      }
+    }
+  }
+
 
   protected def bitWidth(tp: Type[_]) = tp match {case FixPtType(s,d,f) => d+f; case FltPtType(g,e) => g+e; case _ => 32}
 

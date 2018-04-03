@@ -22,17 +22,18 @@ trait CppGenInterface extends CppGenCommon {
   //   case _ => super.remap(tp)
   // }
 
+
   def isHostIO(x: Sym[_]) = "false"
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArgInNew(init)  => 
-      argIns = argIns :+ lhs
+      argIns += (lhs -> (argIns.toList.length + drams.toList.length))
       emit(src"${lhs.tp} $lhs = $init;")
     case ArgOutNew(init) => 
-      argOuts = argOuts :+ lhs
+      argOuts += (lhs -> argOuts.toList.length)
       emit(src"//${lhs.tp}* $lhs = new int32_t {0}; // Initialize cpp argout ???")
     // case HostIONew(init) => 
-    //   argIOs = argIOs :+ lhs.asInstanceOf[Sym[Reg[_]]]
+    //   argIOs += lhs.asInstanceOf[Sym[Reg[_]]]
     //   emit(src"${lhs.tp} $lhs = $init;")
     case RegRead(reg)    => 
       emit(src"${lhs.tp} $lhs = $reg;")
@@ -115,15 +116,16 @@ trait CppGenInterface extends CppGenCommon {
 
 
 
-  // override protected def emitFileFooter() {
-  //   withStream(getStream("ArgAPI", "h")) {
-  //     emit("\n// ArgIns")
-  //     argIns.foreach{a => emit(src"#define ${argHandle(a)}_arg ${argMapping(a)._2}")}
-  //     emit("\n// ArgOuts")
-  //     argOuts.foreach{a => emit(src"#define ${argHandle(a)}_arg ${argMapping(a)._3}")}
-  //     emit("\n// ArgIOs")
-  //     argIOs.foreach{a => emit(src"#define ${argHandle(a)}_arg ${argMapping(a)._2}")}
-  //   }
-  //   super.emitFileFooter()
-  // }
+  override def emitFooter(): Unit = {
+    inGen(out,"ArgAPI.h") {
+      emit("\n// ArgIns")
+      argIns.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
+      emit("\n// ArgOuts")
+      argOuts.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
+      emit("\n// ArgIOs")
+      argIOs.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
+    }
+    super.emitFooter()
+  }
+
 }

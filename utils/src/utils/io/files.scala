@@ -1,6 +1,7 @@
 package utils.io
 
 import java.io.{File, PrintStream}
+import org.apache.commons.io._ // TODO: How to copy non-text files without apache?
 import java.nio.file._
 import java.util.function.Consumer
 
@@ -77,11 +78,16 @@ object files {
     val outFile = new File(dest)
     val outPath = new File(dest.split("/").dropRight(1).mkString("/"))
     outPath.mkdirs()
-    val out = new PrintStream(outFile)
-    val res = getClass.getResourceAsStream(src)
-    Source.fromInputStream(res).getLines().foreach{line => out.println(line) }
-    out.close()
-    res.close()
+    if (src.endsWith("gz") | src.endsWith("pdf") | src.endsWith("dtb") | src.endsWith("elf._") | src.endsWith("qws") | src.endsWith("msf")) {
+      val srcFile = getClass.getResource(src)
+      FileUtils.copyURLToFile(srcFile, outFile) // TODO: Figure out a way to copy without apache
+    } else {
+      val out = new PrintStream(outFile)
+      val res = getClass.getResourceAsStream(src)
+      Source.fromInputStream(res).getLines().foreach{ line => out.println(line) }
+      out.close()
+      res.close()      
+    }
   }
 
 }

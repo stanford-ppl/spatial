@@ -6,6 +6,7 @@ import nova.codegen.dot._
 import poly.{ConstraintMatrix, ISL}
 import spatial.codegen.scalagen._
 import spatial.codegen.cppgen._
+import spatial.codegen.chiselgen._
 import spatial.data._
 import spatial.lang.Void
 import spatial.dse.DSEMode
@@ -61,7 +62,7 @@ trait SpatialApp extends DSLApp {
     lazy val globalAllocation = GlobalAllocation(state)
 
     // --- Codegen
-    // lazy val chiselCodegen = ChiselCodegen(state)
+    lazy val chiselCodegen = ChiselGen(state)
     lazy val cppCodegen = CppGen(state)
     lazy val irDotCodegen = IRDotCodegen(state)
     // lazy val treeCodegen = TreeCodegen(state)
@@ -83,7 +84,7 @@ trait SpatialApp extends DSLApp {
       printer ==>
       (cfg.enableRetiming ? retiming) ==>
       // (cfg.enableTree ? irTreeCodegen) ==>
-      // (cfg.enableSynth ? chiselCodegen) ==>
+      (cfg.enableSynth ? chiselCodegen) ==>
       (cfg.enableSynth ? cppCodegen) ==>
       (cfg.enableDot ? irDotCodegen)
       //globalAllocation ==>
@@ -143,6 +144,8 @@ trait SpatialApp extends DSLApp {
     cli.note("Experimental:")
 
     cli.opt[Unit]("asyncMem").action{(_,_) => cfg.enableAsyncMem = true }.text("Enable asynchronous memories")
+
+    cli.opt[Int]("compressWires").action{(t,_) => cfg.compressWires = t }.text("Enable string compression on chisel wires to shrink JVM bytecode")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming
       cfg.enableInstrumentation = true

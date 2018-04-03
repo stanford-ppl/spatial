@@ -70,6 +70,10 @@ trait CppFileGen extends Codegen {
   }
 
   override def emitFooter(): Unit = {
+    inGen(out, "functions.hpp") {
+      emit("""#endif""")
+    }
+
     inGen(out, entryFile) {
       emit("delete c1;")
       close("}")

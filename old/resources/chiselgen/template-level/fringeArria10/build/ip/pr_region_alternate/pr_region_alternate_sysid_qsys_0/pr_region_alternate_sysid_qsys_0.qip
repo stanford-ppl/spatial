@@ -1,0 +1,47 @@
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_TOOL_NAME "QsysPrimePro"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_TOOL_ENV "QsysPrimePro"
+set_global_assignment -library "pr_region_alternate_sysid_qsys_0" -name SOPCINFO_FILE [file join $::quartus(qip_path) "pr_region_alternate_sysid_qsys_0.sopcinfo"]
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name SLD_INFO "QSYS_NAME pr_region_alternate_sysid_qsys_0 HAS_SOPCINFO 1 GENERATION_ID 0"
+set_global_assignment -library "pr_region_alternate_sysid_qsys_0" -name MISC_FILE [file join $::quartus(qip_path) "pr_region_alternate_sysid_qsys_0.cmp"]
+set_global_assignment -library "pr_region_alternate_sysid_qsys_0" -name SLD_FILE [file join $::quartus(qip_path) "pr_region_alternate_sysid_qsys_0.regmap"]
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_TARGETED_DEVICE_FAMILY "Arria 10"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_GENERATED_DEVICE_FAMILY "{Arria 10}"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_QSYS_MODE "STANDALONE"
+set_global_assignment -name SYNTHESIS_ONLY_QIP ON
+set_global_assignment -library "pr_region_alternate_sysid_qsys_0" -name MISC_FILE [file join $::quartus(qip_path) "../pr_region_alternate_sysid_qsys_0.ip"]
+
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_NAME "YWx0ZXJhX2F2YWxvbl9zeXNpZF9xc3lz"
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_DISPLAY_NAME "U3lzdGVtIElEIFBlcmlwaGVyYWw="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_AUTHOR "SW50ZWwgQ29ycG9yYXRpb24="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_VERSION "MTcuMQ=="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_PARAMETER "aWQ=::LTExNjE4ODkwNzQ=::MzIgYml0IFN5c3RlbSBJRA=="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_PARAMETER "SURfVkFMVUU=::LTExNjE4ODkwNzQ=::MzIgYml0IFN5c3RlbSBJRA=="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_PARAMETER "VElNRVNUQU1Q::MA==::VGltZSBzdGFtcA=="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_GROUP "QmFzaWMgRnVuY3Rpb25zL1NpbXVsYXRpb247IERlYnVnIGFuZCBWZXJpZmljYXRpb24vRGVidWcgYW5kIFBlcmZvcm1hbmNl"
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cHM6Ly9kb2N1bWVudGF0aW9uLmFsdGVyYS5jb20vIy9saW5rL3NmbzE0MDA3ODc5NTI5MzIvaWdhMTQwMTQwMDA4MzE1Mw=="
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cHM6Ly9kb2N1bWVudGF0aW9uLmFsdGVyYS5jb20vIy9saW5rL2hjbzE0MjE2OTgwNDIwODcvaGNvMTQyMTY5NzY4OTMwMA=="
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_NAME "cHJfcmVnaW9uX2FsdGVybmF0ZV9zeXNpZF9xc3lzXzA="
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_DISPLAY_NAME "c3lzdGVt"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_REPORT_HIERARCHY "On"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_VERSION "MS4w"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19HRU5FUkFUSU9OX0lE::MA==::QXV0byBHRU5FUkFUSU9OX0lE"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfRkFNSUxZ::QXJyaWEgMTA=::QXV0byBERVZJQ0VfRkFNSUxZ"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0U=::MTBBUzA2Nk4zRjQwRTJTRw==::QXV0byBERVZJQ0U="
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfU1BFRURHUkFERQ==::Mg==::QXV0byBERVZJQ0VfU1BFRURHUkFERQ=="
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfUkFURQ==::LTE=::QXV0byBDTE9DS19SQVRF"
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfRE9NQUlO::LTE=::QXV0byBDTE9DS19ET01BSU4="
+set_global_assignment -entity "pr_region_alternate_sysid_qsys_0" -library "pr_region_alternate_sysid_qsys_0" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfUkVTRVRfRE9NQUlO::LTE=::QXV0byBSRVNFVF9ET01BSU4="
+
+
+set_global_assignment -library "altera_avalon_sysid_qsys_171" -name VERILOG_FILE [file join $::quartus(qip_path) "altera_avalon_sysid_qsys_171/synth/altera_avalon_sysid_qsys.v"]
+set_global_assignment -library "pr_region_alternate_sysid_qsys_0" -name VERILOG_FILE [file join $::quartus(qip_path) "synth/pr_region_alternate_sysid_qsys_0.v"]
+
+
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_TOOL_NAME "altera_avalon_sysid_qsys"
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "altera_avalon_sysid_qsys" -library "altera_avalon_sysid_qsys_171" -name IP_TOOL_ENV "QsysPrimePro"
+

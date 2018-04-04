@@ -5,6 +5,8 @@ import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.internal.{spatialConfig => cfg}
+import spatial.data._
+import spatial.util._
 
 
 trait ChiselGenReg extends ChiselGenCommon {
@@ -13,14 +15,16 @@ trait ChiselGenReg extends ChiselGenCommon {
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
 	case ArgInNew(init)  => 
       argIns += (lhs -> (argIns.toList.length + drams.toList.length))
     case ArgOutNew(init) => 
-      // emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)
-      // emitGlobalWireMap(src"${lhs}_en_options", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, Bool()))", forceful=true)
-      // emitt(src"""io.argOuts(${argMapping(lhs).argOutId}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
-      // emitt(src"""io.argOuts(${argMapping(lhs).argOutId}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
+      emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)
+      emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, Bool()))", forceful=true)
       argOuts += (lhs -> (argOuts.toList.length + argOuts.toList.length))
+      emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
+      emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
+      
 
     case GetArgOut(reg) => 
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -101,6 +105,32 @@ trait ChiselGenReg extends ChiselGenCommon {
     //         }
     //     } // TODO: Figure out which reg is really the accum
     //   }
+
+    case ArgInRead(reg) => 
+        emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
+        emitGlobalWire(src"""${lhs}.r := io.argIns(${argIns(reg)})""")
+
+    case ArgOutWrite(reg, v, en) =>
+      val id = argOuts(reg)
+      emitt(src"val ${lhs}_wId = getArgOutLane($id)")
+      v.tp match {
+        case FixPtType(s,d,f) => 
+          if (s) {
+            val pad = 64 - d - f
+            if (pad > 0) {
+              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")  
+            } else {
+              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
+            }
+          } else {
+            emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
+          }
+        case _ => 
+          emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
+      }
+      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
+      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), src"${if (en.isEmpty) 0 else enableRetimeMatch(en.head, lhs)}.toInt")}""")
+
     // case RegRead(reg)    => 
     //   val lhs_sym = quote(lhs)
     //   if (isArgIn(reg) | isHostIO(reg)) {

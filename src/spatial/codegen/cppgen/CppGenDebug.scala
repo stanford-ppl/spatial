@@ -10,7 +10,11 @@ trait CppGenDebug extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
-    case TextConcat(strings) => emit(src"${lhs.tp} $lhs = string_plus(${strings.mkString(",")});")
+    case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
+
+    case TextConcat(strings) => 
+    	val paired = strings.map(quote).reduceRight{(r,c) => "string_plus(" + r + "," + c} + ")" * (strings.length-1)
+    	emit(src"${lhs.tp} $lhs = $paired;")
     case PrintIf(cond,x)   => 
     	if (cond.isEmpty) emit(src"""std::cout << $x;""")
     	else emit(src"""if ( ${cond.toList.mkString(" & ")} ) std::cout << $x;""")

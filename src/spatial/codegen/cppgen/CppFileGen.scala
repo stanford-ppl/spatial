@@ -3,7 +3,7 @@ package spatial.codegen.cppgen
 import argon._
 import argon.codegen.Codegen
 
-trait CppFileGen extends Codegen {
+trait CppFileGen extends CppCodegen {
 
   backend = "cpp"
 
@@ -88,7 +88,7 @@ trait CppFileGen extends Codegen {
         else {"<No input args>"}
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
   	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
-  	    emit(s"""exit(0)""")
+  	    emit(s"""return;""")
       close("}")
 
       emit("")
@@ -101,13 +101,14 @@ trait CppFileGen extends Codegen {
         emit(src"""int numThreads = 1;""")
         emit(src"""char *env_threads = getenv("DELITE_NUM_THREADS");""")
         emit(src"""if (env_threads != NULL) { numThreads = atoi(env_threads); } else {""")
-        emit(src"""  fprintf(stderr, "[WARNING]: DELITE_NUM_THREADS undefined, defaulting to 1\\n");""")
+        emit(src"""  fprintf(stderr, "[WARNING]: DELITE_NUM_THREADS undefined, defaulting to 1\n");""")
         emit(src"""}""")
-        emit(src"""fprintf(stderr, "Executing with %d thread(s)\\n", numThreads);""")
+        emit(src"""fprintf(stderr, "Executing with %d thread(s)\n", numThreads);""")
         emit(src"""Application(numThreads, args);""")
         emit(src"""return 0;""")
       close(src"""}""")
     }
+    super.emitFooter()
   }
 
 }

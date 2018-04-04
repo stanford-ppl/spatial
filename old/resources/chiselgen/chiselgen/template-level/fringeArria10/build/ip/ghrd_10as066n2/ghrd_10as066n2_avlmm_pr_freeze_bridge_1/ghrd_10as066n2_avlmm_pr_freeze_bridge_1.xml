@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deploy
+ date="2018.01.09.14:30:41"
+ outputDirectory="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/">
+ <perimeter>
+  <parameter
+     name="AUTO_GENERATION_ID"
+     type="Integer"
+     defaultValue="0"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_UNIQUE_ID"
+     type="String"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_FAMILY"
+     type="String"
+     defaultValue="Arria 10"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE"
+     type="String"
+     defaultValue="10AS066N3F40E2SG"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_SPEEDGRADE"
+     type="String"
+     defaultValue="2"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLOCK_CLOCK_RATE"
+     type="Long"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLOCK_CLOCK_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLOCK_RESET_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_MST_BRIDGE_TO_SR_ADDRESS_MAP"
+     type="AddressMap"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_MST_BRIDGE_TO_SR_ADDRESS_WIDTH"
+     type="AddressWidthType"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <interface name="clock" kind="clock" start="0">
+   <property name="clockRate" value="0" />
+   <property name="externallyDriven" value="false" />
+   <property name="ptfSchematicName" value="" />
+   <port name="clock" direction="input" role="clk" width="1" />
+  </interface>
+  <interface name="freeze_conduit" kind="conduit" start="0">
+   <property name="associatedClock" value="" />
+   <property name="associatedReset" value="" />
+   <property name="prSafe" value="false" />
+   <port
+       name="freeze_conduit_freeze"
+       direction="input"
+       role="freeze"
+       width="1" />
+   <port
+       name="freeze_conduit_illegal_request"
+       direction="output"
+       role="illegal_request"
+       width="1" />
+  </interface>
+  <interface name="mst_bridge_to_pr" kind="avalon" start="0">
+   <property name="addressAlignment" value="DYNAMIC" />
+   <property name="addressGroup" value="0" />
+   <property name="addressSpan" value="4294967296" />
+   <property name="addressUnits" value="SYMBOLS" />
+   <property name="alwaysBurstMaxBurst" value="false" />
+   <property name="associatedClock" value="clock" />
+   <property name="associatedReset" value="reset_n" />
+   <property name="bitsPerSymbol" value="8" />
+   <property name="bridgedAddressOffset" value="0" />
+   <property
+       name="bridgesToMaster"
+       value="ghrd_10as066n2_avlmm_pr_freeze_bridge_1.mst_bridge_to_sr" />
+   <property name="burstOnBurstBoundariesOnly" value="true" />
+   <property name="burstcountUnits" value="WORDS" />
+   <property name="constantBurstBehavior" value="true" />
+   <property name="explicitAddressSpan" value="0" />
+   <property name="holdTime" value="0" />
+   <property name="interleaveBursts" value="false" />
+   <property name="isBigEndian" value="false" />
+   <property name="isFlash" value="false" />
+   <property name="isMemoryDevice" value="false" />
+   <property name="isNonVolatileStorage" value="false" />
+   <property name="linewrapBursts" value="true" />
+   <property name="maximumPendingReadTransactions" value="1" />
+   <property name="maximumPendingWriteTransactions" value="1" />
+   <property name="minimumReadLatency" value="1" />
+   <property name="minimumResponseLatency" value="1" />
+   <property name="minimumUninterruptedRunLength" value="1" />
+   <property name="prSafe" value="false" />
+   <property name="printableDevice" value="false" />
+   <property name="readLatency" value="0" />
+   <property name="readWaitStates" value="1" />
+   <property name="readWaitTime" value="1" />
+   <property name="registerIncomingSignals" value="false" />
+   <property name="registerOutgoingSignals" value="false" />
+   <property name="setupTime" value="0" />
+   <property name="timingUnits" value="Cycles" />
+   <property name="transparentBridge" value="false" />
+   <property name="waitrequestAllowance" value="0" />
+   <property name="wellBehavedWaitrequest" value="false" />
+   <property name="writeLatency" value="0" />
+   <property name="writeWaitStates" value="0" />
+   <property name="writeWaitTime" value="0" />
+   <port name="mst_bridge_to_pr_read" direction="input" role="read" width="1" />
+   <port
+       name="mst_bridge_to_pr_waitrequest"
+       direction="output"
+       role="waitrequest"
+       width="1" />
+   <port
+       name="mst_bridge_to_pr_write"
+       direction="input"
+       role="write"
+       width="1" />
+   <port
+       name="mst_bridge_to_pr_address"
+       direction="input"
+       role="address"
+       width="32" />
+   <port
+       name="mst_bridge_to_pr_byteenable"
+       direction="input"
+       role="byteenable"
+       width="4" />
+   <port
+       name="mst_bridge_to_pr_writedata"
+       direction="input"
+       role="writedata"
+       width="32" />
+   <port
+       name="mst_bridge_to_pr_readdata"
+       direction="output"
+       role="readdata"
+       width="32" />
+   <port
+       name="mst_bridge_to_pr_burstcount"
+       direction="input"
+       role="burstcount"
+       width="3" />
+   <port
+       name="mst_bridge_to_pr_readdatavalid"
+       direction="output"
+       role="readdatavalid"
+       width="1" />
+   <port
+       name="mst_bridge_to_pr_beginbursttransfer"
+       direction="input"
+       role="beginbursttransfer"
+       width="1" />
+   <port
+       name="mst_bridge_to_pr_debugaccess"
+       direction="input"
+       role="debugaccess"
+       width="1" />
+   <port
+       name="mst_bridge_to_pr_response"
+       direction="output"
+       role="response"
+       width="2" />
+   <port name="mst_bridge_to_pr_lock" direction="input" role="lock" width="1" />
+   <port
+       name="mst_bridge_to_pr_writeresponsevalid"
+       direction="output"
+       role="writeresponsevalid"
+       width="1" />
+  </interface>
+  <interface name="mst_bridge_to_sr" kind="avalon" start="1">
+   <property name="adaptsTo" value="" />
+   <property name="addressGroup" value="0" />
+   <property name="addressUnits" value="SYMBOLS" />
+   <property name="alwaysBurstMaxBurst" value="false" />
+   <property name="associatedClock" value="clock" />
+   <property name="associatedReset" value="reset_n" />
+   <property name="bitsPerSymbol" value="8" />
+   <property name="burstOnBurstBoundariesOnly" value="true" />
+   <property name="burstcountUnits" value="WORDS" />
+   <property name="constantBurstBehavior" value="true" />
+   <property name="dBSBigEndian" value="false" />
+   <property name="doStreamReads" value="false" />
+   <property name="doStreamWrites" value="false" />
+   <property name="holdTime" value="0" />
+   <property name="interleaveBursts" value="false" />
+   <property name="isAsynchronous" value="false" />
+   <property name="isBigEndian" value="false" />
+   <property name="isReadable" value="false" />
+   <property name="isWriteable" value="false" />
+   <property name="linewrapBursts" value="true" />
+   <property name="maxAddressWidth" value="32" />
+   <property name="maximumPendingReadTransactions" value="1" />
+   <property name="maximumPendingWriteTransactions" value="1" />
+   <property name="minimumReadLatency" value="1" />
+   <property name="minimumResponseLatency" value="1" />
+   <property name="prSafe" value="false" />
+   <property name="readLatency" value="0" />
+   <property name="readWaitTime" value="1" />
+   <property name="registerIncomingSignals" value="false" />
+   <property name="registerOutgoingSignals" value="false" />
+   <property name="setupTime" value="0" />
+   <property name="timingUnits" value="Cycles" />
+   <property name="waitrequestAllowance" value="0" />
+   <property name="writeWaitTime" value="0" />
+   <port name="mst_bridge_to_sr_read" direction="output" role="read" width="1" />
+   <port
+       name="mst_bridge_to_sr_waitrequest"
+       direction="input"
+       role="waitrequest"
+       width="1" />
+   <port
+       name="mst_bridge_to_sr_write"
+       direction="output"
+       role="write"
+       width="1" />
+   <port
+       name="mst_bridge_to_sr_address"
+       direction="output"
+       role="address"
+       width="32" />
+   <port
+       name="mst_bridge_to_sr_byteenable"
+       direction="output"
+       role="byteenable"
+       width="4" />
+   <port
+       name="mst_bridge_to_sr_writedata"
+       direction="output"
+       role="writedata"
+       width="32" />
+   <port
+       name="mst_bridge_to_sr_readdata"
+       direction="input"
+       role="readdata"
+       width="32" />
+   <port
+       name="mst_bridge_to_sr_burstcount"
+       direction="output"
+       role="burstcount"
+       width="3" />
+   <port
+       name="mst_bridge_to_sr_readdatavalid"
+       direction="input"
+       role="readdatavalid"
+       width="1" />
+   <port
+       name="mst_bridge_to_sr_beginbursttransfer"
+       direction="output"
+       role="beginbursttransfer"
+       width="1" />
+   <port
+       name="mst_bridge_to_sr_debugaccess"
+       direction="output"
+       role="debugaccess"
+       width="1" />
+   <port
+       name="mst_bridge_to_sr_response"
+       direction="input"
+       role="response"
+       width="2" />
+   <port name="mst_bridge_to_sr_lock" direction="output" role="lock" width="1" />
+   <port
+       name="mst_bridge_to_sr_writeresponsevalid"
+       direction="input"
+       role="writeresponsevalid"
+       width="1" />
+  </interface>
+  <interface name="reset_n" kind="reset" start="0">
+   <property name="associatedClock" value="clock" />
+   <property name="synchronousEdges" value="DEASSERT" />
+   <port name="reset_n" direction="input" role="reset_n" width="1" />
+  </interface>
+ </perimeter>
+ <entity
+   kind="ghrd_10as066n2_avlmm_pr_freeze_bridge_1"
+   version="1.0"
+   name="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">
+  <parameter name="AUTO_CLOCK_CLOCK_RATE" value="-1" />
+  <parameter name="AUTO_CLOCK_CLOCK_DOMAIN" value="-1" />
+  <parameter name="AUTO_CLOCK_RESET_DOMAIN" value="-1" />
+  <parameter name="AUTO_GENERATION_ID" value="0" />
+  <parameter name="AUTO_DEVICE" value="10AS066N3F40E2SG" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="AUTO_MST_BRIDGE_TO_SR_ADDRESS_MAP" value="" />
+  <parameter name="AUTO_UNIQUE_ID" value="" />
+  <parameter name="AUTO_MST_BRIDGE_TO_SR_ADDRESS_WIDTH" value="-1" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/synth/ghrd_10as066n2_avlmm_pr_freeze_bridge_1.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/synth/ghrd_10as066n2_avlmm_pr_freeze_bridge_1.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1.ip" />
+  </sourceFiles>
+  <childSourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/altera_pr_freeze_bridge/avlmm/top/altera_avlmm_pr_freeze_bridge_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/altera_pr_freeze_bridge/avlmm/avlmm_mst_freeze_bridge/altera_avlmm_mst_freeze_bridge_hw.tcl" />
+  </childSourceFiles>
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">"Generating: ghrd_10as066n2_avlmm_pr_freeze_bridge_1"</message>
+   <message level="Info" culprit="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">"Generating: ghrd_10as066n2_avlmm_pr_freeze_bridge_1_altera_avlmm_pr_freeze_bridge_171_yvsimhi"</message>
+   <message level="Info" culprit="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">"Generating: altera_avlmm_mst_freeze_bridge"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avlmm_pr_freeze_bridge"
+   version="17.1"
+   name="ghrd_10as066n2_avlmm_pr_freeze_bridge_1_altera_avlmm_pr_freeze_bridge_171_yvsimhi">
+  <parameter name="MST_BRIDGE_ADDRESS_UNITS" value="SYMBOLS" />
+  <parameter name="SLV_BRIDGE_ADDRESS_UNITS" value="SYMBOLS" />
+  <parameter name="MST_BRIDGE_MAX_PENDING_READS" value="1" />
+  <parameter name="SLV_BRIDGE_CONSTANTBURSTBEHAVIOR" value="true" />
+  <parameter name="SLV_BRIDGE_BURSTCOUNT_WIDTH" value="3" />
+  <parameter name="Interface_Type" value="Avalon-MM Master" />
+  <parameter name="MST_BRIDGE_BURST_BNDR_ONLY" value="true" />
+  <parameter name="SLV_BRIDGE_SYMBOL_WIDTH" value="8" />
+  <parameter name="SLV_BRIDGE_BURST_LINEWRAP" value="true" />
+  <parameter
+     name="slv_bridge_signal_Enable"
+     value="Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes" />
+  <parameter name="MST_BRIDGE_CONSTANTBURSTBEHAVIOR" value="true" />
+  <parameter name="SLV_BRIDGE_BURST_BNDR_ONLY" value="true" />
+  <parameter name="SLV_BRIDGE_READ_WAIT_TIME" value="1" />
+  <parameter
+     name="mst_bridge_signal_name_DERIVED"
+     value="address,beginbursttransfer,byteenable,debugaccess,read,write,readdata,writedata,waitrequest,readdatavalid,burstcount,response,lock,writeresponsevalid" />
+  <parameter name="SLV_BRIDGE_BYTEEN_WIDTH" value="4" />
+  <parameter name="SLV_BRIDGE_FIX_READ_LATENCY" value="0" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="MST_BRIDGE_BYTEEN_WIDTH" value="4" />
+  <parameter name="MST_BRIDGE_BURST_LINEWRAP" value="true" />
+  <parameter name="ENABLE_FREEZE_FROM_PR_REGION" value="false" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <parameter name="SLV_BRIDGE_ADDR_WIDTH" value="32" />
+  <parameter name="MST_BRIDGE_MAX_PENDING_WRITES" value="1" />
+  <parameter name="SLV_BRIDGE_WRITE_WAIT_TIME" value="0" />
+  <parameter name="MST_BRIDGE_BURSTCOUNT_WIDTH" value="3" />
+  <parameter name="AUTO_DEVICE" value="10AS066N3F40E2SG" />
+  <parameter
+     name="mst_bridge_signal_Enable"
+     value="Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes" />
+  <parameter name="MST_BRIDGE_SYMBOL_WIDTH" value="8" />
+  <parameter name="ENABLE_TRAFFIC_TRACKING" value="false" />
+  <parameter name="MST_BRIDGE_ADDR_WIDTH" value="32" />
+  <parameter name="MST_BRIDGE_READ_WAIT_TIME" value="1" />
+  <parameter name="MST_BRIDGE_WRITE_WAIT_TIME" value="0" />
+  <parameter
+     name="slv_bridge_signal_name_DERIVED"
+     value="address,beginbursttransfer,byteenable,debugaccess,read,write,readdata,writedata,waitrequest,readdatavalid,burstcount,response,lock,writeresponsevalid" />
+  <parameter name="SLV_BRIDGE_MAX_PENDING_READS" value="1" />
+  <parameter name="MST_BRIDGE_FIX_READ_LATENCY" value="0" />
+  <parameter name="SLV_BRIDGE_MAX_PENDING_WRITES" value="1" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/altera_avlmm_pr_freeze_bridge_171/synth/ghrd_10as066n2_avlmm_pr_freeze_bridge_1_altera_avlmm_pr_freeze_bridge_171_yvsimhi.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/altera_avlmm_pr_freeze_bridge_171/synth/ghrd_10as066n2_avlmm_pr_freeze_bridge_1_altera_avlmm_pr_freeze_bridge_171_yvsimhi.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/altera_pr_freeze_bridge/avlmm/top/altera_avlmm_pr_freeze_bridge_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/altera_pr_freeze_bridge/avlmm/avlmm_mst_freeze_bridge/altera_avlmm_mst_freeze_bridge_hw.tcl" />
+  </childSourceFiles>
+  <instantiator
+     instantiator="ghrd_10as066n2_avlmm_pr_freeze_bridge_1"
+     as="avlmm_pr_freeze_bridge_1" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">"Generating: ghrd_10as066n2_avlmm_pr_freeze_bridge_1_altera_avlmm_pr_freeze_bridge_171_yvsimhi"</message>
+   <message level="Info" culprit="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">"Generating: altera_avlmm_mst_freeze_bridge"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avlmm_mst_freeze_bridge"
+   version="17.1"
+   name="altera_avlmm_mst_freeze_bridge">
+  <parameter name="USE_WRITE_WAIT_TIME" value="false" />
+  <parameter name="MST_BRIDGE_ADDRESS_UNITS" value="SYMBOLS" />
+  <parameter name="USE_READ_WAIT_TIME" value="false" />
+  <parameter name="MST_BRIDGE_MAX_PENDING_READS" value="1" />
+  <parameter name="MST_BRIDGE_MAX_WRTRANS_WIDTH" value="3" />
+  <parameter name="MST_BRIDGE_BURST_BNDR_ONLY" value="true" />
+  <parameter name="ENABLE_AVLMM_MST_BRIDGE" value="true" />
+  <parameter name="MST_BRIDGE_CONSTANTBURSTBEHAVIOR" value="true" />
+  <parameter name="MST_BRIDGE_MAX_RDTRANS_WIDTH" value="3" />
+  <parameter name="MST_BRIDGE_WWT_WIDTH" value="1" />
+  <parameter name="MST_BRIDGE_FIX_RDLATENCY_WIDTH" value="1" />
+  <parameter
+     name="mst_bridge_signal_name_DERIVED"
+     value="address,beginbursttransfer,byteenable,debugaccess,read,write,readdata,writedata,waitrequest,readdatavalid,burstcount,response,lock,writeresponsevalid" />
+  <parameter name="MST_BRIDGE_RWT_WIDTH" value="1" />
+  <parameter name="USE_READ_DATA_VALID" value="true" />
+  <parameter name="USE_WRRESPONSEVALID" value="true" />
+  <parameter name="MST_BRIDGE_BYTEEN_WIDTH" value="4" />
+  <parameter name="MST_BRIDGE_BURST_LINEWRAP" value="true" />
+  <parameter name="ENABLE_FREEZE_FROM_PR_REGION" value="false" />
+  <parameter name="MST_BRIDGE_MAX_PENDING_WRITES" value="1" />
+  <parameter name="MST_BRIDGE_BURSTCOUNT_WIDTH" value="3" />
+  <parameter
+     name="mst_bridge_signal_Enable"
+     value="Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes" />
+  <parameter name="ENABLE_TRAFFIC_TRACKING" value="false" />
+  <parameter name="MST_BRIDGE_ADDR_WIDTH" value="32" />
+  <parameter name="MST_BRIDGE_READ_WAIT_TIME" value="1" />
+  <parameter name="MST_BRIDGE_WRITE_WAIT_TIME" value="0" />
+  <parameter name="MST_BRIDGE_FIX_READ_LATENCY" value="0" />
+  <parameter name="USE_BURSTCOUNT" value="true" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/altera_avlmm_mst_freeze_bridge_171/synth/altera_avlmm_mst_freeze_bridge.sv"
+       attributes="TOP_LEVEL_FILE" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1/altera_avlmm_mst_freeze_bridge_171/synth/altera_avlmm_mst_freeze_bridge.sv"
+       attributes="TOP_LEVEL_FILE" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/altera_pr_freeze_bridge/avlmm/avlmm_mst_freeze_bridge/altera_avlmm_mst_freeze_bridge_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_avlmm_pr_freeze_bridge_1_altera_avlmm_pr_freeze_bridge_171_yvsimhi"
+     as="avlmm_mst_freeze_bridge" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_avlmm_pr_freeze_bridge_1">"Generating: altera_avlmm_mst_freeze_bridge"</message>
+  </messages>
+ </entity>
+</deploy>

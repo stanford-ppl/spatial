@@ -1,0 +1,845 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+  <title>datasheet for ghrd_10as066n2_emif_hps</title>
+  <style type="text/css">
+body { font-family:arial ;}
+a { text-decoration:underline ; color:#003000 ;}
+a:hover { text-decoration:underline ; color:0030f0 ;}
+td { padding : 5px ;}
+table.topTitle { width:100% ;}
+table.topTitle td.l { text-align:left ; font-weight: bold ; font-size:30px ;}
+table.topTitle td.r { text-align:right ; font-weight: bold ; font-size:16px ;}
+table.blueBar { width : 100% ; border-spacing : 0px ;}
+table.blueBar td { background:#0036ff ; font-size:12px ; color : white ; text-align : left ; font-weight : bold ;}
+table.blueBar td.l { text-align : left ;}
+table.blueBar td.r { text-align : right ;}
+table.items { width:100% ; border-collapse:collapse ;}
+table.items td.label { font-weight:bold ; font-size:16px ; vertical-align:top ;}
+table.items td.mono { font-family:courier ; font-size:12px ; white-space:pre ;}
+div.label { font-weight:bold ; font-size:16px ; vertical-align:top ; text-align:center ;}
+table.grid { border-collapse:collapse ;}
+table.grid td { border:1px solid #bbb ; font-size:12px ;}
+body { font-family:arial ;}
+table.x { font-family:courier ; border-collapse:collapse ; padding:2px ;}
+table.x td { border:1px solid #bbb ;}
+td.tableTitle { font-weight:bold ; text-align:center ;}
+table.grid { border-collapse:collapse ;}
+table.grid td { border:1px solid #bbb ;}
+table.grid td.tableTitle { font-weight:bold ; text-align:center ;}
+table.mmap { border-collapse:collapse ; text-size:11px ; border:1px solid #d8d8d8 ;}
+table.mmap td { border-color:#d8d8d8 ; border-width:1px ; border-style:solid ;}
+table.mmap td.empty { border-style:none ; background-color:#f0f0f0 ;}
+table.mmap td.slavemodule { text-align:left ; font-size:11px ; border-style:solid solid none solid ;}
+table.mmap td.slavem { text-align:right ; font-size:9px ; font-style:italic ; border-style:none solid none solid ;}
+table.mmap td.slaveb { text-align:right ; font-size:9px ; font-style:italic ; border-style:none solid solid solid ;}
+table.mmap td.mastermodule { text-align:center ; font-size:11px ; border-style:solid solid none solid ;}
+table.mmap td.masterlr { text-align:center ; font-size:9px ; font-style:italic ; border-style:none solid solid solid ;}
+table.mmap td.masterl { text-align:center ; font-size:9px ; font-style:italic ; border-style:none none solid solid ;}
+table.mmap td.masterm { text-align:center ; font-size:9px ; font-style:italic ; border-style:none none solid none ;}
+table.mmap td.masterr { text-align:center ; font-size:9px ; font-style:italic ; border-style:none solid solid none ;}
+table.mmap td.addr { font-family:courier ; font-size:9px ; text-align:right ;}
+table.connectionboxes { border-collapse:separate ; border-spacing:0px ; font-family:arial ;}
+table.connectionboxes td.from { border-bottom:1px solid black ; font-size:9px ; font-style:italic ; vertical-align:bottom ; text-align:left ;}
+table.connectionboxes td.to { font-size:9px ; font-style:italic ; vertical-align:top ; text-align:right ;}
+table.connectionboxes td.lefthandwire { border-bottom:1px solid black ; font-size:9px ; font-style:italic ; vertical-align:bottom ; text-align:right ;}
+table.connectionboxes td.righthandwire { border-bottom:1px solid black ; font-size:9px ; font-style:italic ; vertical-align:bottom ; text-align:left ;}
+table.connectionboxes td.righthandlabel { font-size:11px ; vertical-align:bottom ; text-align:left ;}
+table.connectionboxes td.neighbor { padding:3px ; border:1px solid black ; font-size: 11px ; background:#e8e8e8 ; vertical-align:center ; text-align:center ;}
+table.connectionboxes td.main { padding:8px ; border:1px solid black ; font-size: 14px ; font-weight:bold ; background:#ffffff ; vertical-align:center ; text-align:center ;}
+.parametersbox { border:1px solid #d0d0d0 ; display:inline-block ; max-height:160px ; overflow:auto ; width:360px ; font-size:10px ;}
+.flowbox { display:inline-block ;}
+.parametersbox table { font-size:10px ;}
+td.parametername { font-style:italic ;}
+td.parametervalue { font-weight:bold ;}
+div.greydiv { vertical-align:top ; text-align:center ; background:#eeeeee ; border-top:1px solid #707070 ; border-bottom:1px solid #707070 ; padding:20px ; margin:20px ; width:auto ;}</style>
+ </head>
+ <body>
+  <table class="topTitle">
+   <tr>
+    <td class="l">ghrd_10as066n2_emif_hps</td>
+    <td class="r">
+     <br/>
+     <br/>
+    </td>
+   </tr>
+  </table>
+  <table class="blueBar">
+   <tr>
+    <td class="l">2018.01.09.14:30:28</td>
+    <td class="r">Datasheet</td>
+   </tr>
+  </table>
+  <div style="width:100% ;  height:10px"> </div>
+  <div class="label">Overview</div>
+  <div class="greydiv">
+   <div style="display:inline-block ; text-align:left">
+    <table class="connectionboxes">
+     <tr style="height:6px">
+      <td></td>
+     </tr>
+    </table>
+   </div><span style="display:inline-block ; width:28px"> </span>
+   <div style="display:inline-block ; text-align:left"><span>
+     <br/></span>
+   </div>
+  </div>
+  <div style="width:100% ;  height:10px"> </div>
+  <div class="label">Memory Map</div>
+  <table class="mmap">
+   <tr>
+    <td class="empty" rowspan="2"></td>
+   </tr>
+  </table>
+  <a name="module_emif_hps"> </a>
+  <div>
+   <hr/>
+   <h2>emif_hps</h2>altera_emif_a10_hps v17.1
+   <br/>
+   <br/>
+   <br/>
+   <table class="flowbox">
+    <tr>
+     <td class="parametersbox">
+      <h2>Parameters</h2>
+      <table>
+       <tr>
+        <td class="parametername">PROTOCOL_ENUM</td>
+        <td class="parametervalue">PROTOCOL_DDR4</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_FPGA_SPEEDGRADE_GUI</td>
+        <td class="parametervalue">E2 (Production) - change device under 'View'-&gt;'Device Family'</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_RZQ</td>
+        <td class="parametervalue">240</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_CONFIG_ENUM</td>
+        <td class="parametervalue">CONFIG_PHY_AND_HARD_CTRL</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_MEM_CLK_FREQ_MHZ</td>
+        <td class="parametervalue">1066.667</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_DEFAULT_REF_CLK_FREQ</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_REF_CLK_FREQ_MHZ</td>
+        <td class="parametervalue">133.333</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_REF_CLK_JITTER_PS</td>
+        <td class="parametervalue">10.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_RATE_ENUM</td>
+        <td class="parametervalue">RATE_HALF</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_IO_VOLTAGE</td>
+        <td class="parametervalue">1.2</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_DEFAULT_IO</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_HPS_ENABLE_EARLY_RELEASE</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_AC_IO_STD_ENUM</td>
+        <td class="parametervalue">IO_STD_SSTL_12</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_AC_MODE_ENUM</td>
+        <td class="parametervalue">OUT_OCT_40_CAL</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_AC_SLEW_RATE_ENUM</td>
+        <td class="parametervalue">SLEW_RATE_FAST</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_CK_IO_STD_ENUM</td>
+        <td class="parametervalue">IO_STD_SSTL_12</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_CK_MODE_ENUM</td>
+        <td class="parametervalue">OUT_OCT_40_CAL</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_CK_SLEW_RATE_ENUM</td>
+        <td class="parametervalue">SLEW_RATE_FAST</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_DATA_IO_STD_ENUM</td>
+        <td class="parametervalue">IO_STD_POD_12</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_DATA_OUT_MODE_ENUM</td>
+        <td class="parametervalue">OUT_OCT_34_CAL</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_DATA_IN_MODE_ENUM</td>
+        <td class="parametervalue">IN_OCT_60_CAL</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_AUTO_STARTING_VREFIN_EN</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_PLL_REF_CLK_IO_STD_ENUM</td>
+        <td class="parametervalue">IO_STD_LVDS</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_USER_RZQ_IO_STD_ENUM</td>
+        <td class="parametervalue">IO_STD_CMOS_12</td>
+       </tr>
+       <tr>
+        <td class="parametername">PHY_DDR4_STARTING_VREFIN</td>
+        <td class="parametervalue">68.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_FORMAT_ENUM</td>
+        <td class="parametervalue">MEM_FORMAT_UDIMM</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_DQ_WIDTH</td>
+        <td class="parametervalue">32</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_DQ_PER_DQS</td>
+        <td class="parametervalue">8</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_NUM_OF_DIMMS</td>
+        <td class="parametervalue">1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_RANKS_PER_DIMM</td>
+        <td class="parametervalue">1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_CK_WIDTH</td>
+        <td class="parametervalue">1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_ROW_ADDR_WIDTH</td>
+        <td class="parametervalue">15</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_COL_ADDR_WIDTH</td>
+        <td class="parametervalue">10</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_BANK_ADDR_WIDTH</td>
+        <td class="parametervalue">2</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_BANK_GROUP_WIDTH</td>
+        <td class="parametervalue">1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_DM_EN</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_ALERT_N_PLACEMENT_ENUM</td>
+        <td class="parametervalue">DDR4_ALERT_N_PLACEMENT_DATA_LANES</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_ALERT_N_DQS_GROUP</td>
+        <td class="parametervalue">3</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_HIDE_ADV_MR_SETTINGS</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TCL</td>
+        <td class="parametervalue">16</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_RTT_NOM_ENUM</td>
+        <td class="parametervalue">DDR4_RTT_NOM_RZQ_6</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_ATCL_ENUM</td>
+        <td class="parametervalue">DDR4_ATCL_DISABLED</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_DRV_STR_ENUM</td>
+        <td class="parametervalue">DDR4_DRV_STR_RZQ_7</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_RTT_WR_ENUM</td>
+        <td class="parametervalue">DDR4_RTT_WR_ODT_DISABLED</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_WTCL</td>
+        <td class="parametervalue">11</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_RTT_PARK</td>
+        <td class="parametervalue">DDR4_RTT_PARK_ODT_DISABLED</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_WRITE_DBI</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_READ_DBI</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_DEFAULT_VREFOUT</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_DQS_WIDTH</td>
+        <td class="parametervalue">4</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_CS_PER_DIMM</td>
+        <td class="parametervalue">1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_VREFDQ_TRAINING_VALUE</td>
+        <td class="parametervalue">72.9</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_VREFDQ_TRAINING_RANGE_DISP</td>
+        <td class="parametervalue">Range 2 - 45% to 77.5%</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_USE_DEFAULT_ODT</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODTN_1X1</td>
+        <td class="parametervalue">Rank 0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT0_1X1</td>
+        <td class="parametervalue">off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODTN_1X1</td>
+        <td class="parametervalue">Rank 0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT0_1X1</td>
+        <td class="parametervalue">on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODTN_2X2</td>
+        <td class="parametervalue">Rank 0,Rank 1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT0_2X2</td>
+        <td class="parametervalue">off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT1_2X2</td>
+        <td class="parametervalue">off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODTN_2X2</td>
+        <td class="parametervalue">Rank 0,Rank 1</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT0_2X2</td>
+        <td class="parametervalue">on,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT1_2X2</td>
+        <td class="parametervalue">off,on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODTN_4X2</td>
+        <td class="parametervalue">Rank 0,Rank 1,Rank 2,Rank 3</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT0_4X2</td>
+        <td class="parametervalue">off,off,on,on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT1_4X2</td>
+        <td class="parametervalue">on,on,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODTN_4X2</td>
+        <td class="parametervalue">Rank 0,Rank 1,Rank 2,Rank 3</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT0_4X2</td>
+        <td class="parametervalue">off,off,on,on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT1_4X2</td>
+        <td class="parametervalue">on,on,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODTN_4X4</td>
+        <td class="parametervalue">Rank 0,Rank 1,Rank 2,Rank 3</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT0_4X4</td>
+        <td class="parametervalue">off,off,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT1_4X4</td>
+        <td class="parametervalue">off,off,on,on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT2_4X4</td>
+        <td class="parametervalue">off,off,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_ODT3_4X4</td>
+        <td class="parametervalue">on,on,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODTN_4X4</td>
+        <td class="parametervalue">Rank 0,Rank 1,Rank 2,Rank 3</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT0_4X4</td>
+        <td class="parametervalue">on,on,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT1_4X4</td>
+        <td class="parametervalue">off,off,on,on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT2_4X4</td>
+        <td class="parametervalue">off,off,on,on</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_ODT3_4X4</td>
+        <td class="parametervalue">on,on,off,off</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_DERIVED_ODTN</td>
+        <td class="parametervalue">Rank 0,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_DERIVED_ODT0</td>
+        <td class="parametervalue">(Drive) RZQ/7 (34 Ohm),-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_DERIVED_ODT1</td>
+        <td class="parametervalue">-,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_DERIVED_ODT2</td>
+        <td class="parametervalue">-,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_R_DERIVED_ODT3</td>
+        <td class="parametervalue">-,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_DERIVED_ODTN</td>
+        <td class="parametervalue">Rank 0,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_DERIVED_ODT0</td>
+        <td class="parametervalue">(Nominal) RZQ/6 (40 Ohm),-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_DERIVED_ODT1</td>
+        <td class="parametervalue">-,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_DERIVED_ODT2</td>
+        <td class="parametervalue">-,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_W_DERIVED_ODT3</td>
+        <td class="parametervalue">-,-,-,-</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_SPEEDBIN_ENUM</td>
+        <td class="parametervalue">DDR4_SPEEDBIN_2666</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TIS_PS</td>
+        <td class="parametervalue">50</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TIS_AC_MV</td>
+        <td class="parametervalue">100</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TIH_PS</td>
+        <td class="parametervalue">75</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TIH_DC_MV</td>
+        <td class="parametervalue">75</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDIVW_TOTAL_UI</td>
+        <td class="parametervalue">0.23</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_VDIVW_TOTAL</td>
+        <td class="parametervalue">110</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDQSQ_UI</td>
+        <td class="parametervalue">0.19</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TQH_UI</td>
+        <td class="parametervalue">0.71</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDVWP_UI</td>
+        <td class="parametervalue">0.72</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDQSCK_PS</td>
+        <td class="parametervalue">160</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDQSS_CYC</td>
+        <td class="parametervalue">0.27</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TQSH_CYC</td>
+        <td class="parametervalue">0.46</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDSH_CYC</td>
+        <td class="parametervalue">0.18</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TDSS_CYC</td>
+        <td class="parametervalue">0.18</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TWLS_CYC</td>
+        <td class="parametervalue">0.13</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TWLH_CYC</td>
+        <td class="parametervalue">0.13</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TINIT_US</td>
+        <td class="parametervalue">500</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TMRD_CK_CYC</td>
+        <td class="parametervalue">10</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TRAS_NS</td>
+        <td class="parametervalue">32.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TRCD_NS</td>
+        <td class="parametervalue">12.5</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TRP_NS</td>
+        <td class="parametervalue">12.5</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TREFI_US</td>
+        <td class="parametervalue">7.8</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TRFC_NS</td>
+        <td class="parametervalue">260.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TWR_NS</td>
+        <td class="parametervalue">15.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TWTR_L_CYC</td>
+        <td class="parametervalue">8</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TWTR_S_CYC</td>
+        <td class="parametervalue">3</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TFAW_NS</td>
+        <td class="parametervalue">30.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TRRD_L_CYC</td>
+        <td class="parametervalue">7</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TRRD_S_CYC</td>
+        <td class="parametervalue">6</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TCCD_L_CYC</td>
+        <td class="parametervalue">6</td>
+       </tr>
+       <tr>
+        <td class="parametername">MEM_DDR4_TCCD_S_CYC</td>
+        <td class="parametervalue">4</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_USE_DEFAULT_ISI_VALUES</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_IS_SKEW_WITHIN_DQS_DESKEWED</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_PKG_BRD_SKEW_WITHIN_DQS_NS</td>
+        <td class="parametervalue">0.02</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_IS_SKEW_WITHIN_AC_DESKEWED</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_BRD_SKEW_WITHIN_AC_NS</td>
+        <td class="parametervalue">0.02</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_DQS_TO_CK_SKEW_NS</td>
+        <td class="parametervalue">0.02</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_SKEW_BETWEEN_DIMMS_NS</td>
+        <td class="parametervalue">0.05</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_SKEW_BETWEEN_DQS_NS</td>
+        <td class="parametervalue">0.02</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_AC_TO_CK_SKEW_NS</td>
+        <td class="parametervalue">0.0</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_MAX_CK_DELAY_NS</td>
+        <td class="parametervalue">0.6</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_MAX_DQS_DELAY_NS</td>
+        <td class="parametervalue">0.6</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_AC_ISI_NS</td>
+        <td class="parametervalue">0.17</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_RCLK_ISI_NS</td>
+        <td class="parametervalue">0.17</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_WCLK_ISI_NS</td>
+        <td class="parametervalue">0.06</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_RDATA_ISI_NS</td>
+        <td class="parametervalue">0.12</td>
+       </tr>
+       <tr>
+        <td class="parametername">BOARD_DDR4_WDATA_ISI_NS</td>
+        <td class="parametervalue">0.13</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_AUTO_POWER_DOWN_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_AUTO_POWER_DOWN_CYCS</td>
+        <td class="parametervalue">32</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_USER_REFRESH_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_USER_PRIORITY_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_AUTO_PRECHARGE_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_ADDR_ORDER_ENUM</td>
+        <td class="parametervalue">DDR4_CTRL_ADDR_ORDER_CS_R_B_C_BG</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_ECC_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_ECC_AUTO_CORRECTION_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_REORDER_EN</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_STARVE_LIMIT</td>
+        <td class="parametervalue">10</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_MMR_EN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_RD_TO_WR_SAME_CHIP_DELTA_CYCS</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_WR_TO_RD_SAME_CHIP_DELTA_CYCS</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_RD_TO_RD_DIFF_CHIP_DELTA_CYCS</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_RD_TO_WR_DIFF_CHIP_DELTA_CYCS</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_WR_TO_WR_DIFF_CHIP_DELTA_CYCS</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">CTRL_DDR4_WR_TO_RD_DIFF_CHIP_DELTA_CYCS</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_SOFT_NIOS_MODE</td>
+        <td class="parametervalue">SOFT_NIOS_MODE_DISABLED</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_TG_AVL_2_EXPORT_CFG_INTERFACE</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">SHORT_QSYS_INTERFACE_NAMES</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_SIM_CAL_MODE_ENUM</td>
+        <td class="parametervalue">SIM_CAL_MODE_SKIP</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_EXPORT_SEQ_AVALON_SLAVE</td>
+        <td class="parametervalue">CAL_DEBUG_EXPORT_MODE_DISABLED</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_EXPORT_SEQ_AVALON_MASTER</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_EX_DESIGN_NUM_OF_SLAVES</td>
+        <td class="parametervalue">1</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_EX_DESIGN_ISSP_EN</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_INTERFACE_ID</td>
+        <td class="parametervalue">0</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_EFFICIENCY_MONITOR</td>
+        <td class="parametervalue">EFFMON_MODE_DISABLED</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_USE_TG_AVL_2</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_BYPASS_DEFAULT_PATTERN</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_BYPASS_USER_STAGE</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_BYPASS_REPEAT_STAGE</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_BYPASS_STRESS_STAGE</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_SKIP_CA_LEVEL</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_SKIP_CA_DESKEW</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">DIAG_DDR4_SKIP_VREF_CAL</td>
+        <td class="parametervalue">false</td>
+       </tr>
+       <tr>
+        <td class="parametername">EX_DESIGN_GUI_DDR4_SEL_DESIGN</td>
+        <td class="parametervalue">AVAIL_EX_DESIGNS_GEN_DESIGN</td>
+       </tr>
+       <tr>
+        <td class="parametername">EX_DESIGN_GUI_DDR4_GEN_SIM</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">EX_DESIGN_GUI_DDR4_GEN_SYNTH</td>
+        <td class="parametervalue">true</td>
+       </tr>
+       <tr>
+        <td class="parametername">EX_DESIGN_GUI_DDR4_HDL_FORMAT</td>
+        <td class="parametervalue">HDL_FORMAT_VERILOG</td>
+       </tr>
+       <tr>
+        <td class="parametername">EX_DESIGN_GUI_DDR4_TARGET_DEV_KIT</td>
+        <td class="parametervalue">TARGET_DEV_KIT_NONE</td>
+       </tr>
+       <tr>
+        <td class="parametername">deviceFamily</td>
+        <td class="parametervalue">UNKNOWN</td>
+       </tr>
+       <tr>
+        <td class="parametername">generateLegacySim</td>
+        <td class="parametervalue">false</td>
+       </tr>
+      </table>
+     </td>
+    </tr>
+   </table>&#160;&#160;
+   <table class="flowbox">
+    <tr>
+     <td class="parametersbox">
+      <h2>Software Assignments</h2>(none)</td>
+    </tr>
+   </table>
+  </div>
+  <table class="blueBar">
+   <tr>
+    <td class="l">generation took 0.00 seconds</td>
+    <td class="r">rendering took 0.01 seconds</td>
+   </tr>
+  </table>
+ </body>
+</html>

@@ -1,0 +1,72 @@
+diff --git a/hdk/common/verif/include/sh_dpi_tasks.svh b/hdk/common/verif/include/sh_dpi_tasks.svh
+index fb394cc..8d080ba 100755
+--- a/hdk/common/verif/include/sh_dpi_tasks.svh
++++ b/hdk/common/verif/include/sh_dpi_tasks.svh
+@@ -27,12 +27,46 @@ import tb_type_defines_pkg::*;
+    export "DPI-C" task sv_map_host_memory;
+    export "DPI-C" task cl_peek;
+    export "DPI-C" task cl_poke;
++   
++   export "DPI-C" task TMP_que_buffer_to_cl;
++   export "DPI-C" task TMP_start_que_to_cl;
++   export "DPI-C" task TMP_is_dma_to_cl_done;
++   
++   export "DPI-C" task TMP_start_que_to_buffer;
++   export "DPI-C" task TMP_que_cl_to_buffer;
++   export "DPI-C" task TMP_is_dma_to_buffer_done;
++   
+    export "DPI-C" task sv_int_ack;
+    export "DPI-C" task sv_pause;
+ 
+    static int h2c_desc_index = 0;
+    static int c2h_desc_index = 0;
+    
++   task TMP_que_buffer_to_cl(input /*int chan,*/ longint unsigned src_addr, longint unsigned cl_addr, int unsigned len);
++      sv_map_host_memory(src_addr);
++      tb.que_buffer_to_cl(0, /*chan=*/0, src_addr, cl_addr, len[27:0]);
++   endtask
++   task TMP_start_que_to_cl(/*input int chan*/);
++      tb.start_que_to_cl(0, /*chan=*/0);
++   endtask
++   task TMP_is_dma_to_cl_done(/*input int chan*/ output int unsigned is_done);
++      is_done[31:1] = 0;
++      is_done[0] = tb.is_dma_to_cl_done(.chan(0));
++   endtask
++   task TMP_start_que_to_buffer(/*input int chan*/);
++      tb.start_que_to_buffer(0, /*chan=*/0);
++   endtask
++   task TMP_que_cl_to_buffer(input /*int chan,*/ longint unsigned dst_addr, longint unsigned cl_addr, int unsigned len);
++      sv_map_host_memory(dst_addr);
++      tb.que_cl_to_buffer(0, /*chan=*/0, dst_addr, cl_addr, len[27:0]);
++   endtask
++   task TMP_is_dma_to_buffer_done(/*input int chan,*/ output int unsigned is_done);
++      is_done[31:1] = 0;
++      is_done = tb.is_dma_to_buffer_done(0, /*chan=*/0);
++   endtask
++   
+    task sv_printf(input string msg);
+       $display("%S", msg);
+    endtask
+@@ -42,11 +76,11 @@ import tb_type_defines_pkg::*;
+    endtask
+ 
+    task cl_peek(input longint unsigned addr, output int unsigned data);
+-      tb.card.fpga.sh.peek(addr, data);
++      peek_ocl(0, addr, data, 0);
+    endtask
+    
+    task cl_poke(input longint unsigned addr, int unsigned data);
+-      tb.card.fpga.sh.poke(addr, data);
++      poke_ocl(0, addr, data, 0);
+    endtask
+ 
+    task sv_int_ack(input int unsigned int_num);
+@@ -54,7 +88,7 @@ import tb_type_defines_pkg::*;
+    endtask
+    
+    task sv_pause(input int x);
+-      repeat (x) #1us;
++      repeat (x) #1ns;
+    endtask
+ 
+    function void hm_put_byte(input longint unsigned addr, byte d);

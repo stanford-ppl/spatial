@@ -126,8 +126,7 @@ trait Lifts extends LiftsPriority1 {
       */
     def apply(range: ((Int, Int), Int))(implicit ov2: Overload1): I32 = createParam(v, range._1._1, range._1._2, range._2)
 
-    def to(end: Int): Series[I32] = Series[I32](v, end+1, 1, 1)
-    def to(end: I32): Series[I32] = Series[I32](v, end+1, 1, 1)
+    def to(end: Int): Range = Range(v, end)
     def to[B](implicit cast: Cast[Int,B]): B = cast(v)
 
     def x: I32 = this.to[I32]

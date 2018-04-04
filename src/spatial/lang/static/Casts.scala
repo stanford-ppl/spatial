@@ -37,11 +37,10 @@ trait Casts extends CastsPriority1 { this: SpatialStatics =>
   implicit def box[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
   implicit class BoxSym[A:Type](x: A) extends argon.static.ExpMiscOps[Any,A](x)
 
-  @api implicit def regRead[A:Bits](x: Reg[A]): A = x.value
-  @api implicit def argRead[A:Bits](x: ArgIn[A]): A = x.value
+  @api implicit def regRead[A](x: Reg[A]): A = x.value
+  @api implicit def argRead[A](x: ArgIn[A]): A = x.value
 
-
-  implicit class CastType[A:Type](x: A) {
+  implicit class CastType[A](x: A) {
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
   }
 

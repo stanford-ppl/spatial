@@ -79,6 +79,9 @@ trait AliasRewrites extends RewriteRules {
   @rewrite def mem_par(op: MemPar): Sym[_] = {
     case MemPar(Op(alloc: MemAlloc[_,_]), d) => I32(1)
   }
+  @rewrite def mem_len(op: MemLen): Sym[_] = {
+    case MemLen(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
+  }
 
   @rewrite def mem_dim(op: MemDim): Sym[_] = {
     case MemDim(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))

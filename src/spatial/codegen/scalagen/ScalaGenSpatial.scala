@@ -1,8 +1,9 @@
 package spatial.codegen.scalagen
 
+import argon._
 import spatial.codegen.naming.NamedCodegen
 
-trait ScalaGenSpatial extends ScalaCodegen with ScalaFileGen
+case class ScalaGenSpatial(IR: State) extends ScalaCodegen with ScalaFileGen
   with ScalaGenArray
   with ScalaGenBit
   with ScalaGenFixPt

@@ -12,7 +12,7 @@ trait SpadeDesign extends DSLApp {
 
   def main(): Void
 
-  final def stage(args: Array[String]): Block[_] = stageBlock{ main() }
+  final def stageApp(args: Array[String]): Block[_] = stageBlock{ main() }
 
   def runPasses[R](block: Block[R]): Unit = {
     lazy val printer = IRPrinter(state)

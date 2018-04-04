@@ -39,8 +39,8 @@ trait StaticMath {
 
   implicit class SeqMathOps[A](xs: Seq[A]) {
     @api def reduceTree(f: (A,A) => A): A = reduce(xs:_*)(f)
-    @api def sumTree(f: (A,A) => A)(implicit A: Num[A]): A = sum(xs:_*)
-    @api def prodTree(f: (A,A) => A)(implicit A: Num[A]): A = product(xs:_*)
+    @api def sumTree(implicit A: Num[A]): A = sum(xs:_*)
+    @api def prodTree(implicit A: Num[A]): A = product(xs:_*)
   }
 
   implicit class SeqBitOps(xs: Seq[Bit]) {

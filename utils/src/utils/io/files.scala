@@ -4,8 +4,6 @@ import java.io._
 import java.nio.file._
 import java.util.function.Consumer
 
-import scala.io.Source
-
 object files {
   def sep: String = java.io.File.separator
   def cwd: String = new java.io.File("").getAbsolutePath

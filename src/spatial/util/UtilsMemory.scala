@@ -233,4 +233,9 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
     if (isBuffAccum) AccumType.Buff else AccumType.None
   }
+
+  @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {
+    val strides = List.tabulate(dims.length){d => dims.drop(d+1).prodTree }
+    indices.zip(strides).map{case (a,b) => a.to[I32] * b }.sumTree
+  }
 }

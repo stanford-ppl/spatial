@@ -3,6 +3,13 @@ package spatial.test
 import spatial.dsl._
 import utest._
 
+@spatial object StageArgs {
+  def main(): Void = {
+    val x = args(0).to[I32]
+    println(r"x: $x")
+  }
+}
+
 @spatial object StageForeach {
   def main(): Void = Accel {
     Foreach(0::32){i => println("Hi") }
@@ -31,6 +38,7 @@ import utest._
 }
 
 object StagingTests extends Testbench { val tests = Tests {
+  'StageArgs     - test(StageArgs)
   'StageForeach  - test(StageForeach)
   'StageMemories - test(StageMemories)
   'StageUpdate   - test(StageUpdate)

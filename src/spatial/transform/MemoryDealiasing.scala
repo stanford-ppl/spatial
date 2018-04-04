@@ -6,6 +6,8 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 
+import utils.implicits.collections._
+
 case class MemoryDealiasing(IR: State) extends MutateTransformer {
   override val allowUnsafeSubst: Boolean = true // Allow mem -> Invalid (to drop)
 
@@ -58,30 +60,64 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
     }
   }
 
-  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+  def fieldsRanges(
+    ranges: Seq[Seq[Series[Idx]]],
+    d:      Int
+  )(field: Series[Idx] => Idx): Seq[I32] = {
+    val fieldsIdx = ranges.map{rngs => rngs.get(d).map{range => field(range) }.getOrElse(I32(0)) }
+    val fields = fieldsIdx.map{field: Idx =>
+      implicit val T: Bits[Idx] = field.tp.asInstanceOf[Bits[Idx]]
+      field.asUnchecked[I32]
+    }
+    fields
+  }
+
+  def dealiasRanges(
+    conds:  Seq[Bit],
+    ranges: Seq[Seq[Series[Idx]]],
+    d:      Int,
+  )(field: Series[Idx] => Idx): I32 = {
+    val fields = fieldsRanges(ranges, d)(field)
+    oneHotMux(conds, fields)
+  }
+
+  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     // These are still needed to track accumulators for Reduce, MemReduce
     //case _: MemDenseAlias[_,_,_]    => Invalid.asInstanceOf[Sym[A]]
     //case _: MemSparseAlias[_,_,_,_] => Invalid.asInstanceOf[Sym[A]]
 
-    case op @ GetDRAMAddress(Op(MemDenseAlias(F(conds),F(mems),_))) =>
+    case op @ GetDRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
       implicit val ba: Bits[_] = op.A
       val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]])) }
-      oneHotMux(conds, addrs).asInstanceOf[Sym[A]]
+      oneHotMux(conds, addrs)
+
+    case MemStart(Op(MemDenseAlias(F(conds),_,F(ranges))), d) => dealiasRanges(conds, ranges, d)(_.start)
+    case MemEnd(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.end)
+    case MemStep(Op(MemDenseAlias(F(conds),_,F(ranges))), d)  => dealiasRanges(conds, ranges, d)(_.step)
+    case MemPar(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => fieldsRanges(ranges, d)(_.par).head
+    case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
+
+    case MemDim(Op(MemDenseAlias(F(conds),F(ms),_)), d) =>
+      val mems = ms.map(_.asInstanceOf[Sym[_]])
+      val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
+      oneHotMux(conds, dims)
+
+    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank)
 
     case op: Reader[_,_] if op.mem.isDenseAlias =>
       val Reader(Op(MemDenseAlias(F(conds),F(mems),F(ranges))), addr, F(ens)) = op
 
-      readMux(conds, mems, ranges, addr, ens)(op.A).asInstanceOf[Sym[A]]
+      readMux(conds, mems, ranges, addr, ens)(op.A)
 
     case op: Writer[_] if op.mem.isDenseAlias =>
       val Writer(Op(MemDenseAlias(F(conds),F(mems),F(ranges))), F(data), F(addr), F(ens)) = op
 
-      writeDemux(data,conds,mems,ranges,addr,ens)(Bits.m(op.A)).head.asInstanceOf[Sym[A]]
+      writeDemux(data,conds,mems,ranges,addr,ens)(Bits.m(op.A)).head
 
     case op: Resetter[_] if op.mem.isDenseAlias =>
       val Resetter(Op(MemDenseAlias(F(conds),F(mems),_)), F(ens)) = op
 
-      resetDemux(conds,mems,ens).head.asInstanceOf[Sym[A]]
+      resetDemux(conds,mems,ens).head
 
     case op: StatusReader[_] if op.mem.isDenseAlias =>
       val StatusReader(mem @ Op(MemDenseAlias(F(conds),F(mems),_)), F(ens)) = op
@@ -95,5 +131,5 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       box(oneHotMux(conds, reads.map(_.unbox)))
 
     case _ => super.transform(lhs, rhs)
-  }
+  }).asInstanceOf[Sym[A]]
 }

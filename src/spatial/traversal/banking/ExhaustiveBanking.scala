@@ -51,7 +51,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     * Note that the total size is O(N**rank)
     */
   def Alphas(rank: Int, N: Int): Iterator[Seq[Int]] = {
-    val a2 = (0 to 2*N).meta.filter(x => isPow2(x) || x == 1 || x == 0)
+    val a2 = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0)
     def Alphas2(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
         a2.iterator.flatMap{aD => Alphas2(dim+1, prev :+ aD) }
@@ -60,9 +60,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
     def AlphasX(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
-        (0 to 2*N).meta.iterator.flatMap{aD => AlphasX(dim+1, prev :+ aD) }
+        (0 to 2*N).iterator.flatMap{aD => AlphasX(dim+1, prev :+ aD) }
       }
-      else (0 to 2*N).meta.iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
+      else (0 to 2*N).iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
     }
     Alphas2(1, Nil).filterNot(_.forall(_ == 0)) ++ AlphasX(1, Nil).filterNot(_.forall(_ == 0))
   }
@@ -71,7 +71,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val rank = dims.length
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
 
-    val (n2,nx) = (Nmin to 8*Nmin).meta.partition{i => isPow2(i) }
+    val (n2,nx) = (Nmin to 8*Nmin).partition{i => isPow2(i) }
     val n2Head = if (n2.head.toDouble/Nmin > MAGIC_CUTOFF_N) Seq(Nmin) else Nil
     val Ns = (n2Head ++ n2 ++ nx).iterator
 

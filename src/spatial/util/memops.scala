@@ -11,10 +11,11 @@ object memops {
   implicit class AliasOps[A](x: Sym[A]) {
     def rank: Int = rankOf(x)
 
-    @rig def start(): Seq[Idx] = Seq.tabulate(rank){i => stage(MemStart(x, i)) }
-    @rig def step(): Seq[Idx] = Seq.tabulate(rank){i => stage(MemStep(x, i)) }
-    @rig def end(): Seq[Idx] = Seq.tabulate(rank){i => stage(MemEnd(x, i)) }
+    @rig def starts(): Seq[I32] = Seq.tabulate(rank){i => stage(MemStart(x, i)) }
+    @rig def steps(): Seq[I32] = Seq.tabulate(rank){i => stage(MemStep(x, i)) }
+    @rig def ends(): Seq[I32] = Seq.tabulate(rank){i => stage(MemEnd(x, i)) }
     @rig def pars(): Seq[I32] = Seq.tabulate(rank){i => stage(MemPar(x, i)) }
+    @rig def lens(): Seq[I32] = Seq.tabulate(rank){i => stage(MemLen(x, i)) }
 
     // TODO[2]: Units
     //def units(): Seq[Boolean] = metadata[AliasUnit](x).get.unit()

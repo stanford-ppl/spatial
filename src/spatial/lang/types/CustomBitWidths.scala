@@ -1,20 +1,24 @@
 package spatial.lang.types
 
-trait BOOL[T] {
+import argon.Mirrorable
+
+trait BOOL[T] extends Mirrorable[BOOL[T]] {
   val v: Boolean
   override def equals(x: Any): Boolean = x match {
     case that: BOOL[_] => this.v == that.v
     case _ => false
   }
   override def toString: String = if (v) "TRUE" else "FALSE"
+  def mirror(f:Tx): BOOL[T] = this
 }
-trait INT[T] {
+trait INT[T] extends Mirrorable[INT[T]] {
   val v: Int
   override def equals(x: Any): Boolean = x match {
     case that: INT[_] => this.v == that.v
     case _ => false
   }
   override def toString = s"_$v"
+  def mirror(f:Tx): INT[T] = this
 }
 
 trait TRUE extends BOOL[TRUE] { val v = true }

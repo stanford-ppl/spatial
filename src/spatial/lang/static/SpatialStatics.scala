@@ -6,6 +6,7 @@ trait SpatialStatics extends Lifts with Casts with utils.Overloads
   with StaticMath
   with StaticMisc
   with StaticTransfers
+  with StaticTuples
 
 /** Internal view of Spatial */
 trait InternalStatics extends SpatialStatics with InternalAliases

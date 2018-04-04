@@ -8,12 +8,13 @@ import spatial.codegen.scalagen._
 import spatial.codegen.cppgen._
 import spatial.codegen.chiselgen._
 import spatial.data._
-import spatial.lang.Void
+import spatial.lang.{Void,Text,Tensor1}
 import spatial.dse.DSEMode
 import spatial.targets.{HardwareTarget, Targets}
 import spatial.transform._
 import spatial.traversal._
 import spatial.internal.{spatialConfig => cfg}
+import spatial.node.InputArguments
 import spatial.rewrites.SpatialRewriteRules
 
 trait SpatialApp extends DSLApp {
@@ -29,9 +30,14 @@ trait SpatialApp extends DSLApp {
     }
   }
 
+  var args: Tensor1[Text] = _
   def main(): Void
+  //def main(args: Tensor1[Text]): Void = main()
 
-  final def stage(args: Array[String]): Block[_] = stageBlock{ main() }
+  final def stageApp(sargs: Array[String]): Block[_] = stageBlock{
+    args = stage(InputArguments())
+    main()
+  }
 
   override def initConfig(): Config = new SpatialConfig
   override def flows(): Unit = SpatialFlowRules(state)       // Register standard flow analysis rules
@@ -42,19 +48,24 @@ trait SpatialApp extends DSLApp {
     isl.startup()
 
     // --- Debug
-    lazy val printer           = IRPrinter(state)
+    lazy val printer = IRPrinter(state)
 
     // --- Checking
-    lazy val sanityChecks      = SanityChecks(state)
+    lazy val sanityChecks = SanityChecks(state)
 
     // --- Analysis
-    lazy val accessAnalyzer    = AccessAnalyzer(state)
-    lazy val memoryAnalyzer    = MemoryAnalyzer(state)
+    lazy val accessAnalyzer     = AccessAnalyzer(state)
+    lazy val memoryAnalyzer     = MemoryAnalyzer(state)
+    lazy val initiationAnalyzer = InitiationAnalyzer(state)
+
+    // --- Reports
+
 
     // --- Transformer
     lazy val friendlyTransformer = FriendlyTransformer(state)
     lazy val switchTransformer = SwitchTransformer(state)
     lazy val switchOptimizer   = SwitchOptimizer(state)
+    lazy val memoryDealiasing  = MemoryDealiasing(state)
     lazy val pipeInserter      = PipeInserter(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
     lazy val retiming          = RetimingTransformer(state)
@@ -66,6 +77,7 @@ trait SpatialApp extends DSLApp {
     lazy val cppCodegen = CppGen(state)
     lazy val irDotCodegen = IRDotCodegen(state)
     // lazy val treeCodegen = TreeCodegen(state)
+    lazy val scalaCodegen = ScalaGenSpatial(state)
     lazy val puDotCodegen = PUDotCodegen(state)
 
     block ==>
@@ -74,6 +86,7 @@ trait SpatialApp extends DSLApp {
       sanityChecks ==>
       switchTransformer ==>
       switchOptimizer ==>
+      memoryDealiasing ==>
       pipeInserter ==>
       printer ==>
       accessAnalyzer ==>
@@ -83,6 +96,8 @@ trait SpatialApp extends DSLApp {
       unrollTransformer ==>
       printer ==>
       (cfg.enableRetiming ? retiming) ==>
+      initiationAnalyzer ==>
+      (cfg.enableSim ? scalaCodegen) ==>
       // (cfg.enableTree ? irTreeCodegen) ==>
       (cfg.enableSynth ? chiselCodegen) ==>
       (cfg.enableSynth ? cppCodegen) ==>

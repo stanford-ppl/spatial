@@ -6,7 +6,7 @@ import utils.implicits.collections._
 import spatial.data._
 import spatial.node._
 import spatial.internal.spatialConfig
-import spatial.targets.LatencyModel
+import spatial.targets.{HardwareTarget, LatencyModel}
 
 import scala.collection.mutable
 
@@ -45,6 +45,7 @@ trait UtilsModeling {
     dfs(Set(end),Set(end))
   }
 
+  @stateful def target: HardwareTarget = spatialConfig.target
   @stateful def latencyModel: LatencyModel = spatialConfig.target.latencyModel
 
   @stateful def latencyOf(e: Sym[_], inReduce: Boolean = false): Double = {

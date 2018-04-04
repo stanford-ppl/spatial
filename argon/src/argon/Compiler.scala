@@ -47,7 +47,7 @@ trait Compiler { self =>
     bug(s"  ${config.logDir}${config.name}_exception.log")
   }
 
-  def stage(args: Array[String]): Block[_]
+  def stageApp(args: Array[String]): Block[_]
 
   def runPasses[R](b: Block[R]): Unit
 
@@ -83,7 +83,7 @@ trait Compiler { self =>
 
   final def stageProgram(args: Array[String]): Block[_] = instrument("staging"){
     if (config.enMemLog) memWatch.note("Staging")
-    val block = withLog(config.logDir, "0000_Staging.log"){ stage(args) }
+    val block = withLog(config.logDir, "0000_Staging.log"){ stageApp(args) }
     checkBugs("staging")
     checkErrors("staging") // Exit now if errors were found during staging
     block

@@ -82,10 +82,10 @@ object MemDenseAlias {
 @op case class MemSparseAlias[A,Addr[T],Src[T],Alias[T]](
     cond: Seq[Bit],
     mem:  Seq[Src[A]],
-    addr: Seq[Addr[Idx]]
+    addr: Seq[Addr[I32]]
   )(implicit
     val A:     Type[A],
-    val Addr:  Type[Addr[Idx]],
+    val Addr:  Type[Addr[I32]],
     val Src:   Type[Src[A]],
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
@@ -93,9 +93,9 @@ object MemDenseAlias {
   val mutable = true
 }
 object MemSparseAlias {
-  @rig def apply[A,Addr[T],Src[T],Alias[T]](mem: Src[A], addr: Addr[Idx])(implicit
+  @rig def apply[A,Addr[T],Src[T],Alias[T]](mem: Src[A], addr: Addr[I32])(implicit
     A:     Type[A],
-    Addr:  Type[Addr[Idx]],
+    Addr:  Type[Addr[I32]],
     Src:   Type[Src[A]],
     Alias: Type[Alias[A]]
   ): MemSparseAlias[A,Addr,Src,Alias] = {

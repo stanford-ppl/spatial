@@ -67,7 +67,7 @@ import scala.reflect.macros.blackbox
 class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroUtils[Ctx](__c) {
   import __c.universe._
 
-  def virtualize(t: Tree): List[Tree] = VirtualizationTransformer(t)
+  def virt(t: Tree): List[Tree] = VirtualizationTransformer(t)
 
   private object VirtualizationTransformer {
     def apply(tree: Tree) = new VirtualizationTransformer().apply(tree)

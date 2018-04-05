@@ -5,12 +5,12 @@ import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 
 /** Annotation class for @virt macro annotation. */
-final class virt extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro virt.impl
+final class virtualize extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro virtualize.impl
 }
 
 /** Companion object implementing @virt macro annotation. */
-private object virt {
+private object virtualize {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
     val util = new Virtualizer[c.type](c)
     import util._
@@ -26,17 +26,17 @@ private object virt {
     val inputs = annottees.toList
     val outputs = inputs match {
       case (a:ValDef) :: as if a.mods.hasFlag(Flag.PARAM) =>
-        c.warning(c.enclosingPosition, "@virt cannot be used on parameters.")
+        c.warning(c.enclosingPosition, "@virtualize cannot be used on parameters.")
         inputs
       case (_:TypeDef) :: as =>
-        c.warning(c.enclosingPosition, "@virt cannot be used on type aliases.")
+        c.warning(c.enclosingPosition, "@virtualize cannot be used on type aliases.")
         inputs
 
-      case a :: as => virtualize(a) ::: as
+      case a :: as => virt(a) ::: as
       case Nil     => Nil
     }
 
-    // c.info(c.enclosingPosition, showCode(expandees.head), true)
+    info(showCode(outputs.head))
 
     q"..$outputs"
   }

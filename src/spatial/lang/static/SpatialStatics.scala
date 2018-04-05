@@ -1,7 +1,7 @@
 package spatial.lang
 package static
 
-trait SpatialStatics extends Lifts with Casts with utils.Overloads
+trait SpatialStatics extends Lifts with Casts with utils.Overloads with SpatialVirtualization
   with StaticBits
   with StaticMath
   with StaticMisc
@@ -15,7 +15,7 @@ trait InternalStatics extends SpatialStatics with InternalAliases
 trait ExternalStatics extends InternalStatics with ExternalAliases
 
 /** Application view */
-trait FrontendStatics extends ExternalStatics with SpatialVirtualization
+trait FrontendStatics extends ExternalStatics
   with StaticDebuggingExternal
 {
   type SrcCtx = forge.SrcCtx

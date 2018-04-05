@@ -1,0 +1,57 @@
+<?xml version="1.0" ?>
+<node xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:altera="http://www.altera.com/XMLSchema/Qsys/SystemTree">
+  <instanceKey xsi:type="xs:string">pr_region_alternate_reset_in</instanceKey>
+  <instanceData xsi:type="data">
+    <parameters></parameters>
+    <interconnectAssignments>
+      <interconnectAssignment>
+        <name>qsys_mm.clockCrossingAdapter</name>
+        <value>HANDSHAKE</value>
+      </interconnectAssignment>
+      <interconnectAssignment>
+        <name>qsys_mm.maxAdditionalLatency</name>
+        <value>0</value>
+      </interconnectAssignment>
+    </interconnectAssignments>
+    <className>pr_region_alternate_reset_in</className>
+    <version>1.0</version>
+    <name>pr_region_alternate_reset_in</name>
+    <uniqueName>pr_region_alternate_reset_in</uniqueName>
+    <nonce>0</nonce>
+    <incidentConnections></incidentConnections>
+  </instanceData>
+  <children>
+    <node>
+      <instanceKey xsi:type="xs:string">reset_in</instanceKey>
+      <instanceData xsi:type="data">
+        <parameters>
+          <parameter>
+            <name>ACTIVE_LOW_RESET</name>
+            <value>0</value>
+          </parameter>
+          <parameter>
+            <name>NUM_RESET_OUTPUTS</name>
+            <value>1</value>
+          </parameter>
+          <parameter>
+            <name>SYNCHRONOUS_EDGES</name>
+            <value>deassert</value>
+          </parameter>
+          <parameter>
+            <name>USE_RESET_REQUEST</name>
+            <value>0</value>
+          </parameter>
+        </parameters>
+        <interconnectAssignments></interconnectAssignments>
+        <className>altera_reset_bridge</className>
+        <version>17.1</version>
+        <name>reset_in</name>
+        <uniqueName>pr_region_alternate_reset_in_altera_reset_bridge_171_fpmukdy</uniqueName>
+        <nonce>0</nonce>
+        <incidentConnections></incidentConnections>
+        <path>pr_region_alternate_reset_in.reset_in</path>
+      </instanceData>
+      <children></children>
+    </node>
+  </children>
+</node>

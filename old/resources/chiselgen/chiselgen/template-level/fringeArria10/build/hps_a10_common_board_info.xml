@@ -1,0 +1,120 @@
+<BoardInfo>
+<!--
+	This file contains information that is common to all A10 HPS.
+-->
+
+<DTAppend name="model" type="string" parentlabel="" val="Altera SOCFPGA Arria 10"/>
+<DTAppend name="compatible" parentlabel="" >
+	<val type="string">altr,socfpga-arria10</val>
+	<val type="string">altr,socfpga</val>
+</DTAppend>
+<DTAppend name="enable-method" type="string" parentpath="/cpus" val="altr,socfpga-a10-smp" />
+<DTAppend name="next-level-cache" type="phandle" parentlabel="a10_hps_arm_a9_0" val="a10_hps_mpu_reg_l2_MPUL2"/>
+<DTAppend name="next-level-cache" type="phandle" parentlabel="a10_hps_arm_a9_1" val="a10_hps_mpu_reg_l2_MPUL2"/>
+
+<DTAppend name="cache-unified" type="bool" parentlabel="a10_hps_mpu_reg_l2_MPUL2" val="true"/>
+<DTAppend name="arm,tag-latency" parentlabel="a10_hps_mpu_reg_l2_MPUL2">
+	<val type="number">1</val>
+	<val type="number">1</val>
+	<val type="number">1</val>
+</DTAppend>
+<DTAppend name="arm,data-latency" parentlabel="a10_hps_mpu_reg_l2_MPUL2">
+	<val type="number">2</val>
+	<val type="number">1</val>
+	<val type="number">1</val>
+</DTAppend>
+
+<DTAppend name="pmu0" type="node" parentlabel="sopc0" newlabel="pmu"/>
+<DTAppend name="#address-cells" type="number" parentlabel="pmu" val="1"/>
+<DTAppend name="#size-cells" type="number" parentlabel="pmu" val="1"/>
+<DTAppend name="compatible" type="string" parentlabel="pmu" val="arm,cortex-a9-pmu"/>
+<DTAppend name="interrupt-parent" type="phandle" parentlabel="pmu" val="a10_hps_arm_gic_0"/>
+<DTAppend name="interrupts" parentlabel="pmu">
+<val type="number">0</val>
+<val type="number">176</val>
+<val type="number">4</val>
+<val type="number">0</val>
+<val type="number">177</val>
+<val type="number">4</val>
+</DTAppend>
+<DTAppend name="ranges" type="bool" parentlabel="pmu" val="true"/>
+
+<DTAppend name="cti0@ff118000" type="node" parentlabel="pmu" newlabel="cti0"/>
+<DTAppend name="compatible" type="string" parentlabel="cti0" val="arm,coresight-cti"/>
+<DTAppend name="reg" parentlabel="cti0">
+<val type="hex">0xff118000</val>
+<val type="hex">0x1000</val>
+</DTAppend>
+
+<DTAppend name="cti0@ff119000" type="node" parentlabel="pmu" newlabel="cti1"/>
+<DTAppend name="compatible" type="string" parentlabel="cti1" val="arm,coresight-cti"/>
+<DTAppend name="reg" parentlabel="cti1">
+<val type="hex">0xff119000</val>
+<val type="hex">0x1000</val>
+</DTAppend>
+
+<DTAppend name="status" type="string" parentlabel="a10_hps_i_watchdog_0_l4wd" val="disabled" />
+
+
+<DTAppend name="stmmac-axi-config" type="node" parentlabel="sopc0" newlabel="socfpga_axi_setup"/>
+<DTAppend name="snps,wr_osr_lmt" parentlabel="socfpga_axi_setup" type="hex" val="0xf"/>
+<DTAppend name="snps,rd_osr_lmt" parentlabel="socfpga_axi_setup" type="hex" val="0xf"/>
+<DTAppend name="snps,blen" parentlabel="socfpga_axi_setup">
+<val type="number">0</val>
+<val type="number">0</val>
+<val type="number">0</val>
+<val type="number">0</val>
+<val type="number">16</val>
+<val type="number">0</val>
+<val type="number">0</val>
+</DTAppend>
+
+<DTAppend name="clocks" type="phandle" parentlabel="a10_hps_i_qspi_QSPIDATA" val="qspi_clk"/>
+<DTAppend name="clocks" type="phandle" parentlabel="a10_hps_i_emac_emac0" val="l4_mp_clk"/>
+<DTAppend name="snps,axi-config" type="phandle" parentlabel="a10_hps_i_emac_emac0" val="socfpga_axi_setup"/>
+<DTAppend name="resets" parentlabel="a10_hps_i_emac_emac0" >
+<val type="phandle">a10_hps_i_rst_mgr_rstmgr</val>
+<val type="number">32</val>
+</DTAppend>
+<DTAppend name="reset-names" type="string" parentlabel="a10_hps_i_emac_emac0" val="stmmaceth"/>
+
+<DTAppend name="clocks" type="phandle" parentlabel="a10_hps_i_emac_emac1" val="l4_mp_clk"/>
+<DTAppend name="snps,axi-config" type="phandle" parentlabel="a10_hps_i_emac_emac1" val="socfpga_axi_setup"/>
+<DTAppend name="resets" parentlabel="a10_hps_i_emac_emac1" >
+<val type="phandle">a10_hps_i_rst_mgr_rstmgr</val>
+<val type="number">33</val>
+</DTAppend>
+<DTAppend name="reset-names" type="string" parentlabel="a10_hps_i_emac_emac1" val="stmmaceth"/>
+
+<DTAppend name="clocks" type="phandle" parentlabel="a10_hps_i_emac_emac2" val="l4_mp_clk"/>
+<DTAppend name="snps,axi-config" type="phandle" parentlabel="a10_hps_i_emac_emac2" val="socfpga_axi_setup"/>
+<DTAppend name="resets" parentlabel="a10_hps_i_emac_emac2" >
+<val type="phandle">a10_hps_i_rst_mgr_rstmgr</val>
+<val type="number">34</val>
+</DTAppend>
+<DTAppend name="reset-names" type="string" parentlabel="a10_hps_i_emac_emac2" val="stmmaceth"/>
+
+
+<DTAppend name="supports-highspeed" type="bool" parentlabel="a10_hps_i_sdmmc_sdmmc" val="true"/>
+<DTAppend name="broken-cd" type="bool" parentlabel="a10_hps_i_sdmmc_sdmmc" val="true"/>
+
+<DTAppend name="altr,sysmgr-syscon" parentlabel="a10_hps_i_emac_emac0">
+<val type="phandle">a10_hps_i_sys_mgr_core</val>
+<val type="hex">0x44</val>
+<val type="number">0</val>
+</DTAppend>
+
+<DTAppend name="altr,sysmgr-syscon" parentlabel="a10_hps_i_emac_emac1">
+<val type="phandle">a10_hps_i_sys_mgr_core</val>
+<val type="hex">0x48</val>
+<val type="number">0</val>
+</DTAppend>
+
+<DTAppend name="altr,sysmgr-syscon" parentlabel="a10_hps_i_emac_emac2">
+<val type="phandle">a10_hps_i_sys_mgr_core</val>
+<val type="hex">0x4c</val>
+<val type="number">0</val>
+</DTAppend>
+
+<DTAppend name="clocks" type="phandle" parentlabel="a10_hps_i_fpga_mgr_fpgamgrregs" val="l4_mp_clk"/>
+</BoardInfo>

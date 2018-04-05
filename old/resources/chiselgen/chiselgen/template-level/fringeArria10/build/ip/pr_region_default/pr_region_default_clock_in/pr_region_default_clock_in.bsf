@@ -1,0 +1,59 @@
+/*
+WARNING: Do NOT edit the input and output ports in this file in a text
+editor if you plan to continue editing the block that represents it in
+the Block Editor! File corruption is VERY likely to occur.
+*/
+/*
+Copyright (C) 2017  Intel Corporation. All rights reserved.
+Your use of Intel Corporation's design tools, logic functions 
+and other software and tools, and its AMPP partner logic 
+functions, and any output files from any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Intel Program License 
+Subscription Agreement, the Intel Quartus Prime License Agreement,
+the Intel FPGA IP License Agreement, or other applicable license
+agreement, including, without limitation, that your use is for
+the sole purpose of programming logic devices manufactured by
+Intel and sold by Intel or its authorized distributors.  Please
+refer to the applicable agreement for further details.
+*/
+(header "symbol" (version "1.1"))
+(symbol
+	(rect 0 0 184 104)
+	(text "pr_region_default_clock_in" (rect 13 -1 120 11)(font "Arial" (font_size 10)))
+	(text "inst" (rect 8 88 20 100)(font "Arial" ))
+	(port
+		(pt 0 72)
+		(input)
+		(text "in_clk" (rect 0 0 22 12)(font "Arial" (font_size 8)))
+		(text "in_clk" (rect 4 61 40 72)(font "Arial" (font_size 8)))
+		(line (pt 0 72)(pt 48 72)(line_width 1))
+	)
+	(port
+		(pt 184 72)
+		(output)
+		(text "out_clk" (rect 0 0 28 12)(font "Arial" (font_size 8)))
+		(text "out_clk" (rect 123 61 165 72)(font "Arial" (font_size 8)))
+	)
+	(drawing
+		(text "in_clk" (rect 15 43 66 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "clk" (rect 53 67 124 144)(font "Arial" (color 0 0 0)))
+		(text "out_clk" (rect 97 43 236 99)(font "Arial" (color 128 0 0)(font_size 9)))
+		(text "clk" (rect 81 67 180 144)(font "Arial" (color 0 0 0)))
+		(text " pr_region_default_clock_in " (rect 40 88 248 186)(font "Arial" ))
+		(line (pt 48 32)(pt 96 32)(line_width 1))
+		(line (pt 96 32)(pt 96 88)(line_width 1))
+		(line (pt 48 88)(pt 96 88)(line_width 1))
+		(line (pt 48 32)(pt 48 88)(line_width 1))
+		(line (pt 49 52)(pt 49 76)(line_width 1))
+		(line (pt 50 52)(pt 50 76)(line_width 1))
+		(line (pt 160 72)(pt 96 72)(line_width 1))
+		(line (pt 95 52)(pt 95 76)(line_width 1))
+		(line (pt 94 52)(pt 94 76)(line_width 1))
+		(line (pt 0 0)(pt 186 0)(line_width 1))
+		(line (pt 186 0)(pt 186 104)(line_width 1))
+		(line (pt 0 104)(pt 186 104)(line_width 1))
+		(line (pt 0 0)(pt 0 104)(line_width 1))
+	)
+)

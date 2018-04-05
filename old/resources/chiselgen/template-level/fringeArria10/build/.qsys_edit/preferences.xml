@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<preferences>
+ <debug showDebugMenu="0" />
+ <window width="2265" height="938" x="144" y="4" />
+ <library expandedCategories="Library,Project" />
+ <systemtable filter="All Interfaces">
+  <columns>
+   <irq preferredWidth="63" />
+   <connections preferredWidth="431" />
+   <description preferredWidth="333" />
+  </columns>
+ </systemtable>
+ <generation path="" />
+</preferences>

@@ -40,29 +40,29 @@ trait CppGenInterface extends CppGenCommon {
     case RegWrite(reg,v,en) => 
       emit(src"// $lhs $reg $v $en reg write")
 
-    // case SetArg(reg, v) => 
-    //   reg.tp.typeArguments.head match {
-    //     case FixPtType(s,d,f) => 
-    //       if (f != 0) {
-    //         emit(src"c1->setArg(${reg.name.getOrElse(quote(reg)).toUpperCase}_arg, (int64_t)($v * ((int64_t)1 << $f)), ${isHostIO(reg)}); // $reg")
-    //         emit(src"$reg = $v;")
-    //       } else {
-    //         emit(src"c1->setArg(${reg.name.getOrElse(quote(reg)).toUpperCase}_arg, $v, ${isHostIO(reg)});")
-    //         emit(src"$reg = $v;")
-    //       }
-    //     case FltPtType(g,e) =>         
-    //       emit(src"int64_t ${v}_raw;")
-    //       emit(src"memcpy(&${v}_raw, &${v}, sizeof(${v}));")
-    //       emit(src"${v}_raw = ${v}_raw & ((int64_t) 0 | (int64_t) pow(2,${g+e}) - 1);")
-    //       emit(src"c1->setArg(${reg.name.getOrElse(quote(reg)).toUpperCase}_arg, ${v}_raw, ${isHostIO(reg)}); // $reg")
-    //       emit(src"$reg = $v;")
-    //     case _ => 
-    //         emit(src"c1->setArg(${reg.name.getOrElse(quote(reg)).toUpperCase}_arg, $v, ${isHostIO(reg)}); // $reg")
-    //         emit(src"$reg = $v;")
-    //   }
+    case SetArgIn(reg, v) => 
+      reg.tp.typeArgs.head match {
+        case FixPtType(s,d,f) => 
+          if (f != 0) {
+            emit(src"c1->setArg(${argHandle(reg)}_arg, (int64_t)($v * ((int64_t)1 << $f)), ${isHostIO(reg)}); // $reg")
+            emit(src"$reg = $v;")
+          } else {
+            emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)});")
+            emit(src"$reg = $v;")
+          }
+        case FltPtType(g,e) =>         
+          emit(src"int64_t ${v}_raw;")
+          emit(src"memcpy(&${v}_raw, &${v}, sizeof(${v}));")
+          emit(src"${v}_raw = ${v}_raw & ((int64_t) 0 | (int64_t) pow(2,${g+e}) - 1);")
+          emit(src"c1->setArg(${argHandle(reg)}_arg, ${v}_raw, ${isHostIO(reg)}); // $reg")
+          emit(src"$reg = $v;")
+        case _ => 
+            emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)}); // $reg")
+            emit(src"$reg = $v;")
+      }
     case GetArgOut(reg)    => 
       val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
-      val get_string = src"c1->getArg${bigArg}(${reg.name.getOrElse(quote(reg)).toUpperCase}_arg, ${isHostIO(reg)})"
+      val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${isHostIO(reg)})"
     
       lhs.tp match {
         case FixPtType(s,d,f) => 
@@ -117,7 +117,7 @@ trait CppGenInterface extends CppGenCommon {
 
 
   override def emitFooter(): Unit = {
-    inGen(out,"ArgAPI.h") {
+    inGen(out,"ArgAPI.hpp") {
       emit("\n// ArgIns")
       argIns.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
       emit("\n// ArgOuts")

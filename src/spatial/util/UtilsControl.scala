@@ -81,6 +81,7 @@ trait UtilsControl {
     def shouldFullyUnroll: Boolean = ctrs.forall(_.shouldFullyUnroll)
     def mayFullyUnroll: Boolean = ctrs.forall(_.mayFullyUnroll)
     def isUnit: Boolean = ctrs.forall(_.isUnit)
+    def isStatic: Boolean = ctrs.forall(_.isStatic)
   }
 
   implicit class CounterHelperOps[F](x: Counter[F]) {
@@ -88,6 +89,10 @@ trait UtilsControl {
     def step: Sym[F] = ctrDef(x).step
     def end: Sym[F] = ctrDef(x).end
     def ctrPar: I32 = ctrDef(x).par
+    def isStatic: Boolean = (start,step,end) match {
+      case (Final(_), Final(_), Final(_)) => true
+      case _ => false
+    }
     def nIters: Option[Bound] = (start,step,end) match {
       case (Final(min), Final(stride), Final(max)) =>
         Some(Final(Math.ceil((max - min).toDouble / stride).toInt))

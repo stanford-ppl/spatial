@@ -1,0 +1,136 @@
+// ------------------------------------------
+// Freeze Conduit Bridge
+// ------------------------------------------
+`timescale 1ps / 1ps
+// ------------------------------------------
+// Generation parameters:
+//   OUTPUT_NAME:         $OUTPUT_NAME
+//   NUM_PORTS:  		  $NUM_PORTS
+//   NUM_INTERFACES:      $NUM_INTERFACES
+// ------------------------------------------
+module ${OUTPUT_NAME}  (                       
+@@ foreach CONDUIT_SIGNAL $CONDUIT_SIGNALS_LIST CONDUIT_SIGNALS_DIRECTION $CONDUIT_SIGNALS_DIRECTION_LIST CONDUIT_SIGNAL_WIDTH $CONDUIT_SIGNALS_WIDTH_LIST {
+	@@ set WIRE_WIDTH [expr {${CONDUIT_SIGNAL_WIDTH}-1}] 
+	@@ if {$CONDUIT_SIGNALS_DIRECTION == "input"} {
+	input  wire  [${WIRE_WIDTH}:0]    conduit_bridge_to_pr_${CONDUIT_SIGNAL},                                 
+	output wire  [${WIRE_WIDTH}:0]    conduit_bridge_to_sr_${CONDUIT_SIGNAL},
+	@@} else {
+	output  wire  [${WIRE_WIDTH}:0]  conduit_bridge_to_pr_${CONDUIT_SIGNAL},                                 
+	input wire    [${WIRE_WIDTH}:0]  conduit_bridge_to_sr_${CONDUIT_SIGNAL},
+	@@}
+@@}
+	// conduit freeze                                  
+	input  wire	 freeze,
+	output wire  illegal_request,
+	input  wire   clk,
+	input  wire   reset_n
+);
+
+reg [2:0] state, next_state;
+reg freeze_ack_combi;
+localparam [2:0] IDLE			     = 3'b000;
+@@ if {[lindex $SIGNAL_INTERFACE_TYPE_LIST 0] == "avalon_streaming"} {
+localparam [2:0] CHECK_CURRENT_TRANS = 3'b001;
+localparam [2:0] ISSUE_FREEZE_ACK    = 3'b010;
+localparam [2:0] FREEZE_INTF	     = 3'b011;
+@@} else {
+localparam [2:0] ISSUE_FREEZE_ACK    = 3'b001;
+localparam [2:0] FREEZE_INTF	     = 3'b010;
+@@}
+
+assign illegal_request = 1'b0;
+
+@@ foreach CONDUIT_SIGNAL $CONDUIT_SIGNALS_LIST CONDUIT_SIGNALS_DIRECTION $CONDUIT_SIGNALS_DIRECTION_LIST CONDUIT_SIGNAL_WIDTH $CONDUIT_SIGNALS_WIDTH_LIST CONDUIT_SIGNAL_ASSERTION $CONDUIT_SIGNALS_ASSERTION_LIST SIGNAL_STREAMING_INTERFACE_TYPE $STREAMING_INTERFACE_SIGNAL_TYPE_LIST {
+@@ set loop_count [expr {$CONDUIT_SIGNAL_WIDTH/4}]
+@@ set assertion_value ""
+@@ set freeze_assertion ""
+@@ if {$CONDUIT_SIGNAL_WIDTH <= 4} {
+	@@ if {$CONDUIT_SIGNAL_ASSERTION == 1} {
+	@@ append assertion_value "F"
+	@@} else {
+	@@ append assertion_value "0"
+	@@}
+@@} else {
+	@@for {set i 0} {$i < [expr {$loop_count+1}]} {incr i} {
+	@@ if {$CONDUIT_SIGNAL_ASSERTION == 1} {
+	@@ append assertion_value "F"
+	@@} else {
+	@@ append assertion_value "0"
+	@@}
+	@@}
+@@}
+@@ append freeze_assertion $CONDUIT_SIGNAL_WIDTH "'h" $assertion_value
+@@ if {$CONDUIT_SIGNALS_DIRECTION == "input"} {
+assign conduit_bridge_to_sr_${CONDUIT_SIGNAL} = (freeze) ? ${freeze_assertion} : conduit_bridge_to_pr_${CONDUIT_SIGNAL};
+@@ if {$SIGNAL_STREAMING_INTERFACE_TYPE == "valid"} {
+@@ set AVST_VALID "conduit_bridge_to_pr_${CONDUIT_SIGNAL}"
+@@}
+@@ if {$SIGNAL_STREAMING_INTERFACE_TYPE == "endofpacket"} {
+@@ set AVST_EOP "conduit_bridge_to_pr_${CONDUIT_SIGNAL}"
+@@}
+@@} else {
+assign conduit_bridge_to_pr_${CONDUIT_SIGNAL} = (freeze) ? ${freeze_assertion} : conduit_bridge_to_sr_${CONDUIT_SIGNAL};
+@@ if {$SIGNAL_STREAMING_INTERFACE_TYPE == "valid"} {
+@@ set AVST_VALID "conduit_bridge_to_sr_${CONDUIT_SIGNAL}"
+@@}
+@@ if {$SIGNAL_STREAMING_INTERFACE_TYPE == "endofpacket"} {
+@@ set AVST_EOP "conduit_bridge_to_sr_${CONDUIT_SIGNAL}"
+@@}
+@@}
+
+
+@@}
+
+always @(posedge clk or negedge reset_n) begin
+    if (!reset_n)
+        state <= IDLE;
+    else
+        state <= next_state;
+end
+ 
+always @* begin
+	case (state)
+		IDLE: begin
+			if (freeze) begin
+@@ if {[lindex $SIGNAL_INTERFACE_TYPE_LIST 0] == "avalon_streaming"} {	
+				next_state = CHECK_CURRENT_TRANS;
+@@} else {
+				next_state = ISSUE_FREEZE_ACK;
+@@}
+			end
+			else begin
+				next_state = IDLE;
+			end
+		end
+	
+@@ if {[lindex $SIGNAL_INTERFACE_TYPE_LIST 0] == "avalon_streaming"} {	
+		CHECK_CURRENT_TRANS: begin
+			if (($AVST_VALID == 1) && ($AVST_EOP == 1)) begin
+				next_state = ISSUE_FREEZE_ACK;
+			end
+			else begin
+				next_state = CHECK_CURRENT_TRANS;
+			end
+		end
+@@}		
+		
+		ISSUE_FREEZE_ACK: begin
+		    next_state = FREEZE_INTF;
+		end
+		
+		FREEZE_INTF: begin
+		    if (~freeze) begin
+				next_state = IDLE;
+			end
+			else begin
+				next_state = FREEZE_INTF;
+			end
+		end
+
+		default: begin
+			next_state = 3'bxxx;
+		end
+	endcase
+end 
+
+endmodule

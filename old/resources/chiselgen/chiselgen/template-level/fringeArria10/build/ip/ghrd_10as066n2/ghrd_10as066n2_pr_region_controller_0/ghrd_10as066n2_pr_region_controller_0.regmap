@@ -1,0 +1,178 @@
+<?xml version="1.0"?>
+<device xmlns:xs="http://www.w3.org/2001/XMLSchema-instance" schemaVersion="1.0" xs:noNamespaceSchemaLocation="CMSIS-SVD_Schema_1_0.xsd">
+<name>ghrd_10as066n2_pr_region_controller_0</name>
+<peripherals>
+<peripheral>
+      <baseAddress>0x00000000</baseAddress>
+      <name>ghrd_10as066n2_pr_region_controller_0_avl_csr_altera_pr_region_controller</name>
+      <description>altera_pr_region_controller</description>
+      <registers>
+        <register>
+          <access>read-only</access>
+          <addressOffset>0x0</addressOffset>
+          <description>This is the status register of the freeze controller IP</description>
+          <displayName>freeze_csr_status</displayName>
+          <name>status</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+          <fields>
+            <field>
+              <access>read-only</access>
+              <bitRange>[0:0]</bitRange>
+              <description>Hardware sets this bit to '1 after the PR region return stop_ack signal to indicate that the PR region is going into freezing state.</description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>freeze_status</name>
+            </field>
+            <field>
+              <access>read-only</access>
+              <bitRange>[1:1]</bitRange>
+              <description>Hardware sets this bit to '1 after the PR region return start_ack to indicate that it has successfully kicked off the persona.</description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>unfreeze_status</name>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <access>read-write</access>
+          <addressOffset>0x4</addressOffset>
+          <description>This is the control register of the freeze controller IP</description>
+          <displayName>freeze_csr_ctrl</displayName>
+          <name>control</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+          <fields>
+            <field>
+              <access>read-write</access>
+              <bitRange>[0:0]</bitRange>
+              <description>Write 1 to this bit to start freezing the PR region interfaces. </description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>freeze_req</name>
+            </field>
+            <field>
+              <access>read-write</access>
+              <bitRange>[1:1]</bitRange>
+              <description>Write 1 to start resetting the PR persona. </description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>reset_req</name>
+            </field>
+            <field>
+              <access>read-write</access>
+              <bitRange>[2:2]</bitRange>
+              <description>Write 1 to this bit to stop freezing the PR region interfaces.</description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>unfreeze_req</name>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <access>read-writeOnce</access>
+          <addressOffset>0x8</addressOffset>
+          <description>This is to indicate that there is an error request happen in freeze bridge during freeze state.</description>
+          <displayName>freeze_illegal_request</displayName>
+          <name>illegal_request</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+        </register>
+        <register>
+          <access>read-only</access>
+          <addressOffset>0xc</addressOffset>
+          <description>This is for the software driver to identify the version number of the CSR register.</description>
+          <displayName>freeze_reg_version</displayName>
+          <name>reg_version</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+        </register>
+      </registers>
+    </peripheral>
+  <peripheral>
+      <baseAddress>0x00000000</baseAddress>
+      <name>ghrd_10as066n2_pr_region_controller_0_pr_region_controller_0_avl_csr_altera_pr_region_controller</name>
+      <description>altera_pr_region_controller</description>
+      <registers>
+        <register>
+          <access>read-only</access>
+          <addressOffset>0x0</addressOffset>
+          <description>This is the status register of the freeze controller IP</description>
+          <displayName>freeze_csr_status</displayName>
+          <name>status</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+          <fields>
+            <field>
+              <access>read-only</access>
+              <bitRange>[0:0]</bitRange>
+              <description>Hardware sets this bit to '1 after the PR region return stop_ack signal to indicate that the PR region is going into freezing state.</description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>freeze_status</name>
+            </field>
+            <field>
+              <access>read-only</access>
+              <bitRange>[1:1]</bitRange>
+              <description>Hardware sets this bit to '1 after the PR region return start_ack to indicate that it has successfully kicked off the persona.</description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>unfreeze_status</name>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <access>read-write</access>
+          <addressOffset>0x4</addressOffset>
+          <description>This is the control register of the freeze controller IP</description>
+          <displayName>freeze_csr_ctrl</displayName>
+          <name>control</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+          <fields>
+            <field>
+              <access>read-write</access>
+              <bitRange>[0:0]</bitRange>
+              <description>Write 1 to this bit to start freezing the PR region interfaces. </description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>freeze_req</name>
+            </field>
+            <field>
+              <access>read-write</access>
+              <bitRange>[1:1]</bitRange>
+              <description>Write 1 to start resetting the PR persona. </description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>reset_req</name>
+            </field>
+            <field>
+              <access>read-write</access>
+              <bitRange>[2:2]</bitRange>
+              <description>Write 1 to this bit to stop freezing the PR region interfaces.</description>
+              <modifiedWriteValues>modify</modifiedWriteValues>
+              <name>unfreeze_req</name>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <access>read-writeOnce</access>
+          <addressOffset>0x8</addressOffset>
+          <description>This is to indicate that there is an error request happen in freeze bridge during freeze state.</description>
+          <displayName>freeze_illegal_request</displayName>
+          <name>illegal_request</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+        </register>
+        <register>
+          <access>read-only</access>
+          <addressOffset>0xc</addressOffset>
+          <description>This is for the software driver to identify the version number of the CSR register.</description>
+          <displayName>freeze_reg_version</displayName>
+          <name>reg_version</name>
+          <resetMask>0xffffffff</resetMask>
+          <resetValue>0x00000000</resetValue>
+          <size>32</size>
+        </register>
+      </registers>
+    </peripheral>
+  </peripherals>
+</device>

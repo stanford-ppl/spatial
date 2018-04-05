@@ -97,7 +97,7 @@ trait Codegen extends Traversal {
   protected def ret(block: Block[_]): Unit = gen(block, withReturn = true)
 
   protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
-    throw new Exception(s"[$name] No codegen rule for $lhs, $rhs")
+    if (config.enGen) throw new Exception(s"[$name] No codegen rule for $lhs, $rhs")
   }
 
   final override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = gen(lhs,rhs)

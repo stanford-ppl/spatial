@@ -34,13 +34,18 @@ trait CppGenCommon extends CppCodegen {
     case DoubleType() => "double"
     case _: Text => "string"
     case ai: ArgIn[_] => remap(ai.typeArgs.head)
-    case _ => super.remap(tp)
+    case _: Vec[_] => "vector<" + remap(tp.typeArgs.head) + ">"
+    case _ => 
+      tp.typePrefix match {
+        case "Array" => "vector<" + remap(tp.typeArgs.head) + ">"
+        case _ => super.remap(tp)
+      }
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
     case (FixPtType(s,d,f), _) => c.toString + {if (f+d > 32) "L" else ""}
     case (FltPtType(g,e), _) => c.toString
-    case (_:Text, Const(c: String)) => escapeString(c)
+    case (_:Text, cc: String) => "string(" + escapeString(cc) + ")"
     case _ => super.quoteConst(tp,c)
   }
 

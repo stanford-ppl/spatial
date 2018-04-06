@@ -61,10 +61,8 @@ object DRAM {
   @api override def size: I32 = dims.head
 
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
-  @api def apply[W:INT](addrs: SRAM1[I[W]]): DRAMSparseTile[A] = {
-    val addrs_hack = addrs.asInstanceOf[SRAM1[Idx]]
-    implicit val addrType: Type[SRAM1[Idx]] = addrs_hack.selfType
-    stage(MemSparseAlias[A,SRAM1,DRAM1,DRAMSparseTile](this,addrs_hack))
+  @api def apply(addrs: SRAM1[I32]): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,SRAM1,DRAM1,DRAMSparseTile](this,addrs))
   }
 
   /** Creates a dense, burst transfer from the on-chip `local` to this DRAM's region of main memory. */

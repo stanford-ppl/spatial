@@ -36,7 +36,7 @@ private object virtualize {
       case Nil     => Nil
     }
 
-    info(showCode(outputs.head))
+    // info(showCode(outputs.head))
 
     q"..$outputs"
   }

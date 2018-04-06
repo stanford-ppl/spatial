@@ -69,7 +69,10 @@ object SparseTransfer {
 
         // Send
         Foreach(iters par p){i =>
-          val addr = __ifThenElse(i >= requestLength, dram.address, (addrs.__read(Seq(i),Set.empty) * bytesPerWord).to[I64] + dram.address) //if (i >= requestLength) dram.address.to[I64] else (addrs.__read(Seq(i),Set.empty) * bytesPerWord).to[I64] + dram.address
+          val cond: Bit = i >= requestLength
+          val thn: I64 = dram.address
+          val els: I64 = (addrs.__read(Seq(i),Set.empty) * bytesPerWord).to[I64] + dram.address
+          val addr: I64 = __ifThenElse(cond, thn, els) //if (i >= requestLength) dram.address.to[I64] else (addrs.__read(Seq(i),Set.empty) * bytesPerWord).to[I64] + dram.address
           val addr_bytes = addr
           addrBus := addr_bytes
         }
@@ -89,8 +92,8 @@ object SparseTransfer {
         // Send
         Foreach(iters par p){i =>
           val pad_addr = max(requestLength - 1, 0.to[I32])
-          val curAddr  = if (i >= requestLength) addrs.__read(Seq(pad_addr), Set.empty) else addrs.__read(Seq(i), Set.empty)
-          val data     = if (i >= requestLength) local.__read(Seq(pad_addr), Set.empty) else local.__read(Seq(i), Set.empty)
+          val curAddr  = __ifThenElse(i >= requestLength, addrs.__read(Seq(pad_addr), Set.empty), addrs.__read(Seq(i), Set.empty)) //if (i >= requestLength) addrs.__read(Seq(pad_addr), Set.empty) else addrs.__read(Seq(i), Set.empty)
+          val data     = __ifThenElse(i >= requestLength, local.__read(Seq(pad_addr), Set.empty), local.__read(Seq(i), Set.empty)) //if (i >= requestLength) local.__read(Seq(pad_addr), Set.empty) else local.__read(Seq(i), Set.empty)
 
           val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
           val addr_bytes = addr

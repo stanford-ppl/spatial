@@ -6,6 +6,7 @@ trait Overloads {
   implicit def overload1: Overload1 = new Overload1
   implicit def overload2: Overload2 = new Overload2
   implicit def overload3: Overload3 = new Overload3
+  implicit def overload4: Overload4 = new Overload4
 }
 
 object Overloads {
@@ -13,5 +14,6 @@ object Overloads {
   class Overload1
   class Overload2
   class Overload3
+  class Overload4
 }
 

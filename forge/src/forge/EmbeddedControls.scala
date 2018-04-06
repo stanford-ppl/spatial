@@ -118,9 +118,7 @@ private object EmbeddedControls {
 
   /** Control structures */
 
-  def ifThenElseImpl[T](c: whitebox.Context)(
-    cond: c.Expr[Boolean], thenBr: c.Expr[T], elseBr: c.Expr[T]): c.Expr[T] = {
-
+  def ifThenElseImpl[T](c: whitebox.Context)(cond: c.Expr[Any], thenBr: c.Expr[T], elseBr: c.Expr[T]): c.Expr[T] = {
     import c.universe._
     c.Expr(q"if ($cond) $thenBr else $elseBr")
   }

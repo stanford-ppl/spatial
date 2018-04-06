@@ -65,6 +65,7 @@ trait SpatialApp extends DSLApp {
     lazy val friendlyTransformer = FriendlyTransformer(state)
     lazy val switchTransformer = SwitchTransformer(state)
     lazy val switchOptimizer   = SwitchOptimizer(state)
+    lazy val transferLowering  = TransferLowering(state)
     lazy val memoryDealiasing  = MemoryDealiasing(state)
     lazy val pipeInserter      = PipeInserter(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
@@ -86,6 +87,7 @@ trait SpatialApp extends DSLApp {
       sanityChecks ==>
       switchTransformer ==>
       switchOptimizer ==>
+      transferLowering ==>
       memoryDealiasing ==>
       pipeInserter ==>
       printer ==>

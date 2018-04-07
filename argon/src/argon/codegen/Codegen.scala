@@ -52,7 +52,7 @@ trait Codegen extends Traversal {
   protected def remap(tp: Type[_]): String = tp.typeName
 
   protected def quoteConst(tp: Type[_], c: Any): String = {
-    throw new Exception(s"$name failed to generate constant $c of type $tp")
+    throw new Exception(s"$name failed to generate constant $c (${c.getClass}) of type $tp")
   }
 
   protected def named(s: Sym[_], id: Int): String = nameMap(s"x$id")

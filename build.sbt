@@ -62,6 +62,5 @@ lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(forge)
 lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
 
-
 lazy val nova   = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)
-lazy val apps = project.settings(common).dependsOn(nova, forge, emul, argon, models, poly, spatialTags)
+lazy val apps = project.settings(common).dependsOn(nova)

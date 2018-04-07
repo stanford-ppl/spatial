@@ -4,6 +4,8 @@ import argon._
 import spatial.lang._
 import spatial.node._
 
+import emul.Bool
+
 trait ScalaGenBit extends ScalaGenBits {
 
   override protected def remap(tp: Type[_]): String = tp match {
@@ -11,9 +13,8 @@ trait ScalaGenBit extends ScalaGenBits {
     case _ => super.remap(tp)
   }
 
-  override protected def quoteConst(tp: Type[_], c: Any): String = c match {
-    case Const(true)  => "TRUE"
-    case Const(false) => "FALSE"
+  override protected def quoteConst(tp: Type[_], c: Any): String = (tp, c) match {
+    case (_:Bit, c:Bool) => s"Bool(${c.value},${c.valid})"
     case _ => super.quoteConst(tp,c)
   }
 

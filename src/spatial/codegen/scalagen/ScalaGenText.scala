@@ -13,7 +13,7 @@ trait ScalaGenText extends ScalaCodegen {
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp, c) match {
-    case (_:Text, Const(c: String)) => escapeString(c)
+    case (_:Text, c: String) => escapeString(c)
     case _ => super.quoteConst(tp,c)
   }
 

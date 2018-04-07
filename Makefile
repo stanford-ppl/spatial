@@ -1,6 +1,9 @@
-.PHONY: nova all resources
+.PHONY: nova all resources apps
 all: nova
-	
+
+apps:  
+	sbt "; project apps; compile"
+
 nova:
 	bash bin/make-isl.sh	
 	sbt compile

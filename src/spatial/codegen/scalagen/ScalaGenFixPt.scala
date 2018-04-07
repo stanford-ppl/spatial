@@ -13,7 +13,7 @@ trait ScalaGenFixPt extends ScalaGenBits {
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
-    case (FixPtType(sign,int,frac), Const(c: FixedPoint)) =>
+    case (FixPtType(sign,int,frac), c: FixedPoint) =>
       if(int > 32 | (!sign & int == 32)) s"""FixedPoint(BigDecimal("$c"),FixFormat($sign,$int,$frac))"""
       else s"""FixedPoint(BigDecimal("$c"),FixFormat($sign,$int,$frac))"""
     case _ => super.quoteConst(tp,c)
@@ -60,9 +60,11 @@ trait ScalaGenFixPt extends ScalaGenBits {
     case FixToFlt(x, fmt) =>
       emit(src"val $lhs = $x.toFloatPoint(FltFormat(${fmt.mbits-1},${fmt.ebits}))")
 
-    case FixToText(x) =>
+    case FixToText(x) => emit(src"val $lhs = $x.toString")
+
+    case TextToFix(x, _) =>
       val FixPtType(s,i,f) = lhs.tp
-      emit(src"val $lhs = FixedPoint($x, FixFormat($s,$i,$f))")
+      emit(src"val $lhs = FixedPoint.from($x, FixFormat($s,$i,$f))")
 
     case FixRandom(Some(max)) =>
       val FixPtType(s,i,f) = lhs.tp

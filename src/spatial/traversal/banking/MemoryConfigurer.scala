@@ -84,8 +84,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
     accesses.foreach{a =>
       val grpId = groups.indexWhere{grp =>
-        grp.exists{b => areInParallel(a.access,b.access) } &&
-        grp.forall{b => !a.overlaps(b) }
+        a.parent == Host ||       // Always merge host-side accesses into the first group
+          (grp.exists{b => areInParallel(a.access,b.access) } &&
+           grp.forall{b => !a.overlaps(b) })
       }
       if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
     }

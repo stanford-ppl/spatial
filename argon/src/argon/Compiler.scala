@@ -142,11 +142,11 @@ trait Compiler { self =>
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
 
 
-    msg(s"Compiling ${config.name} to ${config.genDir}")
-    if (config.enDbg) msg(s"Logging ${config.name} to ${config.logDir}")
+    info(s"Compiling ${config.name} to ${config.genDir}")
+    if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
     if (config.test) info("Running in testbench mode")
 
-    files.deleteExts(config.logDir, ".log")
+    files.deleteExts(IR.config.logDir, "log")
 
     flows()
     rewrites()

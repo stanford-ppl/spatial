@@ -59,14 +59,14 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     is.reverseIterator.find{i => !isInvariant(i,x) }
   }
 
-  object Plus  { def unapply[W](x: I[W]): Option[(I[W],I[W])] = x.op.collect{case FixAdd(a,b) => (a,b) }}
-  object Minus { def unapply[W](x: I[W]): Option[(I[W],I[W])] = x.op.collect{case FixSub(a,b) => (a,b) }}
-  object Times { def unapply[W](x: I[W]): Option[(I[W],I[W])] = x.op.collect{case FixMul(a,b) => (a,b) }}
-  object Index { def unapply[W](x: I[W]): Option[I[W]] = Some(x).filter(iters.contains) }
+  object Plus  { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixAdd(a,b) => (a,b) }}
+  object Minus { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixSub(a,b) => (a,b) }}
+  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixMul(a,b) => (a,b) }}
+  object Index { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x).filter(iters.contains) }
 
   private lazy val Zero = Sum.single(0)
   private lazy val One  = Prod.single(1)
-  private def stride[W](i: I[W]): Prod = if (ctrOf.get(i).isDefined) Prod.single(i.ctrStep) else One
+  private def stride[W](i: Ind[W]): Prod = if (ctrOf.get(i).isDefined) Prod.single(i.ctrStep) else One
 
   implicit class AffineComponents(x: Seq[AffineComponent]) {
     def unary_-(): Seq[AffineComponent] = x.map{c => -c}

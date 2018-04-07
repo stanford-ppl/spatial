@@ -113,7 +113,7 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
   } else "X"
 
   def is1s: Boolean = this.bits.forall(_.value)
-
+  def isPow2: Boolean = (this & (this - 1)) === 0 && this.isExactInt
 
   override def hashCode(): Int = (value,valid,fmt).hashCode()
 

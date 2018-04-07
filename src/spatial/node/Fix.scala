@@ -92,6 +92,8 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
     case (Literal(1), _) => stage(FixInv(b))
+    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[TRUE,I,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[TRUE,I,_0]].from(Number.log2(-r))
     case _ => super.rewrite
   }
 }
@@ -104,6 +106,11 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
       warn(ctx)
       null
     case (Literal(0), _) => a
+    case (_, Const(r)) if r.isPow2 && r > 0 =>
+      val i = INT[F].v + Number.log2(r).toInt - 1
+      if (i <= 0) a.from(0)
+      else a.bits(i::0).as[Fix[S,I,F]]
+
     case _ => super.rewrite
   }
 }
@@ -218,7 +225,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixExp[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.exp)
 
 /** Fixed point natural log */
-@op case class FixLn[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.log)
+@op case class FixLn[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.ln)
 
 /** Fixed point square root */
 @op case class FixSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.sqrt)

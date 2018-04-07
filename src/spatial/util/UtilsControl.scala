@@ -116,10 +116,10 @@ trait UtilsControl {
     }
   }
 
-  implicit class IndexHelperOps[W](i: I[W]) {
-    @stateful def ctrStart: I[W] = ctrOf(i).start.unbox
-    @stateful def ctrStep: I[W] = ctrOf(i).step.unbox
-    @stateful def ctrEnd: I[W] = ctrOf(i).end.unbox
+  implicit class IndexHelperOps[W](i: Ind[W]) {
+    @stateful def ctrStart: Ind[W] = ctrOf(i).start.unbox
+    @stateful def ctrStep: Ind[W] = ctrOf(i).step.unbox
+    @stateful def ctrEnd: Ind[W] = ctrOf(i).end.unbox
     @stateful def ctrPar: I32 = ctrOf(i).ctrPar
     @stateful def ctrParOr1: Int = ctrOf.get(i).map(_.ctrPar.toInt).getOrElse(1)
   }

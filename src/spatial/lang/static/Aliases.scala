@@ -6,8 +6,8 @@ import spatial.lang.types.CustomBitWidths
 // Everything else is ok.
 trait InternalAliases extends CustomBitWidths {
   type FixPt[S,I,F] = spatial.lang.Fix[S,I,F]
-  type I[W] = FixPt[TRUE,W,_0]
-  type Idx = I[_]
+  type Ind[W] = FixPt[TRUE,W,_0]
+  type Idx = Ind[_]
   type Rng = spatial.lang.Series[Idx]
 
   type I64 = FixPt[TRUE,_64,_0]

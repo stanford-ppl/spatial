@@ -1,5 +1,4 @@
 import spatial.dsl._
-// import utest._
 
 @spatial object ArgInOut {
 

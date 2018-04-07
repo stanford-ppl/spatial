@@ -57,11 +57,18 @@ trait Printing {
   }
 
   /** Compiler Bugs */
-  @stateful def bug(x: => Any): Unit = state.out.bug(x)
-  @stateful def bug(ctx: SrcCtx): Unit = state.out.bug(ctx)
+  @stateful def bug(x: => Any): Unit = {
+    state.out.bug(x)
+    if (config.enDbg) state.log.bug(x)
+  }
+  @stateful def bug(ctx: SrcCtx): Unit = {
+    state.out.bug(ctx)
+    if (config.enDbg) state.log.bug(ctx)
+  }
   @stateful def bug(ctx: SrcCtx, showCaret: Boolean): Unit = state.out.bug(ctx,showCaret)
   @stateful def bug(ctx: SrcCtx, x: => Any, noBug: Boolean = false): Unit = {
     state.out.bug(ctx, x)
+    if (config.enDbg) state.log.bug(s"$ctx: $x")
     if (!noBug) state.logBug()
   }
 

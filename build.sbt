@@ -3,6 +3,7 @@ val scala_version     = "2.12.4"
 val paradise_version  = "2.1.0"
 
 name := "nova"
+organization := "edu.stanford.ppl"
 
 val common = Seq(
   scalaVersion := scala_version,

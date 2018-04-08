@@ -20,20 +20,8 @@ trait ScalaGenBits extends ScalaCodegen {
     case _:Fix[_,_,_] => fixConst(1,tp)
   }
 
-  dependencies ::= FileDep("scalagen", "Bool.scala")
-  dependencies ::= FileDep("scalagen", "FixedPoint.scala")
-  dependencies ::= FileDep("scalagen", "FixedPointRange.scala")
-  dependencies ::= FileDep("scalagen", "FloatPoint.scala")
-  dependencies ::= FileDep("scalagen", "DataImplicits.scala")
-  dependencies ::= FileDep("scalagen", "Number.scala")
-
   def invalid(tp: Type[_]): String = tp match {
     case _ => throw new Exception(s"Don't know how to generate invalid for type $tp")
-  }
-
-  override def emitHeader(): Unit = {
-    emit(src"import DataImplicits._")
-    super.emitHeader()
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

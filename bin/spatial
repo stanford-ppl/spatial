@@ -21,32 +21,51 @@ class SpatialArgumentParser(ArgumentParser):
   
   def print_help(self, file=None):
     print("""
-spatial CLI for spatial
-Usage: spatial [options]
+Spatial
+Usage: spatial <app> [options]
 
-  --help                   prints this usage text
-  -q, --quiet              disable background logging
-  -v, --verbose            enable verbose printout
-  -c, --clean              Reset output directory
-  -m, --multifile <value>  aggressiveness for splitting generated code files
-                            0 = no splitting or scoping
-                            1 = no splitting but yes scoping on inner pipes
-                            2 = no splitting but yes scoping everywhere
-                            3 <DEPRECATED> = splitting for inner pipes only
-                            4 = all blocks
-  -o, --out <value>        location of output directory. Default is ./gen/<appname>
-  -e, --emission <value>   Conservativeness when emitting nodes.
-                            0 = crash when emitNode is undefined (release mode)
-                            1 = warn when undefined
-                            2 = warn when undefined and report when node matched but outside backend rules
-  --synth                  enable codegen to chisel + cpp (Synthesis) (disable sim) [false]
-  --sim                    enable codegen to Scala (Simulation) (disable synth) [true]
-  --fpga <value>           Set name of FPGA target [Default]
-  --dse                    enables design space exploration [false]
-  --naming                 generates the debug name for all syms, rather than "x${s.id}" only'
-  --tree                   enables logging of controller tree for visualizing app structure
-  --dot                    enables dot generation
-  --withoutSrc             disable app source code copy to generated directory
+Help:
+  -h, --help            Prints this usage text
+
+Verbosity:
+  -q, --quiet           Disable all logging and printing
+  -v, --verbose         Enable logging
+  --vv                  Enable verbose logging
+
+Output:
+  -c, --clean           Reset output directory
+  -o, --out <value>     Location of output directory. [./gen/<appname>]
+  -d, --detail <value>  Dot graph detail (0: control only, 1: all nodes) [1]
+
+DSE:
+  --dse                 Enables design space exploration [false]
+  --threads <value>     Sets number of threads to use in DSE
+  --bruteforce          Enables bruteforce DSE
+  --heuristic           Enables heuristic DSE
+  --nonaming            Disables the debug name for all syms, using "x${s.id}" only'
+
+Backends:
+  --fpga <value>        Sets name of FPGA target [Default]
+  --sim                 Enables codegen to Scala (disables retiming by default) [false]
+  --synth               Enables codegen to chisel + cpp (Synthesis) [true]
+  --dot                 Enables dot graph generation
+  --retime              Force retiming for --sim
+  --noretime            Disables retiming for all targets
+  --multifile <value>   Sets file splitting [4]:
+                          0: <DEPRECATED> no splitting or scoping
+                          1: <DEPRECATED> no splitting but yes scoping on inner pipes
+                          2: <DEPRECATED> no splitting but yes scoping everywhere
+                          3: <DEPRECATED> splitting for inner pipes only
+                          4: all blocks
+                          5: java class file compression
+                          6: <EXPERIMENTAL, UNSTABLE> further compression
+
+Experimental:
+  --asyncMem            Enables asynchronous memories
+  --instrument          Enables counters for each loop to assist in balancing pipelines
+  --tightControl        Enables tighter timing between controllers at the expense of potentially failing timing
+  --cheapFifos          Enables cheap fifos; accesses must be multiples of each other and not have lane-enables
+  --runtime             Enables application runtime estimation
       """)
   #sys.exit(0)
 

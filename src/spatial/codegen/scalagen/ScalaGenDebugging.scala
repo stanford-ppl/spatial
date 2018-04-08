@@ -7,16 +7,14 @@ import spatial.node._
 trait ScalaGenDebugging extends ScalaCodegen {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case PrintIf(en,msg)             => emit(src"val $lhs = if ($en) System.out.print($msg)")
-    case AssertIf(en,cond,Some(msg)) => emit(src"val $lhs = if ($en) assert($cond, $msg)")
-    case AssertIf(en,cond,None)      => emit(src"val $lhs = if ($en) assert($cond)")
-    case BreakpointIf(en)        =>
-      val bp = '"' + "Breakpoint" + '"'
-      emit(src"val $lhs = if ($en) { System.out.println($bp); Console.readLine() }")
+    case PrintIf(ens,msg)             => emit(src"val $lhs = if (${and(ens)}) System.out.print($msg)")
+    case AssertIf(ens,cond,Some(msg)) => emit(src"val $lhs = if (${and(ens)}) assert($cond, $msg)")
+    case AssertIf(ens,cond,None)      => emit(src"val $lhs = if (${and(ens)}) assert($cond)")
 
-    case ExitIf(en)        =>
-      val exit = '"' + "Exit" + '"'      
-      emit(src"val $lhs = if ($en) { System.out.println($exit); return }")      
+    case BreakpointIf(ens) =>
+      emit(src"""val $lhs = if (${and(ens)}) { System.out.println("${lhs.ctx}: Breakpoint"); Console.readLine() }""")
+
+    case ExitIf(ens) => emit(src"""val $lhs = if (${and(ens)}) { System.out.println("${lhs.ctx}: Exit"); sys.exit() }""")
 
     case _ => super.gen(lhs, rhs)
   }

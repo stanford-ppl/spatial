@@ -17,7 +17,7 @@ trait ScalaGenRegFile extends ScalaGenMemories {
     case RegFileReset(rf, en)    => emit(src"val $lhs = if ($en) $rf.reset()")
     case RegFileShiftIn(rf,data,addr,en,axis) =>
       val ctx = s""""${lhs.ctx}""""
-      emit(src"val $lhs = if ($en) $rf.shiftIn($ctx, Seq($addr), $axis, $data)")
+      emit(src"val $lhs = if (${and(en)}) $rf.shiftIn($ctx, Seq($addr), $axis, $data)")
 
 //    case RegFileVectorShiftIn(rf,data,addr,en,axis,len) =>
 //      val ctx = s""""${lhs.ctx}""""

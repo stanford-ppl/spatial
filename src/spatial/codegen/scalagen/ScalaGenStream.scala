@@ -92,7 +92,7 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
     case op@StreamInBankedRead(strm, ens) =>
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) =>
-        emit(src"val a$i = if ($en && $strm.nonEmpty) $strm.dequeue() else ${invalid(op.A)}")
+        emit(src"val a$i = if (${and(en)} && $strm.nonEmpty) $strm.dequeue() else ${invalid(op.A)}")
       }
       emit(src"Array[${op.A}](" + ens.indices.map{i => src"a$i"}.mkString(", ") + ")")
       close("}")
@@ -100,7 +100,7 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
     case StreamOutBankedWrite(strm, data, ens) =>
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) =>
-        emit(src"if ($en) $strm.enqueue(${data(i)})")
+        emit(src"if (${and(en)}) $strm.enqueue(${data(i)})")
       }
       close("}")
 

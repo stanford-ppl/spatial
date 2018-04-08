@@ -2,7 +2,7 @@ package emul
 
 import scala.language.implicitConversions
 
-object EmulImplicits {
+object implicits {
   implicit def fixedPointToInt(x: FixedPoint): Int = x.toInt
   implicit def intToFixedPoint(x: Int): FixedPoint = FixedPoint.fromInt(x)
   implicit def boolToBoolean(x: Bool): Boolean = x.value

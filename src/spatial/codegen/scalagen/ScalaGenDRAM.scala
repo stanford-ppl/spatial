@@ -15,8 +15,7 @@ trait ScalaGenDRAM extends ScalaGenMemories {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMNew(dims,zero) =>
       emitMemObject(lhs){
-        val name = s""""${lhs.fullname}""""
-        emit(src"object $lhs extends Memory[${op.A}]($name, $zero)")
+        emit(src"""object $lhs extends Memory[${op.A}]("${lhs.fullname}", $zero)""")
       }
       val elementsPerBurst = spatialConfig.target.burstSize / op.A.nbits
       val size = src"""${dims.map(quote).mkString("*")} + $elementsPerBurst"""

@@ -28,23 +28,6 @@ trait FileDependencies extends Codegen {
         bug("  dst: " + out + relPathApp)
         throw t
       }
-      // Console.println("source: /" + folder + "/" + name)
-      // Console.println("from: " + from)
-      // Console.println("dest: " + out + relPathApp)
-
-      //Console.println(folder + " " + out + " " + name + " " + dest)
-      //Console.println(from)
-      //try {
-
-//      }
-//      catch {
-//        case _: NullPointerException =>
-//          bug(s"Null Pointer: Cannot copy file dependency $this: ")
-//          bug("  src: " + folder + "/" + name)
-//          bug("  dst: " + out + relPathApp)
-//        case x: Throwable =>
-//
-//      }
     }
   }
 

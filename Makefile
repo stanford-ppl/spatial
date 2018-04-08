@@ -1,11 +1,14 @@
 .PHONY: nova all resources apps
-all: nova
+all: apps
+
+install: 
+	sbt "; project emul; publishLocal"
 
 apps:  
 	sbt "; project apps; compile"
+	sbt "; project emul; publishLocal"
 
 nova:
-	bash bin/make-isl.sh	
 	sbt compile
 
 resources:

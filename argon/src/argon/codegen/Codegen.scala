@@ -38,12 +38,10 @@ trait Codegen extends Traversal {
 
   override protected def preprocess[R](b: Block[R]): Block[R] = {
     clearGen()
-    emitHeader()
     super.preprocess(b)
   }
 
   override protected def postprocess[R](b: Block[R]): Block[R] = {
-    emitFooter()
     super.postprocess(b)
   }
 
@@ -68,7 +66,6 @@ trait Codegen extends Traversal {
 
   protected def quoteOrRemap(arg: Any): String = arg match {
     case p: Seq[_]     => p.map(quoteOrRemap).mkString(", ")  // By default, comma separate Seq
-    case s: Set[_]     => s.map(quoteOrRemap).mkString(", ")
     case e: Ref[_,_]   => quote(e)
     case s: String     => s
     case c: Int        => c.toString
@@ -85,9 +82,13 @@ trait Codegen extends Traversal {
 
   override protected def process[R](block: Block[R]): Block[R] = {
     preprocess(block)
+
     inGen(out, entryFile) {
-      gen(block)
+      emitHeader()
+      emitEntry(block)
+      emitFooter()
     }
+
     postprocess(block)
   }
 

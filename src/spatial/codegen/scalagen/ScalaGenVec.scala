@@ -44,4 +44,5 @@ trait ScalaGenVec extends ScalaGenBits with ScalaGenText {
 
     case _ => super.gen(lhs, rhs)
   }
+
 }

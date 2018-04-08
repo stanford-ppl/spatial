@@ -32,7 +32,7 @@ trait ScalaGenLIFO extends ScalaGenMemories {
     case op@LIFOBankedPop(lifo, ens) =>
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) =>
-        emit(src"val a$i = if ($en && $lifo.nonEmpty) $lifo.pop() else ${invalid(op.A)}")
+        emit(src"val a$i = if (${and(en)} && $lifo.nonEmpty) $lifo.pop() else ${invalid(op.A)}")
       }
       emit(src"Array[${op.A}](" + ens.indices.map{i => src"a$i"}.mkString(", ") + ")")
       close("}")
@@ -40,7 +40,7 @@ trait ScalaGenLIFO extends ScalaGenMemories {
     case LIFOBankedPush(lifo, data, ens) =>
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) =>
-        emit(src"if ($en) $lifo.push(${data(i)})")
+        emit(src"if (${and(en)}) $lifo.push(${data(i)})")
       }
       close("}")
 

@@ -13,16 +13,6 @@ abstract class Access {
 case class Read(mem: Sym[_], addr: Seq[Idx], ens: Set[Bit]) extends Access
 case class Write(mem: Sym[_], data: Sym[_], addr: Seq[Idx], ens: Set[Bit]) extends Access
 
-abstract class BankedAccess {
-  def mem:  Sym[_]
-  def bank: Seq[Seq[Idx]]
-  def ofs:  Seq[Idx]
-  def ens:  Seq[Set[Bit]]
-}
-case class BankedRead(mem: Sym[_], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends BankedAccess
-case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends BankedAccess
-
-
 /** Status read of a memory */
 abstract class StatusReader[R:Bits] extends EnPrimitive[R] {
   override val R: Bits[R] = Bits[R]

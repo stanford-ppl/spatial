@@ -34,14 +34,14 @@ trait ScalaGenFIFO extends ScalaGenMemories {
     case op@FIFOBankedDeq(fifo, ens) =>
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) =>
-        emit(src"val a$i = if ($en && $fifo.nonEmpty) $fifo.dequeue() else ${invalid(op.A)}")
+        emit(src"val a$i = if (${and(en)} && $fifo.nonEmpty) $fifo.dequeue() else ${invalid(op.A)}")
       }
       emit(src"Array[${op.A}](" + ens.indices.map{i => src"a$i"}.mkString(", ") + ")")
       close("}")
 
     case FIFOBankedEnq(fifo, data, ens) =>
       open(src"val $lhs = {")
-      ens.zipWithIndex.foreach{case (en,i) => emit(src"if ($en) $fifo.enqueue(${data(i)})") }
+      ens.zipWithIndex.foreach{case (en,i) => emit(src"if (${and(en)}) $fifo.enqueue(${data(i)})") }
       close("}")
 
     case _ => super.gen(lhs, rhs)

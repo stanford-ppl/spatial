@@ -3,6 +3,15 @@ package spatial.node
 import argon._
 import spatial.lang._
 
+abstract class BankedAccess {
+  def mem:  Sym[_]
+  def bank: Seq[Seq[Idx]]
+  def ofs:  Seq[Idx]
+  def ens:  Seq[Set[Bit]]
+}
+case class BankedRead(mem: Sym[_], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends BankedAccess
+case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends BankedAccess
+
 /** Banked accessors */
 abstract class BankedAccessor[A:Type,R:Type] extends EnPrimitive[R] {
   val A: Type[A] = Type[A]
@@ -24,6 +33,15 @@ abstract class BankedAccessor[A:Type,R:Type] extends EnPrimitive[R] {
     enss = enss.map{ens => ens ++ addEns}
     this.update(f)
   }
+}
+
+object BankedAccessor {
+  def unapply(x: Op[_]): Option[(Option[BankedWrite],Option[BankedRead])] = x match {
+    case a: BankedAccessor[_,_] if a.bankedWrite.nonEmpty || a.bankedRead.nonEmpty =>
+      Some((a.bankedWrite,a.bankedRead))
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Option[BankedWrite],Option[BankedRead])] = x.op.flatMap(BankedAccessor.unapply)
 }
 
 abstract class BankedReader[A:Bits](implicit vT: Type[Vec[A]]) extends BankedAccessor[A,Vec[A]] {

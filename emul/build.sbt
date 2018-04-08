@@ -1,6 +1,7 @@
 val scala_version = "2.12.4"
 
 name := "emul"
+organization := "edu.stanford.ppl"
 
 val common = Seq(
   scalaVersion := scala_version,
@@ -42,7 +43,8 @@ val common = Seq(
   resolvers += Resolver.sonatypeRepo("releases"),
 
   /** Release **/
-  publishArtifact := false
+  publishArtifact   := true,
+  publishMavenStyle := true
 )
 
 

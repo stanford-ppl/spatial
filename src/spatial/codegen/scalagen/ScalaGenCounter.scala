@@ -5,7 +5,6 @@ import spatial.lang._
 import spatial.node._
 
 trait ScalaGenCounter extends ScalaCodegen {
-  dependencies ::= FileDep("scalagen", "Counter.scala")
 
   override protected def remap(tp: Type[_]): String = tp match {
     case _:Counter[_]   => src"Counterlike"

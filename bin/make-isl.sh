@@ -1,4 +1,5 @@
 #!/bin/bash
+
 pushd .
 cd isl
 make

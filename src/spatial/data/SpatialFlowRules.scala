@@ -16,6 +16,11 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case Accessor(wr,rd) =>
       wr.foreach{w => writersOf(w.mem) = writersOf(w.mem) + s }
       rd.foreach{r => readersOf(r.mem) = readersOf(r.mem) + s }
+
+    case BankedAccessor(wr,rd) =>
+      wr.foreach{w => writersOf(w.mem) = writersOf(w.mem) + s }
+      rd.foreach{r => readersOf(r.mem) = readersOf(r.mem) + s }
+
     case _ =>
   }
 

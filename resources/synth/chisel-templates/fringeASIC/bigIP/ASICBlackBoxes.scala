@@ -126,8 +126,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   // fexp: Supports only half, single, double precisions
   // Fixed latency of 20 cycles
@@ -158,8 +158,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   // flog: Supports half, single, double
   // Set to max latency 22 cycles
@@ -190,8 +190,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   // fsqrt: Supports custom
   // Set to max latency of 28 cycles
@@ -222,8 +222,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   class FAdd(val exp: Int, val frac: Int) extends Module {
     val io = IO(new Bundle {
@@ -272,8 +272,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   class FSub(val exp: Int, val frac: Int) extends Module {
     val io = IO(new Bundle {
@@ -322,8 +322,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   class FMul(val exp: Int, val frac: Int) extends Module {
     val io = IO(new Bundle {
@@ -372,8 +372,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   class FDiv(val exp: Int, val frac: Int) extends Module {
     val io = IO(new Bundle {
@@ -422,8 +422,8 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
-	}
+    }
+  }
 
   class FLt(val exp: Int, val frac: Int) extends Module {
     val io = IO(new Bundle {
@@ -472,7 +472,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   class FLe(val exp: Int, val frac: Int) extends Module {
@@ -522,7 +522,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   class FEq(val exp: Int, val frac: Int) extends Module {
@@ -572,7 +572,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   class FNe(val exp: Int, val frac: Int) extends Module {
@@ -622,7 +622,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   class FGt(val exp: Int, val frac: Int) extends Module {
@@ -672,7 +672,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   class FGe(val exp: Int, val frac: Int) extends Module {
@@ -722,7 +722,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   // Fix2Float: Supports custom fixed point and custom floating point widths
@@ -754,7 +754,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   // Float2Fix: Supports custom fixed point and custom floating point widths
@@ -786,7 +786,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 
   // Float2Float: Supports custom fixed point and custom floating point widths
@@ -818,7 +818,7 @@ generate_target {all} [get_ips $moduleName]
 
       FringeGlobals.tclScript.flush
       createdIP += moduleName
-		}
+    }
   }
 }
 

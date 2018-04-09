@@ -119,7 +119,7 @@ class Innerpipe(val isFSM: Boolean = false, val ctrDepth: Int = 1, val stateWidt
       if (retime == 0) {
         stateFF.io.input(0).data := {if (isReduce) pipeReset.U else pipeRun.U}
       } else {
-        stateFF.io.input(0).data := Mux(state === pipeDone.U, pipeSpinWait.U, state) //Mux(state === pipeRun.U & io.input.ctr_done, pipeDone.U, state)) // Move along if enable turns on just as we reach done state
+        stateFF.io.input(0).data := Mux(state === pipeDone.U, pipeSpinWait.U, Mux(state === pipeRun.U & io.input.ctr_done, pipeDone.U, state)) // Move along if enable turns on just as we reach done state
       }
     }
   } else { // FSM inner

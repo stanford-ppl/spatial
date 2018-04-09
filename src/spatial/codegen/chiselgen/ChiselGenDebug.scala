@@ -13,6 +13,7 @@ trait ChiselGenDebug extends ChiselGenCommon {
 	case FixToText(_)  => 
     case TextConcat(_) => 
     case PrintIf(_,_) => 
+    case BitToText(_) => 
 	case _ => super.gen(lhs, rhs)
   }
 }

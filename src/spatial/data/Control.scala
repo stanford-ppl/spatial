@@ -53,6 +53,14 @@ object isOuter {
   def update(x: Sym[_], isOut: Boolean): Unit = if (isOut) levelOf(x) = OuterControl else levelOf(x) = InnerControl
 }
 
+/** A controller's level in the control hierarchy. */
+case class CtrParent(ctrParent: Sym[_]) extends StableData[CtrParent]
+object ctrlNodeOf {
+  def get(x: Sym[_]): Option[Sym[_]] = metadata[CtrParent](x).map(_.ctrParent)
+  def apply(x: Sym[_]): Sym[_] = ctrlNodeOf.get(x).getOrElse{throw new Exception(s"Undefined counter parent for $x") }
+  def update(x: Sym[_], ctrParent: Sym[_]): Unit = metadata.add(x, CtrParent(ctrParent))
+}
+
 /** The control schedule determined by the compiler. */
 case class ControlScheduling(sched: Sched) extends StableData[ControlScheduling]
 object styleOf {

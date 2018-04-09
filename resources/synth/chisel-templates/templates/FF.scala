@@ -140,7 +140,7 @@ class NBufFF(val numBufs: Int, val w: Int, val numWriters: Int = 1) extends Modu
     normal.data := chisel3.util.Mux1H(wrMask, (0 until numWriters).map{i => io.input(i).data})
     normal.init := chisel3.util.Mux1H(wrMask, (0 until numWriters).map{i => io.input(i).init})
     normal.enable := chisel3.util.Mux1H(wrMask, (0 until numWriters).map{i => io.input(i).enable}) & wrMask.reduce{_|_}
-    normal.reset := chisel3.util.Mux1H(wrMask, (0 until numWriters).map{i => io.input(i).reset})
+    normal.reset := chisel3.util.Mux1H(wrMask, (0 until numWriters).map{i => io.input(i).reset}) & wrMask.reduce{_|_}
     f.io.input(0) := Mux(io.broadcast.enable, io.broadcast, normal)
   }
 

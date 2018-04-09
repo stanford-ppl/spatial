@@ -18,6 +18,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixAnd(x,y)  => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := $x & $y")
     case FixOr(x,y)   => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := $x | $y")
     case FixXor(x,y)  => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := $x ^ $y")
+    case VecApply(vector, i) => emitGlobalWireMap(src"""$lhs""", src"""Wire(${lhs.tp})"""); emit(src"$lhs := $vector.apply($i)")
+
     // case FixLt(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x < $y")
     // case FixLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x <= $y")
     // case FixNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x =/= $y")

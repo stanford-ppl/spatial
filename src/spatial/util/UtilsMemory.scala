@@ -58,6 +58,18 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     def isReader: Boolean = Reader.unapply(x).isDefined
     def isWriter: Boolean = Writer.unapply(x).isDefined
 
+    def banks: Seq[Seq[Idx]] = {
+      x match {
+        case Op(SRAMBankedRead(_,bank,_,_)) => bank
+        case Op(SRAMBankedWrite(_,_,bank,_,_)) => bank
+        case _ => Console.println(s"NO BAKNING on $x");Seq(Seq())
+      }
+    }
+
+    def isDirectlyBanked: Boolean = {
+      if (x.banks.head.head.isConst) true else false
+    }
+
     /**
       * Returns the sequence of enables associated with this symbol
       */
@@ -157,6 +169,15 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     case Op(write: BankedAccessor[_,_]) => write.width
     case _ => 1
   }
+
+  def accessWidth(access: Sym[_]): Int = access match {
+    case Op(ba: BankedAccessor[_,_]) => ba.width
+    case _ => -1
+  }
+
+  def wPortMuxWidth(mem: Sym[_], port: Int): Int = writersOf(mem).map{portsOf(_).values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
+
+  def rPortMuxWidth(mem: Sym[_], port: Int): Int = readersOf(mem).map{portsOf(_).values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
 
   /**
     * Returns iterators between controller containing access (inclusive) and controller containing mem (exclusive).

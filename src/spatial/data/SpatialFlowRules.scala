@@ -45,6 +45,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case ctrl: Control[_] =>
       val children = op.blocks.flatMap(_.stms.filter(isControl))
       isOuter(s) = children.exists{s => !isBranch(s) || isOuterControl(s) } || isAccel(s)
+      if (!s.cchains.isEmpty) ctrlNodeOf(s.cchains.head) = s
       s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
       op.blocks.foreach{blk =>

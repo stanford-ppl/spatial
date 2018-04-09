@@ -30,6 +30,18 @@ class SRAMVerilogAWS[T <: Data](val t: T, val d: Int) extends BlackBox(
   val io = IO(new SRAMVerilogIO(t, d))
 }
 
+class SRAMVerilogAWS_URAM[T <: Data](val t: T, val d: Int) extends BlackBox(
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+{
+  val io = IO(new SRAMVerilogIO(t, d))
+}
+
+class SRAMVerilogAWS_BRAM[T <: Data](val t: T, val d: Int) extends BlackBox(
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+{
+  val io = IO(new SRAMVerilogIO(t, d))
+}
+
 class SRAMVerilogDE1SoC[T <: Data](val t: T, val d: Int) extends BlackBox(
   Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
 {
@@ -64,11 +76,15 @@ class FFRAM[T <: Data](override val t: T, override val d: Int) extends GenericRA
   io.rdata := rf.io.rdata
 }
 
-class SRAM[T <: Data](override val t: T, override val d: Int) extends GenericRAM(t, d) {
+class SRAM[T <: Data](override val t: T, override val d: Int, val resourceType: String) extends GenericRAM(t, d) {
   // Customize SRAM here
   FringeGlobals.target match {
     case "aws" | "zynq" | "zcu" | "arria10" =>
-      val mem = Module(new SRAMVerilogAWS(t, d))
+        val mem = resourceType match {
+            case "URAM" => Module(new SRAMVerilogAWS_URAM(t, d))
+            case "BRAM" => Module(new SRAMVerilogAWS_BRAM(t, d))
+            case _      => Module(new SRAMVerilogAWS(t, d))
+        }
       mem.io.clk := clock
       mem.io.raddr := io.raddr
       mem.io.wen := io.wen
@@ -83,17 +99,6 @@ class SRAM[T <: Data](override val t: T, override val d: Int) extends GenericRAM
       val equalReg = RegNext(io.wen & (io.raddr === io.waddr), false.B)
       val wdataReg = RegNext(io.wdata.asUInt, 0.U)
       io.rdata := Mux(equalReg, wdataReg.asUInt, mem.io.rdata).asTypeOf(t)
-
-    case "DE1" | "de1soc" =>
-      val mem = Module(new SRAMVerilogDE1SoC(t, d))
-      mem.io.clk := clock
-      mem.io.raddr := io.raddr
-      mem.io.wen := io.wen
-      mem.io.waddr := io.waddr
-      mem.io.wdata := io.wdata.asUInt()
-      mem.io.flow := io.flow
-      mem.io.raddrEn := true.B
-      mem.io.waddrEn := true.B
 
     case _ =>
       val mem = Module(new SRAMVerilogSim(t, d))

@@ -24,11 +24,11 @@ object FringeGlobals {
   def target = _target
   def target_= (value: String): Unit = {
     bigIP = value match {
-      case "zynq" | "zcu" => new fringeZynq.bigIP.BigIPZynq()
-      case "aws"          => new fringeAWS.bigIP.BigIPAWS()
-      // case "de1soc"       => new fringeDE1SoC.bigIP.BigIPDE1SoC()
-      case "asic"         => new fringeASIC.bigIP.BigIPASIC()
-      case _              => new fringe.bigIP.BigIPSim()
+      case "zynq" | "zcu"    => new fringeZynq.bigIP.BigIPZynq()
+      case "aws" | "aws-sim" => new fringeAWS.bigIP.BigIPAWS()
+      case "asic"            => new fringeASIC.bigIP.BigIPASIC()
+      case "vcs"             => new fringeZynq.bigIP.BigIPZynq()
+      case _                 => new fringe.bigIP.BigIPSim()
     }
 
     magPipelineDepth = value match {

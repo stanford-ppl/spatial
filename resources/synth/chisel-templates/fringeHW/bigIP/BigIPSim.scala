@@ -62,7 +62,7 @@ class BigIPSim extends BigIP {
     }
   }
 
-  def fadd(a: UInt, b: UInt, m: Int, e: Int): UInt = {
+  def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt = {
     val result = Wire(new FloatingPoint(m, e))
     val fma = Module(new MulAddRecFN(m, e))
     fma.io.a := recFNFromFN(m, e, a)

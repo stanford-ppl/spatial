@@ -9,7 +9,6 @@ trait ChiselFileGen extends ChiselCodegen {
 
   backend = "accel"
 
-
   override def emitHeader(): Unit = {
 
     inGenn(out, "IOModule", ext) {
@@ -117,7 +116,7 @@ trait ChiselFileGen extends ChiselCodegen {
     super.emitHeader()
   }
 
-  override protected def emitEntry(block: Block[_]): Unit = {  }
+  override protected def emitEntry(block: Block[_]): Unit = { gen(block) }
 
   override def emitFooter(): Unit = {
 

@@ -29,6 +29,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argOutLoopbacks = scala.collection.mutable.HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
   var drams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var streamCtrCopy = List[Sym[_]]()
 
   def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getReadStreams).toSet ++
@@ -51,6 +52,56 @@ trait ChiselGenCommon extends ChiselCodegen {
       0.0 // FIXME
     } else {
       0.0
+    }
+  }
+
+  def emitCounterChain(lhs: Sym[_], suffix: String = ""): Unit = {
+    if (!lhs.cchains.isEmpty) {
+      val cchain = lhs.cchains.head
+      var isForever = cchain.isForever
+      val w = bitWidth(cchain.ctrs.head.typeArgs.head)
+      val counter_data = cchain.ctrs.map{ ctr => ctr match {
+        case Op(CounterNew(start, end, step, par)) => 
+          val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
+          val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
+          val (stride_wire, stride_constr) = step match {case Final(st) => (src"${st}.FP(true, $w, 0)", src"Some($st)"); case _ => (quote(step), "None")}
+          val par_wire = {src"$par"}.split('.').take(1)(0) // TODO: What is this doing?
+          (start_wire, end_wire, stride_wire, par_wire, start_constr, end_constr, stride_constr, "Some(0)")
+        case Op(ForeverNew()) => 
+          isForever = true
+          ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
+      }}
+      emitGlobalWireMap(src"""${cchain}${suffix}_done""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${cchain}${suffix}_en""", """Wire(Bool())""") // Dangerous but whatever
+      emitGlobalWireMap(src"""${cchain}${suffix}_resetter""", """Wire(Bool())""")
+      emitGlobalModule(src"""val ${cchain}${suffix}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
+      emitGlobalModule(src"""val ${cchain}${suffix}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
+      emitGlobalModule(src"""val ${cchain}${suffix}_starts = List(${counter_data.map{_._1}}) """)
+      emitGlobalModule(src"""val ${cchain}${suffix} = Module(new templates.Counter(List(${counter_data.map(_._4)}), """ + 
+                       src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
+                       src"""List(${counter_data.map(_._8)}), List(${cchain.ctrs.map(c => bitWidth(c.typeArgs.head))})))""") 
+
+      emit(src"""${cchain}${suffix}.io.input.stops.zip(${cchain}${suffix}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
+      emit(src"""${cchain}${suffix}.io.input.strides.zip(${cchain}${suffix}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
+      emit(src"""${cchain}${suffix}.io.input.starts.zip(${cchain}${suffix}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
+      emit(src"""${cchain}${suffix}.io.input.gaps.foreach { gap => gap := 0.S }""")
+      emit(src"""${cchain}${suffix}.io.input.saturate := false.B""")
+      emit(src"""${cchain}${suffix}.io.input.enable := ${swap(src"${cchain}${suffix}", En)}""")
+      emit(src"""${swap(src"${cchain}${suffix}", Done)} := ${cchain}${suffix}.io.output.done""")
+      emit(src"""${cchain}${suffix}.io.input.reset := ${swap(src"${cchain}${suffix}", Resetter)}""")
+      if (suffix != "") {
+        emit(src"""${cchain}${suffix}.io.input.isStream := true.B""")
+      } else {
+        emit(src"""${cchain}${suffix}.io.input.isStream := false.B""")      
+      }
+      emit(src"""val ${cchain}${suffix}_maxed = ${cchain}${suffix}.io.output.saturated""")
+      cchain.ctrs.zipWithIndex.foreach { case (c, i) =>
+        val x = c.ctrPar.toInt
+        if (suffix == "") {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)))""")}
+        else {emitGlobalWire(s"""val ${quote(c)}${suffix} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)) }""")}
+        emit(s"""(0 until $x).map{ j => ${quote(c)}${suffix}(j) := ${quote(cchain)}${suffix}.io.output.counts($i + j) }""")
+      }
+
     }
   }
 
@@ -108,79 +159,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     0.0 // FIXME
   }
 
-  def emitCounterChain(lhs: CounterChain, suffix: String = ""): Unit = {
-    val ctrs = lhs.ctrs.toList
-    var isForever = false
-    // Temporarily shove ctrl node onto stack so the following is quoted properly
-    if (cchainPassMap.contains(lhs)) {controllerStack.push(cchainPassMap(lhs))}
-    val counter_data = ctrs.map{ ctr => ctr match {
-      case Op(CounterNew(start, end, step, par)) => 
-        val w = bitWidth(ctr.typeArgs.head)
-        (start,end) match { 
-          case (Final(s), Final(e)) => (src"${s}.FP(true, $w, 0)", src"${e}.FP(true, $w, 0)", src"$step", {src"$par"}.split('.').take(1)(0), src"$w")
-          case _ => (src"$start", src"$end", src"$step", {src"$par"}.split('.').take(1)(0), src"$w")
-        }
-      case Op(ForeverNew()) => 
-        isForever = true
-        ("0.S", "999.S", "1.S", "1", "32") 
-    }}
-    // TODO: Combine the below with the above, just monkeypatched this to fix issue #233
-    val counter_construction = ctrs.map{ ctr => ctr match {
-      case Op(CounterNew(start, end, step, par)) => 
-        val st = start match {
-          case Final(s) => src"Some($s)"
-          case _ => "None"
-        }
-        val en = end match {
-          case Final(s) => src"Some($s)"
-          case _ => "None"
-        }
-        val ste = step match {
-          case Final(s) => src"Some($s)"
-          case _ => "None"
-        }
-        (st, en, ste, "Some(0)")
-      case Op(ForeverNew()) => 
-        isForever = true
-        ("Some(0)", "Some(999)", "Some(1)", "Some(0)") 
-    }}
-    if (cchainPassMap.contains(lhs)) {controllerStack.pop()}
-    // disableSplit = true
-    emitGlobalWireMap(src"""${lhs}${suffix}_done""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${lhs}${suffix}_en""", """Wire(Bool())""") // Dangerous but whatever
-    emitGlobalWireMap(src"""${lhs}${suffix}_resetter""", """Wire(Bool())""")
-    emitGlobalModule(src"""val ${lhs}${suffix}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
-    emitGlobalModule(src"""val ${lhs}${suffix}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
-    emitGlobalModule(src"""val ${lhs}${suffix}_starts = List(${counter_data.map{_._1}}) """)
-    emitGlobalModule(src"""val ${lhs}${suffix} = Module(new templates.Counter(List(${counter_data.map(_._4)}), 
-  List(${counter_construction.map(_._1)}), List(${counter_construction.map(_._2)}), List(${counter_construction.map(_._3)}), List(${counter_construction.map(_._4)}), List(${counter_data.map(_._5)}))) // Par of 0 creates forever counter""")
-
-    emit(src"""${lhs}${suffix}.io.input.stops.zip(${lhs}${suffix}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
-    emit(src"""${lhs}${suffix}.io.input.strides.zip(${lhs}${suffix}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
-    emit(src"""${lhs}${suffix}.io.input.starts.zip(${lhs}${suffix}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
-    emit(src"""${lhs}${suffix}.io.input.gaps.foreach { gap => gap := 0.S }""")
-    emit(src"""${lhs}${suffix}.io.input.saturate := false.B""")
-    emit(src"""${lhs}${suffix}.io.input.enable := ${swap(src"${lhs}${suffix}", En)}""")
-    emit(src"""${swap(src"${lhs}${suffix}", Done)} := ${lhs}${suffix}.io.output.done""")
-    emit(src"""${lhs}${suffix}.io.input.reset := ${swap(src"${lhs}${suffix}", Resetter)}""")
-    if (suffix != "") {
-      emit(src"""${lhs}${suffix}.io.input.isStream := true.B""")
-    } else {
-      emit(src"""${lhs}${suffix}.io.input.isStream := false.B""")      
-    }
-    emit(src"""val ${lhs}${suffix}_maxed = ${lhs}${suffix}.io.output.saturated""")
-    ctrs.zipWithIndex.foreach { case (c, i) =>
-      val x = c match {
-        case Op(CounterNew(_,_,_,Literal(p))) => p
-        case Op(ForeverNew()) => 1
-      }
-      if (suffix == "") {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${counter_data(i)._5}.W)))""")}
-      else {emitGlobalWire(s"""val ${quote(c)}${suffix} = (0 until $x).map{ j => Wire(SInt(${counter_data(i)._5}.W)) }""")}
-      emit(s"""(0 until $x).map{ j => ${quote(c)}${suffix}(j) := ${quote(lhs)}${suffix}.io.output.counts($i + j) }""")
-    }
-
-    // disableSplit = false
-  }
 
   protected def emitInhibitor(lhs: Sym[_], fsm: Option[Sym[_]] = None, switch: Option[Sym[_]]): Unit = {
     if (cfg.enableRetiming) {
@@ -313,28 +291,28 @@ trait ChiselGenCommon extends ChiselCodegen {
       case lat: Int => 
         if (!controllerStack.isEmpty) {
           if (isStreamChild(controllerStack.head) & streamOuts != "") {
-            if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
+            if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {
-            if (isBit) src"(${name}).D(${latency}.toInt, rr)"
+            if (isBit) src"(${name}).D($latency, rr)"
             else src"Utils.getRetimed($name, $latency)"          
           }
         } else {
-          if (isBit) src"(${name}).D(${latency}.toInt, rr)"
+          if (isBit) src"(${name}).D($latency, rr)"
           else src"Utils.getRetimed($name, $latency)"                    
         }
       case lat: Double => 
         if (!controllerStack.isEmpty) {
           if (isStreamChild(controllerStack.head) & streamOuts != "") {
-            if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, $latency, ${streamOuts})"
+            if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
+            else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
           } else {
-            if (isBit) src"(${name}).D(${latency}.toInt, rr)"
-            else src"Utils.getRetimed($name, $latency)"
+            if (isBit) src"(${name}).D(${lat.toInt}, rr)"
+            else src"Utils.getRetimed($name, ${lat.toInt})"
           }
         } else {
-          if (isBit) src"(${name}).D(${latency}.toInt, rr)"
-          else src"Utils.getRetimed($name, $latency)"
+          if (isBit) src"(${name}).D(${lat.toInt}, rr)"
+          else src"Utils.getRetimed($name, ${lat.toInt})"
         }
       case lat: String => 
         if (!controllerStack.isEmpty) {
@@ -394,120 +372,7 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   protected def bitWidth(tp: Type[_]) = tp match {case FixPtType(s,d,f) => d+f; case FltPtType(g,e) => g+e; case _ => 32}
 
-  final protected def wireMap(x: String): String = { 
-    if (cfg.compressWires == 1 | cfg.compressWires == 2) {
-      if (compressorMap.contains(x)) {
-        src"${listHandle(compressorMap(x)._1)}(${compressorMap(x)._2})"
-      } else {
-        x
-      }
-    } else {
-      x
-    }
-  }
 
-  final protected def listHandle(rhs: String): String = {
-    val vec = if (rhs.contains("Vec")) {
-      val width_extractor = "Wire\\([ ]*Vec\\(([0-9]+)[ ]*,.*".r
-      val width_extractor(vw) = rhs
-      s"vec${vw}_"
-    } else {""}
-    if (rhs.contains("Bool()")) {
-      s"${vec}b"
-    } else if (rhs.contains("SRFF()")) {
-      s"${vec}srff"
-    } else if (rhs.contains("UInt(")) {
-      val extractor = ".*UInt\\(([0-9]+).W\\).*".r
-      val extractor(width) = rhs
-      s"${vec}u${width}"
-    } else if (rhs.contains("SInt(")) {
-      val extractor = ".*SInt\\(([0-9]+).W\\).*".r
-      val extractor(width) = rhs
-      s"${vec}s${width}"      
-    } else if (rhs.contains(" FixedPoint(")) {
-      val extractor = ".*FixedPoint\\([ ]*(.*)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(s,i,f) = rhs
-      val ss = if (s.contains("rue")) "s" else "u"
-      s"${vec}fp${ss}${i}_${f}"            
-    } else if (rhs.contains(" FloatingPoint(")) {
-      val extractor = ".*FloatingPoint\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(m,e) = rhs
-      s"${vec}flt${m}_${e}"            
-    } else if (rhs.contains(" NBufFF(") && !rhs.contains("numWriters")) {
-      val extractor = ".*NBufFF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(d,w) = rhs
-      s"${vec}nbufff${d}_${w}"  
-    } else if (rhs.contains(" NBufFF(") && rhs.contains("numWriters")) {
-      val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*numWriters[ ]*=[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(d,w,n) = rhs
-      s"${vec}ff${d}_${w}_${n}wr"  
-    } else if (rhs.contains(" templates.FF(")) {
-      val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(d,w) = rhs
-      s"${vec}ff${d}_${w}"  
-    } else if (rhs.contains(" multidimR(")) {
-      val extractor = ".*multidimR\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(n,dims,w) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}mdr${n}_${d}_${w}"  
-    } else if (rhs.contains(" multidimW(")) {
-      val extractor = ".*multidimW\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(n,dims,w) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}mdw${n}_${d}_${w}"  
-    } else if (rhs.contains(" multidimRegW(")) {
-      val extractor = ".*multidimRegW\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9, ]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(n,dims,w) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}mdrw${n}_${d}_${w}"  
-    } else if (rhs.contains(" Seqpipe(")) {
-      val extractor = ".*Seqpipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
-      val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}seq${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Metapipe(")) {
-      val extractor = ".*Metapipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
-      val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}meta${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Innerpipe(")) {
-      val extractor = ".*Innerpipe\\([ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(strm,ctrd,stw,static,isRed) = rhs
-      val st = strm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}inner${st}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Streaminner(")) {
-      val extractor = ".*Streaminner\\([ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(strm,ctrd,stw,static,isRed) = rhs
-      val st = strm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}strinner${st}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Parallel(")) {
-      val extractor = ".*Parallel\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
-      val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}parallel${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Streampipe(")) {
-      val extractor = ".*Streampipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
-      val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}strmpp${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains("_retime")) {
-      "rt"
-    } else {
-      throw new Exception(s"Cannot compress ${rhs}!")
-    }
-  }
 
   def swap(tup: (Sym[_], RemapSignal)): String = { swap(tup._1, tup._2) }
 

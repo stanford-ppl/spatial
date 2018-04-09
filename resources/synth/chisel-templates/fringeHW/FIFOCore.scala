@@ -159,7 +159,7 @@ class FIFOCore[T<:Data](override val t: T, override val d: Int, override val v: 
   val mems = List.fill(bankCount) {
     List.fill(v) {
       if (w == 1 || banked || depth == 1) Module(new FFRAM(t, depth)) else {
-        val sram = Module(new SRAM(t, depth))
+        val sram = Module(new SRAM(t, depth, "VIVADO_SELECT"))
         sram.io.flow := true.B
         sram
       }

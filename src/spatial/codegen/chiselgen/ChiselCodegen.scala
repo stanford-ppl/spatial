@@ -2,13 +2,14 @@ package spatial.codegen.chiselgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
+import spatial.codegen.naming._
 import spatial.internal.{spatialConfig => cfg}
 import emul.FloatPoint
 import emul.FixedPoint
 import spatial.lang._
 import spatial.node._
 
-trait ChiselCodegen extends FileDependencies  {
+trait ChiselCodegen extends NamedCodegen with FileDependencies {
   override val lang: String = "chisel"
   override val ext: String = "scala"
   override def entryFile: String = s"RootController_1.$ext"
@@ -59,14 +60,143 @@ trait ChiselCodegen extends FileDependencies  {
     case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
     case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
     case BitType() => "Bool()"
-    // case tp: VectorType[_] => src"Vec(${tp.width}, ${tp.typeArguments.head})"
+    // case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => super.remap(tp)
+  }
+
+  final protected def wireMap(x: String): String = { 
+    if (cfg.compressWires == 1 | cfg.compressWires == 2) {
+      if (compressorMap.contains(x)) {
+        src"${listHandle(compressorMap(x)._1)}(${compressorMap(x)._2})"
+      } else {
+        x
+      }
+    } else {
+      x
+    }
+  }
+
+  final protected def listHandle(rhs: String): String = {
+    val vec = if (rhs.contains("Vec")) {
+      val width_extractor = "Wire\\([ ]*Vec\\(([0-9]+)[ ]*,.*".r
+      val width_extractor(vw) = rhs
+      s"vec${vw}_"
+    } else {""}
+      if (rhs.contains("Bool()")) {
+      s"${vec}b"
+    } else if (rhs.contains("SRFF()")) {
+      s"${vec}srff"
+    } else if (rhs.contains("UInt(")) {
+      val extractor = ".*UInt\\(([0-9]+).W\\).*".r
+      val extractor(width) = rhs
+      s"${vec}u${width}"
+    } else if (rhs.contains("SInt(")) {
+      val extractor = ".*SInt\\(([0-9]+).W\\).*".r
+      val extractor(width) = rhs
+      s"${vec}s${width}"
+    } else if (rhs.contains(" FixedPoint(")) {
+      val extractor = ".*FixedPoint\\([ ]*(.*)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(s,i,f) = rhs
+      val ss = if (s.contains("rue")) "s" else "u"
+      s"${vec}fp${ss}${i}_${f}"
+    } else if (rhs.contains(" FloatingPoint(")) {
+      val extractor = ".*FloatingPoint\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(m,e) = rhs
+      s"${vec}flt${m}_${e}"
+    } else if (rhs.contains(" NBufFF(") && !rhs.contains("numWriters")) {
+      val extractor = ".*NBufFF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(d,w) = rhs
+      s"${vec}nbufff${d}_${w}"
+    } else if (rhs.contains(" NBufFF(") && rhs.contains("numWriters")) {
+      val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*numWriters[ ]*=[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(d,w,n) = rhs
+      s"${vec}ff${d}_${w}_${n}wr"
+    } else if (rhs.contains(" templates.FF(")) {
+      val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(d,w) = rhs
+      s"${vec}ff${d}_${w}"
+    } else if (rhs.contains(" R_Info(")) {
+      val extractor = ".*R_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
+      val extractor(n,dims) = rhs
+      val d = dims.replace(" ", "").replace(",","_")
+      s"${vec}mdr${n}_${d}"
+    } else if (rhs.contains(" W_Info(")) {
+      val extractor = ".*W_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(n,dims,w) = rhs
+      val d = dims.replace(" ", "").replace(",","_")
+      s"${vec}mdw${n}_${d}_${w}"
+    } else if (rhs.contains(" RegR_Info(")) {
+      val extractor = ".*RegR_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
+      val extractor(n,dims) = rhs
+      val d = dims.replace(" ", "").replace(",","_")
+      s"${vec}ri${n}_${d}"
+    } else if (rhs.contains(" RegW_Info(")) {
+      val extractor = ".*RegW_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(n,dims,w) = rhs
+      val d = dims.replace(" ", "").replace(",","_")
+      s"${vec}wi${n}_${d}_${w}"
+    } else if (rhs.contains(" multidimRegW(")) {
+      val extractor = ".*multidimRegW\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9, ]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(n,dims,w) = rhs
+      val d = dims.replace(" ", "").replace(",","_")
+      s"${vec}mdrw${n}_${d}_${w}"
+    } else if (rhs.contains(" Seqpipe(")) {
+      val extractor = ".*Seqpipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
+      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
+      val f = fsm.replace("false", "f").replace("true", "t")
+      val s = static.replace("false", "f").replace("true", "t")
+      val ir = isRed.replace("false", "f").replace("true", "t")
+      s"${vec}seq${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
+    } else if (rhs.contains(" Metapipe(")) {
+      val extractor = ".*Metapipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
+      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
+      val f = fsm.replace("false", "f").replace("true", "t")
+      val s = static.replace("false", "f").replace("true", "t")
+      val ir = isRed.replace("false", "f").replace("true", "t")
+      s"${vec}meta${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
+    } else if (rhs.contains(" Innerpipe(")) {
+      val extractor = ".*Innerpipe\\([ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
+      val extractor(strm,ctrd,stw,static,isRed) = rhs
+      val st = strm.replace("false", "f").replace("true", "t")
+      val s = static.replace("false", "f").replace("true", "t")
+      val ir = isRed.replace("false", "f").replace("true", "t")
+      s"${vec}inner${st}_${ctrd}_${stw}_${s}_${ir}"
+    } else if (rhs.contains(" Streaminner(")) {
+      val extractor = ".*Streaminner\\([ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
+      val extractor(strm,ctrd,stw,static,isRed) = rhs
+      val st = strm.replace("false", "f").replace("true", "t")
+      val s = static.replace("false", "f").replace("true", "t")
+      val ir = isRed.replace("false", "f").replace("true", "t")
+      s"${vec}strinner${st}_${ctrd}_${stw}_${s}_${ir}"
+    } else if (rhs.contains(" Parallel(")) {
+      val extractor = ".*Parallel\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
+      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
+      val f = fsm.replace("false", "f").replace("true", "t")
+      val s = static.replace("false", "f").replace("true", "t")
+      val ir = isRed.replace("false", "f").replace("true", "t")
+      s"${vec}parallel${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
+    } else if (rhs.contains(" Streampipe(")) {
+      val extractor = ".*Streampipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
+      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
+      val f = fsm.replace("false", "f").replace("true", "t")
+      val s = static.replace("false", "f").replace("true", "t")
+      val ir = isRed.replace("false", "f").replace("true", "t")
+      s"${vec}strmpp${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
+    } else if (rhs.contains("_retime")) {
+      "rt"
+    } else {
+      throw new Exception(s"Cannot compress ${rhs}!")
+    }
   }
 
   override def named(s: Sym[_], id: Int): String = s.op match {
     case Some(rhs) => rhs match {
       case _: AccelScope       => s"RootController"
+      case DelayLine(size, data) => data match {
+        case Const(_) => src"$data"
+        case _ => wireMap(src"${data}_D$size" + alphaconv.getOrElse(src"${data}_D$size", ""))
+      }
       case _ => super.named(s, id)
     }
     case _ => super.named(s, id)
@@ -259,6 +389,7 @@ trait ChiselCodegen extends FileDependencies  {
     val resourcesPath = "synth/chisel-templates"
 
     dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
+    dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
     dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
     dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
     dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")

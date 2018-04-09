@@ -13,10 +13,10 @@ deepest=`grep -r "Deepest" chisel/IOModule.scala | sed "s/^.*: //g" | sed "s/ //
 appname=`basename \`pwd\``
 classname=`basename \`dirname \\\`pwd\\\`\``
 
-echo "$appname,$classname,depths,$depths" >> /home/mattfel/spatial-lang/stats.csv
-echo "$appname,$classname,widths,$widths" >> /home/mattfel/spatial-lang/stats.csv
-echo "$appname,$classname,deepest,$deepest" >> /home/mattfel/spatial-lang/stats.csv
-echo "$appname,$classname,widest,$widest" >> /home/mattfel/spatial-lang/stats.csv
+echo "$appname,$classname,depths,$depths" >> /home/mattfel/spatial/stats.csv
+echo "$appname,$classname,widths,$widths" >> /home/mattfel/spatial/stats.csv
+echo "$appname,$classname,deepest,$deepest" >> /home/mattfel/spatial/stats.csv
+echo "$appname,$classname,widest,$widest" >> /home/mattfel/spatial/stats.csv
 
 # Fake out regression
 echo "PASS: 1"

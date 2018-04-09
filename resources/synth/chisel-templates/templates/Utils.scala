@@ -6,6 +6,9 @@ import chisel3.util._
 import chisel3.internal.sourceinfo._
 import types._
 import fringe._
+import emul._
+
+import scala.math._
 
 sealed trait DeviceTarget
 object Default extends DeviceTarget
@@ -584,7 +587,7 @@ object Utils {
   var sramload_latency = 0
   var sramstore_latency = 0
   var tight_control = false
-  var SramThreshold = 4 // Threshold between turning Mem1D into register array vs real memory
+  var SramThreshold = 0 // Threshold between turning Mem1D into register array vs real memory
   var mux_latency = 1
   var retime = false
 
@@ -620,7 +623,102 @@ object Utils {
     result.r := fNFromRecFN(m, e, fma.io.out)
     result
   }
-  def getFloatBits(num: Float) = java.lang.Float.floatToRawIntBits(num)
+
+  def fadd(num1: FloatingPoint, num2: FloatingPoint, latency: Int): FloatingPoint = {
+      val m = num1.m
+      val e = num1.e
+      val result = Wire(new FloatingPoint(m, e))
+      result.r := FringeGlobals.bigIP.fadd(num1.r, num2.r, m, e, latency)
+      result
+  }
+
+  def fabs(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+    result.r := FringeGlobals.bigIP.fabs(num.r, num.m, num.e)
+    result
+  }
+
+  def fexp(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+//    val fma = Module(new DivSqrtRecFN_small(m,e,0))
+//    fma.io.a := num.r
+//    fma.io.inValid := true.B // TODO: What should this be?
+//    fma.io.sqrtOp := true.B // TODO: What should this be?
+//    fma.io.roundingMode := 0.U(3.W) // TODO: What should this be?
+//    fma.io.detectTininess := true.B // TODO: What should this be?
+//    result.r := fNFromRecFN(m, e, fma.io.out)
+    result.r := FringeGlobals.bigIP.fexp(num.r, num.m, num.e)
+    result
+  }
+
+  def tanh(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+
+    val one = Utils.FloatPoint(m, e, 1)
+    val two = Utils.FloatPoint(m, e, 2)
+
+    val t2 = two *-* num
+    val exp2t = fexp(t2)
+    val out = (exp2t - one) /-/ (exp2t + one)
+    out
+  }
+
+  def sigmoid(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val one = Utils.FloatPoint(m, e, 1)
+
+    val result = Wire(new FloatingPoint(m, e))
+    result := frec(fexp(-num) + one)
+    result
+  }
+
+  def flog(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+    result.r := FringeGlobals.bigIP.flog(num.r, num.m, num.e)
+    result
+  }
+
+  def fsqrt(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+    result.r := FringeGlobals.bigIP.fsqrt(num.r, num.m, num.e)
+    result
+  }
+  
+  def frec(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+    result.r := FringeGlobals.bigIP.frec(num.r, num.m, num.e)
+    result
+  }
+  
+  def frsqrt(num: FloatingPoint): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+    result.r := FringeGlobals.bigIP.frsqrt(num.r, num.m, num.e)
+    result
+  }
+
+  def fltaccum(num: FloatingPoint, en: Bool, last: Bool): FloatingPoint = {
+    val m = num.m
+    val e = num.e
+    val result = Wire(new FloatingPoint(m, e))
+    result.r := FringeGlobals.bigIP.fltaccum(num.r, en, last, num.m, num.e)
+    result
+  }
+
+
   // def getDoubleBits(num: Double) = java.lang.Double.doubleToRawIntBits(num)
   def delay[T <: chisel3.core.Data](sig: T, length: Int):T = {
     if (length == 0) {
@@ -648,6 +746,16 @@ object Utils {
           (regs(length-1)).asInstanceOf[T]
       }
     }
+  }
+
+  def frand(seed: Int, m: Int, e: Int): FloatingPoint = {
+      val size = m+e
+
+      val flt_rng = Module(new PRNG(seed, size))
+      val result = Wire(new FloatingPoint(m, e))
+      flt_rng.io.en := true.B
+      result.r := flt_rng.io.output
+      result
   }
 
   def streamCatchDone(in_done: Bool, ready: Bool, retime: Int, rr: Bool, reset: Bool): Bool = {
@@ -709,21 +817,25 @@ object Utils {
     cst
   }
 
+  def getFloatBits(num: Float) = java.lang.Float.floatToRawIntBits(num)
+
   def FloatPoint[T](m: Int, e: Int, init: T): FloatingPoint = {
     val cst = Wire(new FloatingPoint(m, e))
-    init match {
-      case i: Double => cst.raw := getFloatBits(i.toFloat).S.asUInt
-      case i: Bool => cst.r := mux(i, getFloatBits(1f).U, getFloatBits(0f).U)
-      // case i: UInt => 
-      // case i: SInt => 
-      case i: Int => cst.raw := getFloatBits(i.toFloat).U
-    }
+  //   val fmt = emul.FltFormat(m - 1, e)
+  //   init match {
+  //     case i: Int    => cst.raw := emul.FloatPoint(i, fmt).rawBitsAsInt.U
+  //     case i: Float  => cst.raw := emul.FloatPoint(i, fmt).rawBitsAsInt.S.asUInt
+  //     case i: Double => cst.raw := emul.FloatPoint(i, fmt).rawBitsAsInt.S.asUInt
+  //     case i: Bool   => cst.r := mux(i, getFloatBits(1f).U, getFloatBits(0f).U)
+  //     // case i: UInt => 
+  //     // case i: SInt =>
+  //   }
     cst
   }
 
   // def Cat[T1 <: chisel3.core.Data, T2 <: chisel3.core.Data](x1: T1, x2: T2): UInt = {
   //   val raw_x1 = x1 match {
-  //     case x:UInt => x
+  //     case x:uint => x
   //     case x:FixedPoint => x.raw
   //   }
   //   val raw_x2 = x2 match {

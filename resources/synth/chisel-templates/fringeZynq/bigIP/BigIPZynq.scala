@@ -90,8 +90,8 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     }
   }
 
-  def fadd(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
-    val m = Module(new FAdd(mw, e))
+  def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int): UInt = {
+    val m = Module(new FAdd(mw, e, latency))
     m.io.a := a
     m.io.b := b
     m.io.out
@@ -149,6 +149,65 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     val m = Module(new FNe(mw, e))
     m.io.a := a
     m.io.b := b
+    m.io.out
+  }
+  override def fabs(a: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FAbs(mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def fexp(a: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FExp(mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def flog(a: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FLog(mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def fsqrt(a: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FSqrt(mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def frec(a: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FRec(mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def frsqrt(a: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FRSqrt(mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def ffma(a: UInt, b: UInt, c: UInt, mw: Int, e: Int): UInt = {
+    val m = Module(new FFma(mw, e))
+    m.io.a := a
+    m.io.b := b
+    m.io.c := c
+    m.io.out
+  }
+  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, mw: Int, e: Int): UInt = {
+    val m = Module(new Fix2Float(dec, frac, mw, e))
+    m.io.a := a
+    m.io.out
+  }
+  override def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int): UInt = {
+    val m = Module(new Float2Fix(mw, e, sign, dec, frac))
+    m.io.a := a
+    m.io.out
+  }
+  override def flt2flt(a: UInt, mwa: Int, ea: Int, mw_out: Int, e_out: Int): UInt = {
+    val m = Module(new Float2Float(mwa, ea, mw_out, e_out))
+    m.io.a := a
+    m.io.out
+  }
+  override def fltaccum(a: UInt, en: Bool, last: Bool, mw: Int, e: Int): UInt = {
+    val m = Module(new FAccum(mw, e))
+    m.io.a := a
+    m.io.en := en
+    m.io.last := last
     m.io.out
   }
 

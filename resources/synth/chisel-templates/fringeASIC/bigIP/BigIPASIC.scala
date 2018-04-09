@@ -90,7 +90,7 @@ class BigIPASIC extends BigIP with ASICBlackBoxes {
     }
   }
 
-  def fadd(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
+  def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int): UInt = {
     val m = Module(new FAdd(mw, e))
     m.io.a := a
     m.io.b := b

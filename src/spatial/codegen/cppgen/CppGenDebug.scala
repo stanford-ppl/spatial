@@ -18,6 +18,7 @@ trait CppGenDebug extends CppGenCommon {
     case PrintIf(cond,x)   => 
     	if (cond.isEmpty) emit(src"""std::cout << $x;""")
     	else emit(src"""if ( ${cond.toList.mkString(" & ")} ) std::cout << $x;""")
+    case BitToText(x) => emit(src"""${lhs.tp} $lhs = $x ? string("true") : string("false");""")
     case _ => super.gen(lhs, rhs)
   }
 

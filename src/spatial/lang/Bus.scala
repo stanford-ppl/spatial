@@ -1,13 +1,15 @@
 package spatial.lang
 
+import argon.Mirrorable
 import spatial.tags._
 
 case class Pin(name: String) {
   override def toString: String = name
 }
 
-abstract class Bus {
+abstract class Bus extends Mirrorable[Bus] {
   def length: Int
+  def mirror(f:Tx) = this
 }
 
 object Bus {
@@ -20,8 +22,8 @@ case class PinBus(valid: Pin, data: Seq[Pin]) extends Bus {
   def length: Int = data.length
 }
 
-@struct case class BurstCmd(offset: I64, size: I32, isLoad: Bit) extends Bits
-@struct case class IssuedCmd(size: I32, start: I32, end: I32) extends Bits
+@struct case class BurstCmd(offset: I64, size: I32, isLoad: Bit)
+@struct case class IssuedCmd(size: I32, start: I32, end: I32)
 
 abstract class DRAMBus[A:Bits] extends Bus { def length: Int = Bits[A].nbits }
 

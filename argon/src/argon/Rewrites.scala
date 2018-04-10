@@ -23,7 +23,7 @@ class Rewrites {
 
   // Roughly O(R), where R is the number of rules for a specific node class
   private val rules: mutable.HashMap[Class[_], ArrayBuffer[RewriteRule]] = mutable.HashMap.empty
-  private val names: mutable.HashSet[String] = mutable.HashSet.empty
+  private[argon] val names: mutable.HashSet[String] = mutable.HashSet.empty
 
   def rule(op: Op[_]): Seq[RewriteRule] = rules.getOrElse(op.getClass, Nil)
 
@@ -42,6 +42,10 @@ class Rewrites {
   private def applyRule[A:Type](op: Op[A], ctx: SrcCtx, state: State, rule: RewriteRule): Option[A] = {
     rule.apply((op,ctx,state)) match {
       case Some(s) if s.tp <:< Type[A] => Some(s.asInstanceOf[A])
+      case Some(s) =>
+        implicit val IR: State = state
+        dbgs(s"Ignoring rewrite rule for $op: ${s.tp} was not subtype of ${Type[A]}")
+        None
       case _ => None
     }
   }

@@ -115,9 +115,19 @@ abstract class Transformer extends Pass {
   }
   final def mirrorProduct[T<:Product](x: T): T = {
     // Note: this only works if the case class has no implicit parameters!
-    val constructor = x.getClass.getConstructors.head
-    val inputs = x.productIterator.map{x => f(x).asInstanceOf[Object] }.toSeq
-    constructor.newInstance(inputs:_*).asInstanceOf[T]
+    val constructors = x.getClass.getConstructors
+    if (constructors.isEmpty) x
+    else {
+      try {
+        val constructor = x.getClass.getConstructors.head
+        val inputs = x.productIterator.map { x => f(x).asInstanceOf[Object] }.toSeq
+        constructor.newInstance(inputs: _*).asInstanceOf[T]
+      }
+      catch { case t:Throwable =>
+        bug(s"Could not mirror $x")
+        throw t
+      }
+    }
   }
 
   final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {

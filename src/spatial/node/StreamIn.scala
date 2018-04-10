@@ -4,7 +4,7 @@ import argon._
 import forge.tags.op
 import spatial.lang._
 
-case class StreamInNew[A:Bits](bus: Bus) extends MemAlloc[A,StreamIn] {
+@op case class StreamInNew[A:Bits](bus: Bus) extends MemAlloc[A,StreamIn] {
   def dims: Seq[I32] = Seq(I32(1))
 }
 

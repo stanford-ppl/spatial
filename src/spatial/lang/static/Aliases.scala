@@ -54,6 +54,7 @@ trait InternalAliases extends CustomBitWidths {
   lazy val Fold    = spatial.lang.control.Fold
   lazy val MemReduce = spatial.lang.control.MemReduce
   lazy val MemFold   = spatial.lang.control.MemFold
+  lazy val FSM       = spatial.lang.control.FSM
 
   lazy val Pipe = spatial.lang.control.Pipe
   lazy val Sequential = spatial.lang.control.Sequential

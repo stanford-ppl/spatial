@@ -13,6 +13,8 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
+    dbgs(s"$lhs = $rhs [ctrl: ${lhs.toCtrl}, inner: ${isInnerControl(lhs.toCtrl)}]")
+
     metadata.clear[MUsers](lhs)
 
     if (inHw) checkUses(lhs, rhs)
@@ -34,7 +36,10 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
 
   private def checkUses(lhs: Sym[_], rhs: Op[_]): Unit = {
+    dbgs(s"  pending: ${pendingUses.all.mkString(", ")}")
+    dbgs(s"  inputs: ${rhs.nonBlockInputs.mkString(", ")}")
     val pending = rhs.nonBlockInputs.flatMap{sym => pendingUses(sym) }
+    dbgs(s"  uses: ${pending.mkString(", ")}")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
@@ -44,9 +49,8 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
   }
 
   private def addUse(user: Sym[_], used: Set[Sym[_]], block: Ctrl): Unit = {
-    dbgs(s"${stm(user)}")
     dbgs(s"  Uses:")
-    used.foreach{s => dbgs(s"  ${stm(s)}")}
+    used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
     used.foreach{node =>
       usersOf(node) = usersOf(node) + User(user, block)
@@ -60,12 +64,12 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
   private def addPropagatingUse(sym: Sym[_], pending: Seq[Sym[_]]): Unit = {
     dbgs(s"  Node is propagating reader of:")
-    pending.foreach{s => dbgs(s"  ${stm(s)}")}
+    pending.foreach{s => dbgs(s"  - ${stm(s)}")}
     pendingUses += sym -> (pending.toSet + sym)
   }
 
   private def addPendingUse(sym: Sym[_]): Unit = if (!pendingUses.all.contains(sym)) {
-    dbgs(s"  Adding pending: $sym")
+    dbgs(s"  Adding pending: $sym [ctrl: ${sym.toCtrl}, block: $blk]")
     pendingUses += sym -> Set(sym)
   }
 

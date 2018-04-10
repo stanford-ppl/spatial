@@ -24,7 +24,7 @@ trait BlkTraversal extends AccelTraversal {
     val prevBlk = blk
     val saveHW  = inHw
     blk = b
-    inHw = isAccel(b)
+    inHw = inHw || isAccel(b)
     val result = func
     blk = prevBlk
     inHw = saveHW

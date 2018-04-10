@@ -125,13 +125,13 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
 
   /** View the staged value or type as B[A]. */
   def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {
-    if (isSubtype(tp.getClass,tag.runtimeClass)) tp.asInstanceOf[B[A]]
-    else throw new Exception(s"Cannot view $tp (${tp.tp}) as a ${tag.runtimeClass}")
+    if (isSubtype(exp.getClass,tag.runtimeClass)) exp.asInstanceOf[B[A]]
+    else throw new Exception(s"Cannot view $exp ($tp) as a ${tag.runtimeClass}")
   }
 
   /** View the staged value or type as a B[A] if it is a subtype of B, None otherwise. */
   def getView[B[_]](implicit ev: ClassTag[B[_]]): Option[B[A]] = {
-    if (isSubtype(tp.getClass,ev.runtimeClass)) Some(tp.asInstanceOf[B[A]]) else None
+    if (isSubtype(exp.getClass,ev.runtimeClass)) Some(exp.asInstanceOf[B[A]]) else None
   }
 }
 

@@ -31,9 +31,14 @@ import spatial.dsl._
           val redMax = Reg[I32](999)
           Pipe{ redMax := min(tileSize, N.value-i) }
           val accum = Reduce(Reg[I32](0.to[I32]))(redMax par innerPar){ ii =>
-            (i + ii).to[I32]
-          } {_+_}
-          Pipe { out := accum }
+            val m = (i + ii).to[I32]
+            println(r"{i:$i,ii:$ii}: $m")
+            m
+          }{_+_}
+          Pipe {
+            println(r"{ii:$i}: accum:$accum")
+            out := accum
+          }
         }
       }
     }
@@ -87,8 +92,8 @@ import spatial.dsl._
     println("expected: " + gold)
     println("result: " + result)
 
-    // val cksum = gold == result
-    // println(r"PASS: ${cksum} (MemTest1D)")
+    val cksum = gold == result
+    println(r"PASS: $cksum (MemTest1D)")
   }
 }
 
@@ -124,7 +129,7 @@ import spatial.dsl._
     println("expected: " + gold)
     println("result: " + result)
 
-    // val cksum = gold == result
-    // println("PASS: " + cksum + " (MemTest2D)")
+    val cksum = gold == result
+    //println("PASS: " + cksum + " (MemTest2D)")
   }
 }

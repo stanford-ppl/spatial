@@ -12,9 +12,9 @@ trait UtilsHierarchy {
   def isPrimitive(sym: Sym[_]): Boolean = sym.op.exists(isPrimitive)
   def isPrimitive(op: Op[_]): Boolean = op.isInstanceOf[Primitive[_]]
 
-  def isTransient(sym: Sym[_]): Boolean = sym.op.exists(isTransient)
-  def isTransient(op: Op[_]): Boolean = op match {
-    case p: Primitive[_] => p.isTransient
+  def isEphemeral(sym: Sym[_]): Boolean = sym.op.exists(isEphemeral)
+  def isEphemeral(op: Op[_]): Boolean = op match {
+    case p: Primitive[_] => p.isEphemeral
     case _ => false
   }
 

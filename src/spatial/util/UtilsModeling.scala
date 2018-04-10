@@ -2,11 +2,12 @@ package spatial.util
 
 import argon._
 import forge.tags.stateful
+import models.{Model,Area}
 import utils.implicits.collections._
 import spatial.data._
 import spatial.node._
 import spatial.internal.spatialConfig
-import spatial.targets.{HardwareTarget, LatencyModel}
+import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
 
 import scala.collection.mutable
 
@@ -46,6 +47,8 @@ trait UtilsModeling {
   }
 
   @stateful def target: HardwareTarget = spatialConfig.target
+  @stateful def areaModel: AreaModel = spatialConfig.target.areaModel
+  @stateful def NoArea: Area = areaModel.NoArea
   @stateful def latencyModel: LatencyModel = spatialConfig.target.latencyModel
 
   @stateful def latencyOf(e: Sym[_], inReduce: Boolean = false): Double = {

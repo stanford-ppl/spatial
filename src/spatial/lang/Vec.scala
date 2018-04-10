@@ -8,19 +8,19 @@ import utils.plural
 
 import spatial.node._
 
-@ref class Vec[A:Bits](val length: Int) extends Top[Vec[A]] with Ref[Array[Any],Vec[A]] with Arith[Vec[A]] with Bits[Vec[A]] {
+@ref class Vec[A:Bits](val width: Int) extends Top[Vec[A]] with Ref[Array[Any],Vec[A]] with Arith[Vec[A]] with Bits[Vec[A]] {
   val A: Bits[A] = Bits[A]
   val aA: Option[Arith[A]] = A.getView[Arith]
   override val box: Vec[A] <:< (Arith[Vec[A]] with Bits[Vec[A]]) = implicitly[Vec[A] <:< (Arith[Vec[A]] with Bits[Vec[A]])]
   private implicit val evv: A <:< Bits[A] = A.box
 
   // TODO[4]: These are all quite expensive for large vectors
-  @api def elems: List[A] = List.tabulate(length){i => this.apply(i) }
+  @api def elems: List[A] = List.tabulate(width){i => this.apply(i) }
   @api def map[B:Bits](func: A => B): Vec[B] = Vec.LeastFirst(elems.map(func):_*)
   @api def zip[B:Bits,R:Bits](that: Vec[B])(func: (A,B) => R): Vec[R] = {
-    if (that.length != this.length) {
-      implicit val tV: Vec[R] = Vec.bits[R](length)
-      error(ctx,s"Mismatched vector lengths. Expected length $length, got ${that.length}.")
+    if (that.width != this.width) {
+      implicit val tV: Vec[R] = Vec.bits[R](width)
+      error(ctx,s"Mismatched vector lengths. Expected length $width, got ${that.width}.")
       error(ctx)
       err[Vec[R]]("Mismatched vector")
     }
@@ -31,7 +31,7 @@ import spatial.node._
   @api def reduce(func: (A,A) => A): A = ReduceTree(elems:_*)(func)
 
   @rig def arith(name: String)(func: Arith[A] => Vec[A]): Vec[A] = aA.map(func).getOrElse{
-    implicit val tV: Vec[A] = Vec.bits[A](length)
+    implicit val tV: Vec[A] = Vec.bits[A](width)
     error(ctx, s"Arithmetic $name is not defined for ${this.tp}")
     error(ctx)
     err[Vec[A]]("Undefined arithmetic vector operation")
@@ -45,6 +45,10 @@ import spatial.node._
   @api def /(b: Vec[A]): Vec[A] = arith("division"){a => this.zip(b)(a.div) }
   @api def %(b: Vec[A]): Vec[A] = arith("modulus"){a => this.zip(b)(a.mod) }
 
+  @api override def asBits: Vec[Bit] = {
+    val elems = Seq.tabulate(width){i => this(i).asBits }
+    Vec.concat(elems)
+  }
 
   /**
     * Returns the word at index i in this vector.
@@ -59,23 +63,37 @@ import spatial.node._
   @api def apply(s: Series[I32]): Vec[A] = (s.start, s.end, s.step) match {
     case (Const(x1),Const(x2),Const(c)) =>
       if (c !== 1) {
-        error(this.ctx, "Strides for vector slice are currently unsupported.")
-        error(this.ctx)
+        error(ctx, "Strides for vector slice are currently unsupported.")
+        error(ctx)
         Vec.empty[A]
       }
       else {
         val msb = Number.max(x1, x2).toInt
         val lsb = Number.min(x1, x2).toInt
-        if (msb - lsb == 0) {
-          warn(this.ctx, "Empty vector slice.")
-          warn(this.ctx)
+        if (lsb > width) {
+          warn(ctx, "Slice is entirely outside word width. Will use zeros instead.")
+          warn(ctx)
         }
-        Vec.slice(this, msb, lsb)
+        else if (msb > width) {
+          warn(ctx, "Slice includes words outside vector width.")
+          warn(ctx, "Zeros will be inserted in the MSBs.", noWarning = true)
+          warn(ctx)
+        }
+        sliceUnchecked(msb, lsb)
       }
     case _ =>
       error(this.ctx, "Apply range for bit slicing must be statically known.")
       error(this.ctx)
       Vec.empty[A]
+  }
+
+  @rig def sliceUnchecked(msb: Int, lsb: Int): Vec[A] = {
+    if (msb <= width)     Vec.slice(this, msb, lsb)
+    else if (lsb > width) Vec.bits[A](msb - lsb + 1).zero
+    else {
+      val zeros = Vec.bits[A](msb - width).zero
+      Vec.slice(this, width, lsb) ++ zeros
+    }
   }
 
   /**
@@ -96,16 +114,16 @@ import spatial.node._
 
   // --- Typeclass Methods
   override protected val __isPrimitive: Boolean = false
-  override def nbits: Int = A.nbits * length
+  override def nbits: Int = A.nbits * width
 
-  @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(length){ A.zero }:_*)
-  @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(length-1){ A.zero} :+ A.one :_*)
+  @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(width){ A.zero }:_*)
+  @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(width-1){ A.zero} :+ A.one :_*)
   @rig def random(max: Option[Vec[A]]): Vec[A] = {
-    if (max.isDefined && max.get.length != length) {
-      error(ctx, s"Vector length mismatch. Expected $length ${plural(length,"word")}, got ${max.get.length}")
+    if (max.isDefined && max.get.width != width) {
+      error(ctx, s"Vector length mismatch. Expected $width ${plural(width,"word")}, got ${max.get.width}")
       error(ctx)
     }
-    val elems = Seq.tabulate(length){i => A.random(max.map{vec => vec(i)}) }
+    val elems = Seq.tabulate(width){i => A.random(max.map{vec => vec(i)}) }
     Vec.LeastLast(elems:_*)
   }
 
@@ -175,7 +193,19 @@ object Vec {
     * Creates a new vector which is the concatenation of all given vectors.
     */
   @rig def concat[A:Bits](vecs: Seq[Vec[A]]): Vec[A] = {
-    implicit val tV: Vec[A] = Vec.bits[A](vecs.map(_.length).sum)
+    implicit val tV: Vec[A] = Vec.bits[A](vecs.map(_.width).sum)
     stage(VecConcat(vecs))
+  }
+
+  @rig def fromBits[A](bits: Vec[Bit], width: Int, A: Bits[A]): Vec[A] = A match {
+    case _:Bit => bits.asInstanceOf[Vec[A]]
+    case _ =>
+      implicit val bA: Bits[A] = A
+      val elems = Seq.tabulate(width) { i =>
+        val offset = i * A.nbits
+        val length = A.nbits
+        bits.sliceUnchecked(msb = offset + length, lsb = offset).as[A]
+      }
+      Vec.fromSeq(elems)
   }
 }

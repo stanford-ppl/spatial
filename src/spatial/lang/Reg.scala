@@ -24,6 +24,8 @@ import scala.collection.mutable
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = this.value
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = Reg.write(this, data, ens)
   @rig def __reset(ens: Set[Bit]): Void = stage(RegReset(this,ens))
+
+  @rig override def toText: Text = this.value.toText
 }
 object Reg {
   @api def apply[A:Bits]: Reg[A] = Reg.alloc[A](zero[A])

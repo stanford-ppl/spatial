@@ -54,6 +54,10 @@ trait ScalaGenFixPt extends ScalaGenBits {
 
     case FixNeq(x,y) => emit(src"val $lhs = $x !== $y")
     case FixEql(x,y) => emit(src"val $lhs = $x === $y")
+
+    case FixMax(x,y) => emit(src"val $lhs = Number.max($x,$y)")
+    case FixMin(x,y) => emit(src"val $lhs = Number.min($x,$y)")
+
     case FixToFix(x, fmt) =>
       emit(src"val $lhs = $x.toFixedPoint(FixFormat(${fmt.sign},${fmt.ibits},${fmt.fbits}))")
 
@@ -64,7 +68,7 @@ trait ScalaGenFixPt extends ScalaGenBits {
 
     case TextToFix(x, _) =>
       val FixPtType(s,i,f) = lhs.tp
-      emit(src"val $lhs = FixedPoint.from($x, FixFormat($s,$i,$f))")
+      emit(src"val $lhs = FixedPoint($x, FixFormat($s,$i,$f))")
 
     case FixRandom(Some(max)) =>
       val FixPtType(s,i,f) = lhs.tp

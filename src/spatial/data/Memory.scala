@@ -15,6 +15,8 @@ case class LocalMemories(memories: Set[Sym[_]]) extends FlowData[LocalMemories]
   def +=(mem: Sym[_]): Unit = globals.add(LocalMemories(localMems.all + mem ))
 }
 
+
+
 /**
   * Set of reader symbols for each local memory
   *
@@ -42,6 +44,15 @@ object accessesOf {
 }
 
 /**
+  * List of resetters for a given memory
+  **/
+case class Resetters(resetters: Set[Sym[_]]) extends FlowData[Resetters]
+object resettersOf {
+  def apply(x: Sym[_]): Set[Sym[_]] = metadata[Resetters](x).map(_.resetters).getOrElse(Set.empty)
+  def update(x: Sym[_], resetters: Set[Sym[_]]): Unit = metadata.add(x, Resetters(resetters))
+}
+
+/**
   * Set of local memory reads which each symbol uses
   * Used to detect accumulation cycles
   *
@@ -52,6 +63,7 @@ object readUsesOf {
   def apply(x: Sym[_]): Set[Sym[_]] = metadata[ReadUses](x).map(_.reads).getOrElse(Set.empty)
   def update(x: Sym[_], reads: Set[Sym[_]]): Unit = metadata.add(x, ReadUses(reads))
 }
+
 
 sealed abstract class AccumType {
   def |(that: AccumType): AccumType

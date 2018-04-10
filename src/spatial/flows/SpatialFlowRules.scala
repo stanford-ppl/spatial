@@ -1,7 +1,7 @@
-package spatial.data
+package spatial.flows
 
-import forge.tags._
 import argon._
+import forge.tags._
 import spatial.data._
 import spatial.node._
 import spatial.util._
@@ -20,6 +20,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case BankedAccessor(wr,rd) =>
       wr.foreach{w => writersOf(w.mem) = writersOf(w.mem) + s }
       rd.foreach{r => readersOf(r.mem) = readersOf(r.mem) + s }
+
+    case Resetter(mem,ens) => resettersOf(mem) = resettersOf(mem) + s
 
     case _ =>
   }
@@ -45,7 +47,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case ctrl: Control[_] =>
       val children = op.blocks.flatMap(_.stms.filter(isControl))
       isOuter(s) = children.exists{s => !isBranch(s) || isOuterControl(s) } || isAccel(s)
-      if (!s.cchains.isEmpty) ctrlNodeOf(s.cchains.head) = s
+      s.cchains.foreach{cchain => ctrlNodeOf(cchain) = s }
       s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
       op.blocks.foreach{blk =>
@@ -53,6 +55,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
                        .getOrElse{throw new Exception(s"Block $blk is not associated with an ID in control $ctrl")}
         blk.stms.foreach{lhs => lhs.parent = Controller(s,id) }
       }
+      op.blocks.zipWithIndex.foreach{case (blk,bId) =>
+        blk.stms.foreach{lhs => lhs.blk = Controller(s, bId) }
+      }
+
     case _ => // Nothin'
   }
 
@@ -77,6 +83,15 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
 
     case _ =>
+  }
+
+  @flow def streams(s: Sym[_], op: Op[_]): Unit = {
+    if (isStreamLoad(s))   streamLoadCtrls += s
+    if (isTileTransfer(s)) tileTransferCtrls += s
+    if (isParEnq(s))       streamParEnqs += s
+
+    if (isStreamStageEnabler(s)) streamEnablers += s
+    if (isStreamStageHolder(s))  streamHolders += s
   }
 
 }

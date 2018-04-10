@@ -43,7 +43,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
       }
     }
     else {
-      ret(block)
+      gen(block)
     }
   }
 

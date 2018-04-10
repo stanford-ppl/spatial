@@ -17,7 +17,7 @@ import spatial.lang._
   override def aliases = Nil
   override def contains = Nil
   override def extracts = syms(v)
-  override val isTransient: Boolean = true
+  override val isEphemeral: Boolean = true
   override val debugOnly: Boolean = true
 }
 @op case class VarAssign[A:Type](v: Var[A], x: A) extends Primitive[Void] {

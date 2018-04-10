@@ -46,6 +46,24 @@ trait StaticBits { this: SpatialStatics =>
     /**
       * Gives a view of this vector of bits as the given type without length mismatch warnings.
       */
-    @rig def recastUnchecked[A:Bits]: A = stage(BitsAsData[A](vec, Bits[A]))
+    @rig def recastUnchecked[A:Bits]: A = Bits[A] match {
+      case struct: Struct[_] =>
+        val fieldNames = struct.fields.map{case (name,_) => name }
+        val fieldTypes = struct.fields.map{case (_, mT) => mT }
+        val sizes = struct.fields.map{case (_, Bits(bT)) => bT.nbits }
+        val offsets = List.tabulate(sizes.length){i => sizes.drop(i+1).sum }
+
+        val fields = (fieldTypes,offsets).zipped.toSeq.collect{case (b: Bits[_],offset) =>
+          b.boxed(vec.sliceUnchecked(msb = offset+b.nbits, lsb = offset).asType(b))
+        }
+        val namedFields = fieldNames.zip(fields)
+
+        implicit val sT: Struct[A] = struct.asInstanceOf[Struct[A]]
+        Struct[A](namedFields:_*)
+
+      case v: Vec[_] => Vec.fromBits(vec, v.width, v.A).asInstanceOf[A]
+      case _ =>
+        stage(BitsAsData[A](vec, Bits[A]))
+    }
   }
 }

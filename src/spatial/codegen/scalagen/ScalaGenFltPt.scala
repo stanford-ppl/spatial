@@ -34,6 +34,10 @@ trait ScalaGenFltPt extends ScalaGenBits {
 
     case FltNeq(x,y)   => emit(src"val $lhs = $x !== $y")
     case FltEql(x,y)   => emit(src"val $lhs = $x === $y")
+
+    case FltMax(x,y) => emit(src"val $lhs = Number.max($x,$y)")
+    case FltMin(x,y) => emit(src"val $lhs = Number.min($x,$y)")
+
     case FltToFlt(x, fmt) =>
       emit(src"val $lhs = $x.toFloatPoint(FltFormat(${fmt.mbits-1},${fmt.ebits}))")
 

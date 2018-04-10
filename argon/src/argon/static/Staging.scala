@@ -86,6 +86,7 @@ trait Staging { this: Printing =>
         val lhs = symbol()
         val sym = op.R.boxed(lhs)
 
+        logs(s"$lhs = $op")
         checkAliases(sym,effects)
         runFlows(sym,op)
 

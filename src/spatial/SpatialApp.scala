@@ -101,9 +101,12 @@ trait SpatialApp extends DSLApp {
       accessAnalyzer ==> printer ==>
       memoryAnalyzer ==> printer ==>
       memoryAllocator ==>
+      memoryReporter  ==>
       unrollTransformer ==> printer ==>
-      (cfg.enableRetiming ? retiming) ==>
+      (cfg.enableRetiming ? retiming) ==> printer ==>
+      (cfg.enableRetiming ? retimeReporter) ==>
       initiationAnalyzer ==>
+      printer ==>
       (cfg.enableSim ? scalaCodegen) ==>
       // (cfg.enableTree ? irTreeCodegen) ==>
       (cfg.enableSynth ? chiselCodegen) ==>

@@ -18,43 +18,43 @@ case class MemoryReporter(IR: State) extends Pass {
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)
 
-    withLog(config.logDir, "Memories.report") {
+    inGen(config.repDir, "Memories.report") {
       val total = mems.map(_._2).fold(NoArea){_+_}
-      dbgs(s"---------------------------")
-      dbgs(s"Estimated Total Memories: ")
-      dbgs(s"---------------------------")
+      emit(s"---------------------------")
+      emit(s"Estimated Total Memories: ")
+      emit(s"---------------------------")
       val tab = (0 +: total.keys.map{k => k.length }).max
-      total.foreach{(key,v) => if (v > 0) dbgs(s"  $key: ${" "*(key.length - tab)}$v") }
-      dbg(s"---------------------------")
-      dbgs(s"\n\n")
+      total.foreach{(key,v) => if (v > 0) emit(s"  $key: ${" "*(key.length - tab)}$v") }
+      emit(s"---------------------------")
+      emit(s"\n\n")
 
       mems.foreach{case (mem,area) =>
-        dbg(s"---------------------------------------------------------------------")
-        dbg(s"Name: ${mem.fullname}")
-        dbg(s"Type: ${mem.tp}")
-        dbg(s"Src:  ${mem.ctx}")
-        dbg(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
-        dbg(s"---------------------------------------------------------------------")
-        dbg(s"Symbol:     ${stm(mem)}")
+        emit(s"---------------------------------------------------------------------")
+        emit(s"Name: ${mem.fullname}")
+        emit(s"Type: ${mem.tp}")
+        emit(s"Src:  ${mem.ctx}")
+        emit(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
+        emit(s"---------------------------------------------------------------------")
+        emit(s"Symbol:     ${stm(mem)}")
         val duplicates = duplicatesOf(mem)
-        dbg(s"Instances: ${duplicates.length}")
-        area.foreach{case (k,v) => if (v > 0) dbgs(s"  $k: ${" "*(k.length - 10)}$v") }
+        emit(s"Instances: ${duplicates.length}")
+        area.foreach{case (k,v) => if (v > 0) emit(s"  $k: ${" "*(k.length - 10)}$v") }
 
         val readers = readersOf(mem)
         val writers = writersOf(mem)
-        dbgs(s"\n")
-        dbg(s"Instance Summary: ")
+        emit(s"\n")
+        emit(s"Instance Summary: ")
         duplicates.zipWithIndex.foreach{case (inst,i) =>
           val Memory(banking,depth,isAccum) = inst
           val banks  = banking.map(_.nBanks).mkString(", ")
           val format = if (banks.length == 1) "Flat" else "Hierarchical"
-          dbg(s"  #$i: Banked")
-          dbg(s"     Resource: ${inst.resource.name}")
-          dbg(s"     Depth:    $depth")
-          dbg(s"     Accum:    $isAccum")
-          dbg(s"     Banks:    $banks <$format>")
-          banking.foreach{grp => dbgs(s"       $grp") }
-          dbg(s"     Ports: ")
+          emit(s"  #$i: Banked")
+          emit(s"     Resource: ${inst.resource.name}")
+          emit(s"     Depth:    $depth")
+          emit(s"     Accum:    $isAccum")
+          emit(s"     Banks:    $banks <$format>")
+          banking.foreach{grp => emit(s"       $grp") }
+          emit(s"     Ports: ")
           def portStr(port: Option[Int], as: Iterable[Sym[_]], tp: String): Iterator[String] = {
             as.iterator.filter{a => dispatchOf(a).values.exists(_.contains(i)) }
                        .filter{a => portsOf(a).values.exists(_.bufferPort == port) }
@@ -63,16 +63,16 @@ case class MemoryReporter(IR: State) extends Pass {
 
           (0 until inst.depth).foreach{p =>
             val lines = portStr(Some(p), writers,"WR") ++ portStr(Some(p), readers,"RD")
-            lines.foreach{line => dbg(s"       $line")}
+            lines.foreach{line => emit(s"       $line")}
           }
           if (inst.depth > 1) {
             val lines = portStr(None, writers, "WR") ++ portStr(None, readers, "RD")
-            lines.foreach { line => dbg(s"       $line") }
+            lines.foreach { line => emit(s"       $line") }
           }
         }
 
-        dbg(s"---------------------------------------------------------------------")
-        dbg("\n\n\n")
+        emit(s"---------------------------------------------------------------------")
+        emit("\n\n\n")
       }
     }
 

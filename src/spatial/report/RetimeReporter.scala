@@ -9,14 +9,18 @@ import spatial.util._
 case class RetimeReporter(IR: State) extends AccelTraversal {
   override def shouldRun: Boolean = config.enInfo
 
+  override def process[R](block: Block[R]): Block[R] = {
+    inGen(config.repDir, "Retime.report"){ super.process(block) }
+  }
+
   private def printBlocks(lhs: Sym[_], blocks: Seq[Block[_]]): Unit = blocks.zipWithIndex.foreach{case (blk,i) =>
-    state.logTab += 1
-    dbgs(s"block $i: $blk {")
-    state.logTab += 1
+    state.incGenTab()
+    emit(s"block $i: $blk {")
+    state.incGenTab()
     visitBlock(blk)
-    state.logTab -= 1
-    dbgs(s"} // End of $lhs block #$i")
-    state.logTab -= 1
+    state.decGenTab()
+    emit(s"} // End of $lhs block #$i")
+    state.decGenTab()
   }
 
   private def findDelays(x: Sym[_]): Set[(Int,Seq[Sym[_]])] = x match {
@@ -26,35 +30,36 @@ case class RetimeReporter(IR: State) extends AccelTraversal {
     }.filter(_._1 > 0)
     case _ => Set.empty
   }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
-    if (rhs.blocks.nonEmpty) dbgs(s"$lhs = $rhs {")
-    else                     dbgs(s"$lhs = $rhs")
-    lhs.name.foreach{name => dbgs(s" - Name: $name") }
+    if (rhs.blocks.nonEmpty) emit(s"$lhs = $rhs {")
+    else                     emit(s"$lhs = $rhs")
+    lhs.name.foreach{name => emit(s" - Name: $name") }
     val cycle = reduceCycleOf(lhs)
     val inReduce = cycle.nonEmpty
-    dbgs(s" - Type: ${lhs.tp}")
+    emit(s" - Type: ${lhs.tp}")
     if (cycle.isEmpty) {
-      dbgs(s" - Cycle: <no cycle>")
+      emit(s" - Cycle: <no cycle>")
     }
     else {
-      dbgs(s" - Cycle: " + cycle.mkString(", "))
+      emit(s" - Cycle: " + cycle.mkString(", "))
     }
-    dbgs(s" - Latency:          ${latencyModel.latencyOf(lhs,inReduce)}")
-    dbgs(s" - Reduce Latency:   ${latencyModel.latencyOf(lhs,inReduce)}")
-    dbgs(s" - Requires Regs:    ${latencyModel.requiresRegisters(lhs,inReduce)}")
-    dbgs(s" - Built-In Latency: ${latencyModel.builtInLatencyOfNode(lhs)}")
+    emit(s" - Latency:          ${latencyModel.latencyOf(lhs,inReduce)}")
+    emit(s" - Reduce Latency:   ${latencyModel.latencyOf(lhs,inReduce)}")
+    emit(s" - Requires Regs:    ${latencyModel.requiresRegisters(lhs,inReduce)}")
+    emit(s" - Built-In Latency: ${latencyModel.builtInLatencyOfNode(lhs)}")
     val delays = findDelays(lhs).toSeq.sortBy(_._1)
     if (delays.isEmpty) {
-      dbgs(s" - Delays: <none>")
+      emit(s" - Delays: <none>")
     }
     else {
-      dbgs(s" - Delays: ")
-      delays.foreach{case (d,cons) =>  dbgs(s"     [$d] ${cons.mkString(",")}") }
+      emit(s" - Delays: ")
+      delays.foreach{case (d,cons) =>  emit(s"     [$d] ${cons.mkString(",")}") }
     }
 
     printBlocks(lhs, rhs.blocks)
 
-    if (rhs.blocks.nonEmpty) dbgs(s"} // End of $lhs")
+    if (rhs.blocks.nonEmpty) emit(s"} // End of $lhs")
   }
 }
 

@@ -36,7 +36,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int]) extends B
   }
 }
 object ModBanking {
-  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.fill(rank)(1))
+  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i})
 }
 
 

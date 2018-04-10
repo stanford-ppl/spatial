@@ -11,6 +11,16 @@ import utils.multiLoopWithIndex
 trait ScalaGenMemories extends ScalaGenBits {
   var globalMems: Boolean = false
 
+  override def emitPreMain(): Unit = {
+    emit(src"OOB.open()")
+    super.emitPreMain()
+  }
+
+  override def emitPostMain(): Unit = {
+    emit(src"OOB.close()")
+    super.emitPostMain()
+  }
+
   def emitMem(lhs: Sym[_], x: String): Unit = if (globalMems) emit(s"if ($lhs == null) $x") else emit("val " + x)
 
   def flattenAddress(dims: Seq[Idx], indices: Seq[Idx], ofs: Option[Idx]): String = {
@@ -127,7 +137,7 @@ trait ScalaGenMemories extends ScalaGenBits {
   def emitBankedLoad[T:Type](lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]): Unit = {
     val bankAddr = bank.map(_.map(quote).mkString("Seq(", ",", ")")).mkString("Seq(", ",", ")")
     val ofsAddr  = ofs.map(quote).mkString("Seq(", ",", ")")
-    val enables  = ens.map(en => quote(en.head)).mkString("Seq(", ",", ")")
+    val enables  = ens.map(en => and(en)).mkString("Seq(", ",", ")")
     val ctx = s""""${lhs.ctx}""""
     emit(src"val $lhs = $mem.apply($ctx, $bankAddr, $ofsAddr, $enables)")
   }
@@ -135,7 +145,7 @@ trait ScalaGenMemories extends ScalaGenBits {
   def emitBankedStore[T:Type](lhs: Sym[_], mem: Sym[_], data: Seq[Sym[T]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]): Unit = {
     val bankAddr = bank.map(_.map(quote).mkString("Seq(", ",", ")")).mkString("Seq(", ",", ")")
     val ofsAddr  = ofs.map(quote).mkString("Seq(", ",", ")")
-    val enables  = ens.map(en => quote(en.head)).mkString("Seq(", ",", ")")
+    val enables  = ens.map(en => and(en)).mkString("Seq(", ",", ")")
     val datas    = data.map(quote).mkString("Seq(", ",", ")")
     val ctx = s""""${lhs.ctx}""""
     emit(src"val $lhs = $mem.update($ctx, $bankAddr, $ofsAddr, $enables, $datas)")

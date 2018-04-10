@@ -1,5 +1,6 @@
 /RUNNING_PID
 /logs/
+/reports/
 /project/*-shim.sbt
 /project/project/
 /project/target/

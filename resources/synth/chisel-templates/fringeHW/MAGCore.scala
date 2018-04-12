@@ -186,10 +186,11 @@ class MAGCore(
   rrespReadyMux.io.sel := rrespTag.streamId
   io.dram.rresp.ready := rrespReadyMux.io.out
 
+  val burstCounterMaxLatch = Module(new FF(UInt(io.dram.cmd.bits.size.getWidth.W)))
   val wdataMux = Module(new MuxN(Valid(io.dram.wdata.bits), storeStreamInfo.size))
   wdataMux.io.sel := storeStreamIndex(cmdArbiter.io.tag)
-  wdataMux.io.ins.foreach { case i =>
-    i.bits.wlast := i.valid & (burstCounter.io.out === (io.dram.cmd.bits.size - 1.U))
+  wdataMux.io.ins.zipWithIndex.foreach { case (in,i) =>
+    in.bits.wlast := in.valid & (burstCounter.io.out === (Mux(burstCounterMaxLatch.io.enable, io.dram.cmd.bits.size - 1.U, burstCounterMaxLatch.io.out - 1.U))) 
   }
   val wdataValid = wdataMux.io.out.valid
 
@@ -489,7 +490,6 @@ class MAGCore(
 
   val dramValid = io.dram.cmd.valid
 
-  val burstCounterMaxLatch = Module(new FF(UInt(io.dram.cmd.bits.size.getWidth.W)))
   burstCounterMaxLatch.io.init := Cat("hBADF".U, dbgCount.U)
   burstCounterMaxLatch.io.in := io.dram.cmd.bits.size
   burstCounterMaxLatch.io.enable := dramValid & dramReady
@@ -526,6 +526,7 @@ class MAGCore(
   cmdArbiter.io.deqVld := cmdDeqValidMux.io.out
 
   io.dram.wdata.bits.wdata := wdataMux.io.out.bits.wdata
+  io.dram.wdata.bits.wlast := wdataMux.io.out.bits.wlast
   io.dram.wdata.bits.wstrb := wdataMux.io.out.bits.wstrb.reverse // .foreach(_ := 1.U)
   io.dram.wdata.valid := wdataMux.io.out.valid
 

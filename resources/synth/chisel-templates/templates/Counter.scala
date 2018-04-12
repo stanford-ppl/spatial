@@ -175,7 +175,7 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
   val base = Module(new FF((width)))
   base.io.input(0).init := 0.U(width.W)
   base.io.input(0).reset := io.input.reset
-  base.io.input(0).enable := io.input.enables.reduce{_|_}
+  base.io.input(0).en := io.input.enables.reduce{_|_}
 
   val count = base.io.output.data.asSInt
   val num_enabled = io.input.enables.map{e => Mux(e, 1.S(width.W), 0.S(width.W))}.reduce{_+_}
@@ -248,7 +248,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     bases.zipWithIndex.foreach{ case (b,i) => 
       b.io.input(0).init := inits(i).asUInt
       b.io.input(0).reset := io.input.reset
-      b.io.input(0).enable := io.input.enable
+      b.io.input(0).en := io.input.enable
     }
 
     val counts = bases.map(_.io.output.data.asSInt)
@@ -371,7 +371,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     val init = io.input.start
     base.io.input(0).init := init.asUInt
     base.io.input(0).reset := io.input.reset
-    base.io.input(0).enable := io.input.reset | io.input.enable
+    base.io.input(0).en := io.input.reset | io.input.enable
 
     val count = base.io.output.data.asSInt
     val newval = count + (io.input.stride * par.S((width).W)) + io.input.gap // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
@@ -431,7 +431,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     val init = start.asSInt
     base.io.input(0).init := init.asUInt
     base.io.input(0).reset := io.input.reset
-    base.io.input(0).enable := io.input.reset | io.input.enable
+    base.io.input(0).en := io.input.reset | io.input.enable
 
     val count = base.io.output.data.asSInt
     val newval_up = count + ((strideUp * par + gap).S((width).W))

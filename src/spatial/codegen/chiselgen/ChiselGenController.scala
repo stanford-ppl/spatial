@@ -226,28 +226,6 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-  protected def ctrlInfo(sym: Sym[_]): (Boolean, Boolean, String) = {    
-    val hasStreamIns = !getReadStreams(sym.toCtrl).isEmpty
-
-    val isInner = levelOf(sym) == InnerControl
-
-    val smStr = if (isInner) {
-      if (isStreamChild(sym) & hasStreamIns ) {
-        "Streaminner"
-      } else {
-        "Innerpipe"
-      }
-    } else {
-      styleOf(sym) match {
-        case Sched.Pipe => s"Metapipe"
-        case Sched.Stream => "Streampipe"
-        case Sched.Seq => s"Seqpipe"
-        case Sched.ForkJoin => s"Parallel"
-        case Sched.Fork => s"Sched.Fork"
-      }
-    }
-    (hasStreamIns, isInner, smStr)
-  }
 
   protected def emitCopiedCChain(self: Sym[_]): Unit = {
     val parent = self.parent.s.get
@@ -260,13 +238,14 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   protected def emitChildrenCxns(sym:Sym[_], isFSM: Boolean = false): Unit = {
-    val (hasStreamIns, isInner, smStr) = ctrlInfo(sym)
+    val hasStreamIns = !getReadStreams(sym.toCtrl).isEmpty
+    val isInner = levelOf(sym) == InnerControl
 
     /* Control Signals to Children Controllers */
     if (!isInner) {
-      emitt(src"""// ---- Begin $smStr ${sym} Children Signals ----""")
+      emitt(src"""// ---- Begin ${styleOf(sym)} ${sym} Children Signals ----""")
       sym.children.toList.zipWithIndex.foreach { case (c, idx) =>
-        if (smStr == "Streampipe" & !sym.cchains.isEmpty) {
+        if (styleOf(sym) == Sched.Stream & !sym.cchains.isEmpty) {
           emitt(src"""${swap(sym, SM)}.io.input.stageDone(${idx}) := ${swap(src"${sym.cchains.head}_copy${c}", Done)};""")
         } else {
           emitt(src"""${swap(sym, SM)}.io.input.stageDone(${idx}) := ${swap(c, Done)};""")
@@ -281,7 +260,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emitt(src"""${swap(c, En)} := ${swap(c, BaseEn)} ${streamAddition}""")  
 
         // If this is a stream controller, need to set up counter copy for children
-        if (smStr == "Streampipe" & !sym.cchains.isEmpty) {
+        if (styleOf(sym) == Sched.Stream & !sym.cchains.isEmpty) {
           emitGlobalWireMap(src"""${swap(src"${sym.cchains.head}_copy${c}", En)}""", """Wire(Bool())""") 
           val unitKid = c match {case Op(UnitPipe(_,_)) => true; case _ => false}
           val snooping = getNowValidLogic(c.s.get).replace(" ", "") != ""
@@ -308,7 +287,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
     /* Emit reg chains */
     if (!ctrlIters(sym.toCtrl).isEmpty) {
-      if (smStr == "Metapipe" & sym.children.toList.length > 1) {
+      if (styleOf(sym) == Sched.Pipe & sym.children.toList.length > 1) {
         emitRegChains(sym)
       }
     }
@@ -316,118 +295,18 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
+    val isInner = levelOf(sym) == InnerControl
 
-    val (hasStreamIns, isInner, smStr) = ctrlInfo(sym)
-    // TODO: We should really just check for unspecialized reduce, not any reduce
-    val isReduce = if (isInner) {
-      sym match {
-        case Op(UnrolledReduce(_,_,_,_,_)) => true
-        case _ => false
-      }
-    } else false
-
-    emitt(src"""//  ---- ${if (isInner) {"INNER: "} else {"OUTER: "}}Begin ${smStr} $sym Controller ----""")
-
-    /* State Machine Instatiation */
-    // IO
-    var hasForever = false
-    // disableSplit = true
-    val numIter = if (!sym.cchains.isEmpty) {
-      val counters = sym.cchains.head.ctrs
-      counters.zipWithIndex.map {case (ctr,i) =>
-        if (ctr.isForever) {
-          hasForever = true
-          emitGlobalWireMap(src"${sym}_level${i}_iters", src"Wire(UInt(32.W))")
-          emitt(src"""${swap(src"${sym}_level${i}_iters", Blank)} := 0.U // Count forever""")
-          src"${swap(src"${sym}_level${i}_iters", Blank)}"
-        } else {
-          val w = bitWidth(ctr.typeArgs.head)
-          (ctr.start, ctr.end, ctr.step, ctr.ctrPar) match {
-            /*
-                (e - s) / (st * p) + Mux( (e - s) % (st * p) === 0, 0, 1)
-                   1          1              1          1    
-                        1                         1
-                        .                                     1
-                        .            1
-                                   1
-                Issue # 199           
-            */
-            case (Final(s), Final(e), Final(st), Final(p)) => 
-              appPropertyStats += HasStaticCtr
-              emitt(src"val ${sym}${i}_range = ${e} - ${s}")
-              emitt(src"val ${sym}${i}_jump = ${st} * ${p}")
-              emitt(src"val ${sym}${i}_hops = ${sym}${i}_range / ${sym}${i}_jump")
-              emitt(src"val ${sym}${i}_leftover = ${sym}${i}_range % ${sym}${i}_jump")
-              emitt(src"val ${sym}${i}_evenfit = ${sym}${i}_leftover == 0")
-              emitt(src"val ${sym}${i}_adjustment = if (${sym}${i}_evenfit) 0 else 1")
-              emitGlobalWireMap(src"${sym}_level${i}_iters", src"Wire(UInt(${w}.W))")
-              emitt(src"""${swap(src"${sym}_level${i}_iters", Blank)} := (${sym}${i}_hops + ${sym}${i}_adjustment).U(${w}.W)""")
-            case (Final(s), Final(e), _, Final(p)) => 
-              appPropertyStats += HasVariableCtrStride
-              emitt("// TODO: Figure out how to make this one cheaper!")
-              emitt(src"val ${sym}${i}_range = ${e} - ${s}")
-              emitt(src"val ${sym}${i}_jump = ${ctr.step} *-* ${p}.S(${w}.W)")
-              emitt(src"val ${sym}${i}_hops = (${sym}${i}_range.S(${w}.W) /-/ ${sym}${i}_jump).asUInt")
-              emitt(src"val ${sym}${i}_leftover = ${sym}${i}_range.S(${w}.W) %-% ${sym}${i}_jump")
-              emitt(src"val ${sym}${i}_evenfit = ${DL(src"${sym}${i}_leftover.asUInt === 0.U", "Utils.fixeql_latency")}")
-              emitt(src"val ${sym}${i}_adjustment = ${DL(src"Mux(${sym}${i}_evenfit, 0.U, 1.U)", "Utils.mux_latency")}")
-              emitGlobalWireMap(src"${sym}_level${i}_iters", src"Wire(UInt(${w}.W))")
-              emitt(src"""${swap(src"${sym}_level${i}_iters", Blank)} := ${DL(src"${sym}${i}_hops + ${sym}${i}_adjustment", src"(Utils.fixadd_latency*${sym}${i}_hops.getWidth).toInt")}.r""")
-            case (_, _, Final(st), Final(p)) => 
-              appPropertyStats += HasVariableCtrSyms
-              emitt(src"val ${sym}${i}_range =  ${DL(src"${ctr.end} - ${ctr.start}", src"(Utils.fixsub_latency*${ctr.end}.getWidth).toInt")}")
-              emitt(src"val ${sym}${i}_jump = ${st} * ${p}")
-              emitt(src"val ${sym}${i}_hops = ${sym}${i}_range /-/ ${sym}${i}_jump.FP(true, 32, 0)")
-              emitt(src"val ${sym}${i}_leftover = ${sym}${i}_range %-% ${sym}${i}_jump.FP(true, 32, 0)")
-              emitt(src"val ${sym}${i}_evenfit = ${DL(src"${sym}${i}_leftover === 0.U", "Utils.fixeql_latency")}")
-              emitt(src"val ${sym}${i}_adjustment = ${DL(src"Mux(${sym}${i}_evenfit, 0.U, 1.U)", "Utils.mux_latency")}")
-              emitGlobalWireMap(src"${sym}_level${i}_iters", src"Wire(UInt(32.W))")
-              emitt(src"""${swap(src"${sym}_level${i}_iters", Blank)} := ${DL(src"${sym}${i}_hops + ${sym}${i}_adjustment", src"(Utils.fixadd_latency*${sym}${i}_hops.getWidth).toInt")}.r""")
-            case _ => 
-              appPropertyStats += HasVariableCtrSyms // TODO: Possible variable stride too, should probably match against this
-              emitt(src"val ${sym}${i}_range = ${DL(src"${ctr.end} - ${ctr.start}", src"(Utils.fixsub_latency*${ctr.end}.getWidth).toInt")}")
-              emitt(src"val ${sym}${i}_jump = ${ctr.step} *-* ${ctr.ctrPar}")
-              emitt(src"val ${sym}${i}_hops = ${sym}${i}_range /-/ ${sym}${i}_jump")
-              emitt(src"val ${sym}${i}_leftover = ${sym}${i}_range %-% ${sym}${i}_jump")
-              emitt(src"val ${sym}${i}_evenfit = ${DL(src"${sym}${i}_leftover === 0.U", "Utils.fixeql_latency")}")
-              emitt(src"val ${sym}${i}_adjustment = ${DL(src"Mux(${sym}${i}_evenfit, 0.U, 1.U)", "Utils.mux_latency")}")
-              emitGlobalWireMap(src"${sym}_level${i}_iters", src"Wire(UInt(32.W))")
-              emitt(src"""${swap(src"${sym}_level${i}_iters", Blank)} := ${DL(src"${sym}${i}_hops + ${sym}${i}_adjustment", src"(Utils.fixadd_latency*${sym}${i}_hops.getWidth).toInt")}.r""")
-          }
-          // emitt(src"""${swap(src"${sym}_level${i}_iters", Blank)} := ${DL(src"${sym}${i}_hops + ${sym}${i}_adjustment", 1)}.r""")
-          src"${swap(src"${sym}_level${i}_iters", Blank)}"
-        }
-      }
-    } else { 
-      List("1.U") // Unit pipe:
-    }
-    // disableSplit = false
-
-    val constrArg = if (isInner) {s"${isFSM}"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
+    emitt(src"""//  ---- ${levelOf(sym)}: Begin ${styleOf(sym)} $sym Controller ----""")
+    val constrArg = if (levelOf(sym) == InnerControl) {s"${isFSM}"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
 
     val lat = 0// bodyLatency.sum(sym) // FIXME
     emitControlSignals(sym)
     createInstrumentation(sym)
 
-    // Pass done signal upward and grab your own en signals if this is a switchcase child
-    sym.parent match {
-      case Op(SwitchCase(_)) => 
-        emitt(src"""${swap(sym.parent, Done)} := ${swap(sym, Done)}""")
-        val streamAddition = ""//getStreamEnablers(sym) // FIXME
-        emitt(src"""${swap(sym, En)} := ${swap(sym.parent, En)} ${streamAddition}""")  
-        emitt(src"""${swap(sym, Resetter)} := ${swap(sym.parent, Resetter)}""")
-
-      case _ =>
-        // no sniffing to be done
-    }
-
     val stw = sym match{case Op(x: StateMachine[_]) => bitWidth(sym.tp.typeArgs.head); case _ if (sym.children.length <= 1) => 3; case _ => (scala.math.log(sym.children.length) / scala.math.log(2)).toInt + 2}
-    val ctrdepth = if (sym.cchains.isEmpty) 1 else sym.cchains.head.ctrs.length
-    val static = if (sym.cchains.isEmpty) true else sym.cchains.head.isStatic
     emitGlobalRetimeMap(src"""${sym}_retime""", s"${lat}.toInt")
-    emitt(s"""// This is now global: val ${quote(sym)}_retime = ${lat}.toInt // Inner loop? ${isInner}, II = ${iiOf(sym)}""")
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${smStr}(${constrArg.mkString}, ctrDepth = $ctrdepth, stateWidth = ${stw}, retime = ${swap(sym, Retime)}, staticNiter = $static, isReduce = $isReduce))")
-    emitt(src"// This is now global: val ${swap(sym, SM)} = Module(new ${smStr}(${constrArg.mkString}, ctrDepth = $ctrdepth, stateWidth = ${stw}, retime = ${swap(sym, Retime)}, staticNiter = $static))")
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${levelOf(sym)}(${styleOf(sym)}, ${constrArg.mkString}, stateWidth = ${stw}))")
     emitt(src"""${swap(sym, SM)}.io.input.enable := ${swap(sym, En)} & retime_released""")
     if (isFSM) {
       emitGlobalWireMap(src"${sym}_inhibitor", "Wire(Bool())") // hacky but oh well
@@ -440,10 +319,9 @@ trait ChiselGenController extends ChiselGenCommon {
     }
     emitGlobalWireMap(src"""${swap(sym, RstEn)}""", """Wire(Bool())""") 
     emitt(src"""${swap(sym, RstEn)} := ${swap(sym, SM)}.io.output.rst_en // Generally used in inner pipes""")
-    emitt(src"""${swap(sym, SM)}.io.input.numIter := (${numIter.mkString(" *-* ")}).raw.asUInt // Unused for inner and parallel""")
-    if (cfg.target.latencyModel.model("FixMul")("b" -> 32)("LatencyOf").toInt * numIter.length > maxretime) maxretime = cfg.target.latencyModel.model("FixMul")("b" -> 32)("LatencyOf").toInt * numIter.length
     emitt(src"""${swap(sym, SM)}.io.input.rst := ${swap(sym, Resetter)} // generally set by parent""")
 
+    val hasStreamIns = !getReadStreams(sym.toCtrl).isEmpty
     if (isStreamChild(sym) & hasStreamIns & beneathForever(sym)) {
       emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, En)} & ~${swap(sym, CtrTrivial)} // Immediate parent has forever counter, so never mask out datapath_en""")    
     } else if ((isStreamChild(sym) & hasStreamIns & !sym.cchains.isEmpty)) { // for FSM or hasStreamIns, tie en directly to datapath_en
@@ -457,7 +335,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
     
     /* Counter Signals for controller (used for determining done) */
-    if (smStr != "Parallel" & smStr != "Streampipe") {
+    if (styleOf(sym) != Sched.ForkJoin & styleOf(sym) != Sched.Stream) {
       if (!sym.cchains.isEmpty) {
         if (!sym.cchains.head.isForever) {
           emitGlobalWireMap(src"""${swap(sym.cchains.head, En)}""", """Wire(Bool())""") 
@@ -477,7 +355,7 @@ trait ChiselGenController extends ChiselGenCommon {
                 emitt(src"${swap(sym.cchains.head, En)} := ${swap(sym, SM)}.io.output.ctr_inc // Should probably also add inhibitor")
               } 
           }
-          emitt(src"""// ---- Counter Connections for $smStr ${sym} (${sym.cchains.head}) ----""")
+          emitt(src"""// ---- Counter Connections for ${styleOf(sym)} ${sym} (${sym.cchains.head}) ----""")
           val ctr = sym.cchains.head
           if (isStreamChild(sym) & hasStreamIns) {
             emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, Done), 1, true)} // Do not use rst_en for stream kiddo""")
@@ -491,7 +369,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
         }
       } else {
-        emitt(src"""// ---- Single Iteration for $smStr ${sym} ----""")
+        emitt(src"""// ---- Single Iteration for ${styleOf(sym)} ${sym} ----""")
         if (isInner) { 
           emitGlobalWireMap(src"${sym}_ctr_en", "Wire(Bool())")
           if (isStreamChild(sym) & hasStreamIns) {
@@ -507,15 +385,10 @@ trait ChiselGenController extends ChiselGenCommon {
       }
     }
 
-    val hsi = if (isInner & hasStreamIns) "true.B" else "false.B"
-    val hf = if (hasForever) "true.B" else "false.B"
-    emitt(src"${swap(sym, SM)}.io.input.hasStreamIns := $hsi")
-    emitt(src"${swap(sym, SM)}.io.input.forever := $hf")
-
     // emitChildrenCxns(sym, cchain, iters, isFSM)
     /* Create reg chain mapping */
     if (!ctrlIters(sym.toCtrl).isEmpty) {
-      if (smStr == "Metapipe" & sym.children.length > 1) {
+      if (styleOf(sym) == Sched.Pipe & sym.children.length > 1) {
         sym.children.foreach{ 
           case stage @ Op(s:UnrolledForeach) => cchainPassMap += (s.cchain -> stage)
           case stage @ Op(s:UnrolledReduce) => cchainPassMap += (s.cchain -> stage)

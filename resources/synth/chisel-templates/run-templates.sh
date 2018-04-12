@@ -5,7 +5,7 @@ hn=`hostname`
 echo "hostname is $hn"
 export RUNNING_REGRESSION=1
 # sed Launcher to create a launcher for each test
-file=${TEMPLATES_HOME}/tests/templates/Launcher.scala
+file=${NEW_TEMPLATES_HOME}/tests/templates/Launcher.scala
 # Get list of args
 startArgs=(`grep -n "\/\/ Start args" $file | sed "s/:\/\/ Start args//g"`)
 endArgs=(`grep -n "\/\/ End args" $file | sed "s/:\/\/ End args//g"`)
@@ -14,7 +14,7 @@ tests=(`sed -n ${startArgs},${endArgs}p $file | grep val | sed "s/.*val //g" | s
 startLaunch=(`grep -n "\/\/ Start launcher" $file | sed "s/:.*\/\/ Start launcher//g"`)
 endLaunch=(`grep -n "\/\/ End launcher" $file | sed "s/:.*\/\/ End launcher//g"`)
 lines=(`cat $file | wc -l`)
-newfile=${TEMPLATES_HOME}/tests/templates/expandedlauncher
+newfile=${NEW_TEMPLATES_HOME}/tests/templates/expandedlauncher
 sed -n 1,${startLaunch}p $file > $newfile
 for t in ${tests[@]}; do
 echo "  templates = templates ++ Arguments.${t}.zipWithIndex.map{ case(arg,i) => 

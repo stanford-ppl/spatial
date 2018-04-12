@@ -18,11 +18,10 @@ object Stream extends Sched // Stream extends Sched { override def toString = "S
 object Fork extends Sched // Fork extends Sched { override def toString = "Fork" }
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
-class OuterController(val depth: Int, val sched: Sched, val numIterWidth: Int, 
-                      val ctrDepth: Int = 1, val staticNiter: Boolean = false, val isFSM: Boolean = false) extends Module {
+class OuterController(val sched: Sched, val depth: Int, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
   // Overloaded construters
   // Tuple unpacker
-  def this(tuple: (Int, Sched, Int, Int, Boolean)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5)
+  def this(tuple: (Sched, Int, Boolean)) = this(tuple._1,tuple._2,tuple._3)
 
   val io = IO( new Bundle {
     // Controller signals
@@ -134,11 +133,11 @@ class OuterController(val depth: Int, val sched: Sched, val numIterWidth: Int,
 
 
 
-class InnerController(val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
+class InnerController(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
-  def this(tuple: (Boolean, Int)) = this(tuple._1,tuple._2)
+  def this(tuple: (Sched, Boolean, Int)) = this(tuple._1,tuple._2,tuple._3)
 
   // States
   val pipeInit = 0

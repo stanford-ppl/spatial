@@ -73,6 +73,7 @@ trait Codegen extends Traversal {
     case l: Long       => l.toString + "L"
     case l: BigDecimal => l.toString
     case l: BigInt     => l.toString
+    case o: Option[_] if !o.isDefined => "None"
     case _ => throw new RuntimeException(s"[$name] Could not quote or remap $arg (${arg.getClass})")
   }
 

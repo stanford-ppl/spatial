@@ -30,11 +30,11 @@ trait ImplicitsPriority3 {
   implicit def numericCast[A:Num,B:Num]: Cast[A,B] = Right(new CastFunc[A,B]{
     @api def apply(a: A): B = (Num[B] match {
       case tp:Fix[s,i,f] =>
-        import tp.fmt._
+        import tp.fmt._     // This imports implicits for BOOL[s], INT[i], and INT[f]
         a.__toFix[s,i,f]
 
       case tp:Flt[m,e] =>
-        import tp.fmt._
+        import tp.fmt._     // This imports implicits for INT[m] and INT[e]
         a.__toFlt[m,e]
 
     }).asInstanceOf[B]

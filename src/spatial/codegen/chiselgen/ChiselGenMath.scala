@@ -160,8 +160,8 @@ trait ChiselGenMath extends ChiselGenCommon {
       emit(src"${lhs}.r := Mux(($sel), ${a}.r, ${b}.r)")
 
     // // Assumes < and > are defined on runtime type...
-    // case Min(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := Mux(($a < $b), $a, $b).r")
-    // case Max(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := Mux(($a > $b), $a, $b).r")
+    case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := Mux(($a < $b), $a, $b).r")
+    case FixMax(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := Mux(($a > $b), $a, $b).r")
 
     case FltRecip(x) => x.tp match {
       case DoubleType() => throw new Exception("DoubleType not supported for FltRecip") 

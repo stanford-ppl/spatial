@@ -67,8 +67,8 @@ class State extends forge.AppState {
   var gen: PrintStream = new PrintStream(new NullOutputStream)
   val streams = new mutable.HashMap[String, PrintStream]
   def streamName: String = streams.map(_.swap).apply(gen)
-  def incGenTab: Unit = { genTabs(gen) = genTabs(gen) + 1 }
-  def decGenTab: Unit = { genTabs(gen) = genTabs(gen) - 1 }
+  def incGenTab(): Unit = { genTabs(gen) = genTabs(gen) + 1 }
+  def decGenTab(): Unit = { genTabs(gen) = genTabs(gen) - 1 }
   def getGenTab: Int = { if (genTabs.contains(gen)) genTabs(gen) else {genTabs += gen -> 0; 0} }
 
   /** Infos */

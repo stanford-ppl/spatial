@@ -24,5 +24,4 @@ trait StagedVarLike[A] extends VarLike[A] {
       __sassign(v)(ctx, state.asInstanceOf[State])
     }
   }
-
 }

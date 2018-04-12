@@ -29,18 +29,32 @@ class Instrument(val top: String = "") {
     }
   }
 
+  def fix(keys: Iterable[String]): Unit = {
+    val cats = keys.map(_.split("."))
+    val max = keys.map(_.length).maxOrElse(1)
+    for (i <- max until 1 by -1) {
+      val cs = cats.flatMap{parts => if (parts.length >= i) Some(parts.take(i)) else None }
+
+      cs.foreach{top =>
+        val cat = top.mkString(".")
+        val entries = cats.filter(_.startsWith(top)).map(_.mkString("."))
+        val total = entries.map{e => times(e) }.sum
+
+        if (!times.contains(cat) || times(cat) < total) times += cat -> total
+      }
+    }
+  }
+
   private def subcats(cat: String, keys: Iterable[String], depth: Int): Iterable[String] = {
     keys.filter(key => key.startsWith(cat) && key.count(_ == '.') == depth+1)
-        .toSeq.sortBy(key => -times.getOrElse(key,-1L) )
+        .toSeq.sortBy(key => -times(key) )
   }
 
   private def dumpCategory(cat: String, keys: Iterable[String])(implicit out: PrintStream): Unit = {
     val depth = cat.count(_ == '.')
     val parent = cat.split('.').dropRight(1).mkString(".")
+    val time = times(cat)
     val subs = subcats(cat, keys, depth)
-    val total = subs.map(times.getOrElse(_,0L)).sum
-    val time = Math.max(times.getOrElse(cat,0L), total)
-    times(cat) = time
     val parentTime = if (depth == 0) time else times.getOrElse(parent, time)
     out.info(/*"  "*depth +*/ s"$cat: ${time/1000.0}s (" + "%.2f".format(time.toDouble/parentTime*100) + "%)")
     subs.foreach(dumpCategory(_,keys))
@@ -57,10 +71,15 @@ class Instrument(val top: String = "") {
   def totalTime: Long = topKeys.map{times.apply}.maxOrElse(0)
 
   def dump(title: => String, out: PrintStream = Console.out): Unit = {
+    fix(times.keySet)
     out.info(title)
     val top = topKeys
     val keys = times.keys ++ top
     top.foreach{cat => dumpCategory(cat, keys)(out) }
+  }
+
+  def dumpAll(out: PrintStream = Console.out): Unit = {
+    times.foreach{case (name,time) => out.println(s"$name: ${time/1000.0}s") }
   }
 
   @inline def reset(): Unit = {

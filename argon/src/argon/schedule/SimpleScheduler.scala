@@ -19,9 +19,10 @@ class SimpleScheduler extends Scheduler {
 
     val unused = mutable.HashSet.empty[Sym[_]]
 
+    // Simple dead code elimination
     scope.reverseIterator.foreach{s =>
       val uses = s.consumers diff unused
-      if (uses.isEmpty && s.effects.isIdempotent) unused += s
+      if (s != result && uses.isEmpty && s.effects.isIdempotent) unused += s
     }
     val keep  = scope.filter{s => !unused.contains(s) }
 

@@ -81,6 +81,9 @@ object userStyleOf {
 /** Metadata holding a list of children within a controller. */
 case class Children(children: Seq[Controller]) extends FlowData[Children]
 
+/** Metadata holding the block of a controller within the controller hierarchy. */
+case class ParentBlk(blk: Ctrl) extends FlowData[ParentBlk]
+
 /** Metadata holding the parent of a controller within the controller hierarchy. */
 case class ParentController(parent: Ctrl) extends FlowData[ParentController]
 

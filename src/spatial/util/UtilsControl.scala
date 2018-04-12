@@ -25,6 +25,9 @@ trait UtilsControl {
     def parent: Ctrl = metadata[ParentController](x).map(_.parent).getOrElse(Host)
     def parent_=(p: Ctrl): Unit = metadata.add(x, ParentController(p))
 
+    def blk: Ctrl = metadata[ParentBlk](x).map(_.blk).getOrElse{Host}
+    def blk_=(blk: Ctrl): Unit = metadata.add(x, ParentBlk(blk))
+
     @stateful def children: Seq[Controller] = {
       if (!isControl(x)) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](x).map(_.children).getOrElse(Nil)
@@ -239,6 +242,56 @@ trait UtilsControl {
     val lca = LCA(a,b)
     // TODO[2]: Arbitrary dataflow graph for children
     isInnerControl(lca) || isParallel(lca)
+  }
+
+
+  def isStreamLoad(e: Sym[_]): Boolean = e match {
+    case Op(_:FringeDenseLoad[_,_]) => true
+    case _ => false
+  }
+
+  def isTileTransfer(e: Sym[_]): Boolean = e match {
+    case Op(_:FringeDenseLoad[_,_]) => true
+    case Op(_:FringeDenseStore[_,_]) => true
+    case Op(_:FringeSparseLoad[_,_]) => true
+    case Op(_:FringeSparseStore[_,_]) => true
+    case _ => false
+  }
+
+  // TODO[3]: Should this just be any write?
+  def isParEnq(e: Sym[_]): Boolean = e match {
+    case Op(_:FIFOBankedEnq[_]) => true
+    case Op(_:LIFOBankedPush[_]) => true
+    case Op(_:SRAMBankedWrite[_,_]) => true
+    case Op(_:FIFOEnq[_]) => true
+    case Op(_:LIFOPush[_]) => true
+    case Op(_:SRAMWrite[_,_]) => true
+    //case Op(_:ParLineBufferEnq[_]) => true
+    case _ => false
+  }
+
+  def isStreamStageEnabler(e: Sym[_]): Boolean = e match {
+    case Op(_:FIFODeq[_]) => true
+    case Op(_:FIFOBankedDeq[_]) => true
+    case Op(_:LIFOPop[_]) => true
+    case Op(_:LIFOBankedPop[_]) => true
+    case Op(_:StreamInRead[_]) => true
+    case Op(_:StreamInBankedRead[_]) => true
+    //case Op(_:DecoderTemplateNew[_]) => true
+    //case Op(_:DMATemplateNew[_]) => true
+    case _ => false
+  }
+
+  def isStreamStageHolder(e: Sym[_]): Boolean = e match {
+    case Op(_:FIFOEnq[_]) => true
+    case Op(_:FIFOBankedEnq[_]) => true
+    case Op(_:LIFOPush[_]) => true
+    case Op(_:LIFOBankedPush[_]) => true
+    case Op(_:StreamOutWrite[_]) => true
+    case Op(_:StreamOutBankedWrite[_]) => true
+    //case Op(_:BufferedOutWrite[_]) => true
+    //case Op(_:DecoderTemplateNew[_]) => true
+    case _ => false
   }
 
 }

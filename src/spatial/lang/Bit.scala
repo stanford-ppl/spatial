@@ -42,6 +42,7 @@ import spatial.node._
 
 object Bit {
   def apply(x: Boolean): Bit = uconst[Bit](Bool(x))
+  def apply(x: Bool): Bit = uconst[Bit](x)
 }
 
 object BitType {

@@ -5,6 +5,7 @@ import argon._
 import forge.tags._
 
 import spatial.node._
+import spatial.util._
 
 trait Bits[A] extends Top[A] with Ref[Any,A] {
   def box: A <:< Bits[A]
@@ -39,6 +40,11 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
     this.asUnchecked[B]
   }
 
+  @rig def asType[B](tp: Bits[B]): B = {
+    implicit val B: Bits[B] = tp
+    this.as[B]
+  }
+
   /**
     * Gives a view of this value's bits as the given type, without conversion.
     * Bit length mismatch warnings are suppressed.
@@ -55,9 +61,21 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
   /**
     * Gives a view of this value as a vector of bits (without any conversion).
     */
-  @api def asBits: Vec[Bit] = {
-    implicit val tV: Vec[Bit] = Vec.bits[Bit](Bits[A].nbits)
-    stage(DataAsBits(this))
+  @api def asBits: Vec[Bit] = this match {
+    case struct: Struct[_] =>
+      if (!struct.fields.forall(_._2.isBits)) {
+        error(ctx, s"asBits is not available for type ${this.tp}")
+        error(ctx)
+        implicit val vT: Vec[Bit] = Vec.bits[Bit](0)
+        err[Vec[Bit]](s"asBits not available for type ${this.tp}")
+      }
+      else {
+        val fields = struct.fieldMap.collect{case (_, sym: Bits[_]) => sym.asBits }
+        Vec.concat(fields)
+      }
+    case _ =>
+      implicit val tV: Vec[Bit] = Vec.bits[Bit](Bits[A].nbits)
+      stage(DataAsBits(this))
   }
 
   // --- Typeclass Methods
@@ -86,7 +104,7 @@ object Bits {
   }
   def m[A,B](n: Bits[A]): Bits[B] = n.asInstanceOf[Bits[B]]
 
-  def unapply[A](x: Type[A]): Option[Bits[A]] = x match {
+  def unapply[A](x: ExpType[_,A]): Option[Bits[A]] = x match {
     case b: Bits[_] => Some(b.asInstanceOf[Bits[A]])
     case _ => None
   }

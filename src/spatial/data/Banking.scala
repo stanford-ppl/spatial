@@ -30,9 +30,13 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int]) extends B
     import spatial.util.IntLike._
     (alpha.zip(addr).map{case (a,i) => a*i }.sumTree / B) % N
   }
+  override def toString: String = {
+    val name = if (B == 1) "Cyclic" else "Block Cyclic"
+    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>"
+  }
 }
 object ModBanking {
-  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.fill(rank)(1))
+  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i})
 }
 
 

@@ -6,12 +6,9 @@ import models._
 
 import spatial.data._
 import spatial.util._
-import spatial.internal.spatialConfig
 import spatial.targets.MemoryResource
 
 case class MemoryAllocator(IR: State) extends Pass {
-  private def target = spatialConfig.target
-  private def areaModel = target.areaModel
   implicit def AREA_FIELDS: AreaFields[Double] = areaModel.RESOURCE_FIELDS
 
   override protected def process[R](block: Block[R]): Block[R] = {
@@ -24,19 +21,15 @@ case class MemoryAllocator(IR: State) extends Pass {
   }
 
   def allocate(): Unit = {
-    val memories = localMems.all
 
     def areaMetric(mem: Sym[_], inst: Memory, resource: MemoryResource): Double = {
-      // Negative because sortBy gives smallest to largest
-      -resource.summary(areaModel.rawMemoryArea(mem, inst, resource))
+      -resource.summary(areaModel.rawMemoryArea(mem, inst, resource)) // sortBy: smallest to largest
     }
 
     // Memories which can use more specialized memory resources
-    val (sramAble,nonSRAM) = memories.partition(canSRAM)
+    val (sramAble,nonSRAM) = localMems.all.partition(canSRAM)
 
-    var remaining: Set[(Sym[_],Memory,Int)] = sramAble.flatMap{mem =>
-      duplicatesOf(mem).zipWithIndex.map{case (d,i) => (mem,d,i) }
-    }
+    var unassigned: Set[(Sym[_],Memory,Int)] = sramAble.flatMap{mem => duplicatesOf(mem).zipWithIndex.map{case (d,i) => (mem,d,i) }}
 
     dbg(s"\n\n")
     dbg("Allocating Memory Resources")
@@ -58,7 +51,7 @@ case class MemoryAllocator(IR: State) extends Pass {
     resources.dropRight(1).foreach{resource =>
       dbg(s"Allocating ${resource.name}: ")
       // Sort by the expected resource utilization of this memory
-      val costs = remaining.map{case (mem,dup,i) =>
+      val costs = unassigned.map{case (mem,dup,i) =>
         val area = areaMetric(mem,dup,resource)
         val raw: Area  = Area(resource.name -> -area)
         //dbg(s"  ${str(mem)} [#$i]: ${-area}")
@@ -69,7 +62,10 @@ case class MemoryAllocator(IR: State) extends Pass {
       var assigned: Set[Int] = Set.empty
 
       // Terminate early if no memory can fit
-      if (costs.forall{t => t._5 > capacity }) {
+      if (costs.isEmpty) {
+        dbg(s"  Skipping ${resource.name} - all memories have been assigned!")
+      }
+      else if (costs.forall{t => t._5 > capacity }) {
         dbg(s"  Skipping ${resource.name} - not enough resources remaining")
       }
       else {
@@ -95,10 +91,10 @@ case class MemoryAllocator(IR: State) extends Pass {
           idx += 1
         }
       }
-      remaining = remaining.zipWithIndex.filterNot{case (_,i) => assigned.contains(i) }.map(_._1)
+      unassigned = unassigned.filterNot{case (mem,d,i) => assigned.contains(i) }
     }
 
-    remaining.foreach{case (_,dup,_) => dup.resourceType = Some(resources.last) }
+    unassigned.foreach{case (mem,dup,_) => dup.resourceType = Some(resources.last) }
     nonSRAM.foreach{mem => duplicatesOf(mem).foreach{dup => dup.resourceType = Some(resources.last) }}
   }
 

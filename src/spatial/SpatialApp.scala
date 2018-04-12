@@ -8,19 +8,21 @@ import spatial.codegen.scalagen._
 import spatial.codegen.cppgen._
 import spatial.codegen.chiselgen._
 import spatial.data._
-import spatial.lang.{Void,Text,Tensor1}
+import spatial.lang.{Tensor1, Text, Void}
 import spatial.dse.DSEMode
+import spatial.flows.SpatialFlowRules
 import spatial.targets.{HardwareTarget, Targets}
 import spatial.transform._
 import spatial.traversal._
 import spatial.internal.{spatialConfig => cfg}
 import spatial.node.InputArguments
+import spatial.report._
 import spatial.rewrites.SpatialRewriteRules
 
 trait SpatialApp extends DSLApp {
-  val target: HardwareTarget = null
-  val desc: String = "Spatial compiler"
-  val script: String = "spatial"
+  val target: HardwareTarget = null   // Optionally overridden by the application
+  final val desc: String = "Spatial compiler"
+  final val script: String = "spatial"
   private var overrideRetime = false
 
   private class SpatialISL extends ISL {
@@ -54,12 +56,15 @@ trait SpatialApp extends DSLApp {
     lazy val sanityChecks = SanityChecks(state)
 
     // --- Analysis
+    lazy val useAnalyzer        = UseAnalyzer(state)
     lazy val accessAnalyzer     = AccessAnalyzer(state)
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
+    lazy val memoryAllocator    = MemoryAllocator(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
 
     // --- Reports
-
+    lazy val memoryReporter = MemoryReporter(state)
+    lazy val retimeReporter = RetimeReporter(state)
 
     // --- Transformer
     lazy val friendlyTransformer = FriendlyTransformer(state)
@@ -68,6 +73,7 @@ trait SpatialApp extends DSLApp {
     lazy val transferLowering  = TransferLowering(state)
     lazy val memoryDealiasing  = MemoryDealiasing(state)
     lazy val pipeInserter      = PipeInserter(state)
+    lazy val registerCleanup   = RegisterCleanup(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
     lazy val retiming          = RetimingTransformer(state)
 
@@ -89,16 +95,18 @@ trait SpatialApp extends DSLApp {
       switchOptimizer ==>
       transferLowering ==>
       memoryDealiasing ==>
-      pipeInserter ==>
-      printer ==>
-      accessAnalyzer ==>
-      printer ==>
-      memoryAnalyzer ==>
-      printer ==>
-      unrollTransformer ==>
-      printer ==>
-      (cfg.enableRetiming ? retiming) ==>
+      pipeInserter ==> printer ==>
+      useAnalyzer ==> printer ==>
+      registerCleanup ==> printer ==>
+      accessAnalyzer ==> printer ==>
+      memoryAnalyzer ==> printer ==>
+      memoryAllocator ==>
+      memoryReporter  ==>
+      unrollTransformer ==> printer ==>
+      (cfg.enableRetiming ? retiming) ==> printer ==>
+      (cfg.enableRetiming ? retimeReporter) ==>
       initiationAnalyzer ==>
+      printer ==>
       (cfg.enableSim ? scalaCodegen) ==>
       // (cfg.enableTree ? irTreeCodegen) ==>
       (cfg.enableSynth ? chiselCodegen) ==>

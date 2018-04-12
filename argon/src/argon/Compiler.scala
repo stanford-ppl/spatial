@@ -83,7 +83,14 @@ trait Compiler { self =>
 
   final def stageProgram(args: Array[String]): Block[_] = instrument("staging"){
     if (config.enMemLog) memWatch.note("Staging")
-    val block = withLog(config.logDir, "0000_Staging.log"){ stageApp(args) }
+    val block = withLog(config.logDir, "0000_Staging.log"){
+      dbg(s"Rewrite Rules: ")
+      IR.rewrites.names.foreach{name => dbg(s"  $name") }
+      dbg(s"Flow Rules: ")
+      IR.flows.names.foreach{name => dbg(s"  $name") }
+
+      stageApp(args)
+    }
     checkBugs("staging")
     checkErrors("staging") // Exit now if errors were found during staging
     block

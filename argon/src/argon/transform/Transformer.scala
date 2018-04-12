@@ -15,32 +15,37 @@ abstract class Transformer extends Pass {
 
   // Default rules for mirroring
   // NOTE: This doesn't currently work for mirroring Products with implicit constructor arguments
-  def apply[T](x: T): T = (x match {
-    case x: Mirrorable[_]    => mirrorMirrorable(x)
-    case x: Sym[_]           => transformSym(x)
-    case x: Lambda1[a,_]     => transformBlock(x).asLambda1[a]
-    case x: Lambda2[a,b,_]   => transformBlock(x).asLambda2[a,b]
-    case x: Lambda3[a,b,c,_] => transformBlock(x).asLambda3[a,b,c]
-    case x: Block[_]         => transformBlock(x)
-    case x: Option[_]        => x.map{this.apply}
-    case x: Seq[_]           => x.map{this.apply}
-    case x: Map[_,_]         => x.map{case (k,v) => f(k) -> f(v) }
-    case x: mutable.Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
-    case x: Product          => mirrorProduct(x)
-    case x: Iterable[_]      => x.map{this.apply}
-    case x: Char => x
-    case x: Byte => x
-    case x: Short => x
-    case x: Int => x
-    case x: Long => x
-    case x: Float => x
-    case x: Double => x
-    case x: Boolean => x
-    case x: String => x
-    case _ =>
-      if (config.enDbg) warn(s"No explicit mirroring rule for type ${x.getClass}")
-      x
-  }).asInstanceOf[T]
+  def apply[T](x: T): T = {
+    val y = (x match {
+      case x: Mirrorable[_]    => mirrorMirrorable(x)
+      case x: Sym[_]           => transformSym(x)
+      case x: Lambda1[a,_]     => transformBlock(x).asLambda1[a]
+      case x: Lambda2[a,b,_]   => transformBlock(x).asLambda2[a,b]
+      case x: Lambda3[a,b,c,_] => transformBlock(x).asLambda3[a,b,c]
+      case x: Block[_]         => transformBlock(x)
+      case x: Option[_]        => x.map{this.apply}
+      case x: Seq[_]           => x.map{this.apply}
+      case x: Map[_,_]         => x.map{case (k,v) => f(k) -> f(v) }
+      case x: mutable.Map[_,_] => x.map{case (k,v) => f(k) -> f(v) }
+      case x: Product          => mirrorProduct(x)
+      case x: Iterable[_]      => x.map{this.apply}
+      case x: Char => x
+      case x: Byte => x
+      case x: Short => x
+      case x: Int => x
+      case x: Long => x
+      case x: Float => x
+      case x: Double => x
+      case x: Boolean => x
+      case x: String => x
+      case _ =>
+        if (config.enDbg) warn(s"No explicit mirroring rule for type ${x.getClass}")
+        x
+    }).asInstanceOf[T]
+
+    if (y.isInstanceOf[Invalid]) throw new Exception(s"Used removed symbol in mirroring of $x")
+    y
+  }
 
   def tx[T](block: Block[T]): () => T = () => inlineBlock(block).asInstanceOf[T]
 
@@ -110,9 +115,19 @@ abstract class Transformer extends Pass {
   }
   final def mirrorProduct[T<:Product](x: T): T = {
     // Note: this only works if the case class has no implicit parameters!
-    val constructor = x.getClass.getConstructors.head
-    val inputs = x.productIterator.map{x => f(x).asInstanceOf[Object] }.toSeq
-    constructor.newInstance(inputs:_*).asInstanceOf[T]
+    val constructors = x.getClass.getConstructors
+    if (constructors.isEmpty) x
+    else {
+      try {
+        val constructor = x.getClass.getConstructors.head
+        val inputs = x.productIterator.map { x => f(x).asInstanceOf[Object] }.toSeq
+        constructor.newInstance(inputs: _*).asInstanceOf[T]
+      }
+      catch { case t:Throwable =>
+        bug(s"Could not mirror $x")
+        throw t
+      }
+    }
   }
 
   final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {

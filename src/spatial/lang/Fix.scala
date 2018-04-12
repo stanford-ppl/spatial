@@ -52,7 +52,7 @@ object FixFmt {
 
   @api def ::(start: Fix[S,I,F]): Series[Fix[S,I,F]]  = Series[Fix[S,I,F]](start, this, 1, 1, isUnit = false)
   @api def par(p: I32): Series[Fix[S,I,F]]            = Series[Fix[S,I,F]](zero, this, one, p, isUnit = false)
-  @api def by(step: Fix[S,I,F]): Series[Fix[S,I,F]]   = Series[Fix[S,I,F]](one, this, step, 1, isUnit = false)
+  @api def by(step: Fix[S,I,F]): Series[Fix[S,I,F]]   = Series[Fix[S,I,F]](zero, this, step, 1, isUnit = false)
   @api def until(end: Fix[S,I,F]): Series[Fix[S,I,F]] = Series[Fix[S,I,F]](this, end, one, 1, isUnit = false)
 
   @api override def neql(that: Fix[S,I,F]): Bit = stage(FixNeq(this,that))

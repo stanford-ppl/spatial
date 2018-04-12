@@ -11,12 +11,12 @@ trait FlowRules {
   */
 class Flows {
   private val rules = ArrayBuffer[(String,PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit])]()
-  private val ruleNames = HashSet[String]()
+  private[argon] val names = HashSet[String]()
 
-  def add(name: String, func: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit]): Unit = if (!ruleNames.contains(name)) {
+  def add(name: String, func: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit]): Unit = if (!names.contains(name)) {
     //println(s"Added flow rule: $name")
     rules += ((name,func))
-    ruleNames += name
+    names += name
   }
 
   def apply[A](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx, state: State): Unit = {

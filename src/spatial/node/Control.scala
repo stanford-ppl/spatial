@@ -57,6 +57,7 @@ import spatial.lang._
   fold:   Option[A],
   iters:  List[I32]
 )(implicit val A: Bits[A]) extends Loop[Void] {
+  override def binds: Seq[Sym[_]] = super.binds ++ reduce.inputs
   override def cchains = Seq(cchain -> iters)
   override def bodies  = Seq(iters -> Seq(map,reduce), Nil -> Seq(load,store))
 }
@@ -82,6 +83,7 @@ import spatial.lang._
   fold:   Boolean,
   itersM: Seq[I32]
 )(implicit val A: Bits[A], val C: LocalMem[A,C]) extends EarlyBlackBox[Void] {
+  override def binds: Seq[Sym[_]] = super.binds ++ reduce.inputs
   @rig def lower(): Void = { } // TODO[1]: Lower MemReduce
 }
 
@@ -101,6 +103,7 @@ import spatial.lang._
   itersMap:  Seq[I32],
   itersRed:  Seq[I32]
 )(implicit val A: Bits[A], val C: LocalMem[A,C]) extends Loop[Void] {
+  override def inputs: Seq[Sym[_]] = super.binds ++ reduce.inputs
   override def iters: Seq[I32] = itersMap ++ itersRed
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
@@ -117,6 +120,7 @@ import spatial.lang._
   action:    Lambda1[A,Void],
   nextState: Lambda1[A,A]
 )(implicit val A: Bits[A]) extends Loop[Void] {
+  override def binds = super.binds ++ notDone.inputs
   override def iters: Seq[I32] = Nil
   override def cchains = Nil
   override def bodies = Seq(Nil -> Seq(notDone, action, nextState))

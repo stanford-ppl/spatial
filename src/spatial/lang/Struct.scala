@@ -10,7 +10,13 @@ trait Struct[A] extends Top[A] with Ref[Nothing,A] {
   private implicit lazy val A: Struct[A] = this.selfType
   @rig def field[F:Type](name: String): F = Struct.field[A,F](me, name)
 
+  @rig private def __field[F](name: String, tp: Type[_]): Sym[F] = {
+    implicit val F: Type[F] = tp.asInstanceOf[Type[F]]
+    F.boxed(Struct.field[A,F](me, name))
+  }
+
   def fields: Seq[(String,ExpType[_,_])]
+  @rig def fieldMap: Seq[(String,Exp[_,_])] = fields.map{case (name,tp) => (name, __field(name, tp)) }
 }
 
 object Struct {

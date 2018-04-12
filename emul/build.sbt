@@ -2,6 +2,7 @@ val scala_version = "2.12.4"
 
 name := "emul"
 organization := "edu.stanford.ppl"
+isSnapshot := true
 
 val common = Seq(
   scalaVersion := scala_version,

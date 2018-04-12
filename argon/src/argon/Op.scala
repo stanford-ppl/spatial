@@ -18,6 +18,8 @@ abstract class Op[R:Type] extends Serializable with Product {
   def name: String = productPrefix
 
   def expInputs: Seq[Sym[_]] = recursive.collectSeqs(expsFunc)(productIterator)
+  def blockInputs: Seq[Sym[_]] = recursive.collectSeqs(expsFunc)(blocks)
+  def nonBlockInputs: Seq[Sym[_]] = expInputs diff blockInputs
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies */
   // Inputs: symbol dataflow dependencies for this Def.

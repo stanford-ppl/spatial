@@ -15,7 +15,7 @@ private class MemLog(var dir: String, interval: Long) extends Runnable {
       val free = runtime.freeMemory()
       val total = runtime.totalMemory()
       val max = runtime.maxMemory()
-      stream.println(s"[$timestamp] Used: ${(total - free)/mb}, Free: ${free/mb}, Total: ${total/mb}, Max: ${max/mb}")
+      stream.println(s"[$timestamp] Used: ${(total - free)/mb}MB, Free: ${free/mb}MB, Total: ${total/mb}MB, Max: ${max/mb}MB")
       Thread.sleep(interval)
     }
     stream.close()

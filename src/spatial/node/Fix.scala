@@ -109,7 +109,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Const(r)) if r.isPow2 && r > 0 =>
       val i = INT[F].v + Number.log2(r).toInt - 1
       if (i <= 0) a.from(0)
-      else a.bits(i::0).as[Fix[S,I,F]]
+      else a.bits(i::0).asUnchecked[Fix[S,I,F]]
 
     case _ => super.rewrite
   }
@@ -266,7 +266,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     a:  Fix[S1,I1,F1],
     f2: FixFmt[S2,I2,F2])
   extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
-  override val isTransient = true
+  override val isEphemeral = true
   @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
     case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
     case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]

@@ -25,6 +25,8 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
     case m:Reg[_]       => new MemoryConfigurer(m, strategy)
     case m:ArgIn[_]     => new MemoryConfigurer(m, strategy)
     case m:ArgOut[_]    => new MemoryConfigurer(m, strategy)
+    case m:StreamIn[_]  => new MemoryConfigurer(m, strategy)
+    case m:StreamOut[_] => new MemoryConfigurer(m, strategy)
     case _ => throw new Exception(s"Don't know how to bank memory of type ${mem.tp}")
   }).asInstanceOf[MemoryConfigurer[C]]
 

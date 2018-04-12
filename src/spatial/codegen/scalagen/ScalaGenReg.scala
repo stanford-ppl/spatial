@@ -15,10 +15,10 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
     case op@RegNew(init)    => emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}]($init)") }
     case RegReset(reg, ens) =>
       val init = reg match {case Op(RegNew(i)) => i }
-      emit(src"val $lhs = if (${and(ens)}) $reg.update(0, $init)")
+      emit(src"val $lhs = if (${and(ens)}) $reg.set($init)")
 
-    case RegRead(reg)       => emit(src"val $lhs = $reg.apply(0)")
-    case RegWrite(reg,v,en) => emit(src"val $lhs = if ($en) $reg.update(0, $v)")
+    case RegRead(reg)       => emit(src"val $lhs = $reg.value")
+    case RegWrite(reg,v,en) => emit(src"val $lhs = if (${and(en)}) $reg.set($v)")
 
     //case RegWriteAccum(reg,data,first,en,_) =>
     //  emit(src"val $lhs = if ($en && $first) $reg.update(0,$data) else if ($en) $reg.update(0,$data + $reg.apply(0))")

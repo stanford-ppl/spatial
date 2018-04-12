@@ -7,52 +7,6 @@ import chisel3.iotesters.{PeekPokeTester, Driver, ChiselFlatSpec}
 /**
  * FF test harness
  */
-class FFTests(c: FF) extends PeekPokeTester(c) {
-  val initval = 10
-  poke(c.io.input(0).init, initval)
-  step(1)
-  reset(1)
-  expect(c.io.output.data, initval)
-
-  // overwrite init
-  poke(c.io.input(0).data, 0)
-  poke(c.io.input(0).enable, 1)
-  step(1)
-  expect(c.io.output.data, 0)
-  step(1)
-
-  val numCycles = 15
-  for (i <- 0 until numCycles) {
-    val newenable = rnd.nextInt(2)
-    val oldout = peek(c.io.output.data)
-    poke(c.io.input(0).data, i)
-    poke(c.io.input(0).enable, newenable)
-    step(1)
-    if (newenable == 1) {
-      // val a = peek(c.io.output.data)
-      // println(s"expect $a to be $i")
-      expect(c.io.output.data, i)
-    } else {
-      // val a = peek(c.io.output.data)
-      // println(s"expect $a to be $oldout")
-      expect(c.io.output.data, oldout)
-    }
-  }
-  poke(c.io.input(0).reset, 1)
-  poke(c.io.input(0).enable, 0)
-  // val b = peek(c.io.output.data)
-  // println(s"expect $b to be $initval")
-  expect(c.io.output.data, initval)
-  step(1)
-  // val cc = peek(c.io.output.data)
-  // println(s"expect $cc to be $initval")
-  expect(c.io.output.data, initval)
-  poke(c.io.input(0).reset, 0)
-  step(1)
-  // val d = peek(c.io.output.data)
-  // println(s"expect $d to be $initval")
-  expect(c.io.output.data, initval)
-}
 
 class NBufFFTests(c: NBufFF) extends PeekPokeTester(c) {
   val timeout = 400

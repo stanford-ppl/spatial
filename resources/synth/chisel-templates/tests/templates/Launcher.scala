@@ -45,14 +45,9 @@ object Arguments {
     // (18,"max","FloatingPoint",List(24,8))
   )
   val FF = List(
-    16,
-    32,
-    64
-  )
-  val NBufFF = List(
-    (3,32),
-    (2,32),
-    (10,32)
+    (16, HashMap(0 -> 1)),
+    (32, HashMap(0 -> 1)),
+    (64, HashMap(0 -> 1))
   )
   val FFNoInit = List(
     32
@@ -111,15 +106,26 @@ object Arguments {
     (List(2,2,2), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8)),
     (List(4,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8))
   )
-  val Seqpipe = List(
-    1,
-    10
+  val OuterController = List(
+    (1, Sequential, 32, 1, false),
+    (2, Sequential, 32, 1, false),
+    (5, Sequential, 32, 1, false),
+    (8, Sequential, 32, 1, false),
+    (1, Pipeline, 32, 1, false),
+    (2, Pipeline, 32, 1, false),
+    (5, Pipeline, 32, 1, false),
+    (8, Pipeline, 32, 1, false),
+    (1, ForkJoin, 32, 1, false),
+    (2, ForkJoin, 32, 1, false),
+    (5, ForkJoin, 32, 1, false),
+    (8, ForkJoin, 32, 1, false)  
+    // (1, Stream, 32, 1, false),
+    // (2, Stream, 32, 1, false),
+    // (5, Stream, 32, 1, false),
+    // (8, Stream, 32, 1, false),
   )
-  val Metapipe = List(
-    1,
-    2,
-    5,
-    8
+  val InnerController = List(
+    (false, 32)
   )
   val PRNG = List(
     1,
@@ -133,37 +139,40 @@ object Arguments {
   val SRAM = List(
            ( List(1,16), 32, 
              List(1,1), List(1,1),
-             HashMap(0 -> List(List(0,0))),  HashMap(0 -> List(List(0,0))),
              HashMap[Int,Int](), HashMap[Int,Int](),
+             HashMap(0 -> List(List(0,0))),  HashMap(0 -> List(List(0,0))),
              BankedMemory ),
            ( List(1,32), 32, 
              List(1,2), List(1,1),
-             HashMap(0 -> List(List(0,0), List(0,1))),  HashMap(0 -> List(List(0,0),List(0,1))),
              HashMap[Int,Int](), HashMap[Int,Int](),
+             HashMap(0 -> List(List(0,0), List(0,1))),  HashMap(0 -> List(List(0,0),List(0,1))),
              BankedMemory ),
            ( List(32,32), 32, 
              List(2,2), List(1,1),
-             HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1))),  HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1))),
              HashMap[Int,Int](), HashMap[Int,Int](),
+             HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1))),  HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1))),
              BankedMemory )
         )
-  // val NBufSRAM = List( 
-  //          ( List(8,12), 2, 32, 
-  //            List(1,1), List(1,1), 
-  //            List(1), List(1), List(0), List(1), List(1), BankedMemory),
-  //          ( List(8,12), 3, 32, 
-  //            List(1,1), List(1,1), 
-  //            List(1), List(1), List(0), List(2), List(1), BankedMemory),
-  //          ( List(8,12), 3, 32, 
-  //            List(1,2), List(1,2), 
-  //            List(2), List(2), List(0), List(2), List(2), BankedMemory)
-  //       )
-  val Innerpipe = List(
-    false
-  )
-  val Parallel = List(
-    3
-  )
+  val NBufMem = List( 
+           ( SRAMType, List(8,12), 2, 32, 
+             List(1,2), List(1,1),
+             HashMap[Int, HashMap[Int,Int]](), HashMap[Int, HashMap[Int,Int]](),
+             HashMap(0 -> HashMap(0 -> List(List(0,0), List(0,1)))),  HashMap(1 -> HashMap(0 -> List(List(0,0),List(0,1)))),
+             HashMap(0 -> 1),
+             BankedMemory),
+           ( SRAMType, List(8,12), 5, 32, 
+             List(2,2), List(1,1),
+             HashMap[Int, HashMap[Int,Int]](), HashMap[Int, HashMap[Int,Int]](),
+             HashMap(0 -> HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1)))),  HashMap(4 -> HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1)))),
+             HashMap(0 -> 1),
+             BankedMemory),
+           ( FFType, List(1), 2, 32, 
+             List(1), List(1),
+             HashMap(0 -> HashMap(0 -> 1)), HashMap(1 -> HashMap(0 -> 1)),
+             HashMap[Int, HashMap[Int,List[List[Int]]]](), HashMap[Int, HashMap[Int,List[List[Int]]]](),
+             HashMap(0 -> 1),
+             BankedMemory)
+        )
   val SystolicArray2D = List(
     (List(7,6), List(2,2), List(0,1.0,1.0,0), List(0,0,0,1), None, Sum, 32, 0),
     (List(4,4), List(2,2), List(1.0,1.0,1.0,0), List(0,0,0,1), None, Sum, 32, 0),
@@ -242,14 +251,6 @@ object Launcher {
     (s"FF$i" -> { (backendName: String) =>
     	Driver(() => new FF(arg), "verilator") {
           (c) => new FFTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.NBufFF.zipWithIndex.map{ case(arg,i) => 
-    (s"NBufFF$i" -> { (backendName: String) =>
-    	Driver(() => new NBufFF(arg), "verilator") {
-          (c) => new NBufFFTests(c)
         }
       }) 
   }.toMap
@@ -350,18 +351,18 @@ object Launcher {
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.Seqpipe.zipWithIndex.map{ case(arg,i) => 
-    (s"Seqpipe$i" -> { (backendName: String) =>
-    	Driver(() => new Seqpipe(arg), "verilator") {
-          (c) => new SeqpipeTests(c)
+  templates = templates ++ Arguments.OuterController.zipWithIndex.map{ case(arg,i) => 
+    (s"OuterController$i" -> { (backendName: String) =>
+    	Driver(() => new OuterController(arg), "verilator") {
+          (c) => new OuterControllerTests(c)
         }
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.Metapipe.zipWithIndex.map{ case(arg,i) => 
-    (s"Metapipe$i" -> { (backendName: String) =>
-    	Driver(() => new Metapipe(arg), "verilator") {
-          (c) => new MetapipeTests(c)
+  templates = templates ++ Arguments.InnerController.zipWithIndex.map{ case(arg,i) => 
+    (s"InnerController$i" -> { (backendName: String) =>
+    	Driver(() => new InnerController(arg), "verilator") {
+          (c) => new InnerControllerTests(c)
         }
       }) 
   }.toMap
@@ -390,18 +391,10 @@ object Launcher {
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.Innerpipe.zipWithIndex.map{ case(arg,i) => 
-    (s"Innerpipe$i" -> { (backendName: String) =>
-    	Driver(() => new Innerpipe(arg), "verilator") {
-          (c) => new InnerpipeTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.Parallel.zipWithIndex.map{ case(arg,i) => 
-    (s"Parallel$i" -> { (backendName: String) =>
-    	Driver(() => new Parallel(arg), "verilator") {
-          (c) => new ParallelTests(c)
+  templates = templates ++ Arguments.NBufMem.zipWithIndex.map{ case(arg,i) => 
+    (s"NBufMem$i" -> { (backendName: String) =>
+    	Driver(() => new NBufMem(arg), "verilator") {
+          (c) => new NBufMemTests(c)
         }
       }) 
   }.toMap

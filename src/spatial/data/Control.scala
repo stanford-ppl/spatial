@@ -18,8 +18,8 @@ object Sched {
 
 /** The level of control within the hierarchy. */
 sealed abstract class ControlLevel
-case object InnerControl extends ControlLevel
-case object OuterControl extends ControlLevel
+case object InnerControl extends ControlLevel { override def toString = "InnerController" }
+case object OuterControl extends ControlLevel { override def toString = "OuterController" }
 
 sealed abstract class Ctrl {
   def s: Option[Sym[_]] = None

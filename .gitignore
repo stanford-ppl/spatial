@@ -39,3 +39,4 @@ target/
 *.out
 *.tags
 
+resources/synth/chisel-templates/test_run_dir/*

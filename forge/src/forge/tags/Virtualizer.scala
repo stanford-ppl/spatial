@@ -180,10 +180,12 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
         /* Methods defined on Any/AnyRef with arguments */
 
         case Apply(Select(qualifier, TermName("$eq$eq")), List(arg)) =>
-          call(None, "infix_$eq$eq", List(qualifier, arg))
+          Apply(Select(qualifier, TermName("$eq$eq$eq")), List(arg))
+          //call(None, "infix_$eq$eq", List(qualifier, arg))
 
         case Apply(Select(qualifier, TermName("$bang$eq")), List(arg)) =>
-          call(None, "infix_$bang$eq", List(qualifier, arg))
+          Apply(Select(qualifier, TermName("$bang$eq$eq")), List(arg))
+          //call(None, "infix_$bang$eq", List(qualifier, arg))
 
         case Apply(Select(qualifier, TermName("equals")), List(arg)) =>
           call(None, "infix_equals", List(qualifier, arg))

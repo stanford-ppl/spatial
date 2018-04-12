@@ -19,13 +19,13 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
   }
 
   def busWidthCheck(tp: Bits[_], bus: Bus, mem: String): Unit = {
-    if (tp.nbits < bus.length) {
-      warn(ctx, s"Bus length is greater than size of $mem type.")
+    if (tp.nbits < bus.nbits) {
+      warn(ctx, s"Bus bits is greater than number of bits of $mem type.")
       warn(s"Hardware will drive only the first ${tp.nbits} bits of the bus.")
       warn(ctx)
     }
-    else if (tp.nbits > bus.length) {
-      warn(ctx, s"Bus length is smaller than size of $mem type.")
+    else if (tp.nbits > bus.nbits) {
+      warn(ctx, s"Bus bits is smaller than number of bits of $mem type.")
       warn(s"Hardware will use only the first ${tp.nbits} bits in the word")
       warn(ctx)
     }

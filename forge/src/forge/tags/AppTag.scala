@@ -24,7 +24,7 @@ class AppTag(dsl: String, dslApp: String) {
       case _ => invalidAnnotationUse("dsl", "classes", "objects", "traits")
     }
 
-    //c.info(c.enclosingPosition, showCode(outputs.head), force = true)
+    //info(showCode(outputs.head))
 
     q"..$outputs"
   }

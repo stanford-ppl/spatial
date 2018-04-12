@@ -7,6 +7,8 @@ import forge.tags._
 import spatial.node._
 
 case class FltFmt[M,E](m: INT[M], e: INT[E]) {
+  implicit val M: INT[M] = m
+  implicit val E: INT[E] = e
   def sign: Boolean = true
   def mbits: Int = m.v
   def ebits: Int = e.v
@@ -23,7 +25,7 @@ object FltFmt {
 
   def mbits: Int = fmt.mbits
   def ebits: Int = fmt.ebits
-  def nbits: Int = mbits + ebits
+  @rig def nbits: Int = mbits + ebits
 
   @api def unary_-(): Flt[M,E] = stage(FltNeg(this))
   @api def +(that: Flt[M,E]): Flt[M,E] = stage(FltAdd(this,that))
@@ -95,6 +97,8 @@ object FltFmt {
   }
 
   @api override def toText: Text = stage(FltToText(this))
+  @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = this.to[Fix[S2,I2,F2]]
+  @rig def __toFlt[M:INT,E:INT]: Flt[M,E] = this.to[Flt[M,E]]
 }
 
 object Flt {

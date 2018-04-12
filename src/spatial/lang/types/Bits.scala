@@ -79,7 +79,7 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
   }
 
   // --- Typeclass Methods
-  def nbits: Int
+  @rig def nbits: Int
   @rig def zero: A
   @rig def one: A
   @rig def random(max: Option[A]): A
@@ -95,13 +95,8 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
 }
 
 object Bits {
-  def apply[A:Bits]: Bits[A] = {
-    try { implicitly[Bits[A]] }
-    catch {case t:Throwable =>
-      fatal("Could not get bit evidence")
-      throw t
-    }
-  }
+  def apply[A:Bits]: Bits[A] = implicitly[Bits[A]]
+
   def m[A,B](n: Bits[A]): Bits[B] = n.asInstanceOf[Bits[B]]
 
   def unapply[A](x: ExpType[_,A]): Option[Bits[A]] = x match {

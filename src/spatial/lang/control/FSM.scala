@@ -9,9 +9,6 @@ object FSM {
   @api def apply[A:Bits](init: Lift[A])(notDone: A => Bit)(action: A => Void)(next: A => A): Void = {
     fsm(init.unbox, notDone, action, next)
   }
-  @api def apply[A:Bits](notDone: A => Bit)(action: A => Void)(next: A => A): Void = {
-    fsm(implicitly[Bits[A]].zero, notDone, action, next)
-  }
 
   @rig def fsm[A:Bits](start: A, notDone: A => Bit, action: A => Void, nextState: A => A): Void = {
     val cur = bound[A]

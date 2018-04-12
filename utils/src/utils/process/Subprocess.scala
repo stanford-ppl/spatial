@@ -2,7 +2,7 @@ package utils.process
 
 import java.io._
 
-case class Subprocess(args: String*)(react: (String,BufferedReader) => Option[String]) {
+class Subprocess(args: String*)(react: (String,BufferedReader) => Option[String]) {
   private var reader: BufferedReader = _
   private var writer: BufferedWriter = _
   private var logger: BufferedReader = _
@@ -63,5 +63,5 @@ case class Subprocess(args: String*)(react: (String,BufferedReader) => Option[St
     (lines.reverse, errs.reverse)
   }
 
-  def kill(): Unit = if (p eq null) throw new Exception("Process has not started") else p.destroy()
+  def kill(): Unit = if (p eq null) () else p.destroy()
 }

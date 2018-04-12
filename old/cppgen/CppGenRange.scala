@@ -2,7 +2,7 @@ package spatial.codegen.cppgen
 
 import argon.codegen.cppgen.CppCodegen
 import argon.core._
-import spatial.aliases._
+
 import spatial.nodes._
 
 trait CppGenRange extends CppCodegen {

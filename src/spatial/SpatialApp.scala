@@ -2,7 +2,7 @@ package spatial
 
 import argon.{DSLApp, _}
 import argon.passes.IRPrinter
-import nova.codegen.dot._
+import pir.codegen.dot._
 import poly.{ConstraintMatrix, ISL}
 import spatial.codegen.scalagen._
 import spatial.codegen.cppgen._
@@ -33,12 +33,11 @@ trait SpatialApp extends DSLApp {
   }
 
   var args: Tensor1[Text] = _
-  def main(): Void
-  //def main(args: Tensor1[Text]): Void = main()
+  def main(args: Tensor1[Text]): Void
 
   final def stageApp(sargs: Array[String]): Block[_] = stageBlock{
     args = stage(InputArguments())
-    main()
+    main(args)
   }
 
   override def initConfig(): Config = new SpatialConfig
@@ -75,6 +74,7 @@ trait SpatialApp extends DSLApp {
     lazy val pipeInserter      = PipeInserter(state)
     lazy val registerCleanup   = RegisterCleanup(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
+    lazy val aliasCleanup      = AliasCleanup(state)
     lazy val retiming          = RetimingTransformer(state)
 
     lazy val globalAllocation = GlobalAllocation(state)
@@ -87,8 +87,7 @@ trait SpatialApp extends DSLApp {
     lazy val scalaCodegen = ScalaGenSpatial(state)
     lazy val puDotCodegen = PUDotCodegen(state)
 
-    block ==>
-      printer ==>
+    block ==> printer ==>
       friendlyTransformer ==>
       sanityChecks ==>
       switchTransformer ==>
@@ -103,6 +102,7 @@ trait SpatialApp extends DSLApp {
       memoryAllocator ==>
       memoryReporter  ==>
       unrollTransformer ==> printer ==>
+      aliasCleanup ==> printer ==>
       (cfg.enableRetiming ? retiming) ==> printer ==>
       (cfg.enableRetiming ? retimeReporter) ==>
       initiationAnalyzer ==>

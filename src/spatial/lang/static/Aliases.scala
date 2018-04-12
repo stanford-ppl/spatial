@@ -56,6 +56,7 @@ trait InternalAliases extends CustomBitWidths {
   lazy val MemFold   = spatial.lang.control.MemFold
   lazy val FSM       = spatial.lang.control.FSM
 
+  lazy val Parallel = spatial.lang.control.Parallel
   lazy val Pipe = spatial.lang.control.Pipe
   lazy val Sequential = spatial.lang.control.Sequential
   lazy val Stream = spatial.lang.control.Stream
@@ -63,10 +64,15 @@ trait InternalAliases extends CustomBitWidths {
 
   /** Host */
   type Tensor1[A] = spatial.lang.host.Array[A]
+  lazy val Tensor1 = spatial.lang.host.Array
   type Tensor2[A] = spatial.lang.host.Matrix[A]
+  lazy val Tensor2 = spatial.lang.host.Matrix
   type Tensor3[A] = spatial.lang.host.Tensor3[A]
+  lazy val Tensor3 = spatial.lang.host.Tensor3
   type Tensor4[A] = spatial.lang.host.Tensor4[A]
+  lazy val Tensor4 = spatial.lang.host.Tensor4
   type Tensor5[A] = spatial.lang.host.Tensor5[A]
+  lazy val Tensor5 = spatial.lang.host.Tensor5
   type CSVFile = spatial.lang.host.CSVFile
   type BinaryFile = spatial.lang.host.BinaryFile
 }
@@ -150,3 +156,41 @@ trait ExternalAliases extends InternalAliases {
   type CounterChain = spatial.lang.CounterChain
   lazy val CounterChain = spatial.lang.CounterChain
 }
+
+trait ShadowingAliases extends ExternalAliases {
+  type Char = spatial.lang.Fix[FALSE,_8,_0]
+  type Byte = spatial.lang.Fix[TRUE,_8,_0]
+  type Short = spatial.lang.Fix[TRUE,_16,_0]
+  type Int   = spatial.lang.Fix[TRUE,_32,_0]
+  type Long  = spatial.lang.Fix[TRUE,_64,_0]
+
+  type Half  = spatial.lang.Flt[_11,_5]
+  type Float = spatial.lang.Flt[_24,_8]
+  type Double = spatial.lang.Flt[_53,_11]
+
+  type Boolean = spatial.lang.Bit
+  type String = spatial.lang.Text
+
+  type Array[A] = spatial.lang.host.Array[A]
+  lazy val Array = spatial.lang.host.Array
+  type Matrix[A] = spatial.lang.host.Matrix[A]
+  lazy val Matrix = spatial.lang.host.Matrix
+
+  type Unit = spatial.lang.Void
+
+  object gen {
+    type Char = scala.Char
+    type Byte = scala.Byte
+    type Short = scala.Short
+    type Int = scala.Int
+    type Long = scala.Long
+    type Float = scala.Float
+    type Double = scala.Double
+    type Boolean = scala.Boolean
+    type String = java.lang.String
+    type Array[A] = scala.Array[A]
+    lazy val Array = scala.Array
+    type Unit = scala.Unit
+  }
+}
+

@@ -1,7 +1,7 @@
 package spatial.codegen.cppgen
 
 import argon.core._
-import spatial.aliases._
+
 import spatial.nodes._
 
 

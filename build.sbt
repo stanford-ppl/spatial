@@ -1,6 +1,7 @@
 val nova_version      = "1.0"
 val scala_version     = "2.12.4"
 val paradise_version  = "2.1.0"
+val scalatestVersion  = "3.0.5"
 
 name := "nova"
 organization := "edu.stanford.ppl"
@@ -12,8 +13,12 @@ val common = Seq(
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
-    "com.lihaoyi" %% "utest" % "0.6.3" % "test",         // Testing
+    "org.scalatest" %% "scalatest" % scalatestVersion % "test",
     "com.github.scopt" %% "scopt" % "3.7.0",
+
+    // Alternative library for testing
+    //"com.lihaoyi" %% "utest" % "0.6.3" % "test",         // Testing
+
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",
     //"commons-io" % "commons-io" % "2.5"
@@ -42,7 +47,6 @@ val common = Seq(
 
   /** Testing **/
   scalacOptions in Test ++= Seq("-Yrangepos"),
-  testFrameworks += new TestFramework("utest.runner.Framework"),
 
   /** Macro Paradise **/
   resolvers += Resolver.sonatypeRepo("snapshots"),

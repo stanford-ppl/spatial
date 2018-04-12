@@ -18,8 +18,8 @@ import spatial.lang._
   val tA: Bits[A] = Bits[A]
   val box: Out[A] <:< Bits[Out[A]] = implicitly[Out[A] <:< Bits[Out[A]]]
   override val __isPrimitive: Boolean = true
-  override def nbits: Int = tA.nbits
 
+  @rig def nbits: Int = tA.nbits
   @rig def zero: Out[A] = const[Out[A]](new Ptr(tA.zero))
   @rig def one: Out[A] = const[Out[A]](new Ptr(tA.one))
   @rig def random(max: Option[Out[A]]): Out[A] = undefinedOp("random")

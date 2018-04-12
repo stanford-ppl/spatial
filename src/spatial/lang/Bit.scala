@@ -21,8 +21,8 @@ import spatial.node._
   // --- Typeclass Methods
   override val box: Bit <:< Bits[Bit] = implicitly[Bit <:< Bits[Bit]]
   override val __isPrimitive: Boolean = true
-  override def nbits: Int = 1
 
+  @rig def nbits: Int = 1
   @rig def zero: Bit = this.from(false)
   @rig def one: Bit = this.from(true)
   @rig def random(max: Option[Bit]): Bit = stage(BitRandom(max))

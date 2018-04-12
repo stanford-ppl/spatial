@@ -29,22 +29,21 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
 
   def targsType(select: TypeName, targs: List[Tree]): Tree = tq"$select[..$targs]"
 
-  // Hack for scala bug #10589 where <caseaccessor> gets added to (private) implicit fields
-  def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{
+  def fieldsFix(field: ValDef): ValDef = field match {
     case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) &&
-                                     mods.hasFlag(Flag.PARAMACCESSOR) &&
-                                     mods.hasFlag(Flag.IMPLICIT) &&
-                                     mods.hasFlag(Flag.LOCAL) &&
-                                     mods.hasFlag(Flag.PROTECTED) =>
+      mods.hasFlag(Flag.PARAMACCESSOR) &&
+      mods.hasFlag(Flag.IMPLICIT) &&
+      mods.hasFlag(Flag.LOCAL) &&
+      mods.hasFlag(Flag.PROTECTED) =>
 
       val flags = Modifiers(Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.LOCAL | Flag.PROTECTED)
       ValDef(flags, name, tp, rhs)
 
     case ValDef(mods,name,tp,rhs) if mods.hasFlag(Flag.CASEACCESSOR) &&
-                                     mods.hasFlag(Flag.PARAMACCESSOR) &&
-                                     mods.hasFlag(Flag.PRIVATE) &&
-                                     mods.hasFlag(Flag.IMPLICIT) &&
-                                     mods.hasFlag(Flag.LOCAL) =>
+      mods.hasFlag(Flag.PARAMACCESSOR) &&
+      mods.hasFlag(Flag.PRIVATE) &&
+      mods.hasFlag(Flag.IMPLICIT) &&
+      mods.hasFlag(Flag.LOCAL) =>
       val flags = Modifiers(Flag.PRIVATE | Flag.IMPLICIT | Flag.PARAMACCESSOR | Flag.LOCAL)
       ValDef(flags, name, tp, rhs)
 
@@ -55,6 +54,9 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
 
     case v => v
   }
+
+  // Hack for scala bug #10589 where <caseaccessor> gets added to (private) implicit fields
+  def fieldsFix(fields: List[ValDef]): List[ValDef] = fields.map{fieldsFix}
 
   def isWildcardType(tp: Tree, str: String): Boolean = tp match {
     case ExistentialTypeTree(AppliedTypeTree(Ident(TypeName(`str`)), List(Ident(TypeName(arg)))), _) => arg.startsWith("_$")
@@ -142,7 +144,12 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     lazy val fields: List[ValDef] = fieldsFix(__body.collect{case x: ValDef => x })
     lazy val methods: List[DefDef] = __body.collect{case x: DefDef => x }
     lazy val other: List[Tree] = __body.filter{case _:ValDef|_:DefDef => false; case _ => true }
-    lazy val body: List[Tree] = fields ++ methods ++ other
+
+    // Must maintain order of statements in the body!
+    lazy val body: List[Tree] = __body.map{
+      case x: ValDef => fieldsFix(x)
+      case x => x
+    }
 
     def fieldsAndMethods: (List[ValDef],List[DefDef]) = (fields, methods)
     def fieldAndMethodNames: List[String] = fields.map(_.nameStr) ++ methods.map(_.nameStr)

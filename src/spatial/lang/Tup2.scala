@@ -40,11 +40,13 @@ import forge.tags._
   @api def ceil(a: Tup2[A, B]): Tup2[A, B] = arith("ceil"){(a,b) => Tup2(a.ceil(this._1), b.ceil(this._2)) }
   @api def floor(a: Tup2[A, B]): Tup2[A, B] = arith("floor"){(a,b) => Tup2(a.floor(this._1), b.floor(this._2)) }
 
-  override def nbits: Int = (A.getView[Bits],B.getView[Bits]) match {
+  @rig def nbits: Int = (A.getView[Bits],B.getView[Bits]) match {
     case (Some(a),Some(b)) => a.nbits + b.nbits
-    case _ => fatal(s"${this.tp} is not a bit-based type.")
+    case _ =>
+      error(this.ctx, s"${this.tp} is not a bit-based type.")
+      error(this.ctx)
+      0
   }
-
   @api def zero: Tup2[A, B] = bits("zero"){(a,b) => Tup2(a.zero, b.zero) }
   @api def one: Tup2[A, B] = bits("one"){(a,b) => Tup2(a.one, b.one) }
   @api def random(max: Option[Tup2[A, B]]): Tup2[A, B] = bits("random"){(a,b) =>

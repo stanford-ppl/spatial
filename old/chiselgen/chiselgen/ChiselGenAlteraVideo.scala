@@ -2,7 +2,7 @@ package spatial.codegen.chiselgen
 
 import argon.codegen.FileDependencies
 import argon.core._
-import spatial.aliases._
+
 import spatial.nodes._
 
 trait ChiselGenAlteraVideo extends ChiselCodegen with FileDependencies {

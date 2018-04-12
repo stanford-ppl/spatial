@@ -111,19 +111,24 @@ trait ReduceUnrolling extends UnrollingBase {
 
   // Hack to get the accumulator duplicate from the original and the loadAccum block for this reduction
   // Assumes that the accumulator corresponds to exactly one duplicate
-  def accumHack[T](orig: Sym[T], load: Block[_]): T = {
-    val contents = load.nestedStms
-    val readers = readersOf(orig)
-    readers.find{reader => contents.contains(reader) } match {
-      case Some(reader) =>
-        val mapping = dispatchOf(reader)
-        if (mapping.isEmpty) throw new Exception(s"No dispatch found in reduce for accumulator $orig")
-        val dispatch = mapping.head._2.head
-        if (!memories.contains((orig,dispatch))) throw new Exception(s"No duplicate found for accumulator $orig")
-        memories((orig,dispatch)).asInstanceOf[T]
+  def accumHack[T](orig: Sym[T], load: Block[_]): T = orig match {
+    case Op(MemDenseAlias(_,mems,_)) =>
+      if (mems.length > 1) throw new Exception(s"Accumulation on aliased memories is not yet supported")
+      else accumHack(mems.head.asInstanceOf[Sym[T]], load)
 
-      case None => throw new Exception(s"No reader found in reduce for accumulator $orig")
-    }
+    case _ =>
+      val contents = load.nestedStms
+      val readers = readersOf(orig)
+      readers.find{reader => contents.contains(reader) } match {
+        case Some(reader) =>
+          val mapping = dispatchOf(reader)
+          if (mapping.isEmpty) throw new Exception(s"No dispatch found in reduce for accumulator $orig")
+          val dispatch = mapping.head._2.head
+          if (!memories.contains((orig,dispatch))) throw new Exception(s"No duplicate found for accumulator $orig")
+          memories((orig,dispatch)).asInstanceOf[T]
+
+        case None => throw new Exception(s"No reader found in reduce for accumulator $orig")
+      }
   }
 
   def unrollReduceTree[A:Bits](
@@ -138,7 +143,7 @@ trait ReduceUnrolling extends UnrollingBase {
 
     case None =>
       // ASSUMPTION: If any values are invalid, they are at the end of the list (corresponding to highest index values)
-      // TODO: This may be incorrect if we parallelize by more than the innermost iterator
+      // TODO[2]: This may be incorrect if we parallelize by more than the innermost iterator
       inputs.zip(valids).reduceTree{case ((x, x_en), (y, y_en)) =>
         (mux(y_en, rfunc(x,y), x), x_en | y_en) // res is valid if x or y is valid
       }._1

@@ -1,5 +1,7 @@
 package argon
 
+import java.lang.Thread.UncaughtExceptionHandler
+
 import argon.passes.Pass
 import argon.transform.Transformer
 import utils.io.files
@@ -7,14 +9,42 @@ import utils._
 import utils.implicits.terminal._
 
 trait Compiler { self =>
-  protected var IR: State = new State
-  final implicit def __IR: State = IR
+  protected[argon] var IR: State = new State
+  final protected implicit def __IR: State = IR
   private val instrument = new Instrument()
   private val memWatch = new MemoryLogger()
 
   val script: String
   val desc: String
   def name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
+
+  var directives: Map[String,String] = Map.empty
+  def define[T](name: String, default: T)(implicit ctx: SrcCtx): T = directives.get(name.toLowerCase) match {
+    case Some(arg) =>
+      try {
+        (default match {
+          case _: Boolean => arg.toBoolean
+          case _: Char  => arg.head
+          case _: Byte  => arg.toByte
+          case _: Short => arg.toShort
+          case _: Int   => arg.toInt
+          case _: Long  => arg.toLong
+          case _: Float => arg.toFloat
+          case _: Double => arg.toDouble
+          case _: String => arg
+          case _ =>
+            error(ctx, s"Don't know how to get flag of type ${default.getClass}")
+            error(ctx)
+            default
+        }).asInstanceOf[T]
+      }
+      catch {case _: Throwable =>
+        error(ctx, s"Could not parse flag $name value $arg")
+        error(ctx)
+        default
+      }
+    case None => default
+  }
 
   protected def checkBugs(stage: String): Unit = if (IR.hadBugs) throw CompilerBugs(stage, IR.bugs)
   protected def checkErrors(stage: String): Unit = if (IR.hadErrors) throw CompilerErrors(stage, IR.errors)
@@ -134,6 +164,15 @@ trait Compiler { self =>
     IR = new State                 // Create a new, empty state
     IR.config = initConfig()
     IR.config.name = name          // Set the default program name
+    directives = Map.empty
+
+    val (direcs, other) = args.partition(_.startsWith("-D"))
+
+    directives ++= direcs.flatMap{d =>
+      val parts = d.drop(2).split("=").map(_.trim)
+      if (parts.length == 2) Some(parts.head.toLowerCase -> parts.last)
+      else { warn("Unrecognized argument: $d"); None }
+    }
 
     val parser = new scopt.OptionParser[Unit](script){
       override def reportError(msg: String): Unit = { System.out.error(msg); IR.logError() }
@@ -142,7 +181,7 @@ trait Compiler { self =>
     parser.head(script, desc)
     parser.help("help").text("prints this usage text")
     defineOpts(parser)
-    parser.parse(args, ())         // Initialize the Config (from commandline)
+    parser.parse(other, ())         // Initialize the Config (from commandline)
     settings()                     // Override config with any DSL or app-specific settings
     IR.config.logDir = IR.config.logDir + files.sep + name + files.sep
     IR.config.genDir = IR.config.genDir + files.sep + {if (config.genDirOverride) "" else {name + files.sep}}
@@ -175,17 +214,17 @@ trait Compiler { self =>
       execute(args)
     }
     catch {
-      case CompilerBugs(stage,n) =>
-        onException(new Exception(s"$n compiler ${plural(n,"bug")} during pass $stage"))
-        failure = Some(TestbenchFailure(s"$n compiler ${plural(n,"bug")} during pass $stage"))
+      case t: CompilerBugs =>
+        onException(t)
+        failure = Some(t)
 
-      case CompilerErrors(stage,n) =>
+      case t @ CompilerErrors(stage,n) =>
         error(s"${IR.errors} ${plural(n,"error")} found during $stage")
-        failure = Some(TestbenchFailure(s"$n ${plural(n,"error")} found during $stage"))
+        failure = Some(t)
 
       case t: Throwable =>
         onException(t)
-        val except = TestbenchFailure(s"Uncaught exception ${t.getMessage} (${t.getCause})")
+        val except = UnhandledException(t)
         except.setStackTrace(t.getStackTrace)
         failure = Some(except)
     }

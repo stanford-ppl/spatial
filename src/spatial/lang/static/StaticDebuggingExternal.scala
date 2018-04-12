@@ -28,6 +28,123 @@ trait StaticDebuggingExternal {
 
   @api def sleep(cycles: I32): Void = Foreach(cycles by 1){_ =>  }
 
+  /** Prints the given Array to the console, preceded by an optional heading. **/
+  @virtualize
+  @api def printArray[T:Type](array: Tensor1[T], header: Text = Text("")): Void = {
+    println(header)
+    (0 until array.length).foreach{i => print(array(i).toString + " ") }
+    println("")
+  }
+
+  /** Prints the given Matrix to the console, preceded by an optional heading. **/
+  @virtualize
+  @api def printMatrix[T:Type](matrix: Tensor2[T], header: Text = Text("")): Void = {
+    println(header)
+    (0 until matrix.rows) foreach { i =>
+      (0 until matrix.cols) foreach { j =>
+        print(matrix(i, j).toString + "\t")
+      }
+      println("")
+    }
+  }
+
+  /** Prints the given Tensor3 to the console, preceded by an optional heading. **/
+  @virtualize
+  @api def printTensor3[T:Type](tensor: Tensor3[T], header: Text = Text("")): Void = {
+    println(header)
+    (0 until tensor.dim0) foreach { i =>
+      (0 until tensor.dim1) foreach { j =>
+        (0 until tensor.dim2) foreach { k =>
+          print(tensor(i, j, k).toString + "\t")
+        }
+        println("")
+      }
+      (0 until tensor.dim2) foreach {_ => print("--\t")}
+      println("")
+    }
+  }
+
+  /** Prints the given Tensor4 to the console, preceded by the an optional heading. **/
+  @virtualize
+  @api def printTensor4[T:Type](tensor: Tensor4[T], header: Text = Text("")): Void = {
+    println(header)
+    (0 until tensor.dim0) foreach { i =>
+      (0 until tensor.dim1) foreach { j =>
+        (0 until tensor.dim2) foreach { k =>
+          (0 until tensor.dim3) foreach { l =>
+            print(tensor(i, j, k, l).toString + "\t")
+          }
+          println("")
+        }
+        (0 until tensor.dim3) foreach {_ => print("--\t")}
+        println("")
+      }
+      (0 until tensor.dim3) foreach {_ => print("--\t")}
+      println("")
+    }
+  }
+
+  /** Prints the given Tensor5 to the console, preceded by the an optional heading. **/
+  @virtualize
+  @api def printTensor5[T:Type](tensor: Tensor5[T], header: Text = Text("")): Void = {
+    println(header)
+    (0 until tensor.dim0) foreach { i =>
+      (0 until tensor.dim1) foreach { j =>
+        (0 until tensor.dim2) foreach { k =>
+          (0 until tensor.dim3) foreach { l =>
+            (0 until tensor.dim4) foreach { m =>
+              print(tensor(i, j, k, l, m).toString + "\t")
+            }
+            println("")
+          }
+          (0 until tensor.dim4) foreach {_ => print("--\t")}
+          println("")
+        }
+        (0 until tensor.dim4) foreach {_ => print("--\t")}
+        println("")
+      }
+      (0 until tensor.dim4) foreach {_ => print("--\t")}
+      println("")
+    }
+  }
+
+  /** Prints the given SRAM1 to the console, preceded by an optional heading. **/
+  @virtualize
+  @api def printSRAM[T:Type](array: SRAM1[T]): Void = {
+    (0 until array.length) foreach { i => print(array(i).toString + " ") }
+    println("")
+  }
+
+  /** Prints the given SRAM2 to the console, preceded by an optional heading. **/
+  @virtualize
+  @api def printSRAM[T:Type](matrix: SRAM2[T]): Void = {
+    (0 until matrix.rows) foreach { i =>
+      (0 until matrix.cols) foreach { j =>
+        print(matrix(i, j).toString + "\t")
+      }
+      println("")
+    }
+  }
+
+  /** Prints the given SRAM3 to the console, preceded by an optional heading. **/
+  @virtualize
+  @api def printSRAM[T:Type](tensor: SRAM3[T]): Void = {
+    (0 until tensor.dim0) foreach { i =>
+      (0 until tensor.dim1) foreach { j =>
+        (0 until tensor.dim2) foreach { k =>
+          print(tensor(i, j, k).toString + "\t")
+        }
+        println("")
+      }
+      (0 until tensor.dim2) foreach {_ => print("--\t")}
+      println("")
+    }
+  }
+
+  implicit class I32Range(x: Series[I32]) {
+    @api def foreach(func: I32 => Void): Void = Foreach(x){i => func(i) }
+  }
+
 
   implicit class Quoting(sc: StringContext) {
     @api def r(args: Any*): Text = {

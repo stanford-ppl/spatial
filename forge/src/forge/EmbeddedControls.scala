@@ -49,7 +49,7 @@ trait EmbeddedControls {
   //  def __valDef[T](init: T): T = macro valDefImpl[T]
 
   /** Control structures */
-  def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T = macro ifThenElseImpl[T]
+  //def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T = macro ifThenElseImpl[T]
   def __return(expr: Any): Nothing = macro returnImpl
   def __whileDo(cond: Boolean, body: Unit): Unit = macro whileDoImpl
   def __doWhile(body: Unit, cond: Boolean): Unit = macro doWhileImpl
@@ -60,8 +60,8 @@ trait EmbeddedControls {
   // def __typedCase[A,T,R](bind: T, guard: Boolean, body: R): A => R = macro typedCaseImpl[A,T,R]
 
   /** `Any` Infix Methods */
-  def infix_+(x1: String, x2: Any): String = macro string_+
-  def infix_+(x1: Any, x2: Any): Any = macro any_+ // don't know the return type => should actually never be produced by Virtualizer
+  //def infix_+(x1: String, x2: Any): String = macro string_+
+  //def infix_+(x1: Any, x2: Any): Any = macro any_+ // don't know the return type => should actually never be produced by Virtualizer
   def infix_==(x1: Any, x2: Any): Boolean = macro any_==
   def infix_!=(x1: Any, x2: Any): Boolean = macro any_!=
   def infix_##(x: Any): Int = macro any_##
@@ -92,7 +92,7 @@ trait EmbeddedControls {
 /**
   * EmbeddedControls companion object containing macro implementations.
   */
-private object EmbeddedControls {
+object EmbeddedControls {
 
   /** Val/Var Definitions */
   def newVarImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = {

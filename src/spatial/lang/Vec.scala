@@ -16,7 +16,7 @@ import spatial.node._
 
   // TODO[4]: These are all quite expensive for large vectors
   @api def elems: List[A] = List.tabulate(width){i => this.apply(i) }
-  @api def map[B:Bits](func: A => B): Vec[B] = Vec.LeastFirst(elems.map(func):_*)
+  @api def map[B:Bits](func: A => B): Vec[B] = Vec.ZeroFirst(elems.map(func):_*)
   @api def zip[B:Bits,R:Bits](that: Vec[B])(func: (A,B) => R): Vec[R] = {
     if (that.width != this.width) {
       implicit val tV: Vec[R] = Vec.bits[R](width)
@@ -25,7 +25,7 @@ import spatial.node._
       err[Vec[R]]("Mismatched vector")
     }
     else {
-      Vec.LeastFirst(this.elems.zip(that.elems).map{case (a,b) => func(a,b) }:_*)
+      Vec.ZeroFirst(this.elems.zip(that.elems).map{case (a,b) => func(a,b) }:_*)
     }
   }
   @api def reduce(func: (A,A) => A): A = ReduceTree(elems:_*)(func)
@@ -114,17 +114,17 @@ import spatial.node._
 
   // --- Typeclass Methods
   override protected val __isPrimitive: Boolean = false
-  override def nbits: Int = A.nbits * width
 
-  @rig def zero: Vec[A] = Vec.LeastLast(Seq.fill(width){ A.zero }:_*)
-  @rig def one: Vec[A] = Vec.LeastLast(Seq.fill(width-1){ A.zero} :+ A.one :_*)
+  @rig def nbits: Int = A.nbits * width
+  @rig def zero: Vec[A] = Vec.ZeroLast(Seq.fill(width){ A.zero }:_*)
+  @rig def one: Vec[A] = Vec.ZeroLast(Seq.fill(width-1){ A.zero} :+ A.one :_*)
   @rig def random(max: Option[Vec[A]]): Vec[A] = {
     if (max.isDefined && max.get.width != width) {
       error(ctx, s"Vector length mismatch. Expected $width ${plural(width,"word")}, got ${max.get.width}")
       error(ctx)
     }
     val elems = Seq.tabulate(width){i => A.random(max.map{vec => vec(i)}) }
-    Vec.LeastLast(elems:_*)
+    Vec.ZeroLast(elems:_*)
   }
 
   @rig def abs(a: Vec[A]): Vec[A] = arith("abs"){a => this.map(a.abs) }
@@ -151,7 +151,7 @@ object Vec {
     * The first element is the most significant word (vector index N-1).
     * The last element is the least significant word (vector index of 0).
     */
-  @api def LeastLast[A:Bits](elems: A*): Vec[A] = fromSeq(elems.reverse)
+  @api def ZeroLast[A:Bits](elems: A*): Vec[A] = fromSeq(elems.reverse)
 
   /**
     * Creates a big-endian vector from the given N elements.
@@ -166,7 +166,7 @@ object Vec {
     * The first element is the least significant word (vector index 0).
     * The last element is the most significant word (vector index of N-1).
     */
-  @api def LeastFirst[A:Bits](elems: A*): Vec[A] = fromSeq(elems)
+  @api def ZeroFirst[A:Bits](elems: A*): Vec[A] = fromSeq(elems)
 
   /**
     * Creates an empty vector (of the given type).

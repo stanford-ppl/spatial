@@ -6,10 +6,13 @@ import forge.tags._
 import spatial.node._
 
 case class FixFmt[S,I,F](s: BOOL[S], i: INT[I], f: INT[F]) {
+  implicit val S: BOOL[S] = s
+  implicit val I: INT[I] = i
+  implicit val F: INT[F] = f
   def sign: Boolean = s.v
   def ibits: Int = i.v
   def fbits: Int = f.v
-  def nbits: Int = ibits + fbits
+  @rig def nbits: Int = ibits + fbits
   def toEmul: FixFormat = FixFormat(sign,ibits,fbits)
   def merge(that: FixFmt[_,_,_]): FixFmt[_,_,_] = {
     val fmt = this.toEmul.combine(that.toEmul)
@@ -29,7 +32,7 @@ object FixFmt {
   def sign: Boolean = fmt.sign
   def ibits: Int = fmt.ibits
   def fbits: Int = fmt.fbits
-  def nbits: Int = ibits + fbits
+  @rig def nbits: Int = ibits + fbits
 
   // --- Infix Methods
   @api def unary_-(): Fix[S,I,F] = stage(FixNeg(this))
@@ -115,7 +118,7 @@ object FixFmt {
 
   /** Returns a string of ones interpreted as this value's format. */
   def ones: Fix[S,I,F] = {
-    uconst(FixedPoint.fromBits(Array.fill(nbits){emul.Bool(true)}, fmt.toEmul))
+    uconst(FixedPoint.fromBits(Array.fill(ibits+fbits){emul.Bool(true)}, fmt.toEmul))
   }
   /** Returns the minimum integer value representable by this number's format. */
   def minInt: Fix[S,I,F] = uconst(fmt.toEmul.MIN_INTEGRAL_VALUE_FP)
@@ -130,6 +133,9 @@ object FixFmt {
   def maxValue: Fix[S,I,F] = uconst(fmt.toEmul.MIN_VALUE_FP)
 
   @api override def toText: Text = stage(FixToText(this))
+
+  @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = this.to[Fix[S2,I2,F2]]
+  @rig def __toFlt[M:INT,E:INT]: Flt[M,E] = this.to[Flt[M,E]]
 }
 
 object Fix {

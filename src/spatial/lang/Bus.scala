@@ -1,6 +1,7 @@
 package spatial.lang
 
 import argon.Mirrorable
+import forge.tags._
 import spatial.tags._
 
 case class Pin(name: String) {
@@ -8,7 +9,7 @@ case class Pin(name: String) {
 }
 
 abstract class Bus extends Mirrorable[Bus] {
-  def length: Int
+  @rig def nbits: Int
   def mirror(f:Tx) = this
 }
 
@@ -19,13 +20,13 @@ object Bus {
 
 case class PinBus(valid: Pin, data: Seq[Pin]) extends Bus {
   override def toString: String = "Bus(" + valid.toString + ": " + data.mkString(", ") + ")"
-  def length: Int = data.length
+  @rig def nbits: Int = data.length
 }
 
 @struct case class BurstCmd(offset: I64, size: I32, isLoad: Bit)
 @struct case class IssuedCmd(size: I32, start: I32, end: I32)
 
-abstract class DRAMBus[A:Bits] extends Bus { def length: Int = Bits[A].nbits }
+abstract class DRAMBus[A:Bits] extends Bus { @rig def nbits: Int = Bits[A].nbits }
 
 case object BurstCmdBus extends DRAMBus[BurstCmd]
 case object BurstAckBus extends DRAMBus[Bit]

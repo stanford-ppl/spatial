@@ -757,6 +757,10 @@ object Utils {
       result
   }
 
+  def risingEdge(sig:Bool): Bool = {
+    sig & Utils.delay(~sig,1)
+  }
+
   def streamCatchDone(in_done: Bool, ready: Bool, retime: Int, rr: Bool, reset: Bool): Bool = {
     import ops._
     if (retime.toInt > 0) {
@@ -776,25 +780,6 @@ object Utils {
     }
   }
 
-  // def ShiftRegister[T <: chisel3.core.Data](data: T, size: Int):T = {
-  //   data match {
-  //     case d: UInt => chisel3.util.ShiftRegister(data, size)
-  //     case d: FixedPoint => chisel3.util.ShiftRegister(data, size)
-  //   }
-  // }
-
-  // def Reverse[T <: chisel3.core.Data](data: T):T = {
-  //   data match {
-  //     case d: UInt => chisel3.util.Reverse(d)
-  //     case d: FixedPoint => 
-  //       val res = Wire(new FixedPoint(d.s, d.d, d.f))
-  //       res.r := chisel3.util.Reverse(d.r)
-  //   }
-  // }
-
-  def risingEdge(sig:Bool): Bool = {
-    sig & Utils.delay(~sig,1)
-  }
   // Helper for making fixedpt when you know the value at creation time
   def FixedPoint[T](s: Int, d: Int, f: Int, init: T, sign_extend: scala.Boolean): types.FixedPoint = {
     FixedPoint(s > 0, d, f, init, sign_extend)

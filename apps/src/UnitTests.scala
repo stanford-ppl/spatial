@@ -130,6 +130,6 @@ import spatial.dsl._
     println("result: " + result)
 
     val cksum = gold == result
-    //println("PASS: " + cksum + " (MemTest2D)")
+    // println("PASS: " + cksum + " (MemTest2D)")
   }
 }

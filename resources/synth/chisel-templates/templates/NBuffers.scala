@@ -15,12 +15,12 @@ class NBufMem(val mem: MemPrimitive,
            val xBarWMux: HashMap[Int, HashMap[Int, Int]], val xBarRMux: HashMap[Int, HashMap[Int, Int]], // buffer -> (muxPort -> accessPar)
            val directWMux: HashMap[Int, HashMap[Int, List[List[Int]]]], val directRMux: HashMap[Int, HashMap[Int, List[List[Int]]]],  // buffer -> (muxPort -> List(banks, banks, ...))
            val broadcastWMux: HashMap[Int, Int], // Assume broadcasts are XBar
-           val bankingMode: BankingMode, val syncMem: Boolean = false) extends Module { 
+           val bankingMode: BankingMode, val inits: Option[List[Double]], val syncMem: Boolean = false, val fracBits: Int = 0) extends Module { 
 
   // Overloaded constructers
   // Tuple unpacker
   def this(tuple: (MemPrimitive, List[Int], Int, Int, List[Int], List[Int], HashMap[Int, HashMap[Int, Int]], HashMap[Int, HashMap[Int, Int]], 
-    HashMap[Int, HashMap[Int,List[List[Int]]]], HashMap[Int, HashMap[Int, List[List[Int]]]], HashMap[Int, Int], BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, false)
+    HashMap[Int, HashMap[Int,List[List[Int]]]], HashMap[Int, HashMap[Int, List[List[Int]]]], HashMap[Int, Int], BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, None, false, 0)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -94,7 +94,7 @@ class NBufMem(val mem: MemPrimitive,
                         banks, strides, 
                         combinedXBarWMux, flatXBarRMux,
                         flatDirectWMux, flatDirectRMux,
-                        bankingMode, syncMem))
+                        bankingMode, inits, syncMem, fracBits))
       }
       // Route NBuf IO to SRAM IOs
       srams.zipWithIndex.foreach{ case (f,i) => 
@@ -173,7 +173,7 @@ class NBufMem(val mem: MemPrimitive,
       }
     case FFType => 
       val ffs = (0 until numBufs).map{ i => 
-        Module(new FF(bitWidth, combinedXBarWMux))
+        Module(new FF(bitWidth, combinedXBarWMux, inits, fracBits))
       }
       // Route NBuf IO to FF IOs
       ffs.zipWithIndex.foreach{ case (f,i) => 

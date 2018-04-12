@@ -107,25 +107,25 @@ object Arguments {
     (List(4,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8))
   )
   val OuterController = List(
-    (1, Sequential, 32, 1, false),
-    (2, Sequential, 32, 1, false),
-    (5, Sequential, 32, 1, false),
-    (8, Sequential, 32, 1, false),
-    (1, Pipeline, 32, 1, false),
-    (2, Pipeline, 32, 1, false),
-    (5, Pipeline, 32, 1, false),
-    (8, Pipeline, 32, 1, false),
-    (1, ForkJoin, 32, 1, false),
-    (2, ForkJoin, 32, 1, false),
-    (5, ForkJoin, 32, 1, false),
-    (8, ForkJoin, 32, 1, false)  
-    // (1, Stream, 32, 1, false),
-    // (2, Stream, 32, 1, false),
-    // (5, Stream, 32, 1, false),
-    // (8, Stream, 32, 1, false),
+    (Sequential, 1, false),
+    (Sequential, 2, false),
+    (Sequential, 5, false),
+    (Sequential, 8, false),
+    (Pipeline, 1, false),
+    (Pipeline, 2, false),
+    (Pipeline, 5, false),
+    (Pipeline, 8, false),
+    (ForkJoin, 1, false),
+    (ForkJoin, 2, false),
+    (ForkJoin, 5, false),
+    (ForkJoin, 8, false)  
+    // (1, Stream, false),
+    // (2, Stream, false),
+    // (5, Stream, false),
+    // (8, Stream, false),
   )
   val InnerController = List(
-    (false, 32)
+    (Sequential, false, 32)
   )
   val PRNG = List(
     1,

@@ -85,7 +85,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       emit(src"""${cchain}${suffix}.io.input.strides.zip(${cchain}${suffix}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
       emit(src"""${cchain}${suffix}.io.input.starts.zip(${cchain}${suffix}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
       emit(src"""${cchain}${suffix}.io.input.gaps.foreach { gap => gap := 0.S }""")
-      emit(src"""${cchain}${suffix}.io.input.saturate := false.B""")
+      emit(src"""${cchain}${suffix}.io.input.saturate := true.B""")
       emit(src"""${cchain}${suffix}.io.input.enable := ${swap(src"${cchain}${suffix}", En)}""")
       emit(src"""${swap(src"${cchain}${suffix}", Done)} := ${cchain}${suffix}.io.output.done""")
       emit(src"""${cchain}${suffix}.io.input.reset := ${swap(src"${cchain}${suffix}", Resetter)}""")
@@ -371,6 +371,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   // }
 
   protected def bitWidth(tp: Type[_]) = tp match {case FixPtType(s,d,f) => d+f; case FltPtType(g,e) => g+e; case _ => 32}
+  protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 
 
 

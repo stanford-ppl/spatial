@@ -70,7 +70,7 @@ trait ChiselGenController extends ChiselGenCommon {
     emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
+    if (!isOuter(lhs)) emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${lhs}_ctr_trivial""", """Wire(Bool())""")
   }
 
@@ -133,7 +133,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${DL(swap(s, Done), 0, true)}, ${swap(s, En)}, List($i)) // Used to be delay of 1 on Nov 26, 2017 but not sure why""")
         }
       }
-      emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.output.ctr_inc)""")
+      emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.ctrInc)""")
       // Associate bound sym with both ctrl node and that ctrl node's cchain
     }
   }
@@ -171,7 +171,7 @@ trait ChiselGenController extends ChiselGenCommon {
               emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.connectStageCtrl(${DL(swap(s, Done), 1, true)}, ${swap(s,En)}, List($i))""")
             }
           }
-          emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.chain_pass(${swap(src"${v}${suffix}", Blank)}, ${swap(lhs, SM)}.io.output.ctr_inc)""")
+          emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.chain_pass(${swap(src"${v}${suffix}", Blank)}, ${swap(lhs, SM)}.io.ctrInc)""")
         }
       }
     }
@@ -238,25 +238,24 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   protected def emitChildrenCxns(sym:Sym[_], isFSM: Boolean = false): Unit = {
-    val hasStreamIns = !getReadStreams(sym.toCtrl).isEmpty
     val isInner = levelOf(sym) == InnerControl
 
     /* Control Signals to Children Controllers */
     if (!isInner) {
-      emitt(src"""// ---- Begin ${styleOf(sym)} ${sym} Children Signals ----""")
+      emitt(src"""// ---- Begin ${styleOf(sym).toString} ${sym} Children Signals ----""")
       sym.children.toList.zipWithIndex.foreach { case (c, idx) =>
         if (styleOf(sym) == Sched.Stream & !sym.cchains.isEmpty) {
-          emitt(src"""${swap(sym, SM)}.io.input.stageDone(${idx}) := ${swap(src"${sym.cchains.head}_copy${c}", Done)};""")
+          emitt(src"""${swap(sym, SM)}.io.doneIn(${idx}) := ${swap(src"${sym.cchains.head}_copy${c}", Done)};""")
         } else {
-          emitt(src"""${swap(sym, SM)}.io.input.stageDone(${idx}) := ${swap(c, Done)};""")
+          emitt(src"""${swap(sym, SM)}.io.doneIn(${idx}) := ${swap(c, Done)};""")
         }
 
-        emitt(src"""${swap(sym, SM)}.io.input.stageMask(${idx}) := ${swap(c, Mask)};""")
+        emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := ${swap(c, Mask)};""")
 
         val streamAddition = getStreamEnablers(c.s.get)
 
         val base_delay = if (cfg.enableTightControl) 0 else 1
-        emitt(src"""${swap(c, BaseEn)} := ${DL(src"${swap(sym, SM)}.io.output.stageEnable(${idx})", base_delay, true)} & ${DL(src"~${swap(c, Done)}", 1, true)}""")  
+        emitt(src"""${swap(c, BaseEn)} := ${DL(src"${swap(sym, SM)}.io.enableOut(${idx})", base_delay, true)} & ${DL(src"~${swap(c, Done)}", 1, true)}""")  
         emitt(src"""${swap(c, En)} := ${swap(c, BaseEn)} ${streamAddition}""")  
 
         // If this is a stream controller, need to set up counter copy for children
@@ -275,12 +274,12 @@ trait ChiselGenController extends ChiselGenCommon {
           // emit copied cchain is now responsibility of child
           // emitCounterChain(sym.cchains.head, ctrs, src"_copy$c")
           emitt(src"""${swap(src"${sym.cchains.head}_copy${c}", En)} := ${signalHandle}""")
-          emitt(src"""${swap(src"${sym.cchains.head}_copy${c}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.output.rst_en", 1, true)}""")
+          emitt(src"""${swap(src"${sym.cchains.head}_copy${c}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
         }
         if (c match { case Op(_: StateMachine[_]) => true; case _ => false}) { // If this is an fsm, we want it to reset with each iteration, not with the reset of the parent
-          emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.output.rst_en", 1, true)} | ${DL(swap(c, Done), 1, true)}""") //changed on 12/13
+          emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)} | ${DL(swap(c, Done), 1, true)}""") //changed on 12/13
         } else {
-          emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.output.rst_en", 1, true)}""")   //changed on 12/13
+          emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")   //changed on 12/13
         }
         
       }
@@ -296,97 +295,41 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = levelOf(sym) == InnerControl
-
-    emitt(src"""//  ---- ${levelOf(sym)}: Begin ${styleOf(sym)} $sym Controller ----""")
-    val constrArg = if (levelOf(sym) == InnerControl) {s"${isFSM}"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
-
     val lat = 0// bodyLatency.sum(sym) // FIXME
+
+    // Construct controller args
+    emitt(src"""//  ---- ${levelOf(sym).toString}: Begin ${styleOf(sym).toString} $sym Controller ----""")
+    val constrArg = if (levelOf(sym) == InnerControl) {s"${isFSM}"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
+    val stw = sym match{case Op(x: StateMachine[_]) => s",stateWidth = bitWidth(sym.tp.typeArgs.head)"; case _ => ""}
+
+    // Generate standard control signals for all types
+    emitGlobalRetimeMap(src"""${sym}_retime""", s"${lat}.toInt")
     emitControlSignals(sym)
     createInstrumentation(sym)
 
-    val stw = sym match{case Op(x: StateMachine[_]) => bitWidth(sym.tp.typeArgs.head); case _ if (sym.children.length <= 1) => 3; case _ => (scala.math.log(sym.children.length) / scala.math.log(2)).toInt + 2}
-    emitGlobalRetimeMap(src"""${sym}_retime""", s"${lat}.toInt")
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${levelOf(sym)}(${styleOf(sym)}, ${constrArg.mkString}, stateWidth = ${stw}))")
-    emitt(src"""${swap(sym, SM)}.io.input.enable := ${swap(sym, En)} & retime_released""")
-    if (isFSM) {
-      emitGlobalWireMap(src"${sym}_inhibitor", "Wire(Bool())") // hacky but oh well
-      emitt(src"""${swap(sym, Done)} := ${DL(src"${swap(sym, SM)}.io.output.done & ${DL(src"~${swap(sym, Inhibitor)}", 2, true)}", swap(sym, Retime), true)}""")      
-    } else if (isStreamChild(sym)) {
-      val streamOuts = if (getStreamInfoReady(sym.toCtrl).mkString(" && ").replace(" ","") != "") getStreamInfoReady(sym.toCtrl).mkString(" && ") else { "true.B" }
-      emitt(src"""${swap(sym, Done)} := Utils.streamCatchDone(${swap(sym, SM)}.io.output.done, $streamOuts, ${swap(sym, Retime)}, rr, accelReset) // Directly connecting *_done.D* creates a hazard on stream pipes if ~*_ready turns off for that exact cycle, since the retime reg will reject it""")
-    } else {
-      emitt(src"""${swap(sym, Done)} := Utils.risingEdge(${DL(src"${swap(sym, SM)}.io.output.done", swap(sym, Retime), true)}) // Rising edge necessary in case stall happens at same time as done comes through""")
-    }
+    // Create controller
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${levelOf(sym).toString}(${styleOf(sym).toString}, ${constrArg.mkString} $stw))")
+
+    // Connect enable and rst in (rst)
+    emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getReadyLogic(sym)}""")
+    emitt(src"""${swap(sym, RstEn)} := ${swap(sym, SM)}.io.ctrRst // Generally used in inner pipes""")
+    emitt(src"""${swap(sym, SM)}.io.rst := ${swap(sym, Resetter)} // generally set by parent""")
+
+    //  Capture rst out (ctrRst)
     emitGlobalWireMap(src"""${swap(sym, RstEn)}""", """Wire(Bool())""") 
-    emitt(src"""${swap(sym, RstEn)} := ${swap(sym, SM)}.io.output.rst_en // Generally used in inner pipes""")
-    emitt(src"""${swap(sym, SM)}.io.input.rst := ${swap(sym, Resetter)} // generally set by parent""")
 
-    val hasStreamIns = !getReadStreams(sym.toCtrl).isEmpty
-    if (isStreamChild(sym) & hasStreamIns & beneathForever(sym)) {
-      emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, En)} & ~${swap(sym, CtrTrivial)} // Immediate parent has forever counter, so never mask out datapath_en""")    
-    } else if ((isStreamChild(sym) & hasStreamIns & !sym.cchains.isEmpty)) { // for FSM or hasStreamIns, tie en directly to datapath_en
-      emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, En)} & ~${swap(sym, Done)} & ~${swap(sym, CtrTrivial)} ${getNowValidLogic(sym)}""")  
-    } else if (isFSM) { // for FSM or hasStreamIns, tie en directly to datapath_en
-      emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, En)} & ~${swap(sym, Done)} & ~${swap(sym, CtrTrivial)} & ~${swap(sym, SM)}.io.output.done ${getNowValidLogic(sym)}""")  
-    } else if ((isStreamChild(sym) & hasStreamIns)) { // _done used to be commented out but I'm not sure why
-      emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, En)} & ~${swap(sym, Done)} & ~${swap(sym, CtrTrivial)} ${getNowValidLogic(sym)} """)  
+    // Capture sm done, and handle pipeline stalls for streaming case
+    if (!getReadStreams(sym.toCtrl).toList.isEmpty) {
+      val streamOuts = getStreamInfoReady(sym.toCtrl).mkString(" && ")
+      emitt(src"""${swap(sym, Done)} := Utils.streamCatchDone(${swap(sym, SM)}.io.done, $streamOuts, ${swap(sym, Retime)}, rr, accelReset) // Directly connecting *_done.D* creates a hazard on stream pipes if ~*_ready turns off for that exact cycle, since the retime reg will reject it""")
     } else {
-      emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.output.ctr_inc & ~${swap(sym, Done)} & ~${swap(sym, CtrTrivial)} ${getReadyLogic(sym)}""")
-    }
-    
-    /* Counter Signals for controller (used for determining done) */
-    if (styleOf(sym) != Sched.ForkJoin & styleOf(sym) != Sched.Stream) {
-      if (!sym.cchains.isEmpty) {
-        if (!sym.cchains.head.isForever) {
-          emitGlobalWireMap(src"""${swap(sym.cchains.head, En)}""", """Wire(Bool())""") 
-          sym match { 
-            case Op(n: UnrolledReduce) => // These have II
-              emitt(src"""${swap(sym.cchains.head, En)} := ${swap(sym, SM)}.io.output.ctr_inc & ${swap(sym, IIDone)}""")
-            case Op(n: UnrolledForeach) => 
-              if (isStreamChild(sym) & hasStreamIns) {
-                emitt(src"${swap(sym.cchains.head, En)} := ${swap(sym, DatapathEn)} & ${swap(sym, IIDone)} & ~${swap(sym, Inhibitor)} ${getNowValidLogic(sym)}") 
-              } else {
-                emitt(src"${swap(sym.cchains.head, En)} := ${swap(sym, SM)}.io.output.ctr_inc & ${swap(sym, IIDone)}// Should probably also add inhibitor")
-              }             
-            case _ => // If parent is stream, use the fine-grain enable, otherwise use ctr_inc from sm
-              if (isStreamChild(sym) & hasStreamIns) {
-                emitt(src"${swap(sym.cchains.head, En)} := ${swap(sym, DatapathEn)} & ~${swap(sym, Inhibitor)} ${getNowValidLogic(sym)}") 
-              } else {
-                emitt(src"${swap(sym.cchains.head, En)} := ${swap(sym, SM)}.io.output.ctr_inc // Should probably also add inhibitor")
-              } 
-          }
-          emitt(src"""// ---- Counter Connections for ${styleOf(sym)} ${sym} (${sym.cchains.head}) ----""")
-          val ctr = sym.cchains.head
-          if (isStreamChild(sym) & hasStreamIns) {
-            emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, Done), 1, true)} // Do not use rst_en for stream kiddo""")
-          } else {
-            emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, RstEn), 0, true)} // changed on 9/19""")
-          }
-          if (isInner) { 
-            // val dlay = if (cfg.enableRetiming || cfg.enablePIRSim) {src"1 + ${swap(sym, Retime)}"} else "1"
-            emitt(src"""${swap(sym, SM)}.io.input.ctr_done := ${DL(swap(ctr, Done), 1, true)}""")
-          }
-
-        }
-      } else {
-        emitt(src"""// ---- Single Iteration for ${styleOf(sym)} ${sym} ----""")
-        if (isInner) { 
-          emitGlobalWireMap(src"${sym}_ctr_en", "Wire(Bool())")
-          if (isStreamChild(sym) & hasStreamIns) {
-            emitt(src"""${swap(sym, SM)}.io.input.ctr_done := ${DL(src"${swap(sym, En)} & ~${swap(sym, Done)}", 1, true)} // Disallow consecutive dones from stream inner""")
-            emitt(src"""${swap(sym, CtrEn)} := ${swap(sym, Done)} // stream kiddo""")
-          } else {
-            emitt(src"""${swap(sym, SM)}.io.input.ctr_done := ${DL(src"Utils.risingEdge(${swap(sym, SM)}.io.output.ctr_inc)", 1, true)}""")
-            emitt(src"""${swap(sym, CtrEn)} := ${swap(sym, SM)}.io.output.ctr_inc""")            
-          }
-        } else {
-          emitt(s"// TODO: How to properly emitt for non-innerpipe unit counter?  Probably doesn't matter")
-        }
-      }
+      emitt(src"""${swap(sym, Done)} := ${DL(src"${swap(sym, SM)}.io.done", swap(sym, Retime), true)} // Used to catch risingEdge""")
     }
 
-    // emitChildrenCxns(sym, cchain, iters, isFSM)
-    /* Create reg chain mapping */
+    // Capture datapath_en
+    if (!isOuter(sym)) emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.ctrInc & ~${swap(sym, Done)} & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
+
+    // Create reg chain mapping for cchain
     if (!ctrlIters(sym.toCtrl).isEmpty) {
       if (styleOf(sym) == Sched.Pipe & sym.children.length > 1) {
         sym.children.foreach{ 
@@ -401,6 +344,18 @@ trait ChiselGenController extends ChiselGenCommon {
       }
     }
     emitCounterChain(sym)
+
+    // Connect signals to cchain
+    if (!sym.cchains.isEmpty) { if (!sym.cchains.head.isForever) {
+      val ctr = sym.cchains.head
+      emitt(src"""${swap(ctr, En)} := ${swap(sym, SM)}.io.ctrInc & ${swap(sym, IIDone)} ${getNowValidLogic(sym)}""")
+      if (!getReadStreams(sym.toCtrl).toList.isEmpty) emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, Done), 1, true)} // Do not use rst_en for stream kiddo""")
+      emitt(src"""${swap(ctr, Resetter)} := ${swap(sym, RstEn)}""")
+      emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(swap(ctr, Done), 1, true)}""")
+    }} else {
+      emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(src"Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)", 1, true)}""")
+    }
+
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

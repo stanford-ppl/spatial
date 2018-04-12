@@ -129,7 +129,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
            val banks: List[Int], val strides: List[Int], 
            val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
            val directWMux: HashMap[Int, List[List[Int]]], val directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
-           val bankingMode: BankingMode, val syncMem: Boolean = false) extends Module { 
+           val bankingMode: BankingMode, val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module { 
 
   // Overloaded construters
   // Tuple unpacker
@@ -275,9 +275,17 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
 
 
 class FF(val bitWidth: Int,
-         val xBarWMux: HashMap[Int, Int] = HashMap(0 -> 1) // muxPort -> 1 bookkeeping
+         val xBarWMux: HashMap[Int, Int] = HashMap(0 -> 1), // muxPort -> 1 bookkeeping
+         val init: Option[List[Double]] = None,
+         val fracBits: Int = 0
         ) extends Module {
-  def this(tuple: (Int, HashMap[Int, Int])) = this(tuple._1,tuple._2)
+  def this(tuple: (Int, HashMap[Int, Int])) = this(tuple._1,tuple._2,None,0)
+  // Compatibility with standard mem codegen
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: HashMap[Int, Int], xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
+           directWMux: HashMap[Int, List[List[Int]]], directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
 
   val io = IO(new Bundle{
     val input = Vec(xBarWMux.toList.length, Input(new W_XBar(0, List(0), bitWidth)))
@@ -285,8 +293,8 @@ class FF(val bitWidth: Int,
       val data  = Output(UInt(bitWidth.W))
     }
   })
-  
-  val ff = RegInit(io.input(0).init)
+
+  val ff = if (init.isDefined) RegInit((init.get.head*scala.math.pow(2,fracBits)).toLong.U(bitWidth.W)) else RegInit(io.input(0).init)
   val anyReset = io.input.map{_.reset}.reduce{_|_}
   val anyEnable = io.input.map{_.en}.reduce{_|_}
   val wr_data = chisel3.util.Mux1H(io.input.map{_.en}, io.input.map{_.data})

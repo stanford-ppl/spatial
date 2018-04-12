@@ -62,12 +62,14 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       x match {
         case Op(SRAMBankedRead(_,bank,_,_)) => bank
         case Op(SRAMBankedWrite(_,_,bank,_,_)) => bank
-        case _ => Console.println(s"NO BAKNING on $x");Seq(Seq())
+        case _ => Seq(Seq())
       }
     }
 
     def isDirectlyBanked: Boolean = {
-      if (x.banks.head.head.isConst) true else false
+      if (x.banks.toList.flatten.isEmpty) false 
+      else if (x.banks.head.head.isConst) true 
+      else false
     }
 
     /**

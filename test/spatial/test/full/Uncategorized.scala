@@ -281,6 +281,44 @@ import spatial.test.Testbench
 }
 
 
+@spatial object SimpleSequential {
+
+  def simpleSeq(xIn: I32, yIn: I32): I32 = {
+    val innerPar = 1 (1 -> 1)
+    val tileSize = 64 (64 -> 64)
+
+    val x = ArgIn[I32]
+    val y = ArgIn[I32]
+    val out = ArgOut[I32]
+    setArg(x, xIn)
+    setArg(y, yIn)
+    Accel {
+      val bram = SRAM[I32](tileSize)
+      Foreach(tileSize by 1 par innerPar){ ii =>
+        bram(ii) = x.value * ii
+      }
+      out := bram(y.value)
+    }
+    getArg(out)
+  }
+
+  def main(args: Array[String]): Void = {
+    val x = args(0).to[I32]
+    val y = args(1).to[I32]
+    val result = simpleSeq(x, y)
+
+    val a1 = Array.tabulate(64){i => x * i}
+    val gold = a1(y)
+
+    println("expected: " + gold)
+    println("result:   " + result)
+    val chkSum = result == gold
+    // assert(chkSum)
+    println("PASS: " + chkSum + " (SimpleSeq)")
+  }
+}
+
+
 object Uncategorized extends Testbench {
   test(ArgInOut)
   test(Niter)
@@ -295,4 +333,5 @@ object Uncategorized extends Testbench {
   test(FoldAccumTest)
   test(MemReduceTest)
   test(UtilTest)
+  test(SimpleSequential)
 }

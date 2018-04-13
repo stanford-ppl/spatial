@@ -57,8 +57,14 @@ trait Staging { this: Printing =>
     }
     if (immutables.nonEmpty) {
       error(ctx, "Illegal mutation of immutable symbols")
+      error(ctx)
       immutables.foreach{s =>
-        error(s"${s.ctx}:  symbol ${stm(s)} defined here")
+        error(s.ctx, s"Mutation of ${s.nameOr("symbol")} defined here.")
+        error(s.ctx)
+      }
+
+      immutables.foreach{s =>
+        dbgs(s"${s.ctx}:  symbol ${stm(s)} defined here")
         dbgs(s"${stm(s)}")
         strMeta(s)
       }
@@ -86,7 +92,7 @@ trait Staging { this: Printing =>
         val lhs = symbol()
         val sym = op.R.boxed(lhs)
 
-        logs(s"$lhs = $op")
+        //logs(s"$lhs = $op")
         checkAliases(sym,effects)
         runFlows(sym,op)
 

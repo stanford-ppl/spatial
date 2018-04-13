@@ -3,7 +3,7 @@ package spatial.codegen.cppgen
 import argon.core._
 import argon.nodes._
 import argon.codegen.cppgen.CppCodegen
-import spatial.aliases._
+
 import spatial.nodes._
 
 import scala.collection.mutable.ListBuffer

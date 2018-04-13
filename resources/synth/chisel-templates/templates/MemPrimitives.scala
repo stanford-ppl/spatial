@@ -288,7 +288,7 @@ class FF(val bitWidth: Int,
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
 
   val io = IO(new Bundle{
-    val input = Vec(xBarWMux.toList.length, Input(new W_XBar(0, List(0), bitWidth)))
+    val input = Vec(xBarWMux.toList.length, Input(new W_XBar(1, List(1), bitWidth)))
     val output = new Bundle {
       val data  = Output(UInt(bitWidth.W))
     }
@@ -305,6 +305,8 @@ class FF(val bitWidth: Int,
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.input(base) := wBundle
   }
+
+  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {io.output.data}
 
 }
 

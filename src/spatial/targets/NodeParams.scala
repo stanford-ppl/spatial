@@ -10,7 +10,7 @@ import spatial.internal.spatialConfig
 
 trait NodeParams {
 
-  def nbits(e: Sym[_]): Int = e.tp match {case Bits(bits) => bits.nbits }
+  @rig def nbits(e: Sym[_]): Int = e.tp match {case Bits(bits) => bits.nbits }
   def sign(e: Sym[_]): Boolean = e.tp match {case FixPtType(s,_,_) => s; case _ => true }
 
   // TODO[1]: Arbitrary scheduling order

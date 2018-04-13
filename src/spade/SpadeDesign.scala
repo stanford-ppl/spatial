@@ -2,8 +2,8 @@ package spade
 
 import argon.{DSLApp, _}
 import argon.passes.IRPrinter
-import nova.codegen._
-import nova.codegen.dot.{ArchDotCodegen, IRDotCodegen}
+import pir.codegen._
+import pir.codegen.dot.{ArchDotCodegen, IRDotCodegen}
 import spatial.lang.Void
 
 trait SpadeDesign extends DSLApp {

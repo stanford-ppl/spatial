@@ -42,6 +42,8 @@ class Config {
   def enDbg: Boolean = logLevel >= 1
 
   /** Paths */
+  var cwd: String = new java.io.File(".").getAbsolutePath
+
   var name: String = "App"
   var logDir: String = files.cwd + files.sep + "logs"
   var genDir: String = files.cwd + files.sep + "gen"

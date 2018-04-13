@@ -1,8 +1,7 @@
 package spade.test
 
 import spade.dsl._
-import spatial.dsl._
-import utest._
+
 
 @spade object ArchModel_Simple {
 
@@ -40,21 +39,21 @@ import utest._
   val SRAM_SIZE_WORDS = SRAM_SIZE_BYTES / 4
 
   def main(): Void = {
-    implicit val wSize: Vec[Bit] = Vec.tp(pmuSpec.nLanes)  // word width
-    def getPMU(x: Int, y: Int) = {
+    implicit val wSize: Vec[Bit] = Vec.bits[Bit](pmuSpec.nLanes)  // word width
+    def getPMU(x: scala.Int, y: scala.Int) = {
       val m = PMU(pmuSpec).op.get.asInstanceOf[PMUModule]
       m.x = x
       m.y = y
       m
     }
-    def getPCU(x: Int, y: Int) = {
+    def getPCU(x: scala.Int, y: scala.Int) = {
       val m = PCU(pcuSpec).op.get.asInstanceOf[PCUModule]
       m.x = x
       m.y = y
       m
     }
 
-    def grid(rows: Int, cols: Int) = List.tabulate(rows) { y =>
+    def grid(rows: scala.Int, cols: scala.Int) = List.tabulate(rows) { y =>
       List.tabulate(cols) { x =>
         val flattenedID = x * cols + y
         if (flattenedID % 2 == 0) getPCU(x, y) else getPMU(x, y)
@@ -72,6 +71,6 @@ import utest._
   }
 }
 
-object ArchModelTests extends Testbench { val tests = Tests {
-  'ArchModel_Simple - test(ArchModel_Simple)
-}}
+class ArchModelTests extends Testbench {
+  "ArchModelSimple" should "compile" in test(ArchModel_Simple)
+}

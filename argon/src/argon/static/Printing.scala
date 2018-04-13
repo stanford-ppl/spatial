@@ -26,7 +26,7 @@ trait Printing {
 
   /** Compiler Info Messages */
   @stateful def info(x: => Any): Unit = if (config.enInfo) state.out.info(x)
-  @stateful def info(ctx: SrcCtx): Unit = if (config.enInfo) state.out.info(ctx)
+  @stateful def info(ctx: SrcCtx): Unit = info(ctx, showCaret = true)
   @stateful def info(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enInfo) state.out.info(ctx,showCaret)
   @stateful def info(ctx: SrcCtx, x: => Any, noInfo: Boolean = false): Unit = {
     if (config.enInfo) state.out.info(ctx, x)
@@ -34,7 +34,7 @@ trait Printing {
 
   /** Compiler Warnings */
   @stateful def warn(x: => Any): Unit = if (config.enWarn) state.out.warn(x)
-  @stateful def warn(ctx: SrcCtx): Unit = if (config.enWarn) state.out.warn(ctx)
+  @stateful def warn(ctx: SrcCtx): Unit = warn(ctx, showCaret = true)
   @stateful def warn(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enWarn) state.out.warn(ctx,showCaret)
   @stateful def warn(ctx: SrcCtx, x: => Any, noWarning: Boolean = false): Unit = {
     if (config.enWarn) state.out.warn(ctx, x)
@@ -42,30 +42,32 @@ trait Printing {
   }
 
   /** Compiler Errors */
-  @stateful def error(x: => Any): Unit = if (config.enError) state.out.error(x)
-  @stateful def error(ctx: SrcCtx): Unit = if (config.enError) state.out.error(ctx)
-  @stateful def error(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enError) state.out.error(ctx,showCaret)
+  @stateful def error(x: => Any): Unit = {
+    if (config.enDbg) state.log.log(s"[error] $x")
+    if (config.enError) state.out.error(x)
+  }
+  @stateful def error(ctx: SrcCtx): Unit = error(ctx, showCaret = true)
+  @stateful def error(ctx: SrcCtx, showCaret: Boolean): Unit = {
+    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, showCaret) }
+    if (config.enError) state.out.error(ctx,showCaret)
+  }
   @stateful def error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
   @stateful def error(ctx: SrcCtx, x: => String, noError: Boolean): Unit = {
+    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, x, noError) }
     if (config.enError) state.out.error(ctx, x)
     if (!noError) state.logError()
   }
 
-  def fatal(x: => Any): Nothing = {
-    Console.out.error(x)
-    throw CompilerErrors("Staging", 1)
-  }
-
   /** Compiler Bugs */
   @stateful def bug(x: => Any): Unit = {
-    state.out.bug(x)
     dbg("[bug] " + x)
+    state.out.bug(x)
   }
-  @stateful def bug(ctx: SrcCtx): Unit = {
-    state.out.bug(ctx)
+  @stateful def bug(ctx: SrcCtx): Unit = bug(ctx, showCaret = true)
+  @stateful def bug(ctx: SrcCtx, showCaret: Boolean): Unit = {
     dbg("[bug] " + ctx.content.getOrElse(""))
+    state.out.bug(ctx, showCaret)
   }
-  @stateful def bug(ctx: SrcCtx, showCaret: Boolean): Unit = state.out.bug(ctx,showCaret)
   @stateful def bug(ctx: SrcCtx, x: => Any, noBug: Boolean = false): Unit = {
     state.out.bug(ctx, x)
     dbg(s"[bug] $ctx: $x")
@@ -77,6 +79,9 @@ trait Printing {
   @stateful def msg(x: => Any): Unit = if (config.enInfo) state.out.println(x)
 
   /** Debugging */
+  @stateful def dbg(ctx: SrcCtx, x: => Any): Unit = {
+    if (config.enDbg) state.log.println(s"$ctx: $x")
+  }
   @stateful def dbg(x: => Any): Unit = if (config.enDbg) state.log.println(x)
   @stateful def dbgs(x: => Any): Unit = if (config.enDbg) state.log.println("  "*state.logTab + x)
   @stateful def dbgss(x: => Any): Unit = if (config.enDbg) {

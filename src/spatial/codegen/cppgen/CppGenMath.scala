@@ -5,6 +5,8 @@ import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.internal.{spatialConfig => cfg}
+import spatial.data._
+import spatial.util._
 
 
 trait CppGenMath extends CppGenCommon {
@@ -98,9 +100,15 @@ trait CppGenMath extends CppGenCommon {
       emit(src"${lhs.tp} $lhs;")
       emit(src"if ($sel){ $lhs = $a; } else { $lhs = $b; }")
 
-    // // Assumes < and > are defined on runtime type...
-    // case Min(a, b) => emit(src"${lhs.tp} $lhs = std::min($a,$b);")
-    // case Max(a, b) => emit(src"${lhs.tp} $lhs = std::max($a,$b);")
+    case FixSLA(x,y) => lhs.tp match {
+        case FixPtType(s,d,f) if (f > 0) => emit(src"${lhs.tp} $lhs = $x * pow(2.,$y);")
+        case _ => emit(src"${lhs.tp} $lhs = $x << $y;")
+      }
+    case FixSRA(x,y) => lhs.tp match {
+        case FixPtType(s,d,f) if (f > 0) => emit(src"${lhs.tp} $lhs = $x / pow(2.,$y);")
+        case _ => emit(src"${lhs.tp} $lhs = $x >> $y;")
+      }
+    case FixSRU(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
 
 
       

@@ -58,10 +58,10 @@ trait Scoping {
       state.impure ++= sched.motionedImpure
     }
 
-    if (config.enLog) {
-      logs(s"Staged block ${sched.block}")
-      sched.block.stms.foreach{s => logs(s"  ${stm(s)}") }
-    }
+//    if (config.enLog) {
+//      logs(s"Staged block ${sched.block}")
+//      sched.block.stms.foreach{s => logs(s"  ${stm(s)}") }
+//    }
 
     sched.block
   }

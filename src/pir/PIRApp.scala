@@ -2,7 +2,7 @@ package pir
 
 import argon.{DSLApp, _}
 import argon.passes.IRPrinter
-import nova.codegen.dot.{IRDotCodegen, PUDotCodegen}
+import pir.codegen.dot.{IRDotCodegen, PUDotCodegen}
 import spatial.lang.Void
 
 trait PIRApp extends DSLApp {

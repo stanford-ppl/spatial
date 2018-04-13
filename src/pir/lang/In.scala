@@ -13,8 +13,8 @@ import scala.collection.mutable
   val tA: Bits[A] = Bits[A]
   val box: In[A] <:< Bits[In[A]] = implicitly[In[A] <:< Bits[In[A]]]
   override val __isPrimitive: Boolean = true
-  override def nbits: Int = tA.nbits
 
+  @rig def nbits: Int = tA.nbits
   @rig def zero: In[A] = const[In[A]](new Ptr(tA.zero))
   @rig def one: In[A] = const[In[A]](new Ptr(tA.one))
   @rig def random(max: Option[In[A]]): In[A] = undefinedOp("random")

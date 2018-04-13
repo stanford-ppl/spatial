@@ -3,7 +3,8 @@ package control
 
 import argon._
 import forge.tags._
-import spatial.node.MemReduceBlackBox
+import spatial.node._
+import spatial.util.memops._
 
 protected class MemReduceAccum[A,C[T]](
   accum: C[A],
@@ -28,13 +29,41 @@ protected class MemReduceAccum[A,C[T]](
 
   /** N dimensional memory reduction */
   @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
-    val cchain = CounterChain(domain)
-    val iters = List.fill(domain.length){ bound[I32] }
+    val cchainMap = CounterChain(domain)
+    val acc = C.evMem(accum)
+
+    val starts  = acc.starts()
+    val strides = acc.steps()
+    val ends    = acc.ends()
+    val pars    = acc.pars()
+    val ctrsRed = (0 to acc.rank-1).map{i =>
+      Counter[I32](start = starts(i), step = strides(i), end = ends(i), par = pars(i))
+    }
+    val cchainRed = CounterChain(ctrsRed)
+
+    val itersMap = List.fill(domain.length){ bound[I32] }
+    val itersRed = List.fill(acc.rank){ bound[I32] }
     val lA = bound[A]
     val rA = bound[A]
-    val mapBlk: Block[C[A]] = stageBlock{ map(iters) }
+    val mapBlk: Block[C[A]] = stageBlock{ map(itersMap) }
     val redBlk: Lambda2[A,A,A] = stageLambda2(lA,rA){ reduce(lA, rA) }
-    val pipe = stage(MemReduceBlackBox[A,C](Set.empty,cchain,accum,mapBlk,redBlk,ident,fold,iters))
+    val resLd:  Lambda1[C[A],A] = stageLambda1(mapBlk.result){ C.evMem(mapBlk.result.unbox).__read(itersRed, Set.empty) }
+    val accLd:  Lambda1[C[A],A] = stageLambda1(acc){ acc.__read(itersRed, Set.empty) }
+    val accSt:  Lambda2[C[A],A,Void] = stageLambda2(acc, redBlk.result){ acc.__write(redBlk.result.unbox,itersRed,Set.empty) }
+    val pipe = stage(OpMemReduce[A,C](
+      ens = Set.empty,
+      cchainMap,
+      cchainRed,
+      accum,
+      mapBlk,
+      resLd,
+      accLd,
+      redBlk,
+      accSt,
+      ident,
+      fold,
+      itersMap,
+      itersRed))
     opt.set(pipe)
     accum
   }

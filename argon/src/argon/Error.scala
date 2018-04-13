@@ -1,14 +1,16 @@
 package argon
 
+import utils.plural
+
 import scala.util.control.NoStackTrace
 
-class LexerError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
-class ParserError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
+case class UnhandledException(t: Throwable)
+   extends Exception(s"Uncaught exception ${t.getMessage} (${t.getCause})")
 
-class TypeError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
-class UserError(val ctx: SrcCtx, val msg: String) extends Error with NoStackTrace
+case class CompilerErrors(stage: String, n: Int)
+   extends Exception(s"$n compiler ${plural(n,"error")} during pass $stage")
+      with NoStackTrace
 
-case class TestbenchFailure(msg: String) extends Exception(msg)
-
-case class CompilerErrors(stage: String, n: Int) extends Error with NoStackTrace
-case class CompilerBugs(stage: String, n: Int) extends Error with NoStackTrace
+case class CompilerBugs(stage: String, n: Int)
+   extends Exception(s"$n ${plural(n,"bug")} found during $stage")
+      with NoStackTrace

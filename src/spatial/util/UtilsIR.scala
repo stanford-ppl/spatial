@@ -15,7 +15,7 @@ trait UtilsIRLowPriority {
 
 trait UtilsIR extends UtilsIRLowPriority {
   /** Returns the number of bits of data the given symbol represents. */
-  def nbits(e: Sym[_]): Int = e.tp match {case Bits(bT) => bT.nbits; case _ => 0 }
+  @rig def nbits(e: Sym[_]): Int = e.tp match {case Bits(bT) => bT.nbits; case _ => 0 }
 
 
   @stateful def canMotion(stms: Seq[Sym[_]]): Boolean = {

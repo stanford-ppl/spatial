@@ -4,7 +4,7 @@ import scala.math._
 import argon.core._
 import argon.nodes._
 import spatial.targets.DE1._
-import spatial.aliases._
+
 import spatial.metadata._
 import spatial.nodes._
 import spatial.utils._

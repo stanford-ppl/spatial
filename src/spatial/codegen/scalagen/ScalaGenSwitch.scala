@@ -15,11 +15,7 @@ trait ScalaGenSwitch extends ScalaGenBits with ScalaGenMemories with ScalaGenSRA
       open(src"val $lhs = {")
         selects.indices.foreach { i =>
           open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
-            val Op(SwitchCase(body)) = op.cases(i)
-            open(src"val ${op.cases(i)} = {")
-              ret(body)
-            close("}")
-            emit(src"${op.cases(i)}")
+            ret(op.cases(i).body)
           close("}")
         }
         if (isBits) emit(src"else { ${invalid(op.R)} }") else emit(src"()")

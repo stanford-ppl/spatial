@@ -11,6 +11,10 @@ import spatial.node._
   @api override def eql(that: Text): Bit = stage(TextEql(this,that))
 
   @api override def toText: Text = this
+  @api def +(that: Any): Text = that match {
+    case b: Top[_] => this ++ b.toText
+    case b         => this ++ Text(b.toString)
+  }
 
   // --- Typeclass Methods
   override protected val __isPrimitive: Boolean = true

@@ -1,8 +1,7 @@
 package pir.test
 
-import spatial.dsl._
+import spatial.lib._
 import pir.dsl._
-import utest._
 
 @pir object PIR_LSTM {
   val STAGES = 6
@@ -28,14 +27,14 @@ import utest._
       }
     }
 
-    def GEMV(rows: Int, cols: Int) = PCU(0::STAGES::rows,0::LANES::cols) { (i,j) =>
+    def GEMV(rows: scala.Int, cols: scala.Int) = PCU(0::STAGES::rows,0::LANES::cols) { (i,j) =>
       val a = pcu.in[I32](0)
       val b = pcu.in[I32](1)
       val y = pcu.out[I32](0)
       y := BBox.GEMM(a,b)
     }
 
-    def StreamingPCU(numIns: Int, tileSize: Int) = PCU(0::tileSize::1) { i =>
+    def StreamingPCU(numIns: scala.Int, tileSize: scala.Int) = PCU(0::tileSize::1) { i =>
       val y = pcu.out[I32](0)
       y := (numIns match {
         case 1 => BBox.Stream1(pcu.in[I32](0))
@@ -219,7 +218,7 @@ import utest._
   }
 }
 
-object PIRTests extends Testbench { val tests = Tests {
-  'PIR_GEMM - test(PIR_GEMM)
-  'PIR_LSTM - test(PIR_LSTM)
-}}
+class PIRTests extends Testbench {
+  "PIR_GEMM" should "compile" in test(PIR_GEMM)
+  "PIR_LSTM" should "compile" in test(PIR_LSTM)
+}

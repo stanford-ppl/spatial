@@ -29,6 +29,9 @@ trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   @rig def acos(a: A): A
   @rig def atan(a: A): A
   @rig def sigmoid(a: A): A
+
+  @rig def __toFix[S:BOOL,I:INT,F:INT]: Fix[S,I,F]
+  @rig def __toFlt[M:INT,E:INT]: Flt[M,E]
 }
 object Num {
   def apply[A:Num]: Num[A] = implicitly[Num[A]]

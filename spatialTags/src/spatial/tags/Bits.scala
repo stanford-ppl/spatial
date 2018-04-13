@@ -25,12 +25,12 @@ class Bits[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[
 
     val cls2 = {
       cls.mixIn(tq"Bits[$clsName]")
-         .injectMethod(q"""private def bitsCheck(): Unit = {
+         .injectMethod(q"""private def bitsCheck(): scala.Unit = {
                              val bitsOpt = List(..$bitssOpt)
                              if (!bitsOpt.forall(_.isDefined)) throw new Exception("Bits not defined for " + this.tp)
                            }""".asDef)
          .injectMethod(
-           q"""private def bitsCheck2(op: String)(func: => ${cls.fullName})(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
+           q"""private def bitsCheck2(op: java.lang.String)(func: => ${cls.fullName})(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
                  val bitsOpt = List(..$bitssOpt)
                  if (!bitsOpt.forall(_.isDefined)) {
                     argon.error(ctx, op + " not defined for " + this.tp)
@@ -40,7 +40,7 @@ class Bits[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[
                  else func
                }""".asDef)
 
-         .injectMethod(q"""def nbits: Int = { bitsCheck(); List(..$nbitss).sum }""".asDef)
+         .injectMethod(q"""def nbits(implicit ctx: forge.SrcCtx, state: argon.State): scala.Int = { bitsCheck(); List(..$nbitss).sum }""".asDef)
          .injectMethod(q"""def zero(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck2("zero"){ ${obj.name}.apply(..$zeros) }""".asDef)
          .injectMethod(q"""def one(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck2("one"){ ${obj.name}.apply(..$ones) }""".asDef)
          .injectMethod(

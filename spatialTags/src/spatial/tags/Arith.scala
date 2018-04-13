@@ -34,7 +34,7 @@ class Arith[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro
     val cls2 = {
       cls.mixIn(tq"Arith[$clsName]")
         .injectMethod(
-          q"""private def __arith(op: String)(func: => ${cls.fullName})(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
+          q"""private def __arith(op: java.lang.String)(func: => ${cls.fullName})(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
                  val arithOpt = List(..$arithOpt)
                  if (!arithOpt.forall(_.isDefined) || arithOpt.exists(_ eq null)) {
                     argon.error(ctx, op + " not defined for " + this.tp)

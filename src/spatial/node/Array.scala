@@ -7,7 +7,9 @@ import spatial.lang.host._
 
 @op case class InputArguments() extends Op[Array[Text]]
 
-@op case class ArrayNew[A:Type](size: I32) extends Op2[A,Array[A]]
+@op case class ArrayNew[A:Type](size: I32) extends Op2[A,Array[A]] {
+  override def effects: Effects = Effects.Mutable
+}
 
 @op case class ArrayFromSeq[A:Type](seq: Seq[Sym[A]]) extends Op2[A,Array[A]]
 

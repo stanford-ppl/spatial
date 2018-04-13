@@ -197,13 +197,13 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
             }}
             step(1)
             (0 until rPar).foreach { kdim => 
-              expect(c.io.output.data(base + kdim), 999)
+              expect(c.io.output.data(kdim), 999)
             }
           }
         }  
       case FFType => 
         val base = c.xBarRMux.keys.toList.head
-        expect(c.io.output.data(base), 999)
+        expect(c.io.output.data(0), 999)
         step(1)
     }
     c.io.directR.foreach{p => poke(p.en, false)}
@@ -279,13 +279,13 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
             }}
             step(1)
             (0 until rPar).foreach { kdim => 
-              expect(c.io.output.data(((c.numBufs-1) * rPar) + kdim), epoch*100 + (i*c.logicalDims(0) + j + kdim)*2)
+              expect(c.io.output.data(kdim), epoch*100 + (i*c.logicalDims(0) + j + kdim)*2)
             }
           }
         }
       case FFType => 
         val base = c.xBarRMux.keys.toList.head
-        expect(c.io.output.data(base), epoch*100)
+        expect(c.io.output.data(0), epoch*100)
         step(1)
     }
     

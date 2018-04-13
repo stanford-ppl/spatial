@@ -21,7 +21,7 @@ case class Series[+A:Num](
 
   def par(p: I32): Series[A] = Series[A](start, end, step, p, isUnit=false)
 
-  @api def length: A = (end - start + step - Num[A].from(1))/step
+  @api def length: I32 = ( (end - start + step - Num[A].from(1))/step ).to[I32]
 
   @api def meta: Range = (start,end,step,par) match {
     case (Literal(s:Int),Literal(e:Int),Literal(stride:Int),_) => Range(s,e,stride)
@@ -36,6 +36,9 @@ case class Series[+A:Num](
       error(ctx)
       Range(0, 0, 1)
   }
+
+  /** Returns the `i`'th element in this Series. */
+  @api def at(i: I32): A = start + i.to[A]*step
 
   def mirror(f:Tx): Series[_] = Series[A](f(start),f(end),f(step),f(par),isUnit)
   override def toString: String = s"Series($start, $end, $step, $par, $isUnit)"

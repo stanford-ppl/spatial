@@ -16,8 +16,16 @@ trait StaticMath {
   /** Creates a reduction tree for a fixed number of elements. */
   @api def reduce[T](xs: T*)(reduce: (T,T) => T): T = ReduceTree(xs:_*)(reduce)
 
-  @api def min[A:Num](a: A, b: A): A = Num[A].min(a,b)
-  @api def max[A:Num](a: A, b: A): A = Num[A].max(a,b)
+  @api def min[A:Num](a: Sym[A], b: Sym[A]): A = Num[A].min(a.unbox,b.unbox)
+  @api def min[A:Num,B](a: Sym[A], b: Lift[B]): A = Num[A].min(a.unbox,Num[A].from(b.orig))
+  @api def min[A:Num,B](a: Lift[B], b: Sym[A]): A = Num[A].min(Num[A].from(a.orig),b.unbox)
+  @api def min[A:Num](a: Lift[A], b: Lift[A]): A = Num[A].min(a.unbox, b.unbox)
+
+  @api def max[A:Num](a: Sym[A], b: Sym[A]): A = Num[A].max(a.unbox,b.unbox)
+  @api def max[A:Num,B](a: A, b: Lift[B]): A = Num[A].max(a,Num[A].from(b.orig))
+  @api def max[A:Num,B](a: Lift[B], b: A): A = Num[A].max(Num[A].from(a.orig),b)
+  @api def max[A:Num](a: Lift[A], b: Lift[A]): A = Num[A].max(a.unbox, b.unbox)
+
   @api def abs[A:Num](a: A): A = Num[A].abs(a)
   @api def ceil[A:Num](a: A): A = Num[A].ceil(a)
   @api def floor[A:Num](a: A): A = Num[A].floor(a)

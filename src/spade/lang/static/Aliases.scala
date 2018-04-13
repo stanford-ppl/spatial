@@ -2,11 +2,12 @@ package spade.lang.static
 
 // No aliases of the form type X = spade.lang.X (creates a circular reference)
 // Everything else is ok.
-trait InternalAliases {
+trait InternalAliases extends spatial.lang.static.InternalAliases {
+
 
 }
 
-trait ExternalAliases extends InternalAliases {
+trait ExternalAliases extends InternalAliases with spatial.lang.static.ExternalAliases {
   type PCUSpec = spade.node.PCUSpec
   type PCU = spade.node.PCU
   lazy val PCU = spade.node.PCU

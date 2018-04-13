@@ -5,7 +5,13 @@ import java.io.PrintStream
 
 object terminal {
   implicit class PrintReport(out: PrintStream) {
-    def report(x: => Any): Unit = out.println(x)
+    def log(x: => Any): Unit = out.println(x)
+    def log(ctx: Ctx, x: => Any): Unit = log(ctx.toString + ": " + x)
+    def log(ctx: Ctx): Unit = log(ctx, showCaret = false)
+    def log(ctx: Ctx, showCaret: Boolean): Unit = if (ctx.content.isDefined) {
+      log(ctx.content.get)
+      if (showCaret) log(" "*(ctx.column-1) + "^") else log("")
+    }
 
     def warn(x: => Any): Unit = out.println(s"[${Console.YELLOW}warn${Console.RESET}] $x")
     def warn(ctx: Ctx, x: => Any): Unit = warn(ctx.toString + ": " + x)

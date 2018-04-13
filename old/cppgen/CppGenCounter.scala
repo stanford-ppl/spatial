@@ -3,7 +3,7 @@ package spatial.codegen.cppgen
 import argon.codegen.FileDependencies
 import argon.codegen.cppgen.CppCodegen
 import argon.core._
-import spatial.aliases._
+
 import spatial.nodes._
 
 trait CppGenCounter extends CppCodegen with FileDependencies {

@@ -71,6 +71,7 @@ trait Codegen extends Traversal {
     case c: Int        => c.toString
     case b: Boolean    => b.toString
     case l: Long       => l.toString + "L"
+    case d: Double     => d.toString
     case l: BigDecimal => l.toString
     case l: BigInt     => l.toString
     case o: Option[_] if !o.isDefined => "None"

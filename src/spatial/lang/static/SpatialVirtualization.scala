@@ -9,15 +9,6 @@ import spatial.node.IfThenElse
 import language.experimental.macros
 import scala.reflect.macros.whitebox
 
-trait LowPriorityVirtualization {
-
-  implicit class EqualsOps(x: Any) {
-    def !==(y: Any): Boolean = x != y
-    def ===(y: Any): Boolean = x == y
-  }
-
-}
-
 trait SpatialVirtualization extends ArgonVirtualization with forge.EmbeddedControls {
   import SpatialVirtualization._
 
@@ -41,21 +32,15 @@ trait SpatialVirtualization extends ArgonVirtualization with forge.EmbeddedContr
     stage(IfThenElse[A](cond,blkThen,blkElse))
   }
 
-  @rig def infix_+[A](x1: String, x2: A): Text = x2 match {
-    case t: Top[_] => Text(x1) ++ t.toText
-    case _ => Text(x1 + x2)
-  }
-
-  @rig def infix_!=[A:Type,B](a: Sym[A], b: Lift[B]): Bit = a.view[Top] !== Type[A].from(b.orig)
-  @rig def infix_!=[A,B:Type](a: Lift[A], b: Sym[B]): Bit = Type[B].from(a.orig) !== b
-  @rig def infix_!=[A:Type,B:Type](a: Sym[A], b: Sym[B]): Bit = a.view[Top] !== b
-
-  @rig def infix_==[A:Type,B](a: Sym[A], b: Lift[B]): Bit = a.view[Top] === Type[A].from(b.orig)
-  @rig def infix_==[A,B:Type](a: Lift[A], b: Sym[A]): Bit = Type[B].from(a.orig) === b
-  @rig def infix_==[A:Type,B:Type](a: Sym[A], b: Sym[B]): Bit = a.view[Top] === b
+  def infix_+(x1: String, x2: Any): Text = macro text_plus
 }
 
 private object SpatialVirtualization {
+  def text_plus(c: whitebox.Context)(x1: c.Expr[String], x2: c.Expr[Any]): c.Expr[Text] = {
+    import c.universe._
+    c.Expr(q"Text($x1) + $x2")
+  }
+
 //  def eqlImpl[T](c: whitebox.Context)(x1: c.Expr[Any], x2: c.Expr[Any]): c.Expr[T] = {
 //    import c.universe._
 //    c.Expr(q"$x1 === $x2")

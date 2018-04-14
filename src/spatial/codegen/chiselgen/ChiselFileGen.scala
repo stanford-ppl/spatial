@@ -11,6 +11,26 @@ trait ChiselFileGen extends ChiselCodegen {
 
   override def emitHeader(): Unit = {
 
+    inGen(out, "controller_tree.html") {
+      emit("""<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+</head><body>
+
+  <div data-role="main" class="ui-content" style="overflow-x:scroll;">
+    <h2>Controller Diagram for """)
+      emit(cfg.name)
+      if (!cfg.enableAsyncMem) {emit(" syncMem")}
+      else if (cfg.enableRetiming) {emit(" retimed")}
+      emit("""</h2>
+<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">""")
+
+    }
+
     inGenn(out, "IOModule", ext) {
       emitt("package accel")
 	  emitt("import chisel3._")
@@ -119,6 +139,12 @@ trait ChiselFileGen extends ChiselCodegen {
   override protected def emitEntry(block: Block[_]): Unit = { gen(block) }
 
   override def emitFooter(): Unit = {
+
+    inGen(out, "controller_tree.html") {
+      emit(s"""  </TABLE>
+</body>
+</html>""")
+    }
 
     inGen(out, "Instantiator.scala") {
           emit("""val w = if (target == "zcu") 32 else if (target == "vcs" || target == "asic") 8 else 32""")

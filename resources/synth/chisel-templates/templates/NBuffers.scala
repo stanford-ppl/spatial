@@ -227,7 +227,6 @@ class NBufMem(val mem: MemPrimitive,
         }
       }
     case FFType => 
-      Console.println(s"comibend mux $combinedXBarWMux")
       val ffs = (0 until numBufs).map{ i => 
         Module(new FF(bitWidth, combinedXBarWMux, inits, fracBits))
       }

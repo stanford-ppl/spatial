@@ -62,6 +62,45 @@ trait ChiselGenController extends ChiselGenCommon {
     // }
   }
 
+  val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
+
+  def print_stage_prefix(title: String, ctr: String, node: String, ctx: String, inner: Boolean = false, collapsible: Boolean = true): Unit = {
+    inGen(out, "controller_tree.html") {
+      open(s"""<!--Begin $node -->""")
+      emit(s"""<TD><font size = "6">$title<br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
+      if (!inner & !collapsible) {emit("""<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}
+      emit("\n")
+      if (!inner) {
+        val coll = if (collapsible) "data-role=\"collapsible\""
+        emit(s"""<div $coll>""")
+        emit(s"""<h4> </h4>${table_init}""")
+      }
+    }
+  }
+
+  def print_stream_info(sym: Sym[_]): Unit = {
+    inGen(out, "controller_tree.html") {
+      if (getReadStreams(sym.toCtrl).toList.length + getWriteStreams(sym.toCtrl).toList.length > 0){
+        emit(s"""<div style="border:1px solid black">Stream Info<br>""")
+        val listens = getReadStreams(sym.toCtrl).map{a => s"${a}"}.mkString(",")
+        val pushes = getWriteStreams(sym.toCtrl).map{a => s"${a}"}.mkString(",")
+        if (listens != "") emit(s"""<p align="left">----->$listens""")
+        if (listens != "" & pushes != "") emit(s"<br>")
+        if (pushes != "") emit(s"""<p align="right">$pushes----->""")
+        emit("""</div>\n""")
+      }
+    }
+  }
+
+  def print_stage_suffix(name: String, inner: Boolean = false): Unit = {
+    inGen(out, "controller_tree.html") {
+      if (!inner) {
+        emit(s"""</TABLE></div>""")
+      }
+      close(s"""</TD><!-- Close $name -->\n""")
+    }
+  }
+
   protected def emitControlSignals(lhs: Sym[_]): Unit = {
     emitGlobalWireMap(src"""${swap(lhs, Done)}""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
@@ -77,17 +116,17 @@ trait ChiselGenController extends ChiselGenCommon {
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
       val parent = if (controllerStack.isEmpty) lhs else controllerStack.head 
       controllerStack.push(lhs)
+      val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
+      print_stage_prefix(s"${styleOf(lhs)}", s"${cchain}", s"$lhs", s"${lhs.ctx}", levelOf(lhs) == InnerControl)
       if (levelOf(lhs) == OuterControl) {widthStats += lhs.children.toList.length}
       else if (levelOf(lhs) == InnerControl) {depthStats += controllerStack.length}
-
-      // Tree stuff
 
       parent
   }
 
   final private def exitCtrl(lhs: Sym[_]): Unit = {
     // Tree stuff
-
+    print_stage_suffix(s"$lhs", levelOf(lhs) == InnerControl)
     controllerStack.pop()
   }
 
@@ -241,6 +280,12 @@ trait ChiselGenController extends ChiselGenCommon {
   protected def emitChildrenCxns(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = levelOf(sym) == InnerControl
 
+    sym.children.toList.zipWithIndex.foreach{case (cc, idx) => 
+      val c = cc.s.get
+      emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
+      emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
+    }
+
     /* Control Signals to Children Controllers */
     if (!isInner) {
       emitt(src"""// ---- Begin ${styleOf(sym).toString} ${sym} Children Signals ----""")
@@ -251,8 +296,6 @@ trait ChiselGenController extends ChiselGenCommon {
         } else {
           emitt(src"""${swap(sym, SM)}.io.doneIn(${idx}) := ${swap(c, Done)};""")
         }
-
-        emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := ${swap(c, Mask)};""")
 
         val streamAddition = getStreamEnablers(cc.s.get)
 
@@ -329,7 +372,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
 
     // Capture datapath_en
-    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.ctrInc & ~${swap(sym, Done)} & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
+    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
 
     // Create reg chain mapping for cchain
     if (!ctrlIters(sym.toCtrl).isEmpty) {
@@ -393,6 +436,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emitt(src"""retime_released := ${DL("retime_counter.io.output.done",1)} // break up critical path by delaying this """)
       if (levelOf(lhs) == InnerControl) emitInhibitor(lhs, None, None)
 
+      emitt(src"""${swap(lhs, SM)}.io.parentAck := io.done""")
       visitBlock(func)
       emitChildrenCxns(lhs)
       // emitCopiedCChain(lhs)
@@ -421,12 +465,11 @@ trait ChiselGenController extends ChiselGenCommon {
       if (levelOf(lhs) == InnerControl) emitInhibitor(lhs, None, None)
       inSubGen(src"${lhs}", src"${parent_kernel}") {
         emitt(s"// Controller Stack: ${controllerStack.tail}")
+        emitChildrenCxns(lhs)
         visitBlock(func)
       }
-      emitChildrenCxns(lhs)
       emitCopiedCChain(lhs)
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
-      emitt(src"${swap(lhs, Mask)} := $en")
       exitCtrl(lhs)
 
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
@@ -450,6 +493,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emitParallelizedLoop(iters, cchain)
           allocateValids(lhs, cchain, iters, valids)
           if (styleOf(lhs) == Sched.Pipe & lhs.children.length > 1) allocateRegChains(lhs, iters.flatten, cchain) // Needed to generate these global wires before visiting children who may use them
+          emitChildrenCxns(lhs)
           visitBlock(func)
         }
         emitValids(lhs, cchain, iters, valids)
@@ -472,6 +516,7 @@ trait ChiselGenController extends ChiselGenCommon {
             emitValidsDummy(iters, valids, src"_copy$lhs") // FIXME: Weird situation with nested stream ctrlrs, hacked quickly for tian so needs to be fixed
           }
           // Register the remapping for bound syms in children
+          emitChildrenCxns(lhs)
           visitBlock(func)
         }
         if (lhs.children.length > 0) {
@@ -481,13 +526,11 @@ trait ChiselGenController extends ChiselGenCommon {
           }          
         }
       }
-      emitChildrenCxns(lhs)
       emitCopiedCChain(lhs)
       if (!(styleOf(lhs) == Sched.Stream && lhs.children.length > 0)) {
         connectCtrTrivial(cchain)
       }
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
-      emitt(src"${swap(lhs, Mask)} := $en")
       exitCtrl(lhs)
 
     case UnrolledReduce(ens,cchain,func,iters,valids) =>
@@ -511,6 +554,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emitParallelizedLoop(iters, cchain)
           allocateValids(lhs, cchain, iters, valids)
           if (styleOf(lhs) == Sched.Pipe & lhs.children.length > 1) allocateRegChains(lhs, iters.flatten, cchain) // Needed to generate these global wires before visiting children who may use them
+          emitChildrenCxns(lhs)
           visitBlock(func)
         }
         emitValids(lhs, cchain, iters, valids)
@@ -534,6 +578,7 @@ trait ChiselGenController extends ChiselGenCommon {
             emitValidsDummy(iters, valids, src"_copy$lhs") // FIXME: Weird situation with nested stream ctrlrs, hacked quickly for tian so needs to be fixed
           }
           // Register the remapping for bound syms in children
+          emitChildrenCxns(lhs)
           visitBlock(func)
         }
         if (lhs.children.length > 0) {
@@ -543,13 +588,11 @@ trait ChiselGenController extends ChiselGenCommon {
           }          
         }
       }
-      emitChildrenCxns(lhs)
       emitCopiedCChain(lhs)
       if (!(styleOf(lhs) == Sched.Stream && lhs.children.length > 0)) {
         connectCtrTrivial(cchain)
       }
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
-      emitt(src"${swap(lhs, Mask)} := $en")
       exitCtrl(lhs)
 
 

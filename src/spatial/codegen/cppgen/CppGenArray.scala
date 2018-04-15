@@ -16,24 +16,68 @@ trait CppGenArray extends CppGenCommon {
     emit(src"${tp}* $lhs = new ${tp}($size);")
   }
 
-  protected def emitApply(dst: Sym[_], array: Sym[_], i: String, isDef: Boolean = true): Unit = {
-    // if (isArrayType(dst.tp)) {
-    //   val iterator = if ("^[0-9].*".r.findFirstIn(src"$i").isDefined) {src"${array}_applier"} else {src"$i"}
-    //   if (isDef) {
-    //     emit(src"""${dst.tp}* $dst = new ${dst.tp}(${getSize(array, src"[$i]")}); //cannot apply a vector from 2D vector, so make new vec and fill it, eventually copy the vector in the constructor here""")
-    //     emit(src"for (int ${iterator}_sub = 0; ${iterator}_sub < (*${array})[${i}].size(); ${iterator}_sub++) { (*$dst)[${iterator}_sub] = (*${array})[$i][${iterator}_sub]; }")          
-    //   } else {
-    //     emit(src"for (int ${iterator}_sub = 0; ${iterator}_sub < (*${array})[${i}].size(); ${iterator}_sub++) { (*$dst)[${iterator}_sub] = (*${array})[$i][${iterator}_sub]; }")          
-    //   }
-    // } else {
-    //   if (isDef) {
-    //     emit(src"${dst.tp} $dst = (*${array})[$i];")  
-    //   } else {
-    //     emit(src"$dst = (*${array})[$i];")
-    //   }
-    // }
+  private def getNestingLevel(tp: Type[_]): Int = tp match {
+    case tp: Vec[_] => 1 + getNestingLevel(tp.typeArgs.head) 
+    case _ => 0
   }
 
+  protected def isArrayType(tp: Type[_]): Boolean = tp match {
+    case tp: Vec[_] => tp.typeArgs.head match {
+      case tp: Vec[_] => println("EXCEPTION: Probably can't handle nested array types in ifthenelse"); true
+      case _ => true
+    }
+    case _ => false
+  }
+
+  protected def emitUpdate(lhs: Sym[_], value: Sym[_], i: String, tp: Type[_]): Unit = {
+    if (isArrayType(tp)) {
+      if (getNestingLevel(tp) > 1) throw new Exception(s"ND Array exception on $lhs, $tp")
+
+      emit(src"(*$lhs)[$i].resize(${getSize(value)});")
+      open(src"for (int ${value}_copier = 0; ${value}_copier < ${getSize(value)}; ${value}_copier++) {")
+        emit(src"(*$lhs)[$i][${value}_copier] = (*${value})[${value}_copier];")
+      close("}")
+    }
+    else {
+      tp match {
+        case FixPtType(s,d,f) if (f == 0) => 
+          val intermediate_tp = if (d+f > 64) s"int128_t"
+                   else if (d+f > 32) s"int64_t"
+                   else if (d+f > 16) s"int32_t"
+                   else if (d+f > 8) s"int16_t"
+                   else if (d+f > 4) s"int8_t"
+                   else if (d+f > 2) s"int8_t"
+                   else if (d+f == 2) s"int8_t"
+                   else "bool"
+
+          emit(src"(*$lhs)[$i] = (${intermediate_tp}) ${value};") // Always convert to signed, then to unsigned if on the boards
+        case _ => emit(src"(*$lhs)[$i] = ${value};")
+      }
+    }
+  }
+
+  protected def emitApply(dst: Sym[_], array: Sym[_], i: String, isDef: Boolean = true): Unit = {
+    if (isArrayType(dst.tp)) {
+      val iterator = if ("^[0-9].*".r.findFirstIn(src"$i").isDefined) {src"${array}_applier"} else {src"$i"}
+      if (isDef) {
+        emit(src"""${dst.tp}* $dst = new ${dst.tp}(${getSize(array, src"[$i]")}); //cannot apply a vector from 2D vector, so make new vec and fill it, eventually copy the vector in the constructor here""")
+        emit(src"for (int ${iterator}_sub = 0; ${iterator}_sub < (*${array})[${i}].size(); ${iterator}_sub++) { (*$dst)[${iterator}_sub] = (*${array})[$i][${iterator}_sub]; }")          
+      } else {
+        emit(src"for (int ${iterator}_sub = 0; ${iterator}_sub < (*${array})[${i}].size(); ${iterator}_sub++) { (*$dst)[${iterator}_sub] = (*${array})[$i][${iterator}_sub]; }")          
+      }
+    } else {
+      if (isDef) {
+        emit(src"${dst.tp} $dst = (*${array})[$i];")  
+      } else {
+        emit(src"$dst = (*${array})[$i];")
+      }
+    }
+  }
+
+  private def getPrimitiveType(tp: Type[_]): String = tp match {
+    case tp: Vec[_] => getPrimitiveType(tp.typeArgs.head) 
+    case _ => remap(tp)
+  }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
@@ -65,8 +109,105 @@ trait CppGenArray extends CppGenCommon {
         case _ => emit(src"${lhs}.push_back($e);")
       }}
 
+    case MapIndices(size, func)   =>
+      emitNewArray(lhs, lhs.tp, src"$size")
+      open(src"for (int ${func.input} = 0; ${func.input} < $size; ${func.input}++) {")
+      visitBlock(func)
+      if (isArrayType(func.result.tp)) {
+        if (getNestingLevel(func.result.tp) > 1) {Console.println(s"ERROR: Need to fix more than 2D arrays")}
+        emit(src"(*$lhs)[${func.input}].resize(${getSize(func.result)});")
+        open(src"for (int ${func.result}_copier = 0; ${func.result}_copier < ${getSize(func.result)}; ${func.result}_copier++) {")
+          emit(src"(*$lhs)[${func.input}][${func.result}_copier] = (*${func.result})[${func.result}_copier];")
+        close("}")
+      } else {
+        emit(src"(*$lhs)[${func.input}] = ${func.result};")  
+      }
+      close("}")
 
+    case ArrayForeach(array,apply,func) =>
+      open(src"for (int ${func.input} = 0; ${func.input} < ${getSize(array)}; ${func.input}++) {")
+      visitBlock(apply)
+      visitBlock(func)
+      close("}")
 
+    case ArrayMap(array,apply,func) =>
+      emitNewArray(lhs, lhs.tp, getSize(array))
+      open(src"for (int ${func.input} = 0; ${func.input} < ${getSize(array)}; ${func.input}++) { ")
+      visitBlock(apply)
+      visitBlock(func)
+      emitUpdate(lhs, func.result, src"${func.input}", func.result.tp)
+      close("}")
+      
+
+    case ArrayZip(a, b, applyA, applyB, func) =>
+      emitNewArray(lhs, lhs.tp, getSize(a))
+      open(src"for (int i = 0; i < ${getSize(a)}; i++) { ")
+      visitBlock(applyA)
+      visitBlock(applyB)
+      visitBlock(func)
+      emitUpdate(lhs, func.result, src"i", func.result.tp)
+      close("}")
+
+      // 
+    // case ArrayReduce(array, apply, reduce, rV) =>
+    //   if (isArrayType(lhs.tp)) {
+    //     emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""") 
+    //   } else {
+    //     emit(src"${lhs.tp} $lhs;") 
+    //   }
+    //   open(src"if (${getSize(array)} > 0) { // Hack to handle reductions on things of length 0")
+    //     emitApply(lhs, array, "0", false)
+    //   closeopen("} else {")
+    //     emit(src"$lhs = 0;")
+    //   close("}")
+    //   open(src"for (int ${func.input} = 1; ${func.input} < ${getSize(array)}; ${func.input}++) {")
+    //     emitApply(rV._1, array, src"${func.input}")
+    //     // emit(src"""${rV._1.tp}${if (isArrayType(rV._1.tp)) "*" else ""} ${rV._1} = (*${array})[$${func.input}];""")
+    //     emit(src"""${rV._2.tp}${if (isArrayType(rV._2.tp)) "*" else ""} ${rV._2} = $lhs;""")
+    //     visitBlock(reduce)
+    //     emit(src"$lhs = ${reduce.result};")
+    //   close("}")
+
+    // case ArrayFilter(array, apply, cond) =>
+    //   open(src"val $lhs = $array.filter{${apply.result} => ")
+    //   visitBlock(cond)
+    //   close("}")
+
+    // case ArrayFlatMap(array, apply, func) =>
+    //   val nesting = getNestingLevel(array.tp)
+    //   emit("// TODO: flatMap node assumes the func block contains only applies (.flatten)")
+
+    //   // Initialize lhs array
+    //   List.tabulate(nesting){ level =>
+    //     val grabbers = List.tabulate(level){ m => "[0]" }.mkString("")
+    //     emit(src"int size_${lhs}_$level = (*${array})${grabbers}.size();")
+    //     ()
+    //   }
+    //   emitNewArray(lhs, lhs.tp, src"""${List.tabulate(nesting){ m => src"size_${lhs}_$m" }.mkString("*")}""")
+
+    //   // Open all levels of loop
+    //   List.tabulate(nesting) { level => 
+    //     val grabbers = List.tabulate(level){_ => "[0]" }.mkString("") 
+    //     open(src"for (int i_$level = 0; i_${level} < size_${lhs}_$level; i_${level}++) { ")
+    //     ()
+    //   }
+
+    //   // Pluck off elements of the $array
+    //   val applyString = List.tabulate(nesting){ level => src"""[i_${level}]""" }.mkString("")
+    //   emit(src"${getPrimitiveType(lhs.tp)} ${func.result} = (*${array})${applyString};")
+
+    //   // Update the lhs
+    //   val flatIndex = List.tabulate(nesting){ level => 
+    //     src"""${ List.tabulate(nesting){ k => src"size_${lhs}_${level+1+k}" }.mkString("*") } ${ if (level+1 < nesting) "*" else "" }i_${level}"""
+    //   }.mkString(" + ")
+    //   emit(src"(*$lhs)[$flatIndex] = ${func.result};")
+
+    //   // Close all levels of loop
+    //   List.tabulate(nesting) { level => 
+    //     val grabbers = List.tabulate(level){_ => "[0]" }.mkString("") 
+    //     close("}")
+    //     ()
+    //   }
     case _ => super.gen(lhs, rhs)
   }
 

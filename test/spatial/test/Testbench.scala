@@ -77,10 +77,4 @@ abstract class Testbench extends FlatSpec with argon.Testbench with Matchers {
       run  = "bash scripts/stats.sh"
     )
   )
-
-  override def test(x: Any): Unit = x match {
-    case app: DSLApp => app.name should "compile and run" in { super.test(x) }
-    case _ => super.test(x)
-  }
-
 }

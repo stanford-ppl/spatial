@@ -1,4 +1,4 @@
-package spatial.test.full
+package spatial.test.feature
 
 import spatial.math.LinearAlgebra._
 import spatial.dsl._

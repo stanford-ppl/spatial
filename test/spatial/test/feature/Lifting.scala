@@ -1,4 +1,4 @@
-package spatial.test.full
+package spatial.test.feature
 
 import spatial.dsl._
 import spatial.test.Testbench

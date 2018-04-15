@@ -1,4 +1,4 @@
-package spatial.test.feature
+package spatial.test.compiler
 
 import argon._
 import spatial.lang._

@@ -1,7 +1,7 @@
-package spatial.test.feature
+package spatial.test.compiler
 
-import spatial.test.Testbench
 import spatial.node.FixInv
+import spatial.test.Testbench
 import spatial.dsl._
 
 @spatial object BasicRewriteChecks extends argon.Requirements {

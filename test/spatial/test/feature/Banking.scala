@@ -1,4 +1,4 @@
-package spatial.test.full
+package spatial.test.feature
 
 import spatial.dsl._
 import spatial.test.Testbench
@@ -247,8 +247,14 @@ import spatial.test.Testbench
 }
 
 
-@spatial object MemTest2D { // Regression (Unit) // Args: 7
+@spatial object MemTest2D extends Testbench { // Regression (Unit) // Args: 7
+  //val spatialArgs = List("--noretime -Dp1=32", "-Dp1=16")
+  //val runtimeArgs = List("7 32", (7,32), List(32,12))
+  //val fuzzArgs = Some(-128::128)
+
   def main(args: Array[String]): Void = {
+    val p1: scala.Int = spatialArgs(0).toInt
+    val p2: scala.Int = spatialArgs(1).toInt
 
     // Declare SW-HW interface vals
     val x = ArgIn[I32]
@@ -261,7 +267,7 @@ import spatial.test.Testbench
     // Create HW accelerator
     Accel {
       val mem = SRAM[I32](64, 128)
-      Sequential.Foreach(64 by 1, 128 by 1) { (i,j) =>
+      Sequential.Foreach(64 by 1, 128 by 1 par p1) { (i,j) =>
         mem(i,j) = x + (i.to[I32]*128+j.to[I32]).to[I32]
       }
       Pipe { y := mem(63,127) }
@@ -276,6 +282,7 @@ import spatial.test.Testbench
 
     val cksum = gold == result
     println("PASS: " + cksum + " (MemTest2D)")
+    assert(cksum)
   }
 }
 

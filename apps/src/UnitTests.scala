@@ -2,7 +2,7 @@ import spatial.dsl._
 
 @spatial object ArgInOut {
 
-  def main(): Void = {
+  def main(args: Array[String]): Void = {
     val a = ArgIn[I32]
     val b = ArgOut[I32]
     setArg(a, args(0).to[I32])
@@ -46,7 +46,7 @@ import spatial.dsl._
     getArg(out)
   }
 
-  def main(): Void = {
+  def main(args: Array[String]): Void = {
     val len = args(0).to[I32]
 
     val result = nIterTest(len)
@@ -64,7 +64,7 @@ import spatial.dsl._
 
 @spatial object MemTest1D { // Regression (Unit) // Args: 7
 
-  def main(): Void = {
+  def main(args: Array[String]): Void = {
 
     // Declare SW-HW interface vals
     val x = ArgIn[I32]
@@ -101,7 +101,7 @@ import spatial.dsl._
 @spatial object MemTest2D { // Regression (Unit) // Args: 7
 
 
-  def main(): Void = {
+  def main(args: Array[String]): Void = {
 
     // Declare SW-HW interface vals
     val x = ArgIn[I32]

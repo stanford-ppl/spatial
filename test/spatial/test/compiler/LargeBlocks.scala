@@ -1,4 +1,4 @@
-package spatial.test.cperf
+package spatial.test.compiler
 
 import spatial.test.Testbench
 import spatial.dsl._

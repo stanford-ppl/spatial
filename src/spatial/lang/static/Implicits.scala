@@ -262,6 +262,11 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   }
   @rig implicit def intWrapper(v: Int): IntWrapper = new IntWrapper(v)
 
+  class SeriesWrapper(b: Series[I32])(implicit ctx: SrcCtx, state: State) {
+    def by(step: I32): Series[I32] = Series[I32](b.start, b.end, step, b.par)
+  }
+  @rig implicit def seriesWrapper(v: Series[I32]): SeriesWrapper = new SeriesWrapper(v)
+  
   class LongWrapper(b: Long)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Long,B]): B = cast(b)
   }

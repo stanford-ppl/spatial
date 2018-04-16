@@ -268,10 +268,12 @@ trait ChiselGenController extends ChiselGenCommon {
 
 
   protected def emitCopiedCChain(self: Sym[_]): Unit = {
-    val parent = self.parent.s.get
-    if (parent != Host) {
-      if (levelOf(parent) != InnerControl && styleOf(parent) == Sched.Stream) {
-        emitCounterChain(self, src"_copy${self}")
+    if (self.parent.s.isDefined) {
+      val parent = self.parent.s.get
+      if (parent != Host) {
+        if (levelOf(parent) != InnerControl && styleOf(parent) == Sched.Stream) {
+          emitCounterChain(self, src"_copy${self}")
+        }
       }
     }
 

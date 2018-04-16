@@ -4,9 +4,13 @@ import argon._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
+import spatial.data._
+import spatial.util._
 
 
 trait CppGenArray extends CppGenCommon {
+
+  var struct_list: List[String] = List()
 
   protected def getSize(array: Sym[_], extractor:String = ""): String = {
     src"(*${array})${extractor}.size()"
@@ -96,6 +100,55 @@ trait CppGenArray extends CppGenCommon {
       //   emit(src"${lhs.tp} $lhs=0;")
       //   emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
     }
+    case SimpleStruct(st) => 
+      val struct = st.map(_._1).mkString("")
+      // Add to struct header if not there already
+      if (!struct_list.contains(struct)) {
+        struct_list = struct_list :+ struct
+        inGen(out, "structs.hpp") {
+          open(src"typedef struct ${struct} {")
+          st.foreach{f => emit(src"${f._2.tp} ${f._1};")}
+          emit(src"${struct}(${st.map{f => emit(src"${f._2.tp} ${f._1}")}.mkString(",")}){")
+          st.foreach{f => emit(src"${f._1} = ${f._1};")}          
+          close("};")
+        }
+      }
+      emit(src"${struct} $lhs = ${struct}(${st.map{f => src"${f._2}"}.mkString(",")})")
+
+    case FieldApply(struct, field) => emit(src"""${lhs.tp} $lhs = ${struct}.$field""")
+
+    // case SetMem(dram, data) => 
+    //   val rawtp = remapIntType(dram.tp.typeArguments.head)
+    //   if (spatialNeedsFPType(dram.tp.typeArguments.head)) {
+    //     dram.tp.typeArguments.head match { 
+    //       case FixPtType(s,d,f) => 
+    //         emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
+    //         open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
+    //           emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
+    //         close("}")
+    //         emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
+    //       case _ => emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
+    //     }
+    //   } else {
+    //     emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
+    //   }
+    // case GetMem(dram, data) => 
+    //   val rawtp = remapIntType(dram.tp.typeArguments.head)
+    //   if (spatialNeedsFPType(dram.tp.typeArguments.head)) {
+    //     dram.tp.typeArguments.head match { 
+    //       case FixPtType(s,d,f) => 
+    //         emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
+    //         emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
+    //         open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
+    //           emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
+    //           emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
+    //         close("}")
+    //       case _ => emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
+    //     }
+    //   } else {
+    //     emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
+    //   }
+
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
     case VecSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")
                 open(src"""for (int ${lhs}_i = 0; ${lhs}_i < ${start} - ${end} + 1; ${lhs}_i++){""") 
@@ -146,6 +199,16 @@ trait CppGenArray extends CppGenCommon {
       visitBlock(applyB)
       visitBlock(func)
       emitUpdate(lhs, func.result, src"i", func.result.tp)
+      close("}")
+
+    case UnrolledForeach(ens,cchain,func,iters,valids) => 
+      // Hacky reimplementation of old RangeForeach(start, stop, step, func, i)
+      val start = cchain.ctrs.head.start
+      val end = cchain.ctrs.head.end
+      val step = cchain.ctrs.head.step
+      val i = iters.head
+      open(src"for (int $i = $start; $i < $end; $i = $i + $step) {")
+      visitBlock(func)
       close("}")
 
       // 

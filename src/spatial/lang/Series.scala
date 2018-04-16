@@ -19,6 +19,8 @@ case class Series[+A:Num](
 
   def ::(start2: A@uV): Series[A] = Series[A](start2, end, start, par, isUnit=false)
 
+  def by(st: A@uV): Series[A] = Series[A](start, end, st, par, isUnit=false)
+
   def par(p: I32): Series[A] = Series[A](start, end, step, p, isUnit=false)
 
   @api def length: I32 = ( (end - start + step - Num[A].from(1))/step ).to[I32]

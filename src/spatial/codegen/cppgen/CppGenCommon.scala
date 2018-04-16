@@ -7,6 +7,8 @@ import spatial.node._
 import emul.FloatPoint
 import emul.FixedPoint
 import utils.escapeString
+import spatial.util._
+
 
 
 trait CppGenCommon extends CppCodegen { 

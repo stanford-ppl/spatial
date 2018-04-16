@@ -25,6 +25,11 @@ trait CppFileGen extends CppCodegen {
       emit("""#include "functions.hpp" """)
     }
 
+    inGen(out, "structs.hpp") {
+      emit("#ifndef STRUCTS_HPP")
+      emit("#define STRUCTS_HPP")
+    }
+
     inGen(out, "ArgAPI.hpp") {
       emit(s"// API for args in app ${config.name}")
     }
@@ -74,6 +79,10 @@ trait CppFileGen extends CppCodegen {
       emit("""#endif""")
     }
 
+    inGen(out, "structs.hpp") {
+      emit("#endif // STRUCTS_HPP ///:~ ")
+    }
+    
     inGen(out, entryFile) {
       emit("delete c1;")
       close("}")

@@ -203,7 +203,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
-    val prnts = List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"}
+    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"} else ""
     emit(src"// Creating sub kernel ${name}_1")
     inGenn(out, name, ext) {
       emit("""package accel""")

@@ -1,10 +1,11 @@
 package spatial.test.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
+import spatial.test.SpatialTest
 
 
-@spatial object BinaryFileTest {
+@spatial object BinaryFileTest extends SpatialTest{
+  override def runtimeArgs: Args = NoArgs
 
   type Nibble = FixPt[TRUE,_4,_0]
   type UByte = FixPt[FALSE,_8,_0]
@@ -60,11 +61,5 @@ import spatial.test.Testbench
     }
     matches
   }
-}
-
-
-
-class FileIO extends Testbench {
-  test(BinaryFileTest)
 }
 

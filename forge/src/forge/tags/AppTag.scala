@@ -16,10 +16,10 @@ class AppTag(dsl: String, dslApp: String) {
     val inputs = annottees.toList
     val outputs = inputs match {
       case (a:ClassDef) :: as =>
-        val mod = a.mixIn(appType).injectStm(q"import ${TermName(dsl)}.dsl._")
+        val mod = a.mixIn(appType) //.injectStm(q"import ${TermName(dsl)}.dsl._")
         virt(mod) ::: as
       case (a:ModuleDef) :: as =>
-        val mod = a.mixIn(appType).injectStm(q"import ${TermName(dsl)}.dsl._")
+        val mod = a.mixIn(appType) //.injectStm(q"import ${TermName(dsl)}.dsl._")
         virt(mod) ::: as
       case _ => invalidAnnotationUse("dsl", "classes", "objects", "traits")
     }

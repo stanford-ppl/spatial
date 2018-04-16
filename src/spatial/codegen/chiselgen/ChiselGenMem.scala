@@ -20,7 +20,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/memInfo(mem).nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = memInfo(mem).nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
-    emitGlobalWireMap(src"""${lhs}""", src"""Wire(Vec(${ens.length}, ${mem.tp.typeArgs.head}))""") 
+    if (ens.length > 1) emitGlobalWireMap(src"""${lhs}""", src"""Wire(Vec(${ens.length}, ${mem.tp.typeArgs.head}))""") 
+    else                emitGlobalWireMap(src"""${lhs}""", src"""Wire(${mem.tp.typeArgs.head})""") 
     ens.zipWithIndex.foreach{case (e, i) => 
       if (ens(i).isEmpty) emit(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
       else emit(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(e.head, lhs), true)} & ${e.mkString(" & ")}""")
@@ -31,7 +32,8 @@ trait ChiselGenMem extends ChiselGenCommon {
       } else {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
         bank(i).zipWithIndex.foreach{case (b,j) => emit(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
-        emit(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, ${portsOf(lhs).values.head.muxPort}, $i)""")
+        if (ens.length > 1) emit(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, ${portsOf(lhs).values.head.muxPort}, $i)""")
+        else                emit(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, ${portsOf(lhs).values.head.muxPort}, $i)""")
       }
     }
     
@@ -64,45 +66,45 @@ trait ChiselGenMem extends ChiselGenCommon {
   def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     val inst = memInfo(mem)
     val dims = constDimsOf(mem)
-    val broadcasts = writersOf(mem).filter{w => !portsOf(w).values.head.bufferPort.isDefined}.map(accessWidth(_)).toList
+    val broadcasts = writersOf(mem).filter{w => !portsOf(w).values.head.bufferPort.isDefined & inst.depth > 1}.map(accessWidth(_)).toList
 
     val templateName = if (inst.depth == 1) s"${name}("
                        else if (broadcasts.length > 0) {appPropertyStats += HasNBufSRAM; nbufs = nbufs :+ mem; "NBufMem(${name}Type"}
 
     val depth = if (inst.depth > 1) s"${inst.depth}," else ""
     // Create mapping for (bufferPort -> (muxPort -> width)) for XBar accesses
-    val XBarWBuilder = writersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined) // Filter out broadcasters
+    val XBarWBuilder = writersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(!_.isDirectlyBanked)              // Filter out statically banked
-                              .groupBy(portsOf(_).values.head.bufferPort.get)      // Group by port
+                              .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
                                 if (inst.depth > 1) src"$bufp -> " else "" + 
                                 "scala.collection.mutable.HashMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",") + ")"
                               }
-    val XBarRBuilder = readersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined) // Filter out broadcasters
+    val XBarRBuilder = readersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(!_.isDirectlyBanked)              // Filter out statically banked
-                              .groupBy(portsOf(_).values.head.bufferPort.get)      // Group by port
+                              .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, reads) => 
                                 if (inst.depth > 1) src"$bufp -> " else "" + 
                                 "scala.collection.mutable.HashMap(" + reads.map{r => src"${portsOf(r).values.head.muxPort} -> ${accessWidth(r)}"}.mkString(",") + ")"
                               }
-    val DirectWBuilder = writersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined) // Filter out broadcasters
+    val DirectWBuilder = writersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
-                              .groupBy(portsOf(_).values.head.bufferPort.get)      // Group by port
+                              .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
                                 if (inst.depth > 1) src"$bufp -> " else "" + 
                                 "scala.collection.mutable.HashMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",") + ")"
                               }
-    val DirectRBuilder = readersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined) // Filter out broadcasters
+    val DirectRBuilder = readersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
-                              .groupBy(portsOf(_).values.head.bufferPort.get)      // Group by port
+                              .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
                                 if (inst.depth > 1) src"$bufp -> " else "" + 
                                 "scala.collection.mutable.HashMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",") + ")"
                               }
     val bPar = if (broadcasts.length > 0) {broadcasts.mkString("List(",",",")") + ","} else ""
 
-    val dimensions = dims.map(_.toString).mkString("List(", ",", ")")
-    val numBanks = inst.nBanks.map(_.toString).mkString("List(", ",", ")")
+    val dimensions = dims.map(_.toString).mkString("List[Int](", ",", ")")
+    val numBanks = inst.nBanks.map(_.toString).mkString("List[Int](", ",", ")")
     val strides = numBanks // TODO: What to do with strides
     val bankingMode = "BankedMemory" // TODO: Find correct one
 

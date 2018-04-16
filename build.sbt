@@ -13,7 +13,7 @@ val common = Seq(
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
-    "org.scalatest" %% "scalatest" % scalatestVersion % "test",
+    "org.scalatest" %% "scalatest" % scalatestVersion,
     "com.github.scopt" %% "scopt" % "3.7.0",
 
     // Alternative library for testing

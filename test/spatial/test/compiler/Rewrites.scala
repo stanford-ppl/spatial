@@ -1,10 +1,12 @@
 package spatial.test.compiler
 
 import spatial.node.FixInv
-import spatial.test.Testbench
+import spatial.test.SpatialTest
 import spatial.dsl._
 
-@spatial object BasicRewriteChecks extends argon.Requirements {
+@spatial object BasicRewriteChecks extends SpatialTest with argon.Requirements {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     val b = random[Bit]
     val t = true.to[Bit]
@@ -76,6 +78,3 @@ import spatial.dsl._
   }
 }
 
-class Rewrites extends Testbench {
-  test(BasicRewriteChecks)
-}

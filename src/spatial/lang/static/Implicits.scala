@@ -23,8 +23,8 @@ trait ImplicitsPriority3 {
   implicit def stringToWrappedString(x: String): WrappedString = new WrappedString(x)
 
   implicit class EqualsOps(x: Any) {
-    def !==(y: Any): Boolean = x != y
-    def ===(y: Any): Boolean = x == y
+    def infix_!=(y: Any): Boolean = x != y
+    def infix_==(y: Any): Boolean = x == y
   }
 
   implicit def numericCast[A:Num,B:Num]: Cast[A,B] = Right(new CastFunc[A,B]{

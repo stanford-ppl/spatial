@@ -1,10 +1,16 @@
 package spatial.test
 
-import argon.DSLApp
-import org.scalatest.{FlatSpec, Matchers}
+import argon.DSLTest
+import spatial.SpatialApp
+import spatial.lang.{Bit, Text, Void}
+import forge.SrcCtx
 
-abstract class Testbench extends FlatSpec with argon.Testbench with Matchers {
+// Create a testbench which runs Scala tests
+abstract class SpatialTest extends DSLTest with SpatialApp {
   private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
+
+  def assert(cond: Bit)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond)
+  def assert(cond: Bit, msg: Text)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond, msg)
 
   class ChiselBackend(name: String, args: String, make: String, run: String)
     extends Backend(name,args,make,run) {
@@ -21,7 +27,7 @@ abstract class Testbench extends FlatSpec with argon.Testbench with Matchers {
     }
   }
 
-  override val backends = Seq(
+  def targets = Seq(
     new Backend(
       name = "Scala",
       args = "--sim",
@@ -36,7 +42,7 @@ abstract class Testbench extends FlatSpec with argon.Testbench with Matchers {
 
     new ChiselBackend(
       name = "VCS",
-      args = "--synth --fpga Default",
+      args = "--synth --fpga Zynq",
       make = "make vcs",
       run  = "bash scripts/regression_run.sh"
     ) {
@@ -77,4 +83,22 @@ abstract class Testbench extends FlatSpec with argon.Testbench with Matchers {
       run  = "bash scripts/stats.sh"
     )
   )
+
+  // TODO: Shouldn't try to compile multiple chisel targets if the app target is overridden
+  override def backends: Seq[Backend] = {
+    targets
+  }
+
+  protected def checkIR(block: argon.Block[_]): Result = Unknown
+
+  final override def postprocess(block: argon.Block[_]): Unit = {
+    import argon._
+    import spatial.node.AssertIf
+
+    val stms = block.nestedStms
+    val hasAssert = stms.exists{case Op(_:AssertIf) => true; case _ => false }
+    if (!hasAssert) throw Indeterminate
+    checkIR(block)
+  }
+
 }

@@ -23,7 +23,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     // case FixLt(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x < $y")
     // case FixLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x <= $y")
     // case FixNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x =/= $y")
-    // case FixEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x === $y")
+    case FixEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x === $y")
     // case UnbMul(x,y) => emit(src"val $lhs = $x *& $y")
     // case UnbDiv(x,y) => emit(src"val $lhs = $x /& $y")
     // case SatAdd(x,y) => emit(src"val $lhs = $x <+> $y")

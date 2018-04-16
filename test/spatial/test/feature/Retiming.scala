@@ -1,9 +1,10 @@
 package spatial.test.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
+import spatial.test.SpatialTest
 
-@spatial object SimpleRetimePipe {
+@spatial object SimpleRetimePipe extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val a = ArgIn[I32]
@@ -17,7 +18,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RetimeLoop {
+@spatial object RetimeLoop extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -32,7 +34,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object NestedPipeTest {
+@spatial object NestedPipeTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     // Declare SW-HW interface vals
@@ -62,7 +65,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RetimeRandomTest {
+@spatial object RetimeRandomTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     val x = ArgOut[Bit]
     Accel {
@@ -73,7 +78,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RetimeOffsetTest {
+@spatial object RetimeOffsetTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -85,12 +92,4 @@ import spatial.test.Testbench
       Foreach(64 par 16){i => println(sram(i)) }
     }
   }
-}
-
-class Retiming extends Testbench {
-  test(SimpleRetimePipe)
-  test(RetimeLoop)
-  test(NestedPipeTest)
-  test(RetimeRandomTest)
-  test(RetimeOffsetTest)
 }

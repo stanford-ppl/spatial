@@ -1,10 +1,12 @@
 package spatial.test.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
+import spatial.test.SpatialTest
 
 
-@spatial object NestedAlias {
+@spatial object NestedAlias extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val x = SRAM[I32](32)
@@ -22,9 +24,4 @@ import spatial.test.Testbench
       println(z(0))       // Should be 10
     }
   }
-}
-
-
-class Aliasing extends Testbench {
-  test(NestedAlias)
 }

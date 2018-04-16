@@ -1,10 +1,12 @@
 package spatial.test.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
+import _root_.spatial.test.SpatialTest
 
 
-@spatial object SimpleParTest {
+@spatial object SimpleParTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -14,7 +16,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object FixedOffsetTest {
+@spatial object FixedOffsetTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     val x = ArgIn[I32]
     Accel {
@@ -25,7 +29,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RandomOffsetTest {
+@spatial object RandomOffsetTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -40,7 +46,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RandomOffsetTestWrite {
+@spatial object RandomOffsetTestWrite extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -54,9 +62,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object TwoDuplicatesSimple {
-
-  //type Int = Fix[TRUE,_32,_0]
+@spatial object TwoDuplicatesSimple extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val dram = DRAM[Int](32)
@@ -85,9 +92,8 @@ import spatial.test.Testbench
 }
 
 // Nonsensical app, just to get structure there.
-@spatial object TwoDuplicatesPachinko {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@spatial object TwoDuplicatesPachinko extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val dram = DRAM[Int](512)
@@ -112,12 +118,10 @@ import spatial.test.Testbench
 
 
 
-@spatial object LegalFIFOParallelization {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@spatial object LegalFIFOParallelization extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
-
     val out = ArgOut[Int]
 
     Accel {
@@ -132,28 +136,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object IllegalFIFOParallelization {
-  //
-  type Int = Fix[TRUE,_32,_0]
-
-  def main(args: Array[String]): Void = {
-    val out = ArgOut[Int]
-
-    Accel {
-      val fifo = FIFO[Int](32)
-
-      Foreach(16 par 2) {i =>
-        Foreach(8 by 1){j => fifo.enq(j) }
-        Foreach(8 by 1){j => out := fifo.deq() }
-      }
-    }
-
-  }
-}
-
-@spatial object RegCoalesceTest {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@spatial object RegCoalesceTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val out1 = ArgOut[Int]
@@ -169,9 +153,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object SRAMCoalesceTest {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@spatial object SRAMCoalesceTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -189,8 +172,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LinearWriteRandomRead {
-
+@spatial object LinearWriteRandomRead extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -211,7 +194,8 @@ import spatial.test.Testbench
 }
 
 
-@spatial object MemTest1D { // Regression (Unit) // Args: 7
+@spatial object MemTest1D extends SpatialTest {
+  override def runtimeArgs: Args = "7"
 
   def main(args: Array[String]): Void = {
 
@@ -247,15 +231,10 @@ import spatial.test.Testbench
 }
 
 
-@spatial object MemTest2D extends Testbench { // Regression (Unit) // Args: 7
-  //val spatialArgs = List("--noretime -Dp1=32", "-Dp1=16")
-  //val runtimeArgs = List("7 32", (7,32), List(32,12))
-  //val fuzzArgs = Some(-128::128)
+@spatial object MemTest2D extends SpatialTest {
+  override def runtimeArgs: Args = "7"
 
   def main(args: Array[String]): Void = {
-    val p1: scala.Int = spatialArgs(0).toInt
-    val p2: scala.Int = spatialArgs(1).toInt
-
     // Declare SW-HW interface vals
     val x = ArgIn[I32]
     val y = ArgOut[I32]
@@ -267,7 +246,7 @@ import spatial.test.Testbench
     // Create HW accelerator
     Accel {
       val mem = SRAM[I32](64, 128)
-      Sequential.Foreach(64 by 1, 128 by 1 par p1) { (i,j) =>
+      Sequential.Foreach(64 by 1, 128 by 1) { (i,j) =>
         mem(i,j) = x + (i.to[I32]*128+j.to[I32]).to[I32]
       }
       Pipe { y := mem(63,127) }
@@ -284,19 +263,4 @@ import spatial.test.Testbench
     println("PASS: " + cksum + " (MemTest2D)")
     assert(cksum)
   }
-}
-
-class Banking extends Testbench {
-  test(SimpleParTest)
-  test(FixedOffsetTest)
-  test(RandomOffsetTest)
-  test(RandomOffsetTestWrite)
-  test(TwoDuplicatesSimple)
-  test(TwoDuplicatesPachinko)
-  test(LegalFIFOParallelization)
-  test(RegCoalesceTest)
-  test(SRAMCoalesceTest)
-  test(LinearWriteRandomRead)
-  test(MemTest1D)
-  test(MemTest2D)
 }

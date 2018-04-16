@@ -370,7 +370,12 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   // }
 
-  protected def bitWidth(tp: Type[_]) = tp match {case FixPtType(s,d,f) => d+f; case FltPtType(g,e) => g+e; case _ => 32}
+  protected def bitWidth(tp: Type[_]): Int = tp match {
+    case FixPtType(s,d,f) => d+f; 
+    case FltPtType(g,e) => g+e; 
+    case BitType() => 1
+    case t: Vec[_] => t.width * bitWidth(t.typeArgs.head)
+  }
   protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 
 

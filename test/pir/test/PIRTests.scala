@@ -3,7 +3,7 @@ package pir.test
 import spatial.lib._
 import pir.dsl._
 
-@pir object PIR_LSTM {
+@pir object PIR_LSTM extends PIRTest {
   val STAGES = 6
   val LANES  = 16
 
@@ -174,7 +174,7 @@ import pir.dsl._
   }
 }
 
-@pir object PIR_GEMM {
+@pir object PIR_GEMM extends PIRTest {
   val STAGES = 6
   val LANES  = 16
 
@@ -216,9 +216,4 @@ import pir.dsl._
     pmuB.out[I32](0) ==> pcu1.in[I32](1)
 
   }
-}
-
-class PIRTests extends Testbench {
-  "PIR_GEMM" should "compile" in test(PIR_GEMM)
-  "PIR_LSTM" should "compile" in test(PIR_LSTM)
 }

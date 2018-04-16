@@ -2,7 +2,7 @@ package spatial.test.compiler
 
 import argon._
 import spatial.lang._
-import spatial.test.Testbench
+import utils.Testbench
 
 
 class ConstantMatching extends Testbench {

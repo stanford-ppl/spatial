@@ -13,5 +13,4 @@ trait DSLApp extends Compiler {
   protected implicit class ConditionalPass(cond: Boolean) {
     def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
   }
-
 }

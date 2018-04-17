@@ -33,6 +33,11 @@ trait SpatialVirtualization extends ArgonVirtualization with forge.EmbeddedContr
   }
 
   def infix_+(x1: String, x2: Any): Text = macro text_plus
+
+  @rig def infix_toString(x: Any): Text = x match {
+    case x: Top[_] => x.toText
+    case _ => Text(x.toString)
+  }
 }
 
 private object SpatialVirtualization {

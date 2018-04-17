@@ -2,7 +2,7 @@ package spatial.tests.feature
 
 import spatial.dsl._
 
-@test class BinaryFileTest extends SpatialTest{
+@test class BinaryFileTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   type Nibble = FixPt[TRUE,_4,_0]

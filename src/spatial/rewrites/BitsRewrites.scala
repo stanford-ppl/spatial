@@ -25,11 +25,6 @@ trait BitsRewrites extends RewriteRules {
 
   @rewrite def data_as_bits(op: DataAsBits[_]): Sym[_] = {
     case op @ DataAsBits(x) =>
-      dbg(s"Rewriting DataAsBits($x)")
-      op match {
-        case DataAsBits(Literal(c)) => dbg(s"$x is constant!")
-        case _ =>
-      }
 
       op match {
         case op @ DataAsBits(x @ Const(c: FixedPoint)) =>

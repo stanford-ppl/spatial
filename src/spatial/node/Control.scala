@@ -20,6 +20,9 @@ import spatial.lang._
   override var ens: Set[Bit] = Set.empty
   override def updateEn(f: Tx, addEns: Set[Bit]) = update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = mirror(f)
+
+  // TODO[5]: Technically Accel doesn't need a simple effect - prevents removal of Accel in ALL cases
+  override def effects: Effects = super.effects andAlso Effects.Simple
 }
 
 @op case class UnitPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {

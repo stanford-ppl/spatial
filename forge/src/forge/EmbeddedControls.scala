@@ -69,7 +69,7 @@ trait EmbeddedControls {
   def infix_hashCode(x: Any): Int = macro any_hashCode
   def infix_asInstanceOf[T](x: Any): T = macro any_asInstanceOf[T]
   def infix_isInstanceOf[T](x: Any): Boolean = macro any_isInstanceOf[T]
-  def infix_toString(x: Any): String = macro any_toString
+  //def infix_toString(x: Any): String = macro any_toString
   def infix_getClass(x: Any): Class[_] = macro any_getClass
 
   /** `AnyRef` Infix Methods */

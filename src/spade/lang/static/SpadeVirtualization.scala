@@ -13,5 +13,5 @@ trait SpadeVirtualization extends forge.EmbeddedControls {
   }
 
   def infix_+(x1: String, x2: Any): String = macro forge.EmbeddedControls.string_+
-
+  def infix_toString(x: Any): String = macro forge.EmbeddedControls.any_toString
 }

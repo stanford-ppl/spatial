@@ -40,8 +40,8 @@ trait AliasRewrites extends RewriteRules {
     Alias: Type[Alias[A]]
   ): Sym[_] = {
     val MemDenseAlias(cond, mem, series) = op
-    dbgs(s"Checking rewrite rule for mem alias:")
-    dbgs(s"$op")
+    //dbgs(s"Checking rewrite rule for mem alias:")
+    //dbgs(s"$op")
     val mems = mem.map{mem => box(mem) }
 
     if (mems.exists{_.isDenseAlias}) {

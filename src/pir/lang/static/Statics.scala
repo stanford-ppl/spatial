@@ -11,4 +11,5 @@ trait ExtensionStatics extends InternalStatics with ExternalAliases
 /** Application view */
 trait ExternalStatics extends ExtensionStatics {
   type PIRApp = pir.PIRApp
+  type PIRTest = pir.PIRTest
 }

@@ -1,10 +1,10 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
 
+@test class DenseTransfer1D extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
-@spatial object DenseTransfer1D {
   def main(args: Array[String]): Void = {
     val dram256 = DRAM[I32](256)
     val dram128 = DRAM[I32](128)
@@ -25,7 +25,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object SparseTransfer1D {
+@test class SparseTransfer1D extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     val dram256 = DRAM[F32](256)
     val addr128 = DRAM[I32](128)
@@ -40,8 +42,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object FIFOGather {
-
+@test class FIFOGather extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
   val n = 32
   val T = 8
 
@@ -80,9 +82,3 @@ import spatial.test.Testbench
   }
 }
 
-
-class DRAMTransfers extends Testbench {
-  test(DenseTransfer1D)
-  test(SparseTransfer1D)
-  test(FIFOGather)
-}

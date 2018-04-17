@@ -3,8 +3,6 @@ package argon
 import argon.passes.Pass
 
 trait DSLApp extends Compiler {
-  val stageArgs: String = ""
-  val testArgs: String = ""
 
   protected implicit class BlockOps[R](block: Block[R]) {
     def ==>(pass: Pass): Block[R] = runPass(pass, block)
@@ -13,5 +11,4 @@ trait DSLApp extends Compiler {
   protected implicit class ConditionalPass(cond: Boolean) {
     def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
   }
-
 }

@@ -1,9 +1,9 @@
 package spade.test
 
 import spade.dsl._
+import _root_.spade.SpadeTest
 
-
-@spade object ArchModel_Simple {
+@spade class ArchModel_Simple extends SpadeTest {
 
   val pcuSpec = new PCUSpec(
     nRegs   = 6,
@@ -69,8 +69,4 @@ import spade.dsl._
 
 //    y.vOuts(0) ==> x.vIns(0)
   }
-}
-
-class ArchModelTests extends Testbench {
-  "ArchModelSimple" should "compile" in test(ArchModel_Simple)
 }

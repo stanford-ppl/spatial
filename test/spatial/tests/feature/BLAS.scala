@@ -1,11 +1,11 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.math.LinearAlgebra._
 import spatial.dsl._
-import spatial.test.Testbench
 
+@test class GEMM extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
-@spatial object GEMM {
   def main(args: Array[String]): Void = Accel {
     val M = 96  // Rows of output
     val N = 96  // Cols of output
@@ -15,8 +15,4 @@ import spatial.test.Testbench
     val y = SRAM[I32](M,N)
     gemm[I32](y,a,b,0,false,false,1,2)
   }
-}
-
-class BLAS extends Testbench {
-  test(GEMM)
 }

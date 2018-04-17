@@ -87,7 +87,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Assumption: Global memories are never duplicated, since they correspond to external pins / memory spaces
     */
   def unrollGlobalMemory[A](mem: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    val mem2 = cloneOp(mem, rhs)
+    val mem2 = lanes.inLane(0){ cloneOp(mem, rhs) }
     memories += (mem,0) -> mem2
     lanes.unify(mem, mem2)
   }
@@ -98,8 +98,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
       isolateSubstWith(mem -> memories(dup)){
-        val lhs2 = cloneOp(lhs, rhs)
-        //register(lhs -> lhs2)
+        val lhs2 = lanes.inLane(0){ cloneOp(lhs, rhs) }
         lhs2
       }
     }

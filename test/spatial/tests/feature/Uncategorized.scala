@@ -1,9 +1,9 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
 
-@spatial object ArgInOut {
+@test class ArgInOut extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val a = ArgIn[I32]
@@ -13,11 +13,12 @@ import spatial.test.Testbench
       b := a + 4
     }
     println("b = a + 4 = " + getArg(b))
-    println(r"PASS: ${getArg(b) == a + 4} (ArgInOut)")
+    assert(getArg(b) == a + 4)
   }
 }
 
-@spatial object Niter { // Regression (Unit) // Args: 100
+@test class Niter extends SpatialTest {
+  override def runtimeArgs: Args = "10"
   val constTileSize = 16
 
   def nIterTest(len: I32): I32 = {
@@ -67,7 +68,9 @@ import spatial.test.Testbench
 
 
 
-@spatial object NestedLoopTest {
+@test class NestedLoopTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = Accel {
     val x = SRAM[I32](64)
     Foreach(64 by 32){i =>
@@ -79,7 +82,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object IfThenElseTest {
+@test class IfThenElseTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def test[T:Bits](x: T, y: T): Void = {
     val c = random[Bit]
@@ -130,8 +134,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object NumericTest {
-
+@test class NumericTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -148,7 +152,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RegTest {
+@test class RegTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val in = ArgIn[Int]
@@ -164,7 +169,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object SRAMTest {
+@test class SRAMTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -175,7 +181,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object MuxTests {
+@test class MuxTests extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -193,7 +200,8 @@ import spatial.test.Testbench
 }
 
 
-@spatial object ReduceTest {
+@test class ReduceTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -204,7 +212,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object FoldAccumTest {
+@test class FoldAccumTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -217,7 +226,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object MemReduceTest {
+@test class MemReduceTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -233,7 +243,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object UtilTest {
+@test class UtilTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val array = Array.tabulate(32){i => random[Int](10) }
@@ -247,8 +258,8 @@ import spatial.test.Testbench
 
 }
 
-@spatial object UntransferredValueTest {
-
+@test class UntransferredValueTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val x = random[Int]
@@ -260,7 +271,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object DRAMSizeTest {
+@test class DRAMSizeTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val arr = args.map{a => a.to[Int] }
@@ -281,7 +293,8 @@ import spatial.test.Testbench
 }
 
 
-@spatial object SimpleSequential {
+@test class SimpleSequential extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def simpleSeq(xIn: I32, yIn: I32): I32 = {
     val innerPar = 1 (1 -> 1)
@@ -313,25 +326,6 @@ import spatial.test.Testbench
     println("expected: " + gold)
     println("result:   " + result)
     val chkSum = result == gold
-    // assert(chkSum)
-    println("PASS: " + chkSum + " (SimpleSeq)")
+    assert(chkSum)
   }
-}
-
-
-object Uncategorized extends Testbench {
-  test(ArgInOut)
-  test(Niter)
-  test(NestedLoopTest)
-  test(IfThenElseTest)
-
-  test(NumericTest)
-  test(RegTest)
-  test(SRAMTest)
-  test(MuxTests)
-  test(ReduceTest)
-  test(FoldAccumTest)
-  test(MemReduceTest)
-  test(UtilTest)
-  test(SimpleSequential)
 }

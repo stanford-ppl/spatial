@@ -14,7 +14,7 @@ trait SpadeDesign extends DSLApp {
 
   final def stageApp(args: Array[String]): Block[_] = stageBlock{ main() }
 
-  def runPasses[R](block: Block[R]): Unit = {
+  def runPasses[R](block: Block[R]): Block[R] = {
     lazy val printer = IRPrinter(state)
     lazy val irDotCodegen = IRDotCodegen(state)
     lazy val archDotCodegen = ArchDotCodegen(state)

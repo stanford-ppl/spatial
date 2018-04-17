@@ -44,7 +44,7 @@ trait SpatialApp extends DSLApp {
   override def flows(): Unit = SpatialFlowRules(state)       // Register standard flow analysis rules
   override def rewrites(): Unit = SpatialRewriteRules(state) // Register initial rewrite rules
 
-  def runPasses[R](block: Block[R]): Unit = {
+  def runPasses[R](block: Block[R]): Block[R] = {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
 
@@ -87,36 +87,39 @@ trait SpatialApp extends DSLApp {
     lazy val scalaCodegen = ScalaGenSpatial(state)
     lazy val puDotCodegen = PUDotCodegen(state)
 
-    block ==> printer ==>
-      friendlyTransformer ==>
-      sanityChecks ==>
-      switchTransformer ==>
-      switchOptimizer ==>
-      transferLowering ==>
-      memoryDealiasing ==>
-      pipeInserter ==> printer ==>
-      useAnalyzer ==> printer ==>
-      registerCleanup ==> printer ==>
-      accessAnalyzer ==> printer ==>
-      memoryAnalyzer ==> printer ==>
-      memoryAllocator ==>
-      memoryReporter  ==>
-      unrollTransformer ==> printer ==>
-      aliasCleanup ==> printer ==>
-      (cfg.enableRetiming ? retiming) ==> printer ==>
-      (cfg.enableRetiming ? retimeReporter) ==>
-      initiationAnalyzer ==>
-      printer ==>
-      (cfg.enableSim ? scalaCodegen) ==>
-      // (cfg.enableTree ? irTreeCodegen) ==>
-      (cfg.enableSynth ? chiselCodegen) ==>
-      (cfg.enableSynth ? cppCodegen) ==>
-      (cfg.enableDot ? irDotCodegen)
+    val result = {
+      block ==> printer ==>
+        friendlyTransformer ==>
+        sanityChecks ==>
+        switchTransformer ==>
+        switchOptimizer ==>
+        transferLowering ==>
+        memoryDealiasing ==>
+        pipeInserter ==> printer ==>
+        useAnalyzer ==> printer ==>
+        registerCleanup ==> printer ==>
+        accessAnalyzer ==> printer ==>
+        memoryAnalyzer ==> printer ==>
+        memoryAllocator ==>
+        memoryReporter  ==>
+        unrollTransformer ==> printer ==>
+        aliasCleanup ==> printer ==>
+        (cfg.enableRetiming ? retiming) ==> printer ==>
+        (cfg.enableRetiming ? retimeReporter) ==>
+        initiationAnalyzer ==>
+        printer ==>
+        (cfg.enableSim ? scalaCodegen) ==>
+        // (cfg.enableTree ? irTreeCodegen) ==>
+        (cfg.enableSynth ? chiselCodegen) ==>
+        (cfg.enableSynth ? cppCodegen) ==>
+        (cfg.enableDot ? irDotCodegen)
+    }
       //globalAllocation ==>
       //printer ==>
       //puDotCodegen ==>
 
     isl.shutdown(100)
+    result
   }
 
   override def defineOpts(cli: CLIParser): Unit = {
@@ -204,12 +207,7 @@ trait SpatialApp extends DSLApp {
   override def settings(): Unit = {
     if (this.target eq null) {
       if (cfg.targetName eq null) {
-        if (cfg.enableRetiming) {
-          error("No target specified. Specify target using: --fpga <device> or")
-          error("override val target = <device>")
-          IR.logError()
-        }
-        else {
+        if (!cfg.enableRetiming) {
           warn("No target specified. Specify target using: --fpga <device> or")
           warn("override val target = <device>")
           warn("Defaulting to 'Default' device.")
@@ -228,6 +226,7 @@ trait SpatialApp extends DSLApp {
             error(s"Available targets: ")
             Targets.targets.foreach{t => error(s"  ${t.name}") }
             IR.logError()
+            return
           }
           else {
             warn(s"No target found with the name '${cfg.targetName}'.")
@@ -248,8 +247,15 @@ trait SpatialApp extends DSLApp {
       cfg.target = this.target
       cfg.targetName = cfg.target.name
     }
-    cfg.target.areaModel.init()
-    cfg.target.latencyModel.init()
+    if (cfg.target eq null) {
+      error("No target specified. Specify target using: --fpga <device> or")
+      error("override val target = <device>")
+      IR.logError()
+    }
+    else {
+      cfg.target.areaModel.init()
+      cfg.target.latencyModel.init()
+    }
   }
 
 }

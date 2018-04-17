@@ -1,12 +1,12 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
-
 
 @struct case class MyStruct(x: I32, y: I32, z: I32)
 
-@spatial object SimpleStructTest {
+@test class SimpleStructTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     val x = random[MyStruct]
     val y = random[MyStruct]
@@ -14,8 +14,4 @@ import spatial.test.Testbench
     println(r"y: $y")
     println(r"x + y: ${x + y}")
   }
-}
-
-class Structs extends Testbench {
-  test(SimpleStructTest)
 }

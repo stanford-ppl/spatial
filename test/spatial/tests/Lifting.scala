@@ -1,10 +1,10 @@
-package spatial.test.full
+package spatial.tests
 
 import spatial.dsl._
-import spatial.test.Testbench
 
+@test class LiftBoolean extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
-@spatial object LiftBoolean {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -28,7 +28,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LiftByte {
+@test class LiftByte extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -52,7 +54,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LiftShort {
+@test class LiftShort extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -76,7 +80,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LiftInt {
+@test class LiftInt extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -100,7 +106,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LiftLong {
+@test class LiftLong extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -124,7 +132,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LiftFloat {
+@test class LiftFloat extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -148,7 +158,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LiftDouble {
+@test class LiftDouble extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -170,16 +182,4 @@ import spatial.test.Testbench
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
     println("PASS: true")
   }
-}
-
-
-
-class Lifting extends Testbench {
-  test(LiftBoolean)
-  test(LiftByte)
-  test(LiftShort)
-  test(LiftInt)
-  test(LiftLong)
-  test(LiftFloat)
-  test(LiftDouble)
 }

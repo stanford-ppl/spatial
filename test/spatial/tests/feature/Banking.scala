@@ -1,10 +1,10 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
 
+@test class SimpleParTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
-@spatial object SimpleParTest {
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -14,7 +14,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object FixedOffsetTest {
+@test class FixedOffsetTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     val x = ArgIn[I32]
     Accel {
@@ -25,7 +27,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RandomOffsetTest {
+@test class RandomOffsetTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -40,7 +44,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RandomOffsetTestWrite {
+@test class RandomOffsetTestWrite extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = {
     Accel {
       val sram = SRAM[I32](64)
@@ -54,9 +60,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object TwoDuplicatesSimple {
-
-  //type Int = Fix[TRUE,_32,_0]
+@test class TwoDuplicatesSimple extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val dram = DRAM[Int](32)
@@ -85,9 +90,8 @@ import spatial.test.Testbench
 }
 
 // Nonsensical app, just to get structure there.
-@spatial object TwoDuplicatesPachinko {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@test class TwoDuplicatesPachinko extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val dram = DRAM[Int](512)
@@ -112,12 +116,10 @@ import spatial.test.Testbench
 
 
 
-@spatial object LegalFIFOParallelization {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@test class LegalFIFOParallelization extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
-
     val out = ArgOut[Int]
 
     Accel {
@@ -132,28 +134,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object IllegalFIFOParallelization {
-  //
-  type Int = Fix[TRUE,_32,_0]
-
-  def main(args: Array[String]): Void = {
-    val out = ArgOut[Int]
-
-    Accel {
-      val fifo = FIFO[Int](32)
-
-      Foreach(16 par 2) {i =>
-        Foreach(8 by 1){j => fifo.enq(j) }
-        Foreach(8 by 1){j => out := fifo.deq() }
-      }
-    }
-
-  }
-}
-
-@spatial object RegCoalesceTest {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@test class RegCoalesceTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val out1 = ArgOut[Int]
@@ -169,9 +151,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object SRAMCoalesceTest {
-  //
-  type Int = Fix[TRUE,_32,_0]
+@test class SRAMCoalesceTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -189,8 +170,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object LinearWriteRandomRead {
-
+@test class LinearWriteRandomRead extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -211,7 +192,8 @@ import spatial.test.Testbench
 }
 
 
-@spatial object MemTest1D { // Regression (Unit) // Args: 7
+@test class MemTest1D extends SpatialTest {
+  override def runtimeArgs: Args = "7"
 
   def main(args: Array[String]): Void = {
 
@@ -247,9 +229,10 @@ import spatial.test.Testbench
 }
 
 
-@spatial object MemTest2D { // Regression (Unit) // Args: 7
-  def main(args: Array[String]): Void = {
+@test class MemTest2D extends SpatialTest {
+  override def runtimeArgs: Args = "7"
 
+  def main(args: Array[String]): Void = {
     // Declare SW-HW interface vals
     val x = ArgIn[I32]
     val y = ArgOut[I32]
@@ -276,20 +259,6 @@ import spatial.test.Testbench
 
     val cksum = gold == result
     println("PASS: " + cksum + " (MemTest2D)")
+    assert(cksum)
   }
-}
-
-class Banking extends Testbench {
-  test(SimpleParTest)
-  test(FixedOffsetTest)
-  test(RandomOffsetTest)
-  test(RandomOffsetTestWrite)
-  test(TwoDuplicatesSimple)
-  test(TwoDuplicatesPachinko)
-  test(LegalFIFOParallelization)
-  test(RegCoalesceTest)
-  test(SRAMCoalesceTest)
-  test(LinearWriteRandomRead)
-  test(MemTest1D)
-  test(MemTest2D)
 }

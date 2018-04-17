@@ -1,23 +1,27 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
 
+@test class StageArgs extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
-@spatial object StageArgs {
   def main(args: Array[String]): Void = {
     val x = args(0).to[I32]
     println(r"x: $x")
   }
 }
 
-@spatial object StageForeach {
+@test class StageForeach extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = Accel {
     Foreach(0::32){i => println("Hi") }
   }
 }
 
-@spatial object StageMemories {
+@test class StageMemories extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = Accel {
     val dram = DRAM[I32](32)
     val sram = SRAM[I32](16)
@@ -26,7 +30,9 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object StageUpdate {
+@test class StageUpdate extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   def main(args: Array[String]): Void = Accel {
     val sram = SRAM[I32](16)
     Foreach(0 until 32){i =>
@@ -38,9 +44,3 @@ import spatial.test.Testbench
   }
 }
 
-class Staging extends Testbench {
-  test(StageArgs)
-  test(StageForeach)
-  test(StageMemories)
-  test(StageUpdate)
-}

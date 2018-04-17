@@ -18,6 +18,9 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
       warn(this.ctx)
   }
 
+  @api def infix_!=(that: Any): Bit = this !== that
+  @api def infix_==(that: Any): Bit = this === that
+
   @api def !==(that: Any): Bit = this match {
     case v: VarLike[_] => v.__read match {
       case v: Top[_] => v !== that

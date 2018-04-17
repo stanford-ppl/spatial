@@ -35,10 +35,10 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
     case DRAMNew(ds,_) =>
       val dims = f(ds)
       dimMapping ++= dims.distinct.map{
-        case d @ Op(RegRead(reg)) if reg.isArgIn => d -> d
-        case d if d.isValue => d -> d
+        case d @ Op(ArgInRead(reg))      => d -> d
+        case d if d.isValue              => d -> d
         case d if dimMapping.contains(d) => d -> dimMapping(d)
-        case d => d -> argIn(d).unbox
+        case d                           => d -> argIn(d).unbox
       }
       val dims2 = dims.map{d => dimMapping(d) }
       addedArgIns ++= dims.zip(dims2)

@@ -1,11 +1,12 @@
-package spatial.test.cperf
+package spatial.tests.compiler
 
-import spatial.test.Testbench
 import spatial.dsl._
 
 import scala.collection.mutable.ArrayBuffer
 
-@spatial object BitTest {
+@test class BitTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
   // Returns a random number in [min,max)
   def rand(max: gen.Int, min: gen.Int): gen.Int = scala.util.Random.nextInt(max-min)+min
 
@@ -40,8 +41,4 @@ import scala.collection.mutable.ArrayBuffer
       }
     }
   }
-}
-
-class LargeBlocks extends Testbench {
-  test(BitTest)
 }

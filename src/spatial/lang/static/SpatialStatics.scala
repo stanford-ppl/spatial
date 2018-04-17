@@ -9,6 +9,7 @@ trait SpatialStatics extends Implicits with utils.Overloads with SpatialVirtuali
   with StaticTransfers
   with StaticTuples
   with Constructors
+  with ArrayAPI
 
 /** Internal view of Spatial */
 trait InternalStatics extends SpatialStatics with InternalAliases

@@ -1,10 +1,9 @@
-package spatial.test.full
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.Testbench
 
-
-@spatial object BasicFSM  {
+@test class BasicFSM extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)
@@ -25,7 +24,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object BasicCondFSM   {
+@test class BasicCondFSM extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)
@@ -51,7 +51,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object DotProductFSM  {
+@test class DotProductFSM extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
     val vectorA = Array.fill(128){ random[Int](10) }
@@ -86,7 +87,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object OuterSwitchFSMTest   {
+@test class OuterSwitchFSMTest extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
     val vectorA = Array.fill(128){ random[Int](10) }
@@ -126,12 +128,4 @@ import spatial.test.Testbench
     println(r"result: $result, gold: $gold")
     println(r"PASS: ${result == gold}")
   }
-}
-
-
-class FSMTests extends Testbench {
-  test(BasicFSM)
-  test(BasicCondFSM)
-  test(DotProductFSM)
-  test(OuterSwitchFSMTest)
 }

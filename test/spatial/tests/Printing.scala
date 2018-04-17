@@ -1,9 +1,9 @@
-package spatial.test.full
+package spatial.tests
 
 import spatial.dsl._
-import spatial.test.Testbench
 
-@spatial object IntPrinting {
+@test class IntPrinting extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
     Accel { }
@@ -12,7 +12,8 @@ import spatial.test.Testbench
   }
 }
 
-@spatial object RegLifting {
+@test class RegLifting extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
     Accel {
@@ -43,9 +44,4 @@ import spatial.test.Testbench
       println(a)
     }
   }
-}
-
-class Printing extends Testbench {
-  test(IntPrinting)
-  test(RegLifting)
 }

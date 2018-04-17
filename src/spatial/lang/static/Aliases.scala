@@ -79,6 +79,7 @@ trait InternalAliases extends CustomBitWidths {
 
 trait ExternalAliases extends InternalAliases {
   type SpatialApp = spatial.SpatialApp
+  type SpatialTest = spatial.SpatialTest
   type Top[A] = spatial.lang.Top[A]
 
   // --- Memories

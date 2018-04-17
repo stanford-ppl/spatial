@@ -79,7 +79,7 @@ trait Compiler { self =>
 
   def stageApp(args: Array[String]): Block[_]
 
-  def runPasses[R](b: Block[R]): Unit
+  def runPasses[R](b: Block[R]): Block[R]
 
 
 
@@ -126,10 +126,13 @@ trait Compiler { self =>
     block
   }
 
+  def postprocess(block: Block[_]): Unit = { }
+
   final def compileProgram(args: Array[String]): Unit = instrument("compile"){
     val block = stageProgram(args)
     if (config.enLog) info(s"Symbols: ${IR.maxId}")
-    runPasses(block)
+    val result = runPasses(block)
+    postprocess(result)
   }
 
   type CLIParser = scopt.OptionParser[Unit]
@@ -186,7 +189,6 @@ trait Compiler { self =>
     IR.config.logDir = IR.config.logDir + files.sep + name + files.sep
     IR.config.genDir = IR.config.genDir + files.sep + {if (config.genDirOverride) "" else {name + files.sep}}
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
-
 
     info(s"Compiling ${config.name} to ${config.genDir}")
     if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")

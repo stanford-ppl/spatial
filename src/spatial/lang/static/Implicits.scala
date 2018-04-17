@@ -22,19 +22,21 @@ trait ImplicitsPriority3 {
   import scala.collection.immutable.WrappedString
   implicit def stringToWrappedString(x: String): WrappedString = new WrappedString(x)
 
+  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
+
   implicit class EqualsOps(x: Any) {
-    def !==(y: Any): Boolean = x != y
-    def ===(y: Any): Boolean = x == y
+    def infix_!=(y: Any): Boolean = x != y
+    def infix_==(y: Any): Boolean = x == y
   }
 
   implicit def numericCast[A:Num,B:Num]: Cast[A,B] = Right(new CastFunc[A,B]{
     @api def apply(a: A): B = (Num[B] match {
       case tp:Fix[s,i,f] =>
-        import tp.fmt._
+        import tp.fmt._     // This imports implicits for BOOL[s], INT[i], and INT[f]
         a.__toFix[s,i,f]
 
       case tp:Flt[m,e] =>
-        import tp.fmt._
+        import tp.fmt._     // This imports implicits for INT[m] and INT[e]
         a.__toFlt[m,e]
 
     }).asInstanceOf[B]
@@ -62,7 +64,6 @@ trait ImplicitsPriority2 extends ImplicitsPriority3 {
   @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
   @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
 
-  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 }
 
 trait ImplicitsPriority1 extends ImplicitsPriority2 {

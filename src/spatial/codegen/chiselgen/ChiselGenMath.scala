@@ -162,7 +162,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     // // Assumes < and > are defined on runtime type...
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := Mux(($a < $b), $a, $b).r")
     case FixMax(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := Mux(($a > $b), $a, $b).r")
-
+    case FixToFix(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${a}.cast($lhs)")
     case FltRecip(x) => x.tp match {
       case DoubleType() => throw new Exception("DoubleType not supported for FltRecip") 
       case HalfType() => emit(src"val $lhs = Utils.frec($x)") 

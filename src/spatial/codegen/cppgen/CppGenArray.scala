@@ -107,47 +107,40 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"typedef struct ${struct} {")
-          st.foreach{f => emit(src"${f._2.tp} ${f._1};")}
-          emit(src"${struct}(${st.map{f => emit(src"${f._2.tp} ${f._1}")}.mkString(",")}){")
-          st.foreach{f => emit(src"${f._1} = ${f._1};")}          
+          st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
+          open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}"}.mkString(",")}){")
+            st.foreach{f => emit(src"${f._1} = ${f._1};")}
+          close("}")
           close("};")
         }
       }
-      emit(src"${struct} $lhs = ${struct}(${st.map{f => src"${f._2}"}.mkString(",")})")
+      emit(src"${struct} $lhs = ${struct}(${st.map{f => {if (!isConst(f._2) & !isArrayType(f._2)) "&" else ""} + src"&${f._2}"}.mkString(",")});")
 
-    case FieldApply(struct, field) => emit(src"""${lhs.tp} $lhs = ${struct}.$field""")
+    case FieldApply(struct, field) => emit(src"""${lhs.tp} $lhs = *${struct}.$field;""")
 
-    // case SetMem(dram, data) => 
-    //   val rawtp = remapIntType(dram.tp.typeArguments.head)
-    //   if (spatialNeedsFPType(dram.tp.typeArguments.head)) {
-    //     dram.tp.typeArguments.head match { 
-    //       case FixPtType(s,d,f) => 
-    //         emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
-    //         open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
-    //           emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
-    //         close("}")
-    //         emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
-    //       case _ => emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
-    //     }
-    //   } else {
-    //     emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
-    //   }
-    // case GetMem(dram, data) => 
-    //   val rawtp = remapIntType(dram.tp.typeArguments.head)
-    //   if (spatialNeedsFPType(dram.tp.typeArguments.head)) {
-    //     dram.tp.typeArguments.head match { 
-    //       case FixPtType(s,d,f) => 
-    //         emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
-    //         emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
-    //         open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
-    //           emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
-    //           emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
-    //         close("}")
-    //       case _ => emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
-    //     }
-    //   } else {
-    //     emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
-    //   }
+    case SetMem(dram, data) => 
+      val f = fracBits(dram.tp.typeArgs.head)
+      if (f > 0) {
+        emit(src"vector<${dram.tp.typeArgs.head}>* ${dram}_rawified = new vector<${dram.tp.typeArgs.head}>((*${data}).size());")
+        open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
+          emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${dram.tp.typeArgs.head}) ((*${data})[${dram}_rawified_i] * ((${dram.tp.typeArgs.head})1 << $f));")
+        close("}")
+        emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${dram.tp.typeArgs.head}));")
+      } else {
+        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+      }
+    case GetMem(dram, data) => 
+      val f = fracBits(dram.tp.typeArgs.head)
+      if (f > 0) {
+        emit(src"vector<${dram.tp.typeArgs.head}>* ${data}_rawified = new vector<${dram.tp.typeArgs.head}>((*${data}).size());")
+        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${dram.tp.typeArgs.head}));")
+        open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
+          emit(src"${dram.tp.typeArgs.head} ${data}_tmp = (*${data}_rawified)[${data}_i];")
+          emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${dram.tp.typeArgs.head})1 << $f);")
+        close("}")
+      } else {
+        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+      }
 
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
     case VecSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")
@@ -194,42 +187,44 @@ trait CppGenArray extends CppGenCommon {
 
     case ArrayZip(a, b, applyA, applyB, func) =>
       emitNewArray(lhs, lhs.tp, getSize(a))
-      open(src"for (int i = 0; i < ${getSize(a)}; i++) { ")
+      open(src"for (int ${applyA.inputB} = 0; ${applyA.inputB} < ${getSize(a)}; ${applyA.inputB}++) { ")
       visitBlock(applyA)
       visitBlock(applyB)
       visitBlock(func)
-      emitUpdate(lhs, func.result, src"i", func.result.tp)
+      emitUpdate(lhs, func.result, src"${applyA.inputB}", func.result.tp)
       close("}")
 
     case UnrolledForeach(ens,cchain,func,iters,valids) => 
-      // Hacky reimplementation of old RangeForeach(start, stop, step, func, i)
-      val start = cchain.ctrs.head.start
-      val end = cchain.ctrs.head.end
-      val step = cchain.ctrs.head.step
-      val i = iters.head
-      open(src"for (int $i = $start; $i < $end; $i = $i + $step) {")
+      val starts = cchain.ctrs.map(_.start)
+      val ends = cchain.ctrs.map(_.end)
+      val steps = cchain.ctrs.map(_.step)
+      iters.zipWithIndex.foreach{case (i,idx) => 
+        open(src"for (int $i = ${starts(idx)}; $i < ${ends(idx)}; $i = $i + ${steps(idx)}) {")
+        valids(idx).foreach{v => emit(src"${v.tp} ${v} = true; // TODO: Safe to assume this in cppgen?")}
+      }
       visitBlock(func)
-      close("}")
+      iters.foreach{_ => close("}")}
 
       // 
-    // case ArrayReduce(array, apply, reduce, rV) =>
-    //   if (isArrayType(lhs.tp)) {
-    //     emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""") 
-    //   } else {
-    //     emit(src"${lhs.tp} $lhs;") 
-    //   }
-    //   open(src"if (${getSize(array)} > 0) { // Hack to handle reductions on things of length 0")
-    //     emitApply(lhs, array, "0", false)
-    //   closeopen("} else {")
-    //     emit(src"$lhs = 0;")
-    //   close("}")
-    //   open(src"for (int ${func.input} = 1; ${func.input} < ${getSize(array)}; ${func.input}++) {")
-    //     emitApply(rV._1, array, src"${func.input}")
-    //     // emit(src"""${rV._1.tp}${if (isArrayType(rV._1.tp)) "*" else ""} ${rV._1} = (*${array})[$${func.input}];""")
-    //     emit(src"""${rV._2.tp}${if (isArrayType(rV._2.tp)) "*" else ""} ${rV._2} = $lhs;""")
-    //     visitBlock(reduce)
-    //     emit(src"$lhs = ${reduce.result};")
-    //   close("}")
+    case ArrayReduce(array, apply, reduce) =>
+      if (isArrayType(lhs.tp)) {
+        emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""") 
+      } else {
+        emit(src"${lhs.tp} $lhs;") 
+      }
+      open(src"if (${getSize(array)} > 0) { // Hack to handle reductions on things of length 0")
+        emitApply(lhs, array, "0", false)
+      close("}")
+      open("else {")
+        emit(src"$lhs = 0;")
+      close("}")
+
+      open(src"for (int ${apply.inputB} = 1; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
+        emitApply(reduce.inputA, array, src"${apply.inputB}")
+        emit(src"""${reduce.inputB.tp}${if (isArrayType(reduce.inputB.tp)) "*" else ""} ${reduce.inputB} = $lhs;""")
+        visitBlock(reduce)
+        emit(src"$lhs = ${reduce.result};")
+      close("}")
 
     // case ArrayFilter(array, apply, cond) =>
     //   open(src"val $lhs = $array.filter{${apply.result} => ")

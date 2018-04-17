@@ -602,6 +602,7 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   override def emitFooter(): Unit = {
+    enterAccel()
     if (cfg.compressWires >= 1) {
       inGenn(out, "GlobalModules", ext) {
         emitt(src"val ic = List.fill(${instrumentCounters.length*2}){Module(new InstrumentationCounter())}")
@@ -647,6 +648,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     }
 
+    exitAccel()
     super.emitFooter()
   }
 

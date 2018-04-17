@@ -364,7 +364,7 @@ trait ChiselGenStream extends ChiselGenCommon {
   }
 
   override def emitFooter(): Unit = {
-
+  	enterAccel()
     val insList = List.fill(streamIns.length){ "StreamParInfo(32, 1)" }.mkString(",")
     val outsList = List.fill(streamOuts.length){ "StreamParInfo(32, 1)" }.mkString(",")
 
@@ -379,7 +379,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       emit(s"""val streamInsInfo = List(${insList})""")
       emit(s"""val streamOutsInfo = List(${outsList})""")
     }
-
+    exitAccel()
     super.emitFooter()
   }
 }

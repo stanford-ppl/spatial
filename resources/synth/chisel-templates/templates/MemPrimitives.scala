@@ -310,6 +310,118 @@ class FF(val bitWidth: Int,
 
 }
 
+class FIFO(val logicalDims: List[Int], val bitWidth: Int, 
+           val banks: List[Int], 
+           val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int],
+           val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
+
+  def this(tuple: (List[Int], Int, List[Int], HashMap[Int, Int], HashMap[Int, Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+
+  val depth = logicalDims.product // Size of memory
+  val N = logicalDims.length // Number of dimensions
+  val ofsWidth = Utils.log2Up(depth/banks.product) + 2
+  val elsWidth = Utils.log2Up(depth) + 2
+  val banksWidths = banks.map(Utils.log2Up(_))
+
+  // Compute info required to set up IO interface
+  val hasXBarW = xBarWMux.values.sum > 0
+  val hasXBarR = xBarRMux.values.sum > 0
+  val numXBarW = if (hasXBarW) xBarWMux.values.sum else 0
+  val numXBarR = if (hasXBarR) xBarRMux.values.sum else 0
+  val totalOutputs = numXBarR
+  val defaultDirect = List.fill(banks.length)(99)
+
+  val io = IO( new Bundle {
+    val xBarW = Vec(1 max numXBarW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
+    val xBarR = Vec(1 max numXBarR, Input(new R_XBar(ofsWidth, banksWidths))) 
+    val flow = Vec(xBarRMux.values.sum, Input(Bool()))
+    val output = new Bundle {
+      val data  = Vec(totalOutputs, Output(UInt(bitWidth.W)))
+    }
+    val full = Output(Bool())
+    val almostFull = Output(Bool())
+    val empty = Output(Bool())
+    val almostEmpty = Output(Bool())
+    val numel = Output(UInt(32.W))
+  })
+
+  // Create bank counters
+  val headCtr = Module(new CompactingCounter(numXBarW, depth, elsWidth))
+  val tailCtr = Module(new CompactingCounter(numXBarR, depth, elsWidth))
+  (0 until numXBarW).foreach{i => headCtr.io.input.enables(i) := io.xBarW(i).en}
+  (0 until numXBarR).foreach{i => tailCtr.io.input.enables(i) := io.xBarR(i).en}
+  headCtr.io.input.reset := reset
+  tailCtr.io.input.reset := reset
+  headCtr.io.input.dir := true.B
+  tailCtr.io.input.dir := true.B
+
+  // Create numel counter
+  val elements = Module(new CompactingIncDincCtr(numXBarW, numXBarR, depth, elsWidth))
+  (0 until numXBarW).foreach{i => elements.io.input.inc_en(i)  := io.xBarW(i).en}
+  (0 until numXBarR).foreach{i => elements.io.input.dinc_en(i) := io.xBarR(i).en}
+
+  // Create physical mems
+  val numBanks = banks.product
+  val m = (0 until numBanks).map{ i => Module(new Mem1D(depth/numBanks, bitWidth))}
+
+  // Create compacting network
+  val enqCompactor = Module(new CompactingEnqNetwork(xBarWMux.toSeq.sortBy(_._1).toMap.values.toList, numBanks, ofsWidth, bitWidth))
+  enqCompactor.io.headCnt := headCtr.io.output.count
+  (0 until numXBarW).foreach{i => enqCompactor.io.in(i).data := io.xBarW(i).data; enqCompactor.io.in(i).en := io.xBarW(i).en}
+
+  // Connect compacting network to banks
+  val active_w_bank = Utils.singleCycleModulo(headCtr.io.output.count, numBanks.S(elsWidth.W))
+  val active_w_addr = Utils.singleCycleDivide(headCtr.io.output.count, numBanks.S(elsWidth.W))
+  (0 until numBanks).foreach{i => 
+    val addr = Mux(i.S(elsWidth.W) < active_w_bank, active_w_addr + 1.S(elsWidth.W), active_w_addr)
+    m(i).io.w.ofs := addr.asUInt
+    m(i).io.w.data := enqCompactor.io.out(i).data
+    m(i).io.w.en   := enqCompactor.io.out(i).en
+    m(i).io.wMask  := enqCompactor.io.out(i).en
+  }
+
+  // Create dequeue compacting network
+  val deqCompactor = Module(new CompactingDeqNetwork(xBarRMux.toSeq.sortBy(_._1).toMap.values.toList, numBanks, elsWidth, bitWidth))
+  deqCompactor.io.tailCnt := tailCtr.io.output.count
+  val active_r_bank = Utils.singleCycleModulo(tailCtr.io.output.count, numBanks.S(elsWidth.W))
+  val active_r_addr = Utils.singleCycleDivide(tailCtr.io.output.count, numBanks.S(elsWidth.W))
+  (0 until numBanks).foreach{i => 
+    val addr = Mux(i.S(elsWidth.W) < active_r_bank, active_r_addr + 1.S(elsWidth.W), active_r_addr)
+    m(i).io.r.ofs := addr.asUInt
+    deqCompactor.io.input.data(i) := m(i).io.output.data
+  }
+  (0 until numXBarR).foreach{i =>
+    deqCompactor.io.input.deq(i) := io.xBarR(i).en
+  }
+  (0 until xBarRMux.values.max).foreach{i =>
+    io.output.data(i) := deqCompactor.io.output.data(i)
+  }
+
+  // Check if there is data
+  io.empty := elements.io.output.empty
+  io.full := elements.io.output.full
+  io.almostEmpty := elements.io.output.almostEmpty
+  io.almostFull := elements.io.output.almostFull
+  io.numel := elements.io.output.numel.asUInt
+
+  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+    val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
+    io.xBarW(base) := wBundle
+  }
+
+  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, muxPort, vecId, true.B)}
+
+  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+    val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
+    io.xBarR(base) := rBundle    
+    io.flow(base) := flow
+    io.output.data(vecId)
+  }
+
+
+
+}
+
 
 // class ShiftRegFile(val logicalDims: List[Int], val bitWidth: Int, 
 //                    val banks: List[Int], val bankDepth: Int, val inits: Option[Map[List[Int], Double]], val stride: Int, 

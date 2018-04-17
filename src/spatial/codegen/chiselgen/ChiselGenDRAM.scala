@@ -217,6 +217,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
   override def emitFooter(): Unit = {
 
+    enterAccel()
     val intersect = loadsList.distinct.intersect(storesList.distinct)
 
     val num_unusedDrams = dramsList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
@@ -237,7 +238,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       emit(src"val io_numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */")
  
     }
-
+    exitAccel()
     super.emitFooter()
   }
 

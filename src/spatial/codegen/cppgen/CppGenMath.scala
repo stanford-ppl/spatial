@@ -36,6 +36,7 @@ trait CppGenMath extends CppGenCommon {
     case FixEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
     case FixMod(x,y) => emit(src"${lhs.tp} $lhs = $x % $y;")
     case FixRandom(x) => emit(src"${lhs.tp} $lhs = rand() % ${x.getOrElse(100)};")
+    case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
     // case FixConvert(x) => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $x;  // should be fixpt ${lhs.tp}")
     // case FixPtToFltPt(x) => lhs.tp match {
     //   case DoubleType() => emit(src"${lhs.tp} $lhs = (double) $x;")
@@ -94,7 +95,7 @@ trait CppGenMath extends CppGenCommon {
     case FltAtan(x)    => emit(src"${lhs.tp} $lhs = atan($x);")
     case FixFloor(x)   => emit(src"${lhs.tp} $lhs = floor($x);")
     case FixCeil(x)    => emit(src"${lhs.tp} $lhs = ceil($x);")
-
+    case FixToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
 
     case Mux(sel, a, b) => 
       emit(src"${lhs.tp} $lhs;")

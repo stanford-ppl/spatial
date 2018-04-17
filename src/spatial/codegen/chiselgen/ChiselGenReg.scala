@@ -15,16 +15,17 @@ trait ChiselGenReg extends ChiselGenCommon {
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
+    case InputArguments()       => 
 	case ArgInNew(init)  => 
       argIns += (lhs -> (argIns.toList.length + drams.toList.length))
     case ArgOutNew(init) => 
+      enterAccel()
       emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)
       emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, Bool()))", forceful=true)
       argOuts += (lhs -> (argOuts.toList.length + argOuts.toList.length))
       emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
       emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
-      
+      exitAccel()
 
     case GetArgOut(reg) => 
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -261,6 +262,7 @@ trait ChiselGenReg extends ChiselGenCommon {
   }
 
   override def emitFooter(): Unit = {
+    enterAccel()
     // inGenn(out, "BufferControlCxns", ext)) {
     //   nbufs.foreach{ case (mem, i) => 
     //     val info = bufferControlInfo(mem, i)
@@ -269,7 +271,6 @@ trait ChiselGenReg extends ChiselGenCommon {
     //     }
     //   }
     // }
-
     inGen(out, "Instantiator.scala") {
       emit("")
       emit("// Scalars")
@@ -290,7 +291,7 @@ trait ChiselGenReg extends ChiselGenCommon {
       emitt(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
 
     }
-
+    exitAccel()
     super.emitFooter()
   }
 

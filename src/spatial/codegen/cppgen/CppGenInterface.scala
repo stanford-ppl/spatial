@@ -64,6 +64,8 @@ trait CppGenInterface extends CppGenCommon {
             emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)}); // $reg")
             emit(src"$reg = $v;")
       }
+    case _: CounterNew[_] => 
+    case _: CounterChainNew => 
     case GetArgOut(reg)    => 
       val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
       val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${isHostIO(reg)})"

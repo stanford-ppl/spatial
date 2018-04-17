@@ -65,22 +65,13 @@ object Arguments {
     "null"
   )
   val FIFO = List(
-    (1,1,10,1,1),
-    (2,2,30,1,1),
-    (4,4,52,1,1),
-    (4,1,56,1,1),
-    (1,4,56,1,1),
-    (3,6,48,1,1),
-    (6,3,48,1,1)
-  )
-  val GeneralFIFO = List(
-    (List(1),List(1),80,16),
-    (List(1),List(5),80,16),
-    (List(1),List(8),80,16),
-    (List(2),List(1),80,16),
-    (List(5),List(1),80,16),
-    (List(6),List(3),80,16),
-    (List(1),List(2),50,32)
+    (List(80), 16, List(1), HashMap(0 -> 1),HashMap(0 -> 1)),
+    (List(80), 16, List(5), HashMap(0 -> 1),HashMap(0 -> 5)),
+    (List(80), 16, List(8), HashMap(0 -> 1),HashMap(0 -> 8)),
+    (List(80), 16, List(2), HashMap(0 -> 2),HashMap(0 -> 1)),
+    (List(80), 16, List(5), HashMap(0 -> 5),HashMap(0 -> 1)),
+    (List(80), 16, List(6), HashMap(0 -> 6),HashMap(0 -> 3)),
+    (List(80), 16, List(2), HashMap(0 -> 1),HashMap(0 -> 2))
   )
   val FILO = List(
     (1,1,10,1,1),
@@ -299,14 +290,6 @@ object Launcher {
     (s"FIFO$i" -> { (backendName: String) =>
     	Driver(() => new FIFO(arg), "verilator") {
           (c) => new FIFOTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.GeneralFIFO.zipWithIndex.map{ case(arg,i) => 
-    (s"GeneralFIFO$i" -> { (backendName: String) =>
-    	Driver(() => new GeneralFIFO(arg), "verilator") {
-          (c) => new GeneralFIFOTests(c)
         }
       }) 
   }.toMap

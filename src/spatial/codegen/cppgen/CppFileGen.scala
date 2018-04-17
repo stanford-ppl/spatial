@@ -26,6 +26,22 @@ trait CppFileGen extends CppCodegen {
     }
 
     inGen(out, "structs.hpp") {
+      emit("#include <vector>")
+      emit("""#include <stdint.h>""")
+      emit("""#include <sys/time.h>""")
+      emit("""#include <iostream>""")
+      emit("""#include <fstream>""")
+      emit("""#include <string> """)
+      emit("""#include <sstream> """)
+      emit("""#include <stdarg.h>""")
+      emit("""#include <signal.h>""")
+      emit("""#include <sys/wait.h>""")
+      emit("""#include <pwd.h>""")
+      emit("""#include <unistd.h>""")
+      emit("""#include <stdlib.h>""")
+      emit("""#include <stdio.h>""")
+      emit("""#include <errno.h>""")
+      emit("using std::vector;")
       emit("#ifndef STRUCTS_HPP")
       emit("#define STRUCTS_HPP")
     }
@@ -35,6 +51,7 @@ trait CppFileGen extends CppCodegen {
     }
 
     inGen(out, entryFile) {
+      emit("""#include "structs.hpp"""")
       emit("""#include <stdint.h>""")
       emit("""#include <sys/time.h>""")
       emit("""#include <iostream>""")
@@ -97,7 +114,7 @@ trait CppFileGen extends CppCodegen {
         else {"<No input args>"}
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
   	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
-  	    emit(s"""return;""")
+  	    emit(s"""exit(0);""")
       close("}")
 
       emit("")

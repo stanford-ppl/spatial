@@ -10,7 +10,7 @@ trait ChiselFileGen extends ChiselCodegen {
   backend = "accel"
 
   override def emitHeader(): Unit = {
-
+    enterAccel() // Guarantee prints for the following
     inGen(out, "controller_tree.html") {
       emit("""<!DOCTYPE html>
 <html>
@@ -133,13 +133,14 @@ trait ChiselFileGen extends ChiselCodegen {
 
     }
 
+    exitAccel()
     super.emitHeader()
   }
 
   override protected def emitEntry(block: Block[_]): Unit = { gen(block) }
 
   override def emitFooter(): Unit = {
-
+    enterAccel() // Guarantee prints for this section
     inGen(out, "controller_tree.html") {
       emit(s"""  </TABLE>
 </body>
@@ -432,7 +433,7 @@ trait ChiselFileGen extends ChiselCodegen {
 
     }
 
-
+    exitAccel()
     super.emitFooter()
   }
 

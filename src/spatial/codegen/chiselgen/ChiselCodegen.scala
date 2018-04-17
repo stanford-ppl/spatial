@@ -17,7 +17,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   var streamLines = collection.mutable.Map[String, Int]() // Map from filename number of lines it has
   var streamExtensions = collection.mutable.Map[String, Int]() // Map from filename to number of extensions it has
   val tabWidth: Int = 2
-  val maxLinesPerFile = 200
+  val maxLinesPerFile = 1000
   var compressorMap = collection.mutable.HashMap[String, (String,Int)]()
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()
@@ -42,10 +42,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
+    enterAccel()
     inGenn(out, "RootController", ext) {
       exitAccel()
       visitBlock(b)
-      enterAccel()
     }
     // if (withReturn) emitt(src"${b.result}")
   }
@@ -234,10 +234,12 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
 
   final protected def inGenn[T](out: String, base: String, ext: String)(blk: => T): Unit = {
     // Lookup current split extension and number of lines
-    if (!streamExtensions.contains(base)) streamExtensions += base -> 1
-    val currentOverflow = s"_${streamExtensions(base)}"
-    if (!streamLines.contains(base + currentOverflow + "." + ext)) streamLines += {base + currentOverflow + "." + ext} -> 0
-    inGen(out, base + currentOverflow + "." + ext)(blk)
+    if (scope == "accel") {
+      if (!streamExtensions.contains(base)) streamExtensions += base -> 1
+      val currentOverflow = s"_${streamExtensions(base)}"
+      if (!streamLines.contains(base + currentOverflow + "." + ext)) streamLines += {base + currentOverflow + "." + ext} -> 0
+      inGen(out, base + currentOverflow + "." + ext)(blk)
+    }
   }
 
   protected def emitt(x: String, forceful: Boolean = false): Unit = {

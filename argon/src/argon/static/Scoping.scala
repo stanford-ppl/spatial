@@ -7,7 +7,12 @@ import utils.tags.instrument
 
 trait Scoping {
 
-  @inline private def reify[R](block: => Sym[R]): Sym[R] = block
+  @stateful @inline private def reify[R](block: => Sym[R]): Sym[R] = {
+    if (state.isStaging) state.logTab += 1
+    val result = block
+    if (state.isStaging) state.logTab -= 1
+    result
+  }
 
   @inline private def schedule[R](
     inputs: Seq[Sym[_]],
@@ -58,10 +63,18 @@ trait Scoping {
       state.impure ++= sched.motionedImpure
     }
 
-//    if (config.enLog) {
-//      logs(s"Staged block ${sched.block}")
-//      sched.block.stms.foreach{s => logs(s"  ${stm(s)}") }
-//    }
+    if (state.isStaging && config.enLog) {
+      logs(s"Completed block ${sched.block}")
+      sched.block.stms.foreach{s => logs(s"  ${stm(s)}") }
+      logs(s"Effects: ${sched.block.effects}")
+      logs(s"Escaping: ")
+      sched.motioned.foreach{s => logs(s"  ${stm(s)}")}
+      val dropped = scope diff (sched.block.stms ++ sched.motioned)
+      if (dropped.nonEmpty) {
+        logs(s"Dropped: ")
+        dropped.foreach{s => logs(s"  ${stm(s)}") }
+      }
+    }
 
     sched.block
   }

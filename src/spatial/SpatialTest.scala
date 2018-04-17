@@ -32,7 +32,7 @@ trait SpatialTest extends DSLTest with SpatialApp {
     make = "make",
     run  = "bash run.sh"
   ) {
-    def shouldRun: Boolean = enable("Scala")
+    def shouldRun: Boolean = enable("test.Scala")
     override def parseRunError(line: String): Result = {
       if (line.trim.startsWith("at")) Error(prev)   // Scala exception
       else super.parseRunError(line)
@@ -45,7 +45,7 @@ trait SpatialTest extends DSLTest with SpatialApp {
     make = "make vcs",
     run  = "bash scripts/regression_run.sh"
   ) {
-    override def shouldRun: Boolean = enable("VCS")
+    override def shouldRun: Boolean = enable("test.VCS")
     override val makeTimeout: Long = 13000
   }
 
@@ -55,7 +55,7 @@ trait SpatialTest extends DSLTest with SpatialApp {
     make = "make zynq",
     run  = "bash scripts/scrape.sh Zynq"
   ) {
-    override def shouldRun: Boolean = enable("Zynq")
+    override def shouldRun: Boolean = enable("test.Zynq")
     override val makeTimeout: Long = 13000
   }
 
@@ -65,7 +65,7 @@ trait SpatialTest extends DSLTest with SpatialApp {
     make = "make zcu",
     run  = "bash scripts/scrape.sh ZCU"
   ) {
-    override def shouldRun: Boolean = enable("ZCU")
+    override def shouldRun: Boolean = enable("test.ZCU")
     override val makeTimeout: Long = 13000
   }
 
@@ -75,7 +75,7 @@ trait SpatialTest extends DSLTest with SpatialApp {
     make = "make aws-F1-afi",
     run  = "bash scripts/scrape.sh AWS"
   ) {
-    override def shouldRun: Boolean = enable("AWS")
+    override def shouldRun: Boolean = enable("test.AWS")
     override val makeTimeout: Long = 32400
   }
 

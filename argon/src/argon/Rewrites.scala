@@ -42,10 +42,7 @@ class Rewrites {
   private def applyRule[A:Type](op: Op[A], ctx: SrcCtx, state: State, rule: RewriteRule): Option[A] = {
     rule.apply((op,ctx,state)) match {
       case Some(s) if s.tp <:< Type[A] => Some(s.asInstanceOf[A])
-      case Some(s) =>
-        implicit val IR: State = state
-        dbgs(s"Ignoring rewrite rule for $op: ${s.tp} was not subtype of ${Type[A]}")
-        None
+      case Some(s) => None
       case _ => None
     }
   }

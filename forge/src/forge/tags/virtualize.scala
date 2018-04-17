@@ -5,7 +5,7 @@ import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 
 /** Annotation class for @virt macro annotation. */
-final class virtualize extends StaticAnnotation {
+final class virtualize   extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro virtualize.impl
 }
 
@@ -36,7 +36,7 @@ private object virtualize {
       case Nil     => Nil
     }
 
-    // info(showCode(outputs.head))
+    //info(showCode(outputs.head))
 
     q"..$outputs"
   }

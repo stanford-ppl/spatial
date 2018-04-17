@@ -81,6 +81,9 @@ trait ScalaGenArray extends ScalaCodegen {
         ret(func)
       close("}")
 
+    case ArrayMkString(array,start,delim,end) =>
+      emit(src"val $lhs = $array.mkString($start, $delim, $end)")
+
     case _ => super.gen(lhs, rhs)
   }
 }

@@ -20,7 +20,7 @@ trait DSLTest extends Testbench with DSLApp with Args { test =>
   //-------------------//
 
   def backends: Seq[Backend]
-  def enable(str: String): Boolean = sys.props.get("test."+str).exists(v => v.trim.toLowerCase == "true")
+  def enable(str: String): Boolean = sys.props.get(str).exists(v => v.trim.toLowerCase == "true")
   lazy val DISABLE: Seq[Backend] = Seq(IGNORE_TEST)
 
   /** A backend which can compile and run a given application.

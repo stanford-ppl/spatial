@@ -1,9 +1,8 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
-@spatial object SimpleRetimePipe extends SpatialTest {
+@test class SimpleRetimePipe extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -18,7 +17,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object RetimeLoop extends SpatialTest {
+@test class RetimeLoop extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -34,7 +33,8 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object NestedPipeTest extends SpatialTest {
+
+@test class NestedPipeTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -65,7 +65,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object RetimeRandomTest extends SpatialTest {
+@test class RetimeRandomTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -78,7 +78,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object RetimeOffsetTest extends SpatialTest {
+@test class RetimeOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {

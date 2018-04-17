@@ -1,6 +1,11 @@
 /** Miscellaneous Utilities */
 package object utils {
 
+  def env(str: String): Boolean = {
+    val res = System.getProperties.getProperty(str)
+    if (res eq null) false else res.toBoolean
+  }
+
   /**
     * Returns an iterator over the multi-dimensional space `dims`.
     * If dims is empty, trivially returns an iterator with only one element (Nil)

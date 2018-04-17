@@ -1,8 +1,8 @@
 package utils
 
-import org.scalatest.{FlatSpec,Matchers}
+import org.scalatest.{FlatSpecLike,Matchers}
 
-abstract class Testbench extends FlatSpec with Matchers {
+trait Testbench extends FlatSpecLike with Matchers {
   type Result = utils.Result
   type Error = Result.Error
   lazy val Pass: Result = Result.Pass

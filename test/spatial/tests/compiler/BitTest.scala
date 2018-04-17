@@ -1,11 +1,10 @@
-package spatial.test.compiler
+package spatial.tests.compiler
 
-import spatial.test.SpatialTest
 import spatial.dsl._
 
 import scala.collection.mutable.ArrayBuffer
 
-@spatial object BitTest extends SpatialTest {
+@test class BitTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   // Returns a random number in [min,max)

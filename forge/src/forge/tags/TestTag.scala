@@ -3,29 +3,29 @@ package forge.tags
 import language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class AppTag(dsl: String, dslApp: String) {
+class TestTag(dsl: String, dslTest: String) {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
     val util = new Virtualizer[c.type](c)
     import util._
     import c.universe._
 
-    val appType = Ident(TypeName(dslApp))
+    val testType = Ident(TypeName(dslTest))
     // Bit strange here. Virtualization requires at least EmbeddedControls to have
     // an implementation default. However, we also can't mix EmbeddedControls in directly
     // because we need a view of the DSL's overrides
     val inputs = annottees.toList
     val outputs = inputs match {
       case (a:ClassDef) :: as =>
-        val mod = a.mixIn(appType) //.injectStm(q"import ${TermName(dsl)}.dsl._")
-        virt(mod) ::: as
-      case (a:ModuleDef) :: as =>
-        val mod = a.mixIn(appType) //.injectStm(q"import ${TermName(dsl)}.dsl._")
-        virt(mod) ::: as
-      case _ => invalidAnnotationUse(dsl, "classes", "objects", "traits")
+        val mod = a.mixIn(testType).injectMethod(q"override def toString: java.lang.String = this.name".asDef)
+        val cls = virt(mod)
+        cls ::: as
+
+      case _ => invalidAnnotationUse("test", "classes", "traits")
     }
 
-    //info(showCode(outputs.head))
+    //outputs.foreach{out => info(showCode(out)) }
 
     q"..$outputs"
   }
 }
+

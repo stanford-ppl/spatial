@@ -1,10 +1,8 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
-
-@spatial object BasicFSM extends SpatialTest {
+@test class BasicFSM extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
@@ -26,7 +24,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object BasicCondFSM extends SpatialTest {
+@test class BasicCondFSM extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
@@ -53,7 +51,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object DotProductFSM extends SpatialTest {
+@test class DotProductFSM extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
@@ -89,7 +87,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object OuterSwitchFSMTest extends SpatialTest {
+@test class OuterSwitchFSMTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {

@@ -1,11 +1,10 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
 @struct case class MyStruct(x: I32, y: I32, z: I32)
 
-@spatial object SimpleStructTest extends SpatialTest {
+@test class SimpleStructTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {

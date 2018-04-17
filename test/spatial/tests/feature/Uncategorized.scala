@@ -1,10 +1,9 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
-@spatial class ArgInOut extends SpatialTest {
-   override def runtimeArgs: Args = NoArgs
+@test class ArgInOut extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
     val a = ArgIn[I32]
@@ -18,8 +17,8 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object Niter extends SpatialTest {
-   override def runtimeArgs: Args = "10"
+@test class Niter extends SpatialTest {
+  override def runtimeArgs: Args = "10"
   val constTileSize = 16
 
   def nIterTest(len: I32): I32 = {
@@ -69,7 +68,7 @@ import spatial.test.SpatialTest
 
 
 
-@spatial object NestedLoopTest extends SpatialTest {
+@test class NestedLoopTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = Accel {
@@ -83,7 +82,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object IfThenElseTest extends SpatialTest {
+@test class IfThenElseTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def test[T:Bits](x: T, y: T): Void = {
@@ -135,7 +134,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object NumericTest extends SpatialTest {
+@test class NumericTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -153,7 +152,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object RegTest extends SpatialTest {
+@test class RegTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -170,7 +169,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object SRAMTest extends SpatialTest {
+@test class SRAMTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -182,7 +181,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object MuxTests extends SpatialTest {
+@test class MuxTests extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -201,7 +200,7 @@ import spatial.test.SpatialTest
 }
 
 
-@spatial object ReduceTest extends SpatialTest {
+@test class ReduceTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -213,7 +212,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object FoldAccumTest extends SpatialTest {
+@test class FoldAccumTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -227,7 +226,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object MemReduceTest extends SpatialTest {
+@test class MemReduceTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -244,7 +243,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object UtilTest extends SpatialTest {
+@test class UtilTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -259,7 +258,7 @@ import spatial.test.SpatialTest
 
 }
 
-@spatial object UntransferredValueTest extends SpatialTest {
+@test class UntransferredValueTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -272,7 +271,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object DRAMSizeTest extends SpatialTest {
+@test class DRAMSizeTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -294,7 +293,7 @@ import spatial.test.SpatialTest
 }
 
 
-@spatial object SimpleSequential extends SpatialTest {
+@test class SimpleSequential extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def simpleSeq(xIn: I32, yIn: I32): I32 = {

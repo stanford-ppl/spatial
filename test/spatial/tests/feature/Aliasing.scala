@@ -1,10 +1,9 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
 
-@spatial object NestedAlias extends SpatialTest {
+@test class NestedAlias extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {

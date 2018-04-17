@@ -12,4 +12,5 @@ trait ExtensionStatics extends InternalStatics with ExternalAliases
 /** Application view */
 trait ExternalStatics extends ExtensionStatics {
   type SpadeDesign = spade.SpadeDesign
+  type SpadeTest = spade.SpadeTest
 }

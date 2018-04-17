@@ -1,8 +1,9 @@
 package spade.test
 
 import spade.dsl._
+import _root_.spade.SpadeTest
 
-@spade object ArchModel_Simple extends SpadeTest {
+@spade class ArchModel_Simple extends SpadeTest {
 
   val pcuSpec = new PCUSpec(
     nRegs   = 6,

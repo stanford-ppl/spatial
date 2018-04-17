@@ -5,6 +5,7 @@ trait LowPriorityArgsImplicits { this: Args =>
 }
 
 trait Args extends LowPriorityArgsImplicits {
+  val NoArgs: Args = Args(Seq(""))
 
   case class Args(cmds: Seq[java.lang.String]) {
     def and(cmd: java.lang.String): Args = Args(cmds :+ cmd)

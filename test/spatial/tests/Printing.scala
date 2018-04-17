@@ -1,8 +1,8 @@
-package spatial.test
+package spatial.tests
 
 import spatial.dsl._
 
-@spatial object IntPrinting extends SpatialTest {
+@test class IntPrinting extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
@@ -12,7 +12,7 @@ import spatial.dsl._
   }
 }
 
-@spatial object RegLifting extends SpatialTest {
+@test class RegLifting extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {

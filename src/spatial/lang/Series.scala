@@ -15,7 +15,7 @@ case class Series[+A:Num](
     isUnit: Boolean = false)
   extends Mirrorable[Series[_]] {
 
-  def tp: Num[A@uV] = Num[A]
+  def A: Num[A@uV] = Num[A]
 
   def ::(start2: A@uV): Series[A] = Series[A](start2, end, start, par, isUnit=false)
 

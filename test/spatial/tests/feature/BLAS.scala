@@ -1,11 +1,9 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.math.LinearAlgebra._
 import spatial.dsl._
-import spatial.test.SpatialTest
 
-
-@spatial object GEMM extends SpatialTest{
+@test class GEMM extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = Accel {

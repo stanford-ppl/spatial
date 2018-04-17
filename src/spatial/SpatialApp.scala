@@ -207,12 +207,7 @@ trait SpatialApp extends DSLApp {
   override def settings(): Unit = {
     if (this.target eq null) {
       if (cfg.targetName eq null) {
-        if (cfg.enableRetiming) {
-          error("No target specified. Specify target using: --fpga <device> or")
-          error("override val target = <device>")
-          IR.logError()
-        }
-        else {
+        if (!cfg.enableRetiming) {
           warn("No target specified. Specify target using: --fpga <device> or")
           warn("override val target = <device>")
           warn("Defaulting to 'Default' device.")
@@ -231,6 +226,7 @@ trait SpatialApp extends DSLApp {
             error(s"Available targets: ")
             Targets.targets.foreach{t => error(s"  ${t.name}") }
             IR.logError()
+            return
           }
           else {
             warn(s"No target found with the name '${cfg.targetName}'.")
@@ -251,8 +247,15 @@ trait SpatialApp extends DSLApp {
       cfg.target = this.target
       cfg.targetName = cfg.target.name
     }
-    cfg.target.areaModel.init()
-    cfg.target.latencyModel.init()
+    if (cfg.target eq null) {
+      error("No target specified. Specify target using: --fpga <device> or")
+      error("override val target = <device>")
+      IR.logError()
+    }
+    else {
+      cfg.target.areaModel.init()
+      cfg.target.latencyModel.init()
+    }
   }
 
 }

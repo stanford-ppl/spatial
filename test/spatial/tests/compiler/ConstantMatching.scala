@@ -1,11 +1,10 @@
-package spatial.test.compiler
+package spatial.tests.compiler
 
 import argon._
+import spatial.SpatialTestbench
 import spatial.lang._
-import utils.Testbench
 
-
-class ConstantMatching extends Testbench {
+class ConstantMatching extends SpatialTestbench {
   "MatchI32" should "match constants with Literal" in {
     val x = I32(32)
     val y = I32(32)

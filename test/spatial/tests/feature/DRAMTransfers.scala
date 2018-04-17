@@ -1,9 +1,8 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
-@spatial object DenseTransfer1D extends SpatialTest {
+@test class DenseTransfer1D extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -26,7 +25,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object SparseTransfer1D extends SpatialTest {
+@test class SparseTransfer1D extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -43,7 +42,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object FIFOGather extends SpatialTest {
+@test class FIFOGather extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   val n = 32
   val T = 8

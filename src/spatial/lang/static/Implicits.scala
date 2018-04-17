@@ -22,6 +22,8 @@ trait ImplicitsPriority3 {
   import scala.collection.immutable.WrappedString
   implicit def stringToWrappedString(x: String): WrappedString = new WrappedString(x)
 
+  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
+
   implicit class EqualsOps(x: Any) {
     def infix_!=(y: Any): Boolean = x != y
     def infix_==(y: Any): Boolean = x == y
@@ -62,7 +64,6 @@ trait ImplicitsPriority2 extends ImplicitsPriority3 {
   @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
   @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
 
-  @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 }
 
 trait ImplicitsPriority1 extends ImplicitsPriority2 {

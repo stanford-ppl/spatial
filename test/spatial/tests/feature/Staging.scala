@@ -1,9 +1,8 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import spatial.test.SpatialTest
 
-@spatial object StageArgs extends SpatialTest {
+@test class StageArgs extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -12,7 +11,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object StageForeach extends SpatialTest {
+@test class StageForeach extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = Accel {
@@ -20,7 +19,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object StageMemories extends SpatialTest {
+@test class StageMemories extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = Accel {
@@ -31,7 +30,7 @@ import spatial.test.SpatialTest
   }
 }
 
-@spatial object StageUpdate extends SpatialTest {
+@test class StageUpdate extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = Accel {

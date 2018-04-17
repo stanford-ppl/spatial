@@ -1,10 +1,8 @@
-package spatial.test.feature
+package spatial.tests.feature
 
 import spatial.dsl._
-import _root_.spatial.test.SpatialTest
 
-
-@spatial object SimpleParTest extends SpatialTest {
+@test class SimpleParTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -16,7 +14,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object FixedOffsetTest extends SpatialTest {
+@test class FixedOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -29,7 +27,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object RandomOffsetTest extends SpatialTest {
+@test class RandomOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -46,7 +44,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object RandomOffsetTestWrite extends SpatialTest {
+@test class RandomOffsetTestWrite extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -62,7 +60,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object TwoDuplicatesSimple extends SpatialTest {
+@test class TwoDuplicatesSimple extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -92,7 +90,7 @@ import _root_.spatial.test.SpatialTest
 }
 
 // Nonsensical app, just to get structure there.
-@spatial object TwoDuplicatesPachinko extends SpatialTest {
+@test class TwoDuplicatesPachinko extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -118,7 +116,7 @@ import _root_.spatial.test.SpatialTest
 
 
 
-@spatial object LegalFIFOParallelization extends SpatialTest {
+@test class LegalFIFOParallelization extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -136,7 +134,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object RegCoalesceTest extends SpatialTest {
+@test class RegCoalesceTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -153,7 +151,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object SRAMCoalesceTest extends SpatialTest {
+@test class SRAMCoalesceTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -172,7 +170,7 @@ import _root_.spatial.test.SpatialTest
   }
 }
 
-@spatial object LinearWriteRandomRead extends SpatialTest {
+@test class LinearWriteRandomRead extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
@@ -194,7 +192,7 @@ import _root_.spatial.test.SpatialTest
 }
 
 
-@spatial object MemTest1D extends SpatialTest {
+@test class MemTest1D extends SpatialTest {
   override def runtimeArgs: Args = "7"
 
   def main(args: Array[String]): Void = {
@@ -231,7 +229,7 @@ import _root_.spatial.test.SpatialTest
 }
 
 
-@spatial object MemTest2D extends SpatialTest {
+@test class MemTest2D extends SpatialTest {
   override def runtimeArgs: Args = "7"
 
   def main(args: Array[String]): Void = {

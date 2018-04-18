@@ -96,8 +96,8 @@ trait Spatial extends Compiler {
         friendlyTransformer ==>
         sanityChecks ==>
         switchTransformer ==>
-        switchOptimizer ==>
-        transferLowering ==>
+        switchOptimizer ==> printer ==>
+        transferLowering ==> printer ==>
         memoryDealiasing ==>
         pipeInserter ==> printer ==>
         useAnalyzer ==> printer ==>

@@ -92,7 +92,7 @@ trait Staging { this: Printing =>
         val lhs = symbol()
         val sym = op.R.boxed(lhs)
 
-        if (state.isStaging) {
+        if (config.enLog) {
           logs(s"$lhs = $op")
           logs(s"Effects: $effects")
         }

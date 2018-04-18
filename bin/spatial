@@ -92,7 +92,7 @@ def getSrcCode(opts, args):
   os.chdir("../..")
 
 def getFullyQualifiedName(app):
-  path_cmd = "find -name '" + app + ".class'"
+  path_cmd = "find ./ -name '" + app + ".class'"
   p = subprocess.Popen(path_cmd, stdout=subprocess.PIPE, shell=True)
   p.wait()
   paths = []
@@ -135,6 +135,11 @@ def main():
   sbt_project = 'apps/'
 
   (opts, args) = parser.parse_known_args()
+
+  ecode = os.system("sbt \"; project apps; compile\"")
+  if ecode != 0: exit(1)
+  ecode = os.system("sbt test:compile")
+  if ecode != 0: exit(1)
 
   name, isTest = getFullyQualifiedName(opts.app)
 

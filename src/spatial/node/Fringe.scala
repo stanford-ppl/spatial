@@ -8,26 +8,34 @@ import spatial.lang._
     dram:       DRAM[A,C],
     cmdStream:  StreamOut[BurstCmd],
     dataStream: StreamIn[A])
-  extends FringeNode[A,Void]
+  extends FringeNode[A,Void] {
+  override def effects: Effects = Effects.Writes(dataStream)
+}
 
 @op case class FringeDenseStore[A:Bits,C[T]](
     dram:       DRAM[A,C],
     cmdStream:  StreamOut[BurstCmd],
     dataStream: StreamOut[Tup2[A,Bit]],
     ackStream:  StreamIn[Bit])
-  extends FringeNode[A,Void]
+  extends FringeNode[A,Void] {
+  override def effects: Effects = Effects.Writes(ackStream, dram)
+}
 
 @op case class FringeSparseLoad[A:Bits,C[T]](
     dram:       DRAM[A,C],
     addrStream: StreamOut[I64],
     dataStream: StreamIn[A])
-  extends FringeNode[A,Void]
+  extends FringeNode[A,Void] {
+  override def effects: Effects = Effects.Writes(dataStream)
+}
 
 @op case class FringeSparseStore[A:Bits,C[T]](
     dram:      DRAM[A,C],
     cmdStream: StreamOut[Tup2[A,I64]],
     ackStream: StreamIn[Bit])
-  extends FringeNode[A,Void]
+  extends FringeNode[A,Void] {
+  override def effects: Effects = Effects.Writes(ackStream, dram)
+}
 
 
 object Fringe {

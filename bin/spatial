@@ -136,6 +136,11 @@ def main():
 
   (opts, args) = parser.parse_known_args()
 
+  ecode = os.system("sbt \"; project apps; compile\"")
+  if ecode != 0: exit(1)
+  ecode = os.system("sbt test:compile")
+  if ecode != 0: exit(1)
+
   name, isTest = getFullyQualifiedName(opts.app)
 
   java_cmd = ""

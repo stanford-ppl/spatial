@@ -20,7 +20,9 @@ trait Struct[A] extends Top[A] with Ref[Nothing,A] {
 }
 
 object Struct {
+  def tp[S:Struct]: Struct[S] = implicitly[Struct[S]]
+
   @rig def apply[S:Struct](elems: (String,Sym[_])*): S = stage(SimpleStruct[S](elems))
-  @rig def field[S:Struct,A:Type](struct: S, name: String): A = stage(FieldApply[S,A](struct,name))
-  @rig def field_update[S:Struct,A:Type](struct: S, name: String, data: A): Void = stage(FieldUpdate[S,A](struct,name,data))
+  @rig def field[S:Struct,A:Type](struct: S, name: String): A = stage(FieldApply[S,A](Struct.tp[S].box(struct),name))
+  @rig def field_update[S:Struct,A:Type](struct: S, name: String, data: A): Void = stage(FieldUpdate[S,A](Struct.tp[S].box(struct),name,data))
 }

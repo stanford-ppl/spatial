@@ -71,7 +71,7 @@ trait ScalaGenFileIO extends ScalaCodegen {
 
     case op @ WriteBinaryFile(file, len, value) =>
       open(src"val $lhs = {")
-        emit(src"var ${value.input} = FixedPoint(0)")
+        emit(src"var ${value.input} = FixedPoint.fromInt(0)")
         emit(src"val stream = new java.io.DataOutputStream(new java.io.FileOutputStream($file))")
         open(src"while (${value.input} < $len) {")
           visitBlock(value)

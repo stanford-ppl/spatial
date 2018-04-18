@@ -70,7 +70,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         }
 
         open(src"while(hasItems_$lhs) {")
-        iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = FixedPoint(1)") }
+        iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = FixedPoint.fromInt(1)") }
         valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = Bool(true,true)") }
       }
       else {

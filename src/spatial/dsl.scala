@@ -1,8 +1,8 @@
 package spatial
 
-trait DSL extends lang.static.FrontendStatics
+trait SpatialDSL extends lang.static.FrontendStatics
 
-object lib extends DSL {
+object lib extends SpatialDSL {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag
@@ -18,7 +18,7 @@ object lib extends DSL {
   }
 }
 
-object dsl extends DSL with lang.static.ShadowingStatics {
+object dsl extends SpatialDSL with lang.static.ShadowingStatics {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.{AppTag,TestTag}

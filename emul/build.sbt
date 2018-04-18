@@ -1,4 +1,4 @@
-val scala_version = "2.12.4"
+val scala_version = "2.12.5"
 
 name := "emul"
 organization := "edu.stanford.ppl"

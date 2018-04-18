@@ -270,7 +270,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   case class PartialUnroller(cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     // HACK: Don't unroll inner loops for CGRA generation
     val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.noInnerLoopUnroll) inds.map{_ => 1}
-    else cchain.pars.map(_.toInt)
+                       else cchain.pars.map(_.toInt)
 
     val fs: Seq[Boolean] = cchain.ctrs.map(_.isForever)
 

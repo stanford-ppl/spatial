@@ -40,27 +40,27 @@ trait ScalaGenArray extends ScalaCodegen {
     case ArrayUpdate(array, i, data) => emit(src"val $lhs = $array.update($i, $data)")
     case MapIndices(size, func) =>
       open(src"val $lhs = Array.tabulate($size){bbb => ")
-        emit(src"val ${func.input} = FixedPoint(bbb)")
+        emit(src"val ${func.input} = FixedPoint.fromInt(bbb)")
         ret(func)
       close("}")
 
     case ArrayForeach(array,apply,func) =>
       open(src"val $lhs = $array.indices.foreach{bbb => ")
-        emit(src"val ${func.input} = FixedPoint(bbb)")
+        emit(src"val ${apply.inputB} = FixedPoint.fromInt(bbb)")
         gen(apply)
         ret(func)
       close("}")
 
     case ArrayMap(array,apply,func) =>
       open(src"val $lhs = Array.tabulate($array.length){bbb => ")
-        emit(src"val ${func.input} = FixedPoint(bbb)")
+        emit(src"val ${apply.inputB} = FixedPoint.fromInt(bbb)")
         gen(apply)
         ret(func)
       close("}")
 
     case ArrayZip(a, b, applyA, applyB, func) =>
       open(src"val $lhs = Array.tabulate($a.length){bbb => ")
-        emit(src"val ${applyA.inputA} = FixedPoint(bbb)")
+        emit(src"val ${applyA.inputB} = FixedPoint.fromInt(bbb)")
         gen(applyA)
         gen(applyB)
         ret(func)

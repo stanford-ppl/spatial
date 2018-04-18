@@ -12,6 +12,12 @@ abstract class AccelOp[R:Type] extends Op[R] {
 abstract class FringeNode[A:Bits,R:Type] extends AccelOp[R] {
   val A: Bits[A] = Bits[A]
 }
+object FringeNode {
+  def unapply[R](x: Sym[R]): Option[Sym[R]] = x match {
+    case Op(_:FringeNode[_,_]) => Some(x)
+    case _ => None
+  }
+}
 
 /** Nodes with implicit control signals/logic with internal state */
 abstract class Control[R:Type] extends AccelOp[R] {

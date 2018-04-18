@@ -55,9 +55,10 @@ case class PipeInserter(IR: State) extends MutateTransformer {
         val stage = if (i >= 0) stages(i) else stages.head
         stage.nodes += s
 
-      case Alloc(s)     => nextOuterStage.nodes += s
-      case Primitive(s) => nextInnerStage.nodes += s
-      case Control(s)   => nextOuterStage.nodes += s
+      case Alloc(s)      => nextOuterStage.nodes += s
+      case Primitive(s)  => nextInnerStage.nodes += s
+      case Control(s)    => nextOuterStage.nodes += s
+      case FringeNode(s) => nextOuterStage.nodes += s
     }
 
     stages.zipWithIndex.foreach{

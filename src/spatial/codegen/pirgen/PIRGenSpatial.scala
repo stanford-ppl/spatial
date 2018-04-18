@@ -1,4 +1,4 @@
-package spatial.codegen.scalagen
+package spatial.codegen.pirgen
 
 import argon._
 import spatial.codegen.naming.NamedCodegen
@@ -33,11 +33,8 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenSwitch
   with NamedCodegen {
 
-  override def copyDependencies(out: String): Unit = {
-    dependencies ::= FileDep("scalagen", "Makefile", "../")
-    dependencies ::= FileDep("scalagen", "run.sh", "../")
-    dependencies ::= FileDep("scalagen", "build.sbt", "../")
-    dependencies ::= FileDep("scalagen/project", "build.properties", "../project/")
-    super.copyDependencies(out)
-  }
+  //override def copyDependencies(out: String): Unit = {
+    //dependencies ::= FileDep("pirgen", "Makefile", "../")
+    //super.copyDependencies(out)
+  //}
 }

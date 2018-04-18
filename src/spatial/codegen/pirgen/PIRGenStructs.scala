@@ -1,5 +1,5 @@
 package spatial.codegen
-package scalagen
+package pirgen
 
 import argon._
 import spatial.lang._

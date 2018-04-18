@@ -1,4 +1,4 @@
-package spatial.codegen.scalagen
+package spatial.codegen.pirgen
 
 import argon._
 import spatial.data._

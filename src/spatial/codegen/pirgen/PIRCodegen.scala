@@ -1,15 +1,16 @@
-package spatial.codegen.scalagen
+package spatial.codegen.pirgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
 
 import spatial.lang._
 import spatial.internal.spatialConfig
+import spatial.traversal.AccelTraversal
 
 import scala.language.postfixOps
 import scala.sys.process._
 
-trait PIRCodegen extends Codegen with FileDependencies {
+trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal {
   override val lang: String = "scala"
   override val ext: String = "scala"
 

@@ -7,6 +7,7 @@ import poly.{ConstraintMatrix, ISL}
 import spatial.codegen.scalagen._
 import spatial.codegen.cppgen._
 import spatial.codegen.chiselgen._
+import spatial.codegen.pirgen._
 import spatial.data._
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.dse.DSEMode
@@ -88,6 +89,7 @@ trait Spatial extends Compiler {
     // lazy val treeCodegen = TreeCodegen(state)
     lazy val scalaCodegen = ScalaGenSpatial(state)
     lazy val puDotCodegen = PUDotCodegen(state)
+    lazy val pirCodegen = PIRGenSpatial(state)
 
     val result = {
       block ==> printer ==>
@@ -114,7 +116,8 @@ trait Spatial extends Compiler {
         // (cfg.enableTree ? irTreeCodegen) ==>
         (cfg.enableSynth ? chiselCodegen) ==>
         (cfg.enableSynth ? cppCodegen) ==>
-        (cfg.enableDot ? irDotCodegen)
+        (cfg.enableDot ? irDotCodegen) ==>
+        (cfg.enablePIR ? pirCodegen)
     }
     //globalAllocation ==>
     //printer ==>

@@ -107,16 +107,20 @@ def getFullyQualifiedName(app):
 
   if len(paths) == 1:
     path = paths[0].decode("utf-8")
+  elif len(paths) == 0:
+    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] No application with name " + app + " found.\n")
+    exit(1)
   else:
     print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Ambiguous application name\n")
     for path in paths:
       print(path + "\n")
+    exit(1)
 
   name = path.replace("/", ".")
   isTest = path.find("test-classes") > 0
 
   classPos = name.find("classes.")
-  print("classPos: " + str(classPos))
+  #print("classPos: " + str(classPos))
   if classPos >= 0:
     name = name[(classPos+8):]
   name = name[:(len(name)-6)]

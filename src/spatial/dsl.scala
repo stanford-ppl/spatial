@@ -32,7 +32,7 @@ object dsl extends SpatialDSL with lang.static.ShadowingStatics {
   final class test extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro test.impl
   }
-  private object test extends TestTag("spatial", "SpatialTest")
+  private object test extends TestTag("spatial", "SpatialTest", "SpatialApp")
 
   final class struct extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl

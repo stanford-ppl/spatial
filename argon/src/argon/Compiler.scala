@@ -1,7 +1,5 @@
 package argon
 
-import java.lang.Thread.UncaughtExceptionHandler
-
 import argon.passes.Pass
 import argon.transform.Transformer
 import utils.io.files
@@ -200,16 +198,24 @@ trait Compiler { self =>
     rewrites()
   }
 
-  def execute(args: Array[String]): Unit = instrument("nova"){
+  def execute(args: Array[String]): Unit = instrument("compiler"){
     init(args)
     if (config.enMemLog) memWatch.start(config.logDir)
     compileProgram(args)
   }
 
+  protected implicit class BlockOps[R](block: Block[R]) {
+    def ==>(pass: Pass): Block[R] = runPass(pass, block)
+    def ==>(pass: (Boolean,Pass)): Block[R] = if (pass._1) runPass(pass._2,block) else block
+  }
+  protected implicit class ConditionalPass(cond: Boolean) {
+    def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
+  }
+
   /**
     * The "real" entry point for the application
     */
-  def main(args: Array[String]): Unit = {
+  def compile(args: Array[String]): Unit = {
     instrument.reset()
     var failure: Option[Throwable] = None
     try {
@@ -257,5 +263,6 @@ trait Compiler { self =>
     IR.streams.values.foreach{stream => stream.close() }
 
     if (config.test && failure.nonEmpty) throw failure.get
+    else if (failure.nonEmpty || IR.hadBugs || IR.hadErrors) sys.exit(1)
   }
 }

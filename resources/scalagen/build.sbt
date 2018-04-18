@@ -1,7 +1,7 @@
 // Build file for testing spatial apps
 name := "spatial-app"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls")
 
 scalaSource in Compile := baseDirectory.value / "scala"

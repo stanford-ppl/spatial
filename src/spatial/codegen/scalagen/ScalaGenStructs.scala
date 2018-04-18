@@ -16,7 +16,7 @@ trait ScalaGenStructs extends ScalaCodegen with StructCodegen with ScalaGenBits 
 
   protected def emitStructDeclaration(name: String, tp: Struct[_]): Unit = {
     open(src"case class $name(")
-      tp.fields.foreach{case (field,t) => emit(src"var $field: $t") }
+      tp.fields.foreach{case (field,t) => emit(src"var $field: $t,") }
     close(") {")
     open("")
       emit("override def productPrefix = \"" + tp.typeName + "\"")
@@ -24,11 +24,13 @@ trait ScalaGenStructs extends ScalaCodegen with StructCodegen with ScalaGenBits 
   }
 
   protected def emitDataStructures(): Unit = if (encounteredStructs.nonEmpty) {
-    inGen(getOrCreateStream(out, "Structs")) {
+    inGen(getOrCreateStream(out, "Structs.scala")) {
+      emitHeader()
       for ((tp, name) <- encounteredStructs) {
         emitStructDeclaration(name, tp)
         emit("")
       }
+      emitFooter()
     }
   }
   

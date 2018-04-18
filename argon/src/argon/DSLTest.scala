@@ -7,7 +7,7 @@ import utils.{Args, Testbench}
 
 import scala.concurrent.{Await, Future, duration}
 
-trait DSLTest extends Testbench with DSLApp with Args { test =>
+trait DSLTest extends Testbench with Compiler with Args { test =>
   //-------------------//
   // Testing Arguments //
   //-------------------//
@@ -169,7 +169,6 @@ trait DSLTest extends Testbench with DSLApp with Args { test =>
   private val tests = backends.filter(_.shouldRun)
   if (tests.isEmpty) {
     ignore should "...nothing? (No backends enabled. Enable using -D<backend>=true)" in { () }
-    sys.props.keys.toSeq.sorted.foreach{k => Console.out.println(s"$k") }
   }
   else {
     tests.foreach{backend => backend.runBackend() }

@@ -41,11 +41,25 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
     val mapLanes = PartialUnroller(cchainMap, itersMap, isInnerLoop = false)
+    val reduceLanes = PartialUnroller(cchainRed, itersRed, true)
     val isMap2   = mapLanes.indices
+    val isRed2   = reduceLanes.indices
     val mvs      = mapLanes.indexValids
+    val rvs      = reduceLanes.indexValids
     val start    = cchainMap.ctrs.map(_.start.asInstanceOf[I32])
     val redType  = reduceType(reduce.result)
     val intermed = func.result
+
+    logs(s"  Map iterators: $isMap2")
+    mapLanes.foreach{p =>
+      logs(s"    Lane #$p")
+      itersMap.foreach{i => logs(s"    $i -> ${f(i)}") }
+    }
+    logs(s"  Reduction iterators: $isRed2")
+    reduceLanes.foreach{p =>
+      logs(s"    Lane #$p")
+      itersRed.foreach{i => logs(s"    $i -> ${f(i)}") }
+    }
 
     val blk = stageLambda1(accum){
       logs(s"[Accum-fold $lhs] Unrolling map")
@@ -56,8 +70,17 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
       if (cchainRed.isUnit) {
         logs(s"[Accum-fold $lhs] Unrolling unit pipe reduction")
+        reduceLanes.foreach{p =>
+          logs(s"Lane #$p")
+          itersRed.foreach{i => logs(s"  $i -> ${f(i)}") }
+        }
+
         stage(UnitPipe(enables ++ ens, stageBlock{
-          val values = inReduce(redType,false){ mapLanes.map{_ => loadRes.inline() } }
+          val values = inReduce(redType,true){
+            mapLanes.map{_ =>
+              reduceLanes.inLane(0){ loadRes.inline() }
+            }
+          }
           val foldValue = if (fold) Some( loadAcc.inline() ) else None
           unrollReduceAccumulate[A,C](accum, values, mvalids(), ident, foldValue, reduce, loadAcc, storeAcc, isMap2.map(_.head), start, isInner = false)
           void
@@ -65,14 +88,6 @@ trait MemReduceUnrolling extends ReduceUnrolling {
       }
       else {
         logs(s"[Accum-fold $lhs] Unrolling pipe-reduce reduction")
-
-        val reduceLanes = PartialUnroller(cchainRed, itersRed, true)
-        val isRed2 = reduceLanes.indices
-        val rvs = reduceLanes.indexValids
-        reduceLanes.foreach{p =>
-          logs(s"Lane #$p")
-          itersRed.foreach{i => logs(s"  $i -> ${f(i)}") }
-        }
 
         val rBlk = stageBlock{
           logs(s"[Accum-fold $lhs] Unrolling map loads")
@@ -86,11 +101,6 @@ trait MemReduceUnrolling extends ReduceUnrolling {
           }
 
           logs(s"[Accum-fold $lhs] Unrolling accum loads")
-          reduceLanes.foreach{p =>
-            logs(s"Lane #$p")
-            itersRed.foreach{i => logs(s"  $i -> ${f(i)}") }
-          }
-
           val accValues = inReduce(redType,false){
             register(loadAcc.input -> accum)
             unroll(loadAcc, reduceLanes)

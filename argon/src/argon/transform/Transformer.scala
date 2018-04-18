@@ -72,7 +72,7 @@ abstract class Transformer extends Pass {
     dest.name = src.name
     dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
     val data = metadata.all(src).filterNot{case (_,m) => m.skipOnTransform }
-                                .flatMap{case (_,m) => mirror(m) : Option[Metadata[_]] }
+                                .flatMap{case (_,m) => mirror(m) : Option[Data[_]] }
     metadata.addAll(dest, data)
   }
 
@@ -89,7 +89,7 @@ abstract class Transformer extends Pass {
     else (lhs2, false)
   }
 
-  final def mirror(m: Metadata[_]): Option[Metadata[_]] = Option(m.mirror(f)).map(_.asInstanceOf[Metadata[_]])
+  final def mirror(m: Data[_]): Option[Data[_]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[_]])
 
   def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.R

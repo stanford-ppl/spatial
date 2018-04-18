@@ -2,7 +2,7 @@ package pir
 
 import argon.DSLTest
 
-abstract class PIRTest extends DSLTest with PIRApp {
+trait PIRTest extends PIR with DSLTest {
   override def runtimeArgs: Args = NoArgs
 
   object PLASMA extends Backend(

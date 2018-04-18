@@ -21,6 +21,6 @@ clear:
 	rm -rf reports
 
 clean:
-	sbt "; forge/clean; core/clean; nova/clean"
+	sbt "; forge/clean; argon/clean; nova/clean"
 	sbt clean
 

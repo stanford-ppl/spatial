@@ -28,7 +28,7 @@ abstract class MutateTransformer extends ForwardTransformer {
     * NOTE: We don't erase invalid metadata here to avoid issues with Effects, etc.
     */
   def updateMetadata(sym: Sym[_]): Unit = {
-    val data = metadata.all(sym).flatMap{case (k,m) => mirror(m) : Option[Metadata[_]] }
+    val data = metadata.all(sym).flatMap{case (k,m) => mirror(m) : Option[Data[_]] }
     metadata.addAll(sym, data)
   }
 

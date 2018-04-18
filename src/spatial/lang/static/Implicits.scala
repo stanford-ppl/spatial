@@ -256,7 +256,7 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
       */
     def apply(range: ((Int, Int), Int))(implicit ov2: Overload1): I32 = createParam(b, range._1._1, range._1._2, range._2)
 
-    def to(end: Int): Range = Range(b, end)
+    def to(end: Int): Range = Range.inclusive(b, end)
     def to[B](implicit cast: Cast[Int,B]): B = cast(b)
 
     def x: I32 = this.to[I32]

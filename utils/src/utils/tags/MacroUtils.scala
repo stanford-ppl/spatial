@@ -131,6 +131,8 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
       val body2 = func(body)
       DefDef(mods,nameTerm,tparams,paramss,retTp,body2)
     }
+
+    def renamed(name: String): DefDef = DefDef(mods, TermName(name), tparams, paramss, retTp, body)
   }
 
   trait Templated[A] {
@@ -191,6 +193,10 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
         copyWithParents(parents :+ parent.head)
       else
         cls
+    }
+
+    def renameMethod(orig: String, repl: String): A = mapMethods{d =>
+      if (d.nameStr == orig) d.renamed(repl) else d
     }
   }
 

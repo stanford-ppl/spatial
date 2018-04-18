@@ -7,17 +7,17 @@ import scala.collection.mutable
 class GlobalMetadata {
   type Tx = Transformer
 
-  private def keyOf[M<:Metadata[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]
+  private def keyOf[M<:Data[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]
 
-  private val data = mutable.HashMap[Class[_],Metadata[_]]()
+  private val data = mutable.HashMap[Class[_],Data[_]]()
 
-  private def add(k: Class[_], m: Metadata[_]): Unit = { data += k -> m }
-  def add[M<:Metadata[M]:Manifest](m : M): Unit = { data += m.key -> m }
-  def apply[M<:Metadata[M]:Manifest]: Option[M] = data.get(keyOf[M]).map(_.asInstanceOf[M])
-  def clear[M<:Metadata[M]:Manifest]: Unit = data.remove(keyOf[M])
+  private def add(k: Class[_], m: Data[_]): Unit = { data += k -> m }
+  def add[M<:Data[M]:Manifest](m : M): Unit = { data += m.key -> m }
+  def apply[M<:Data[M]:Manifest]: Option[M] = data.get(keyOf[M]).map(_.asInstanceOf[M])
+  def clear[M<:Data[M]:Manifest]: Unit = data.remove(keyOf[M])
 
   def mirrorAfterTransform(f:Tx): Unit = data.foreach{case (k,v) => Option(v.mirror(f)) match {
-    case Some(v2) => data(k) = v2.asInstanceOf[Metadata[_]]
+    case Some(v2) => data(k) = v2.asInstanceOf[Data[_]]
     case None => data.remove(k)
   }}
   def clearBeforeTransform(): Unit = {
@@ -28,5 +28,5 @@ class GlobalMetadata {
   def copyTo(that: GlobalMetadata): Unit = data.foreach{case (k,v) => that.add(k,v) }
   def reset(): Unit = data.clear()
 
-  def foreach(func: (Class[_],Metadata[_]) => Unit): Unit = data.foreach{case (k,v) => func(k,v)}
+  def foreach(func: (Class[_],Data[_]) => Unit): Unit = data.foreach{case (k,v) => func(k,v)}
 }

@@ -202,6 +202,13 @@ trait SpatialApp extends DSLApp {
     cli.opt[Unit]("runtime").action{ (_,_) =>
       cfg.enableRuntimeModel = true
     }.text("Enable application runtime estimation")
+
+    cli.opt[Unit]("pir").action { (_,_) =>
+      cfg.enablePIR = true
+      cfg.enableInterpret = false
+      cfg.enableSynth = false
+      if (!overrideRetime) cfg.enableRetiming = false
+    }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
   }
 
   override def settings(): Unit = {

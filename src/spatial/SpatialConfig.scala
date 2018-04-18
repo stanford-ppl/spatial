@@ -43,4 +43,6 @@ class SpatialConfig extends Config {
   def ignoreParEdgeCases: Boolean = false
   def noInnerLoopUnroll: Boolean = false
   def enableBufferCoalescing: Boolean = true
+
+  var enablePIR = false
 }

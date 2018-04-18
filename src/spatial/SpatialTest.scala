@@ -4,8 +4,7 @@ import argon.DSLTest
 import forge.SrcCtx
 import spatial.lang.{Bit, Text, Void}
 
-// Create a testbench which runs Scala tests
-trait SpatialTest extends DSLTest with SpatialApp {
+trait SpatialTest extends Spatial with DSLTest {
   private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
 
   def assert(cond: Bit)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond)

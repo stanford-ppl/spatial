@@ -16,5 +16,5 @@ object dsl extends ExternalStatics {
   final class test extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro test.impl
   }
-  private object test extends TestTag("pir", "PIRTest")
+  private object test extends TestTag("pir", "PIRTest", "PIRApp")
 }

@@ -6,12 +6,15 @@ import spatial.lang._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
   val A: Num[A] = Num[A]
+  override def effects: Effects = Effects.Unique
 }
 @op case class ForeverNew() extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 
-@op case class CounterChainNew(counters: Seq[Counter[_]]) extends Alloc[CounterChain]
+@op case class CounterChainNew(counters: Seq[Counter[_]]) extends Alloc[CounterChain] {
+  override def effects: Effects = Effects.Unique
+}
 
 @op case class AccelScope(block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil

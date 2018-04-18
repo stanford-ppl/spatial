@@ -14,6 +14,7 @@ import spatial.dsl._
   }
 }
 
+
 @test class FixedOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 

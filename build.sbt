@@ -69,3 +69,5 @@ lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
 
 lazy val nova   = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)
 lazy val apps = project.settings(common).dependsOn(nova)
+
+addCommandAlias("make", "; project apps; compile")

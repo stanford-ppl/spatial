@@ -12,7 +12,6 @@ trait Codegen extends Traversal {
   def ext: String
   def out: String = s"${config.genDir}${files.sep}${lang}${files.sep}"
   def entryFile: String = s"Main.$ext"
-  var cliArgs: Map[Int,String] = Map.empty
   protected var backend = ""
   protected var scope = "host"
 

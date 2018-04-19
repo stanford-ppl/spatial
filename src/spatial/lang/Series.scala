@@ -18,6 +18,7 @@ case class Series[+A:Num](
   def A: Num[A@uV] = Num[A]
 
   def ::(start2: A@uV): Series[A] = Series[A](start2, end, start, par, isUnit=false)
+  def by(stride: A@uV): Series[A] = Series[A](start, end, stride, par, isUnit)
 
   def par(p: I32): Series[A] = Series[A](start, end, step, p, isUnit=false)
 

@@ -2,7 +2,7 @@ package spatial.codegen.scalagen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
-
+import spatial.data.CLIArgs
 import spatial.lang._
 
 trait ScalaCodegen extends Codegen with FileDependencies {
@@ -34,13 +34,7 @@ trait ScalaCodegen extends Codegen with FileDependencies {
         emitPostMain()
       close(src"}")
       open("def printHelp(): Unit = {")
-        val argInts = cliArgs.toSeq.map(_._1)
-        val argsList = if (argInts.nonEmpty) {
-          (0 to argInts.max).map{i =>
-            if (cliArgs.contains(i)) s"<$i- ${cliArgs(i)}>" else s"<$i - UNUSED>"
-          }.mkString(" ")
-        }
-        else {"<No input args>"}
+        val argsList = CLIArgs.listNames.mkString(" ")
         emit(s"""System.out.print("Help for app: ${config.name}\\n")""")
         emit(s"""System.out.print("  -- bash run.sh $argsList\\n\\n");""")
         emit(s"""System.exit(0);""")

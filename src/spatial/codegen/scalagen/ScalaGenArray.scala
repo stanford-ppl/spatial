@@ -1,6 +1,7 @@
 package spatial.codegen.scalagen
 
 import argon._
+import spatial.data._
 import spatial.lang._
 import spatial.node._
 
@@ -16,16 +17,14 @@ trait ScalaGenArray extends ScalaCodegen {
     case op@ArrayFromSeq(seq)   => emit(src"val $lhs = ${op.R}($seq)")
 
     case ArrayApply(array @ Op(InputArguments()), i) =>
-      if (lhs.name.isDefined) {
-        val ii = i match {case Const(c) => c.toInt; case _ => -1}
-        if (cliArgs.contains(ii)) cliArgs += (ii -> s"${cliArgs(ii)} / ${lhs.name.get}")
-        else cliArgs += (ii -> lhs.name.get)
-      }
+
       emit(src"// Commandline argument #$i (${lhs.name.getOrElse("<unnamed>")})")
       emit(src"val $lhs = try{ $array.apply($i) }")
       open(src"catch {case _:Throwable =>")
-        if (lhs.name.isDefined) emit(src"""println("Missing argument " + $i + " ('${lhs.name.get}')")""")
-        else emit(src"""println("Missing argument " + $i)""")
+        CLIArgs.get(i) match {
+          case Some(name) => emit(src"""println("Missing argument " + $i + " ('$name')")""")
+          case _          => emit(src"""println("Missing argument " + $i)""")
+        }
         emit(src"printHelp()")
         emit(src"sys.exit(-1)")
       close("}")

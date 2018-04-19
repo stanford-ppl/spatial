@@ -57,6 +57,7 @@ trait Spatial extends Compiler {
     lazy val sanityChecks = SanityChecks(state)
 
     // --- Analysis
+    lazy val cliNaming          = CLINaming(state)
     lazy val useAnalyzer        = UseAnalyzer(state)
     lazy val accessAnalyzer     = AccessAnalyzer(state)
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
@@ -76,7 +77,6 @@ trait Spatial extends Compiler {
     lazy val pipeInserter      = PipeInserter(state)
     lazy val registerCleanup   = RegisterCleanup(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
-    lazy val aliasCleanup      = AliasCleanup(state)
     lazy val retiming          = RetimingTransformer(state)
 
     lazy val globalAllocation = GlobalAllocation(state)
@@ -91,6 +91,7 @@ trait Spatial extends Compiler {
 
     val result = {
       block ==> printer ==>
+        cliNaming ==>
         friendlyTransformer ==>
         sanityChecks ==>
         switchTransformer ==>
@@ -105,7 +106,6 @@ trait Spatial extends Compiler {
         memoryAllocator ==>
         memoryReporter  ==>
         unrollTransformer ==> printer ==>
-        aliasCleanup ==> printer ==>
         (cfg.enableRetiming ? retiming) ==> printer ==>
         (cfg.enableRetiming ? retimeReporter) ==>
         initiationAnalyzer ==>

@@ -84,8 +84,8 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     // These are still needed to track accumulators for Reduce, MemReduce
     // MemDenseAlias and MemSparseAlias are removed after unrolling in AliasCleanup
-    //case _: MemDenseAlias[_,_,_]    => Invalid.asInstanceOf[Sym[A]]
-    //case _: MemSparseAlias[_,_,_,_] => Invalid.asInstanceOf[Sym[A]]
+    case op: MemDenseAlias[_,_,_]    if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
+    case op: MemSparseAlias[_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
 
     case op @ GetDRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
       implicit val ba: Bits[_] = op.A

@@ -2,6 +2,7 @@ package argon.codegen.cppgen
 
 import argon.core._
 import argon.codegen.FileGen
+import spatial.data.CLIArgs
 
 trait CppFileGen extends FileGen {
 
@@ -90,13 +91,7 @@ typedef __int128 int128_t;
   override protected def emitFileFooter() {
     emit("delete c1;")
     close("}")
-    val argInts = cliArgs.toSeq.map(_._1)
-    val argsList = if (argInts.length > 0) {
-      (0 to argInts.max).map{i => 
-        if (cliArgs.contains(i)) s"<$i- ${cliArgs(i)}>"
-        else s"<${i}- UNUSED>"
-      }.mkString(" ")
-    } else {"<No input args>"}
+    val argsList = CLIArgs.listNames.mkString(" ")
     emit(s"""
 void printHelp() {
   fprintf(stderr, "Help for app: ${config.name}\\n");

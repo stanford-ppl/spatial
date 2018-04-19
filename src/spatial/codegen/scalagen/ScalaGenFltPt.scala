@@ -23,6 +23,10 @@ trait ScalaGenFltPt extends ScalaGenBits {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case FltIsPosInf(x) => emit(src"val $lhs = Bool($x.isPositiveInfinity, $x.valid)")
+    case FltIsNegInf(x) => emit(src"val $lhs = Bool($x.isNegativeInfinity, $x.valid)")
+    case FltIsNaN(x)    => emit(src"val $lhs = Bool($x.isNaN, $x.valid)")
+
     case FltNeg(x)   => emit(src"val $lhs = -$x")
     case FltAdd(x,y) => emit(src"val $lhs = $x + $y")
     case FltSub(x,y) => emit(src"val $lhs = $x - $y")

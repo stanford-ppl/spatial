@@ -45,6 +45,10 @@ object FltFmt {
     case _ => super.===(that)
   }
 
+  @api def isNaN: Bit = stage(FltIsNaN(this))
+  @api def isPosInf: Bit = stage(FltIsPosInf(this))
+  @api def isNegInf: Bit = stage(FltIsNegInf(this))
+
   // --- Typeclass Methods
 
   @rig def min(a: Flt[M,E], b: Flt[M,E]): Flt[M,E] = stage(FltMin(a,b))

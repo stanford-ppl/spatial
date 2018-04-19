@@ -34,7 +34,7 @@ case class PipeInserter(IR: State) extends MutateTransformer {
     super.transform(lhs,rhs)
   }
 
-  protected def insertPipes[R](block: Block[R]): Block[R] = stageBlock({
+  protected def insertPipes[R](block: Block[R]): Block[R] = stageScope(f(block.inputs),block.options){
     val stages = ArrayBuffer[Stage]()
     def curStage: Stage = stages.last
     def nextInnerStage: Stage = {
@@ -100,7 +100,7 @@ case class PipeInserter(IR: State) extends MutateTransformer {
       case _:Void => void
       case s      => f(s)
     }).asInstanceOf[Sym[R]]
-  }, block.options)
+  }
 
   def regFrom[A](s: Bits[A]): Reg[A] = {
     implicit val ctx: SrcCtx = s.ctx

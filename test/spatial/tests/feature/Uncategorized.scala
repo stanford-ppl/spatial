@@ -63,6 +63,7 @@ import spatial.dsl._
 
     val cksum = gold == result
     println(r"PASS: $cksum (Niter)")
+    assert(cksum)
   }
 }
 

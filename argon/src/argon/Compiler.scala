@@ -124,7 +124,9 @@ trait Compiler { self =>
     block
   }
 
-  def postprocess(block: Block[_]): Unit = { }
+  def postprocess(block: Block[_]): Unit = {
+    info(s"Completed")
+  }
 
   final def compileProgram(args: Array[String]): Unit = instrument("compile"){
     val block = stageProgram(args)

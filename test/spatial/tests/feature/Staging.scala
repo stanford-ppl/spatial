@@ -3,11 +3,12 @@ package spatial.tests.feature
 import spatial.dsl._
 
 @test class StageArgs extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+  override def runtimeArgs: Args = "32"
 
   def main(args: Array[String]): Void = {
     val x = args(0).to[I32]
     println(r"x: $x")
+    assert(x == 32)
   }
 }
 

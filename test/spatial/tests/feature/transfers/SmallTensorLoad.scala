@@ -53,5 +53,6 @@ import spatial.dsl._
     printTensor4(getTensor4(KERNEL_COPY_CPU), "Kernel copied from CPU:")
 
     println("PASS: " + cksum + " (SmallTensorLoad)")
+    assert(cksum)
   }
 }

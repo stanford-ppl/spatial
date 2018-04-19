@@ -4,13 +4,14 @@ import argon._
 import argon.codegen.{Codegen, FileDependencies}
 
 import spatial.lang._
+import spatial.data._
 import spatial.internal.spatialConfig
-import spatial.traversal.AccelTraversal
+import spatial.traversal.BlkTraversal
 
 import scala.language.postfixOps
 import scala.sys.process._
 
-trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal {
+trait PIRCodegen extends Codegen with FileDependencies with BlkTraversal with PIRPrinting {
   override val lang: String = "scala"
   override val ext: String = "scala"
 
@@ -69,11 +70,16 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal {
     }
   }
 
-  //def emit(lhs:Any, rhs:Any):Unit = {
-    //emit(s"""val ${quote(lhs)} = $rhs$quoteCtrl.name("$lhs")""")
-  //}
-  //def emit(lhs:Any, rhs:Any, comment:Any):Unit = {
-    //emit(s"""val ${quote(lhs)} = $rhs.name("$lhs")$quoteCtrl // $comment""")
-  //}
+  def emitc(lhs:Any, rhs:Any, comment:Any=""):Unit = {
+    val ctrl = blk match {
+      case Host => None
+      case blk:Controller => Some(blk.sym)
+    }
+    emit(src"""val ${lhs} = $rhs.name("$lhs")${ctrl.fold("") { c => s".ctrl($c)" }} // $comment""")
+  }
+
+  def emitDummy(lhs:Any, rhs:Any) = {
+    emit(src"val $lhs = $rhs")
+  }
 
 }

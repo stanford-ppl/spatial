@@ -23,20 +23,20 @@ trait PIRGenFltPt extends PIRGenBits {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case FltNeg(x)   => emit(src"val $lhs = -$x")
-    case FltAdd(x,y) => emit(src"val $lhs = $x + $y")
-    case FltSub(x,y) => emit(src"val $lhs = $x - $y")
-    case FltMul(x,y) => emit(src"val $lhs = $x * $y")
-    case FltDiv(x,y) => emit(src"val $lhs = $x / $y")
-    case FltRecip(x) => emit(src"val $lhs = Number.recip($x)")
-    case FltLst(x,y) => emit(src"val $lhs = $x < $y")
-    case FltLeq(x,y) => emit(src"val $lhs = $x <= $y")
+    //case FltNeg(x)   => 
+    //case FltAdd(x,y) => 
+    //case FltSub(x,y) => 
+    //case FltMul(x,y) => 
+    //case FltDiv(x,y) => 
+    //case FltRecip(x) => 
+    //case FltLst(x,y) => 
+    //case FltLeq(x,y) => 
 
-    case FltNeq(x,y)   => emit(src"val $lhs = $x !== $y")
-    case FltEql(x,y)   => emit(src"val $lhs = $x === $y")
+    //case FltNeq(x,y)   => 
+    //case FltEql(x,y)   => 
 
-    case FltMax(x,y) => emit(src"val $lhs = Number.max($x,$y)")
-    case FltMin(x,y) => emit(src"val $lhs = Number.min($x,$y)")
+    //case FltMax(x,y) => 
+    //case FltMin(x,y) => 
 
     case FltToFlt(x, fmt) =>
       emit(src"val $lhs = $x.toFloatPoint(FltFormat(${fmt.mbits-1},${fmt.ebits}))")
@@ -57,26 +57,25 @@ trait PIRGenFltPt extends PIRGenBits {
       val FltPtType(g,e) = lhs.tp
       emit(src"val $lhs = FloatPoint.random(FltFormat(${g-1},$e))")
 
-    case FltAbs(x)     => emit(src"val $lhs = Number.abs($x)")
-    case FltFloor(x)   => emit(src"val $lhs = Number.floor($x)")
-    case FltCeil(x)    => emit(src"val $lhs = Number.ceil($x)")
-    case FltLn(x)      => emit(src"val $lhs = Number.log($x)")
-    case FltExp(x)     => emit(src"val $lhs = Number.exp($x)")
-    case FltSqrt(x)    => emit(src"val $lhs = Number.sqrt($x)")
-    case FltSin(x)     => emit(src"val $lhs = Number.sin($x)")
-    case FltCos(x)     => emit(src"val $lhs = Number.cos($x)")
-    case FltTan(x)     => emit(src"val $lhs = Number.tan($x)")
-    case FltSinh(x)    => emit(src"val $lhs = Number.sinh($x)")
-    case FltCosh(x)    => emit(src"val $lhs = Number.cosh($x)")
-    case FltTanh(x)    => emit(src"val $lhs = Number.tanh($x)")
-    case FltAsin(x)    => emit(src"val $lhs = Number.asin($x)")
-    case FltAcos(x)    => emit(src"val $lhs = Number.acos($x)")
-    case FltAtan(x)    => emit(src"val $lhs = Number.atan($x)")
-    case FltPow(x,exp) => emit(src"val $lhs = Number.pow($x, $exp)")
-    case FltFMA(m1,m2,add) => emit(src"val $lhs = ($m1 * $m2) + $add")
-    case FltRecipSqrt(x)   => emit(src"val $lhs = Number.recipSqrt($x)")
-    case FltSigmoid(x)     => emit(src"val $lhs = ${one(x.tp)} / (Number.exp(-$x) + ${one(x.tp)})")
-
+    //case FltAbs(x)     => 
+    //case FltFloor(x)   => 
+    //case FltCeil(x)    => 
+    //case FltLn(x)      => 
+    //case FltExp(x)     => 
+    //case FltSqrt(x)    => 
+    //case FltSin(x)     => 
+    //case FltCos(x)     => 
+    //case FltTan(x)     => 
+    //case FltSinh(x)    => 
+    //case FltCosh(x)    => 
+    //case FltTanh(x)    => 
+    //case FltAsin(x)    => 
+    //case FltAcos(x)    => 
+    //case FltAtan(x)    => 
+    //case FltPow(x,exp) => 
+    //case FltFMA(m1,m2,add) =>
+    //case FltRecipSqrt(x)   =>
+    //case FltSigmoid(x)     =>
 
     case _ => super.gen(lhs, rhs)
   }

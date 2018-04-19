@@ -31,6 +31,7 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenDelays
   with PIRGenLUTs
   with PIRGenSwitch
+  with PIRGenOp
   with NamedCodegen {
 
   //override def copyDependencies(out: String): Unit = {

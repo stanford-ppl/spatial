@@ -3,6 +3,7 @@ package spatial.codegen.pirgen
 import argon._
 import spatial.lang._
 import spatial.node._
+import spatial.data._
 
 trait PIRGenArgs extends PIRGenMemories {
 
@@ -14,16 +15,17 @@ trait PIRGenArgs extends PIRGenMemories {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@ArgInNew(init) => 
-      //emit(quote(lhs, 0), s"top.argFringe.argIn(init=${getConstant(init).get})", rhs)
-      //boundOf.get(lhs).foreach { bound =>
-        //emit(s"boundOf(${quote(lhs, 0)}) = ${bound}")
-      //}
-    case SetArgIn(reg, v)  => emit(src"val $lhs = $reg.set($v)")
-    case ArgInRead(reg)    => emit(src"val $lhs = $reg.value")
+      emitc(lhs, src"top.argFringe.argIn(init=${getConstant(init).get})", rhs)
+      boundOf.get(lhs).foreach { bound =>
+        emit(src"boundOf(${lhs}) = ${bound}")
+      }
+    case SetArgIn(reg, v)  => emitDummy(lhs, rhs)
+    case ArgInRead(reg)    => emitDummy(lhs, rhs)
 
-    case op@ArgOutNew(init)    => emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}]($init)") }
-    case ArgOutWrite(reg,v,en) => emit(src"val $lhs = if (${and(en)}) $reg.set($v)")
-    case GetArgOut(reg)        => emit(src"val $lhs = $reg.value")
+    case op@ArgOutNew(init)    => 
+        emitc(lhs, src"top.argFringe.argOut(init=${getConstant(init).get})", rhs)
+    case ArgOutWrite(reg,v,en) => emitDummy(lhs, rhs)
+    case GetArgOut(reg)        => emitDummy(lhs, rhs)
     case _ => super.gen(lhs, rhs)
   }
 

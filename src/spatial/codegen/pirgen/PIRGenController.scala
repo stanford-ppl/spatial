@@ -87,7 +87,7 @@ trait PIRGenController extends PIRGenControl with PIRGenStream with PIRGenMemori
     }
   }
 
-  private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_])(contents: => Unit): Unit = {
+  private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_])(contents: => Unit): Unit = withCtrl(lhs) {
     val ins    = func.nestedInputs
     val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Nil)
     val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).distinct.filterNot(_.isMem) diff binds
@@ -113,45 +113,44 @@ trait PIRGenController extends PIRGenControl with PIRGenStream with PIRGenMemori
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case AccelScope(func) =>
-      inAccel {
-        emit(src"/** BEGIN HARDWARE BLOCK $lhs **/")
-        globalMems = true
-        if (!lhs.willRunForever) {
-          open(src"def accel(): Unit = {")
-          open(src"val $lhs = try {")
-          visitBlock(func)
-          close("}")
-          open("catch {")
-          emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
-          emit(src"""case t: Throwable => throw t""")
-          close("}")
-          close("}")
-          emit("accel()")
+    case AccelScope(func) => withCtrl(lhs) {
+      emit(src"/** BEGIN HARDWARE BLOCK $lhs **/")
+      globalMems = true
+      if (!lhs.willRunForever) {
+        open(src"def accel(): Unit = {")
+        open(src"val $lhs = try {")
+        visitBlock(func)
+        close("}")
+        open("catch {")
+        emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
+        emit(src"""case t: Throwable => throw t""")
+        close("}")
+        close("}")
+        emit("accel()")
+      }
+      else {
+        if (streamIns.nonEmpty) {
+          emit(src"def hasItems = " + streamIns.map(quote).map(_ + ".nonEmpty").mkString(" || "))
         }
         else {
-          if (streamIns.nonEmpty) {
-            emit(src"def hasItems = " + streamIns.map(quote).map(_ + ".nonEmpty").mkString(" || "))
-          }
-          else {
-            emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
-            emit(src"val ${lhs}_iters = Console.readLine.toInt")
-            emit(src"var ${lhs}_ctr = 0")
-            emit(src"def hasItems: Boolean = { val has = ${lhs}_ctr < ${lhs}_iters ; ${lhs}_ctr += 1; has }")
-          }
-          open(src"while(hasItems) {")
-          emitControlBlock(lhs, func)
-          close("}")
-          emit(src"val $lhs = ()")
+          emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
+          emit(src"val ${lhs}_iters = Console.readLine.toInt")
+          emit(src"var ${lhs}_ctr = 0")
+          emit(src"def hasItems: Boolean = { val has = ${lhs}_ctr < ${lhs}_iters ; ${lhs}_ctr += 1; has }")
         }
-        streamOuts.foreach{case x@Op(StreamOutNew(bus)) =>
-          if (!bus.isInstanceOf[DRAMBus[_]]) emit(src"$x.dump()") // HACK: Print out streams after block finishes running
-        }
-        emitControlDone(lhs)
-        bufferedOuts.foreach{buff => emit(src"$buff.close()") }
-        globalMems = false
-        emit(src"/** END HARDWARE BLOCK $lhs **/")
+        open(src"while(hasItems) {")
+        emitControlBlock(lhs, func)
+        close("}")
+        emit(src"val $lhs = ()")
       }
+      streamOuts.foreach{case x@Op(StreamOutNew(bus)) =>
+        if (!bus.isInstanceOf[DRAMBus[_]]) emit(src"$x.dump()") // HACK: Print out streams after block finishes running
+      }
+      emitControlDone(lhs)
+      bufferedOuts.foreach{buff => emit(src"$buff.close()") }
+      globalMems = false
+      emit(src"/** END HARDWARE BLOCK $lhs **/")
+    }
 
 
     case UnitPipe(ens, func) =>

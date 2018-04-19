@@ -61,8 +61,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     final def runApp(): Result = {
       var result: Result = Unknown
       runtimeArgs.cmds.foreach { args =>
-        val a = args.split(" ").map(_.trim).filter(_.nonEmpty)
-        result = result orElse command("run", runArgs ++ a, backend.runTimeout, backend.parseRunError)
+        result = result orElse command("run", runArgs :+ args, backend.runTimeout, backend.parseRunError)
       }
       result orElse Pass
     }
@@ -73,9 +72,9 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       val stageArgs = test.compileArgs.cmds
       stageArgs.iterator.map{cmd => () => {
         try {
-          val backArgs = backend.args.split(" ").map(_.trim)
-          val stageArgs = cmd.split(" ").map(_.trim)
-          val args = backArgs ++ stageArgs ++ Seq("-v")
+          val backArgs = backend.args.split(" ").map(_.trim).filterNot(_.isEmpty)
+          val stageArgs = cmd.split(" ").map(_.trim).filterNot(_.isEmpty)
+          val args = backArgs ++ stageArgs ++ Seq("-v", "--test")
           val f = Future{ scala.concurrent.blocking {
             init(args)
             IR.config.genDir = s"${IR.config.cwd}/gen/$backend/$name/"
@@ -96,6 +95,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
       val cmdLog = new PrintStream(IR.config.logDir + s"/$pass.log")
       var cause: Result = Unknown
+      Console.out.println(args.mkString(" "))
       val cmd = new Subprocess(args:_*)({case (line,_) =>
         val err = parse(line)
         cause = cause.orElse(err)
@@ -153,7 +153,6 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       }
     }
   }
-
 
   object IGNORE_TEST extends Backend(
     name = "Ignore",

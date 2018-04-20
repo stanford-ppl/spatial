@@ -12,7 +12,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
 
-  def emitBankedLoad(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
+  def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //readersOf(mem).find{_.node == lhs}.get.ctrlNode
@@ -39,7 +39,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     
   }
 
-  def emitBankedStore(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
+  def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
@@ -120,18 +120,26 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
-
+    // SRAMs
     case op: SRAMNew[_,_] => emitMem(lhs, "SRAM", None)
+    case op@SRAMBankedRead(sram,bank,ofs,ens) => emitRead(lhs, sram, bank, ofs, ens)
+    case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitWrite(lhs, sram, data, bank, ofs, ens)
 
-    case op@SRAMBankedRead(sram,bank,ofs,ens) => emitBankedLoad(lhs, sram, bank, ofs, ens)
-
-    case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitBankedStore(lhs, sram, data, bank, ofs, ens)
-
+    // Registers
     case RegNew(init) => emitMem(lhs, "FF", None)
+    case RegWrite(reg, data, ens) => emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
+    case RegRead(reg) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set())) 
 
-    case RegWrite(reg, data, ens) => emitBankedStore(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-
-    case RegRead(reg) => emitBankedLoad(lhs, reg, Seq(Seq()), Seq(), Seq(Set())) 
+    // FIFOs
+    case FIFONew(depths) => emitMem(lhs, "FIFO", None)
+    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io.empty")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io.almostFull")
+    case op@FIFOPeek(fifo,_) => emit(src"val $lhs = $fifo.io.output.data(0)")
+    case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.io.numel")
+    case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq(Seq()), Seq(), ens)
+    case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq(Seq()), Seq(), ens)
 
     case _ => super.gen(lhs, rhs)
   }

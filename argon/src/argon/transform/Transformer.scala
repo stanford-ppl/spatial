@@ -51,6 +51,7 @@ abstract class Transformer extends Pass {
 
   protected def transformSym[T](sym: Sym[T]): Sym[T]
   protected def transformBlock[T](block: Block[T]): Block[T] = {
+    logs(s"Transformed block inputs: ${block.inputs} -> ${f(block.inputs)}")
     stageScope(f(block.inputs),block.options){ inlineBlock(block) }
   }
 

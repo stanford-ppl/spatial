@@ -10,10 +10,14 @@ import spatial.dsl._
     val b = ArgIn[I32]
     val c = ArgIn[I32]
     val d = ArgOut[I32]
+    setArg(a, 3)
+    setArg(b, 5)
+    setArg(c, 10)
     Accel {
       d := a * b + c
     }
     println("d: " + getArg(d))
+    assert(getArg(d) == 25)
   }
 }
 
@@ -62,6 +66,7 @@ import spatial.dsl._
     val gold = 3*(N + 4 + 4 + 9) + N / 4
     println("expected: " + gold)
     println("result: " + result)
+    assert(gold == result)
   }
 }
 
@@ -70,16 +75,20 @@ import spatial.dsl._
 
   def main(args: Array[String]): Void = {
     val x = ArgOut[Bit]
+    val nx = ArgOut[Bit]
     Accel {
       val y = random[Bit]
       x := !y
+      nx := y
     }
     println(r"bit: $x")
+    assert(getArg(x) != getArg(nx))
   }
 }
 
 @test class RetimeOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends = DISABLE // TODO: Rewrite
 
   def main(args: Array[String]): Void = {
     Accel {

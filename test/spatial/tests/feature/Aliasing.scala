@@ -21,6 +21,7 @@ import spatial.dsl._
                           //                     ^       ^
                           //                     0       1      = z
       println(z(0))       // Should be 10
+      assert(z(0) == 10)
     }
   }
 }

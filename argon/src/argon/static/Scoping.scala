@@ -65,6 +65,7 @@ trait Scoping {
 
     if (config.enLog) {
       logs(s"Completed block ${sched.block}")
+      logs(s"Inputs:  $inputs")
       sched.block.stms.foreach{s => logs(s"  ${stm(s)}") }
       logs(s"Effects: ${sched.block.effects}")
       logs(s"Escaping: ")

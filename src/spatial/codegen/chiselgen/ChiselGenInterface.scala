@@ -5,9 +5,11 @@ import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.internal.{spatialConfig => cfg}
+import spatial.data._
+import spatial.util._
 
 
-trait ChiselGenDRAM extends ChiselGenCommon {
+trait ChiselGenInterface extends ChiselGenCommon {
 
   var loadsList = List[Sym[_]]()
   var storesList = List[Sym[_]]()
@@ -16,15 +18,55 @@ trait ChiselGenDRAM extends ChiselGenCommon {
   var dramsList = List[Sym[_]]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    // case op@DRAMNew(dims,zero) =>
-    //   dramsList = dramsList :+ lhs
-    //   if (argMapping(lhs) == (-1,-1,-1)) {
-    //     throw new spatial.UnusedDRAMException(lhs, lhs.name.getOrElse("noname"))
-    //   }
+    case InputArguments()       => 
+    case ArgInNew(init)  => 
+      argIns += (lhs -> argIns.toList.length)
+    case ArgOutNew(init) => 
+      enterAccel()
+      emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)
+      emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, Bool()))", forceful=true)
+      argOuts += (lhs -> argOuts.toList.length)
+      emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
+      emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
+      exitAccel()
 
-    // case GetDRAMAddress(dram) =>
-    //   val id = argMapping(dram).argInId
-    //   emit(src"""val $lhs = io.argIns($id)""")
+    case GetArgOut(reg) => 
+      argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
+      // emitGlobalWireMap(src"""${lhs}""",src"Wire(${newWire(reg.tp.typeArguments.head)})")
+      emitt(src"""${lhs}.r := io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
+
+
+    case ArgInRead(reg) => 
+        emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
+        emitGlobalWire(src"""${lhs}.r := io.argIns(${argIns(reg)})""")
+
+    case ArgOutWrite(reg, v, en) =>
+      val id = argOuts(reg)
+      emitt(src"val ${lhs}_wId = getArgOutLane($id)")
+      v.tp match {
+        case FixPtType(s,d,f) => 
+          if (s) {
+            val pad = 64 - d - f
+            if (pad > 0) {
+              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")  
+            } else {
+              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
+            }
+          } else {
+            emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
+          }
+        case _ => 
+          emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
+      }
+      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
+      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), src"${if (en.isEmpty) 0 else enableRetimeMatch(en.head, lhs)}.toInt")}""")
+
+    case DRAMNew(dims, _) => 
+      drams += (lhs -> drams.toList.length)
+
+    case GetDRAMAddress(dram) =>
+      val id = argHandle(dram)
+      emit(src"""val $lhs = io.argIns(api.$id)""")
 
     // case FringeDenseLoad(dram,cmdStream,dataStream) =>
     //   // Find stages that pushes to cmdstream and dataStream
@@ -224,6 +266,15 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
     inGen(out, "Instantiator.scala") {
       emit("")
+      emit("// Scalars")
+      emit(s"val numArgIns_reg = ${argIns.toList.length}")
+      emit(s"val numArgOuts_reg = ${argOuts.toList.length}")
+      emit(s"val numArgIOs_reg = ${argIOs.toList.length}")
+      argIns.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIns($i) ( ${p._1.name.getOrElse("")} )""") }
+      argOuts.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argOuts($i) ( ${p._1.name.getOrElse("")} )""") }
+      argIOs.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIOs($i) ( ${p._1.name.getOrElse("")} )""") }
+      emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
+      emit("")
       emit(s"// Memory streams")
       emit(src"""val loadStreamInfo = List(${loadParMapping.map(_.replace("FringeGlobals.",""))}) """)
       emit(src"""val storeStreamInfo = List(${storeParMapping.map(_.replace("FringeGlobals.",""))}) """)
@@ -232,11 +283,28 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     }
 
     inGenn(out, "IOModule", ext) {
+      emit("// Scalars")
+      emit(s"val io_numArgIns_reg = ${argIns.toList.length}")
+      emit(s"val io_numArgOuts_reg = ${argOuts.toList.length}")
+      emit(s"val io_numArgIOs_reg = ${argIOs.toList.length}")
+      emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
       emit("// Memory Streams")
       emit(src"""val io_loadStreamInfo = List($loadParMapping) """)
       emit(src"""val io_storeStreamInfo = List($storeParMapping) """)
       emit(src"val io_numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */")
- 
+    }
+
+    inGen(out, "ArgAPI.scala") {
+      open("object api {")
+      emit("\n// ArgIns")
+      argIns.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
+      emit("\n// ArgIOs")
+      argIOs.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length}")}
+      emit("\n// ArgOuts")
+      argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
+      emit("\n// DRAM Ptrs:")
+      drams.foreach {case (d, id) => emit(src"val ${argHandle(d)}_ptr = ${id+argIns.toList.length+argIOs.toList.length}")}
+      close("}")
     }
     exitAccel()
     super.emitFooter()

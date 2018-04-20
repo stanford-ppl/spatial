@@ -1,7 +1,8 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
+
+import spatial.data._
 
 trait CppFileGen extends CppCodegen {
 
@@ -105,16 +106,15 @@ trait CppFileGen extends CppCodegen {
       close("}")
       emit("")
       open("void printHelp() {")
-        val argInts = cliArgs.toSeq.map(_._1)
-        val argsList = if (argInts.nonEmpty) {
-          (0 to argInts.max).map{i =>
-            if (cliArgs.contains(i)) s"<$i- ${cliArgs(i)}>" else s"<$i - UNUSED>"
-          }.mkString(" ")
-        }
-        else {"<No input args>"}
+        val argsList = CLIArgs.listNames.mkString(" ")
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
+<<<<<<< HEAD
   	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
   	    emit(s"""exit(0);""")
+=======
+  	    emit(s"""fprintf(stderr, "  -- bash run.sh $argsList\\n\\n");""")
+  	    emit(s"""return;""")
+>>>>>>> origin/master
       close("}")
 
       emit("")

@@ -55,6 +55,24 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  var argHandleMap = scala.collection.mutable.HashMap[Sym[_], String]() // Map for tracking defs of nodes and if they get redeffed anywhere, we map it to a suffix
+  def argHandle(d: Sym[_]): String = {
+    if (argHandleMap.contains(d)) {
+      argHandleMap(d)
+    } else {
+      val attempted_name = d.name.getOrElse(quote(d)).toUpperCase
+      if (argHandleMap.values.toList.contains(attempted_name)) {
+        val taken = argHandleMap.values.toList.filter(_.contains(attempted_name))
+        val given_name = attempted_name + "_dup" + taken.length
+        argHandleMap += (d -> given_name)
+        given_name
+      } else {
+        argHandleMap += (d -> attempted_name)
+        attempted_name
+      }
+    }
+  }
+
   def emitCounterChain(lhs: Sym[_], suffix: String = ""): Unit = {
     if (!lhs.cchains.isEmpty) {
       val cchain = lhs.cchains.head
@@ -375,6 +393,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     case FltPtType(g,e) => g+e; 
     case BitType() => 1
     case t: Vec[_] => t.width * bitWidth(t.typeArgs.head)
+    case st: Struct[_] => st.fields.map{case (name, typ) => bitWidth(typ)}.sum
   }
   protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 

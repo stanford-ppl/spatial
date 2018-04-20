@@ -15,22 +15,6 @@ trait ChiselGenReg extends ChiselGenCommon {
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case InputArguments()       => 
-	case ArgInNew(init)  => 
-      argIns += (lhs -> (argIns.toList.length + drams.toList.length))
-    case ArgOutNew(init) => 
-      enterAccel()
-      emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)
-      emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, Bool()))", forceful=true)
-      argOuts += (lhs -> (argOuts.toList.length + argOuts.toList.length))
-      emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
-      emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
-      exitAccel()
-
-    case GetArgOut(reg) => 
-      argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
-      // emitGlobalWireMap(src"""${lhs}""",src"Wire(${newWire(reg.tp.typeArguments.head)})")
-      emitt(src"""${lhs}.r := io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
 
     // case HostIONew(init) =>
     //   emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful = true)
@@ -106,31 +90,6 @@ trait ChiselGenReg extends ChiselGenCommon {
     //         }
     //     } // TODO: Figure out which reg is really the accum
     //   }
-
-    case ArgInRead(reg) => 
-        emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
-        emitGlobalWire(src"""${lhs}.r := io.argIns(${argIns(reg)})""")
-
-    case ArgOutWrite(reg, v, en) =>
-      val id = argOuts(reg)
-      emitt(src"val ${lhs}_wId = getArgOutLane($id)")
-      v.tp match {
-        case FixPtType(s,d,f) => 
-          if (s) {
-            val pad = 64 - d - f
-            if (pad > 0) {
-              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")  
-            } else {
-              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
-            }
-          } else {
-            emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
-          }
-        case _ => 
-          emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
-      }
-      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), src"${if (en.isEmpty) 0 else enableRetimeMatch(en.head, lhs)}.toInt")}""")
 
     // case RegRead(reg)    => 
     //   val lhs_sym = quote(lhs)
@@ -261,38 +220,5 @@ trait ChiselGenReg extends ChiselGenCommon {
 	case _ => super.gen(lhs, rhs)
   }
 
-  override def emitFooter(): Unit = {
-    enterAccel()
-    // inGenn(out, "BufferControlCxns", ext)) {
-    //   nbufs.foreach{ case (mem, i) => 
-    //     val info = bufferControlInfo(mem, i)
-    //     info.zipWithIndex.foreach{ case (inf, port) => 
-    //       emitt(src"""${swap(src"${mem}_${i}", Blank)}.connectStageCtrl(${DL(swap(quote(inf._1), Done), 1, true)}, ${swap(quote(inf._1), BaseEn)}, List(${port})) ${inf._2}""")
-    //     }
-    //   }
-    // }
-    inGen(out, "Instantiator.scala") {
-      emit("")
-      emit("// Scalars")
-      emit(s"val numArgIns_reg = ${argIns.toList.length}")
-      emit(s"val numArgOuts_reg = ${argOuts.toList.length}")
-      emit(s"val numArgIOs_reg = ${argIOs.toList.length}")
-      argIns.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIns($i) ( ${p._1.name.getOrElse("")} )""") }
-      argOuts.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argOuts($i) ( ${p._1.name.getOrElse("")} )""") }
-      argIOs.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIOs($i) ( ${p._1.name.getOrElse("")} )""") }
-      emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
-    }
-
-    inGenn(out, "IOModule", ext) {
-      emitt("// Scalars")
-      emitt(s"val io_numArgIns_reg = ${argIns.toList.length}")
-      emitt(s"val io_numArgOuts_reg = ${argOuts.toList.length}")
-      emitt(s"val io_numArgIOs_reg = ${argIOs.toList.length}")
-      emitt(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
-
-    }
-    exitAccel()
-    super.emitFooter()
-  }
 
 }

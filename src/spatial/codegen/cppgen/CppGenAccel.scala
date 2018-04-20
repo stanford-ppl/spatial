@@ -128,9 +128,10 @@ trait CppGenAccel extends CppGenCommon {
 
     case AssertIf(en, cond, m) => 
       // Emits will only happen if outside the accel
-      val str = src"""${m.getOrElse("API assert failed with no message provided")}"""
+      val str = src"""${m.getOrElse("\"API assert failed with no message provided\"")}"""
       emit(src"""string $lhs = string_plus("\n=================\n", string_plus($str, "\n=================\n"));""")
-      emit(src"""if ($en) { ASSERT($cond, ${lhs}.c_str()); }""")
+      val enable = if (en.toList.isEmpty) "true" else en.map(quote).mkString("&")
+      emit(src"""if ($enable) { ASSERT($cond, ${lhs}.c_str()); }""")
       if (scope == "accel") earlyExits = earlyExits :+ lhs
 
     case BreakpointIf(en) => 

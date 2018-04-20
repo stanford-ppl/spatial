@@ -9,6 +9,10 @@ abstract class FltOp[M:INT,E:INT,R:Type] extends Primitive[R] {
 }
 abstract class FltOp1[M:INT,E:INT] extends FltOp[M,E,Flt[M,E]]
 
+@op case class FltIsPosInf[M:INT,E:INT](a: Flt[M,E]) extends FltOp[M,E,Bit]
+@op case class FltIsNegInf[M:INT,E:INT](a: Flt[M,E]) extends FltOp[M,E,Bit]
+@op case class FltIsNaN[M:INT,E:INT](a: Flt[M,E]) extends FltOp[M,E,Bit]
+
 @op case class FltNeg[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltAdd[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltSub[M:INT,E:INT](a: Flt[M,E], b: Flt[M,E]) extends FltOp1[M,E]

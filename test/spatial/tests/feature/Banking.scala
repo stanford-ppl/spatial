@@ -6,11 +6,17 @@ import spatial.dsl._
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
+    val dram = DRAM[I32](64)
     Accel {
       val sram = SRAM[I32](64)
       Foreach(64 par 16){i => sram(i) = i + 1  }
       Foreach(64 par 16){i => println(sram(i)) }
+
+      dram store sram
     }
+    val golden = Array.tabulate(64){i => i + 1 }
+    val output = getMem(dram)
+    assert(golden == output)
   }
 }
 
@@ -20,16 +26,24 @@ import spatial.dsl._
 
   def main(args: Array[String]): Void = {
     val x = ArgIn[I32]
+    val dram = DRAM[I32](64)
     Accel {
       val sram = SRAM[I32](64)
       Foreach(64 par 16){i => sram(i + x.value) = i + x.value }
       Foreach(64 par 16){i => println(sram(i)) }
+
+      dram store sram
     }
+
+    val golden = Array.tabulate(64){i => i }
+    val output = getMem(dram)
+    assert(golden == output)
   }
 }
 
 @test class RandomOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends = DISABLE // TODO: Rewrite
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -47,6 +61,7 @@ import spatial.dsl._
 
 @test class RandomOffsetTestWrite extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends = DISABLE // TODO: Rewrite
 
   def main(args: Array[String]): Void = {
     Accel {
@@ -93,6 +108,7 @@ import spatial.dsl._
 // Nonsensical app, just to get structure there.
 @test class TwoDuplicatesPachinko extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends = DISABLE // TODO: Rewrite
 
   def main(args: Array[String]): Void = {
     val dram = DRAM[Int](512)
@@ -132,6 +148,7 @@ import spatial.dsl._
       }
     }
 
+    assert(getArg(out) == 7)
   }
 }
 
@@ -149,6 +166,8 @@ import spatial.dsl._
         Pipe { out2 := reg.value }
       }
     }
+    assert(getArg(out1) == 15)
+    assert(getArg(out2) == 15)
   }
 }
 
@@ -156,10 +175,11 @@ import spatial.dsl._
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
+    val out1 = ArgOut[Int]
+    val out2 = ArgOut[Int]
+
     Accel {
       val sram = SRAM[Int](32)
-      val out1 = ArgOut[Int]
-      val out2 = ArgOut[Int]
       Foreach(16 by 1){i =>
         Foreach(16 by 1){j => sram(j) = i*j }
         val sum = Reduce(0)(16 par 2){j => sram(j) }{_+_}
@@ -168,6 +188,13 @@ import spatial.dsl._
         out2 := product
       }
     }
+
+    val data = Array.tabulate(16){i => i*15 }
+    val sum  = data.reduce{_+_}
+    val prod = data.reduce{_*_}
+
+    assert(getArg(out1) == sum)
+    assert(getArg(out2) == prod)
   }
 }
 
@@ -175,11 +202,11 @@ import spatial.dsl._
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {
+    val out1 = ArgOut[Int]
+
     Accel {
       val sram = SRAM[Int](16)
       val addr = SRAM[Int](16)
-      val out1 = ArgOut[Int]
-      val out2 = ArgOut[Int]
       Foreach(16 by 1){i =>
         Foreach(16 by 1 par 2){j =>
           sram(j) = i*j
@@ -189,6 +216,11 @@ import spatial.dsl._
         out1 := sum
       }
     }
+
+    val addr = Array.tabulate(16){i => 16 - i }
+    val data = Array.tabulate(16){i => i * 15 }
+    val gold = Array.tabulate(16){i => data(addr(i)) }.reduce{_+_}
+    assert(getArg(out1) == gold)
   }
 }
 
@@ -226,6 +258,7 @@ import spatial.dsl._
 
     val cksum = gold == result
     println(r"PASS: $cksum (MemTest1D)")
+    assert(cksum)
   }
 }
 

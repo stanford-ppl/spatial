@@ -85,11 +85,14 @@ trait SpatialTest extends Spatial with DSLTest {
   final override def postprocess(block: argon.Block[_]): Unit = {
     import argon._
     import spatial.node.AssertIf
+    super.postprocess(block)
 
-    val stms = block.nestedStms
-    val hasAssert = stms.exists{case Op(_:AssertIf) => true; case _ => false }
-    if (!hasAssert) throw Indeterminate
-    checkIR(block)
+    if (config.test) {
+      val stms = block.nestedStms
+      val hasAssert = stms.exists{case Op(_: AssertIf) => true; case _ => false }
+      if (!hasAssert) throw Indeterminate
+      checkIR(block)
+    }
   }
 
 }

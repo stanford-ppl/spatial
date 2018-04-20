@@ -79,6 +79,7 @@ import spatial.dsl._
     printArray(out, "out")
     printArray(gold, "gold")
     println("PASS: " + isCorrect)
+    assert(isCorrect)
   }
 }
 

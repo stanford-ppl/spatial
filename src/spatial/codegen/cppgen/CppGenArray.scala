@@ -114,7 +114,7 @@ trait CppGenArray extends CppGenCommon {
           close("};")
         }
       }
-      emit(src"${struct} $lhs = ${struct}(${st.map{f => {if (!isConst(f._2) & !isArrayType(f._2)) "&" else ""} + src"&${f._2}"}.mkString(",")});")
+      emit(src"${struct} $lhs = ${struct}(${st.map{f => {if (!f._2.isConst & !isArrayType(f._2.tp)) "&" else ""} + src"&${f._2}"}.mkString(",")});")
 
     case FieldApply(struct, field) => emit(src"""${lhs.tp} $lhs = *${struct}.$field;""")
 

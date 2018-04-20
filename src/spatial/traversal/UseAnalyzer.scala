@@ -17,11 +17,13 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
     metadata.clear[MUsers](lhs)
 
-    if (inHw) checkUses(lhs, rhs)
-    if (isEphemeral(lhs)) addPendingUse(lhs)
+    def inspect(): Unit = {
+      if (inHw) checkUses(lhs, rhs)
+      if (isEphemeral(lhs)) addPendingUse(lhs)
+      super.visit(lhs, rhs)
+    }
 
-    if (isControl(lhs)) withCtrl(lhs){ super.visit(lhs,rhs) }
-    else super.visit(lhs, rhs)
+    if (isControl(lhs)) withCtrl(lhs){ inspect() } else inspect()
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
@@ -49,7 +51,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
   }
 
   private def addUse(user: Sym[_], used: Set[Sym[_]], block: Ctrl): Unit = {
-    dbgs(s"  Uses:")
+    dbgs(s"  Uses [Block: $block]:")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
     used.foreach{node =>

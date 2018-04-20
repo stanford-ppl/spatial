@@ -158,9 +158,9 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     val xBarR = Vec(numXBarR, Input(new R_XBar(ofsWidth, banksWidths))) 
     val directW = HVec(Array.tabulate(numDirectW){i => Input(new W_Direct(ofsWidth, if (hasDirectW) directWMux.toSeq.sortBy(_._1).toMap.values.flatten.toList(i) else defaultDirect, bitWidth))})
     val directR = HVec(Array.tabulate(numDirectR){i => Input(new R_Direct(ofsWidth, if (hasDirectR) directRMux.toSeq.sortBy(_._1).toMap.values.flatten.toList(i) else defaultDirect))})
-    val flow = Vec(xBarRMux.values.sum + directRMux.values.flatten.toList.length, Input(Bool()))
+    val flow = Vec(1 max {xBarRMux.values.sum + directRMux.values.flatten.toList.length}, Input(Bool()))
     val output = new Bundle {
-      val data  = Vec(totalOutputs, Output(UInt(bitWidth.W)))
+      val data  = Vec(1 max totalOutputs, Output(UInt(bitWidth.W)))
     }
   })
 
@@ -288,7 +288,7 @@ class FF(val bitWidth: Int,
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
 
   val io = IO(new Bundle{
-    val input = Vec(xBarWMux.toList.length, Input(new W_XBar(1, List(1), bitWidth)))
+    val input = Vec(xBarWMux.toList.length max 1, Input(new W_XBar(1, List(1), bitWidth)))
     val output = new Bundle {
       val data  = Output(UInt(bitWidth.W))
     }

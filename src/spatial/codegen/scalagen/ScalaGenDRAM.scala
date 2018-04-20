@@ -80,6 +80,23 @@ trait ScalaGenDRAM extends ScalaGenMemories {
       close("}")
       emit(src"$cmdStream.clear()")
 
+    case MemDenseAlias(cond, mems, _) =>
+      open(src"val $lhs = {")
+        cond.zip(mems).zipWithIndex.foreach{case ((c,mem),idx) =>
+          if (idx == 0) emit(src"if ($c) $mem")
+          else          emit(src"else if ($c) $mem")
+        }
+        emit(src"else null.asInstanceOf[${lhs.tp}]")
+      close("}")
+
+    case MemSparseAlias(cond, mems, _) =>
+      open(src"val $lhs = {")
+      cond.zip(mems).zipWithIndex.foreach{case ((c,mem),idx) =>
+        if (idx == 0) emit(src"if ($c) $mem")
+        else          emit(src"else if ($c) $mem")
+      }
+      emit(src"else null.asInstanceOf[${lhs.tp}]")
+      close("}")
 
     case _ => super.gen(lhs, rhs)
   }

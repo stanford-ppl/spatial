@@ -21,7 +21,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case VecApply(vector, i) => emitGlobalWireMap(src"""$lhs""", src"""Wire(${lhs.tp})"""); emit(src"$lhs := $vector.apply($i)")
 
     // case FixLt(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x < $y")
-    // case FixLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x <= $y")
+    case FixLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x <= $y")
     // case FixNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x =/= $y")
     case FixEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x === $y")
     // case UnbMul(x,y) => emit(src"val $lhs = $x *& $y")
@@ -30,9 +30,11 @@ trait ChiselGenMath extends ChiselGenCommon {
     // case SatSub(x,y) => emit(src"val $lhs = $x <-> $y")
     // case SatMul(x,y) => emit(src"val $lhs = $x <*> $y")
     // case SatDiv(x,y) => emit(src"val $lhs = $x </> $y")
-    // case FixLsh(x,Const(yy))  => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := ($x << $yy).r // TODO: cast to proper type (chisel expands bits)")
-    // case FixRsh(x,Const(yy))  => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := ($x >> $yy).r")
-    // case FixURsh(x,Const(yy)) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := ($x >>> $yy).r")
+    case FixSLA(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := ($x << $y).r // TODO: cast to proper type (chisel expands bits)")
+    case FixSRA(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := ($x >> $y).r")
+    case FixSRU(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs}.r := ($x >>> $y).r")
+    case BitRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}) === 1.U")
+    case FixRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)})")
     // case UnbSatMul(x,y) => emit(src"val $lhs = $x <*&> $y")
     // case UnbSatDiv(x,y) => emit(src"val $lhs = $x </&> $y")
     // case FixRandom(x) =>
@@ -169,6 +171,12 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FloatType()  => emit(src"val $lhs = Utils.frec($x)")
     }
     
+    case And(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs} := $a & $b")
+    case Or(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs} := $a | $b")
+    case Xor(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"${lhs} := $a ^ $b")
+
+    case DataAsBits(data) => emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})");emit(src"${lhs}.zipWithIndex.foreach{case (b, i) => b := ${data}(i)")
+    case BitsAsData(data, fmt) => emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})");emit(src"${lhs}.r := chisel3.Util.Cat(${data})")
     // case FltInvSqrt(x) => x.tp match {
     //   case DoubleType() => throw new Exception("DoubleType not supported for FltInvSqrt") 
     //   case HalfType() =>  emit(src"val $lhs = Utils.frsqrt($x)")

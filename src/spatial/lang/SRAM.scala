@@ -2,8 +2,8 @@ package spatial.lang
 
 import argon._
 import forge.tags._
+import spatial.data.writeBuffer
 import utils.implicits.collections._
-
 import spatial.node._
 import spatial.lang.types._
 
@@ -25,6 +25,14 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   @api def dim2: I32 = dims.indexOrElse(2, I32(1))
   @api def dim3: I32 = dims.indexOrElse(3, I32(1))
   @api def dim4: I32 = dims.indexOrElse(4, I32(1))
+
+  /** Creates an alias of this SRAM with parallel access in the last dimension. */
+  @api def par(p: I32): C[A] = {
+    implicit val C: Type[C[A]] = this.selfType
+    val ds = this.dims
+    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => i.toSeries } :+ (ds.last par p)
+    stage(MemDenseAlias(me,ranges))
+  }
 
   /** Returns the value at `addr`.
     * The number of indices should match the SRAM's rank.
@@ -50,6 +58,8 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
       error(ctx)
     }
   }
+
+  def buffer: C[A] = { writeBuffer.enableOn(this); me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
@@ -107,8 +117,6 @@ object SRAM {
 
   /** Updates the value at (`row`,`col`) to `data`. */
   @api def update(row: I32, col: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
-
-
 
 }
 

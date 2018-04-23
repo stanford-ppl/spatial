@@ -11,9 +11,9 @@ import spatial.lang._
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
   private val MAGIC_CUTOFF_N = 1.4
-  private val k = bound[I32]
-  private val k0 = bound[I32]
-  private val k1 = bound[I32]
+  private val k = boundVar[I32]
+  private val k0 = boundVar[I32]
+  private val k1 = boundVar[I32]
   private val Bs = Seq(2, 4, 8, 16, 32, 64, 128, 256)
 
   override def bankAccesses(

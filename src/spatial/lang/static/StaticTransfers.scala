@@ -21,6 +21,18 @@ trait StaticTransfers {
   }
 
   /**
+    * Transfer a scalar value from the host to the accelerator through the HostIO `reg`.
+    */
+  @api def setArg[A](reg: HostIO[A], value: Lift[A]): Void = {
+    implicit val bA: Bits[A] = reg.A
+    stage(SetHostIO(reg,value.unbox))
+  }
+  @api def setArg[A](reg: HostIO[A], value: Bits[A]): Void = {
+    implicit val bA: Bits[A] = reg.A
+    stage(SetHostIO(reg,value.unbox))
+  }
+
+  /**
     * Transfer a scalar value from the accelerator to the host through the ArgOut `reg`.
     */
   @api def getArg[A](reg: ArgOut[A]): A = {
@@ -28,6 +40,13 @@ trait StaticTransfers {
     stage(GetArgOut(reg))
   }
 
+  /**
+    * Transfer a scalar value from the accelerator to the host through the HostIO `reg`.
+    */
+  @api def getArg[A](reg: HostIO[A]): A = {
+    implicit val bA: Bits[A] = reg.A
+    stage(GetHostIO(reg))
+  }
 
   /** Transfers the given @Array of `data` from the host's memory to `dram`'s region of accelerator DRAM. **/
   @api def setMem[A:Bits,C[T]](dram: DRAM[A,C], data: Tensor1[A]): Void = stage(SetMem(dram,data))

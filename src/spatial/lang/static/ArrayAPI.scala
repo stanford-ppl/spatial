@@ -3,6 +3,7 @@ package static
 
 import argon._
 import forge.tags._
+import spatial.node.CharArrayToText
 
 trait ArrayAPI {
 
@@ -11,5 +12,7 @@ trait ArrayAPI {
 
     @api def flatten: Tensor1[A] = a.flatMap{x => x}
   }
+
+  @api def charArrayToString(a: Tensor1[U8]): Text = stage(CharArrayToText(a))
 
 }

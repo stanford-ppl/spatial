@@ -16,6 +16,14 @@ import spatial.node._
     case b         => this ++ Text(b.toString)
   }
 
+  @api def length: I32 = stage(TextLength(this))
+  @api def apply(i: I32): U8 = stage(TextApply(this, i))
+  @api def slice(start: I32, end: I32): Text = stage(TextSlice(this, start, end))
+
+  @api def map[R:Type](f: U8 => R): Tensor1[R] = Tensor1.tabulate(this.length){i => f(this(i)) }
+
+  @api def toCharArray: Tensor1[U8] = this.map{c => c}
+
   // --- Typeclass Methods
   override protected val __isPrimitive: Boolean = true
 }

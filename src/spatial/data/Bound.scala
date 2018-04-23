@@ -1,6 +1,5 @@
 package spatial.data
 
-import forge.tags._
 import argon._
 import emul.FixedPoint
 
@@ -8,6 +7,7 @@ import emul.FixedPoint
 abstract class Bound(x: Int) { def toInt: Int = x }
 case class Final(x: Int) extends Bound(x)
 case class Expect(x: Int) extends Bound(x)
+case class UpperBound(x: Int) extends Bound(x)
 
 case class SymbolBound(bound: Bound) extends FlowData[SymbolBound]
 object boundOf {
@@ -34,5 +34,9 @@ object Final {
 
 object Expect {
   def unapply(x: Bound): Option[Int] = Some(x.toInt)
+  def unapply(x: Sym[_]): Option[Int] = boundOf.get(x).map(_.toInt)
+}
+
+object Upper {
   def unapply(x: Sym[_]): Option[Int] = boundOf.get(x).map(_.toInt)
 }

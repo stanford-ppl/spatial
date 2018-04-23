@@ -19,6 +19,18 @@ import spatial.lang._
   override val debugOnly: Boolean = true
 }
 
+@op case class TextLength(a: Text) extends Primitive[I32] {
+  override val debugOnly: Boolean = true
+}
+
+@op case class TextApply(a: Text, i: I32) extends Primitive[U8] {
+  override val debugOnly: Boolean = true
+}
+
+@op case class TextSlice(a: Text, start: I32, end: I32) extends Primitive[Text] {
+  override val debugOnly: Boolean = true
+}
+
 /** Generic conversion from any symbol to Text. */
 @op case class GenericToText[A:Type](a: Sym[A]) extends Primitive[Text] {
   val A: Type[A] = Type[A]

@@ -25,7 +25,7 @@ object BlackBox {
     val PP: I32 = 1 (1 -> 16)
     val ctrP = 1 until k par PP
     val cchain = CounterChain(Seq(ctrP))
-    val iters = Seq(bound[I32])
+    val iters = Seq(boundVar[I32])
     stage(GEMMBox(cchain,y,a,b,c,alpha,beta,i,j,mt,nt,iters))
   }
 

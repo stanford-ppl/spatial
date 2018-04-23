@@ -17,32 +17,54 @@ trait StaticMath {
   @api def reduce[T](xs: T*)(reduce: (T,T) => T): T = ReduceTree(xs:_*)(reduce)
 
   @api def min[A:Num](a: Sym[A], b: Sym[A]): A = Num[A].min(a.unbox,b.unbox)
-  @api def min[A:Num,B](a: Sym[A], b: Lift[B]): A = Num[A].min(a.unbox,Num[A].from(b.orig))
-  @api def min[A:Num,B](a: Lift[B], b: Sym[A]): A = Num[A].min(Num[A].from(a.orig),b.unbox)
+  @api def min[A:Num](a: Sym[A], b: Literal): A = Num[A].min(a.unbox,Num[A].from(b.value))
+  @api def min[A:Num](a: Literal, b: Sym[A]): A = Num[A].min(Num[A].from(a.value),b.unbox)
   @api def min[A:Num](a: Lift[A], b: Lift[A]): A = Num[A].min(a.unbox, b.unbox)
 
   @api def max[A:Num](a: Sym[A], b: Sym[A]): A = Num[A].max(a.unbox,b.unbox)
-  @api def max[A:Num,B](a: A, b: Lift[B]): A = Num[A].max(a,Num[A].from(b.orig))
-  @api def max[A:Num,B](a: Lift[B], b: A): A = Num[A].max(Num[A].from(a.orig),b)
+  @api def max[A:Num,B](a: A, b: Literal): A = Num[A].max(a,Num[A].from(b.value))
+  @api def max[A:Num,B](a: Literal, b: A): A = Num[A].max(Num[A].from(a.value),b)
   @api def max[A:Num](a: Lift[A], b: Lift[A]): A = Num[A].max(a.unbox, b.unbox)
 
-  @api def abs[A:Num](a: A): A = Num[A].abs(a)
-  @api def ceil[A:Num](a: A): A = Num[A].ceil(a)
-  @api def floor[A:Num](a: A): A = Num[A].floor(a)
-  @api def pow[A:Num](b: A, e: A): A = Num[A].pow(b,e)
-  @api def exp[A:Num](a: A): A = Num[A].exp(a)
-  @api def ln[A:Num](a: A): A = Num[A].ln(a)
-  @api def sqrt[A:Num](a: A): A = Num[A].sqrt(a)
-  @api def sin[A:Num](a: A): A = Num[A].sin(a)
-  @api def cos[A:Num](a: A): A = Num[A].cos(a)
-  @api def tan[A:Num](a: A): A = Num[A].tan(a)
-  @api def sinh[A:Num](a: A): A = Num[A].sinh(a)
-  @api def cosh[A:Num](a: A): A = Num[A].cosh(a)
-  @api def tanh[A:Num](a: A): A = Num[A].tanh(a)
-  @api def asin[A:Num](a: A): A = Num[A].asin(a)
-  @api def acos[A:Num](a: A): A = Num[A].acos(a)
-  @api def atan[A:Num](a: A): A = Num[A].atan(a)
-  @api def sigmoid[A:Num](a: A): A = Num[A].sigmoid(a)
+  @api def pow[A:Num](b: Sym[A], e: Sym[A]): A = Num[A].pow(b.unbox,e.unbox)
+  @api def pow[A:Num](a: A, b: Literal): A = Num[A].pow(a,Num[A].from(b.value))
+  @api def pow[A:Num](a: Literal, b: A): A = Num[A].pow(Num[A].from(a.value),b)
+  @api def pow[A:Num](b: Lift[A], e: Lift[A]): A = Num[A].pow(b.unbox,e.unbox)
+
+  @api def abs[A:Num](a: Sym[A]): A = Num[A].abs(a.unbox)
+  @api def ceil[A:Num](a: Sym[A]): A = Num[A].ceil(a.unbox)
+  @api def floor[A:Num](a: Sym[A]): A = Num[A].floor(a.unbox)
+  @api def exp[A:Num](a: Sym[A]): A = Num[A].exp(a.unbox)
+  @api def ln[A:Num](a: Sym[A]): A = Num[A].ln(a.unbox)
+  @api def sqrt[A:Num](a: Sym[A]): A = Num[A].sqrt(a.unbox)
+  @api def sin[A:Num](a: Sym[A]): A = Num[A].sin(a.unbox)
+  @api def cos[A:Num](a: Sym[A]): A = Num[A].cos(a.unbox)
+  @api def tan[A:Num](a: Sym[A]): A = Num[A].tan(a.unbox)
+  @api def sinh[A:Num](a: Sym[A]): A = Num[A].sinh(a.unbox)
+  @api def cosh[A:Num](a: Sym[A]): A = Num[A].cosh(a.unbox)
+  @api def tanh[A:Num](a: Sym[A]): A = Num[A].tanh(a.unbox)
+  @api def asin[A:Num](a: Sym[A]): A = Num[A].asin(a.unbox)
+  @api def acos[A:Num](a: Sym[A]): A = Num[A].acos(a.unbox)
+  @api def atan[A:Num](a: Sym[A]): A = Num[A].atan(a.unbox)
+  @api def sigmoid[A:Num](a: Sym[A]): A = Num[A].sigmoid(a.unbox)
+
+  @api def abs[A:Num](a: Lift[A]): A = Num[A].abs(a.unbox)
+  @api def ceil[A:Num](a: Lift[A]): A = Num[A].ceil(a.unbox)
+  @api def floor[A:Num](a: Lift[A]): A = Num[A].floor(a.unbox)
+  @api def exp[A:Num](a: Lift[A]): A = Num[A].exp(a.unbox)
+  @api def ln[A:Num](a: Lift[A]): A = Num[A].ln(a.unbox)
+  @api def sqrt[A:Num](a: Lift[A]): A = Num[A].sqrt(a.unbox)
+  @api def sin[A:Num](a: Lift[A]): A = Num[A].sin(a.unbox)
+  @api def cos[A:Num](a: Lift[A]): A = Num[A].cos(a.unbox)
+  @api def tan[A:Num](a: Lift[A]): A = Num[A].tan(a.unbox)
+  @api def sinh[A:Num](a: Lift[A]): A = Num[A].sinh(a.unbox)
+  @api def cosh[A:Num](a: Lift[A]): A = Num[A].cosh(a.unbox)
+  @api def tanh[A:Num](a: Lift[A]): A = Num[A].tanh(a.unbox)
+  @api def asin[A:Num](a: Lift[A]): A = Num[A].asin(a.unbox)
+  @api def acos[A:Num](a: Lift[A]): A = Num[A].acos(a.unbox)
+  @api def atan[A:Num](a: Lift[A]): A = Num[A].atan(a.unbox)
+  @api def sigmoid[A:Num](a: Lift[A]): A = Num[A].sigmoid(a.unbox)
+
 
 
   implicit class SeqMathOps[A](xs: Seq[A]) {
@@ -54,6 +76,40 @@ trait StaticMath {
   implicit class SeqBitOps(xs: Seq[Bit]) {
     @api def andTree: Bit = xs.reduceTree(_&&_)
     @api def orTree: Bit = xs.reduceTree(_||_)
+  }
+
+  /** Taylor expansion for natural exponential**/
+  @api def exp_taylor[T:Num](x: T): T = {
+    mux(x < -3.5.to[T], 0.to[T],
+      mux(x < -1.2.to[T], x*0.1.to[T] + 0.35.to[T],
+        1.to[T] + x + x*x/2.to[T] + x*x*x/6.to[T] + x*x*x*x/24.to[T] + x*x*x*x*x/120.to[T]))
+  }
+
+  /** Taylor expansion for natural log to third degree. **/
+  @api def log_taylor[T:Num](x: T): T = {
+    val xx = x - 1.to[T]
+    xx - xx*xx/2.to[T] + xx*xx*xx/3.to[T] - xx*xx*xx*xx/4.to[T]
+  }
+
+  /** Taylor expansion for sin from -pi to pi **/
+  @api def sin_taylor[T:Type:Num](x: T): T = {
+    x - x*x*x/6.to[T] + x*x*x*x*x/120.to[T] //- x*x*x*x*x*x*x/5040
+  }
+
+
+  /** Taylor expansion for cos from -pi to pi **/
+  @api def cos_taylor[T:Num](x: T): T = {
+    1.to[T] - x*x/2.to[T] + x*x*x*x/24.to[T] //- x*x*x*x*x*x/720
+  }
+
+  @api def sqrt_approx[T:Num](x: T): T = {
+    // I don't care how inefficient this is, it is just a placeholder for backprop until we implement floats
+    mux(x < 2.to[T], 1.to[T] + (x-1.to[T])/2.to[T] -(x-1.to[T])*(x-1.to[T])/8.to[T]+(x-1.to[T])*(x-1.to[T])*(x-1.to[T])/16.to[T], // 3rd order taylor for values up to 2
+      mux(x < 10.to[T], x*0.22.to[T] + 1.to[T], // Linearize
+        mux( x < 100.to[T], x*0.08.to[T] + 2.5.to[T], // Linearize
+          mux( x < 1000.to[T], x*0.028.to[T] + 8.to[T], // Linearize
+            mux( x < 10000.to[T], x*0.008.to[T] + 20.to[T], // Linearize
+              mux( x < 100000.to[T], x*0.003.to[T] + 60.to[T], x*0.0002.to[T] + 300.to[T]))))))
   }
 
 }

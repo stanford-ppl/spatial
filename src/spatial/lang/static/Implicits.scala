@@ -3,14 +3,14 @@ package static
 
 import argon._
 import forge.tags._
-import spatial.data.rangeOf
 import spatial.node._
 
 import utils.Overloads._
 
 trait ImplicitsPriority3 {
 
-  implicit class AppendOps[A:Type](x: A)(implicit ctx: SrcCtx, state: State) {
+  // Shadows name in Predef
+  implicit class any2stringadd[A:Type](x: A)(implicit ctx: SrcCtx, state: State) {
     def +(y: Any): Text = (x, y) match {
       case (a: Top[_], b: Top[_]) => a.toText ++ b.toText
       case (a, b: Top[_]) => Text(a.toString) ++ b.toText
@@ -41,14 +41,25 @@ trait ImplicitsPriority3 {
 
     }).asInstanceOf[B]
   })
+
+  // Using Lift[A] is always lowest priority
+  @rig implicit def liftBoolean(b: Boolean): Lift[Bit] = new Lift(b,b.to[Bit])
+  @rig implicit def liftByte(b: Byte): Lift[I8] = new Lift[I8](b,b.to[I8])
+  @rig implicit def liftChar(b: Char): Lift[U8] = new Lift[U8](b,b.to[U8])
+  @rig implicit def liftShort(b: Short): Lift[I16] = new Lift[I16](b,b.to[I16])
+  @rig implicit def liftInt(b: Int): Lift[I32] = new Lift[I32](b,b.to[I32])
+  @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
+  @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
+  @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
 }
 
 trait ImplicitsPriority2 extends ImplicitsPriority3 {
   implicit def boxNum[A:Num](x: A): Num[A] = Num[A].box(x)
 
-  import scala.runtime.{RichInt,RichByte,RichBoolean,RichShort,RichLong}
+  import scala.runtime.{RichInt,RichChar,RichByte,RichBoolean,RichShort,RichLong}
   import scala.collection.immutable.StringOps
   implicit def boolean2RichBoolean(x: Boolean): RichBoolean = new RichBoolean(x)
+  implicit def char2RichChar(x: Char): RichChar = new RichChar(x)
   implicit def byte2RichByte(x: Byte): RichByte = new RichByte(x)
   implicit def short2RichShort(x: Short): RichShort = new RichShort(x)
   implicit def int2RichInt(x: Int): RichInt = new RichInt(x)
@@ -56,14 +67,13 @@ trait ImplicitsPriority2 extends ImplicitsPriority3 {
   implicit def stringToStringOps(x: String): StringOps = new StringOps(x)
 
   // Using Lift[A] is always lowest priority
-  @rig implicit def liftBoolean(b: Boolean): Lift[Bit] = new Lift(b,b.to[Bit])
-  @rig implicit def liftByte(b: Byte): Lift[I8] = new Lift[I8](b,b.to[I8])
-  @rig implicit def liftShort(b: Short): Lift[I16] = new Lift[I16](b,b.to[I16])
-  @rig implicit def liftInt(b: Int): Lift[I32] = new Lift[I32](b,b.to[I32])
-  @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
-  @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
-  @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
-
+  @rig implicit def litBoolean(b: Boolean): Literal = new Literal(b)
+  @rig implicit def litByte(b: Byte): Literal = new Literal(b)
+  @rig implicit def litShort(b: Short): Literal = new Literal(b)
+  @rig implicit def litInt(b: Int): Literal = new Literal(b)
+  @rig implicit def litLong(b: Long): Literal = new Literal(b)
+  @rig implicit def litFloat(b: Float): Literal = new Literal(b)
+  @rig implicit def litDouble(b: Double): Literal = new Literal(b)
 }
 
 trait ImplicitsPriority1 extends ImplicitsPriority2 {
@@ -79,38 +89,24 @@ trait ImplicitsPriority1 extends ImplicitsPriority2 {
   // Shadows Predef method
   @api implicit def wrapString(x: String): Text = Text(x)
 
-  @api implicit def FixFromInt[S:BOOL,I:INT,F:INT](c: Int): Fix[S,I,F] = c.to[Fix[S,I,F]]
-
-  implicit class RegNumericWrapper[A](x: A) {
-    @api def +[B:Arith](that: Reg[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: Reg[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: Reg[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: Reg[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: Reg[B]): B = Arith[B].from(x) % that.value
-
-    @api def <[B:Order](that: Reg[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: Reg[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: Reg[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: Reg[B]): Bit = Order[B].from(x) >= that.value
-
-    @api def !==[B:Type](that: Reg[B]): Bit = Type[B].from(x) !== that.value
-    @api def ===[B:Type](that: Reg[B]): Bit = Type[B].from(x) === that.value
-
-    @api def !==[B:Type](that: Lift[B]): Bit = Type[B].from(x) !== that.unbox
-    @api def ===[B:Type](that: Lift[B]): Bit = Type[B].from(x) === that.unbox
-  }
 }
 
 trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   implicit def box[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
   implicit class BoxSym[A:Type](x: A) extends argon.static.ExpMiscOps[Any,A](x)
 
-  @api implicit def regRead[A](x: Reg[A]): A = x.value
-  @api implicit def argRead[A](x: ArgIn[A]): A = x.value
+  def * = new Wildcard
 
-  implicit class CastType[A](x: A) {
-    @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
-  }
+  // Ways to lift type U to type S:
+  //   1. Implicit conversions:
+  //        a + 1
+  //   1.a. Implicit wrapping:
+  //          0 until 10
+  //   2. Lifting with no evidence: Lift[U,S]
+  //        if (c) 0 else 1: Use
+  //   3. Explicit lifting: Cast[U,S]
+  //        1.to[I32]
+
 
   //=== Bit ===//
   class Cvt_Text_Bit extends Cast2Way[Text,Bit] {
@@ -170,46 +166,75 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   implicit def CastFltToFix[M1:INT,E1:INT,S2:BOOL,I2:INT,F2:INT]: Cast[Flt[M1,E1],Fix[S2,I2,F2]] = Left(new Cvt_Fix_Flt[S2,I2,F2,M1,E1])
 
 
-  // Ways to lift type U to type S:
-  //   1. Implicit lifting:  Implicit defs
-  //        a + 1
-  //   2. Lifting on infix methods: Use wrappers
-  //        0 until 10
-  //   3. Lifting with no evidence: Lift[U,S]
-  //        if (c) 0 else 1: Use
-  //   4. Explicit lifting: Cast[U,S]
-  //        1.to[I32]
+  // --- Implicit Conversions
 
-
-  // --- Implicits defs
-
-  @api implicit def FixFromFloat[S:BOOL,I:INT,F:INT](c: Float): Fix[S,I,F] = c.to[Fix[S,I,F]]
-  @api implicit def FixFromDouble[S:BOOL,I:INT,F:INT](c: Double): Fix[S,I,F] = c.to[Fix[S,I,F]]
-
-  @api implicit def FltFromByte[M:INT,E:INT](c: Byte): Flt[M,E] = c.to[Flt[M,E]]
-  @api implicit def FltFromShort[M:INT,E:INT](c: Short): Flt[M,E] = c.to[Flt[M,E]]
-  @api implicit def FltFromLong[M:INT,E:INT](c: Long): Flt[M,E] = c.to[Flt[M,E]]
-
-  @api implicit def BitFromBoolean(c: Boolean): Bit = c.to[Bit]
-
-  @api implicit def FixFromByte[S:BOOL,I:INT,F:INT](c: Byte): Fix[S,I,F] = c.to[Fix[S,I,F]]
-  @api implicit def FixFromShort[S:BOOL,I:INT,F:INT](c: Short): Fix[S,I,F] = c.to[Fix[S,I,F]]
-  @api implicit def FixFromLong[S:BOOL,I:INT,F:INT](c: Long): Fix[S,I,F] = c.to[Fix[S,I,F]]
-
-  @api implicit def FltFromFloat[M:INT,E:INT](c: Float): Flt[M,E] = c.to[Flt[M,E]]
-  @api implicit def FltFromDouble[M:INT,E:INT](c: Double): Flt[M,E] = c.to[Flt[M,E]]
-
-  @api implicit def VoidFromUnit(c: Unit): Void = Void.c
-
-  @api implicit def SeriesToCounter[S:BOOL,I:INT,F:INT](x: Series[Fix[S,I,F]]): Counter[Fix[S,I,F]] = Counter.from(x)
-
-
-  @rig def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
-    val p = I32.p(default)
-    rangeOf(p) = (start, stride, end)
-    p
+  class CastType[A](x: A) {
+    @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
   }
 
+  class NumericAddOps[A:Numeric](x: A) {
+    @api def +[B:Arith](that: Reg[B]): B = Arith[B].from(x) + that.value
+    @api def -[B:Arith](that: Reg[B]): B = Arith[B].from(x) - that.value
+    @api def *[B:Arith](that: Reg[B]): B = Arith[B].from(x) * that.value
+    @api def /[B:Arith](that: Reg[B]): B = Arith[B].from(x) / that.value
+    @api def %[B:Arith](that: Reg[B]): B = Arith[B].from(x) % that.value
+
+    @api def <[B:Order](that: Reg[B]): Bit = Order[B].from(x) < that.value
+    @api def <=[B:Order](that: Reg[B]): Bit = Order[B].from(x) <= that.value
+    @api def >[B:Order](that: Reg[B]): Bit = Order[B].from(x) > that.value
+    @api def >=[B:Order](that: Reg[B]): Bit = Order[B].from(x) >= that.value
+
+    @api def infix_!=[B:Type](that: Reg[B]): Bit = Type[B].from(x) !== that.value
+    @api def infix_==[B:Type](that: Reg[B]): Bit = Type[B].from(x) === that.value
+
+    @api def +[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) + that.value
+    @api def -[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) - that.value
+    @api def *[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) * that.value
+    @api def /[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) / that.value
+    @api def %[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) % that.value
+
+    @api def <[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) < that.value
+    @api def <=[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) <= that.value
+    @api def >[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) > that.value
+    @api def >=[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) >= that.value
+
+    @api def infix_!=[B:Type](that: ArgIn[B]): Bit = Type[B].from(x) !== that.value
+    @api def infix_==[B:Type](that: ArgIn[B]): Bit = Type[B].from(x) === that.value
+
+    @api def +[B:Arith](that: HostIO[B]): B = Arith[B].from(x) + that.value
+    @api def -[B:Arith](that: HostIO[B]): B = Arith[B].from(x) - that.value
+    @api def *[B:Arith](that: HostIO[B]): B = Arith[B].from(x) * that.value
+    @api def /[B:Arith](that: HostIO[B]): B = Arith[B].from(x) / that.value
+    @api def %[B:Arith](that: HostIO[B]): B = Arith[B].from(x) % that.value
+
+    @api def <[B:Order](that: HostIO[B]): Bit = Order[B].from(x) < that.value
+    @api def <=[B:Order](that: HostIO[B]): Bit = Order[B].from(x) <= that.value
+    @api def >[B:Order](that: HostIO[B]): Bit = Order[B].from(x) > that.value
+    @api def >=[B:Order](that: HostIO[B]): Bit = Order[B].from(x) >= that.value
+
+    @api def infix_!=[B:Type](that: HostIO[B]): Bit = Type[B].from(x) !== that.value
+    @api def infix_==[B:Type](that: HostIO[B]): Bit = Type[B].from(x) === that.value
+
+    @api def +[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) + getArg(that)
+    @api def -[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) - getArg(that)
+    @api def *[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) * getArg(that)
+    @api def /[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) / getArg(that)
+    @api def %[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) % getArg(that)
+
+    @api def <[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) < getArg(that)
+    @api def <=[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) <= getArg(that)
+    @api def >[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) > getArg(that)
+    @api def >=[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) >= getArg(that)
+
+    @api def infix_!=[B:Type](that: ArgOut[B]): Bit = Type[B].from(x) !== getArg(that)
+    @api def infix_==[B:Type](that: ArgOut[B]): Bit = Type[B].from(x) === getArg(that)
+  }
+
+  class RegNumerics[A:Num](reg: Reg[A]) {
+    @api def :+=(data: A): Void = reg := reg.value + data.unbox
+    @api def :-=(data: A): Void = reg := reg.value - data.unbox
+    @api def :*=(data: A): Void = reg := reg.value * data.unbox
+  }
 
 
   // Note: Naming is important here to override the names in Predef.scala
@@ -217,17 +242,18 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   class BooleanWrapper(b: Boolean)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Boolean,B]): B = cast(b)
   }
-  @rig implicit def booleanWrapper(b: Boolean): BooleanWrapper = new BooleanWrapper(b)
 
   class ByteWrapper(b: Byte)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Byte,B]): B = cast(b)
   }
-  @rig implicit def byteWrapper(b: Byte): ByteWrapper = new ByteWrapper(b)
+
+  class CharWrapper(b: Char)(implicit ctx: SrcCtx, state: State) {
+    def to[B](implicit cast: Cast[Char,B]): B = cast(b)
+  }
 
   class ShortWrapper(b: Short)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Short,B]): B = cast(b)
   }
-  @rig implicit def ShortWrapper(b: Short): ShortWrapper = new ShortWrapper(b)
 
   class IntWrapper(b: Int)(implicit ctx: SrcCtx, state: State) {
     def until(end: I32): Series[I32] = Series[I32](I32(b), end, I32(1), I32(1))
@@ -261,24 +287,55 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
     def x: I32 = this.to[I32]
   }
-  @rig implicit def intWrapper(v: Int): IntWrapper = new IntWrapper(v)
 
   class LongWrapper(b: Long)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Long,B]): B = cast(b)
   }
-  @rig implicit def longWrapper(b: Long): LongWrapper = new LongWrapper(b)
 
   class FloatWrapper(b: Float)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Float,B]): B = cast(b)
   }
-  @rig implicit def floatWrapper(b: Float): FloatWrapper = new FloatWrapper(b)
 
   class DoubleWrapper(b: Double)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[Double,B]): B = cast(b)
   }
-  @rig implicit def doubleWrapper(b: Double): DoubleWrapper = new DoubleWrapper(b)
 
+  // --- A (Any)
+  implicit def castType[A](a: A): CastType[A] = new CastType[A](a)
+
+
+  // --- Reg[A]
+  @api implicit def regRead[A](x: Reg[A]): A = x.value
+  implicit def regNumerics[A:Num](x: Reg[A]): RegNumerics[A] = new RegNumerics[A](x)
+
+
+  // --- ArgIn[A]
+  @api implicit def argRead[A](x: ArgIn[A]): A = x.value
+
+
+  // --- HostIO[A]
+  @api implicit def hostIORead[A](x: HostIO[A]): A = x.value
+
+
+  // --- A:Numeric
+  implicit def numericAddOps[A:Numeric](x: A): NumericAddOps[A] = new NumericAddOps[A](x)
+
+
+  // --- Wildcard
+  @api implicit def wildcardToForever(w: Wildcard): Counter[I32] = stage(ForeverNew())
+
+
+  // --- Series
+  @api implicit def SeriesToCounter[S:BOOL,I:INT,F:INT](x: Series[Fix[S,I,F]]): Counter[Fix[S,I,F]] = Counter.from(x)
+
+
+  // --- String
   @api implicit def augmentString(x: String): Text = Text(x)
+
+
+  // --- Unit
+  @api implicit def VoidFromUnit(c: Unit): Void = Void.c
+
 
   // --- Boolean
   implicit lazy val castBooleanToBit: Cast[Boolean,Bit] = Right(new Lifter[Boolean,Bit])
@@ -286,11 +343,32 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   implicit def CastBooleanToFlt[M:INT,E:INT]: Cast[Boolean,Flt[M,E]] = Right(new Lifter[Boolean,Flt[M,E]])
   implicit def CastBooleanToNum[A:Num]: Cast[Boolean,A] = Right(new Lifter[Boolean,A])
 
+  @api implicit def BitFromBoolean(c: Boolean): Bit = c.to[Bit]
+  @api implicit def booleanWrapper(c: Boolean): BooleanWrapper = new BooleanWrapper(c)
+
   // --- Byte
   implicit lazy val castByteToBit: Cast[Byte,Bit] = Right(new Lifter[Byte,Bit])
   implicit def CastByteToFix[S:BOOL,I:INT,F:INT]: Cast[Byte,Fix[S,I,F]] = Right(new Lifter[Byte,Fix[S,I,F]])
   implicit def CastByteToFlt[M:INT,E:INT]: Cast[Byte,Flt[M,E]] = Right(new Lifter[Byte,Flt[M,E]])
   implicit def CastByteToNum[A:Num]: Cast[Byte,A] = Right(new Lifter[Byte,A])
+
+  @api implicit def FixFromByte[S:BOOL,I:INT,F:INT](c: Byte): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FltFromByte[M:INT,E:INT](c: Byte): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def NumFromByte[A:Num](c: Byte): A = c.to[A]
+  @api implicit def byteWrapper(c: Byte): ByteWrapper = new ByteWrapper(c)
+
+
+  // --- Char
+  implicit lazy val castCharToBit: Cast[Char,Bit] = Right(new Lifter[Char,Bit])
+  implicit def CastCharToFix[S:BOOL,I:INT,F:INT]: Cast[Char,Fix[S,I,F]] = Right(new Lifter[Char,Fix[S,I,F]])
+  implicit def CastCharToFlt[M:INT,E:INT]: Cast[Char,Flt[M,E]] = Right(new Lifter[Char,Flt[M,E]])
+  implicit def CastCharToNum[A:Num]: Cast[Char,A] = Right(new Lifter[Char,A])
+
+  @api implicit def FixFromChar[S:BOOL,I:INT,F:INT](c: Char): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FltFromChar[M:INT,E:INT](c: Char): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def NumFromChar[A:Num](c: Char): A = c.to[A]
+  @api implicit def charWrapper(c: Char): CharWrapper = new CharWrapper(c)
+
 
   // --- Short
   implicit lazy val castShortToBit: Cast[Short,Bit] = Right(new Lifter[Short,Bit])
@@ -298,11 +376,23 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   implicit def CastShortToFlt[M:INT,E:INT]: Cast[Short,Flt[M,E]] = Right(new Lifter[Short,Flt[M,E]])
   implicit def CastShortToNum[A:Num]: Cast[Short,A] = Right(new Lifter[Short,A])
 
+  @api implicit def FltFromShort[M:INT,E:INT](c: Short): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def FixFromShort[S:BOOL,I:INT,F:INT](c: Short): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def NumFromShort[A:Num](c: Short): A = c.to[A]
+  @api implicit def ShortWrapper(c: Short): ShortWrapper = new ShortWrapper(c)
+
+
   // --- Int
   implicit lazy val castIntToBit: Cast[Int,Bit] = Right(new Lifter[Int,Bit])
   implicit def CastIntToFix[S:BOOL,I:INT,F:INT]: Cast[Int,Fix[S,I,F]] = Right(new Lifter[Int,Fix[S,I,F]])
   implicit def CastIntToFlt[M:INT,E:INT]: Cast[Int,Flt[M,E]] = Right(new Lifter[Int,Flt[M,E]])
   implicit def CastIntToNum[A:Num]: Cast[Int,A] = Right(new Lifter[Int,A])
+
+  @api implicit def FltFromInt[M:INT,E:INT](c: Int): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def FixFromInt[S:BOOL,I:INT,F:INT](c: Int): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def NumFromInt[A:Num](c: Int): A = c.to[A]
+  @api implicit def intWrapper(c: Int): IntWrapper = new IntWrapper(c)
+
 
   // --- Long
   implicit lazy val castLongToBit: Cast[Long,Bit] = Right(new Lifter[Long,Bit])
@@ -310,15 +400,33 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   implicit def CastLongToFlt[M:INT,E:INT]: Cast[Long,Flt[M,E]] = Right(new Lifter[Long,Flt[M,E]])
   implicit def CastLongToNum[A:Num]: Cast[Long,A] = Right(new Lifter[Long,A])
 
+  @api implicit def FixFromLong[S:BOOL,I:INT,F:INT](c: Long): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FltFromLong[M:INT,E:INT](c: Long): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def NumFromLong[A:Num](c: Long): A = c.to[A]
+  @api implicit def longWrapper(c: Long): LongWrapper = new LongWrapper(c)
+
+
   // --- Float
   implicit lazy val castFloatToBit: Cast[Float,Bit] = Right(new Lifter[Float,Bit])
   implicit def CastFloatToFix[S:BOOL,I:INT,F:INT]: Cast[Float,Fix[S,I,F]] = Right(new Lifter[Float,Fix[S,I,F]])
   implicit def CastFloatToFlt[M:INT,E:INT]: Cast[Float,Flt[M,E]] = Right(new Lifter[Float,Flt[M,E]])
   implicit def CastFloatToNum[A:Num]: Cast[Float,A] = Right(new Lifter[Float,A])
 
+  @api implicit def FixFromFloat[S:BOOL,I:INT,F:INT](c: Float): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FltFromFloat[M:INT,E:INT](c: Float): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def NumFromFloat[A:Num](c: Float): A = c.to[A]
+  @api implicit def floatWrapper(c: Float): FloatWrapper = new FloatWrapper(c)
+
+
   // --- Double
   implicit lazy val castDoubleToBit: Cast[Double,Bit] = Right(new Lifter[Double,Bit])
   implicit def CastDoubleToFix[S:BOOL,I:INT,F:INT]: Cast[Double,Fix[S,I,F]] = Right(new Lifter[Double,Fix[S,I,F]])
   implicit def CastDoubleToFlt[M:INT,E:INT]: Cast[Double,Flt[M,E]] = Right(new Lifter[Double,Flt[M,E]])
   implicit def CastDoubleToNum[A:Num]: Cast[Double,A] = Right(new Lifter[Double,A])
+
+  @api implicit def FixFromDouble[S:BOOL,I:INT,F:INT](c: Double): Fix[S,I,F] = c.to[Fix[S,I,F]]
+  @api implicit def FltFromDouble[M:INT,E:INT](c: Double): Flt[M,E] = c.to[Flt[M,E]]
+  @api implicit def NumFromDouble[A:Num](c: Double): A = c.to[A]
+  @api implicit def doubleWrapper(c: Double): DoubleWrapper = new DoubleWrapper(c)
+
 }

@@ -23,9 +23,9 @@ abstract class PUPtr {
     case Some(in) =>
       error(ctx, s"Cannot cast input $i as both ${Bits[A]} and ${in.tA}")
       error(ctx)
-      bound[In[A]]
+      boundVar[In[A]]
     case None =>
-      val in = bound[In[A]]
+      val in = boundVar[In[A]]
       inputs += i -> in
       in
   }
@@ -35,9 +35,9 @@ abstract class PUPtr {
     case Some(out) =>
       error(ctx, s"Cannot cast output $i as both ${Bits[A]} and ${out.tA}")
       error(ctx)
-      bound[Out[A]]
+      boundVar[Out[A]]
     case None =>
-      val out = bound[Out[A]]
+      val out = boundVar[Out[A]]
       outputs += i -> out
       out
   }
@@ -55,7 +55,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
   @api def read(ranges: Seq[Series[I32]])(path: Seq[I32] => I32): Void = {
     val u = unit.getOrElse{throw new Exception("Modified uninitialized PMUPtr") }
     curPtr.withPtr(this){
-      val indices = ranges.map{_ => bound[I32] }
+      val indices = ranges.map{_ => boundVar[I32] }
       val block = stageBlock{
         val ctrs = ranges.map{r => Counter.from(r) }
         CounterChain(ctrs)
@@ -75,7 +75,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
   @api def write(ranges: Seq[Series[I32]])(path: Seq[I32] => (I32,Bits[_])): Void = {
     val u = unit.getOrElse{throw new Exception("Modified uninitialized PMUPtr") }
     curPtr.withPtr(this){
-      val indices = ranges.map{_ => bound[I32] }
+      val indices = ranges.map{_ => boundVar[I32] }
       val block = stageBlock{
         val ctrs = ranges.map{r => Counter.from(r) }
         CounterChain(ctrs)
@@ -113,7 +113,7 @@ object PCU {
   @api def apply(ranges: Seq[Series[I32]])(datapath: Seq[I32] => Void): PCUPtr = {
     val ptr = PCUPtr()
     curPtr.withPtr(ptr) {
-      val indices = ranges.map{_ => bound[I32] }
+      val indices = ranges.map{_ => boundVar[I32] }
       val block = stageBlock {
         val ctrs = ranges.map{r => Counter.from(r) }
         CounterChain(ctrs)

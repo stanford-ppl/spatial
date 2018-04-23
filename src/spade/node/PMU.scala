@@ -29,12 +29,12 @@ object PMU {
   @api def apply(spec: PMUSpec)(implicit wSize: Vec[Bit]): PMU = {
     implicit val vSize: Vec[Vec[Bit]] = Vec.bits[Vec[Bit]](spec.nLanes)
 
-    val cIns  = Seq.fill(spec.nCIns){ bound[In[Bit]] }
-    val cOuts = Seq.fill(spec.nCOuts){ bound[Out[Bit]] }
-    val sIns  = Seq.fill(spec.nSIns){ bound[In[Vec[Bit]]] }
-    val sOuts = Seq.fill(spec.nSOuts){ bound[Out[Vec[Bit]]] }
-    val vIns  = Seq.fill(spec.nVIns){ bound[In[Vec[Vec[Bit]]]] }
-    val vOuts = Seq.fill(spec.nVOuts){ bound[Out[Vec[Vec[Bit]]]] }
+    val cIns  = Seq.fill(spec.nCIns){ boundVar[In[Bit]] }
+    val cOuts = Seq.fill(spec.nCOuts){ boundVar[Out[Bit]] }
+    val sIns  = Seq.fill(spec.nSIns){ boundVar[In[Vec[Bit]]] }
+    val sOuts = Seq.fill(spec.nSOuts){ boundVar[Out[Vec[Bit]]] }
+    val vIns  = Seq.fill(spec.nVIns){ boundVar[In[Vec[Vec[Bit]]]] }
+    val vOuts = Seq.fill(spec.nVOuts){ boundVar[Out[Vec[Vec[Bit]]]] }
 
     stage(PMUModule(cIns,cOuts,sIns,sOuts,vIns,vOuts,spec))
   }

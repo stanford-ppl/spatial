@@ -6,15 +6,15 @@ import forge.tags._
 import spatial.data._
 import spatial.node._
 
-class Directives(options: CtrlOpt) extends ForeachClass(options) {
+class Directives(options: CtrlOpt) {
   lazy val Foreach   = new ForeachClass(options)
   lazy val Reduce    = new ReduceClass(options)
   lazy val Fold      = new FoldClass(options)
   lazy val MemReduce = new MemReduceClass(options)
   lazy val MemFold   = new MemFoldClass(options)
 
-  @rig protected def unit_pipe(func: => Void): Void = {
-    val block = stageBlock{ func }
+  @rig protected def unit_pipe(func: => Any): Void = {
+    val block = stageBlock{ func; void }
     val pipe = stage(UnitPipe(Set.empty, block))
     options.set(pipe)
     pipe
@@ -23,17 +23,19 @@ class Directives(options: CtrlOpt) extends ForeachClass(options) {
 
 class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(Sched.Pipe),ii)) {
   /** "Pipelined" unit controller */
-  @api def apply(func: => Void): Void = unit_pipe(func)
+  @api def apply(func: => Any): Void = unit_pipe(func)
 
-  def apply(ii: Int) = new Pipe(name, Some(ii))
+  def II(ii: Int) = new Pipe(name, Some(ii))
 }
 class Stream(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sched.Stream))) {
   /** "Streaming" unit controller */
-  @api def apply(func: => Void): Void = unit_pipe(func)
+  @api def apply(func: => Any): Void = unit_pipe(func)
+
+  @api def apply(wild: Wildcard)(func: => Any): Void = Stream.Foreach(*){_ => func }
 }
 class Sequential(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sched.Seq))) {
   /** "Sequential" unit controller */
-  @api def apply(func: => Void): Void = unit_pipe(func)
+  @api def apply(func: => Any): Void = unit_pipe(func)
 }
 
 object Named {

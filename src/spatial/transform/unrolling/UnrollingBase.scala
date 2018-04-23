@@ -274,8 +274,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     val fs: Seq[Boolean] = cchain.ctrs.map(_.isForever)
 
-    val indices: Seq[Seq[I32]] = Ps.map{p => List.fill(p){ bound[I32] }}
-    val indexValids:  Seq[Seq[Bit]] = Ps.map{p => List.fill(p){ bound[Bit] }}
+    val indices: Seq[Seq[I32]] = Ps.map{p => List.fill(p){ boundVar[I32] }}
+    val indexValids:  Seq[Seq[Bit]] = Ps.map{p => List.fill(p){ boundVar[Bit] }}
 
     // Valid bits corresponding to each lane
     protected def createLaneValids(): Seq[Seq[Bit]] = List.tabulate(P){p =>

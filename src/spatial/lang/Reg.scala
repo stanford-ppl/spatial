@@ -1,12 +1,10 @@
 package spatial.lang
 
 import argon._
-import forge.{Ptr,VarLike}
+import forge.{Ptr, VarLike}
 import forge.tags._
-import spatial.lang
+import spatial.data.writeBuffer
 import spatial.node._
-
-import scala.collection.mutable
 
 @ref class Reg[A:Bits] extends LocalMem0[A,Reg] with StagedVarLike[A] with Ref[Ptr[Any],Reg[A]] {
   val A: Bits[A] = Bits[A]
@@ -16,11 +14,15 @@ import scala.collection.mutable
   // --- Infix Methods
   @api def :=(data: A): Void = Reg.write(this, data)
   @api def value: A = Reg.read(this)
+  @api def reset(): Void = stage(RegReset(this,Set.empty))
+  @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))
 
+  def buffer: Reg[A] = { writeBuffer.enableOn(this); me }
+
+  // --- Typeclass Methods
   @rig def __sread(): A = Reg.read(this)
   @rig def __sassign(x: A): Unit = Reg.write(this, x)
 
-  // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = this.value
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = Reg.write(this, data, ens)
   @rig def __reset(ens: Set[Bit]): Void = stage(RegReset(this,ens))

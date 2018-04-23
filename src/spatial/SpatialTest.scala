@@ -78,6 +78,11 @@ trait SpatialTest extends Spatial with DSLTest {
     override val makeTimeout: Long = 32400
   }
 
+  class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)
+  object RequireErrors {
+    def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
+  }
+
   override def backends: Seq[Backend] = Seq(Scala, Zynq, VCS, AWS)
 
   protected def checkIR(block: argon.Block[_]): Result = Unknown

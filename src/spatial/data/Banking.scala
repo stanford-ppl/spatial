@@ -196,6 +196,12 @@ object portsOf {
     val map = portsOf.get(x).getOrElse(Map.empty)
     portsOf.add(x, map + (uid -> port))
   }
+}
 
 
+case class EnableWriteBuffer(flag: Boolean) extends StableData[EnableWriteBuffer]
+
+object writeBuffer {
+  def isEnabled(x: Sym[_]): Boolean = metadata[EnableWriteBuffer](x).exists(_.flag)
+  def enableOn(x: Sym[_]): Unit = metadata.add(x, EnableWriteBuffer(true))
 }

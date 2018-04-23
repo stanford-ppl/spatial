@@ -13,10 +13,74 @@ trait InternalAliases extends CustomBitWidths {
   type I64 = FixPt[TRUE,_64,_0]
   type I32 = FixPt[TRUE,_32,_0]
   type I16 = FixPt[TRUE,_16,_0]
+  type I15 = FixPt[TRUE,_15,_0]
+  type I14 = FixPt[TRUE,_14,_0]
+  type I13 = FixPt[TRUE,_13,_0]
+  type I12 = FixPt[TRUE,_12,_0]
+  type I11 = FixPt[TRUE,_11,_0]
+  type I10 = FixPt[TRUE,_10,_0]
+  type  I9 = FixPt[TRUE, _9,_0]
   type  I8 = FixPt[TRUE, _8,_0]
+  type  I7 = FixPt[TRUE, _7,_0]
+  type  I6 = FixPt[TRUE, _6,_0]
+  type  I5 = FixPt[TRUE, _5,_0]
+  type  I4 = FixPt[TRUE, _4,_0]
+  type  I3 = FixPt[TRUE, _3,_0]
+  type  I2 = FixPt[TRUE, _2,_0]
+
+  type U64 = FixPt[FALSE,_64,_0]
   type U32 = FixPt[FALSE,_32,_0]
   type U16 = FixPt[FALSE,_16,_0]
+  type U15 = FixPt[FALSE,_15,_0]
+  type U14 = FixPt[FALSE,_14,_0]
+  type U13 = FixPt[FALSE,_13,_0]
+  type U12 = FixPt[FALSE,_12,_0]
+  type U11 = FixPt[FALSE,_11,_0]
+  type U10 = FixPt[FALSE,_10,_0]
+  type  U9 = FixPt[FALSE, _9,_0]
   type  U8 = FixPt[FALSE, _8,_0]
+  type  U7 = FixPt[FALSE, _7,_0]
+  type  U6 = FixPt[FALSE, _6,_0]
+  type  U5 = FixPt[FALSE, _5,_0]
+  type  U4 = FixPt[FALSE, _4,_0]
+  type  U3 = FixPt[FALSE, _3,_0]
+  type  U2 = FixPt[FALSE, _2,_0]
+
+  type Int64 = I64
+  type Int32 = I32
+  type Int16 = I16
+  type Int15 = I15
+  type Int14 = I14
+  type Int13 = I13
+  type Int12 = I12
+  type Int11 = I11
+  type Int10 = I10
+  type Int9  = I9
+  type Int8  = I8
+  type Int7  = I7
+  type Int6  = I6
+  type Int5  = I5
+  type Int4  = I4
+  type Int3  = I3
+  type Int2  = I2
+
+  type UInt64 = U64
+  type UInt32 = U32
+  type UInt16 = U16
+  type UInt15 = U15
+  type UInt14 = U14
+  type UInt13 = U13
+  type UInt12 = U12
+  type UInt11 = U11
+  type UInt10 = U10
+  type UInt9  = U9
+  type UInt8  = U8
+  type UInt7  = U7
+  type UInt6  = U6
+  type UInt5  = U5
+  type UInt4  = U4
+  type UInt3  = U3
+  type UInt2  = U2
 
   type FltPt[M,E] = spatial.lang.Flt[M,E]
   type F64 = FltPt[_53,_11]
@@ -106,6 +170,7 @@ trait ExternalAliases extends InternalAliases {
   type LUT3[A] = spatial.lang.LUT3[A]
   type LUT4[A] = spatial.lang.LUT4[A]
   type LUT5[A] = spatial.lang.LUT5[A]
+  lazy val LUT = spatial.lang.LUT
 
   type RegFile[A,C[T]] = spatial.lang.RegFile[A,C]
   type RegFile1[A] = spatial.lang.RegFile1[A]
@@ -128,7 +193,17 @@ trait ExternalAliases extends InternalAliases {
   type ArgOut[A] = spatial.lang.ArgOut[A]
   lazy val ArgOut = spatial.lang.ArgOut
 
+  type HostIO[A] = spatial.lang.HostIO[A]
+  lazy val HostIO = spatial.lang.HostIO
+
+  type StreamIn[A] = spatial.lang.StreamIn[A]
+  lazy val StreamIn = spatial.lang.StreamIn
+
+  type StreamOut[A] = spatial.lang.StreamOut[A]
+  lazy val StreamOut = spatial.lang.StreamOut
+
   // --- Primitives
+  type Tup2[A,B] = spatial.lang.Tup2[A,B]
 
   type Bit = spatial.lang.Bit
   lazy val Bit = spatial.lang.Bit
@@ -156,6 +231,8 @@ trait ExternalAliases extends InternalAliases {
 
   type CounterChain = spatial.lang.CounterChain
   lazy val CounterChain = spatial.lang.CounterChain
+
+  type Wildcard = spatial.lang.Wildcard
 }
 
 trait ShadowingAliases extends ExternalAliases {
@@ -171,11 +248,14 @@ trait ShadowingAliases extends ExternalAliases {
 
   type Boolean = spatial.lang.Bit
   type String = spatial.lang.Text
+  type Label = java.lang.String
 
   type Array[A] = spatial.lang.host.Array[A]
   lazy val Array = spatial.lang.host.Array
   type Matrix[A] = spatial.lang.host.Matrix[A]
   lazy val Matrix = spatial.lang.host.Matrix
+
+  type Tuple2[A,B] = spatial.lang.Tup2[A,B]
 
   type Unit = spatial.lang.Void
 

@@ -92,8 +92,8 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
     case (Literal(1), _) => stage(FixInv(b))
-    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[TRUE,I,_0]].from(Number.log2(r))
-    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[TRUE,I,_0]].from(Number.log2(-r))
+    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[S,I,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[S,I,_0]].from(Number.log2(-r))
     case _ => super.rewrite
   }
 }
@@ -116,7 +116,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point arithmetic shift left */
-@op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
+@op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x << y)
     case _ => super.rewrite
@@ -124,7 +124,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point arithmetic shift right */
-@op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
+@op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >> y)
     case _ => super.rewrite
@@ -132,7 +132,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point logical (unsigned) shift right */
-@op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
+@op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >>> y)
     case _ => super.rewrite

@@ -1,10 +1,6 @@
-package spatial.tests
+package spatial.tests.syntax
 
 import spatial.dsl._
-
-object Main {
-  def main(args: scala.Array[java.lang.String]): scala.Unit = { Console.out.println("hey") }
-}
 
 @test class LiftBoolean extends SpatialTest {
   override def runtimeArgs: Args = NoArgs

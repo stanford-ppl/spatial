@@ -4,7 +4,7 @@ import spatial.node.FixInv
 import spatial.dsl._
 import spatial.SpatialTestbench
 
-class BasicRewriteChecks extends SpatialTestbench {
+@test class BasicRewriteChecks extends SpatialTestbench {
   val b = random[Bit]
   val t = true.to[Bit]
   val f = false.to[Bit]

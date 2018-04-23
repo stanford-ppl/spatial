@@ -77,6 +77,11 @@ object DRAM {
   @api def store[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = {
     stage(DenseTransfer(this,local,isLoad = false))
   }
+
+  /** Creates a dense, burst transfer from the on-chip `local` to this DRAM's region of main memory.
+    * Restricted to the first `len` elements in local.
+    **/
+  @api def store(local: SRAM1[A], len: I32): Void = stage(DenseTransfer(this,local.apply(0::len),isLoad = false))
 }
 
 /** A 2-dimensional [[DRAM]] with elements of type A. */

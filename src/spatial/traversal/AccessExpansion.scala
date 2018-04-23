@@ -14,7 +14,7 @@ trait AccessExpansion {
   implicit def __IR: State
   private val unrolls = mutable.HashMap[(Idx,Seq[Int]),Idx]()
 
-  private def nextRand(): Idx = bound[I32]
+  private def nextRand(): Idx = boundVar[I32]
   private def nextRand(x: Idx): Idx = {
     val x2 = nextRand()
     domainOf.get(x).foreach{d => domainOf(x2) = d }

@@ -43,14 +43,14 @@ protected class MemReduceAccum[A,C[T]](
 
     //logs(s"Creating MemReduce on accumulator of rank ${acc.rank}")
 
-    val itersMap = List.fill(domain.length){ bound[I32] }
-    val itersRed = List.fill(acc.rank){ bound[I32] }
+    val itersMap = List.fill(domain.length){ boundVar[I32] }
+    val itersRed = List.fill(acc.rank){ boundVar[I32] }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")
 
-    val lA = bound[A]
-    val rA = bound[A]
+    val lA = boundVar[A]
+    val rA = boundVar[A]
     val mapBlk: Block[C[A]] = stageBlock{ map(itersMap) }
     val redBlk: Lambda2[A,A,A] = stageLambda2(lA,rA){ reduce(lA, rA) }
     val resLd:  Lambda1[C[A],A] = stageLambda1(mapBlk.result){ C.evMem(mapBlk.result.unbox).__read(itersRed, Set.empty) }

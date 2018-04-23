@@ -2,7 +2,7 @@ package spatial
 
 trait SpatialDSL extends lang.static.FrontendStatics
 
-object lib extends SpatialDSL {
+object libview extends SpatialDSL {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag

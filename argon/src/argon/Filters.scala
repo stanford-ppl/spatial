@@ -5,7 +5,7 @@ import utils.recursive
 object Filters {
 
   val expsFunc: PartialFunction[Any,Seq[Sym[_]]] = {
-    case s: Sym[_] => Seq(s)
+    case s: Sym[_] if !s.isType => Seq(s)
     case b: Block[_] => exps(b.result) ++ exps(b.effects.antiDeps)
     case d: Op[_]    => d.expInputs
     case l: Iterable[_] => recursive.collectSeqs(expsFunc)(l.iterator)

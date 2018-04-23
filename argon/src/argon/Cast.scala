@@ -53,7 +53,8 @@ class Lifter[A,B:Type] extends CastFunc[A,B] {
   *
   *   Needs implicit evidence for what type scala.Int should be lifted to.
   */
-class Lift[B:Type](val orig: Any, b: B) {
+class Lift[B:Type](orig: Any, b: B) {
   def unbox: B = b
+  def B: Type[B] = Type[B]
 }
 

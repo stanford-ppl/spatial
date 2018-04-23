@@ -104,7 +104,7 @@ trait ScalaGenMemories extends ScalaGenBits {
 
     if (mem.isRegFile) {
       // HACK: Stage, then generate, the banking and offset addresses for the regfile on the fly
-      val addr = Seq.fill(rankOf(mem)){ bound[I32] }
+      val addr = Seq.fill(rankOf(mem)){ boundVar[I32] }
       val bankAddrFunc = stageBlock{
         val bank = inst.bankSelects(addr)
         implicit val vT: Type[Vec[I32]] = Vec.bits[I32](bank.length)

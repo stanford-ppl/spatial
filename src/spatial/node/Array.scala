@@ -88,3 +88,4 @@ import spatial.lang.host._
     end:   Text)
   extends Op2[A,Text]
 
+@op case class CharArrayToText(array: Tensor1[U8]) extends Op[Text]

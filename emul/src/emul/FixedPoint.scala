@@ -141,6 +141,7 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
 }
 
 object FixedPoint {
+  def fromChar(x: Char): FixedPoint = FixedPoint(x, FixFormat(false,8,0))
   def fromByte(x: Byte): FixedPoint = FixedPoint(x, FixFormat(true,8,0))
   def fromShort(x: Short): FixedPoint = FixedPoint(x, FixFormat(true,16,0))
   def fromInt(x: Int): FixedPoint = FixedPoint(x, FixFormat(true,32,0))

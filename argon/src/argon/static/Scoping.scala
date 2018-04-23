@@ -7,14 +7,14 @@ import utils.tags.instrument
 
 trait Scoping {
 
-  @stateful @inline private def reify[R](block: => Sym[R]): Sym[R] = {
+  @stateful @inline private def reify[R](block: => R): R = {
     if (state.isStaging) state.logTab += 1
     val result = block
     if (state.isStaging) state.logTab -= 1
     result
   }
 
-  @inline private def schedule[R](
+  @stateful def stageScope_Schedule[R](
     inputs: Seq[Sym[_]],
     result: Sym[R],
     scope:  Seq[Sym[_]],
@@ -22,21 +22,43 @@ trait Scoping {
     options: BlockOptions,
     motion: Boolean,
     scheduler: Scheduler
-  ): Schedule[R] = scheduler(inputs,result,scope,impure,options,motion)
+  ): Block[R] = {
+    val schedule = scheduler(inputs,result,scope,impure,options,motion)
+
+    if (motion) {
+      state.scope ++= schedule.motioned
+      state.impure ++= schedule.motionedImpure
+    }
+
+    if (config.enLog) {
+      logs(s"Completed block ${schedule.block}")
+      logs(s"Inputs:  $inputs")
+      schedule.block.stms.foreach{s => logs(s"  ${stm(s)}") }
+      logs(s"Effects: ${schedule.block.effects}")
+      logs(s"Escaping: ")
+      schedule.motioned.foreach{s => logs(s"  ${stm(s)}")}
+      val dropped = scope diff (schedule.block.stms ++ schedule.motioned)
+      if (dropped.nonEmpty) {
+        logs(s"Dropped: ")
+        dropped.foreach{s => logs(s"  ${stm(s)}") }
+      }
+    }
+
+    schedule.block
+  }
 
   /** Stage the effects of an isolated scope with the given inputs.
+    * Returns the scope as a schedulable list of statements
     *
     * @param inputs Bound inputs to this block (for lambda functions)
     * @param block Call by name reference to the scope
-    * @param options Scheduling options for the scope (default is BlockOptions.Normal)
     */
-  @stateful def stageScope[R](
+  @stateful def stageScope_Start[R](
     inputs:  Seq[Sym[_]],
     options: BlockOptions = BlockOptions.Normal
   )(
-    block:   => Sym[R],
-  ): Block[R] = {
-    // TODO[2]: Add code motion scheduler when enabled
+    block: => R
+  ): (R, Seq[Sym[_]], Seq[Impure], Scheduler, Boolean) = {
     lazy val defaultSched = if (state.mayMotion) SimpleScheduler else SimpleScheduler
     val scheduler = options.sched.getOrElse(defaultSched)
     if (state eq null) throw new Exception("Null state during stageScope")
@@ -53,31 +75,30 @@ trait Scoping {
     val result = reify(block)
     val scope  = state.scope
     val impure = state.impure
-    val sched = schedule(inputs,result,scope,impure,options,motion,scheduler)
 
     state.cache  = saveCache
     state.scope  = saveScope
     state.impure = saveImpure
-    if (motion) {
-      state.scope ++= sched.motioned
-      state.impure ++= sched.motionedImpure
-    }
 
-    if (config.enLog) {
-      logs(s"Completed block ${sched.block}")
-      logs(s"Inputs:  $inputs")
-      sched.block.stms.foreach{s => logs(s"  ${stm(s)}") }
-      logs(s"Effects: ${sched.block.effects}")
-      logs(s"Escaping: ")
-      sched.motioned.foreach{s => logs(s"  ${stm(s)}")}
-      val dropped = scope diff (sched.block.stms ++ sched.motioned)
-      if (dropped.nonEmpty) {
-        logs(s"Dropped: ")
-        dropped.foreach{s => logs(s"  ${stm(s)}") }
-      }
-    }
+    (result, scope, impure, scheduler, motion)
+  }
 
-    sched.block
+
+  /** Stage the effects of an isolated scope with the given inputs.
+    * Schedule the resulting scope statements as a Block with the given or default scheduler.
+    *
+    * @param inputs Bound inputs to this block (for lambda functions)
+    * @param block Call by name reference to the scope
+    * @param options Scheduling options for the scope (default is BlockOptions.Normal)
+    */
+  @stateful def stageScope[R](
+    inputs:  Seq[Sym[_]],
+    options: BlockOptions = BlockOptions.Normal
+  )(
+    block:   => Sym[R],
+  ): Block[R] = {
+    val (result, scope, impure, scheduler, motion) = stageScope_Start(inputs, options){ block }
+    stageScope_Schedule(inputs, result, scope, impure, options, motion, scheduler)
   }
 
   @stateful def stageBlock[R](block: => Sym[R], options: BlockOptions = BlockOptions.Normal): Block[R] = {

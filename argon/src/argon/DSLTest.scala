@@ -137,18 +137,19 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     }
   }
 
-  object IllegalExample extends Backend(
+  class IllegalExample(args: String, errors: Int) extends Backend(
     name = "IllegalExample",
-    args = "",
+    args = args,
     make = "",
     run  = ""
   ) {
-    def shouldRun = true
+    def shouldRun: Boolean = true
     override def runBackend(): Unit = {
-      s"${test.name}" should "have compiler errors" in {
+      s"${test.name}" should s"have $errors compiler errors" in {
         compile().foreach{err =>
           err()
           IR.hadErrors shouldBe true
+          IR.errors shouldBe errors
         }
       }
     }

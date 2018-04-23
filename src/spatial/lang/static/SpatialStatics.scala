@@ -10,6 +10,9 @@ trait SpatialStatics extends Implicits with utils.Overloads with SpatialVirtuali
   with StaticTuples
   with Constructors
   with ArrayAPI
+  with Parameters
+  with UserData
+  with ControlAPI
 
 /** Internal view of Spatial */
 trait InternalStatics extends SpatialStatics with InternalAliases
@@ -23,6 +26,7 @@ trait FrontendStatics extends ExternalStatics
 {
   type SrcCtx = forge.SrcCtx
   lazy val SrcCtx = forge.SrcCtx
+  type Cast[A,B] = argon.Cast[A,B]
 }
 
 trait ShadowingStatics extends FrontendStatics with ShadowingAliases

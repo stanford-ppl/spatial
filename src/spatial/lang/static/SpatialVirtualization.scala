@@ -15,14 +15,23 @@ trait SpatialVirtualization extends ArgonVirtualization with forge.EmbeddedContr
   @rig def __ifThenElse[A:Type](cond: Bit, thenBr: => Lift[A], elseBr: => Lift[A])(implicit ov0: Overload0): A = {
     ifThenElse(cond, () => thenBr.unbox, () => elseBr.unbox)
   }
-  @rig def __ifThenElse[A:Type,B](cond: Bit, thenBr: => Sym[A], elseBr: => Lift[B])(implicit ov1: Overload1): A = {
-    ifThenElse(cond, () => thenBr, () => Type[A].from(elseBr.orig))
+  @rig def __ifThenElse[A:Type](cond: Bit, thenBr: => Sym[A], elseBr: => Literal)(implicit ov1: Overload1): A = {
+    ifThenElse(cond, () => thenBr, () => Type[A].from(elseBr.value))
   }
-  @rig def __ifThenElse[A,B:Type](cond: Bit, thenBr: => Lift[A], elseBr: => Sym[B])(implicit ov2: Overload2): B = {
-    ifThenElse(cond, () => Type[B].from(thenBr.orig), () => elseBr)
+  @rig def __ifThenElse[A:Type](cond: Bit, thenBr: => Literal, elseBr: => Sym[A])(implicit ov2: Overload2): A = {
+    ifThenElse(cond, () => Type[A].from(thenBr.value), () => elseBr)
   }
   @rig def __ifThenElse[A](cond: Bit, thenBr: => Sym[A], elseBr: => Sym[A])(implicit ov3: Overload3): A = {
     ifThenElse(cond, () => thenBr, () => elseBr)
+  }
+  @rig def __ifThenElse(cond: Bit, thenBr: => Void, elseBr: => Any)(implicit ov3: Overload4): Void = {
+    ifThenElse(cond, () => thenBr, () => { elseBr; void })
+  }
+  @rig def __ifThenElse(cond: Bit, thenBr: => Any, elseBr: => Void)(implicit ov3: Overload5): Void = {
+    ifThenElse(cond, () => { thenBr; void }, () => { elseBr })
+  }
+  @rig def __ifThenElse(cond: Bit, thenBr: => Void, elseBr: => Void)(implicit ov3: Overload6): Void = {
+    ifThenElse(cond, () => { thenBr }, () => { elseBr })
   }
 
   @rig def ifThenElse[A](cond: Bit, thenBr: () => Sym[A], elseBr: () => Sym[A]): A = {

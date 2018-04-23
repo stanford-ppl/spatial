@@ -1,4 +1,4 @@
-package spatial.tests.feature
+package spatial.tests.feature.memories
 
 import spatial.dsl._
 

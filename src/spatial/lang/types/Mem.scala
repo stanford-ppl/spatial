@@ -45,7 +45,7 @@ trait LocalMem3[A,C[T]<:LocalMem3[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
 
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
-  @api def load(dram: DRAM1[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM3[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
 }
 trait LocalMem4[A,C[T]<:LocalMem4[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
@@ -66,6 +66,7 @@ trait Mem1[A,M1[T]] extends Mem[A,M1] {
 
   /** Returns a view of this memory at the addresses in the given `range`. */
   @api def apply(range: Rng): M1[A] = stage(MemDenseAlias[A,M1,M1](me,Seq(range)))
+
 }
 
 trait Mem2[A,M1[T],M2[T]] extends Mem[A,M2] {

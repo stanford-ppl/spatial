@@ -25,9 +25,9 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
   @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     val acc = accum.getOrElse(Reg[A])
     val cchain = CounterChain(domain)
-    val lA = bound[A]
-    val rA = bound[A]
-    val iters  = List.fill(domain.length){ bound[I32] }
+    val lA = boundVar[A]
+    val rA = boundVar[A]
+    val iters  = List.fill(domain.length){ boundVar[I32] }
     val mapBlk = stageBlock{ map(iters) }
     val ldBlk  = stageLambda1(acc){ acc.value }
     val redBlk = stageLambda2(lA,rA){ reduce(lA,rA) }
@@ -37,9 +37,9 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
     acc
   }
 }
-protected class ReduceConstant[A](a: Lift[A], isFold: Boolean, opt: CtrlOpt) {
-  @rig private def accum(implicit A: Bits[A]) = Some(Reg[A](a.unbox))
-  private def init = Some(a.unbox)
+protected class ReduceConstant[A](a: A, isFold: Boolean, opt: CtrlOpt) {
+  @rig private def accum(implicit A: Bits[A]) = Some(Reg[A](a))
+  private def init = Some(a)
   private def fold = if (isFold) init else None
   private def zero = if (!isFold) init else None
 
@@ -59,7 +59,8 @@ protected class ReduceConstant[A](a: Lift[A], isFold: Boolean, opt: CtrlOpt) {
 
 protected class ReduceClass(opt: CtrlOpt) extends ReduceAccum(None, None, None, opt) {
   /** Reduction with implicit accumulator */
-  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero, isFold = false, opt)
+  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt)
+  def apply[A](zero: Sym[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt)
 
   /** Reduction with explicit accumulator */
   def apply[T](accum: Reg[T]) = new ReduceAccum(Some(accum), None, None, opt)
@@ -67,7 +68,8 @@ protected class ReduceClass(opt: CtrlOpt) extends ReduceAccum(None, None, None, 
 
 protected class FoldClass(opt: CtrlOpt) {
   /** Fold with implicit accumulator */
-  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero, isFold = true, opt)
+  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = true, opt)
+  def apply[A](zero: Sym[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt)
 
   /** Fold with explicit accumulator */
   def apply[A](accum: Reg[A]) = new MemFoldClass(opt).apply(accum)

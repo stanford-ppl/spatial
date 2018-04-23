@@ -49,7 +49,7 @@ trait StaticFileIO {
   @rig def openCSV(filename: Text, write: Boolean): CSVFile = stage(OpenCSVFile(filename, write))
   @rig def readTokens(file: CSVFile, delim: Text): Tensor1[Text] = stage(ReadTokens(file, delim))
   @rig def writeTokens(file: CSVFile, delim: Text, len: I32)(token: I32 => Text): Void = {
-    val i = bound[I32]
+    val i = boundVar[I32]
     val func = stageLambda1(i){ token(i) }
     stage(WriteTokens(file, delim, len, func))
   }
@@ -98,7 +98,7 @@ trait StaticFileIO {
   @rig def openBinary(filename: Text, write: Boolean): BinaryFile = stage(OpenBinaryFile(filename, write))
   @rig def readBinary[A:Num](file: BinaryFile): Tensor1[A] = stage(ReadBinaryFile(file))
   @rig def writeBinary[A:Num](file: BinaryFile, len: I32)(func: I32 => A): Void = {
-    val i = bound[I32]
+    val i = boundVar[I32]
     val f = stageLambda1(i){ func(i) }
     stage(WriteBinaryFile(file, len, f))
   }

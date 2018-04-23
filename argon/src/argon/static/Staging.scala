@@ -8,7 +8,7 @@ import utils.tags.instrument
 
 trait Staging { this: Printing =>
   /** Create a checked parameter (implicit state required) */
-  @stateful def param[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
+  @stateful def parameter[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
 
   /** Create a checked constant (implicit state required) */
   @stateful def const[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked)
@@ -25,7 +25,7 @@ trait Staging { this: Printing =>
   @stateful def err[A:Type](msg: String): A = Type[A]._new(Def.Error[A](state.nextId(),msg), ctx)
   @stateful def err_[A](tp: Type[A], msg: String): A = tp._new(Def.Error[A](state.nextId(),msg), ctx)
 
-  @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
+  @stateful def boundVar[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
 
   @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = {
     if (state eq null) throw new Exception(s"Staging in null state scope")

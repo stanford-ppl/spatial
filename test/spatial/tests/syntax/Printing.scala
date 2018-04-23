@@ -1,4 +1,4 @@
-package spatial.tests
+package spatial.tests.syntax
 
 import spatial.dsl._
 

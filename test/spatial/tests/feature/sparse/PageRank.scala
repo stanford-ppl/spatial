@@ -1,6 +1,6 @@
-package spatial.tests.feature.sparse
+// package spatial.tests.feature.sparse
 
-import spatial.dsl._
+// import spatial.dsl._
 
 
 

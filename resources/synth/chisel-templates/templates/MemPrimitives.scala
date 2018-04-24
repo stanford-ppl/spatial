@@ -261,28 +261,28 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     wire := d
   }
 
-  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarW(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, muxPort, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
     io.output.data(vecId)
   }
 
-  def connectDirectWPort(wBundle: W_Direct, muxPort: Int, vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = directWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directW(base) := wBundle
   }
 
-  def connectDirectRPort(rBundle: R_Direct, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, muxPort, vecId, true.B)}
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val base = directRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directR(base) := rBundle    
     io.flow(base) := flow
@@ -320,12 +320,12 @@ class FF(val bitWidth: Int,
   ff := Mux(anyReset, io.input(0).init, Mux(anyEnable, wr_data, ff))
   io.output.data := Mux(anyReset, io.input(0).init, ff)
 
-  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.input(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {io.output.data}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {io.output.data}
 
 }
 
@@ -426,14 +426,14 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
   io.almostFull := elements.io.output.almostFull
   io.numel := elements.io.output.numel.asUInt
 
-  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarW(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, muxPort, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow

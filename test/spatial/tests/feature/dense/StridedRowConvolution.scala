@@ -1,7 +1,7 @@
-package spatial.tests.feature.dense
+// package spatial.tests.feature.dense
 
 
-import spatial.dsl._
+// import spatial.dsl._
 
 
 // @test class StridedRowConvolution extends SpatialTest { // ReviveMe

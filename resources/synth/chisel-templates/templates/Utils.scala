@@ -5,7 +5,7 @@ import chisel3.util._
 import chisel3.internal.sourceinfo._
 import types._
 import fringe._
-import emul._
+// import emul._
 
 import scala.math._
 

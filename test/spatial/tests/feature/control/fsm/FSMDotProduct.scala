@@ -1,7 +1,7 @@
-package spatial.tests.feature.control.fsm
+// package spatial.tests.feature.control.fsm
 
 
-import spatial.dsl._
+// import spatial.dsl._
 
 
 // @test class FSMDotProduct extends SpatialTest { // ReviveMe (read from argout)

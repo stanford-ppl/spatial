@@ -1,6 +1,6 @@
-package spatial.tests.syntax
+// package spatial.tests.syntax
 
-import spatial.dsl._
+// import spatial.dsl._
 
 // @test class RegMath extends SpatialTest { // ReviveMe
 //   def runtimeArgs: Args = NoArgs

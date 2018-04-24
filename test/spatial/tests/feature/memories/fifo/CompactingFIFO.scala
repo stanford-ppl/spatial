@@ -1,7 +1,7 @@
-package spatial.tests.feature.memories.fifo
+// package spatial.tests.feature.memories.fifo
 
 
-import spatial.dsl._
+// import spatial.dsl._
 
 
 // @test class CompactingFIFO extends SpatialTest { // ReviveMe (write to var)

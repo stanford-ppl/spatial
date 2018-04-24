@@ -1,7 +1,7 @@
-package spatial.tests.feature.sparse
+// package spatial.tests.feature.sparse
 
 
-import spatial.dsl._
+// import spatial.dsl._
 
 
 // @test class PageRank_Bulk extends SpatialTest { // ReviveMe (store to var)

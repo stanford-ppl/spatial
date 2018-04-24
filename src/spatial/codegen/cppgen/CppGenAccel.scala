@@ -82,11 +82,6 @@ trait CppGenAccel extends CppGenCommon {
       //  }
       //  emit(src"// $lhs $reg $v $en reg write")
 
-    case ArgInRead(reg)    => 
-      emit(src"${lhs.tp} $lhs = $reg;")
-    case ArgOutWrite(reg,v,en) => 
-      emit(src"// $lhs $reg $v $en reg write")
-
     case UnitPipe(_,func) => 
       controllerStack.push(lhs)
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)

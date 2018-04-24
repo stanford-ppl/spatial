@@ -1,14 +1,11 @@
 // package spatial.tests.feature.memories.fifo
 
-
 // import spatial.dsl._
-
 
 // @test class CompactingFIFO extends SpatialTest { // ReviveMe (write to var)
 //   override def runtimeArgs: Args = "640"
 
 //   val tileSize = 64
-
 
 //   def main(args: Array[String]): Unit = {
 //     val arraySize = args(0).to[Int]

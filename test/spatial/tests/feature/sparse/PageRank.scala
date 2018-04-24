@@ -2,8 +2,6 @@
 
 // import spatial.dsl._
 
-
-
 // @test class PageRank extends SpatialTest { // ReviveMe (write to var)
 //   override def runtimeArgs: Args = "50 0.125"
 

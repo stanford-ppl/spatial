@@ -56,6 +56,9 @@ import spatial.node._
     stage(ArrayReduce(this,applyBlk,reduceBlk))
   }
 
+  @api def sum(implicit aA: Num[A]): A = this.fold(aA.zero){(a,b) => a + b }
+  @api def product(implicit aA: Num[A]): A = this.fold(aA.one){(a,b) => a * b }
+
   /**
     * Reduces the elements in this Array and the given initial value into a single element
     * using associative function `rfunc`.

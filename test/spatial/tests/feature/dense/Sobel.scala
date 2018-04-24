@@ -1,8 +1,6 @@
 // package spatial.tests.feature.dense
 
-
 // import spatial.dsl._
-
 
 // @test class Sobel extends SpatialTest { // ReviveMe
 //   override def runtimeArgs: Args = "200 160"

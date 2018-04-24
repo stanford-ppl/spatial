@@ -32,10 +32,8 @@ trait NamedCodegen extends Codegen {
       case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}"
       case LUTNew(_,_)  => s"${s}_${s.nameOr("lut")}"
 
-      case SetArgIn(reg,_)      => s"${s}_${s.nameOr(src"set_$reg")}"
-      case ArgInRead(reg)       => s"${s}_${s.nameOr(src"rd_$reg")}"
-      case ArgOutWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"
-      case GetArgOut(reg)       => s"${s}_${s.nameOr(src"get_$reg")}"
+      case SetReg(reg,_)      => s"${s}_${s.nameOr(src"set_$reg")}"
+      case GetReg(reg)       => s"${s}_${s.nameOr(src"get_$reg")}"
 
       case RegRead(reg)      => s"${s}_${s.nameOr(src"rd_$reg")}"
       case RegWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"

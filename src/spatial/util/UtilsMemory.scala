@@ -31,8 +31,9 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     }
 
     def isReg: Boolean = x.isInstanceOf[Reg[_]]
-    def isArgIn: Boolean = x.isInstanceOf[ArgIn[_]]
-    def isArgOut: Boolean = x.isInstanceOf[ArgOut[_]]
+    def isArgIn: Boolean = x.isReg && x.op.exists{ _.isInstanceOf[ArgInNew[_]] }
+    def isArgOut: Boolean = x.isReg && x.op.exists{ _.isInstanceOf[ArgOutNew[_]] }
+    def isHostIO: Boolean = x.isReg && x.op.exists{ _.isInstanceOf[HostIONew[_]] }
 
     def isDRAM: Boolean = x match {
       case _:DRAM[_,_] => true

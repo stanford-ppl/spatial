@@ -1,12 +1,9 @@
 // package spatial.tests.feature.dense
 
-
 // import spatial.dsl._
-
 
 // @test class StridedRowConvolution extends SpatialTest { // ReviveMe
 //   override def runtimeArgs: Args = NoArgs
-
 
 //   def main(args: Array[String]): Unit = {
 //     val R = 20

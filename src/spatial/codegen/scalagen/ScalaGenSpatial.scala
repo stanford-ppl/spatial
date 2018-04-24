@@ -19,7 +19,6 @@ case class ScalaGenSpatial(IR: State) extends ScalaCodegen
   with ScalaGenCounter
   with ScalaGenDRAM
   with ScalaGenFIFO
-  with ScalaGenArgs
   with ScalaGenReg
   with ScalaGenSRAM
   with ScalaGenUnrolled

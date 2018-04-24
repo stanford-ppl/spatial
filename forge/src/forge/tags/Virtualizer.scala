@@ -53,6 +53,7 @@ import scala.reflect.macros.blackbox
   *   throw e                =>       __throw(e)
   *   Nothing                =>       ???
   *   Null                   =>       ???
+  *   a match {case ... }    =>       ???
   * }}}
   *
   * === Unplanned/Unsupported Features ===
@@ -86,22 +87,24 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
       */
     private def transformStm(tree: Tree): List[Tree] = tree match {
       case ValDef(mods, term@TermName(name), tpt, rhs) if mods.hasFlag(Flag.MUTABLE) && !mods.hasFlag(Flag.PARAMACCESSOR) =>
-        tpt match {
-          case EmptyTree =>
-            __c.abort(__c.enclosingPosition, "Missing type for var declaration.")
-          case _ =>
-        }
-        // Mangle Var name to make readVar calls happen explicitly
-        val s = TermName(name+"$v")
-        val vtyp = tq"forge.VarLike[$tpt]"
-        val asgn = TermName(name+"_=")
-        // leaving it a var makes it easier to revert when custom __newVar isn't supplied
-        val v = ValDef(mods, s, vtyp, call(None, "__newVar", List(rhs)))
-        val d = DefDef(mods, term, Nil, Nil, tpt, call(None, "__readVar", List(Ident(s))))
-        val a = q"$mods def $asgn(v: $tpt) = __assign($s, v)"
+        //info("Found var: ")
+        //info(showRaw(tree))
 
-        //DefDef(mods, asgn, Nil, Nil, EmptyTree, call(None, "__assign", List(Ident(s))))
-        List(v, d, a)
+        tpt match {
+          case TypeTree() =>
+            __c.error(tree.pos, "Type annotation required for var declaration.")
+            List(tree)
+          case _ =>
+            // Mangle Var name to make readVar calls happen explicitly
+            val s = TermName(name+"$v")
+            val vtyp = tq"forge.VarLike[$tpt]"
+            val asgn = TermName(name+"_=")
+            // leaving it a var makes it easier to revert when custom __newVar isn't supplied
+            val v = ValDef(mods, s, vtyp, call(None, "__newVar", List(rhs), List(tpt)))
+            val d = DefDef(mods, term, Nil, Nil, tpt, call(None, "__readVar", List(Ident(s))))
+            val a = q"$mods def $asgn(v: $tpt) = __assign($s, v)"
+            List(v, d, a)
+        }
 
       case v@ValDef(mods, term@TermName(name), _, _) if !mods.hasFlag(Flag.PARAMACCESSOR) =>
         val vdef = transform(v)
@@ -130,24 +133,6 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
             Apply(Ident(TermName("__valName")), List(Ident(term), Literal(Constant(name))))
           }
           Function(params, q"..$named; ${transform(body)}")
-
-        // Don't rewrite +=, -=, *=, and /=. This restricts the return value to Unit
-        // in the case where the compiler/DSL author chooses to use implicit classes rather
-        // than infix_ methods
-        /*
-        case Apply(Select(qualifier, TermName("$plus$eq")), List(arg)) =>     // x += y
-          liftFeature(None, "infix_$plus$eq", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("$minus$eq")), List(arg)) =>    // x -= y
-          liftFeature(None, "infix_$minus$eq", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("$times$eq")), List(arg)) =>    // x *= y
-          liftFeature(None, "infix_$times$eq", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("$div$eq")), List(arg)) =>      // x /= y
-          liftFeature(None, "infix_$div$eq", List(qualifier, arg))
-        */
-
 
         /* Control structures (keywords) */
 
@@ -306,66 +291,6 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
               transformSingleCase(cases.head, q"()")
             }
           }*/
-
-        //case ClassDef(mods, name, tpt, body) if mods.hasFlag(Flag.CASE) =>
-          // sstucki: there are issues with the ordering of
-          // virtualization and expansion of case classes (i.e. some
-          // of the expanded code might be virtualized even though it
-          // should not be and vice-versa).  So until we have decided
-          // how proper virtualization of case classes should be done,
-          // any attempt to do so should fail.
-          // TR: not 100% sure what the issue is (although i vaguely
-          // remember that we had issues in Scala-virtualized with
-          // auto-generated case class equality methods using virtualized
-          // equality where it shouldn't). For the moment it seems like
-          // just treating case classes as regular classes works fine.
-          // __.warning(tree.pos, "virtualization of case classes is not fully supported.")
-          //super.transform(tree) //don't virtualize the case class definition but virtualize its body
-
-
-        // Argon-specific hack for changing T:Type to T<:MetaAny[T]:Type
-//        case DefDef(mods,name,tparams,paramss,retTpe,body) =>
-//          // HACK: Change return type from IR.Void to scala.Unit
-//          // This is to allow both
-//          //   def method() { } and
-//          //   def method(): Unit = { } syntax
-//          // Since lifting from scala.Unit to IR.Void is supported in argon,
-//          // but not IR.Unit to scala.Unit, this is the only sane thing to do
-//          val modifiedRetTpe = retTpe match {
-//            case Ident(TypeName("Unit")) =>
-//              Select(Ident(TermName("scala")),TypeName("Unit"))
-//
-//            case tp => tp
-//          }
-//
-//          if (paramss.nonEmpty) {
-//            val metaTypes = paramss.last.collect{
-//              case ValDef(ms,_,AppliedTypeTree(Ident(TypeName("Meta")),List(typeTree)),rhs) if ms.hasFlag(Flag.IMPLICIT) => typeTree
-//              case ValDef(ms,_,AppliedTypeTree(Ident(TypeName("Type")),List(typeTree)),rhs) if ms.hasFlag(Flag.IMPLICIT) => typeTree
-//            }
-//
-//            object TypedTree {
-//              def unapply(x: Tree): Option[String] = x match {
-//                case Ident(TypeName(typeName)) => Some(typeName)
-//                case AppliedTypeTree(TypedTree(typeName),args) => Some(typeName)
-//                case ExistentialType(TypedTree(typeName),args) => Some(typeName)
-//              }
-//            }
-//            val metaTypeNames = metaTypes.map{case TypedTree(typeName) => typeName }
-//
-//            val newTParams = tparams.map{
-//              case TypeDef(ms,TypeName(typeName),targs,TypeBoundsTree(child,EmptyTree)) if metaTypeNames.contains(typeName) =>
-//                val i = metaTypeNames.indexOf(typeName)
-//                val superBound = AppliedTypeTree(Ident(TypeName("MetaAny")), List(metaTypes(i)))
-//                TypeDef(ms,TypeName(typeName),targs,TypeBoundsTree(child,superBound))
-//
-//              case tp => tp
-//            }
-//
-//            super.transform( DefDef(mods,name,newTParams,paramss,modifiedRetTpe,body) )
-//
-//          }
-//          else super.transform(DefDef(mods,name,tparams,paramss,modifiedRetTpe,body))
 
         case _ =>
           super.transform(tree)

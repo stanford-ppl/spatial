@@ -1,8 +1,6 @@
 // package spatial.tests.feature.sparse
 
-
 // import spatial.dsl._
-
 
 // @test class PageRank_Bulk extends SpatialTest { // ReviveMe (store to var)
 //   override def runtimeArgs: Args = "50 0.125"

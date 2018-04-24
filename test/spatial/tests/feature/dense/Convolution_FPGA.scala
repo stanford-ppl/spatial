@@ -2,8 +2,6 @@
 
 // import spatial.dsl._
 
-
-
 // @test class Convolution_FPGA extends SpatialTest { // ReviveMe
 //   override def runtimeArgs: Args = NoArgs
 

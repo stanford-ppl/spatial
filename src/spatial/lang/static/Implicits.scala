@@ -24,11 +24,6 @@ trait ImplicitsPriority3 {
 
   @api implicit def SeriesFromFix[S:BOOL,I:INT,F:INT](x: Fix[S,I,F]): Series[Fix[S,I,F]] = x.toSeries
 
-  implicit class EqualsOps(x: Any) {
-    def infix_!=(y: Any): Boolean = x != y
-    def infix_==(y: Any): Boolean = x == y
-  }
-
   implicit def numericCast[A:Num,B:Num]: Cast[A,B] = Right(new CastFunc[A,B]{
     @api def apply(a: A): B = (Num[B] match {
       case tp:Fix[s,i,f] =>
@@ -51,6 +46,32 @@ trait ImplicitsPriority3 {
   @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
   @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
   @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
+
+  class NumericLiteralOps[A](x: A) {
+    @api def +[B:Arith](that: Reg[B])(implicit cast: Cast[A,B]): B = cast(x) + that.value
+    @api def -[B:Arith](that: Reg[B])(implicit cast: Cast[A,B]): B = cast(x) - that.value
+    @api def *[B:Arith](that: Reg[B])(implicit cast: Cast[A,B]): B = cast(x) * that.value
+    @api def /[B:Arith](that: Reg[B])(implicit cast: Cast[A,B]): B = cast(x) / that.value
+    @api def %[B:Arith](that: Reg[B])(implicit cast: Cast[A,B]): B = cast(x) % that.value
+
+    @api def <[B:Order](that: Reg[B])(implicit cast: Cast[A,B]): Bit = cast(x) < that.value
+    @api def <=[B:Order](that: Reg[B])(implicit cast: Cast[A,B]): Bit = cast(x) <= that.value
+    @api def >[B:Order](that: Reg[B])(implicit cast: Cast[A,B]): Bit = cast(x) > that.value
+    @api def >=[B:Order](that: Reg[B])(implicit cast: Cast[A,B]): Bit = cast(x) >= that.value
+
+    @api def infix_!=[B:Type](that: Reg[B])(implicit cast: Cast[A,B]): Bit = cast(x) !== that.value
+    @api def infix_==[B:Type](that: Reg[B])(implicit cast: Cast[A,B]): Bit = cast(x) === that.value
+
+    @api def infix_!=[B:Type](that: Sym[B])(implicit cast: Cast[A,B]): Bit = cast(x) !== that
+    @api def infix_==[B:Type](that: Sym[B])(implicit cast: Cast[A,B]): Bit = cast(x) === that
+
+    def infix_!=(that: Any): Boolean = x != that
+    def infix_==(that: Any): Boolean = x == that
+  }
+
+  // --- A (Any)
+  implicit def numericLiterals[A](a: A): NumericLiteralOps[A] = new NumericLiteralOps[A](a)
+
 }
 
 trait ImplicitsPriority2 extends ImplicitsPriority3 {
@@ -172,69 +193,12 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
   }
 
-  class NumericAddOps[A:Numeric](x: A) {
-    @api def +[B:Arith](that: Reg[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: Reg[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: Reg[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: Reg[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: Reg[B]): B = Arith[B].from(x) % that.value
-
-    @api def <[B:Order](that: Reg[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: Reg[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: Reg[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: Reg[B]): Bit = Order[B].from(x) >= that.value
-
-    @api def infix_!=[B:Type](that: Reg[B]): Bit = Type[B].from(x) !== that.value
-    @api def infix_==[B:Type](that: Reg[B]): Bit = Type[B].from(x) === that.value
-
-    @api def +[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) % that.value
-
-    @api def <[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) >= that.value
-
-    @api def infix_!=[B:Type](that: ArgIn[B]): Bit = Type[B].from(x) !== that.value
-    @api def infix_==[B:Type](that: ArgIn[B]): Bit = Type[B].from(x) === that.value
-
-    @api def +[B:Arith](that: HostIO[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: HostIO[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: HostIO[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: HostIO[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: HostIO[B]): B = Arith[B].from(x) % that.value
-
-    @api def <[B:Order](that: HostIO[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: HostIO[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: HostIO[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: HostIO[B]): Bit = Order[B].from(x) >= that.value
-
-    @api def infix_!=[B:Type](that: HostIO[B]): Bit = Type[B].from(x) !== that.value
-    @api def infix_==[B:Type](that: HostIO[B]): Bit = Type[B].from(x) === that.value
-
-    @api def +[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) + getArg(that)
-    @api def -[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) - getArg(that)
-    @api def *[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) * getArg(that)
-    @api def /[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) / getArg(that)
-    @api def %[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) % getArg(that)
-
-    @api def <[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) < getArg(that)
-    @api def <=[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) <= getArg(that)
-    @api def >[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) > getArg(that)
-    @api def >=[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) >= getArg(that)
-
-    @api def infix_!=[B:Type](that: ArgOut[B]): Bit = Type[B].from(x) !== getArg(that)
-    @api def infix_==[B:Type](that: ArgOut[B]): Bit = Type[B].from(x) === getArg(that)
+  class RegNumerics[A:Num](reg: Reg[A])(implicit ctx: SrcCtx, state: State) {
+    def :+=(data: A): Void = reg := reg.value + data.unbox
+    def :-=(data: A): Void = reg := reg.value - data.unbox
+    def :*=(data: A): Void = reg := reg.value * data.unbox
   }
 
-  class RegNumerics[A:Num](reg: Reg[A]) {
-    @api def :+=(data: A): Void = reg := reg.value + data.unbox
-    @api def :-=(data: A): Void = reg := reg.value - data.unbox
-    @api def :*=(data: A): Void = reg := reg.value * data.unbox
-  }
 
 
   // Note: Naming is important here to override the names in Predef.scala
@@ -306,19 +270,7 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
   // --- Reg[A]
   @api implicit def regRead[A](x: Reg[A]): A = x.value
-  implicit def regNumerics[A:Num](x: Reg[A]): RegNumerics[A] = new RegNumerics[A](x)
-
-
-  // --- ArgIn[A]
-  @api implicit def argRead[A](x: ArgIn[A]): A = x.value
-
-
-  // --- HostIO[A]
-  @api implicit def hostIORead[A](x: HostIO[A]): A = x.value
-
-
-  // --- A:Numeric
-  implicit def numericAddOps[A:Numeric](x: A): NumericAddOps[A] = new NumericAddOps[A](x)
+  @api implicit def regNumerics[A:Num](x: Reg[A]): RegNumerics[A] = new RegNumerics[A](x)
 
 
   // --- Wildcard

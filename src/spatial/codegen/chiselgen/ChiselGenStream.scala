@@ -47,8 +47,8 @@ trait ChiselGenStream extends ChiselGenCommon {
       emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.asyn_reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_} | accelReset", forceful = true)
       emitGlobalModule(src"${swap(lhs, Valid)} := ${swap(src"${lhs}_valid_srff", Blank)}.io.output.data | ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
       val ens = writersOf(lhs).toList.head match {case Op(StreamOutBankedWrite(_, _, ens)) => ens.toList.length ; case _ => 0}
-	  emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${ens*writersOf(lhs).toList.length}, ${lhs.tp.typeArgs.head}))")
-	  emitGlobalWire(src"""val ${lhs} = Vec((0 until ${ens}).map{i => val ${lhs}_slice_options = (0 until ${writersOf(lhs).toList.length}).map{j => ${swap(lhs, DataOptions)}(i*${writersOf(lhs).toList.length}+j)}; Mux1H(${swap(lhs, ValidOptions)}, ${lhs}_slice_options)}.toList)""")
+	    emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${ens*writersOf(lhs).toList.length}, ${lhs.tp.typeArgs.head}))")
+	    emitGlobalWire(src"""val ${lhs} = Vec((0 until ${ens}).map{i => val ${lhs}_slice_options = (0 until ${writersOf(lhs).toList.length}).map{j => ${swap(lhs, DataOptions)}(i*${writersOf(lhs).toList.length}+j)}; Mux1H(${swap(lhs, ValidOptions)}, ${lhs}_slice_options)}.toList)""")
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
 
 //     case StreamRead(stream, en) =>
@@ -90,95 +90,23 @@ trait ChiselGenStream extends ChiselGenCommon {
 //         emit(src"""// read is of burstAck on $stream""")
 //       }
 
-//     case StreamWrite(stream, data, en) =>
-//       val parent = parentOf(lhs).get
-//       emit(src"""val ${lhs}_wId = getStreamOutLane("$stream")""")
-//       emit(src"""${swap(stream, ValidOptions)}(${lhs}_wId) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & $en""")
-//       emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${lhs}_wId) := ${swap(parent, Done)} // Should be delayed by body latency + ready-off bubbles""")
-//       emit(src"""${swap(stream, DataOptions)}(${lhs}_wId) := $data""")
-//       stream match {
-//         case Def(StreamOutNew(bus)) => bus match {
-//             case VGA => 
-//               emitGlobalWire(src"""// EMITTING VGA GLOBAL""")
-//               // emitGlobalWire(src"""val ${stream} = Wire(UInt(16.W))""")
-//               // emitGlobalWire(src"""val converted_data = Wire(UInt(16.W))""")
-//               emit(src"""// emiiting data for stream ${stream}""")
-//               // emit(src"""${stream} := $data""")
-//               // emit(src"""converted_data := ${stream}""")
-//               val sources = lhs.collectDeps{case Def(StreamRead(strm,_)) => strm}
-//               sources.find{ _ match {
-//                 case Def(StreamInNew(strm)) => 
-//                   strm == VideoCamera
-//               }}
-//               if (sources.length > 0) {
-//                 emit(src"""stream_out_startofpacket := io.stream_in_startofpacket""")
-//                 emit(src"""stream_out_endofpacket := io.stream_in_endofpacket""")                
-//               } else {
-//                 emit(src"""stream_out_startofpacket := Utils.risingEdge(${swap(parent, DatapathEn)})""")
-//                 emit(src"""stream_out_endofpacket := ${swap(parent, Done)}""")
-//               }
-//               // emit(src"""${stream}_valid := ${en} & ShiftRegister(${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)},${symDelay(lhs)}.toInt)""")
-//             case LEDR =>
-//               // emitGlobalWire(src"""val ${stream} = Wire(UInt(32.W))""")
-//         //      emitGlobalWire(src"""val converted_data = Wire(UInt(32.W))""")
-//               // emit(src"""${stream} := $data""")
-//               // emit(src"""io.led_stream_out_data := ${stream}""")
-//             case GPOutput1 =>
-//               // emitGlobalWire(src"""val ${stream} = Wire(UInt(32.W))""")
-//               // emit(src"""${stream} := $data""")
-//               emit(src"""io.gpo1_streamout_writedata := ${stream}""")
-//             case GPOutput2 =>
-//               // emitGlobalWire(src"""val ${stream} = Wire(UInt(32.W))""")
-//               // emit(src"""${stream} := $data""")
-//               emit(src"""io.gpo2_streamout_writedata := ${stream}""")
-//             case BurstFullDataBus() =>
-//               emit(src"""${swap(stream, Valid)} := $en & ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} // Do not delay ready because datapath includes a delayed _valid already """)
-//               // emit(src"""${stream} := $data""")
-
-//             case BurstCmdBus =>  
-//               emit(src"""${swap(stream, Valid)} := $en & ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} // Do not delay ready because datapath includes a delayed _valid already """)
-//               // emit(src"""${stream} := $data""")
-
-//             case _ => 
-//               // emit(src"""${stream}_valid := ShiftRegister(${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)},${symDelay(lhs)}.toInt) & $en""")
-//               val id = argMapping(stream)._1
-//               Predef.assert(id != -1, s"Stream ${quote(stream)} not present in streamOuts")
-//               emit(src"""io.genericStreams.outs($id).bits.data := ${quote(data)}.number """)  // Ignores enable for now
-//               emit(src"""io.genericStreams.outs($id).valid := ${swap(stream, Valid)}""")
-//         }
-//       }
+    case StreamOutBankedWrite(stream, data, ens) =>
+      val parent = lhs.parent.s.get
+      emit(src"""val ${lhs}_wId = getStreamOutLane("$stream")""")
+      val muxPort = portsOf(lhs).values.head.muxPort
+      val en = if (ens.isEmpty) "true.B" else src"${ens.flatten.toList.map(quote).mkString("&")}"
+      emit(src"""${swap(stream, ValidOptions)}(${muxPort}) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & $en & ~${parent}_sm.io.ctrDone """)
+      emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} | ~${parent}_sm.io.ctrDone // Should be delayed by body latency + ready-off bubbles""")
+      emit(src"""${swap(stream, DataOptions)}(${muxPort}) := $data""")
 
 
-//     case e@ParStreamRead(strm, ens) =>
-//       val parent = parentOf(lhs).get
-//       emit(src"""val ${lhs}_rId = getStreamInLane("$strm")""")
-//       strm match {
-//         case Def(StreamInNew(bus)) => bus match {
-//           case VideoCamera => 
-//             emit(src"""val $lhs = Vec(io.stream_in_data)""")  // Ignores enable for now
-//             emit(src"""${swap(strm, ReadyOptions)}(${lhs}_rId) := ${swap(parent, Done)} & ${ens.mkString("&")} & ${DL(swap(parent, DatapathEn), swap(parent, Retime), true)}""")
-//           case SliderSwitch => 
-//             emit(src"""val $lhs = Vec(io.switch_stream_in_data)""")
-//           case _ => 
-//             val isAck = strm match { // TODO: Make this clean, just working quickly to fix bug for Tian
-//               case Def(StreamInNew(bus)) => bus match {
-//                 case BurstAckBus => true
-//                 case ScatterAckBus => true
-//                 case _ => false
-//               }
-//               case _ => false
-//             }
-//             emit(src"""${swap(strm, ReadyOptions)}(${lhs}_rId) := (${ens.map{a => src"$a"}.mkString(" | ")}) & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)
-//             // if (!isAck) {
-//             //   // emit(src"""//val $lhs = List(${ens.map{e => src"${e}"}.mkString(",")}).zipWithIndex.map{case (en, i) => ${strm}(i) }""")
-//               emit(src"""val $lhs = (0 until ${ens.length}).map{ i => ${strm}(i) }""")
-//             // } else {
-//             //   emit(src"""val $lhs = (0 until ${ens.length}).map{ i => ${strm}(i) }""")        
-//             // }
-
-
-//         }
-//       }
+    case StreamInBankedRead(strm, ens) =>
+      val parent = lhs.parent.s.get
+      val muxPort = portsOf(lhs).values.head.muxPort
+      val en = if (ens.isEmpty) "true.B" else src"${ens.flatten.toList.map(quote).mkString("&")}"
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emit(src"""${swap(strm, ReadyOptions)}(${muxPort}) := $en & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)
+      emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}(i) }""")
 
 
 //     case ParStreamWrite(stream, data, ens) =>

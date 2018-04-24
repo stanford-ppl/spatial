@@ -43,7 +43,7 @@ import spatial.dsl._
       val y = Reg[Int](0)
       FSM(true)(x => x){x =>
         y :+= 1
-      }{x => mux(y < 5, true, false)}
+      }{x => mux(y < 5, Bit(true), Bit(false))}
 
       out := y
       dram(0::32 par 16) store bram

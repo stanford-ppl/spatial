@@ -8,6 +8,7 @@ import emul.FloatPoint
 import emul.FixedPoint
 import spatial.lang._
 import spatial.node._
+import emul.Bool
 
 trait ChiselCodegen extends NamedCodegen with FileDependencies {
   override val lang: String = "chisel"
@@ -53,6 +54,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
     case (FixPtType(s,d,f), _) => c.toString + {if (f == 0 && !s) s".U($d.W)" else s".FP($s, $d, $f)"}
     case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
+    case (_:Bit, c:Bool) => s"${c.value}.B"
     case _ => super.quoteConst(tp,c)
   }
 
@@ -60,7 +62,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
     case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
     case BitType() => "Bool()"
-    // case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
+    case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => super.remap(tp)
   }
@@ -207,11 +209,14 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     emit(src"// Creating sub kernel ${name}_1")
     inGenn(out, name, ext) {
       emit("""package accel""")
+
       emit("import templates._")
       emit("import templates.ops._")
       emit("import types._")
+      emit("import api._")
       emit("import chisel3._")
       emit("import chisel3.util._")
+      emit("import scala.collection.immutable._")
       open(src"""trait ${name}_1 extends ${prnts} {""")
       if (cfg.compressWires == 2) {
         emit(src"""def method_${name}_1() {""")

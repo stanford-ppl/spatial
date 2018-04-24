@@ -10,14 +10,6 @@ import spatial.util._
 
 trait ChiselGenArray extends ChiselGenCommon {
 
-  protected def getField(tp: Type[_],field: String): (Int,Int) = tp match {
-    case x: Struct[_] =>
-      val idx = x.fields.indexWhere(_._1 == field)
-      val width = bitWidth(x.fields(idx)._2)
-      val prec = x.fields.take(idx)
-      val precBits = prec.map{case (_,bt) => bitWidth(bt)}.sum
-      (precBits+width-1, precBits)
-  }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case VecSlice(vec, start, stop) => 
@@ -25,17 +17,18 @@ trait ChiselGenArray extends ChiselGenCommon {
       emitt(src"${lhs}.zipWithIndex.foreach{case(w, i) => w := ${vec}(i+$stop)}")
     case VecConcat(list) => 
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
-      list.zipWithIndex.foreach{case (a, i) => emitt(src"${lhs}($i) := $a") }
+      emitt(src"var ${lhs}_i = 0")
+      list.zipWithIndex.foreach{case (a, i) => emitt(src"${a}.zipWithIndex.foreach{case (a,i) => ${lhs}(${lhs}_i + i) := a}; ${lhs}_i = ${lhs}_i + ${a}.length") }
     case VecApply(vec, id) => 
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ${vec}($id).r")
     case SimpleStruct(st) => 
-      emitGlobalWireMap(src"val $lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := Cat(${st.map{f => src"${f._2}"}.mkString(",")})")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"${lhs}.r := Cat(${st.reverse.map{f => if (bitWidth(f._2.tp) > 1) src"${f._2}.r" else src"${f._2}"}.mkString(",")})")
 
     case FieldApply(struct, field) => 
-      emitGlobalWireMap(src"""val $lhs""", src"""Wire(${lhs.tp})""")
-      val (start, end) = getField(struct.typeArgs.head, field)
+      emitGlobalWireMap(src"""$lhs""", src"""Wire(${lhs.tp})""")
+      val (start, end) = getField(struct.tp, field)
       emitt(src"${lhs}.r := ${struct}(${start}, ${end})")
 
     case _ => super.gen(lhs, rhs)

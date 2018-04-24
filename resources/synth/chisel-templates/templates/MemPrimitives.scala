@@ -7,7 +7,7 @@ import ops._
 import fringe._
 import chisel3.util.MuxLookup
 
-import scala.collection.mutable.HashMap
+import scala.collection.immutable.HashMap
 
 sealed trait BankingMode
 object DiagonalMemory extends BankingMode
@@ -196,9 +196,20 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     // Unmask write port if any of the above match
     mem._1.io.wMask := xBarSelect.reduce{_|_} | {if (hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B}
     // Connect matching W port to memory
-    mem._1.io.w.ofs := Mux(if (hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B, chisel3.util.PriorityMux(if (hasDirectW) directSelect.map(_.en) else List(false.B), directSelect).ofs, chisel3.util.PriorityMux(if (hasXBarW) xBarSelect else List(false.B), io.xBarW).ofs)
-    mem._1.io.w.data := Mux(if (hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B, chisel3.util.PriorityMux(if (hasDirectW) directSelect.map(_.en) else List(false.B), directSelect).data, chisel3.util.PriorityMux(if (hasXBarW) xBarSelect else List(false.B), io.xBarW).data)
-    mem._1.io.w.en := Mux(if (hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B, chisel3.util.PriorityMux(if (hasDirectW) directSelect.map(_.en) else List(false.B), directSelect).en, chisel3.util.PriorityMux(if (hasXBarW) xBarSelect else List(false.B), io.xBarW).en)
+    
+    if (directSelect.length > 0 & hasXBarW) { 
+      mem._1.io.w.ofs  := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs, chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs)
+      mem._1.io.w.data := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data, chisel3.util.PriorityMux(xBarSelect, io.xBarW).data)
+      mem._1.io.w.en   := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarW).en)
+    } else if (hasXBarW) { 
+      mem._1.io.w.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs
+      mem._1.io.w.data := chisel3.util.PriorityMux(xBarSelect, io.xBarW).data
+      mem._1.io.w.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarW).en 
+    } else { 
+      mem._1.io.w.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
+      mem._1.io.w.data := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data
+      mem._1.io.w.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
+    }
   }
 
   // Handle Reads
@@ -211,10 +222,18 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     val directSelect = io.directR.filter(_.banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_))
 
     // Unmask write port if any of the above match
-    mem._1.io.rMask := xBarSelect.reduce{_|_} & directSelect.map(_.en).reduce(_|_)
+    mem._1.io.rMask := {if (hasXBarR) xBarSelect.reduce{_|_} else true.B} & {if (directSelect.length > 0) directSelect.map(_.en).reduce(_|_) else true.B}
     // Connect matching R port to memory
-    mem._1.io.r.ofs := Mux(if (hasDirectR) directSelect.map(_.en).reduce(_|_) else false.B, chisel3.util.PriorityMux(if (hasDirectR) directSelect.map(_.en) else List(false.B), directSelect).ofs, chisel3.util.PriorityMux(if (hasXBarR) xBarSelect else List(false.B), io.xBarR).ofs)
-    mem._1.io.r.en := Mux(if (hasDirectR) directSelect.map(_.en).reduce(_|_) else false.B, chisel3.util.PriorityMux(if (hasDirectR) directSelect.map(_.en) else List(false.B), directSelect).en, chisel3.util.PriorityMux(if (hasXBarR) xBarSelect else List(false.B), io.xBarR).en)
+    if (directSelect.length > 0 & hasXBarR) { 
+      mem._1.io.r.ofs  := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs, chisel3.util.PriorityMux(xBarSelect, io.xBarR).ofs)
+      mem._1.io.r.en   := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarR).en)
+    } else if (hasXBarW) { 
+      mem._1.io.r.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarR).ofs
+      mem._1.io.r.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarR).en 
+    } else { 
+      mem._1.io.r.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
+      mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
+    }
 
     mem._1.io.flow := io.flow.reduce{_&_} // TODO: Dangerous but probably works
   }
@@ -316,6 +335,11 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
            val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
 
   def this(tuple: (List[Int], Int, List[Int], HashMap[Int, Int], HashMap[Int, Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: HashMap[Int, Int], xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
+           directWMux: HashMap[Int, List[List[Int]]], directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, banks, xBarWMux, xBarRMux, init, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -324,10 +348,8 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
   val banksWidths = banks.map(Utils.log2Up(_))
 
   // Compute info required to set up IO interface
-  val hasXBarW = xBarWMux.values.sum > 0
-  val hasXBarR = xBarRMux.values.sum > 0
-  val numXBarW = if (hasXBarW) xBarWMux.values.sum else 0
-  val numXBarR = if (hasXBarR) xBarRMux.values.sum else 0
+  val numXBarW = xBarWMux.values.sum 
+  val numXBarR = xBarRMux.values.sum
   val totalOutputs = numXBarR
   val defaultDirect = List.fill(banks.length)(99)
 

@@ -6,7 +6,7 @@ import chisel3.iotesters.{PeekPokeTester, Driver, ChiselFlatSpec}
 import utils.TemplateRunner
 import scala.reflect.runtime._ 
 import scala.reflect.runtime.universe
-import scala.collection.mutable.HashMap
+import scala.collection.immutable.HashMap
 
 // Ripped from http://stackoverflow.com/questions/1469958/scala-how-do-i-dynamically-instantiate-an-object-and-invoke-a-method-using-refl
 object Inst {

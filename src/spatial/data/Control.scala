@@ -77,6 +77,13 @@ object userStyleOf {
   def update(x: Sym[_], sched: Sched): Unit = metadata.add(x, SchedulingDirective(sched))
 }
 
+/** Unified method for extracting schedule. */
+object scheduleOf {
+  def get(x: Sym[_]): Option[Sched] = if (userStyleOf.get(x).isDefined) userStyleOf.get(x) else styleOf.get(x)
+  def apply(x: Sym[_]): Sched = scheduleOf.get(x).getOrElse{throw new Exception(s"Undefined schedule for $x") }
+  def update(x: Sym[_], sched: Sched): Unit = metadata.add(x, SchedulingDirective(sched))
+}
+
 
 /** Metadata holding a list of children within a controller. */
 case class Children(children: Seq[Controller]) extends FlowData[Children]

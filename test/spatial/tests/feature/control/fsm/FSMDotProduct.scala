@@ -27,7 +27,7 @@ import spatial.dsl._
           a load vecA(i::i+16)
           b load vecB(i::i+16)
         }
-        out := out + Reduce(0)(0 until 16){i => a(i) * b(i) }{_+_}
+        out := out.value + Reduce(0)(0 until 16){i => a(i) * b(i) }{_+_}
       }{i => i + 16 }
     }
 

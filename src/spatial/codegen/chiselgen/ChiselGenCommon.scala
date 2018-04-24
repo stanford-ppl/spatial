@@ -33,14 +33,14 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getReadStreams).toSet ++
-    localMems.all.filter{mem => readersOf(mem).exists{_.parent == ctrl }}
+    localMems.all.filter{mem => readersOf(mem).exists{_.parent.s == ctrl.s }}
                  .filter{mem => mem.isStreamIn || mem.isFIFO }
                  // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getWriteStreams).toSet ++
-    localMems.all.filter{mem => writersOf(mem).exists{_.parent == ctrl }}
+    localMems.all.filter{mem => writersOf(mem).exists{c => c.parent.s == ctrl.s }}
                  .filter{mem => mem.isStreamOut || mem.isFIFO }
                  // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
@@ -71,6 +71,16 @@ trait ChiselGenCommon extends ChiselCodegen {
         attempted_name
       }
     }
+  }
+
+  protected def getField(tp: Type[_],field: String): (Int,Int) = tp match {
+    case x: Struct[_] =>
+      val idx = x.fields.indexWhere(_._1 == field)
+      val width = bitWidth(x.fields(idx)._2)
+      val prec = x.fields.take(idx)
+      val precBits = prec.map{case (_,bt) => bitWidth(bt)}.sum
+      (precBits+width-1, precBits)
+    case _ => (-1, -1)
   }
 
   def emitCounterChain(lhs: Sym[_], suffix: String = ""): Unit = {
@@ -211,6 +221,11 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  override protected def remap(tp: Type[_]): String = tp match {
+    case s: Struct[_] => s"UInt(${bitWidth(tp)}.W)"
+    case _ => super.remap(tp)
+  }
+
   def remappedEns(node: Sym[_], ens: List[Sym[_]]): String = {
     var previousLevel: Sym[_] = node
     var nextLevel: Option[Sym[_]] = Some(node.parent.s.get)
@@ -252,7 +267,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       val readiers = getReadStreams(c.toCtrl).map{ pt => pt match {
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
           readersOf(pt).head match {
-            case Op(FIFODeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(readersOf(pt).head,ens.toList)})"
+            case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(readersOf(pt).head,ens.flatten.toList)})"
           }
         // case fifo @ Op(FILONew(size)) => src"${DL(src"~$fifo.io.empty", lat + 1, true)}"
         case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
@@ -261,7 +276,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       val holders = getWriteStreams(c.toCtrl).map { pt => pt match {
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
           writersOf(pt).head match {
-            case Op(FIFOEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(writersOf(pt).head,ens.toList)})"
+            case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(writersOf(pt).head,ens.flatten.toList)})"
           }
         case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
         // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
@@ -284,7 +299,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
-  def getReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
+  def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
       // If we are inside a stream pipe, the following may be set
       val readiers = getWriteStreams(c.toCtrl).map {
         case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Ready)}"
@@ -294,7 +309,14 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
-  def getStreamInfoReady(sym: Ctrl): List[String] = {
+  def getFifoReadyLogic(sym: Ctrl): List[String] = {
+    getWriteStreams(sym).map{ pt => pt match {
+        case fifo @ Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
+        case _ => ""
+    }}.toList.filter(_ != "")
+  }
+
+  def getAllReadyLogic(sym: Ctrl): List[String] = {
     getWriteStreams(sym).map{ pt => pt match {
         case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
         case fifo @ Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
@@ -302,9 +324,15 @@ trait ChiselGenCommon extends ChiselCodegen {
     }}.toList.filter(_ != "")
   }
 
+  def DLTrace(lhs: Sym[_]): Option[String] = {
+    lhs match {
+      case Op(DelayLine(_, data)) => DLTrace(data)
+      case _ => lhs.rhs match {case Def.Const(c) => Some(c.toString); case _ => None}
+    }
+  }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val streamOuts = if (!controllerStack.isEmpty) {getStreamInfoReady(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
+    val streamOuts = if (!controllerStack.isEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
     latency match {
       case lat: Int => 
         if (!controllerStack.isEmpty) {
@@ -394,6 +422,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     case BitType() => 1
     case t: Vec[_] => t.width * bitWidth(t.typeArgs.head)
     case st: Struct[_] => st.fields.map{case (name, typ) => bitWidth(typ)}.sum
+    case _ => -1
   }
   protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 

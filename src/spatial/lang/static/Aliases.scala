@@ -139,6 +139,7 @@ trait InternalAliases extends CustomBitWidths {
   lazy val Tensor5 = spatial.lang.host.Tensor5
   type CSVFile = spatial.lang.host.CSVFile
   type BinaryFile = spatial.lang.host.BinaryFile
+  type NumpyFile = spatial.lang.host.NumpyFile
 }
 
 trait ExternalAliases extends InternalAliases {

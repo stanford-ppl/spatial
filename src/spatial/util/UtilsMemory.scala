@@ -173,7 +173,11 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   }
 
   def accessWidth(access: Sym[_]): Int = access match {
+    case Op(FIFOBankedDeq(_, ens)) => ens.length
+    case Op(FIFOBankedEnq(_, _, ens)) => ens.length
     case Op(ba: BankedAccessor[_,_]) => ba.width
+    case Op(RegWrite(_,_,_)) => 1
+    case Op(RegRead(_)) => 1
     case _ => -1
   }
 

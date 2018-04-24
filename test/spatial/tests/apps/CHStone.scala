@@ -355,7 +355,7 @@ import spatial.targets._
           component(i) = comp_struct(p_comp_info_index, p_comp_info_id, p_comp_info_h_samp_factor, p_comp_info_v_samp_factor, p_comp_info_quant_tbl_no)
         }
 
-        p_jinfo_smp_fact := mux(component(0).h_samp_factor == 2.to[UInt8], 2, 0)
+        p_jinfo_smp_fact := mux(component(0).h_samp_factor == 2.to[UInt8], 2.to[U2], 0.to[U2])
       }}
 
 
@@ -1381,7 +1381,7 @@ import spatial.targets._
               ld_Bfr := ld_Bfr | tmp.value
             }
           }
-          ld_Incnt := (8-Incnt) + 24
+          ld_Incnt := (8-Incnt.value) + 24
         } else {}
       }
       def InitializeBuffer(): Unit = {

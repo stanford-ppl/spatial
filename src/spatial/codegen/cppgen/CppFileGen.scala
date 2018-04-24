@@ -108,13 +108,8 @@ trait CppFileGen extends CppCodegen {
       open("void printHelp() {")
         val argsList = CLIArgs.listNames.mkString(" ")
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
-<<<<<<< HEAD
   	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
   	    emit(s"""exit(0);""")
-=======
-  	    emit(s"""fprintf(stderr, "  -- bash run.sh $argsList\\n\\n");""")
-  	    emit(s"""return;""")
->>>>>>> origin/master
       close("}")
 
       emit("")

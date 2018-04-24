@@ -15,7 +15,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
   var storesList = List[Sym[_]]()
   var loadParMapping = List[String]()
   var storeParMapping = List[String]()
-  var dramsList = List[Sym[_]]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments()       => 
@@ -66,67 +65,59 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
     case GetDRAMAddress(dram) =>
       val id = argHandle(dram)
-      emit(src"""val $lhs = io.argIns(api.$id)""")
+      emit(src"""val $lhs = io.argIns(api.${id}_ptr)""")
 
-    // case FringeDenseLoad(dram,cmdStream,dataStream) =>
-    //   // Find stages that pushes to cmdstream and dataStream
-    //   var cmdStage: Option[Sym[_]] = None
-    //   childrenOf(parentOf(lhs).get).map{c =>
-    //     if (childrenOf(c).length > 0) {
-    //       childrenOf(c).map{ cc => 
-    //         pushesTo(cc).distinct.map{ pt => pt.memory match {
-    //           case fifo @ Def(StreamOutNew(bus)) => 
-    //             if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(cc)
-    //           case _ => 
-    //         }}                      
-    //       }
-    //     } else {
-    //       pushesTo(c).distinct.map{ pt => pt.memory match {
-    //         case fifo @ Def(StreamOutNew(bus)) => 
-    //           if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(c)
-    //         case _ => 
-    //       }}          
-    //     }
-    //   }
+    case FringeDenseLoad(dram,cmdStream,dataStream) =>
+      // // Find stages that pushes to cmdstream and dataStream
+      // var cmdStage: Option[Sym[_]] = None
+      // childrenOf(parentOf(lhs).get).map{c =>
+      //   if (childrenOf(c).length > 0) {
+      //     childrenOf(c).map{ cc => 
+      //       pushesTo(cc).distinct.map{ pt => pt.memory match {
+      //         case fifo @ Def(StreamOutNew(bus)) => 
+      //           if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(cc)
+      //         case _ => 
+      //       }}                      
+      //     }
+      //   } else {
+      //     pushesTo(c).distinct.map{ pt => pt.memory match {
+      //       case fifo @ Def(StreamOutNew(bus)) => 
+      //         if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(c)
+      //       case _ => 
+      //     }}          
+      //   }
+      // }
 
-    //   appPropertyStats += HasTileLoad
-    //   if (isAligned(cmdStream)) appPropertyStats += HasAlignedLoad
-    //   else appPropertyStats += HasUnalignedLoad
-    //   // Get parallelization of datastream
-    //   emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-    //   val par = readersOf(dataStream).head.node match {
-    //     case Def(e@ParStreamRead(strm, ens)) => ens.length
-    //     case _ => 1
-    //   }
+      appPropertyStats += HasTileLoad
+      if (isAligned(cmdStream)) appPropertyStats += HasAlignedLoad
+      else appPropertyStats += HasUnalignedLoad
+      // Get parallelization of datastream
+      // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
+      val par = readersOf(dataStream).head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
 
-    //   val id = loadsList.length
-    //   // loadParMapping = loadParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
-    //   loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
-    //   loadsList = loadsList :+ dram
+      val id = loadsList.length
+      // loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
+      loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, false)"""
+      loadsList = loadsList :+ dram
 
-    //   // TODO: Investigate this _enq business
-    //   val turnstiling_stage = getLastChild(parentOf(lhs).get)
-    //   emitGlobalWire(src"""val ${turnstiling_stage}_enq = io.memStreams.loads(${id}).rdata.valid""")
-
-    //   controllerStack.push(cmdStage.get) // Push so that DLI does the right thing
-    //   emit(src"${swap(cmdStream, Ready)} := ${DL(src"io.memStreams.loads($id).cmd.ready", src"0", true)} // Not sure why the cmdStream ready used to be delayed")
-    //   // Connect the IO interface signals to their streams
-    //   val (addrMSB, addrLSB)  = tupCoordinates(cmdStream.tp.typeArguments.head, "offset")
-    //   val (sizeMSB, sizeLSB)  = tupCoordinates(cmdStream.tp.typeArguments.head, "size")
-    //   val (isLdMSB, isLdLSB)  = tupCoordinates(cmdStream.tp.typeArguments.head, "isLoad")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}($addrMSB,$addrLSB)")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.size := ${cmdStream}($sizeMSB,$sizeLSB)")
-    //   emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.isWr := ~${cmdStream}($isLdMSB,$isLdLSB)")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 0.U")
-    //   controllerStack.pop()
+      // controllerStack.push(cmdStage.get) // Push so that DLI does the right thing
+      // Connect the IO interface signals to their streams
+      emit(src"${swap(cmdStream, Ready)} := io.memStreams.loads($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
+      val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "offset")
+      val (sizeMSB, sizeLSB)  = getField(cmdStream.tp.typeArgs.head, "size")
+      val (isLdMSB, isLdLSB)  = getField(cmdStream.tp.typeArgs.head, "isLoad")
+      emit(src"io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB,$addrLSB)")
+      emit(src"io.memStreams.loads($id).cmd.bits.size := ${cmdStream}(0)($sizeMSB,$sizeLSB)")
+      emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.loads($id).cmd.bits.isWr := ~${cmdStream}(0)($isLdMSB,$isLdLSB)")
+      emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 0.U")
+      // controllerStack.pop()
       
-    //   // Connect the streams to their IO interface signals
-    //   emit(src"io.memStreams.loads($id).rdata.ready := ${swap(dataStream, Ready)}/* & ~${turnstiling_stage}_inhibitor*/")
-    //   emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${symDelay(readersOf(dataStream).head.node)}.toInt")}}""")
-    //   emit(src"""${swap(dataStream, NowValid)} := io.memStreams.loads($id).rdata.valid""")
-    //   emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${symDelay(readersOf(dataStream).head.node)}.toInt", true)}""")
-    //   // emit(src"${swap(cmdStream, Ready)} := ${DL(src"io.memStreams.loads($id).cmd.ready", src"${symDelay(writersOf(cmdStream).head.node)}.toInt", true)}")
+      // Connect the streams to their IO interface signals
+      emit(src"io.memStreams.loads($id).rdata.ready := ${swap(dataStream, Ready)}")
+      emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${symDelay(readersOf(dataStream).head)}.toInt")}}""")
+      emit(src"""${swap(dataStream, NowValid)} := io.memStreams.loads($id).rdata.valid""")
+      emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${symDelay(readersOf(dataStream).head)}.toInt", true)}""")
 
 
     // case FringeSparseLoad(dram,addrStream,dataStream) =>
@@ -158,72 +149,69 @@ trait ChiselGenInterface extends ChiselGenCommon {
     //   emit(src"io.memStreams.loads($id).cmd.bits.isWr := false.B")
     //   emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 1.U")
 
-    // case FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
-    //   appPropertyStats += HasTileStore
+    case FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
+      appPropertyStats += HasTileStore
 
-    //   // Find stages that pushes to cmdstream and dataStream
-    //   var cmdStage: Option[Sym[_]] = None
-    //   var dataStage: Option[Sym[_]] = None
-    //   childrenOf(parentOf(lhs).get).map{c =>
-    //     if (childrenOf(c).length > 0) {
-    //       childrenOf(c).map{ cc => 
-    //         pushesTo(cc).distinct.map{ pt => pt.memory match {
-    //           case fifo @ Def(StreamOutNew(bus)) => 
-    //             if (s"$bus".contains("BurstFullDataBus")) dataStage = Some(cc)
-    //             if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(cc)
-    //           case _ => 
-    //         }}                      
-    //       }
-    //     } else {
-    //       pushesTo(c).distinct.map{ pt => pt.memory match {
-    //         case fifo @ Def(StreamOutNew(bus)) => 
-    //           if (s"$bus".contains("BurstFullDataBus")) dataStage = Some(c)
-    //           if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(c)
-    //         case _ => 
-    //       }}          
-    //     }
-    //   }
+      // // Find stages that pushes to cmdstream and dataStream
+      // var cmdStage: Option[Sym[_]] = None
+      // var dataStage: Option[Sym[_]] = None
+      // childrenOf(parentOf(lhs).get).map{c =>
+      //   if (childrenOf(c).length > 0) {
+      //     childrenOf(c).map{ cc => 
+      //       pushesTo(cc).distinct.map{ pt => pt.memory match {
+      //         case fifo @ Def(StreamOutNew(bus)) => 
+      //           if (s"$bus".contains("BurstFullDataBus")) dataStage = Some(cc)
+      //           if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(cc)
+      //         case _ => 
+      //       }}                      
+      //     }
+      //   } else {
+      //     pushesTo(c).distinct.map{ pt => pt.memory match {
+      //       case fifo @ Def(StreamOutNew(bus)) => 
+      //         if (s"$bus".contains("BurstFullDataBus")) dataStage = Some(c)
+      //         if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(c)
+      //       case _ => 
+      //     }}          
+      //   }
+      // }
 
-    //   if (isAligned(cmdStream)) appPropertyStats += HasAlignedStore
-    //   else appPropertyStats += HasUnalignedStore
+      if (isAligned(cmdStream)) appPropertyStats += HasAlignedStore
+      else appPropertyStats += HasUnalignedStore
 
-    //   // Get parallelization of datastream
-    //   emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-    //   val par = writersOf(dataStream).head.node match {
-    //     case Def(e@ParStreamWrite(_, _, ens)) => ens.length
-    //     case _ => 1
-    //   }
+      // Get parallelization of datastream
+      // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
+      val par = writersOf(dataStream).head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
-    //   val id = storesList.length
-    //   // storeParMapping = storeParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
-    //   storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
-    //   storesList = storesList :+ dram
+      val id = storesList.length
+      // storeParMapping = storeParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
+      // storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
+      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, false)"""
+      storesList = storesList :+ dram
 
-    //   // Connect streams to their IO interface signals
-    //   emit(src"""${swap(dataStream, Ready)} := io.memStreams.stores($id).wdata.ready""")
+      // Connect streams to their IO interface signals
+      emit(src"""${swap(dataStream, Ready)} := io.memStreams.stores($id).wdata.ready""")
 
-    //   // Connect IO interface signals to their streams
-    //   val (dataMSB, dataLSB) = tupCoordinates(dataStream.tp.typeArguments.head, "_1")
-    //   val (strbMSB, strbLSB) = tupCoordinates(dataStream.tp.typeArguments.head, "_2")
-    //   val (addrMSB, addrLSB)  = tupCoordinates(cmdStream.tp.typeArguments.head, "offset")
-    //   val (sizeMSB, sizeLSB)  = tupCoordinates(cmdStream.tp.typeArguments.head, "size")
-    //   val (isLdMSB, isLdLSB)  = tupCoordinates(cmdStream.tp.typeArguments.head, "isLoad")
-    //   controllerStack.push(dataStage.get) // Push so that DLI does the right thing
-    //   emit(src"""io.memStreams.stores($id).wdata.bits.zip(${dataStream}).foreach{case (wport, wdata) => wport := wdata($dataMSB,$dataLSB) }""")
-    //   emit(src"""io.memStreams.stores($id).wstrb.bits := ${dataStream}.map{ _.apply($strbMSB,$strbLSB) }.reduce(Cat(_,_)) """)
-    //   emit(src"""io.memStreams.stores($id).wdata.valid := ${swap(dataStream, Valid)} """)
-    //   controllerStack.pop()
-    //   controllerStack.push(cmdStage.get) // Push so that DLI does the right thing
-    //   emit(src"io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}($addrMSB,$addrLSB)")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.size := ${cmdStream}($sizeMSB,$sizeLSB)")
-    //   emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.isWr := ~${cmdStream}($isLdMSB,$isLdLSB)")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.isSparse := 0.U")
-    //   controllerStack.pop()
-    //   emit(src"${swap(cmdStream, Ready)} := ${DL(src"io.memStreams.stores($id).cmd.ready", src"0", true)} // Baffled why this signal delayed by symDelay(writersOf(cmdStream).head.node) up until 02/13/2018 ?!")
-    //   emit(src"""${swap(ackStream, NowValid)} := io.memStreams.stores($id).wresp.valid""")
-    //   emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${symDelay(readersOf(ackStream).head.node)}.toInt", true)}""")
-    //   emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
+      // Connect IO interface signals to their streams
+      val (dataMSB, dataLSB) = getField(dataStream.tp.typeArgs.head, "_1")
+      val (strbMSB, strbLSB) = getField(dataStream.tp.typeArgs.head, "_2")
+      val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "offset")
+      val (sizeMSB, sizeLSB)  = getField(cmdStream.tp.typeArgs.head, "size")
+      val (isLdMSB, isLdLSB)  = getField(cmdStream.tp.typeArgs.head, "isLoad")
+
+      emit(src"""io.memStreams.stores($id).wdata.bits.zip(${dataStream}).foreach{case (wport, wdata) => wport := wdata($dataMSB,$dataLSB) }""")
+      emit(src"""io.memStreams.stores($id).wstrb.bits := ${dataStream}.map{ _.apply($strbMSB,$strbLSB) }.reduce(Cat(_,_)) """)
+      emit(src"""io.memStreams.stores($id).wdata.valid := ${swap(dataStream, Valid)} """)
+
+      emit(src"io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB,$addrLSB)")
+      emit(src"io.memStreams.stores($id).cmd.bits.size := ${cmdStream}(0)($sizeMSB,$sizeLSB)")
+      emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.stores($id).cmd.bits.isWr := ~${cmdStream}(0)($isLdMSB,$isLdLSB)")
+      emit(src"io.memStreams.stores($id).cmd.bits.isSparse := 0.U")
+
+      emit(src"${swap(cmdStream, Ready)} := io.memStreams.stores($id).cmd.ready")
+      emit(src"""${swap(ackStream, NowValid)} := io.memStreams.stores($id).wresp.valid""")
+      emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${symDelay(readersOf(ackStream).head)}.toInt", true)}""")
+      emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
 
     // case FringeSparseStore(dram,cmdStream,ackStream) =>
     //   appPropertyStats += HasScatter
@@ -262,7 +250,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     enterAccel()
     val intersect = loadsList.distinct.intersect(storesList.distinct)
 
-    val num_unusedDrams = dramsList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
+    val num_unusedDrams = drams.toList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
 
     inGen(out, "Instantiator.scala") {
       emit("")
@@ -295,6 +283,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     }
 
     inGen(out, "ArgAPI.scala") {
+      emit("package accel")
       open("object api {")
       emit("\n// ArgIns")
       argIns.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}

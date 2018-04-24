@@ -19,7 +19,7 @@ import spatial.dsl._
     // Setup off-chip data
 
     val raw_text = args(0)  // loadCSV1D[String]("/remote/regression/data/machsuite/sha_txt.csv", "\n").apply(0)
-    val data_text_int = argon.lang.String.string2num(raw_text)
+    val data_text_int = raw_text.map[U8]{c => c}
     val data_text = Array.tabulate(data_text_int.length){i => data_text_int(i).to[UInt8]}
     val len = HostIO[Int]
     setArg(len, data_text.length)
@@ -184,14 +184,14 @@ import spatial.dsl._
         // Foreach(8 by 1){i => println(" " + state(i))}
 
         Sequential.Foreach(4 by 1){ i =>
-          hash(i)    = (SHFR(state(0), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+4)  = (SHFR(state(1), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+8)  = (SHFR(state(2), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+12) = (SHFR(state(3), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+16) = (SHFR(state(4), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+20) = (SHFR(state(5), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+24) = (SHFR(state(6), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
-          hash(i+28) = (SHFR(state(7), (24-i.to[I32]*8))).apply(7::0).as[UInt8]
+          hash(i)    = (SHFR(state(0), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+4)  = (SHFR(state(1), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+8)  = (SHFR(state(2), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+12) = (SHFR(state(3), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+16) = (SHFR(state(4), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+20) = (SHFR(state(5), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+24) = (SHFR(state(6), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i+28) = (SHFR(state(7), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
         }
 
       }

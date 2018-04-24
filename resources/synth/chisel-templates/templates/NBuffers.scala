@@ -8,7 +8,7 @@ import fringe._
 import chisel3.util.MuxLookup
 import types._
 
-import scala.collection.mutable.HashMap
+import scala.collection.immutable.HashMap
 
 /* Controller that is instantiated in NBuf templates to handle port -> module muxing */
 class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
@@ -16,7 +16,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   val io = IO( new Bundle {
     val sEn = Vec(numBufs, Input(Bool()))
     val sDone = Vec(numBufs, Input(Bool()))
-    val statesInW = Vec(portsWithWriter.length, Output(UInt((1+Utils.log2Up(numBufs)).W)))
+    val statesInW = Vec(1 max portsWithWriter.length, Output(UInt((1+Utils.log2Up(numBufs)).W)))
     val statesInR = Vec(numBufs, Output(UInt((1+Utils.log2Up(numBufs)).W)))
     val statesOut = Vec(numBufs, Output(UInt((1+Utils.log2Up(numBufs)).W)))
   })
@@ -264,7 +264,7 @@ class NBufMem(val mem: MemPrimitive,
 
 
 
-
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int) {connectXBarWPort(wBundle, bufferPort, muxPort, 0)}
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val bufferBase = xBarWMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.sum
     val muxBase = xBarWMux(bufferPort).toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
@@ -272,13 +272,19 @@ class NBufMem(val mem: MemPrimitive,
   }
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
-
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, 0, true.B)}
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val bufferBase = xBarRMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.sum
     val muxBase = xBarRMux(bufferPort).toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(bufferBase + muxBase) := rBundle    
     io.flow(bufferBase + muxBase) := flow
     io.output.data(bufferBase + muxBase + vecId)
+  }
+
+  def connectBroadcastPort(wBundle: W_XBar, muxPort: Int) {connectBroadcastPort(wBundle, muxPort, 0)}
+  def connectBroadcastPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+    val muxBase = broadcastWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
+    io.broadcast(muxBase) := wBundle
   }
 
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {

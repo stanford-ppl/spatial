@@ -31,8 +31,8 @@ import spatial.dsl._
         // val numscats = scatgats_per + random[Int](8)
         val numscats = tileSize
         addrs load srcAddrs(i::i + numscats par P)
-        sram gather inData(addrs par P, numscats)
-        scatterResult(addrs par P, numscats) scatter sram
+        sram gather inData(addrs par P)// sram gather inData(addrs par P, numscats)
+        scatterResult(addrs par P) scatter sram// scatterResult(addrs par P, numscats) scatter sram
       }
     }
 

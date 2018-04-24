@@ -73,6 +73,7 @@ trait ChiselFileGen extends ChiselCodegen {
 	  emitt("import chisel3._")
 	  emitt("import chisel3.util._")
 	  emitt("import types._")
+    emitt("import scala.collection.immutable._")
 
       open(s"""trait GlobalWires_1 extends IOModule_1 {""")
     }
@@ -84,6 +85,7 @@ trait ChiselFileGen extends ChiselCodegen {
 	  emitt("import chisel3._")
 	  emitt("import chisel3.util._")
 	  emitt("import types._")
+    emitt("import scala.collection.immutable._")
 
       open(s"""trait GlobalModules_1 extends GlobalWiresMixer {""")
     }

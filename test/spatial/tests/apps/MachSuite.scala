@@ -571,207 +571,207 @@ import spatial.targets._
 }
 
 
-@test class Stencil2D extends SpatialTest { // Regression (Dense) // Args: none
-  override def runtimeArgs: Args = NoArgs
+// @test class Stencil2D extends SpatialTest { // ReviveMe
+//   override def runtimeArgs: Args = NoArgs
 
 
-  /*
-           ←    COLS     →   
-         ___________________             ___________________                         
-        |                   |           |X  X  X  X  X  X 00|          
-    ↑   |    ←3→            |           |                 00|    * this app pads right and bottom borders with 0      
-        |    ___            |           |    VALID DATA   00|          
-        |  ↑|   |           |           |X  X  X  X  X  X 00|          
-        |  3|   | ----->    |    ->     |                 00|            
- ROWS   |  ↓|___|           |           |X  X  X  X  X  X 00|          
-        |                   |           |                 00|          
-        |                   |           |X  X  X  X  X  X 00|          
-        |                   |           |                 00|          
-    ↓   |                   |           |0000000000000000000|          
-        |                   |           |0000000000000000000|          
-         ```````````````````             ```````````````````      
+//   /*
+//            ←    COLS     →   
+//          ___________________             ___________________                         
+//         |                   |           |X  X  X  X  X  X 00|          
+//     ↑   |    ←3→            |           |                 00|    * this app pads right and bottom borders with 0      
+//         |    ___            |           |    VALID DATA   00|          
+//         |  ↑|   |           |           |X  X  X  X  X  X 00|          
+//         |  3|   | ----->    |    ->     |                 00|            
+//  ROWS   |  ↓|___|           |           |X  X  X  X  X  X 00|          
+//         |                   |           |                 00|          
+//         |                   |           |X  X  X  X  X  X 00|          
+//         |                   |           |                 00|          
+//     ↓   |                   |           |0000000000000000000|          
+//         |                   |           |0000000000000000000|          
+//          ```````````````````             ```````````````````      
                                                
                                                
-  */
+//   */
 
 
 
-  def main(args: Array[String]): Unit = {
+//   def main(args: Array[String]): Unit = {
 
-    // Problem properties
-    val ROWS = 128
-    val COLS = 64
-    val filter_size = 9
-    val par_lb_load = 4
+//     // Problem properties
+//     val ROWS = 128
+//     val COLS = 64
+//     val filter_size = 9
+//     val par_lb_load = 4
 
-    // Setup data
-    val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil2d_data.csv", "\n")
-    val data = raw_data.reshape(ROWS, COLS)
+//     // Setup data
+//     val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil2d_data.csv", "\n")
+//     val data = raw_data.reshape(ROWS, COLS)
 
-    // Setup DRAMs
-    val data_dram = DRAM[Int](ROWS,COLS)
-    val result_dram = DRAM[Int](ROWS,COLS)
+//     // Setup DRAMs
+//     val data_dram = DRAM[Int](ROWS,COLS)
+//     val result_dram = DRAM[Int](ROWS,COLS)
 
-    setMem(data_dram, data)
+//     setMem(data_dram, data)
 
-    Accel {
+//     Accel {
 
-      val filter = LUT[Int](3,3)(379,909,468, // Reverse columns because we shift in from left side
-                                 771,886,165,
-                                 553,963,159)
-      val lb = LineBuffer[Int](3,COLS)
-      val sr = RegFile[Int](3,3)
-      val result_sram = SRAM[Int](ROWS,COLS)
-      Foreach(ROWS by 1){ i =>
-        val wr_row = (i-2)%ROWS
-        lb load data_dram(i, 0::COLS par par_lb_load)
-        Foreach(COLS by 1) {j =>
-          Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j)}
-          val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(r,c)}{_+_}
-          val wr_col = (j-2)%COLS
-          if (i >= 2 && j >= 2) {result_sram(wr_row,wr_col) = temp}
-          else {result_sram(wr_row,wr_col) = 0}
-        }
-      }
+//       val filter = LUT[Int](3,3)(379,909,468, // Reverse columns because we shift in from left side
+//                                  771,886,165,
+//                                  553,963,159)
+//       val lb = LineBuffer[Int](3,COLS)
+//       val sr = RegFile[Int](3,3)
+//       val result_sram = SRAM[Int](ROWS,COLS)
+//       Foreach(ROWS by 1){ i =>
+//         val wr_row = (i-2)%ROWS
+//         lb load data_dram(i, 0::COLS par par_lb_load)
+//         Foreach(COLS by 1) {j =>
+//           Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j)}
+//           val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(r,c)}{_+_}
+//           val wr_col = (j-2)%COLS
+//           if (i >= 2 && j >= 2) {result_sram(wr_row,wr_col) = temp}
+//           else {result_sram(wr_row,wr_col) = 0}
+//         }
+//       }
 
-      result_dram store result_sram
-    }
+//       result_dram store result_sram
+//     }
 
-    // Get results
-    val result_data = getMatrix(result_dram)
-    val raw_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil2d_gold.csv", "\n")
-    val gold = raw_gold.reshape(ROWS,COLS)
+//     // Get results
+//     val result_data = getMatrix(result_dram)
+//     val raw_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil2d_gold.csv", "\n")
+//     val gold = raw_gold.reshape(ROWS,COLS)
 
-    // Printers
-    printMatrix(gold, "gold")
-    printMatrix(result_data, "result")
+//     // Printers
+//     printMatrix(gold, "gold")
+//     printMatrix(result_data, "result")
 
-    val cksum = (0::ROWS, 0::COLS){(i,j) => if (i < ROWS-2 && j < COLS-2) gold(i,j) == result_data(i,j) else true }.reduce{_&&_}
-    println("PASS: " + cksum + " (Stencil2D) * Fix modulo addresses in scalagen?")
+//     val cksum = (0::ROWS, 0::COLS){(i,j) => if (i < ROWS-2 && j < COLS-2) gold(i,j) == result_data(i,j) else true }.reduce{_&&_}
+//     println("PASS: " + cksum + " (Stencil2D) * Fix modulo addresses in scalagen?")
 
-  }
-}
-
-
-@test class Stencil3D extends SpatialTest { // Regression (Dense) // Args: none
-  override def runtimeArgs: Args = NoArgs
+//   }
+// }
 
 
- /*
+// @test class Stencil3D extends SpatialTest { // ReviveMe
+//   override def runtimeArgs: Args = NoArgs
+
+
+//  /*
                                                                                                                              
- H   ↗        ___________________                  ___________________                                                                  
-  E         /                   /|               /000000000000000000/ |                                                                
-   I       / ←    ROW      →   / |              /0  x  x  x  x    0/ 0|                        
- ↙  G     /__________________ /  |             /0________________0/  0|                                                                 
-     H   |                   |   |            |0  X  X  X  X  X  0| x0|      
-      T  |     ___           |   |            |0                 0|  0|      
-         |    /__/|          |   |            |0   VALID DATA    0|  0|    *This app frames all borders with original value  
-   ↑     |  ↑|   ||          |   |            |0  X  X  X  X  X  0| x0|      
-         |  3|   || ----->   |   |   --->     |0                 0|  0|        
-  COL    |  ↓|___|/          |   |            |0  X  X  X  X  X  0| x0|      
-         |                   |   |            |0                 0|  0|      
-         |                   |   |            |0  X  X  X  X  X  0| x0|      
-         |                   |  /             |0                 0| 0/      
-   ↓     |                   | /              |0                 0|0/ 
-         |                   |/               |0000000000000000000|/        
-          ```````````````````                  ```````````````````      
+//  H   ↗        ___________________                  ___________________                                                                  
+//   E         /                   /|               /000000000000000000/ |                                                                
+//    I       / ←    ROW      →   / |              /0  x  x  x  x    0/ 0|                        
+//  ↙  G     /__________________ /  |             /0________________0/  0|                                                                 
+//      H   |                   |   |            |0  X  X  X  X  X  0| x0|      
+//       T  |     ___           |   |            |0                 0|  0|      
+//          |    /__/|          |   |            |0   VALID DATA    0|  0|    *This app frames all borders with original value  
+//    ↑     |  ↑|   ||          |   |            |0  X  X  X  X  X  0| x0|      
+//          |  3|   || ----->   |   |   --->     |0                 0|  0|        
+//   COL    |  ↓|___|/          |   |            |0  X  X  X  X  X  0| x0|      
+//          |                   |   |            |0                 0|  0|      
+//          |                   |   |            |0  X  X  X  X  X  0| x0|      
+//          |                   |  /             |0                 0| 0/      
+//    ↓     |                   | /              |0                 0|0/ 
+//          |                   |/               |0000000000000000000|/        
+//           ```````````````````                  ```````````````````      
                                                 
                                                 
- */
+//  */
 
 
 
-  def main(args: Array[String]): Unit = {
+//   def main(args: Array[String]): Unit = {
 
-    // Problem properties
-    val ROWS = 16 // Leading dim
-    val COLS = 32
-    val HEIGHT = 32
-    val par_load = 16
-    val par_store = 16
-    val loop_height = 2 (1 -> 1 -> 8)
-    val par_lb_load = 4 (1 -> 1 -> 16)
-    val PX = 1
-    // val num_slices = ArgIn[Int]
-    // setArg(num_slices, args(0).to[Int])
-    val num_slices = HEIGHT
-    val filter_size = 3*3*3
+//     // Problem properties
+//     val ROWS = 16 // Leading dim
+//     val COLS = 32
+//     val HEIGHT = 32
+//     val par_load = 16
+//     val par_store = 16
+//     val loop_height = 2 (1 -> 1 -> 8)
+//     val par_lb_load = 4 (1 -> 1 -> 16)
+//     val PX = 1
+//     // val num_slices = ArgIn[Int]
+//     // setArg(num_slices, args(0).to[Int])
+//     val num_slices = HEIGHT
+//     val filter_size = 3*3*3
 
-    // Setup data
-    val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil3d_data.csv", "\n")
-    val data = raw_data.reshape(HEIGHT, COLS, ROWS)
+//     // Setup data
+//     val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil3d_data.csv", "\n")
+//     val data = raw_data.reshape(HEIGHT, COLS, ROWS)
 
-    // Setup DRAMs
-    val data_dram = DRAM[Int](HEIGHT, COLS, ROWS)
-    val result_dram = DRAM[Int](HEIGHT, COLS, ROWS)
+//     // Setup DRAMs
+//     val data_dram = DRAM[Int](HEIGHT, COLS, ROWS)
+//     val result_dram = DRAM[Int](HEIGHT, COLS, ROWS)
 
-    setMem(data_dram, data)
+//     setMem(data_dram, data)
 
-    Accel {
-      val filter = LUT[Int](3,3,3)(   0,  0,  0,
-                                      0, -1,  0,
-                                      0,  0,  0,
+//     Accel {
+//       val filter = LUT[Int](3,3,3)(   0,  0,  0,
+//                                       0, -1,  0,
+//                                       0,  0,  0,
 
-                                      0, -1,  0,
-                                     -1,  6, -1,
-                                      0, -1,  0,
+//                                       0, -1,  0,
+//                                      -1,  6, -1,
+//                                       0, -1,  0,
 
-                                      0,  0,  0,
-                                      0, -1,  0,
-                                      0,  0,  0)
+//                                       0,  0,  0,
+//                                       0, -1,  0,
+//                                       0,  0,  0)
 
-      val result_sram = SRAM[Int](HEIGHT,COLS,ROWS)
+//       val result_sram = SRAM[Int](HEIGHT,COLS,ROWS)
 
-      Foreach(num_slices by 1 par loop_height) { p => 
-        val temp_slice = SRAM[Int](COLS,ROWS)
-        MemReduce(temp_slice)(-1 until 2 by 1) { slice => 
-          val local_slice = SRAM[Int](COLS,ROWS)
-          Foreach(COLS+1 by 1 par PX){ i => 
-            val lb = LineBuffer[Int](3,ROWS)
-            lb load data_dram((p+slice)%HEIGHT, i, 0::ROWS par par_lb_load)
-            Foreach(ROWS+1 by 1 par PX) {j => 
-              val sr = RegFile[Int](3,3)
-              Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j%ROWS)}
-              val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(slice+1,r,c)}{_+_}
-              // For final version, make wr_value a Mux1H instead of a unique writer per val
-              if (i == 0 || j == 0) {Pipe{}/*do nothing*/}
-              else if (i == 1 || i == COLS || j == 1 || j == ROWS) {
-                Pipe{
-                  if (slice == 0) {local_slice(i-1, j-1) = sr(1,1); println("1 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // If on boundary of page, use meat only
-                  else {local_slice(i-1, j-1) = 0} // If on boundary of page, ignore bread
-                }
-              }
-              else if (slice == 0 && (p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = sr(1,1); println("2 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // First and last page, use meat only
-              else if ((p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = 0} // First and last page, ignore bread
-              else {local_slice(i-1, j-1) = temp} // Otherwise write convolution result
-            }       
-          }
-          local_slice
-        }{_+_}
+//       Foreach(num_slices by 1 par loop_height) { p => 
+//         val temp_slice = SRAM[Int](COLS,ROWS)
+//         MemReduce(temp_slice)(-1 until 2 by 1) { slice => 
+//           val local_slice = SRAM[Int](COLS,ROWS)
+//           Foreach(COLS+1 by 1 par PX){ i => 
+//             val lb = LineBuffer[Int](3,ROWS)
+//             lb load data_dram((p+slice)%HEIGHT, i, 0::ROWS par par_lb_load)
+//             Foreach(ROWS+1 by 1 par PX) {j => 
+//               val sr = RegFile[Int](3,3)
+//               Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j%ROWS)}
+//               val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(slice+1,r,c)}{_+_}
+//               // For final version, make wr_value a Mux1H instead of a unique writer per val
+//               if (i == 0 || j == 0) {Pipe{}/*do nothing*/}
+//               else if (i == 1 || i == COLS || j == 1 || j == ROWS) {
+//                 Pipe{
+//                   if (slice == 0) {local_slice(i-1, j-1) = sr(1,1); println("1 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // If on boundary of page, use meat only
+//                   else {local_slice(i-1, j-1) = 0} // If on boundary of page, ignore bread
+//                 }
+//               }
+//               else if (slice == 0 && (p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = sr(1,1); println("2 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // First and last page, use meat only
+//               else if ((p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = 0} // First and last page, ignore bread
+//               else {local_slice(i-1, j-1) = temp} // Otherwise write convolution result
+//             }       
+//           }
+//           local_slice
+//         }{_+_}
 
-        Foreach(COLS by 1, ROWS by 1){(i,j) => result_sram(p, i, j) = temp_slice(i,j)}
+//         Foreach(COLS by 1, ROWS by 1){(i,j) => result_sram(p, i, j) = temp_slice(i,j)}
 
-      }
+//       }
 
-      result_dram(0::HEIGHT, 0::COLS, 0::ROWS par par_store) store result_sram
+//       result_dram(0::HEIGHT, 0::COLS, 0::ROWS par par_store) store result_sram
 
 
-    }
+//     }
 
-    // Get results
-    val result_data = getTensor3(result_dram)
-    val raw_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil3d_gold.csv", "\n")
-    val gold = raw_gold.reshape(HEIGHT,COLS,ROWS)
+//     // Get results
+//     val result_data = getTensor3(result_dram)
+//     val raw_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil3d_gold.csv", "\n")
+//     val gold = raw_gold.reshape(HEIGHT,COLS,ROWS)
 
-    // Printers
-    printTensor3(gold, "gold") // Least significant dimension is horizontal, second-least is vertical, third least is ---- separated blocks
-    printTensor3(result_data, "results")
+//     // Printers
+//     printTensor3(gold, "gold") // Least significant dimension is horizontal, second-least is vertical, third least is ---- separated blocks
+//     printTensor3(result_data, "results")
 
-    val cksum = gold.zip(result_data){_==_}.reduce{_&&_}
-    println("PASS: " + cksum + " (Stencil3D)")
+//     val cksum = gold.zip(result_data){_==_}.reduce{_&&_}
+//     println("PASS: " + cksum + " (Stencil3D)")
 
- }
-}
+//  }
+// }
 
 
 @test class NW extends SpatialTest {
@@ -842,7 +842,7 @@ import spatial.targets._
     setArg(length, measured_length)
     setArg(lengthx2, measured_length*2)
     val max_length = 512
-    assert(max_length >= length, "Cannot have string longer than 512 elements")
+    assert(max_length >= length.value, "Cannot have string longer than 512 elements")
 
     // TODO: Support c++ types with 2 bits in dram
     val seqa_bin = seqa_string.map{c => c.to[Int8] }
@@ -925,8 +925,8 @@ import spatial.targets._
 
     val seqa_aligned_result = getMem(seqa_dram_aligned)
     val seqb_aligned_result = getMem(seqb_dram_aligned)
-    val seqa_aligned_string = charArrayToString(seqa_aligned_result)
-    val seqb_aligned_string = charArrayToString(seqb_aligned_result)
+    val seqa_aligned_string = charArrayToString(seqa_aligned_result.map(_.to[U8]))
+    val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
     // val seqa_gold_string = "cggccgcttag-tgggtgcggtgctaagggggctagagggcttg-tc-gcggggcacgggacatgcg--gcg-t--cgtaaaccaaacat-g-gcgccgggag-attatgctcttgcacg-acag-ta----g-gat-aaagc---agc-t_________________________________________________________________________________________________________".toText
     // val seqb_gold_string = "--------tagct-ggtaccgt-ctaa-gtggc--ccggg-ttgagcggctgggca--gg-c-tg-gaag-gttagcgt-aaggagatatagtccg-cgggtgcagggtg-gctggcccgtacagctacctggcgctgtgcgcgggagctt_________________________________________________________________________________________________________".toText
@@ -1363,19 +1363,20 @@ import spatial.targets._
       nmatches := global_matches
     }
 
-    var gold_nmatches = 0
+    val gold_nmatches = Array.empty[Int](string_length-pattern_length)
     val pattern_length = raw_string_pattern.length
     val string_length = raw_string_data.apply(0).length
     for (i <- 0 until string_length-pattern_length) {
-      val substr = raw_string_data.apply(0).apply(i,i+pattern_length)
-      if (substr == raw_string_pattern) gold_nmatches = gold_nmatches + 1
+      val substr = raw_string_data.apply(0).slice(i,i+pattern_length)
+      if (substr == raw_string_pattern) gold_nmatches(i) = 1
+      else                              gold_nmatches(i) = 0
     }
     val computed_nmatches = getArg(nmatches)
 
-    println("Expected " + gold_nmatches + " matches")
+    println("Expected " + gold_nmatches.reduce{_+_} + " matches")
     println("Found " + computed_nmatches)
 
-    val cksum = gold_nmatches == computed_nmatches
+    val cksum = gold_nmatches.reduce{_+_} == computed_nmatches
     println("PASS: " + cksum + " (KMP) * Implement string find, string file parser, and string <-> hex <-> dec features once argon refactor is done so we can test any strings")
   }
 }      
@@ -2028,7 +2029,7 @@ import spatial.targets._
             cols_sram load cols_dram(start_id :: stop_id par par_segment_load)
             values_sram load values_dram(start_id :: stop_id par par_segment_load)
           }
-          vec_sram gather vec_dram(cols_sram, stop_id - start_id)
+          vec_sram gather vec_dram(cols_sram) //vec_sram gather vec_dram(cols_sram, stop_id - start_id)
           println("row " + {i + tile})
           val element = Reduce(Reg[T](0))(stop_id - start_id by 1 par red_par) { j => 
             // println(" partial from " + j + " = " + {values_sram(j) * vec_sram(j)})
@@ -2112,7 +2113,7 @@ import spatial.targets._
           val vec_sram = SRAM[T](L)
           val gather_addrs = SRAM[Int](L)
           Foreach(L by 1) { j => gather_addrs(j) = cols_sram(i, j) }
-          vec_sram gather vec_dram(gather_addrs, L)
+          vec_sram gather vec_dram(gather_addrs) //vec_sram gather vec_dram(gather_addrs, L)
           val element = Reduce(Reg[T](0))(L by 1) { k => values_sram(i,k) * vec_sram(k) }{_+_}
           result_sram(i) = element
         }
@@ -2471,8 +2472,8 @@ import spatial.targets._
             biases3_sram(i) * biases3_sram(i)
           }{_+_}
 
-          val norm3 = sqrt_approx(norm_temp3)
-          val bias_norm3 = sqrt_approx(bias_norm_temp3)
+          val norm3 = sqrt_approx(norm_temp3.value)
+          val bias_norm3 = sqrt_approx(bias_norm_temp3.value)
 
           // print_bias3()
           Foreach(nodes_per_layer by 1, possible_outputs by 1 par ud_weight3){ (i,j) => 
@@ -2713,8 +2714,8 @@ import spatial.targets._
           val beyond_left = phi_shifted < -TWOPI.to[T]/4
           val beyond_right = phi_shifted > TWOPI.to[T]/4
           val phi_bounded = mux(beyond_left, phi_shifted + TWOPI.to[T]/2, mux(beyond_right, phi_shifted - TWOPI.to[T]/2, phi_shifted))
-          val phi_x = cos_taylor(phi_bounded) * mux(beyond_left || beyond_right, 1, -1) // cos(real phi)
-          val phi_y = sin_taylor(phi_bounded) * mux(beyond_left || beyond_right, 1, -1) // sin(real phi)
+          val phi_x = cos_taylor(phi_bounded) * mux(beyond_left || beyond_right, 1.to[T], -1.to[T]) // cos(real phi)
+          val phi_y = sin_taylor(phi_bounded) * mux(beyond_left || beyond_right, 1.to[T], -1.to[T]) // sin(real phi)
           val temp_x = work_x_sram(j, tid)
           Pipe{work_x_sram(j, tid) = temp_x * phi_x - work_y_sram(j, tid) * phi_y}
           Pipe{work_y_sram(j, tid) = temp_x * phi_y + work_y_sram(j, tid) * phi_x}

@@ -30,7 +30,7 @@ trait CppGenArray extends CppGenCommon {
       case tp: Vec[_] => println("EXCEPTION: Probably can't handle nested array types in ifthenelse"); true
       case _ => true
     }
-    case _ => false
+    case _ => tp.typePrefix == "Array"
   }
 
   protected def emitUpdate(lhs: Sym[_], value: Sym[_], i: String, tp: Type[_]): Unit = {
@@ -101,22 +101,31 @@ trait CppGenArray extends CppGenCommon {
       //   emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
     }
     case SimpleStruct(st) => 
-      val struct = st.map(_._1).mkString("")
+      val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
       // Add to struct header if not there already
       if (!struct_list.contains(struct)) {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
-          open(src"typedef struct ${struct} {")
+          open(src"struct ${struct} {")
           st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-          open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}"}.mkString(",")}){")
-            st.foreach{f => emit(src"${f._1} = ${f._1};")}
+          open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
+            st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
           close("}")
           close("};")
         }
       }
-      emit(src"${struct} $lhs = ${struct}(${st.map{f => {if (!f._2.isConst & !isArrayType(f._2.tp)) "&" else ""} + src"&${f._2}"}.mkString(",")});")
+      val fields = st.zipWithIndex.map{case (f,i) => 
+        if (f._2.isConst) {
+          emit(src"${f._2.tp} ${lhs}_$i = ${f._2};")
+          src"&${lhs}_$i"
+        } else if (isArrayType(f._2.tp) | f._2.tp.typePrefix == "Array") src"${f._2}"
+        else src"&${f._2}"
+      }
+      emit(src"${struct} $lhs = ${struct}(${fields.mkString(",")});")
 
-    case FieldApply(struct, field) => emit(src"""${lhs.tp} $lhs = *${struct}.$field;""")
+    case FieldApply(struct, field) => 
+      if (isArrayType(lhs.tp)) emit(src"""${lhs.tp}* $lhs = ${struct}.$field;""")
+      else emit(src"""${lhs.tp} $lhs = *${struct}.$field;""")
 
     case SetMem(dram, data) => 
       val f = fracBits(dram.tp.typeArgs.head)
@@ -179,6 +188,7 @@ trait CppGenArray extends CppGenCommon {
     case ArrayMap(array,apply,func) =>
       emitNewArray(lhs, lhs.tp, getSize(array))
       open(src"for (int ${func.input} = 0; ${func.input} < ${getSize(array)}; ${func.input}++) { ")
+      emit(src"int ${apply.inputB} = ${func.input};")
       visitBlock(apply)
       visitBlock(func)
       emitUpdate(lhs, func.result, src"${func.input}", func.result.tp)
@@ -225,6 +235,20 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(reduce)
         emit(src"$lhs = ${reduce.result};")
       close("}")
+
+    case op@Switch(selects,block) =>
+
+      emit(src"/** BEGIN SWITCH $lhs **/")
+      emit(src"${lhs.tp} $lhs;")
+      selects.indices.foreach { i =>
+        open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
+          visitBlock(op.cases(i).body)
+          emit(src"${lhs} = ${op.cases(i).body.result};")
+        close("}")
+      }
+      emit(src"/** END SWITCH $lhs **/")
+
+    case SwitchCase(body) => // Controlled by Switch
 
     // case ArrayFilter(array, apply, cond) =>
     //   open(src"val $lhs = $array.filter{${apply.result} => ")

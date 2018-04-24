@@ -41,6 +41,10 @@ case class Series[+A:Num](
   /** Returns the `i`'th element in this Series. */
   @api def at(i: I32): A = start + i.to[A]*step
 
+  @api def foreach(func: A => Unit): Void = {
+
+  }
+
   def mirror(f:Tx): Series[_] = Series[A](f(start),f(end),f(step),f(par),isUnit)
   override def toString: String = s"Series($start, $end, $step, $par, $isUnit)"
 }

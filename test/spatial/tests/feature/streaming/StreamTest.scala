@@ -1,11 +1,8 @@
-package spatial.tests.feature.streaming
+// package spatial.tests.feature.streaming
 
-import spatial.SpatialApp
-import spatial.dsl._
-
+// import spatial.dsl._
 
 // object StreamTest extends SpatialApp {
-
 
 //   def main(args: Array[String]): Unit = {
 //     type T = Int

@@ -29,36 +29,36 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
       exitAccel()
 
-    case GetArgOut(reg) => 
+    case GetReg(reg) =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
       // emitGlobalWireMap(src"""${lhs}""",src"Wire(${newWire(reg.tp.typeArguments.head)})")
       emitt(src"""${lhs}.r := io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
 
 
-    case ArgInRead(reg) => 
-        emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
-        emitGlobalWire(src"""${lhs}.r := io.argIns(${argIns(reg)})""")
-
-    case ArgOutWrite(reg, v, en) =>
-      val id = argOuts(reg)
-      emitt(src"val ${lhs}_wId = getArgOutLane($id)")
-      v.tp match {
-        case FixPtType(s,d,f) => 
-          if (s) {
-            val pad = 64 - d - f
-            if (pad > 0) {
-              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")  
-            } else {
-              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
-            }
-          } else {
-            emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
-          }
-        case _ => 
-          emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")                  
-      }
-      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), src"${if (en.isEmpty) 0 else enableRetimeMatch(en.head, lhs)}.toInt")}""")
+//    case ArgInRead(reg) =>
+//        emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
+//        emitGlobalWire(src"""${lhs}.r := io.argIns(${argIns(reg)})""")
+//
+//    case ArgOutWrite(reg, v, en) =>
+//      val id = argOuts(reg)
+//      emitt(src"val ${lhs}_wId = getArgOutLane($id)")
+//      v.tp match {
+//        case FixPtType(s,d,f) =>
+//          if (s) {
+//            val pad = 64 - d - f
+//            if (pad > 0) {
+//              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+//            } else {
+//              emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")
+//            }
+//          } else {
+//            emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")
+//          }
+//        case _ =>
+//          emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")
+//      }
+//      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
+//      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), src"${if (en.isEmpty) 0 else enableRetimeMatch(en.head, lhs)}.toInt")}""")
 
     case DRAMNew(dims, _) => 
       drams += (lhs -> drams.toList.length)

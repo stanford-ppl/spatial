@@ -329,8 +329,8 @@ trait MemoryUnrolling extends UnrollingBase {
 
     case _:RegRead[_]        => URead(stage(RegRead(mem.asInstanceOf[Reg[A]])))
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))
-    case _:SetReg[_]       => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
-    case _:GetReg[_]      => URead(stage(GetArgOut(mem.asInstanceOf[Reg[A]])))
+    case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
+    case _:GetReg[_]         => URead(stage(GetReg(mem.asInstanceOf[Reg[A]])))
 
     case op:RegFileShiftIn[_,_] =>
       UMultiWrite(data.zipWithIndex.map{case (d,i) =>

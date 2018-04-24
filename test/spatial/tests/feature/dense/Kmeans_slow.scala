@@ -1,8 +1,6 @@
-package spatial.tests.feature.dense
+// package spatial.tests.feature.dense
 
-
-import spatial.dsl._
-
+// import spatial.dsl._
 
 // @test class Kmeans_slow extends SpatialTest { // ReviveMe (groupByReduce)
 //   override def runtimeArgs: Args = "3 64"

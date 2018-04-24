@@ -1,8 +1,6 @@
-package spatial.tests.feature.streaming
+// package spatial.tests.feature.streaming
 
-
-import spatial.SpatialApp
-import spatial.dsl._
+// import spatial.dsl._
 
 // object StreamInOut extends SpatialApp {
 //   import spatial.targets.DE1

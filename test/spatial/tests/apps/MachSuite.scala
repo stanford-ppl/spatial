@@ -1363,9 +1363,11 @@ import spatial.targets._
       nmatches := global_matches
     }
 
-    val gold_nmatches = Array.empty[Int](string_length-pattern_length)
+
     val pattern_length = raw_string_pattern.length
     val string_length = raw_string_data.apply(0).length
+    val gold_nmatches = Array.empty[Int](string_length-pattern_length)
+
     for (i <- 0 until string_length-pattern_length) {
       val substr = raw_string_data.apply(0).slice(i,i+pattern_length)
       if (substr == raw_string_pattern) gold_nmatches(i) = 1

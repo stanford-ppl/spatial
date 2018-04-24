@@ -3,8 +3,6 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 // import spatial.stdlib.Convolution
 
-
-
 @test class Convolutions extends SpatialTest {
   override def runtimeArgs: Args = "16"
   // DSE Parameters

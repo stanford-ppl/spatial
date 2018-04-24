@@ -36,7 +36,7 @@ trait CppGenCommon extends CppCodegen {
     case DoubleType() => "double"
     case _: Bit => "bool"
     case _: Text => "string"
-    case ai: ArgIn[_] => remap(ai.typeArgs.head)
+    case ai: Reg[_] => remap(ai.typeArgs.head)
     case _: Vec[_] => "vector<" + remap(tp.typeArgs.head) + ">"
     case _ => 
       tp.typePrefix match {

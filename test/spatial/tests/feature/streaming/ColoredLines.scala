@@ -1,7 +1,6 @@
-package spatial.tests.feature.streaming
+//package spatial.tests.feature.streaming
 
-
-import spatial.dsl._
+//import spatial.dsl._
 
 // object ColoredLines extends SpatialApp { // try arg = 100
 //   val Cmax = 320

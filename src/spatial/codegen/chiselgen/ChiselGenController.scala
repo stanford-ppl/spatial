@@ -64,16 +64,18 @@ trait ChiselGenController extends ChiselGenCommon {
 
   val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
 
+  var html_tab = 0
   def print_stage_prefix(lhs: Sym[_], title: String, ctr: String, node: String, ctx: String, inner: Boolean = false, collapsible: Boolean = true): Unit = {
     inGen(out, "controller_tree.html") {
-      emit(s"""<!--Begin $node -->""")
-      emit(s"""<TD><font size = "6">$title<br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
-      if (!inner & !collapsible) {emit("""<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}
+      emit(s"""${" "*html_tab}<!--Begin $node -->""")
+      html_tab = html_tab + 1
+      emit(s"""${" "*html_tab}<TD><font size = "6">$title<br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
+      if (!inner & !collapsible) {emit(s"""${" "*html_tab}<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}
       emit("")
       if (!inner) {
         val coll = if (collapsible) "data-role=\"collapsible\""
-        emit(s"""<div $coll>""")
-        emit(s"""<h4> </h4>${table_init}""")
+        emit(s"""${" "*html_tab}<div $coll>""")
+        emit(s"""${" "*html_tab}<h4> </h4>${table_init}""")
       }
 
       print_stream_info(lhs)
@@ -87,10 +89,10 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(s"""<div style="border:1px solid black">Stream Info<br>""")
         val listens = getReadStreams(sym.toCtrl).map{a => s"${a}"}.mkString(",")
         val pushes = getWriteStreams(sym.toCtrl).map{a => s"${a}"}.mkString(",")
-        if (listens != "") emit(s"""<p align="left">----->$listens""")
-        if (listens != "" & pushes != "") emit(s"<br>")
-        if (pushes != "") emit(s"""<p align="right">$pushes----->""")
-        emit("""</div>""")
+        if (listens != "") emit(s"""${" "*html_tab}<p align="left">----->$listens""")
+        if (listens != "" & pushes != "") emit(s"${" "*html_tab}<br>")
+        if (pushes != "") emit(s"""${" "*html_tab}<p align="right">$pushes----->""")
+        emit(s"""${" "*html_tab}</div>""")
       }
     }
   }
@@ -98,9 +100,10 @@ trait ChiselGenController extends ChiselGenCommon {
   def print_stage_suffix(name: String, inner: Boolean = false): Unit = {
     inGen(out, "controller_tree.html") {
       if (!inner) {
-        emit(s"""</TABLE></div>""")
+        emit(s"""${" "*html_tab}</TABLE></div>""")
       }
-      emit(s"""</TD><!-- Close $name -->""")
+      html_tab = html_tab - 1
+      emit(s"""${" "*html_tab}</TD><!-- Close $name -->""")
     }
   }
 
@@ -413,8 +416,8 @@ trait ChiselGenController extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     case AccelScope(func) =>
-      hwblock = Some(enterCtrl(lhs))
       enterAccel()
+      hwblock = Some(enterCtrl(lhs))
       val streamAddition = getStreamEnablers(lhs)
       emitController(lhs)
       emitGlobalWire(src"val accelReset = reset.toBool | io.reset")
@@ -457,8 +460,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitt(s"""done_latch.io.input.reset := ${swap(lhs, Resetter)}""")
       emitt(s"""done_latch.io.input.asyn_reset := ${swap(lhs, Resetter)}""")
       emitt(s"""io.done := done_latch.io.output.data""")
-      exitAccel()
       exitCtrl(lhs)
+      exitAccel()
 
     case UnitPipe(ens,func) =>
       // emitGlobalWireMap(src"${lhs}_II_done", "Wire(Bool())")

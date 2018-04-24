@@ -95,7 +95,7 @@ class OuterController(val sched: Sched, val depth: Int, val isFSM: Boolean = fal
       
       // Define logic for first stage
       active(0).io.input.set := Mux(!done(0).io.output.data & ~io.ctrDone & io.enable & ~io.doneIn(0), true.B, false.B)
-      active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck
+      active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
       iterDone(0).io.input.set := io.doneIn(0) & ~synchronize
       done(0).io.input.set := io.ctrDone & ~io.rst
 
@@ -106,9 +106,6 @@ class OuterController(val sched: Sched, val depth: Int, val isFSM: Boolean = fal
         iterDone(i).io.input.set := io.doneIn(i) & ~synchronize
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
-
-      // Connect output stage enables
-      io.enableOut.zip(active).zip(io.maskIn).foreach{case ((eo,a),m) => eo := a.io.output.data & m}
 
     case ForkJoin | Stream => 
       // Define rule for when ctr increments
@@ -131,7 +128,7 @@ class OuterController(val sched: Sched, val depth: Int, val isFSM: Boolean = fal
   // Connect output signals
   iterDone.zip(io.childAck).foreach{ case (id, ca) => ca := id.io.output.data }
   io.datapathEn := io.enable & ~io.done
-  io.enableOut.zipWithIndex.foreach{case (eo,i) => eo := active(i).io.output.data & ~iterDone(i).io.output.data & io.maskIn(i) & {if (i == 0) ~io.ctrDone else true.B}}
+  io.enableOut.zipWithIndex.foreach{case (eo,i) => eo := active(i).io.output.data & ~iterDone(i).io.output.data & io.maskIn(i) & ~allDone & {if (i == 0) ~io.ctrDone else true.B}}
   io.done := Utils.risingEdge(allDone)
   io.ctrRst := Utils.getRetimed(Utils.risingEdge(allDone), 1)
 

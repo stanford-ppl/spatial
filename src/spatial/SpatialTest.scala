@@ -54,7 +54,7 @@ trait SpatialTest extends Spatial with DSLTest {
     make = "make vcs",
     run  = "bash scripts/regression_run.sh"
   ) {
-    override def shouldRun: Boolean = enable("test.VCS")
+    override def shouldRun: Boolean = enable("test.VCS_noretime")
     override val makeTimeout: Long = 13000
   }
 

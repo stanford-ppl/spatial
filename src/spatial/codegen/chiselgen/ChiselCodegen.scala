@@ -18,7 +18,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   var streamLines = collection.mutable.Map[String, Int]() // Map from filename number of lines it has
   var streamExtensions = collection.mutable.Map[String, Int]() // Map from filename to number of extensions it has
   val tabWidth: Int = 2
-  val maxLinesPerFile = 50
+  val maxLinesPerFile = 400
   var compressorMap = collection.mutable.HashMap[String, (String,Int)]()
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()
@@ -217,7 +217,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
-    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"} else ""
+    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"}.mkString(" with ") else ""
     emitt(src"// Creating sub kernel ${name}_1")
     inGenn(out, name, ext) {
       startFile()

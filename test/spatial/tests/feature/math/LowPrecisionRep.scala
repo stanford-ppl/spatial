@@ -1,6 +1,7 @@
 package spatial.tests.feature.math
 
 import spatial.dsl._
+import spatial.lib._
 
 @test class LowPrecisionRep extends SpatialTest { // Args N in multiple of 64
   override def runtimeArgs: Args = NoArgs

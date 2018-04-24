@@ -1,4 +1,10 @@
 // package spatial.tests.feature.sparse
+<<<<<<< HEAD
+=======
+
+
+// import spatial.dsl._
+>>>>>>> origin/fpga
 
 // import spatial.dsl._
 

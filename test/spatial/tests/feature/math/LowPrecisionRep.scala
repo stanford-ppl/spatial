@@ -20,7 +20,9 @@ import spatial.lib._
     val sf = ArgOut[Float]
 
     Accel {
-      ConvertTo8Bit(dram_out,sf,dram,64)
+      val x = Reg[Float]
+      ConvertTo8Bit(dram_out,x,dram,64)
+      sf := x.value
       //testmem(dram_out,dram,64)
     }
 

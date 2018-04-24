@@ -5,7 +5,6 @@ import spatial.dsl._
 @test class FSMDotProduct extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
-
   def main(args: Array[String]): Unit = {
     val vectorA = Array.fill(128) { random[Int](10) }
     val vectorB = Array.fill(128) { random[Int](10) }

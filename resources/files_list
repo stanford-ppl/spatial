@@ -690,10 +690,6 @@
 ./synth/chisel-templates/project/target/scala-2.12/sbt-1.0/resolution-cache/default/chisel-templates-build/scala_2.12/sbt_1.0/0.1.0-SNAPSHOT/resolved.xml.properties
 ./synth/chisel-templates/project/target/scala-2.12/sbt-1.0/resolution-cache/default/chisel-templates-build/scala_2.12/sbt_1.0/0.1.0-SNAPSHOT/resolved.xml.xml
 ./synth/chisel-templates/project/build.properties
-./synth/chisel-templates/emul/Number.scala
-./synth/chisel-templates/emul/FloatPoint.scala
-./synth/chisel-templates/emul/Bool.scala
-./synth/chisel-templates/emul/FixedPoint.scala
 ./synth/chisel-templates/templates/RegFile.scala
 ./synth/chisel-templates/templates/Types.scala
 ./synth/chisel-templates/templates/Counter.scala

@@ -1,6 +1,6 @@
-package spatial.tests.compiler
+// package spatial.tests.compiler
 
-import spatial.dsl._
+// import spatial.dsl._
 
 @test class IllegalVarAssignTest extends SpatialTest { // ReviveMe (write to var)
   override def runtimeArgs: Args = NoArgs

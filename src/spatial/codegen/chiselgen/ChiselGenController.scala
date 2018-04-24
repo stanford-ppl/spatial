@@ -66,7 +66,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def print_stage_prefix(lhs: Sym[_], title: String, ctr: String, node: String, ctx: String, inner: Boolean = false, collapsible: Boolean = true): Unit = {
     inGen(out, "controller_tree.html") {
-      open(s"""<!--Begin $node -->""")
+      emit(s"""<!--Begin $node -->""")
       emit(s"""<TD><font size = "6">$title<br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
       if (!inner & !collapsible) {emit("""<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}
       emit("")
@@ -100,7 +100,7 @@ trait ChiselGenController extends ChiselGenCommon {
       if (!inner) {
         emit(s"""</TABLE></div>""")
       }
-      close(s"""</TD><!-- Close $name -->""")
+      emit(s"""</TD><!-- Close $name -->""")
     }
   }
 

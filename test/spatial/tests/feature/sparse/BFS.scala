@@ -87,7 +87,7 @@ import spatial.dsl._
 
         Foreach(concatReg by 1) { kk => currentNodes(kk) = frontierNodes(kk) }
         Foreach(concatReg by 1) { kk => frontierLevels(kk) = i + 1 }
-        result(currentNodes) scatter frontierLevels // result(currentNodes, concatReg) scatter frontierLevels
+        result(currentNodes, concatReg) scatter frontierLevels
         numEdges := concatReg
         concatReg := 0.to[Int]
       }

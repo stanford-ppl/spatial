@@ -5,7 +5,6 @@
 // @test class StridedRowConvolution extends SpatialTest { // ReviveMe
 //   override def runtimeArgs: Args = NoArgs
 
-
 //   def main(args: Array[String]): Unit = {
 //     val R = 20
 //     val C = 16

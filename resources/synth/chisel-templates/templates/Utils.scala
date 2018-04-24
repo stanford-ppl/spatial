@@ -5,8 +5,8 @@ import chisel3.util._
 import chisel3.internal.sourceinfo._
 import types._
 import fringe._
-import emul._
-
+// import emul._
+import scala.collection.immutable.HashMap
 import scala.math._
 
 sealed trait DeviceTarget
@@ -572,6 +572,15 @@ object ops {
 }
 
 object Utils {
+
+  type XMap = HashMap[Int, Int]
+  def XMap(xs:(Int, Int)*) = HashMap[Int,Int](xs:_*)
+  type DMap = HashMap[Int, List[List[Int]]]
+  def DMap(xs:(Int,List[List[Int]])*) = HashMap[Int, List[List[Int]]](xs:_*)
+  type NBufXMap = HashMap[Int, XMap]
+  def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
+  type NBufDMap = HashMap[Int, DMap]
+  def NBufDMap(xs:(Int,DMap)*) = HashMap[Int, DMap](xs:_*)
 
   var regression_testing = scala.util.Properties.envOrElse("RUNNING_REGRESSION", "0")
 

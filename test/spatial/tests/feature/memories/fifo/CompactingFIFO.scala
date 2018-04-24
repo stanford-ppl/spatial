@@ -7,7 +7,6 @@
 
 //   val tileSize = 64
 
-
 //   def main(args: Array[String]): Unit = {
 //     val arraySize = args(0).to[Int]
 

@@ -7,8 +7,10 @@ import ops._
 import fringe._
 import chisel3.util.MuxLookup
 import types._
+import Utils._
 
 import scala.collection.immutable.HashMap
+
 
 /* Controller that is instantiated in NBuf templates to handle port -> module muxing */
 class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
@@ -71,15 +73,15 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 class NBufMem(val mem: MemPrimitive, 
            val logicalDims: List[Int], val numBufs: Int, val bitWidth: Int, 
            val banks: List[Int], val strides: List[Int], 
-           val xBarWMux: HashMap[Int, HashMap[Int, Int]], val xBarRMux: HashMap[Int, HashMap[Int, Int]], // bufferPort -> (muxPort -> accessPar)
-           val directWMux: HashMap[Int, HashMap[Int, List[List[Int]]]], val directRMux: HashMap[Int, HashMap[Int, List[List[Int]]]],  // bufferPort -> (muxPort -> List(banks, banks, ...))
-           val broadcastWMux: HashMap[Int, Int], // Assume broadcasts are XBar
+           val xBarWMux: NBufXMap, val xBarRMux: NBufXMap, // bufferPort -> (muxPort -> accessPar)
+           val directWMux: NBufDMap, val directRMux: NBufDMap,  // bufferPort -> (muxPort -> List(banks, banks, ...))
+           val broadcastWMux: XMap, // Assume broadcasts are XBar
            val bankingMode: BankingMode, val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module { 
 
   // Overloaded constructers
   // Tuple unpacker
-  def this(tuple: (MemPrimitive, List[Int], Int, Int, List[Int], List[Int], HashMap[Int, HashMap[Int, Int]], HashMap[Int, HashMap[Int, Int]], 
-    HashMap[Int, HashMap[Int,List[List[Int]]]], HashMap[Int, HashMap[Int, List[List[Int]]]], HashMap[Int, Int], BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, None, false, 0)
+  def this(tuple: (MemPrimitive, List[Int], Int, Int, List[Int], List[Int], NBufXMap, NBufXMap, 
+    HashMap[Int, HashMap[Int,List[List[Int]]]], NBufDMap, XMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, None, false, 0)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -355,8 +357,8 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
   }.toArray:_*)
 
   val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), 
-                                    wMap, rMap, HashMap[Int, HashMap[Int, List[List[Int]]]](), HashMap[Int, HashMap[Int, List[List[Int]]]](),
-                                    HashMap[Int, Int](), BankedMemory
+                                    wMap, rMap, NBufDMap(), NBufDMap(),
+                                    XMap(), BankedMemory
                                   ))
   io <> nbufFF.io
 

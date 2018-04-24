@@ -6,7 +6,7 @@ import chisel3.util._
 import ops._
 import fringe._
 import chisel3.util.MuxLookup
-
+import Utils._
 import scala.collection.immutable.HashMap
 
 sealed trait BankingMode
@@ -127,14 +127,14 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
 
 class SRAM(val logicalDims: List[Int], val bitWidth: Int, 
            val banks: List[Int], val strides: List[Int], 
-           val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
-           val directWMux: HashMap[Int, List[List[Int]]], val directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           val xBarWMux: XMap, val xBarRMux: XMap, // muxPort -> accessPar
+           val directWMux: DMap, val directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            val bankingMode: BankingMode, val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module { 
 
   // Overloaded construters
   // Tuple unpacker
-  def this(tuple: (List[Int], Int, List[Int], List[Int], HashMap[Int, Int], HashMap[Int, Int], 
-    HashMap[Int, List[List[Int]]], HashMap[Int, List[List[Int]]], BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9)
+  def this(tuple: (List[Int], Int, List[Int], List[Int], XMap, XMap, 
+    DMap, DMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -261,28 +261,28 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     wire := d
   }
 
-  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarW(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, muxPort, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
     io.output.data(vecId)
   }
 
-  def connectDirectWPort(wBundle: W_Direct, muxPort: Int, vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = directWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directW(base) := wBundle
   }
 
-  def connectDirectRPort(rBundle: R_Direct, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, muxPort, vecId, true.B)}
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val base = directRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directR(base) := rBundle    
     io.flow(base) := flow
@@ -294,16 +294,16 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
 
 
 class FF(val bitWidth: Int,
-         val xBarWMux: HashMap[Int, Int] = HashMap(0 -> 1), // muxPort -> 1 bookkeeping
+         val xBarWMux: XMap = HashMap(0 -> 1), // muxPort -> 1 bookkeeping
          val init: Option[List[Double]] = None,
          val fracBits: Int = 0
         ) extends Module {
-  def this(tuple: (Int, HashMap[Int, Int])) = this(tuple._1,tuple._2,None,0)
+  def this(tuple: (Int, XMap)) = this(tuple._1,tuple._2,None,0)
   // Compatibility with standard mem codegen
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
-           xBarWMux: HashMap[Int, Int], xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
-           directWMux: HashMap[Int, List[List[Int]]], directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
 
   val io = IO(new Bundle{
@@ -320,25 +320,25 @@ class FF(val bitWidth: Int,
   ff := Mux(anyReset, io.input(0).init, Mux(anyEnable, wr_data, ff))
   io.output.data := Mux(anyReset, io.input(0).init, ff)
 
-  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.input(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {io.output.data}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {io.output.data}
 
 }
 
 class FIFO(val logicalDims: List[Int], val bitWidth: Int, 
            val banks: List[Int], 
-           val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int],
+           val xBarWMux: XMap, val xBarRMux: XMap,
            val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
 
-  def this(tuple: (List[Int], Int, List[Int], HashMap[Int, Int], HashMap[Int, Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
-           xBarWMux: HashMap[Int, Int], xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
-           directWMux: HashMap[Int, List[List[Int]]], directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, banks, xBarWMux, xBarRMux, init, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
@@ -426,14 +426,14 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
   io.almostFull := elements.io.output.almostFull
   io.numel := elements.io.output.numel.asUInt
 
-  def connectXBarWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarW(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, muxPort, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
@@ -447,10 +447,10 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
 
 // class ShiftRegFile(val logicalDims: List[Int], val bitWidth: Int, 
 //                    val banks: List[Int], val bankDepth: Int, val inits: Option[Map[List[Int], Double]], val stride: Int, 
-//                    val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
+//                    val xBarWMux: XMap, val xBarRMux: XMap, // muxPort -> accessPar
 //                    val isBuf: Boolean, val fracBits: Int) extends Module {
 
-//   def this(tuple: (List[Int], Int, List[Int], Int, Option[Map[List[Int], Double]], HashMap[Int, Int], HashMap[Int, Int], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, tuple._10)
+//   def this(tuple: (List[Int], Int, List[Int], Int, Option[Map[List[Int], Double]], XMap, XMap, Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, tuple._10)
 
 
 //   /* FROM SRAM 

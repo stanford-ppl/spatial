@@ -18,7 +18,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   var streamLines = collection.mutable.Map[String, Int]() // Map from filename number of lines it has
   var streamExtensions = collection.mutable.Map[String, Int]() // Map from filename to number of extensions it has
   val tabWidth: Int = 2
-  val maxLinesPerFile = 1000
+  val maxLinesPerFile = 50
   var compressorMap = collection.mutable.HashMap[String, (String,Int)]()
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()
@@ -204,23 +204,25 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     case _ => super.named(s, id)
   }
 
-  final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
-    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"} else ""
-    emit(src"// Creating sub kernel ${name}_1")
-    inGenn(out, name, ext) {
+  final protected def startFile(): Unit = {
       emit("""package accel""")
-
       emit("import templates._")
       emit("import templates.ops._")
       emit("import types._")
       emit("import api._")
       emit("import chisel3._")
       emit("import chisel3.util._")
+      emit("import Utils._")    
       emit("import scala.collection.immutable._")
+  }
+
+  final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
+    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"} else ""
+    emitt(src"// Creating sub kernel ${name}_1")
+    inGenn(out, name, ext) {
+      startFile()
       open(src"""trait ${name}_1 extends ${prnts} {""")
-      if (cfg.compressWires == 2) {
-        emit(src"""def method_${name}_1() {""")
-      }
+      if (cfg.compressWires == 2) { emit(src"""def method_${name}_1() {""") }
       try { body }
       finally {
         inGennAll(out, name, ext){
@@ -248,11 +250,26 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   protected def emitt(x: String, forceful: Boolean = false): Unit = {
-    val lineCount = streamLines(state.streamName.split("/").last)
-    streamLines(state.streamName.split("/").last) += 1
-    if (lineCount > maxLinesPerFile) Console.println("exceeded!")
+    val curStream = state.streamName.split("/").last
+    val curStreamNoExt = curStream.split("\\.").dropRight(1).last
+    val base = curStream.split("_").dropRight(1).mkString("_")
+    val lineCount = streamLines(curStream)
     val on = config.enGen
     if (forceful) {config.enGen = true}
+    if (config.enGen) {
+      streamLines(curStream) += 1
+      if (lineCount > maxLinesPerFile) {
+        val newExt = streamExtensions(base) + 1
+        streamExtensions += base -> newExt
+        val newStreamString = (curStream.split("_").dropRight(1) :+ s"${newExt}").mkString("_")
+        val newStream = getOrCreateStream(out, newStreamString + "." + ext)
+        streamLines += {newStreamString + "." + ext} -> 0
+        state.gen = newStream
+        startFile()
+        open(src"""trait ${newStreamString} extends ${curStreamNoExt} {""")
+        if (cfg.compressWires == 2) { emit(src"""def method_${newStreamString}() {""") }
+      }
+    }
     emit(x)
     config.enGen = on
   }

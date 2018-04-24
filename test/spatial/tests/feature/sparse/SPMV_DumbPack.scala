@@ -64,7 +64,7 @@ import spatial.dsl._
             csrCols load aC(OCROW, 0 :: len par ip)
             csrData load aD(OCROW, 0 :: len par ip)
           }
-          vecGathered gather v(csrCols)//vecGathered gather v(csrCols, len)
+          vecGathered gather v(csrCols, len)
 
           val acc = Reduce(Reg[Int](0.to[Int]))(len by 1 par ip) { i =>
             csrData(i) * vecGathered(i)

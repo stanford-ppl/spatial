@@ -6,7 +6,7 @@ import chisel3.util._
 import ops._
 import fringe._
 import chisel3.util.MuxLookup
-
+import Utils._
 import scala.collection.immutable.HashMap
 
 sealed trait BankingMode
@@ -127,14 +127,14 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
 
 class SRAM(val logicalDims: List[Int], val bitWidth: Int, 
            val banks: List[Int], val strides: List[Int], 
-           val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
-           val directWMux: HashMap[Int, List[List[Int]]], val directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           val xBarWMux: XMap, val xBarRMux: XMap, // muxPort -> accessPar
+           val directWMux: DMap, val directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            val bankingMode: BankingMode, val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module { 
 
   // Overloaded construters
   // Tuple unpacker
-  def this(tuple: (List[Int], Int, List[Int], List[Int], HashMap[Int, Int], HashMap[Int, Int], 
-    HashMap[Int, List[List[Int]]], HashMap[Int, List[List[Int]]], BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9)
+  def this(tuple: (List[Int], Int, List[Int], List[Int], XMap, XMap, 
+    DMap, DMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -294,16 +294,16 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
 
 
 class FF(val bitWidth: Int,
-         val xBarWMux: HashMap[Int, Int] = HashMap(0 -> 1), // muxPort -> 1 bookkeeping
+         val xBarWMux: XMap = HashMap(0 -> 1), // muxPort -> 1 bookkeeping
          val init: Option[List[Double]] = None,
          val fracBits: Int = 0
         ) extends Module {
-  def this(tuple: (Int, HashMap[Int, Int])) = this(tuple._1,tuple._2,None,0)
+  def this(tuple: (Int, XMap)) = this(tuple._1,tuple._2,None,0)
   // Compatibility with standard mem codegen
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
-           xBarWMux: HashMap[Int, Int], xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
-           directWMux: HashMap[Int, List[List[Int]]], directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
 
   val io = IO(new Bundle{
@@ -331,14 +331,14 @@ class FF(val bitWidth: Int,
 
 class FIFO(val logicalDims: List[Int], val bitWidth: Int, 
            val banks: List[Int], 
-           val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int],
+           val xBarWMux: XMap, val xBarRMux: XMap,
            val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
 
-  def this(tuple: (List[Int], Int, List[Int], HashMap[Int, Int], HashMap[Int, Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
-           xBarWMux: HashMap[Int, Int], xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
-           directWMux: HashMap[Int, List[List[Int]]], directRMux: HashMap[Int, List[List[Int]]],  // muxPort -> List(banks, banks, ...)
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, banks, xBarWMux, xBarRMux, init, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
@@ -447,10 +447,10 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
 
 // class ShiftRegFile(val logicalDims: List[Int], val bitWidth: Int, 
 //                    val banks: List[Int], val bankDepth: Int, val inits: Option[Map[List[Int], Double]], val stride: Int, 
-//                    val xBarWMux: HashMap[Int, Int], val xBarRMux: HashMap[Int, Int], // muxPort -> accessPar
+//                    val xBarWMux: XMap, val xBarRMux: XMap, // muxPort -> accessPar
 //                    val isBuf: Boolean, val fracBits: Int) extends Module {
 
-//   def this(tuple: (List[Int], Int, List[Int], Int, Option[Map[List[Int], Double]], HashMap[Int, Int], HashMap[Int, Int], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, tuple._10)
+//   def this(tuple: (List[Int], Int, List[Int], Int, Option[Map[List[Int], Double]], XMap, XMap, Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, tuple._10)
 
 
 //   /* FROM SRAM 

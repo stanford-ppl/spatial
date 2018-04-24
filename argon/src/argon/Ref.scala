@@ -87,6 +87,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
       error(ctx)
       err[A]("Invalid constant")
   }
+
 }
 
 

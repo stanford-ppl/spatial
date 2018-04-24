@@ -34,6 +34,12 @@ object dsl extends SpatialDSL with lang.static.ShadowingStatics {
   }
   private object test extends TestTag("spatial", "SpatialTest", "SpatialApp")
 
+  // Used for debugging virtualization macros
+  final class testv extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro testv.impl
+  }
+  private object testv extends TestTag("spatial", "SpatialTest", "SpatialApp", verbose = true)
+
   final class struct extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl
   }

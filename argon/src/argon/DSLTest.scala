@@ -68,7 +68,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     final def compile(): Iterator[() => Result] = {
       import scala.concurrent.ExecutionContext.Implicits.global   // implicit execution context for Futures
 
-      val name = this.name.replace("_", "/")
+      val name = test.name.replace("_", "/")
       val stageArgs = test.compileArgs.cmds
       stageArgs.iterator.map{cmd => () => {
         try {

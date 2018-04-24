@@ -32,12 +32,12 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
   }
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
-    case GetArgOut(_) if inHw =>
+    case GetReg(_) if inHw =>
       error(lhs.ctx, "Reading ArgOuts within Accel is disallowed.")
       error("Use a Reg to store intermediate values.")
       error(lhs.ctx)
 
-    case SetArgIn(arg,_) if inHw =>
+    case SetReg(arg,_) if inHw =>
       error(lhs.ctx, "Writing ArgIn within Accel is disallowed.")
       error("Use a Reg to store intermediate values.")
       error(lhs.ctx)

@@ -40,7 +40,7 @@ trait CppGenInterface extends CppGenCommon {
     case RegWrite(reg,v,en) => 
       emit(src"// $lhs $reg $v $en reg write")
 
-    case SetArgIn(reg, v) => 
+    case SetReg(reg, v) =>
       reg.tp.typeArgs.head match {
         case FixPtType(s,d,f) => 
           if (f != 0) {
@@ -60,7 +60,7 @@ trait CppGenInterface extends CppGenCommon {
             emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)}); // $reg")
             emit(src"$reg = $v;")
       }
-    case GetArgOut(reg)    => 
+    case GetReg(reg)    =>
       val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
       val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${isHostIO(reg)})"
     

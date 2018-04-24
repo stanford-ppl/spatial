@@ -186,48 +186,6 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
     @api def infix_!=[B:Type](that: Reg[B]): Bit = Type[B].from(x) !== that.value
     @api def infix_==[B:Type](that: Reg[B]): Bit = Type[B].from(x) === that.value
-
-    @api def +[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: ArgIn[B]): B = Arith[B].from(x) % that.value
-
-    @api def <[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: ArgIn[B]): Bit = Order[B].from(x) >= that.value
-
-    @api def infix_!=[B:Type](that: ArgIn[B]): Bit = Type[B].from(x) !== that.value
-    @api def infix_==[B:Type](that: ArgIn[B]): Bit = Type[B].from(x) === that.value
-
-    @api def +[B:Arith](that: HostIO[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: HostIO[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: HostIO[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: HostIO[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: HostIO[B]): B = Arith[B].from(x) % that.value
-
-    @api def <[B:Order](that: HostIO[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: HostIO[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: HostIO[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: HostIO[B]): Bit = Order[B].from(x) >= that.value
-
-    @api def infix_!=[B:Type](that: HostIO[B]): Bit = Type[B].from(x) !== that.value
-    @api def infix_==[B:Type](that: HostIO[B]): Bit = Type[B].from(x) === that.value
-
-    @api def +[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) + getArg(that)
-    @api def -[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) - getArg(that)
-    @api def *[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) * getArg(that)
-    @api def /[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) / getArg(that)
-    @api def %[B:Arith](that: ArgOut[B]): B = Arith[B].from(x) % getArg(that)
-
-    @api def <[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) < getArg(that)
-    @api def <=[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) <= getArg(that)
-    @api def >[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) > getArg(that)
-    @api def >=[B:Order](that: ArgOut[B]): Bit = Order[B].from(x) >= getArg(that)
-
-    @api def infix_!=[B:Type](that: ArgOut[B]): Bit = Type[B].from(x) !== getArg(that)
-    @api def infix_==[B:Type](that: ArgOut[B]): Bit = Type[B].from(x) === getArg(that)
   }
 
   class RegNumerics[A:Num](reg: Reg[A]) {
@@ -307,14 +265,6 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   // --- Reg[A]
   @api implicit def regRead[A](x: Reg[A]): A = x.value
   implicit def regNumerics[A:Num](x: Reg[A]): RegNumerics[A] = new RegNumerics[A](x)
-
-
-  // --- ArgIn[A]
-  @api implicit def argRead[A](x: ArgIn[A]): A = x.value
-
-
-  // --- HostIO[A]
-  @api implicit def hostIORead[A](x: HostIO[A]): A = x.value
 
 
   // --- A:Numeric

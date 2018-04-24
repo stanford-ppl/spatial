@@ -10,10 +10,11 @@ import spatial.util._
 case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTraversal {
   private var dimMapping: Map[I32,I32] = Map.empty
   private var addedArgIns: Seq[(Sym[_],Sym[_])] = Nil
+  private var mostRecentWrite: Map[Reg[_], Sym[_]] = Map.empty
 
   def argIn[A](x: Bits[A]): Sym[A] = {
     implicit val bA: Bits[A] = x.selfType
-    val arg: ArgIn[A] = stage(ArgInNew[A](bA.zero))
+    val arg: Reg[A] = stage(ArgInNew[A](bA.zero))
     dbg(s"Inserted ArgIn $arg for value $x")
     setArg(arg,x.unbox)
     arg.value
@@ -35,15 +36,33 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
     case DRAMNew(ds,_) =>
       val dims = f(ds)
       dimMapping ++= dims.distinct.map{
-        case d @ Op(ArgInRead(reg))      => d -> d
-        case d if d.isValue              => d -> d
-        case d if dimMapping.contains(d) => d -> dimMapping(d)
-        case d                           => d -> argIn(d).unbox
+        case d @ Op(RegRead(reg)) if reg.isArgIn => d -> d
+        case d if d.isValue                      => d -> d
+        case d if dimMapping.contains(d)         => d -> dimMapping(d)
+        case d                                   => d -> argIn(d).unbox
       }
       val dims2 = dims.map{d => dimMapping(d) }
       addedArgIns ++= dims.zip(dims2)
       isolateSubstWith(dims.zip(dims2):_*){ super.transform(lhs,rhs) }
 
+    case RegRead(F(reg)) if !inHw => getArg(reg)
+
+    case RegWrite(F(reg),F(data),_) =>
+      mostRecentWrite += reg -> data
+
+
+
+    case SetReg(F(reg),F(data)) =>
+      mostRecentWrite += reg -> data
+
+      if (inHw && (reg.isArgOut || reg.isHostIO)) {
+        (reg := data).asInstanceOf[Sym[A]]
+      }
+      else {
+        error(ctx, "Setting ArgIn registers within Accel is disallowed. Use a HostIO or ArgOut.")
+        error(ctx)
+        err[A]("Set ArgIn in host")
+      }
 
     case _ => super.transform(lhs,rhs)
   }

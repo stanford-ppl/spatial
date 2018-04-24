@@ -1,7 +1,7 @@
 package spatial.lang
 
 import argon._
-import forge.{Ptr, VarLike}
+import forge.Ptr
 import forge.tags._
 import spatial.data.writeBuffer
 import spatial.node._
@@ -29,11 +29,12 @@ import spatial.node._
 
   @rig override def toText: Text = this.value.toText
 }
+
 object Reg {
   @api def apply[A:Bits]: Reg[A] = Reg.alloc[A](zero[A])
   @api def apply[A:Bits](reset: A): Reg[A] = Reg.alloc[A](reset)
 
-  @rig def alloc[A:Bits](reset: A): Reg[A] = stage(RegNew[A](reset))
+  @rig def alloc[A:Bits](reset: A): Reg[A] = stage(RegNew[A](Bits[A].box(reset)))
   @rig def read[A](reg: Reg[A]): A = {
     implicit val tA: Bits[A] = reg.A
     stage(RegRead(reg))
@@ -43,5 +44,18 @@ object Reg {
     stage(RegWrite(reg,data,ens))
   }
 }
+
+object ArgIn {
+  @api def apply[A:Bits]: Reg[A] = stage(ArgInNew(Bits[A].zero))
+}
+
+object ArgOut {
+  @api def apply[A:Bits]: Reg[A] = stage(ArgOutNew(Bits[A].zero))
+}
+
+object HostIO {
+  @api def apply[A:Bits]: Reg[A] = stage(HostIONew(Bits[A].zero))
+}
+
 
 

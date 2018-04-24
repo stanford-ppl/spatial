@@ -186,14 +186,8 @@ trait ExternalAliases extends InternalAliases {
 
   type Reg[A] = spatial.lang.Reg[A]
   lazy val Reg = spatial.lang.Reg
-
-  type ArgIn[A] = spatial.lang.ArgIn[A]
   lazy val ArgIn = spatial.lang.ArgIn
-
-  type ArgOut[A] = spatial.lang.ArgOut[A]
   lazy val ArgOut = spatial.lang.ArgOut
-
-  type HostIO[A] = spatial.lang.HostIO[A]
   lazy val HostIO = spatial.lang.HostIO
 
   type StreamIn[A] = spatial.lang.StreamIn[A]

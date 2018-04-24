@@ -757,6 +757,13 @@ object Utils {
       result
   }
 
+  def fixrand(seed: Int, bits: Int): FixedPoint = {
+    val prng = Module(new PRNG(seed, bits))
+    val result = Wire(new FixedPoint(false, bits, 0))
+    result := prng.io.output
+    result
+  }
+
   def risingEdge(sig:Bool): Bool = {
     sig & Utils.delay(~sig,1)
   }

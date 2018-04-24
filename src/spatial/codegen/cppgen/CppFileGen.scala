@@ -26,11 +26,33 @@ trait CppFileGen extends CppCodegen {
       emit("""#include "functions.hpp" """)
     }
 
+    inGen(out, "structs.hpp") {
+      emit("#include <vector>")
+      emit("""#include <stdint.h>""")
+      emit("""#include <sys/time.h>""")
+      emit("""#include <iostream>""")
+      emit("""#include <fstream>""")
+      emit("""#include <string> """)
+      emit("""#include <sstream> """)
+      emit("""#include <stdarg.h>""")
+      emit("""#include <signal.h>""")
+      emit("""#include <sys/wait.h>""")
+      emit("""#include <pwd.h>""")
+      emit("""#include <unistd.h>""")
+      emit("""#include <stdlib.h>""")
+      emit("""#include <stdio.h>""")
+      emit("""#include <errno.h>""")
+      emit("using std::vector;")
+      emit("#ifndef STRUCTS_HPP")
+      emit("#define STRUCTS_HPP")
+    }
+
     inGen(out, "ArgAPI.hpp") {
       emit(s"// API for args in app ${config.name}")
     }
 
     inGen(out, entryFile) {
+      emit("""#include "structs.hpp"""")
       emit("""#include <stdint.h>""")
       emit("""#include <sys/time.h>""")
       emit("""#include <iostream>""")
@@ -75,6 +97,10 @@ trait CppFileGen extends CppCodegen {
       emit("""#endif""")
     }
 
+    inGen(out, "structs.hpp") {
+      emit("#endif // STRUCTS_HPP ///:~ ")
+    }
+    
     inGen(out, entryFile) {
       emit("delete c1;")
       close("}")
@@ -82,8 +108,8 @@ trait CppFileGen extends CppCodegen {
       open("void printHelp() {")
         val argsList = CLIArgs.listNames.mkString(" ")
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
-  	    emit(s"""fprintf(stderr, "  -- bash run.sh $argsList\\n\\n");""")
-  	    emit(s"""return;""")
+  	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
+  	    emit(s"""exit(0);""")
       close("}")
 
       emit("")

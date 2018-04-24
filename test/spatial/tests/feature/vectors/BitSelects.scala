@@ -10,10 +10,10 @@ import spatial.dsl._
       val x = 9.to[Int]
       val v = x.asBits
       println(v)
-      println("bit 0: " + x(0))
-      println("bit 1: " + x(1))
-      println("bit 2: " + x(2))
-      println("bit 3: " + x(3))
+      println("bit 0: " + x.bit(0))
+      println("bit 1: " + x.bit(1))
+      println("bit 2: " + x.bit(2))
+      println("bit 3: " + x.bit(3))
 
       assert(x.bit(0), "First bit should be 1")
       assert(!x.bit(1), "Second bit should be 0")

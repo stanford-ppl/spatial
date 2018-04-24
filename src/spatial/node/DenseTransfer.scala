@@ -95,7 +95,7 @@ object DenseTransfer {
         dbg(s"$local => $dram: Using unaligned store ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         unalignedStore(dramAddr, localAddr)
       case _ =>
-        dbg(s"$local => $dram: Using unaligned store (request length is statically unknown)")
+        dbg(s"$local => $dram: Using unaligned store (request length is statically unknown (${dram}))")
         unalignedStore(dramAddr, localAddr)
     }
     def load(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = requestLength match {
@@ -106,7 +106,7 @@ object DenseTransfer {
         dbg(s"$dram => $local: Using unaligned load ($c * ${A.nbits} % ${target.burstSize}* ${c*A.nbits % target.burstSize})")
         unalignedLoad(dramAddr, localAddr)
       case _ =>
-        dbg(s"$dram => $local: Using unaligned load (request length is statically unknown)")
+        dbg(s"$dram => $local: Using unaligned load (request length is statically unknown (${dram}))")
         unalignedLoad(dramAddr, localAddr)
     }
 

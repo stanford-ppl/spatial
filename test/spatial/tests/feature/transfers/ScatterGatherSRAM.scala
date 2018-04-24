@@ -28,8 +28,8 @@ import spatial.dsl._
       Sequential.Foreach(maxNumAddrs by tileSize) { i =>
         val sram = SRAM[T](maxNumAddrs)
         addrs load srcAddrs(i::i + tileSize par P)
-        sram gather gatherData(addrs par P, tileSize)
-        scatterResult(addrs par P, tileSize) scatter sram // TODO: What to do about parallel scatter when sending to same burst simultaneously???
+        sram gather gatherData(addrs par P) //sram gather gatherData(addrs par P, tileSize)
+        scatterResult(addrs par P) scatter sram//scatterResult(addrs par P, tileSize) scatter sram // TODO: What to do about parallel scatter when sending to same burst simultaneously???
       }
     }
 

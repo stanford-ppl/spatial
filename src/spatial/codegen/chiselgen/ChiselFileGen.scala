@@ -10,7 +10,7 @@ trait ChiselFileGen extends ChiselCodegen {
   backend = "accel"
 
   override def emitHeader(): Unit = {
-
+    enterAccel() // Guarantee prints for the following
     inGen(out, "controller_tree.html") {
       emit("""<!DOCTYPE html>
 <html>
@@ -73,6 +73,7 @@ trait ChiselFileGen extends ChiselCodegen {
 	  emitt("import chisel3._")
 	  emitt("import chisel3.util._")
 	  emitt("import types._")
+    emitt("import scala.collection.immutable._")
 
       open(s"""trait GlobalWires_1 extends IOModule_1 {""")
     }
@@ -84,6 +85,7 @@ trait ChiselFileGen extends ChiselCodegen {
 	  emitt("import chisel3._")
 	  emitt("import chisel3.util._")
 	  emitt("import types._")
+    emitt("import scala.collection.immutable._")
 
       open(s"""trait GlobalModules_1 extends GlobalWiresMixer {""")
     }
@@ -133,13 +135,14 @@ trait ChiselFileGen extends ChiselCodegen {
 
     }
 
+    exitAccel()
     super.emitHeader()
   }
 
   override protected def emitEntry(block: Block[_]): Unit = { gen(block) }
 
   override def emitFooter(): Unit = {
-
+    enterAccel() // Guarantee prints for this section
     inGen(out, "controller_tree.html") {
       emit(s"""  </TABLE>
 </body>
@@ -432,7 +435,7 @@ trait ChiselFileGen extends ChiselCodegen {
 
     }
 
-
+    exitAccel()
     super.emitFooter()
   }
 

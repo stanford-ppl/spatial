@@ -73,7 +73,7 @@ import spatial.dsl._
     setArg(length, measured_length)
     setArg(lengthx2, measured_length*2)
     val max_length = 512
-    assert(max_length >= length, "Cannot have string longer than 512 elements")
+    assert(max_length >= length.value, "Cannot have string longer than 512 elements")
 
     // TODO: Support c++ types with 2 bits in dram
     val seqa_bin = seqa_string.map{c => c.to[Int8] }
@@ -160,8 +160,8 @@ import spatial.dsl._
 
     val seqa_aligned_result = getMem(seqa_dram_aligned)
     val seqb_aligned_result = getMem(seqb_dram_aligned)
-    val seqa_aligned_string = charArrayToString(seqa_aligned_result)
-    val seqb_aligned_string = charArrayToString(seqb_aligned_result)
+    val seqa_aligned_string = charArrayToString(seqa_aligned_result.map(_.to[U8]))
+    val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
     // Pass if >75% match
     val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == dash) || (b == dash)) 1 else 0}.reduce{_+_}

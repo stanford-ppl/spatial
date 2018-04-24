@@ -7,6 +7,8 @@ import spatial.node._
 import emul.FloatPoint
 import emul.FixedPoint
 import utils.escapeString
+import spatial.util._
+
 
 
 trait CppGenCommon extends CppCodegen { 
@@ -68,6 +70,8 @@ trait CppGenCommon extends CppCodegen {
     }
   }
 
+
+  protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 
   protected def bitWidth(tp: Type[_]): Int = tp match {
     case FixPtType(s,d,f) => d+f; 

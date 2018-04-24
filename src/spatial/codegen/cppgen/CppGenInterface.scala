@@ -22,12 +22,11 @@ trait CppGenInterface extends CppGenCommon {
   //   case _ => super.remap(tp)
   // }
 
-
   def isHostIO(x: Sym[_]) = "false"
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArgInNew(init)  => 
-      argIns += (lhs -> (argIns.toList.length + drams.toList.length))
+      argIns += (lhs -> argIns.toList.length)
       emit(src"${lhs.tp} $lhs = $init;")
     case ArgOutNew(init) => 
       argOuts += (lhs -> argOuts.toList.length)
@@ -39,8 +38,13 @@ trait CppGenInterface extends CppGenCommon {
       emit(src"${lhs.tp} $lhs = $reg;")
     case RegWrite(reg,v,en) => 
       emit(src"// $lhs $reg $v $en reg write")
+    case DRAMNew(dims, _) => 
+      drams += (lhs -> drams.toList.length)
+      emit(src"""uint64_t ${lhs} = c1->malloc(sizeof(${lhs.tp.typeArgs.head}) * ${dims.map(quote).mkString("*")});""")
+      emit(src"c1->setArg(${argHandle(lhs)}_ptr, $lhs, false);")
+      emit(src"""printf("Allocate mem of size ${dims.map(quote).mkString("*")} at %p\n", (void*)${lhs});""")
 
-    case SetReg(reg, v) =>
+    case SetArgIn(reg, v) => 
       reg.tp.typeArgs.head match {
         case FixPtType(s,d,f) => 
           if (f != 0) {
@@ -60,7 +64,9 @@ trait CppGenInterface extends CppGenCommon {
             emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)}); // $reg")
             emit(src"$reg = $v;")
       }
-    case GetReg(reg)    =>
+    case _: CounterNew[_] => 
+    case _: CounterChainNew => 
+    case GetArgOut(reg)    => 
       val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
       val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${isHostIO(reg)})"
     
@@ -120,10 +126,13 @@ trait CppGenInterface extends CppGenCommon {
     inGen(out,"ArgAPI.hpp") {
       emit("\n// ArgIns")
       argIns.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
+      emit("\n// ArgIOs")
+      argIOs.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.toList.length}")}
       emit("\n// ArgOuts")
       argOuts.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
-      emit("\n// ArgIOs")
-      argIOs.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
+      emit("\n// DRAM Ptrs:")
+      drams.foreach {case (d, id) => emit(src"#define ${argHandle(d)}_ptr ${id+argIns.toList.length+argIOs.toList.length}")}
+
     }
     super.emitFooter()
   }

@@ -40,3 +40,16 @@ import spatial.lang._
   extends Op2[A,Void]{
   override val A: Num[A] = Num[A]
 }
+
+
+
+@op case class OpenNumpyFile(filename: Text, write: Boolean) extends Op[NumpyFile] {
+  override def effects: Effects = Effects.Mutable
+}
+
+@op case class CloseNumpyFile(file: NumpyFile) extends Op[Void]
+
+@op case class ReadNumpyFile[A:Num](file: NumpyFile) extends Op2[A,Tensor1[A]] {
+  override val A: Num[A] = Num[A]
+}
+

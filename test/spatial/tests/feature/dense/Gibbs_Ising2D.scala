@@ -30,7 +30,7 @@ x_par=4  |       --->       X                XX    |
          |_________________________________________|
 
 */
-@test class Gibbs_Ising2D extends SpatialTest {
+@test class Gibbs_Ising2D extends SpatialTest { 
   override def runtimeArgs: Args = "25 0.3 1"
 
 
@@ -93,54 +93,6 @@ x_par=4  |       --->       X                XX    |
     setArg(exp_posbias, exp_pos)
     setArg(iters, I)
 
-    // Accel{
-    //   val exp_sram = SRAM[T](lut_size)
-    //   val grid_lb = LineBuffer[Int](2,COLS)
-    //   val prev_line = SRAM[Int](COLS)
-    //   val bias_line = SRAM[Int](COLS)
-    //   val local_prev_line = SRAM[Int](COLS)
-    //   exp_sram load exp_lut
-    //   prev_line load grid_dram(ROWS-1, 0::COLS)
-    //   local_prev_line load grid_dram(ROWS-1, 0::COLS)
-
-    //   Foreach(iters by 1) { iter =>
-    //     Foreach(ROWS+1 by 1) { i =>
-    //       val active_row = (i-1)%ROWS
-    //       // Fetch next row
-    //       grid_lb load grid_dram(i%ROWS, 0::COLS)
-    //       bias_line load bias_dram(active_row, 0::COLS)
-    //       val window_sr = RegFile[Int](2,2)
-
-    //       // Update each point in active row
-    //       Sequential.Foreach(0 until COLS+1 by 1) { j =>
-    //         // Shift wavefront into regfile for parallel access
-    //         Sequential.Foreach(2 by 1 par 2) { k => window_sr(k, *) <<= grid_lb(k, j%COLS) }
-    //         // Keep local copy of previous line that does not get rotated through the buffers
-    //         // Collect neighbors, wrapping around edges
-    //         val N = mux(i == 0, border.to[Int], local_prev_line((j-1)%COLS))
-    //         val E = mux(j == COLS, border.to[Int], window_sr(1,0))
-    //         val S = mux(i == ROWS, border.to[Int], window_sr(0,1))
-    //         val W = mux(j == 0, border.to[Int], local_prev_line(j-2))
-    //         val self = window_sr(1,1)
-    //         val sum = (N+E+S+W)*self
-    //         val p_flip = exp_sram(-sum+lut_size/2)
-    //         val pi_x = exp_sram(sum+4) * mux((bias_line((j-1)%COLS) * self) < 0, exp_negbias, exp_posbias)
-    //         val threshold = min(1.to[T], pi_x)
-    //         val rng = unif[_16]()
-    //         val flip = mux(pi_x > 1, true.to[Bool], mux(rng < threshold.as[PROB], true.to[Bool], false.to[Bool]))
-    //         if (j > 0 && j < COLS) {
-    //           prev_line(j) = mux(flip, -self, self)
-    //         }
-    //         if (j > 0) {
-    //           local_prev_line(j) = mux(flip, -self, self)
-    //         }
-    //       }
-    //       // Write back line
-    //       if (iter > 0 || i > 0) {grid_dram(active_row, 0::COLS) store prev_line}
-    //     }
-    //   }
-    // }
-
     Accel{
       val exp_sram = SRAM[T](lut_size)
       val grid_sram = SRAM[Int](ROWS,COLS)
@@ -166,8 +118,8 @@ x_par=4  |       --->       X                XX    |
             val p_flip = exp_sram(-sum+lut_size/2)
             val pi_x = exp_sram(sum+4) * mux((bias_sram(i,j) * self) < 0, exp_posbias, exp_negbias)
             val threshold = min(1.to[T], pi_x)
-            val rng = unif[_8]()
-            val flip = mux(pi_x > 1, 1.to[T], mux(rng < threshold(15::8).as[PROB], 1.to[T], 0.to[T]))
+            val rng = random[PROB]
+            val flip = mux(pi_x > 1, 1.to[T], mux(rng < threshold.bits(15::8).as[PROB], 1.to[T], 0.to[T]))
             if (j >= 0 && j < COLS) {
               grid_sram(i,j) = mux(flip == 1.to[T], -self, self)
             }

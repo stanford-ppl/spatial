@@ -1,7 +1,7 @@
 package spatial.tests.feature.dense
 
 import spatial.dsl._
-import spatial.stdlib.Convolution
+// import spatial.stdlib.Convolution
 
 
 
@@ -11,27 +11,27 @@ import spatial.stdlib.Convolution
   val coltile = 32 // (16 -> 16 -> 1280)
 
 
-  def ConvolutionSlide[T:Num](output: DRAM2[T],
-    input: DRAM2[T],
-    filter: LUT2[T],
-    colstride: scala.Int, rowstride: scala.Int): Unit = {
+  // def ConvolutionSlide[T:Num](output: DRAM2[T], // ReviveMe
+  //   input: DRAM2[T],
+  //   filter: LUT2[T],
+  //   colstride: scala.Int, rowstride: scala.Int): Unit = {
 
-    val lb = LineBuffer.strided[T](filter.rows, coltile, rowstride)
-    val sr = RegFile[T](filter.rows, filter.cols)
-    val lineout = SRAM[T](coltile/colstride)
-    Foreach(input.rows by rowstride){row =>
-      lb load input(row, 0::input.cols) // TODO: load with correct rowstride
-      Foreach(input.cols by colstride){j =>
-        Foreach(filter.rows by 1 par filter.rows){i => sr(i,*) <<= lb(i,j::j+colstride)}
-        lineout(j/colstride) = Reduce(Reg[T](0.to[T]))(filter.rows by 1, filter.cols by 1){(ii,jj) =>
-          val img = if ((row.to[Int]+rowstride-1) - (filter.rows - 1 - ii.to[Int]) < 0 || (j.to[Int]+colstride-1) - (filter.cols - 1 - jj.to[Int]) < 0) 0.to[T] else sr(ii,filter.cols - 1 - jj)
-          img * filter(ii,jj)
-        }{_+_}
-        // lineout(j/colstride) = mux(row + (rowstride-1) < filter.rows.to[Int]-1 || j + (colstride-1) < filter.cols.to[Int]-1, 0.to[T], Reduce(Reg[T](0.to[T]))(filter.rows by 1, filter.cols by 1){(ii,jj) => sr(ii,jj) * filter(ii,jj)}{_+_}.value)
-      }
-      output(row/rowstride, 0::output.cols) store lineout
-    }
-  }
+  //   val lb = LineBuffer.strided[T](filter.rows, coltile, rowstride)
+  //   val sr = RegFile[T](filter.rows, filter.cols)
+  //   val lineout = SRAM[T](coltile/colstride)
+  //   Foreach(input.rows by rowstride){row =>
+  //     lb load input(row, 0::input.cols) // TODO: load with correct rowstride
+  //     Foreach(input.cols by colstride){j =>
+  //       Foreach(filter.rows by 1 par filter.rows){i => sr(i,*) <<= lb(i,j::j+colstride)}
+  //       lineout(j/colstride) = Reduce(Reg[T](0.to[T]))(filter.rows by 1, filter.cols by 1){(ii,jj) =>
+  //         val img = if ((row.to[Int]+rowstride-1) - (filter.rows - 1 - ii.to[Int]) < 0 || (j.to[Int]+colstride-1) - (filter.cols - 1 - jj.to[Int]) < 0) 0.to[T] else sr(ii,filter.cols - 1 - jj)
+  //         img * filter(ii,jj)
+  //       }{_+_}
+  //       // lineout(j/colstride) = mux(row + (rowstride-1) < filter.rows.to[Int]-1 || j + (colstride-1) < filter.cols.to[Int]-1, 0.to[T], Reduce(Reg[T](0.to[T]))(filter.rows by 1, filter.cols by 1){(ii,jj) => sr(ii,jj) * filter(ii,jj)}{_+_}.value)
+  //     }
+  //     output(row/rowstride, 0::output.cols) store lineout
+  //   }
+  // }
 
 
   // gemm and gemmv specific
@@ -202,13 +202,13 @@ import spatial.stdlib.Convolution
       val filter7 = LUT[T](3,3,3)(filter5_data.map{_+1}:_*)
 
       // Use stdlib defs
-      Pipe{Convolution.ConvolutionSlide[T](dram1, image, filter, col_stride1, row_stride1, 16, 16)}
-      Pipe{Convolution.ConvolutionSlide[T](dram2, image, filter, col_stride2, row_stride2, 16, 16)}
-      Pipe{Convolution.ConvolutionGEMM[T](dram3, flatimg, filter3)}
-      Pipe{Convolution.ConvolutionGEMM[T](dram4, flatimg4, filter4)}
-      Pipe{Convolution.MCConvolutionSlide(dram5, image3d, filter5, col_stride5, row_stride5, 16, 16, 3)}
-      Pipe{Convolution.MFConvolutionSlide[T](dram6, image, List(filter, filter6), col_stride6, row_stride6, 16, 16)}
-      Pipe{Convolution.MCMFConvolutionSlide[T](dram7, image3d, List(filter5, filter7), col_stride7, row_stride7, 16, 16, 3)}
+      // Pipe{ConvolutionSlide[T](dram1, image, filter, col_stride1, row_stride1, 16, 16)}
+      // Pipe{ConvolutionSlide[T](dram2, image, filter, col_stride2, row_stride2, 16, 16)}
+      Pipe{ConvolutionGEMM[T](dram3, flatimg, filter3)}
+      Pipe{ConvolutionGEMM[T](dram4, flatimg4, filter4)}
+      // Pipe{MCConvolutionSlide(dram5, image3d, filter5, col_stride5, row_stride5, 16, 16, 3)}
+      // Pipe{MFConvolutionSlide[T](dram6, image, List(filter, filter6), col_stride6, row_stride6, 16, 16)}
+      // Pipe{MCMFConvolutionSlide[T](dram7, image3d, List(filter5, filter7), col_stride7, row_stride7, 16, 16, 3)}
 
       // // Use defs in this app
       // ConvolutionSlide[T](dram1, image, filter, col_stride1, row_stride1)

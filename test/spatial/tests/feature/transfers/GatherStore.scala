@@ -28,7 +28,7 @@ import spatial.dsl._
       Sequential.Foreach(numAddr by tileSize) { i =>
         val sram = SRAM[T](tileSize)
         addrs load srcAddrs(i::i + tileSize par P)
-        sram gather gatherData(addrs par P, tileSize)
+        sram gather gatherData(addrs par P) // sram gather gatherData(addrs par P, tileSize)
         denseResult(i::i+tileSize) store sram
       }
     }

@@ -67,6 +67,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
 object RegFile {
   /** Allocates a [[RegFile1]] with capacity for `length` elements of type A. */
   @api def apply[A:Bits](length: I32): RegFile1[A] = stage(RegFileNew[A,RegFile1](Seq(length),None))
+  @api def apply[A:Bits](length: I32, inits: Seq[Bits[A]]): RegFile1[A] = stage(RegFileNew[A,RegFile1](Seq(length),Some(inits)))
 
   /** Allocates a [[RegFile2]] with size `rows` x `cols` and elements of type A. */
   @api def apply[A:Bits](rows: I32, cols: I32): RegFile2[A] = stage(RegFileNew[A,RegFile2](Seq(rows,cols),None))

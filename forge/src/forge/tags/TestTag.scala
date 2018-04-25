@@ -28,6 +28,8 @@ class TestTag(dsl: String, dslTest: String, dslApp: String, verbose: Boolean = f
       case _ => invalidAnnotationUse("test", "classes", "traits")
     }
 
+    if (verbose) info(showCode(outputs.head))
+
     q"..$outputs"
   }
 }

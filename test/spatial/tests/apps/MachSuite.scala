@@ -571,7 +571,7 @@ import spatial.targets._
 }
 
 
-// @test class Stencil2D extends SpatialTest { // ReviveMe
+// @test class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
 //   override def runtimeArgs: Args = NoArgs
 
 
@@ -653,7 +653,7 @@ import spatial.targets._
 // }
 
 
-// @test class Stencil3D extends SpatialTest { // ReviveMe
+// @test class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
 //   override def runtimeArgs: Args = NoArgs
 
 

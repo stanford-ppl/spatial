@@ -11,8 +11,9 @@ import scala.reflect.macros.blackbox
   *
   * === Covered features ===
   * {{{
+  *   x                      =>       __use(x)
   *   val x = e              =>       val x = e; __valName(x, "x")
-  *   var x = e              =>       var x = __newVar(e)
+  *   var x = e              =>       val x = __newVar(e); __valName(x, "x")
   *   if (c) t else e        =>       __ifThenElse(c, t, e)
   *   return t               =>       __return(t)
   *   x = t                  =>       __assign(x, t)
@@ -22,29 +23,30 @@ import scala.reflect.macros.blackbox
   *
   * === Infix methods for `Any` methods ===
   * {{{
-  *   t == t1                =>       infix_==(t, t1)
-  *   t != t1                =>       infix_!=(t, t1)
-  *   t.##                   =>       infix_##(t, t1)
-  *   t.equals t1            =>       infix_equals(t, t1)
-  *   t.hashCode             =>       infix_hashCode(t)
-  *   t.asInstanceOf[T]      =>       infix_asInstanceOf[T](t)
-  *   t.isInstanceOf[T]      =>       infix_isInstanceOf[T](t)
-  *   t.toString             =>       infix_toString(t)
-  *   t.getClass             =>       infix_getClass(t)
+  *   t == t1                =>       t.infix_==(t1)
+  *   t != t1                =>       t.infix_!=(t1)
+  *   t.##                   =>       t.infix_##
+  *   t.equals t1            =>       t.infix_equals(t1)
+  *   t.hashCode             =>       t.infix_hashCode
+  *   t.asInstanceOf[T]      =>       t.infix_asInstanceOf[T]
+  *   t.isInstanceOf[T]      =>       t.infix_isInstanceOf[T]
+  *   t.toString             =>       t.infix_toString
+  *   t.getClass             =>       t.infix_getClass
   * }}}
   *
   * === Infix methods for `AnyRef` methods ===
   * {{{
-  *   t eq t1                =>       infix_eq(t, t1)
-  *   t ne t1                =>       infix_ne(t, t1)
-  *   t.clone                =>       infix_clone(t)
-  *   t.notify               =>       infix_notify(t)
-  *   t.notifyAll            =>       infix_notifyAll(t)
-  *   t.synchronized[T](t1)  =>       infix_synchronized(t, t1)
-  *   t.wait                 =>       infix_wait(t)
-  *   t.wait(l)              =>       infix_wait(t, l)
-  *   t.wait(t1, l)          =>       infix_wait(t, t1, l)
-  *   t.finalize()           =>       infix_finalize(t)
+  *   t eq t1                =>       t.infix_eq(t1)
+  *   t ne t1                =>       t.infix_ne(t1)
+  *   t.clone                =>       t.infix_clone
+  *   t.notify               =>       t.infix_notify
+  *   t.notifyAll            =>       t.infix_notifyAll
+  *   t.synchronized(t1)     =>       t.infix_synchronized(t1)
+  *   t.synchronized[T](t1)  =>       t.infix_synchronized[T](t1)
+  *   t.wait                 =>       t.infix_wait
+  *   t.wait(l)              =>       t.infix_wait(l)
+  *   t.wait(t1, l)          =>       t.infix_wait(t1, l)
+  *   t.finalize()           =>       t.infix_finalize
   * }}}
   *
   * @todo
@@ -53,7 +55,13 @@ import scala.reflect.macros.blackbox
   *   throw e                =>       __throw(e)
   *   Nothing                =>       ???
   *   Null                   =>       ???
-  *   a match {case ... }    =>       ???
+  *   a match {              =>       ???
+  *     case t: T => rhs     =>       ???
+  *     case T(u) => rhs     =>       ???
+  *     case t @ T(u) => rhs =>       ???
+  *     case t    => rhs     =>       ???
+  *     case _    => rhs     =>       ???
+  *   }                      =>       ???
   * }}}
   *
   * === Unplanned/Unsupported Features ===
@@ -78,7 +86,11 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
     def apply(tree: __c.universe.Tree): List[Tree] = transformStm(tree)
 
     def call(receiver: Option[Tree], name: String, args: List[Tree], targs: List[Tree] = Nil): Tree = {
-      methodCall(receiver.map(transform), name, List(args.map(transform)), targs)
+      val args2 = args.map(transform).map{
+        case t @ Ident(TermName(_)) => methodCall(None, "__use", List(List(t)))
+        case t => t
+      }
+      methodCall(receiver.map(transform), name, List(args2), targs)
     }
 
     /** Call for transforming Blocks.
@@ -89,22 +101,28 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
       case ValDef(mods, term@TermName(name), tpt, rhs) if mods.hasFlag(Flag.MUTABLE) && !mods.hasFlag(Flag.PARAMACCESSOR) =>
         //info("Found var: ")
         //info(showRaw(tree))
-
+        /**
+          * Note: It's tempting to transform:
+          *   var v: T = rhs
+          *
+          * to:
+          *   val v$v: Var[T] = newVar(rhs)
+          *   def v: T = readVar(v$v)
+          *   def v_=(t: T): Unit = assign(v$v, t)
+          *
+          * Unfortunately, this doesn't work outside the primary scope of a class/object
+          *  - setters are only inferred for direct class/object fields
+          */
         tpt match {
           case TypeTree() =>
             __c.error(tree.pos, "Type annotation required for var declaration.")
             List(tree)
           case _ =>
-            // Mangle Var name to make readVar calls happen explicitly
-            val s = TermName(name+"$v")
-            val vtyp = tq"forge.VarLike[$tpt]"
-            val asgn = TermName(name+"_=")
-            // leaving it a var makes it easier to revert when custom __newVar isn't supplied
-            val v = ValDef(mods, s, vtyp, call(None, "__newVar", List(rhs), List(tpt)))
-            val d = DefDef(mods, term, Nil, Nil, tpt, call(None, "__readVar", List(Ident(s))))
-            val a = q"$mods def $asgn(v: $tpt) = __assign($s, v)"
-            List(v, d, a)
+            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), List(tpt))).asVal
+            val regv = methodCall(None, "__valName", List(List(Ident(term), Literal(Constant(name)))),Nil)
+            List(vdef, regv)
         }
+
 
       case v@ValDef(mods, term@TermName(name), _, _) if !mods.hasFlag(Flag.PARAMACCESSOR) =>
         val vdef = transform(v)
@@ -118,15 +136,11 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
     override def transform(tree: Tree): Tree = atPos(tree.pos) {
       tree match {
         /* Attempt to stage vars in both class bodies and blocks */
-        case Template(parents, selfType, bodyList) =>
-          val body = bodyList.flatMap(transformStm)
-
-          Template(parents, selfType, body)
+        case Template(parents, selfType, bodyList) => Template(parents, selfType, bodyList.flatMap(transformStm))
 
         case Block(stms, ret) =>
           val stms2 = stms.flatMap(transformStm) ++ transformStm(ret)
           Block(stms2.dropRight(1), stms2.last)
-
 
         case Function(params,body) =>
           val named = params.collect{case ValDef(_,term@TermName(name),_,_) =>
@@ -159,104 +173,74 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
 
         // only stage `+` to `infix_+` if lhs is a String *literal* (we can't look at types!)
         // NOFIX: this pattern does not work for: `string + unstaged + staged`
-        case Apply(Select(qual @ Literal(Constant(s: String)), TermName("$plus")), List(arg)) =>
-          call(None, "infix_$plus", List(qual, arg))
+        case Apply(Select(qual @ Literal(Constant(s:String)), TermName("$plus")), List(arg)) =>
+          call(Some(qual), "infix_$plus", List(arg))
+
+        case Assign(lhs, rhs) => methodCall(None, "__assign", List(List(lhs, transform(rhs))))
 
         /* Methods defined on Any/AnyRef with arguments */
 
-        case Apply(Select(qualifier, TermName("$eq$eq")), List(arg)) =>
-          Apply(Select(qualifier, TermName("infix_$eq$eq")), List(arg))
-          //call(None, "infix_$eq$eq", List(qualifier, arg))
+        case Apply(Select(qual, TermName("$eq$eq")), List(arg))       => call(Some(qual), "infix_$eq$eq", List(arg))
+        case Apply(Select(qual, TermName("$bang$eq")), List(arg))     => call(Some(qual), "infix_$bang$eq", List(arg))
+        case Apply(Select(qual, TermName("equals")), List(arg))       => call(Some(qual), "infix_equals", List(arg))
+        case Apply(Select(qual, TermName("eq")), List(arg))           => call(Some(qual), "infix_eq", List(arg))
+        case Apply(Select(qual, TermName("ne")), List(arg))           => call(Some(qual), "infix_ne", List(arg))
+        case Apply(Select(qual, TermName("wait")), List(arg))         => call(Some(qual), "infix_wait", List(arg))
+        case Apply(Select(qual, TermName("wait")), List(arg0, arg1))  => call(Some(qual), "infix_wait", List(arg0, arg1))
+        case Apply(Select(qual, TermName("synchronized")), List(arg)) => call(Some(qual), "infix_synchronized", List(arg))
+        case Apply(TypeApply(Select(qual, TermName("synchronized")), targs), List(arg)) => call(Some(qual), "infix_synchronized", List(arg), targs)
 
-        case Apply(Select(qualifier, TermName("$bang$eq")), List(arg)) =>
-          Apply(Select(qualifier, TermName("infix_$bang$eq")), List(arg))
-          //call(None, "infix_$bang$eq", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("equals")), List(arg)) =>
-          call(None, "infix_equals", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("eq")), List(arg)) =>
-          call(None, "infix_eq", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("ne")), List(arg)) =>
-          call(None, "infix_ne", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("wait")), List(arg)) =>
-          call(None, "infix_wait", List(qualifier, arg))
-
-        case Apply(Select(qualifier, TermName("wait")), List(arg0, arg1)) =>
-          call(None, "infix_wait", List(qualifier, arg0, arg1))
-
-        case Apply(Select(qualifier, TermName("synchronized")), List(arg)) =>
-          call(None, "infix_synchronized", List(qualifier, arg))
-
-        case Apply(TypeApply(Select(qualifier, TermName("synchronized")), targs), List(arg)) =>
-          call(None, "infix_synchronized", List(qualifier, arg), targs)
-
-        case TypeApply(Select(qualifier, TermName("asInstanceOf")), targs) =>
-          call(None, "infix_asInstanceOf", List(qualifier), targs)
-
-        case TypeApply(Select(qualifier, TermName("isInstanceOf")), targs) =>
-          call(None, "infix_isInstanceOf", List(qualifier), targs)
+        case TypeApply(Select(qual, TermName("asInstanceOf")), targs) => call(Some(qual), "infix_asInstanceOf", Nil, targs)
+        case TypeApply(Select(qual, TermName("isInstanceOf")), targs) => call(Some(qual), "infix_isInstanceOf", Nil, targs)
 
         /* Methods defined on Any/AnyRef without arguments */
 
         // For 0-arg methods we get a different tree depending on if the user writes empty parens 'x.clone()' or no parens 'x.clone'
         // We always match on the empty parens version first
 
-        case Apply(Select(qualifier, TermName("toString")), List()) =>
-          call(None, "infix_toString", List(qualifier))
+        // q.toString(), q.toString
+        case Apply(Select(qual, TermName("toString")), List())   => call(Some(qual), "infix_toString", Nil)
+        case Select(qual, TermName("toString"))                  => call(Some(qual), "infix_toString", Nil)
 
-        case Select(qualifier, TermName("toString")) =>
-          call(None, "infix_toString", List(qualifier))
+        // q.##(), q.##
+        case Apply(Select(qual, TermName("$hash$hash")), List()) => call(Some(qual), "infix_$hash$hash", Nil)
+        case Select(qual, TermName("$hash$hash"))                => call(Some(qual), "infix_$hash$hash", Nil)
 
-        case Apply(Select(qualifier, TermName("$hash$hash")), List()) =>
-          call(None, "infix_$hash$hash", List(qualifier))
+        // q.hashCode(), q.hashCode
+        case Apply(Select(qual, TermName("hashCode")), List())   => call(Some(qual), "infix_hashCode", Nil)
+        case Select(qual, TermName("hashCode"))                  => call(Some(qual), "infix_hashCode", Nil)
 
-        case Select(qualifier, TermName("$hash$hash")) =>
-          call(None, "infix_$hash$hash", List(qualifier))
+        // q.clone(), q.clone
+        case Apply(Select(qual, TermName("clone")), List())      => call(Some(qual), "infix_clone", Nil)
+        case Select(qual, TermName("clone"))                     => call(Some(qual), "infix_clone", Nil)
 
-        case Apply(Select(qualifier, TermName("hashCode")), List()) =>
-          call(None, "infix_hashCode", List(qualifier))
+        // q.notify(), q.notify
+        case Apply(Select(qual, TermName("notify")), List())     => call(Some(qual), "infix_notify", Nil)
+        case Select(qual, TermName("notify"))                    => call(Some(qual), "infix_notify", Nil)
 
-        case Select(qualifier, TermName("hashCode")) =>
-          call(None, "infix_hashCode", List(qualifier))
+        // q.notifyAll(), q.notifyAll
+        case Apply(Select(qual, TermName("notifyAll")), List())  => call(Some(qual), "infix_notifyAll", Nil)
+        case Select(qual, TermName("notifyAll"))                 => call(Some(qual), "infix_notifyAll", Nil)
 
-        case Apply(Select(qualifier, TermName("clone")), List()) =>
-          call(None, "infix_clone", List(qualifier))
+        // q.wait(), q.wait
+        case Apply(Select(qual, TermName("wait")), List())       => call(Some(qual), "infix_wait", Nil)
+        case Select(qual, TermName("wait"))                      => call(Some(qual), "infix_wait", Nil)
 
-        case Select(qualifier, TermName("clone")) =>
-          call(None, "infix_clone", List(qualifier))
+        // q.finalize(), q.finalize
+        case Apply(Select(qual, TermName("finalize")), List())   => call(Some(qual), "infix_finalize", Nil)
+        case Select(qual, TermName("finalize"))                  => call(Some(qual), "infix_finalize", Nil)
 
-        case Apply(Select(qualifier, TermName("notify")), List()) =>
-          call(None, "infix_notify", List(qualifier))
+        // q.getClass(), q.getClass
+        case Apply(Select(qual, TermName("getClass")), List())   => call(Some(qual), "infix_getClass", Nil)
+        case Select(qual, TermName("getClass"))                  => call(Some(qual), "infix_getClass", Nil)
 
-        case Select(qualifier, TermName("notify")) =>
-          call(None, "infix_notify", List(qualifier))
+        case Apply(app,args)  =>
+          val args2 = args.map(transform).map{
+            case t @ Ident(TermName(_)) => methodCall(None, "__use", List(List(t)))
+            case t => t
+          }
+          Apply(transform(app), args2)
 
-        case Apply(Select(qualifier, TermName("notifyAll")), List()) =>
-          call(None, "infix_notifyAll", List(qualifier))
-
-        case Select(qualifier, TermName("notifyAll")) =>
-          call(None, "infix_notifyAll", List(qualifier))
-
-        case Apply(Select(qualifier, TermName("wait")), List()) =>
-          call(None, "infix_wait", List(qualifier))
-
-        case Select(qualifier, TermName("wait")) =>
-          call(None, "infix_wait", List(qualifier))
-
-        case Apply(Select(qualifier, TermName("finalize")), List()) =>
-          call(None, "infix_finalize", List(qualifier))
-
-        case Select(qualifier, TermName("finalize")) =>
-          call(None, "infix_finalize", List(qualifier))
-
-        case Apply(Select(qualifier, TermName("getClass")), List()) =>
-          call(None, "infix_getClass", List(qualifier))
-
-        case Select(qualifier, TermName("getClass")) =>
-          call(None, "infix_getClass", List(qualifier))
 
         // HACK: Transform into if-then-else for now. Better way?
         /*case Match(selector, cases) => tree

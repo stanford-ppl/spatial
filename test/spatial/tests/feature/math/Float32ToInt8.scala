@@ -2,14 +2,11 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-
-
 @test class Float32ToInt8 extends SpatialTest { // Args N in multiple of 64
   override def runtimeArgs: Args = NoArgs
 
   type T = Float
   type B = Byte
-
 
   def main(args: Array[String]): Unit = {
     val size = 64

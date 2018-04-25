@@ -30,7 +30,7 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
   // HACK
   def bitsFromString(lhs: String, line: String, tp: ExpType[_,_]): Unit = tp match {
     case FixPtType(s,i,f) => emit(s"val $lhs = FixedPoint($line, FixFormat($s,$i,$f))")
-    case FltPtType(g,e)   => emit(s"val $lhs = FixedPoint($line, FltFormat(${g-1},$e))")
+    case FltPtType(g,e)   => emit(s"val $lhs = FloatPoint($line, FltFormat(${g-1},$e))")
     case _:Bit            => emit(s"val $lhs = Bool($line.toBoolean, true)")
     case tp: Vec[_] =>
       open(s"""val $lhs = $line.split(",").map(_.trim).map{elem => """)

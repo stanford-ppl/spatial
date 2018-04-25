@@ -68,22 +68,31 @@ trait AliasRewrites extends RewriteRules {
   }
 
   @rewrite def mem_start(op: MemStart): Sym[_] = {
+    case MemStart(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).start.asUnchecked[I32]
     case MemStart(Op(alloc: MemAlloc[_,_]), d) => I32(0)
   }
   @rewrite def mem_step(op: MemStep): Sym[_] = {
+    case MemStep(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).step.asUnchecked[I32]
     case MemStep(Op(alloc: MemAlloc[_,_]), d) => I32(1)
   }
   @rewrite def mem_end(op: MemEnd): Sym[_] = {
+    case MemEnd(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).end.asUnchecked[I32]
     case MemEnd(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
   }
   @rewrite def mem_par(op: MemPar): Sym[_] = {
+    case MemPar(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).par
     case MemPar(Op(alloc: MemAlloc[_,_]), d) => I32(1)
   }
   @rewrite def mem_len(op: MemLen): Sym[_] = {
+    case MemLen(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).length
     case MemLen(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
   }
 
   @rewrite def mem_dim(op: MemDim): Sym[_] = {
+    case MemDim(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => mem.head.asInstanceOf[Sym[_]] match {
+      case Op(alloc: MemAlloc[_,_]) => alloc.dims.indexOrElse(d, I32(1))
+      case _ => Invalid
+    }
     case MemDim(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
   }
 

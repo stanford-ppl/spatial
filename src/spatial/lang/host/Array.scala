@@ -4,6 +4,7 @@ package host
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.internal._
 
 /** A one-dimensional array on the host. */
 @ref class Array[A:Type] extends Top[Array[A]] with Ref[scala.Array[Any],Array[A]] {
@@ -100,23 +101,27 @@ import spatial.node._
   }
 
   /** Returns an immutable view of the data in this Array as a Matrix with given `rows` and `cols`. **/
+  @virtualize
   @api def reshape(rows: I32, cols: I32): Tensor2[A] = {
-    assert(rows*cols == this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+rows.toText+"x"+cols.toText+")")
+    assertIf(rows*cols === this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+rows.toText+"x"+cols.toText+")")
     Tensor2(this, rows, cols)
   }
   /** Returns an immutable view of the data in this Array as a Tensor3 with given dimensions. **/
+  @virtualize
   @api def reshape(dim0: I32, dim1: I32, dim2: I32): Tensor3[A] = {
-    assert(dim0*dim1*dim2 == this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+")")
+    assertIf(dim0*dim1*dim2 === this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+")")
     Tensor3(this, dim0, dim1, dim2)
   }
   /** Returns an immutable view of the data in this Array as a Tensor4 with given dimensions. **/
+  @virtualize
   @api def reshape(dim0: I32, dim1: I32, dim2: I32, dim3: I32): Tensor4[A] = {
-    assert(dim0*dim1*dim2*dim3 == this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+"x"+dim3.toText+")")
+    assertIf(dim0*dim1*dim2*dim3 === this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+"x"+dim3.toText+")")
     Tensor4(this, dim0, dim1, dim2, dim3)
   }
   /** Returns an immutable view of the data in this Array as a Tensor5 with given dimensions. **/
+  @virtualize
   @api def reshape(dim0: I32, dim1: I32, dim2: I32, dim3: I32, dim4: I32): Tensor5[A] = {
-    assert(dim0*dim1*dim2*dim3*dim4 == this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+"x"+dim3.toText+"x"+dim4.toText+")")
+    assertIf(dim0*dim1*dim2*dim3*dim4 === this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+"x"+dim3.toText+"x"+dim4.toText+")")
     Tensor5(this, dim0, dim1, dim2, dim3, dim4)
   }
 

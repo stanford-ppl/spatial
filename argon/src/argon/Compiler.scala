@@ -14,7 +14,7 @@ trait Compiler { self =>
 
   val script: String
   val desc: String
-  def name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
+  var name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
 
   var directives: Map[String,String] = Map.empty
   def define[T](name: String, default: T)(implicit ctx: SrcCtx): T = directives.get(name.toLowerCase) match {
@@ -129,6 +129,12 @@ trait Compiler { self =>
   }
 
   final def compileProgram(args: Array[String]): Unit = instrument("compile"){
+    info(s"Compiling ${config.name} to ${config.genDir}")
+    if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
+    if (config.test) info("Running in testbench mode")
+
+    files.deleteExts(IR.config.logDir, "log")
+
     val block = stageProgram(args)
     if (config.enLog) info(s"Symbols: ${IR.maxId}")
     val result = runPasses(block)
@@ -186,16 +192,10 @@ trait Compiler { self =>
     defineOpts(parser)
     parser.parse(other, ())         // Initialize the Config (from commandline)
     settings()                     // Override config with any DSL or app-specific settings
+    name = config.name
     IR.config.logDir = IR.config.logDir + files.sep + name + files.sep
     IR.config.genDir = IR.config.genDir + files.sep + {if (config.genDirOverride) "" else {name + files.sep}}
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
-
-    info(s"Compiling ${config.name} to ${config.genDir}")
-    if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
-    if (config.test) info("Running in testbench mode")
-
-    files.deleteExts(IR.config.logDir, "log")
-
     flows()
     rewrites()
   }

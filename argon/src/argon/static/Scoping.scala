@@ -101,6 +101,14 @@ trait Scoping {
     stageScope_Schedule(inputs, result, scope, impure, options, motion, scheduler)
   }
 
+  @stateful def stageScopeIf[R](
+    en: Boolean,
+    inputs: Seq[Sym[_]],
+    options: BlockOptions = BlockOptions.Normal
+  )(
+    block: => Sym[R]
+  ): Either[Block[R],Sym[R]] = if (en) Left(stageScope(inputs,options)(block)) else Right(block)
+
   @stateful def stageBlock[R](block: => Sym[R], options: BlockOptions = BlockOptions.Normal): Block[R] = {
     stageScope(Nil, options)(block)
   }

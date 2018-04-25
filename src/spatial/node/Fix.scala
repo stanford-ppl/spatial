@@ -61,6 +61,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixAdd[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_+_) {
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def isAssociative: Boolean = true
+
+  @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (Op(FixSub(x,c)), _) if c == b => x  // (x - b) + b = x
+    case (_, Op(FixSub(x,c))) if c == a => x  // a + (x - a) = x
+    case _ => super.rewrite
+  }
 }
 
 /** Fixed point subtraction */
@@ -68,6 +74,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (_, Literal(0)) => a
     case (Literal(0), _) => -b
+
+    case (Op(FixAdd(x,c)),_) if c == b => x  // (x + b) - b = x
+    case (Op(FixAdd(c,x)),_) if c == b => x  // (b + x) - b = x
+
+    case (_,Op(FixAdd(x,c))) if c == a => -x // a - (x + a) = -x
+    case (_,Op(FixAdd(c,x))) if c == a => -x // a - (a + x) = -x
     case _ => super.rewrite
   }
 }

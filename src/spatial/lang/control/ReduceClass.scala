@@ -3,9 +3,17 @@ package control
 
 import argon._
 import forge.tags._
-import spatial.node.OpReduce
+import spatial.node._
 
-protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Option[A], opt: CtrlOpt) {
+sealed abstract class ReduceLike[A] {
+  @api def apply(domain1: Counter[I32])(map: I32 => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A]
+  @api def apply(domain1: Counter[I32], domain2: Counter[I32])(map: (I32,I32) => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A]
+  @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32])(map: (I32, I32, I32) => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A]
+  @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32], domain4: Counter[I32], domains: Counter[I32]*)(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A]
+  @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A]
+}
+
+protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Option[A], opt: CtrlOpt) extends ReduceLike[A] {
 
   /** 1 dimensional reduction */
   @api def apply(domain: Counter[I32])(map: I32 => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
@@ -19,6 +27,10 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
   /** 3 dimensional reduction */
   @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32])(map: (I32,I32,I32) => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     apply(Seq(domain1,domain2,domain3)){l => map(l(0),l(1),l(2)) }{reduce}
+  }
+
+  @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32], domain4: Counter[I32], domains: Counter[I32]*)(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
+    apply(Seq(domain1,domain2,domain3,domain4) ++ domains)(map){reduce}
   }
 
   /** N dimensional reduction */
@@ -37,11 +49,11 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
     acc
   }
 }
-protected class ReduceConstant[A](a: A, isFold: Boolean, opt: CtrlOpt) {
+protected class ReduceConstant[A](a: A, isFold: Boolean, opt: CtrlOpt) extends ReduceLike[A] {
   @rig private def accum(implicit A: Bits[A]) = Some(Reg[A](a))
   private def init = Some(a)
-  private def fold = if (isFold) init else None
-  private def zero = if (!isFold) init else None
+  private def fold: Option[A] = if (isFold) init else None
+  private def zero: Option[A] = if (!isFold) init else None
 
   @api def apply(domain1: Counter[I32])(map: I32 => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     new ReduceAccum(accum, zero, fold, opt).apply(domain1)(map)(reduce)
@@ -52,6 +64,9 @@ protected class ReduceConstant[A](a: A, isFold: Boolean, opt: CtrlOpt) {
   @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32])(map: (I32, I32, I32) => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     new ReduceAccum(accum, zero, fold, opt).apply(domain1, domain2, domain3)(map)(reduce)
   }
+  @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32], domain4: Counter[I32], domains: Counter[I32]*)(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
+    new ReduceAccum(accum, zero, fold, opt).apply(Seq(domain1, domain2, domain3, domain4) ++ domains)(map)(reduce)
+  }
   @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A] = {
     new ReduceAccum(accum, zero, fold, opt).apply(domain)(map)(reduce)
   }
@@ -60,7 +75,10 @@ protected class ReduceConstant[A](a: A, isFold: Boolean, opt: CtrlOpt) {
 protected class ReduceClass(opt: CtrlOpt) extends ReduceAccum(None, None, None, opt) {
   /** Reduction with implicit accumulator */
   def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt)
-  def apply[A](zero: Sym[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt)
+  def apply[A](zero: Sym[A]): ReduceLike[A] = zero match {
+    case Op(RegRead(reg)) => new ReduceAccum(Some(reg),None,None,opt) // TODO[4]: Hack to get explicit accum
+    case _ => new ReduceConstant[A](zero.unbox, isFold = false, opt)
+  }
 
   /** Reduction with explicit accumulator */
   def apply[T](accum: Reg[T]) = new ReduceAccum(Some(accum), None, None, opt)

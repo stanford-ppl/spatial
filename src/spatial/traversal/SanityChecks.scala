@@ -4,6 +4,7 @@ import argon._
 import argon.passes.Traversal
 import emul.Number
 
+import spatial.data._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
@@ -65,8 +66,8 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
       error("(If this is what you wanted, use the forever counter '*' notation instead.)")
       error(lhs)
 
-    case RegNew(init) if !init.isConst =>
-      error(lhs.ctx, "Reset values of registers must be constants.")
+    case RegNew(init) if !isGlobal(init) =>
+      error(lhs.ctx, s"Reset value of register ${lhs.fullname} was not a constant.")
       error(lhs.ctx)
 
     case op @ StreamInNew(bus)  => busWidthCheck(op.A,bus,"StreamIn")

@@ -21,10 +21,10 @@ import spatial.dsl._
     val dram_out   = DRAM[B](N)
 
     Accel {
-      val sram   = SRAM[T](size)
+      val sram     = SRAM[T](size)
       val sram_out = SRAM[B](size)
-      val maxo   = Reg[T]
-      val delta = Reg[T]
+      val maxo     = Reg[T]
+      val delta    = Reg[T]
 
       Reduce(maxo)(N by size){ii =>
         sram load dram(ii::ii+size)

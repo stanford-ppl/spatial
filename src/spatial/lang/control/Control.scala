@@ -13,7 +13,7 @@ class Directives(options: CtrlOpt) {
   lazy val MemReduce = new MemReduceClass(options)
   lazy val MemFold   = new MemFoldClass(options)
 
-  @rig protected def unit_pipe(func: => Any): Void = {
+  @rig protected def unit_pipe(func: => Any, ens: Set[Bit] = Set.empty): Void = {
     val block = stageBlock{ func; void }
     val pipe = stage(UnitPipe(Set.empty, block))
     options.set(pipe)
@@ -24,6 +24,7 @@ class Directives(options: CtrlOpt) {
 class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(Sched.Pipe),ii)) {
   /** "Pipelined" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)
+  @rig def apply(ens: Set[Bit], func: => Any): Void = unit_pipe(func, ens)
 
   def II(ii: Int) = new Pipe(name, Some(ii))
 }

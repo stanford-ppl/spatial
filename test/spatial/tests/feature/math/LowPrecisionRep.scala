@@ -9,7 +9,6 @@ import spatial.lib._
   type T = Float
   type B = Byte
 
-
   def main(args: Array[String]): Unit = {
     val data = loadCSV1D[Float]("/import/ch-pa-fpga1/pranjalib/python/float100.csv")
     val N = data.length
@@ -36,6 +35,7 @@ import spatial.lib._
 
     val matches = outputArray === goldArray
     println("result:   " + matches)
+    assert(matches)
 
     println("Scaling Factor: " + scalingFactor)
     (0 until N).foreach{ i =>

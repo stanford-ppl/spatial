@@ -41,8 +41,16 @@ trait UtilsHierarchy {
   def isParallel(op: Op[_]): Boolean = op.isInstanceOf[ParallelPipe]
 
 
-  def isInnerControl(ctrl: Ctrl): Boolean = ctrl.s.exists(isInnerControl)
+  def isInnerControl(ctrl: Ctrl): Boolean = ctrl.s.exists(isInnerControl) || !isOuterBlock(ctrl)
   def isInnerControl(sym: Sym[_]): Boolean = isControl(sym) && !isOuter(sym)
   def isOuterControl(sym: Sym[_]): Boolean = isControl(sym) && isOuter(sym)
-  def isOuterControl(ctrl: Ctrl): Boolean = !ctrl.s.exists(isInnerControl)
+  def isOuterControl(ctrl: Ctrl): Boolean  = isOuterBlock(ctrl)
+
+  def isOuterBlock(blk: Ctrl): Boolean = blk match {
+    case Controller(sym,id) => sym match {
+      case Op(ctrl: Control[_]) => isOuterControl(sym) && (ctrl.mayBeOuterBlock(blk.id) || blk.id == -1)
+      case _ => isOuterControl(sym)
+    }
+    case Host => true
+  }
 }

@@ -31,6 +31,7 @@ abstract class PU extends Control[Void] {
   override def iters   = iterss.flatten
   override def cchains = ccs.zip(iterss)
   override def bodies  = Seq(iters -> this.blocks)
+  def mayBeOuterBlock(i: Int): Boolean = true
 
   override def binds = super.binds ++ ins.values ++ outs.values ++ iters
 }

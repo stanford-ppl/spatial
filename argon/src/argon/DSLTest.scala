@@ -79,6 +79,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
             init(args)
             IR.config.genDir = s"${IR.config.cwd}/gen/$backend/$name/"
             IR.config.logDir = s"${IR.config.cwd}/logs/$backend/$name/"
+            IR.config.repDir = s"${IR.config.cwd}/reports/$backend/$name/"
             compileProgram(args)
           }}
           Await.result(f, duration.Duration(backend.makeTimeout, "sec"))

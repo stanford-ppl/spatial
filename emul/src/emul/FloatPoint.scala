@@ -148,6 +148,8 @@ class FloatPoint(val value: FloatValue, val valid: Boolean, val fmt: FltFormat) 
 
   def unary_-(): FloatPoint = FloatPoint.clamped(-this.value, this.valid, fmt)
 
+  def until(end: FloatPoint): FloatPointRange = FloatPointRange(this,end,FloatPoint(1,fmt),isInclusive = false)
+
   // All operations assume that both the left and right hand side have the same fixed point format
   def +(that: FloatPoint): FloatPoint = FloatPoint.clamped(this.value + that.value, this.valid && that.valid, fmt)
   def -(that: FloatPoint): FloatPoint = FloatPoint.clamped(this.value - that.value, this.valid && that.valid, fmt)
@@ -478,5 +480,22 @@ object FloatPoint {
     * @param fmt The format for the max and the fixed point number being generated
     */
   def random(max: FloatPoint, fmt: FltFormat): FloatPoint = FloatPoint.random(fmt) * max
+
+
+  implicit object FloatPointIsIntegral extends Integral[FloatPoint] {
+    def quot(x: FloatPoint, y: FloatPoint): FloatPoint = x / y
+    def rem(x: FloatPoint, y: FloatPoint): FloatPoint = x % y
+    def compare(x: FloatPoint, y: FloatPoint): Int = if ((x < y).value) -1 else if ((x > y).value) 1 else 0
+    def plus(x : FloatPoint, y : FloatPoint) : FloatPoint = x + y
+    def minus(x : FloatPoint, y : FloatPoint) : FloatPoint = x - y
+    def times(x : FloatPoint, y : FloatPoint) : FloatPoint = x * y
+    def negate(x : FloatPoint) : FloatPoint = -x
+    def fromInt(x : scala.Int) : FloatPoint = FloatPoint(x, DoubleFmt)
+    def toInt(x : FloatPoint) : scala.Int = x.toInt
+    def toLong(x : FloatPoint) : scala.Long = x.toLong
+    def toFloat(x : FloatPoint) : scala.Float = x.toFloat
+    def toDouble(x : FloatPoint) : scala.Double = x.toDouble
+    def parseString(str: String): Option[FloatPoint] = None // Undefined for general type
+  }
 
 }

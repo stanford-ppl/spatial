@@ -18,6 +18,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     }
     def isRemoteMem: Boolean = x match {
       case _: RemoteMem[_,_] => true
+      case _: Reg[_] => x.isArgOut || x.isArgIn || x.isHostIO
       case _ => false
     }
     def isMem: Boolean = isLocalMem || isRemoteMem

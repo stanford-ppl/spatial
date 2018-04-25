@@ -1,0 +1,30 @@
+#!/bin/bash
+
+type=$1
+tests=$2
+
+if [[ $tests == "" ]]; then
+  tests="spatial.tests.*"
+elif [[ tests != spatial.tests.* ]]; then
+  tests="spatial.tests.$tests"
+fi
+
+fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"
+echo "Running tests $tests"
+echo "Logging tests to $fileout"
+
+if [[ $type == "mini" ]]; then
+  sbt -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "nightly" ]]; then
+  sbt -Dtest.Scala=true -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "weekly" ]]; then
+  sbt -Dtest.Scala=true -Dtest.VCS=true -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+else
+  echo "Test type '$type' not recognized" 
+  echo "Supported types: [mini | nightly | weekly]"
+  exit 1
+fi
+
+sbtExitCode=${PIPESTATUS[0]}
+echo "sbt exit status $sbtExitCode"
+exit $sbtExitCode

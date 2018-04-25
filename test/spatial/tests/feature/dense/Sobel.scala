@@ -2,7 +2,7 @@
 
 // import spatial.dsl._
 
-// @test class Sobel extends SpatialTest { // ReviveMe
+// @test class Sobel extends SpatialTest { // ReviveMe (LineBuffer)
 //   override def runtimeArgs: Args = "200 160"
 
 //   val Kh = 3

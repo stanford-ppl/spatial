@@ -4,7 +4,7 @@ import spatial.dsl._
 
 import scala.collection.mutable.ArrayBuffer
 
-@test class BitTest extends SpatialTest {
+@testv class BitTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   override def backends = DISABLE
 

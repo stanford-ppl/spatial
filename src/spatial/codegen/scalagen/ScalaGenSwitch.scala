@@ -27,4 +27,5 @@ trait ScalaGenSwitch extends ScalaGenBits with ScalaGenMemories with ScalaGenSRA
 
     case _ => super.gen(lhs, rhs)
   }
+
 }

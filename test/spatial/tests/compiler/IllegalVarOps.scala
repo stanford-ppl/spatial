@@ -1,40 +1,40 @@
-// package spatial.tests.compiler
+package spatial.tests.compiler
 
-// import spatial.dsl._
+import spatial.dsl._
 
-@test class IllegalVarAssignTest extends SpatialTest { // ReviveMe (write to var)
+@test class IllegalVarAssignTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   override def backends = RequireErrors(1)
 
   def main(args: Array[String]): Unit = {
-//     var x = 0
-//     Accel {
-//       x = 32
-//     }
-//     println(x)
+    var testVar: Int = 0
+    Accel {
+      testVar = 32.to[Int]
+    }
+    println(testVar)
   }
 }
 
-@test class IllegalVarReadTest extends SpatialTest { // ReviveMe (write to var)
+@test class IllegalVarReadTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   override def backends = RequireErrors(1)
 
   def main(args: Array[String]): Unit = {
-//     var x = 32
-//     Accel {
-//       val m = x + 32
-//       println(m)
-//     }
+    var xx: Int = 32
+    Accel {
+      val m = xx + 32
+      println(m)
+    }
   }
 }
 
-@test class IllegalVarNewTest extends SpatialTest { // ReviveMe (write to var)
+@test class IllegalVarNewTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   override def backends = RequireErrors(1)
   def main(args: Array[String]): Unit = {
-//     Accel {
-//       var x = 32
-//       println(x + 1)
-//     }
+    Accel {
+      var xx: Int = 32
+      println(xx + 1)
+    }
   }
 }

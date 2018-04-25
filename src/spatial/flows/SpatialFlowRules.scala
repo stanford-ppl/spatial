@@ -94,5 +94,26 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     if (isStreamStageHolder(s))  streamHolders += s
   }
 
+
+  /**
+    * In Spatial, a "global" is any value which is solely a function of input arguments
+    * and constants. These are computed prior to starting the main computation, and
+    * therefore appear constant to the majority of the program.
+    *
+    * Note that this is only true for stateless nodes. These rules should not be generated
+    * for stateful hardware (e.g. accumulators, pseudo-random generators)
+    **/
+  @flow def globals(lhs: Sym[_], rhs: Op[_]): Unit = lhs match {
+    case Impure(_,_) =>
+    case Op(RegRead(reg)) if reg.isArgIn => isGlobal(lhs) = true
+
+    case Primitive(_) =>
+      if (rhs.inputs.nonEmpty && rhs.inputs.forall(isGlobal(_))) isGlobal(lhs) = true
+
+
+
+    case _ => // Not global
+  }
+
 }
 

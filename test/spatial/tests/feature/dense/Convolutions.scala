@@ -9,7 +9,7 @@ import spatial.dsl._
   val coltile = 32 // (16 -> 16 -> 1280)
 
 
-  // def ConvolutionSlide[T:Num](output: DRAM2[T], // ReviveMe
+  // def ConvolutionSlide[T:Num](output: DRAM2[T], // ReviveMe (LineBuffer)
   //   input: DRAM2[T],
   //   filter: LUT2[T],
   //   colstride: scala.Int, rowstride: scala.Int): Unit = {

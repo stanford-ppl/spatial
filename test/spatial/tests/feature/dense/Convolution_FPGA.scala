@@ -2,7 +2,7 @@
 
 // import spatial.dsl._
 
-// @test class Convolution_FPGA extends SpatialTest { // ReviveMe
+// @test class Convolution_FPGA extends SpatialTest { // ReviveMe (LineBuffer)
 //   override def runtimeArgs: Args = NoArgs
 
 //   val Kh = 3

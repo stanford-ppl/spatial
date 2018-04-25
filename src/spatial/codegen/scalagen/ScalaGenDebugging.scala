@@ -8,7 +8,7 @@ trait ScalaGenDebugging extends ScalaCodegen {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case PrintIf(ens,msg)             => emit(src"val $lhs = if (${and(ens)}) System.out.print($msg)")
-    case AssertIf(ens,cond,Some(msg)) => emit(src"val $lhs = if (${and(ens)}) assert($cond, $msg)")
+    case AssertIf(ens,cond,Some(msg)) => emit(src"val $lhs = if (${and(ens)}) { if (!$cond) { System.out.println($msg) }; assert($cond, $msg) }")
     case AssertIf(ens,cond,None)      => emit(src"val $lhs = if (${and(ens)}) assert($cond)")
 
     case BreakpointIf(ens) =>

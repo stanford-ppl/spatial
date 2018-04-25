@@ -208,12 +208,8 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
   // --- Implicit Conversions
 
-
-
   class CastType[A](x: A) {
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
-
-
   }
 
   class RegNumerics[A:Num](reg: Reg[A])(implicit ctx: SrcCtx, state: State) {
@@ -223,26 +219,19 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   }
 
 
+  class LiteralWrapper[A](a: A)(implicit ctx: SrcCtx, state: State) {
+    def to[B](implicit cast: Cast[A,B]): B = cast(a)
+    def toUnchecked[B](implicit cast: Cast[A,B]): B = cast.unchecked(a)
+  }
 
   // Note: Naming is important here to override the names in Predef.scala
   // Note: Need the ctx and state at the implicit class to avoid issues with currying
-  class BooleanWrapper(b: Boolean)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Boolean,B]): B = cast(b)
-  }
+  class BooleanWrapper(a: Boolean)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Boolean](a)
+  class ByteWrapper(a: Byte)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Byte](a)
+  class CharWrapper(a: Char)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Char](a)
+  class ShortWrapper(a: Short)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Short](a)
 
-  class ByteWrapper(b: Byte)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Byte,B]): B = cast(b)
-  }
-
-  class CharWrapper(b: Char)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Char,B]): B = cast(b)
-  }
-
-  class ShortWrapper(b: Short)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Short,B]): B = cast(b)
-  }
-
-  class IntWrapper(b: Int)(implicit ctx: SrcCtx, state: State) {
+  class IntWrapper(b: Int)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Int](b) {
     def until(end: I32): Series[I32] = Series[I32](I32(b), end, I32(1), I32(1))
     def by(step: I32): Series[I32] = Series[I32](1, b, step, 1)
     def par(p: I32): Series[I32] = Series[I32](1, b, 1, p)
@@ -270,22 +259,14 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
     def apply(range: ((Int, Int), Int))(implicit ov2: Overload1): I32 = createParam(b, range._1._1, range._1._2, range._2)
 
     def to(end: Int): Range = Range.inclusive(b, end)
-    def to[B](implicit cast: Cast[Int,B]): B = cast(b)
 
     def x: I32 = this.to[I32]
   }
 
-  class LongWrapper(b: Long)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Long,B]): B = cast(b)
-  }
+  class LongWrapper(a: Long)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Long](a)
+  class FloatWrapper(a: Float)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Float](a)
+  class DoubleWrapper(a: Double)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Double](a)
 
-  class FloatWrapper(b: Float)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Float,B]): B = cast(b)
-  }
-
-  class DoubleWrapper(b: Double)(implicit ctx: SrcCtx, state: State) {
-    def to[B](implicit cast: Cast[Double,B]): B = cast(b)
-  }
 
   // --- A (Any)
   implicit def castType[A](a: A): CastType[A] = new CastType[A](a)

@@ -6,7 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 
 @testv class BitTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-  override def backends = DISABLE
+  override def backends = DISABLED
 
   // Returns a random number in [min,max)
   def rand(max: gen.Int, min: gen.Int): gen.Int = scala.util.Random.nextInt(max-min)+min

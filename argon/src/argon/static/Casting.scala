@@ -18,6 +18,14 @@ trait Casting {
       case Left(cast)  => cast.get(b)
       case Right(cast) => cast.getLeft(b)
     }
+    @rig def unchecked(a: A): B = c match {
+      case Left(cast)  => cast.uncheckedLeft(a)
+      case Right(cast) => cast.unchecked(a)
+    }
+    @rig def uncheckedLeft(b: B): Option[A] = c match {
+      case Left(cast)  => cast.get(b)
+      case Right(cast) => cast.uncheckedGetLeft(b)
+    }
   }
 
   @rig def cast[A,B](a: A)(implicit cast: Cast[A,B]): B = cast.apply(a)

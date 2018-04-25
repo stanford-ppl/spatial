@@ -848,7 +848,7 @@ import spatial.targets._
 
 @test class JPEG_Decode extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-  override def backends = DISABLE
+  override def backends = DISABLED
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
   type UInt16 = FixPt[FALSE, _16, _0]
@@ -1272,7 +1272,7 @@ import spatial.targets._
 
 @test class MPEG2 extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-  override def backends = DISABLE
+  override def backends = DISABLED
 
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]

@@ -573,10 +573,12 @@ object ops {
 
 object Utils {
 
+  type Banks = List[Int]
+  def Banks(xs: Int*) = List(xs:_*)
   type XMap = HashMap[Int, Int]
   def XMap(xs:(Int, Int)*) = HashMap[Int,Int](xs:_*)
-  type DMap = HashMap[Int, List[List[Int]]]
-  def DMap(xs:(Int,List[List[Int]])*) = HashMap[Int, List[List[Int]]](xs:_*)
+  type DMap = HashMap[Int, List[Banks]]
+  def DMap(xs:(Int,List[Banks])*) = HashMap[Int, List[Banks]](xs:_*)
   type NBufXMap = HashMap[Int, XMap]
   def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
   type NBufDMap = HashMap[Int, DMap]

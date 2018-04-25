@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.util._
+import spatial.internal._
 
 case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTraversal {
   private var dimMapping: Map[I32,I32] = Map.empty
@@ -58,7 +59,6 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       val dims2 = dims.map{d => dimMapping(d) }
       addedArgIns ++= dims.zip(dims2)
       isolateSubstWith(dims.zip(dims2):_*){ super.transform(lhs,rhs) }
-
 
     case GetReg(F(reg)) =>
       def read(tp: String): Sym[A] = {
@@ -173,6 +173,12 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         else if (reg.isArgOut) write("ArgOut registers")
         else                   write("registers")
       }
+
+    case AssertIf(F(ens),F(cond),None) =>
+      assertIf(ens, cond, Some(s"$ctx: Assertion failure")).asInstanceOf[Sym[A]]
+
+    case AssertIf(F(ens),F(cond),Some(msg)) =>
+      assertIf(ens, cond, Some(Text(s"$ctx:") + msg)).asInstanceOf[Sym[A]]
 
     case _ => super.transform(lhs,rhs)
   }

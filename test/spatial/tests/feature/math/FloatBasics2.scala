@@ -87,7 +87,7 @@ import spatial.dsl._
       else 0.to[T]
       val b = out_ram(i,j)
       println(i + " Expected: " + a + ", Actual: " + b)
-      assert(a > (b - margin) && a < (b + margin))
+      assert( (a.isNaN && b.isNaN) || (a >= (b - margin) && a <= (b + margin)) )
     }
   }
 }

@@ -11,19 +11,19 @@ import spatial.dsl._
 
     val length = 8
 
-    val data1        = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
-    val data2        = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
-    val data3        = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
+    val data1 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
+    val data2 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
+    val data3 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
 
-    val dram1        = DRAM[T](length)
-    val dram2        = DRAM[T](length)
-    val dram3        = DRAM[T](length)
+    val dram1 = DRAM[T](length)
+    val dram2 = DRAM[T](length)
+    val dram3 = DRAM[T](length)
 
     setMem(dram1, data1)
     setMem(dram2, data2)
     setMem(dram3, data3)
 
-    val ff_out       = DRAM[T](16,length)
+    val ff_out = DRAM[T](16,length)
 
     Accel{
       val sram1    = SRAM[T](length)
@@ -48,12 +48,12 @@ import spatial.dsl._
         Pipe { ff_out_sram(7, i) = mux((sram1(i) == sram2(i)),1.to[T],0.to[T]) }
 
         Pipe { ff_out_sram(8, i) = abs(sram1(i)) }
-        // Pipe { ff_out_sram(9, i) = exp(sram1(i)) }
-        // Pipe { ff_out_sram(10, i) = ln(sram1(i)) }
+        Pipe { ff_out_sram(9, i) = 0 /*exp(sram1(i))*/ }
+        Pipe { ff_out_sram(10, i) = 0 /*ln(sram1(i))*/ }
         Pipe { ff_out_sram(11, i) = (1.to[Float]/sram1(i).to[Float]).to[T] }
-        // Pipe { ff_out_sram(12, i) = 1.to[T]/sqrt(sram1(i)) }
-        // Pipe { ff_out_sram(13, i) = sigmoid(sram1(i)) }
-        // Pipe { ff_out_sram(14, i) = tanh(sram1(i)) }
+        Pipe { ff_out_sram(12, i) = 0 /*1.to[T]/sqrt(sram1(i))*/ }
+        Pipe { ff_out_sram(13, i) = 0 /*sigmoid(sram1(i))*/ }
+        Pipe { ff_out_sram(14, i) = 0 /*tanh(sram1(i))*/ }
         Pipe { ff_out_sram(15, i) = sram1(i) * sram2(i) + sram3(i) }
       }
 
@@ -66,7 +66,7 @@ import spatial.dsl._
     println("Result ADD, MUL, DIV, SRT, SUB, FLT, FGT, FEQ, ABS, EXP, LOG, REC, RST, SIG, TAN, FMA ")
 
     val out_ram = getMatrix(ff_out)
-    val margin = 0.000001.to[T]
+    val margin = 0.0001.to[T]
 
     (0::16,0::length).foreach{(i,j) =>
       val a = if (i == 0 ) {data1(j) + data2(j) }
@@ -88,7 +88,7 @@ import spatial.dsl._
       else 0.to[T]
       val b = out_ram(i,j)
       println(i + " Expected: " + a + ", Actual: " + b)
-      assert(a > (b - margin) && a < (b + margin))
+      assert(abs(a - b) <= margin)
     }
   }
 }

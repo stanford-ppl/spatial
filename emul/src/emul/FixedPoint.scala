@@ -160,7 +160,12 @@ object FixedPoint {
   def apply(x: String, fmt: FixFormat): FixedPoint = FixedPoint.clamped(BigDecimal(x) * Math.pow(2,fmt.fbits), valid=true, fmt)
 
   def invalid(fmt: FixFormat) = new FixedPoint(-1, valid=false, fmt)
-  def clamped(value: BigDecimal, valid: Boolean, fmt: FixFormat): FixedPoint = clamped(value.toBigInt, valid, fmt)
+  def clamped(value: => BigDecimal, valid: Boolean, fmt: FixFormat): FixedPoint = {
+    try {
+      clamped(value.toBigInt, valid, fmt)
+    }
+    catch {case _:NumberFormatException => FixedPoint.invalid(fmt) }
+  }
 
   def fromBits(bits: BigInt, valid: Boolean, fmt: FixFormat): FixedPoint = clamped(bits, valid, fmt)
 

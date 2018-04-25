@@ -15,7 +15,7 @@ import spatial.dsl._
     val N = 128
     val a = args(0).to[T]
     val b = args(1).to[T]
-    val TWOPI = 6.28318530717959
+    val TWOPI = 6.28318530717959.toUnchecked[T]
     val x_data = Array.tabulate(N){ i => a * i.to[T]}
     val x = DRAM[T](N)
     val y = DRAM[T](N)
@@ -54,10 +54,10 @@ import spatial.dsl._
       val sin = SRAM[T](1024)
       val cos = SRAM[T](1024)
       Foreach(1024 by 1){ i =>
-        val phi = TWOPI.to[T]*(i.as[T] / 1024.to[T]) - TWOPI.to[T]/2
-        val beyond_left = phi < -TWOPI.to[T]/4
-        val beyond_right = phi > TWOPI.to[T]/4
-        val phi_shift = mux(beyond_left, phi + TWOPI.to[T]/2, mux(beyond_right, phi - TWOPI.to[T]/2, phi))
+        val phi = TWOPI*(i.as[T] / 1024) - TWOPI/2
+        val beyond_left = phi < -TWOPI/4
+        val beyond_right = phi > TWOPI/4
+        val phi_shift = mux(beyond_left, phi + TWOPI/2, mux(beyond_right, phi - TWOPI/2, phi))
         cos(i) = -cos_taylor(phi_shift) * mux(beyond_left || beyond_right, -1.to[T], 1)
         sin(i) = -sin_taylor(phi_shift) * mux(beyond_left || beyond_right, -1.to[T], 1)
       }

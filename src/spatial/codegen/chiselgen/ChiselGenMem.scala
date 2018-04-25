@@ -53,7 +53,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val invisibleEnable = src"""${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/memInfo(mem).nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = memInfo(mem).nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-    val isBroadcast = !portsOf(lhs).values.head.bufferPort.isDefined
+    val isBroadcast = !portsOf(lhs).values.head.bufferPort.isDefined & memInfo(mem).depth > 1
     val bufferPort = portsOf(lhs).values.head.bufferPort.getOrElse(0)
     val muxPort = portsOf(lhs).values.head.muxPort
 
@@ -137,8 +137,10 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // Registers
     case RegNew(init) => emitMem(lhs, "FF", None)
-    case RegWrite(reg, data, ens) => emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case RegRead(reg) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set())) 
+    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn) => 
+      emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
+    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn) => 
+      emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set())) 
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)

@@ -179,6 +179,11 @@ trait CppGenArray extends CppGenCommon {
       }
       close("}")
 
+    case SeriesForeach(start,end,step,func) =>
+      open(src"for (int ${func.input} = $start; ${func.input} < ${end}; ${func.input} = ${func.input} + $step) {")
+        visitBlock(func)
+      close("}")
+
     case ArrayForeach(array,apply,func) =>
       open(src"for (int ${func.input} = 0; ${func.input} < ${getSize(array)}; ${func.input}++) {")
       visitBlock(apply)

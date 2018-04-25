@@ -21,7 +21,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
   def backends: Seq[Backend]
   def enable(str: String): Boolean = sys.props.get(str).exists(v => v.trim.toLowerCase == "true")
-  lazy val DISABLE: Seq[Backend] = Seq(IGNORE_TEST)
+  lazy val DISABLED: Seq[Backend] = Seq(IGNORE_TEST)
 
   /** A backend which can compile and run a given application.
     *
@@ -96,6 +96,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
       val cmdLog = new PrintStream(IR.config.logDir + s"/$pass.log")
       var cause: Result = Unknown
+      Console.out.println(s"Backend $pass in ${IR.config.logDir}/$pass.log")
       Console.out.println(args.mkString(" "))
       val cmd = new Subprocess(args:_*)({case (line,_) =>
         val err = parse(line)
@@ -108,7 +109,11 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       try {
         val f = Future{ scala.concurrent.blocking{ cmd.block(IR.config.genDir) } }
         val code = Await.result(f, duration.Duration(timeout, "sec"))
-        if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code: $code"))
+        val lines = cmd.stdout()
+        val errs  = cmd.errors()
+        lines.foreach{l => parse(l); cmdLog.println(l) }
+        errs.foreach{e => parse(e); cmdLog.println(e) }
+        if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code during backend $pass: $code.\n${errs.take(4).mkString("\n")}"))
       }
       catch {
         case e: Throwable =>

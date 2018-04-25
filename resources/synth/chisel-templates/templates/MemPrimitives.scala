@@ -262,6 +262,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
   }
 
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+    assert(hasXBarW)
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarW(base) := wBundle
   }
@@ -269,6 +270,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+    assert(hasXBarR)
     val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
@@ -276,6 +278,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
   }
 
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
+    assert(hasDirectW)
     val base = directWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directW(base) := wBundle
   }
@@ -283,6 +286,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+    assert(hasDirectR)
     val base = directRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directR(base) := rBundle    
     io.flow(base) := flow

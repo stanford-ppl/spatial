@@ -1,13 +1,10 @@
 package spatial.tests.feature.math
 
-
 import spatial.dsl._
-
 
 @test class HalfBasics extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   type T = Half
-
 
   def main(args: Array[String]): Unit = {
 
@@ -70,7 +67,7 @@ import spatial.dsl._
     val out_ram = getMatrix(ff_out)
     val margin = 0.000001.to[T]
 
-    val errs = (0::16,0::length){(i,j) =>
+    (0::16,0::length).foreach{(i,j) =>
       val a = if (i == 0 ) {data1(j) + data2(j) }
       else if (i == 1 ) { data1(j) * data2(j) }
       else if (i == 2 ) { data1(j) / data2(j) }
@@ -89,8 +86,8 @@ import spatial.dsl._
       else if (i == 15) { data1(j) * data2(j) + data3(j) }
       else 0.to[T]
       val b = out_ram(i,j)
-      println(i + " Expected: " + a + ", Actual: " + b)
-      a > (b - margin) && a < (b + margin)
+      println(r"$i Expected: $a, Actual: $b (Margin: ${a - margin}:${a + margin})")
+      assert((a.isNaN && b.isNaN) || (b >= (a - margin) && b <= (a + margin)))
     }
   }
 }

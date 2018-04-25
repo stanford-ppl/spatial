@@ -117,7 +117,7 @@ import spatial.node.DelayLine
 
 @test class RetimeOffsetTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-  override def backends = DISABLE // TODO: Rewrite
+  override def backends = DISABLED // TODO: Rewrite
 
   def main(args: Array[String]): Void = {
     Accel {

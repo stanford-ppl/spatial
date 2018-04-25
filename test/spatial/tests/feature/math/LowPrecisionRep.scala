@@ -10,7 +10,7 @@ import spatial.lib._
   type B = Byte
 
   def main(args: Array[String]): Unit = {
-    val data = loadCSV1D[Float]("/import/ch-pa-fpga1/pranjalib/python/float100.csv")
+    val data = Array.tabulate(1000){i => random[Float]( 256) - 128 }
     val N = data.length
 
     val dram = DRAM[T](N)

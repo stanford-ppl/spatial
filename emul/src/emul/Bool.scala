@@ -9,6 +9,7 @@ class Bool(val value: Boolean, val valid: Boolean) extends Equals {
   def ===(that: Bool) = Bool(this.value == that.value, this.valid && that.valid)
 
   def toBoolean: Boolean = value
+  def toValidBoolean: Boolean = value && valid
 
   override def toString: String = if (valid) { value.toString } else "X"
   def toStr: String = if (valid && value) "1" else if (valid) "0" else "X"

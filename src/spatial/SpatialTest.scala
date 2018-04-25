@@ -33,7 +33,9 @@ trait SpatialTest extends Spatial with DSLTest {
   ) {
     def shouldRun: Boolean = enable("test.Scala")
     override def parseRunError(line: String): Result = {
-      if (line.trim.startsWith("at")) Error(prev)   // Scala exception
+      if (line.trim.startsWith("at")) Error(prev) // Scala exception
+      else if (line.trim.contains("Assertion failure")) Error(line) // Assertion failure
+      else if (line.trim.contains("error")) Error(line) // Runtime/compiler error
       else super.parseRunError(line)
     }
   }

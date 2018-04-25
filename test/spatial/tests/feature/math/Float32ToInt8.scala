@@ -11,10 +11,8 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
     val size = 64
 
-    val data = loadCSV1D[Float]("/import/ch-pa-fpga1/pranjalib/python/float100.csv")
-    val N = data.length
-
-    //val data  = Array.tabulate(N){ i => if (i % 3 == 1) random[T](1024) else -1*random[T](1024) }
+    val N = 1024
+    val data  = Array.tabulate(N){ i => if (i % 3 == 1) random[T](1024) else -random[T](1024) }
     val dram = DRAM[T](N)
     setMem(dram, data)
 

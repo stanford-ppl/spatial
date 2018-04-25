@@ -70,12 +70,19 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   /** Create a checked value from the given constant
     * Value may be either a constant or a parameter
     */
-  @rig final def from(c: Any, checked: Boolean = false, isParam: Boolean = false): A = value(c) match {
+  @rig final def from(c: Any, warnOnLoss: Boolean = false, errorOnLoss: Boolean = false, isParam: Boolean = false): A = value(c) match {
     case Some((v,exact)) =>
-      if (!exact && checked) {
-        error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent value ${escapeConst(c)}.")
-        error(s"""Use the explicit annotation "${escapeConst(c)}.to[${this.tp}]" to ignore this error.""")
+      if (!exact && errorOnLoss) {
+        error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
+        error(s"(Closest representable value: ${escapeConst(v)}).")
+        error(s"""Use .to[${this.tp}] to downgrade to a warning, or .toUnchecked to ignore.""")
         error(ctx)
+      }
+      else if (!exact && warnOnLoss) {
+        warn(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
+        warn(s"(Closest representable value: ${escapeConst(v)})")
+        warn(s"""Use .toUnchecked to ignore this warning.""")
+        warn(ctx)
       }
 
       if (isParam) _param(this, v)

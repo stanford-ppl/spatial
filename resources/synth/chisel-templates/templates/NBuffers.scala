@@ -268,6 +268,7 @@ class NBufMem(val mem: MemPrimitive,
 
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int) {connectXBarWPort(wBundle, bufferPort, muxPort, 0)}
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+    assert(hasXBarW)
     val bufferBase = xBarWMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.sum
     val muxBase = xBarWMux(bufferPort).toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarW(bufferBase + muxBase) := wBundle
@@ -276,6 +277,7 @@ class NBufMem(val mem: MemPrimitive,
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, 0, true.B)}
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+    assert(hasXBarR)
     val bufferBase = xBarRMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.sum
     val muxBase = xBarRMux(bufferPort).toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.sum + vecId
     io.xBarR(bufferBase + muxBase) := rBundle    
@@ -290,6 +292,7 @@ class NBufMem(val mem: MemPrimitive,
   }
 
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
+    assert(hasDirectW)
     val bufferBase = directWMux.filter(_._1 < bufferPort).values.map(_.values).flatten.toList.length 
     val muxBase = directWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId
     io.directW(bufferBase + muxBase) := wBundle
@@ -298,6 +301,7 @@ class NBufMem(val mem: MemPrimitive,
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+    assert(hasDirectR)
     val bufferBase = directRMux.filter(_._1 < bufferPort).values.map(_.values).flatten.toList.length
     val xBarRBase = xBarRMux.values.map(_.values).toList.flatten.sum
     val muxBase = directRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.flatten.toList.length + vecId

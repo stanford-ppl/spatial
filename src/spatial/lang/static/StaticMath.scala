@@ -80,8 +80,8 @@ trait StaticMath {
 
   /** Taylor expansion for natural exponential**/
   @api def exp_taylor[T:Num](x: T): T = {
-    mux(x < -3.5.to[T], 0.to[T],
-      mux(x < -1.2.to[T], x*0.1.to[T] + 0.35.to[T],
+    mux(x < -3.5.toUnchecked[T], 0.toUnchecked[T],
+      mux(x < -1.2.toUnchecked[T], x*0.1.toUnchecked[T] + 0.35.toUnchecked[T],
         1.to[T] + x + x*x/2.to[T] + x*x*x/6.to[T] + x*x*x*x/24.to[T] + x*x*x*x*x/120.to[T]))
   }
 
@@ -105,11 +105,11 @@ trait StaticMath {
   @api def sqrt_approx[T:Num](x: T): T = {
     // I don't care how inefficient this is, it is just a placeholder for backprop until we implement floats
     mux(x < 2.to[T], 1.to[T] + (x-1.to[T])/2.to[T] -(x-1.to[T])*(x-1.to[T])/8.to[T]+(x-1.to[T])*(x-1.to[T])*(x-1.to[T])/16.to[T], // 3rd order taylor for values up to 2
-      mux(x < 10.to[T], x*0.22.to[T] + 1.to[T], // Linearize
-        mux( x < 100.to[T], x*0.08.to[T] + 2.5.to[T], // Linearize
-          mux( x < 1000.to[T], x*0.028.to[T] + 8.to[T], // Linearize
-            mux( x < 10000.to[T], x*0.008.to[T] + 20.to[T], // Linearize
-              mux( x < 100000.to[T], x*0.003.to[T] + 60.to[T], x*0.0002.to[T] + 300.to[T]))))))
+      mux(x < 10.to[T], x*0.22.toUnchecked[T] + 1.to[T], // Linearize
+        mux( x < 100.to[T], x*0.08.toUnchecked[T] + 2.5.to[T], // Linearize
+          mux( x < 1000.to[T], x*0.028.toUnchecked[T] + 8.to[T], // Linearize
+            mux( x < 10000.to[T], x*0.008.toUnchecked[T] + 20.to[T], // Linearize
+              mux( x < 100000.to[T], x*0.003.toUnchecked[T] + 60.toUnchecked[T], x*0.0002.toUnchecked[T] + 300.to[T]))))))
   }
 
 }

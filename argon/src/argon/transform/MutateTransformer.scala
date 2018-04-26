@@ -52,12 +52,4 @@ abstract class MutateTransformer extends ForwardTransformer {
 
   def updateNode[A](node: Op[A]): Unit = node.update(f)
 
-  /**
-    * Visit and transform each statement in the given block.
-    * @return the substitution for the block's result
-    */
-  override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
-    inlineBlockWith(block){stms => stms.foreach(visit); f(block.result) }
-  }
-
 }

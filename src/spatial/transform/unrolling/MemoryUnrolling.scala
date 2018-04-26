@@ -140,7 +140,7 @@ trait MemoryUnrolling extends UnrollingBase {
     if (!isUnusedAccess(lhs)) {
       val mem  = rhs.mem
       val addr = if (rhs.addr.isEmpty) None else Some(rhs.addr)
-      val data = f(rhs.dataOpt)
+      val data = rhs.dataOpt // Note that this is the OLD data symbol, if any
       val mems = getInstances(lhs, mem, isLoad = data.isEmpty, None)
 
       dbgs(s"Unrolling ${stm(lhs)}"); strMeta(lhs)

@@ -88,6 +88,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   def unroll[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
+    logs(s"Unrolling $lhs = $rhs")
     if (isControl(rhs)) duplicateController(lhs,rhs)
     else lanes.duplicate(lhs,rhs)
   }
@@ -125,7 +126,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     case _ =>
       val duplicates: List[Sym[_]] = if (isControl(rhs)) duplicateController(lhs,rhs) else unroll(lhs, rhs)
       if (duplicates.length == 1) duplicates.head.asInstanceOf[Sym[A]]
-      else err[A](s"Undefined duplicate of $lhs")
+      else Invalid.asInstanceOf[Sym[A]]
   }
 
 
@@ -137,7 +138,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
     inlineBlockWith(block){stms =>
-      stms.foreach{case Stm(lhs,rhs) => unroll(lhs,rhs.asInstanceOf[Op[Any]])(lhs.tp,lhs.ctx) }
+      stms.foreach(visit)
       lanes.inLane(0){ f(block.result) }
     }
   }
@@ -219,10 +220,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     // --- Each unrolling rule should do at least one of three things:
 
     // 1. Split a given vector as the substitution for the single original symbol
-    def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = map{_ =>
-      val s2 = cloneOp(s, d)
-      register(s -> s2)
-      s2
+    def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
+      if (size > 1) map{_ =>
+        val s2 = cloneOp(s, d)
+        register(s -> s2)
+        s2
+      }
+      else inLane(0){
+        List(update(s, d))
+      }
     }
     // 2. Make later stages depend on the given substitution across all lanes
     // NOTE: This assumes that the node has no meaningful return value (i.e. all are Pipeline or Unit)

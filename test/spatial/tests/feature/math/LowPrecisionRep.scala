@@ -22,7 +22,6 @@ import spatial.lib._
       val x = Reg[Float]
       ConvertTo8Bit(dram_out,x,dram,64)
       sf := x.value
-      //testmem(dram_out,dram,64)
     }
 
     val inputArray = getMem(dram)
@@ -35,12 +34,12 @@ import spatial.lib._
 
     val matches = outputArray === goldArray
     println("result:   " + matches)
-    assert(matches)
 
     println("Scaling Factor: " + scalingFactor)
     (0 until N).foreach{ i =>
       println("input: " + inputArray(i) + ", gold: " + goldArray(i) + ", actual: " + outputArray(i))
     }
 
+    assert(matches)
   }
 }

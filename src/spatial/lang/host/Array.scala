@@ -154,10 +154,10 @@ import spatial.internal._
 
 
   /** Returns true if this Array and `that` contain the same elements, false otherwise. */
-  @api override def neql(that: Array[A]): Bit = this.zip(that){(x,y) => x === y }.forall(x => x)
+  @api override def neql(that: Array[A]): Bit = this.zip(that){(x,y) => x !== y }.exists(x => x)
 
-  /** Returns true if this Array and `that` differ by at least one element, false otherwise. */
-  @api override def eql(that: Array[A]): Bit = this.zip(that){(x,y) => x !== y }.exists(x => x)
+  /** Returns false if this Array and `that` differ by at least one element, true otherwise. */
+  @api override def eql(that: Array[A]): Bit = this.zip(that){(x,y) => x === y }.forall(x => x)
 
   @api override def toText: Text = this.mkString(", ")
 }

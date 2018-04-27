@@ -185,15 +185,14 @@ trait CppGenArray extends CppGenCommon {
       close("}")
 
     case ArrayForeach(array,apply,func) =>
-      open(src"for (int ${func.input} = 0; ${func.input} < ${getSize(array)}; ${func.input}++) {")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
       visitBlock(apply)
       visitBlock(func)
       close("}")
 
     case ArrayMap(array,apply,func) =>
       emitNewArray(lhs, lhs.tp, getSize(array))
-      open(src"for (int ${func.input} = 0; ${func.input} < ${getSize(array)}; ${func.input}++) { ")
-      emit(src"int ${apply.inputB} = ${func.input};")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
       visitBlock(apply)
       visitBlock(func)
       emitUpdate(lhs, func.result, src"${func.input}", func.result.tp)

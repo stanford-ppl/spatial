@@ -12,12 +12,9 @@ import scala.reflect.ClassTag
   type Q16 = FixPt[TRUE,_16,_16]
   val N: scala.Int = 20
 
-   def enumerate[T:Num:ClassTag]: scala.Array[T] = {
+   def enumerate[T:Num:ClassTag](x: T, y: T, z: T): scala.Array[T] = {
     val a = new scala.Array[T](N)
     Pipe {
-      val x = random[T]
-      val y = random[T]
-      val z = random[T]
       a(0) = x
       a(1) = tanh(x)
       a(2) = exp(x)
@@ -40,11 +37,17 @@ import scala.reflect.ClassTag
     }
     a
   }
-   def test[T:Num:ClassTag]: SRAM1[T] = {
+   def test[T:Num:ClassTag](xOut: Reg[T], yOut: Reg[T], zOut: Reg[T]): SRAM1[T] = {
     val sram = SRAM[T](N)
-    val array = enumerate[T]
+    val x = random[T]
+    val y = random[T]
+    val z = random[T]
+    val array = enumerate[T](x, y, z)
     Pipe {
       array.zipWithIndex.foreach{case (s,i) => Pipe { sram(i) = s } }
+      xOut := x
+      yOut := y
+      zOut := z      
     }
     sram
   }
@@ -55,12 +58,24 @@ import scala.reflect.ClassTag
     val dramQ16 = DRAM[Q16](N)
     val dramHalf = DRAM[Half](N)
     val dramFloat = DRAM[Float](N)
+    val xInt = ArgOut[Int]
+    val yInt = ArgOut[Int]
+    val zInt = ArgOut[Int]
+    val xQ16 = ArgOut[Q16]
+    val yQ16 = ArgOut[Q16]
+    val zQ16 = ArgOut[Q16]
+    val xHalf = ArgOut[Half]
+    val yHalf = ArgOut[Half]
+    val zHalf = ArgOut[Half]
+    val xFloat = ArgOut[Float]
+    val yFloat = ArgOut[Float]
+    val zFloat = ArgOut[Float]
 
     Accel {
-      val sramInt = test[Int]
-      val sramQ16 = test[Q16]
-      val sramHalf = test[Half]
-      val sramFloat = test[Float]
+      val sramInt = test[Int](xInt, yInt, zInt)
+      val sramQ16 = test[Q16](xQ16, yQ16, zQ16)
+      val sramHalf = test[Half](xHalf, yHalf, zHalf)
+      val sramFloat = test[Float](xFloat, yFloat, zFloat)
 
       dramInt store sramInt
       dramQ16 store sramQ16
@@ -73,5 +88,9 @@ import scala.reflect.ClassTag
     printArray(getMem(dramHalf), "Half")
     printArray(getMem(dramInt), "Float")
 
+    assert(getMem(dramInt) == enumerate[Int](getArg(xInt), getArg(yInt), getArg(zInt)))
+    assert(getMem(dramQ16) == enumerate[Q16](getArg(xQ16), getArg(yQ16), getArg(zQ16)))
+    assert(getMem(dramHalf) == enumerate[Half](getArg(xHalf), getArg(yHalf), getArg(zHalf)))
+    assert(getMem(dramInt) == enumerate[Float](getArg(xFloat), getArg(yFloat), getArg(zFloat)))
   }
 }

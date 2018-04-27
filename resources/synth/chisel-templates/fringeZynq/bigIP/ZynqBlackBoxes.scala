@@ -134,6 +134,49 @@ generate_target {all} [get_ips $moduleName]
     }
   }
 
+  class SquareRooter(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle {
+      val a = Input(UInt(width.W))
+      val out = Output(UInt(width.W))
+    })
+
+
+    val m = Module(new SqrtBBox(width, signed, latency))
+    m.io.aclk := clock
+    m.io.s_axis_cartesian_tvalid := true.B
+    m.io.s_axis_cartesian_tdata := io.a
+    io.out := m.io.m_axis_dout_tdata
+  }
+
+  class SqrtBBox(val width: Int, val signed: Boolean, val latency: Int) extends BlackBox {
+    val io = IO(new Bundle {
+      val aclk = Input(Clock())
+      val s_axis_cartesian_tvalid = Input(Bool())
+      val s_axis_cartesian_tdata = Input(UInt(width.W))
+      val m_axis_dout_tdata = Output(UInt(width.W))
+    })
+
+    val signedString = if (signed) "Signed" else "Unsigned"
+    val moduleName = s"sqrt_${width}_${width}_${latency}_${signedString}"
+    override def desiredName = s"sqrt_${width}_${width}_${latency}_${signedString}"
+
+    // Print required stuff into a tcl file
+    if (!createdIP.contains(moduleName)) {
+      FringeGlobals.tclScript.println(
+s"""
+## Integer SquareRooter
+create_ip -name cordic -vendor xilinx.com -library ip -version 6.0 -module_name $moduleName
+set_property -dict [list CONFIG.Input_Width.VALUE_SRC USER] [get_bd_cells cordic_0]
+set_property -dict [list CONFIG.Functional_Selection {Square_Root} CONFIG.Input_Width {$width} CONFIG.Output_Width {$width} CONFIG.Data_Format {UnsignedFraction} CONFIG.Output_Width {$width} CONFIG.Coarse_Rotation {false}] [get_bd_cells cordic_0]
+set_property generate_synth_checkpoint false [get_files $moduleName.xci]
+generate_target {all} [get_ips $moduleName]
+""")
+
+      FringeGlobals.tclScript.flush
+      createdIP += moduleName
+    }
+  }
+
 
   class FAbs(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {

@@ -98,7 +98,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       var cause: Result = Unknown
       Console.out.println(s"Backend $pass in ${IR.config.logDir}/$pass.log")
       Console.out.println(args.mkString(" "))
-      val cmd = new Subprocess(args:_*)({case (line,_) =>
+      val cmd = new Subprocess(args:_*)({case (lline,_) =>
+        val line = lline.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt","")
         val err = parse(line)
         cause = cause.orElse(err)
         cmdLog.println(line)
@@ -111,8 +112,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
         val code = Await.result(f, duration.Duration(timeout, "sec"))
         val lines = cmd.stdout()
         val errs  = cmd.errors()
-        lines.foreach{l => parse(l); cmdLog.println(l) }
-        errs.foreach{e => parse(e); cmdLog.println(e) }
+        lines.foreach{ll => val l = ll.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(l); cmdLog.println(l) } // replaceAll to prevent JUnit crash
+        errs.foreach{ee => val e = ee.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(e); cmdLog.println(e) } // replaceAll to prevent JUnit crash
         if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code during backend $pass: $code.\n${errs.take(4).mkString("\n")}"))
       }
       catch {

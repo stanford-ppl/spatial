@@ -728,6 +728,18 @@ object Utils {
     result
   }
 
+  def fix2flt(a: UInt, s: Boolean, d: Int, f: Int, m: Int, e: Int): UInt = {
+    FringeGlobals.bigIP.fix2flt(a,s,d,f,m,e)
+  }
+  def fix2fix(a: UInt, s: Boolean, d: Int, f: Int): UInt = {
+    FringeGlobals.bigIP.fix2fix(a,s,d,f)
+  }
+  def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int): UInt = {
+    FringeGlobals.bigIP.flt2fix(a,mw,e,sign,dec,frac)
+  }
+  def flt2flt(a: UInt, mwa: Int, ea: Int, mw_out: Int, e_out: Int): UInt = {
+    FringeGlobals.bigIP.flt2flt(a,mwa,ea,mw_out,e_out)
+  }
 
   // def getDoubleBits(num: Double) = java.lang.Double.doubleToRawIntBits(num)
   def delay[T <: chisel3.core.Data](sig: T, length: Int):T = {

@@ -65,7 +65,7 @@ trait ScalaGenFltPt extends ScalaGenBits {
     case FltAbs(x)     => emit(src"val $lhs = Number.abs($x)")
     case FltFloor(x)   => emit(src"val $lhs = Number.floor($x)")
     case FltCeil(x)    => emit(src"val $lhs = Number.ceil($x)")
-    case FltLn(x)      => emit(src"val $lhs = Number.log($x)")
+    case FltLn(x)      => emit(src"val $lhs = Number.ln($x)")
     case FltExp(x)     => emit(src"val $lhs = Number.exp($x)")
     case FltSqrt(x)    => emit(src"val $lhs = Number.sqrt($x)")
     case FltSin(x)     => emit(src"val $lhs = Number.sin($x)")

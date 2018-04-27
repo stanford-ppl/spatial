@@ -10,6 +10,7 @@ trait CppGenDebug extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
+    case FltToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
     case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
 
     case TextConcat(strings) => 

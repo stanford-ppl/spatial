@@ -81,7 +81,7 @@ trait ScalaGenFixPt extends ScalaGenBits {
     case FixAbs(x)     => emit(src"val $lhs = Number.abs($x)")
     case FixFloor(x)   => emit(src"val $lhs = Number.floor($x)")
     case FixCeil(x)    => emit(src"val $lhs = Number.ceil($x)")
-    case FixLn(x)      => emit(src"val $lhs = Number.log($x)")
+    case FixLn(x)      => emit(src"val $lhs = Number.ln($x)")
     case FixExp(x)     => emit(src"val $lhs = Number.exp($x)")
     case FixSqrt(x)    => emit(src"val $lhs = Number.sqrt($x)")
     case FixSin(x)     => emit(src"val $lhs = Number.sin($x)")

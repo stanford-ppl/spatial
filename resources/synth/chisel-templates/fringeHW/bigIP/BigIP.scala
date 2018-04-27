@@ -15,7 +15,13 @@ abstract class BigIP {
   def mod(dividend: SInt, divisor: SInt, latency: Int): SInt
   def multiply(a: UInt, b: UInt, latency: Int): UInt
   def multiply(a: SInt, b: SInt, latency: Int): SInt
+  def sqrt(a: UInt, latency: Int): UInt = {
+    throw new Exception("sqrt not implemented!")
+  }
 
+  def fsqrt(a: UInt, latency: Int): UInt = {
+    throw new Exception("fsqrt not implemented!")
+  }
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt
   def fsub(a: UInt, b: UInt, m: Int, e: Int): UInt
   def fmul(a: UInt, b: UInt, m: Int, e: Int): UInt

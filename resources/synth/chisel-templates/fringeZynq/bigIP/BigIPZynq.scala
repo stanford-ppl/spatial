@@ -90,6 +90,12 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     }
   }
 
+  override def sqrt(a: UInt, latency: Int): UInt = {
+    val m = Module(new SquareRooter(a.getWidth, false, latency))
+    m.io.a := a
+    m.io.out
+  }
+
   def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int): UInt = {
     val m = Module(new FAdd(mw, e, latency))
     m.io.a := a

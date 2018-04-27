@@ -6,6 +6,8 @@ import forge.tags._
 import spatial.node._
 import spatial.internal._
 
+import utils.implicits.Readable._
+
 /** A one-dimensional array on the host. */
 @ref class Array[A:Type] extends Top[Array[A]] with Ref[scala.Array[Any],Array[A]] {
   val A: Type[A] = Type[A]
@@ -154,12 +156,28 @@ import spatial.internal._
 
 
   /** Returns true if this Array and `that` contain the same elements, false otherwise. */
-  @api override def neql(that: Array[A]): Bit = this.zip(that){(x,y) => x === y }.forall(x => x)
+  @api override def neql(that: Array[A]): Bit = this.zip(that){(x,y) => x !== y }.exists(x => x)
 
-  /** Returns true if this Array and `that` differ by at least one element, false otherwise. */
-  @api override def eql(that: Array[A]): Bit = this.zip(that){(x,y) => x !== y }.exists(x => x)
+  /** Returns false if this Array and `that` differ by at least one element, true otherwise. */
+  @api override def eql(that: Array[A]): Bit = this.zip(that){(x,y) => x === y }.forall(x => x)
 
   @api override def toText: Text = this.mkString(", ")
+
+  @rig override def getFrom(c: Any, isParam: Boolean = false): Option[(Array[A],Boolean)] = c match {
+    case d: scala.Array[_] if d.isEmpty => Some((stage(ArrayFromSeq[A](Nil)), true))
+
+    case d: scala.Array[_] =>
+      val consts = d.map{
+        case x: Sym[_] => if (x.tp =:= A) Some(x) else None
+        case x if A.canConvertFrom(x) => Some(A.uconst(x))
+        case _ => None
+      }
+      if (consts.forall(_.isDefined)) {
+        Some((stage(ArrayFromSeq[A](consts.map(_.get.asInstanceOf[Sym[A]]))), true))
+      }
+      else None
+    case _ => None
+  }
 }
 
 object Array {

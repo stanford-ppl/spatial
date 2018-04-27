@@ -7,6 +7,11 @@ import spatial.node._
 
 trait ScalaGenArray extends ScalaCodegen {
 
+  override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
+    case (tp: Tensor1[_], c: Array[_]) => src"Array[${tp.A}]($c)"
+    case _ => super.quoteConst(tp,c)
+  }
+
   override protected def remap(tp: Type[_]): String = tp match {
     case tp: Tensor1[_] => src"Array[${tp.A}]"
     case _ => super.remap(tp)

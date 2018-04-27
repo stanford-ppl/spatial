@@ -141,7 +141,7 @@ object Number {
   def sqrt(x: FloatPoint): FloatPoint = FloatPoint(Math.sqrt(x.toDouble), x.fmt).withValid(x.valid)
   def recipSqrt(x: FloatPoint): FloatPoint = FloatPoint(1, x.fmt) / sqrt(x)
   def exp(x: FloatPoint): FloatPoint = FloatPoint(Math.exp(x.toDouble), x.fmt).withValid(x.valid)
-  def log(x: FloatPoint): FloatPoint = FloatPoint(Math.log(x.toDouble), x.fmt).withValid(x.valid)
+  def ln(x: FloatPoint): FloatPoint = FloatPoint(Math.log(x.toDouble), x.fmt).withValid(x.valid)
   def pow(x: FloatPoint, exp: FloatPoint) = FloatPoint(Math.pow(x.toDouble, exp.toDouble), x.fmt).withValid(x.valid)
   def sin(x: FloatPoint): FloatPoint = FloatPoint(Math.sin(x.toDouble), x.fmt).withValid(x.valid)
   def cos(x: FloatPoint): FloatPoint = FloatPoint(Math.cos(x.toDouble), x.fmt).withValid(x.valid)

@@ -62,7 +62,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     case x: java.lang.Long    => this.value(x.toLong)
     case x: java.lang.Float   => this.value(x.toFloat)
     case x: java.lang.Double  => this.value(x.toDouble)
-    case _ if isSubtype(c.getClass,classTag[C].runtimeClass) => Some((c.asInstanceOf[C],true))
+    case _ if isSubtype(c.getClass,classTag[C].runtimeClass) && __isPrimitive => Some((c.asInstanceOf[C],true))
     case _ => None
   }
   final private[argon] def __value(c: Any): Option[C] = value(c).map(_._1)
@@ -70,7 +70,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   /** Create a checked value from the given constant
     * Value may be either a constant or a parameter
     */
-  @rig final def from(c: Any, warnOnLoss: Boolean = false, errorOnLoss: Boolean = false, isParam: Boolean = false): A = value(c) match {
+  @rig final def from(c: Any, warnOnLoss: Boolean = false, errorOnLoss: Boolean = false, isParam: Boolean = false): A = getFrom(c,isParam) match {
     case Some((v,exact)) =>
       if (!exact && errorOnLoss) {
         error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
@@ -84,15 +84,18 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
         warn(s"""Use .toUnchecked to ignore this warning.""")
         warn(ctx)
       }
-
-      if (isParam) _param(this, v)
-      else         _const(this, v)
-
+      v
     case None =>
       implicit val tA: Type[A] = this
       error(ctx, r"Cannot convert ${escapeConst(c)} with type ${c.getClass} to a ${this.tp}")
       error(ctx)
       err[A]("Invalid constant")
+  }
+
+  @rig def getFrom(c: Any, isParam: Boolean = false): Option[(A,Boolean)] = value(c) match {
+    case Some((v,exact)) if isParam => Some((_param(this, v), exact))
+    case Some((v,exact)) => Some((_const(this, v),exact))
+    case None => None
   }
 
 }

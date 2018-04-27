@@ -65,6 +65,7 @@ trait Codegen extends Traversal {
 
   protected def quoteOrRemap(arg: Any): String = arg match {
     case p: Seq[_]     => p.map(quoteOrRemap).mkString(", ")  // By default, comma separate Seq
+    case p: Array[_]   => p.map(quoteOrRemap).mkString(", ")
     case e: Ref[_,_]   => quote(e)
     case s: String     => s
     case c: Int        => c.toString

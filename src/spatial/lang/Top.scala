@@ -31,9 +31,12 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
       case _ =>
         // (Silently) Attempt to create a constant from the rhs
         // Fall back to unstaged comparison if this fails.
-        this.tp.getConst(that) match {
-          case Some(_) => v.neql(this.tp.from(that))
-          case None    => unrelated(that); !this.equals(that)
+        if (this.tp.canConvertFrom(that)) {
+          v.neql(this.tp.from(that))
+        }
+        else {
+          unrelated(that)
+          !this.equals(that)
         }
     }
   }
@@ -47,9 +50,12 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
       case _ =>
         // (Silently) Attempt to create a constant from the rhs
         // Fall back to unstaged comparison if this fails.
-        this.tp.getConst(that) match {
-          case Some(_) => v.eql(this.tp.from(that))
-          case None    => unrelated(that); this.equals(that)
+        if (this.tp.canConvertFrom(that)) {
+          v.eql(this.tp.from(that))
+        }
+        else {
+          unrelated(that)
+          this.equals(that)
         }
     }
   }

@@ -37,7 +37,7 @@ import spatial.dsl._
     val dataOut = getMatrix(dramOut)
     print("\n*** Output Matrix ***\n")
     printMatrix(dataOut)
-    (0 :: n, 0 :: m){(i,j) => assert(dataOut(i,j) == dataIn(j,i)) }
+    (0 :: n, 0 :: m).foreach{(i,j) => assert(dataOut(i,j) == dataIn(j,i)) }
     () // annoying but required
   }
 }

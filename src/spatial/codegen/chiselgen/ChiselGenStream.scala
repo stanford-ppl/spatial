@@ -91,21 +91,20 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
-      val parent = lhs.parent.s.get
-      emit(src"""val ${lhs}_wId = getStreamOutLane("$stream")""")
       val muxPort = portsOf(lhs).values.head.muxPort
-      val en = if (ens.isEmpty) "true.B" else src"${ens.flatten.toList.map(quote).mkString("&")}"
-      emit(src"""${swap(stream, ValidOptions)}(${muxPort}) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & $en & ~${parent}_sm.io.ctrDone """)
+      val base = writersOf(stream).filter(portsOf(_).values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val parent = lhs.parent.s.get
+      ens.zipWithIndex.map{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"; emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & $en & ~${parent}_sm.io.ctrDone """)}
       emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} | ~${parent}_sm.io.ctrDone // Should be delayed by body latency + ready-off bubbles""")
-      emit(src"""${swap(stream, DataOptions)}(${muxPort}) := $data""")
+      data.zipWithIndex.map{case(d,i) => emit(src"""${swap(stream, DataOptions)}($base + $i) := $d""")}
 
 
     case StreamInBankedRead(strm, ens) =>
-      val parent = lhs.parent.s.get
       val muxPort = portsOf(lhs).values.head.muxPort
-      val en = if (ens.isEmpty) "true.B" else src"${ens.flatten.toList.map(quote).mkString("&")}"
+      val base = readersOf(strm).filter(portsOf(_).values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val parent = lhs.parent.s.get
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emit(src"""${swap(strm, ReadyOptions)}(${muxPort}) := $en & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)
+      ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)}
       emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}(i) }""")
 
 

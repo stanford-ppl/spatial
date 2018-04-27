@@ -27,6 +27,10 @@ trait CppGenMath extends CppGenCommon {
     case FixSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
     case FixMul(x,y) => emit(src"${lhs.tp} $lhs = $x * $y;")
     case FixDiv(x,y) => emit(src"${lhs.tp} $lhs = $x / $y;")
+    case FltAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
+    case FltSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
+    case FltMul(x,y) => emit(src"${lhs.tp} $lhs = $x * $y;")
+    case FltDiv(x,y) => emit(src"${lhs.tp} $lhs = $x / $y;")
     case FixAnd(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
     case FixOr(x,y)  => emit(src"${lhs.tp} $lhs = $x | $y;")
     case FixXor(x,y)  => emit(src"${lhs.tp} $lhs = $x ^ $y;")
@@ -34,6 +38,7 @@ trait CppGenMath extends CppGenCommon {
     case FixLeq(x,y) => emit(src"${lhs.tp} $lhs = $x <= $y;")
     case FixNeq(x,y) => emit(src"${lhs.tp} $lhs = $x != $y;")
     case FixEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
+    case FltEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
     case FixMod(x,y) => emit(src"${lhs.tp} $lhs = $x % $y;")
     case FixRandom(x) => emit(src"${lhs.tp} $lhs = rand() % ${x.getOrElse(100)};")
     case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
@@ -76,14 +81,9 @@ trait CppGenMath extends CppGenCommon {
     //   case DoubleType() => emit(src"${lhs.tp} $lhs = log($x);")
     //   case FloatType()  => emit(src"${lhs.tp} $lhs = log($x);")
     // }
-    case FltExp(x)  => x.tp match {
-      case DoubleType() => emit(src"${lhs.tp} $lhs = exp($x);")
-      case FloatType()  => emit(src"${lhs.tp} $lhs = exp($x);")
-    }
-    case FltSqrt(x) => x.tp match {
-      case DoubleType() => emit(src"${lhs.tp} $lhs = sqrt($x);")
-      case FloatType()  => emit(src"${lhs.tp} $lhs = sqrt($x);")
-    }
+    case FltExp(x)  => emit(src"${lhs.tp} $lhs = exp($x);")
+    case FltSqrt(x) => emit(src"${lhs.tp} $lhs = sqrt($x);")
+    case FixSqrt(x) => emit(src"${lhs.tp} $lhs = sqrt($x);")
 
     case FltPow(x,exp) => emit(src"${lhs.tp} $lhs = pow($x, $exp);")
     case FltSin(x)     => emit(src"${lhs.tp} $lhs = sin($x);")
@@ -98,6 +98,8 @@ trait CppGenMath extends CppGenCommon {
     case FixFloor(x)   => emit(src"${lhs.tp} $lhs = floor($x);")
     case FixCeil(x)    => emit(src"${lhs.tp} $lhs = ceil($x);")
     case FixToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FixToFlt(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FltToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
 
     case Mux(sel, a, b) => 
       emit(src"${lhs.tp} $lhs;")

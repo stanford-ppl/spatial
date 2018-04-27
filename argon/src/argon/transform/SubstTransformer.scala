@@ -2,10 +2,8 @@ package argon
 package transform
 
 abstract class SubstTransformer extends Transformer {
-  val allowUnsafeSubst: Boolean = false
-  val allowOldSymbols: Boolean = false
-
   var subst: Map[Sym[_],Sym[_]] = Map.empty
+  var substLazy: Map[Sym[_], () => Sym[_]] = Map.empty
   var blockSubst: Map[Block[_],Block[_]] = Map.empty
 
   /**
@@ -14,27 +12,27 @@ abstract class SubstTransformer extends Transformer {
     */
   def register[A](rule: (A,A)): Unit = register(rule._1,rule._2)
 
-  /**
-    * Register a substitution rule orig -> sub.
-    * If unsafe is true, does not do type checking.
-    */
-  def register[A,B](orig: A, sub: B, unsafe: Boolean = allowUnsafeSubst): Unit = (orig, sub) match {
-    case (s1: Sym[_], s2: Sym[_]) => subst += s1 -> s2
-    case (b1: Block[_], b2: Block[_]) => blockSubst += b1 -> b2
+  /** Register a substitution rule orig -> sub. */
+  def register[A,B](orig: A, sub: B): Unit = (orig, sub) match {
+    case (s1: Sym[_], s2: Sym[_])       => subst += s1 -> s2
+    case (b1: Block[_], b2: Block[_])   => blockSubst += b1 -> b2
     case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
   }
+
+  /** Register a lazy substitution rule orig -> sub, where sub is created on demand. */
+  def registerLazy[A,B](orig: Sym[_], sub: () => Sym[_]): Unit = substLazy += orig -> sub
 
   override protected def transformBlock[T](block: Block[T]): Block[T] = blockSubst.get(block) match {
     case Some(block2) => block2.asInstanceOf[Block[T]]
     case None         => super.transformBlock(block)
   }
 
-
   override protected def transformSym[T](sym: Sym[T]): Sym[T] = subst.get(sym) match {
     case Some(y) => y.asInstanceOf[Sym[T]]
-    case None if sym.isSymbol && !allowOldSymbols =>
-      throw new Exception(s"Used untransformed symbol $sym!")
-    case None => sym
+    case None    => substLazy.get(sym) match {
+      case Some(s) => s().asInstanceOf[Sym[T]]
+      case None    => sym
+    }
   }
 
   /**

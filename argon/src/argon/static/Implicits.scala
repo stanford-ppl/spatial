@@ -125,6 +125,15 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   def effects_=(eff: Effects): Unit = metadata.add(exp, eff)
   def isMutable: Boolean = effects.isMutable
 
+  def shallowAliases: Set[Sym[_]] = metadata[ShallowAliases](exp).map(_.aliases).getOrElse(Set.empty)
+  def shallowAliases_=(aliases: Set[Sym[_]]): Unit = metadata.add(exp, ShallowAliases(aliases))
+
+  def deepAliases: Set[Sym[_]] = metadata[DeepAliases](exp).map(_.aliases).getOrElse(Set.empty)
+  def deepAliases_=(aliases: Set[Sym[_]]): Unit = metadata.add(exp, DeepAliases(aliases))
+
+  def allAliases: Set[Sym[_]] = shallowAliases ++ deepAliases
+  def mutableAliases: Set[Sym[_]] = allAliases.filter(_.isMutable)
+
   /** View the staged value or type as B[A]. */
   def view[B[_]](implicit tag: ClassTag[B[_]], ev: B[_] <:< ExpType[_,_]): B[A] = {
     if (isSubtype(exp.getClass,tag.runtimeClass)) exp.asInstanceOf[B[A]]

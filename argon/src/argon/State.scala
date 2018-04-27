@@ -44,12 +44,6 @@ class State extends forge.AppState {
     if (!motion) cache = Map.empty // Empty the CSE cache in case code motion is disabled
   }
 
-  /** Alias caches */
-  val shallowAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
-  val deepAliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
-  val aliasCache = new mutable.HashMap[Sym[_], Set[Sym[_]]]
-
-
   /** Graph Metadata */
   val globals: GlobalMetadata = new GlobalMetadata
 
@@ -98,13 +92,9 @@ class State extends forge.AppState {
   def reset(): Unit = {
     config.reset()
     id = -1
-    // TODO[3]: Should scope be empty instead of null at start?
     scope = null
     impure = null
     cache = Map.empty
-    shallowAliasCache.clear()
-    deepAliasCache.clear()
-    aliasCache.clear()
     globals.reset()
     pass = 1
     logTab = 0
@@ -125,9 +115,6 @@ class State extends forge.AppState {
     target.scope = this.scope
     target.impure = this.impure
     target.cache = this.cache
-    target.shallowAliasCache ++= this.shallowAliasCache
-    target.deepAliasCache ++= this.deepAliasCache
-    target.aliasCache ++= this.aliasCache
     globals.copyTo(target.globals)
     target.pass = this.pass
     target.logTab = this.logTab

@@ -89,8 +89,8 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
 
   private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_])(contents: => Unit): Unit = {
     val ins    = func.nestedInputs
-    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Nil)
-    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).distinct.filterNot(_.isMem) diff binds
+    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Set.empty).toSeq
+    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).filterNot(_.isMem).distinct diff binds
     val en = if (ens.isEmpty) "true" else ens.map(quote).mkString(" && ")
 
     dbgs(s"${stm(lhs)}")
@@ -100,7 +100,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
       emitHeader()
       open(src"object $lhs {")
       open(src"def run(")
-      inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.length-1) "" else ",")) }
+      inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
       closeopen("): Unit = {")
       open(src"if ($en) {")
       contents

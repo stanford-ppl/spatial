@@ -56,7 +56,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   def requiresRegisters(x: Sym[_]): Boolean = latencyModel.requiresRegisters(x, cycles.contains(x))
   def retimingDelay(x: Sym[_]): Double = if (requiresRegisters(x)) latencyOf(x, cycles.contains(x)) else 0.0
 
-  def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filter{_.isBits}.distinct
+  def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filter{_.isBits}.toSeq
 
   def delayLine[A](size: Int, data: Sym[A])(implicit ctx: SrcCtx): Sym[A] = data.tp match {
     case Bits(bits) =>

@@ -8,9 +8,8 @@ import spatial.lang._
 abstract class StructAlloc[S:Struct] extends Primitive[S] {
   def elems: Seq[(String,Sym[_])]
 
-  override def inputs = syms(elems.map(_._2))
   override def reads  = Nil
-  override def aliases = Nil
+  override def aliases = Nul
   override def contains = syms(elems.map(_._2))
   override val isEphemeral: Boolean = true
 }

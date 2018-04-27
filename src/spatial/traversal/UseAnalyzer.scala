@@ -45,7 +45,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
-      if (isEphemeral(lhs) && !isInnerControl(lhs.toCtrl)) addPropagatingUse(lhs, pending)
+      if (isEphemeral(lhs) && !isInnerControl(lhs.toCtrl)) addPropagatingUse(lhs, pending.toSet)
       else addUse(lhs, pending.toSet, blk)
     }
   }
@@ -64,10 +64,10 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
   }
 
-  private def addPropagatingUse(sym: Sym[_], pending: Seq[Sym[_]]): Unit = {
+  private def addPropagatingUse(sym: Sym[_], pending: Set[Sym[_]]): Unit = {
     dbgs(s"  Node is propagating reader of:")
     pending.foreach{s => dbgs(s"  - ${stm(s)}")}
-    pendingUses += sym -> (pending.toSet + sym)
+    pendingUses += sym -> (pending + sym)
   }
 
   private def addPendingUse(sym: Sym[_]): Unit = if (!pendingUses.all.contains(sym)) {

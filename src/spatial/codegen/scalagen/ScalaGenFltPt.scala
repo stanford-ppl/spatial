@@ -32,6 +32,7 @@ trait ScalaGenFltPt extends ScalaGenBits {
     case FltSub(x,y) => emit(src"val $lhs = $x - $y")
     case FltMul(x,y) => emit(src"val $lhs = $x * $y")
     case FltDiv(x,y) => emit(src"val $lhs = $x / $y")
+    case FltMod(x,y) => emit(src"val $lhs = $x / $y")
     case FltRecip(x) => emit(src"val $lhs = Number.recip($x)")
     case FltLst(x,y) => emit(src"val $lhs = $x < $y")
     case FltLeq(x,y) => emit(src"val $lhs = $x <= $y")

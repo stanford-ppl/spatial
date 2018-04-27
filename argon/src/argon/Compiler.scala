@@ -254,9 +254,18 @@ trait Compiler { self =>
         val stream = getOrCreateStream(config.logDir,log + ".log")
         i.dumpInstrument(heading, stream)
         stream.println("\n")
+        i.dumpAllInstrument(stream)
+        stream.println("\n")
+
         info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
         i.resetInstrument()
       }
+
+      val heading = s"@flow analyses"
+      val stream = getOrCreateStream(config.logDir,"flows.log")
+      IR.flows.instrument.dump(heading,stream)
+      stream.println("\n")
+      IR.flows.instrument.dumpAll(stream)
     }
 
     val time = instrument.totalTime

@@ -30,7 +30,7 @@ trait Scoping {
       state.impure ++= schedule.motionedImpure
     }
 
-    if (config.enLog) {
+    /*if (config.enLog) {
       logs(s"Completed block ${schedule.block}")
       logs(s"Inputs:  $inputs")
       schedule.block.stms.foreach{s => logs(s"  ${stm(s)}") }
@@ -42,7 +42,7 @@ trait Scoping {
         logs(s"Dropped: ")
         dropped.foreach{s => logs(s"  ${stm(s)}") }
       }
-    }
+    }*/
 
     schedule.block
   }

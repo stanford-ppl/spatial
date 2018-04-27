@@ -5,6 +5,7 @@ val scalatestVersion  = "3.0.5"
 
 name := "nova"
 organization := "edu.stanford.ppl"
+trapExit := false
 
 val common = Seq(
   scalaVersion := scala_version,
@@ -67,9 +68,5 @@ lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(forge)
 lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
 
-lazy val nova   = (project in file(".")).settings(common ++ Seq(
-  fullClasspath in Runtime += baseDirectory(_/"target/scala-2.12/test-classes/").value,
-  fullClasspath in Compile += baseDirectory(_/"target/scala-2.12/test-classes/").value
-)).dependsOn(forge, emul, argon, models, poly, spatialTags)
-
+lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)
 lazy val apps = project.settings(common).dependsOn(nova)

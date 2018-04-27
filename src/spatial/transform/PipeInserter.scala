@@ -117,11 +117,15 @@ case class PipeInserter(IR: State) extends MutateTransformer {
           stg.dump(i)
           val calculated = stg.nodes.toSet
           val escaping = stg.nodes.filter{s =>
-            !s.tp.isVoid && (s == block.result || (s.consumers diff calculated).nonEmpty)
+            val used = s.consumers diff calculated
+            dbgs(s"  ${stm(s)}")
+            dbgs(s"    uses: $used")
+            dbgs(s"    nonVoid: ${!s.tp.isVoid}")
+            dbgs(s"    isResult: ${s == block.result}")
+            !s.tp.isVoid && (s == block.result || used.nonEmpty)
           }
-          dbgs(s"Escaping: ")
-          escaping.foreach{s => s"  ${stm(s)}"}
-          val ress = escaping.map{
+
+          val escapingHolders = escaping.map{
             case s if s == block.result && res.isDefined => res.get
             case s => resFrom(s)
           }
@@ -130,11 +134,17 @@ case class PipeInserter(IR: State) extends MutateTransformer {
           val pipe = Pipe {
             isolateSubst{
               stg.nodes.foreach(visit)
-              escaping.zip(ress).foreach{case (s, r) => resWrite(r,s) }
+              escaping.zip(escapingHolders).foreach{case (s, r) => resWrite(r,s) }
             }
           }
           isOuter(pipe) = false
-          escaping.zip(res).foreach{case (s,r) => register(s -> resRead(r)) }
+          dbgs(s"Escaping: ")
+          escaping.zip(escapingHolders).foreach{case (s,r) =>
+            val rd = resRead(r)
+            dbgs(s"  ${stm(s)}")
+            dbgs(s"  => ${stm(rd)}")
+            register(s, rd)
+          }
 
         case (stg,i) if stg.outer =>
           stg.dump(i)

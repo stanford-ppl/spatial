@@ -16,6 +16,9 @@ trait Instrumented { self =>
   def dumpInstrument(name: String = instrumentName, out: PrintStream = Console.out): Unit = {
     instrument.dump(name, out)
   }
+
+  def dumpAllInstrument(out: PrintStream = Console.out): Unit = instrument.dumpAll(out)
+
 }
 
 object Instrumented {

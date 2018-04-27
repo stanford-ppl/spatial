@@ -26,7 +26,7 @@ import spatial.lang._
 @op case class VecConcat[T:Bits](vecs: Seq[Vec[T]])(implicit val tV: Vec[T]) extends Primitive[Vec[T]] {
   override val isEphemeral: Boolean = true
   @rig override def rewrite: Vec[T] = {
-    if (vecs.forall{case Op(VecAlloc(elems)) => true; case _ => false }) {
+    if (vecs.forall{case Op(VecAlloc(_)) => true; case _ => false }) {
       val elems = vecs.flatMap{case Op(VecAlloc(e)) => e }
       stage(VecAlloc(elems))
     }

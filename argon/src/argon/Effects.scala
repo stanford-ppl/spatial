@@ -1,7 +1,5 @@
 package argon
 
-import forge.tags._
-
 case class Effects(
   unique:  Boolean = false,           // Should not be CSEd
   sticky:  Boolean = false,           // Should not be code motioned out of blocks

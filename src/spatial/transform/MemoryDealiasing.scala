@@ -9,7 +9,6 @@ import spatial.util._
 import utils.implicits.collections._
 
 case class MemoryDealiasing(IR: State) extends MutateTransformer {
-  override val allowUnsafeSubst: Boolean = true // Allow mem -> Invalid (to drop)
 
   def recomputeAddr(series: Series[Idx], idx: Idx): Idx = {
     def _recomputeAddr[A<:Exp[_,A]:IntLike](series: Series[A], idx: A): Idx = {

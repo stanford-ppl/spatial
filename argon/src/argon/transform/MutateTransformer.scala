@@ -5,7 +5,6 @@ import utils.tags.instrument
 
 abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
-  override val allowOldSymbols: Boolean = true
 
   /*
    * Options when transforming a statement:

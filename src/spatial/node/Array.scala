@@ -16,7 +16,7 @@ import spatial.lang.host._
 @op case class ArrayLength[A:Type](array: Array[A]) extends Op[I32]
 
 @op case class ArrayApply[A:Type](coll: Array[A], i: I32) extends Op[A] with AtomicRead[Array[A]] {
-  override def aliases = Nil
+  override def aliases = Nul
 }
 
 @op case class ArrayUpdate[A:Type](array: Array[A], i: I32, data: Sym[A]) extends Op[Void] {
@@ -39,7 +39,7 @@ import spatial.lang.host._
     apply: Lambda2[Array[A],I32,A],
     func:  Lambda1[A,B])
   extends Op3[A,B,Array[B]] {
-  override def aliases = Nil
+  override def aliases = Nul
 }
 
 @op case class ArrayZip[A:Type,B:Type,C:Type](
@@ -49,7 +49,7 @@ import spatial.lang.host._
     applyB: Lambda2[Array[B],I32,B],
     func:   Lambda2[A,B,C])
   extends Op4[A,B,C,Array[C]] {
-  override def aliases = Nil
+  override def aliases = Nul
 }
 
 @op case class ArrayReduce[A:Type](
@@ -70,7 +70,7 @@ import spatial.lang.host._
     apply: Lambda2[Array[A],I32,A],
     cond:  Lambda1[A,Bit])
   extends Op2[A,Array[A]] {
-  override def aliases = Nil
+  override def aliases = Nul
 }
 
 @op case class ArrayFlatMap[A:Type,B:Type](
@@ -78,7 +78,7 @@ import spatial.lang.host._
     apply: Lambda2[Array[A],I32,A],
     func:  Lambda1[A,Array[B]])
   extends Op3[A,B,Array[B]] {
-  override def aliases = Nil
+  override def aliases = Nul
 }
 
 @op case class ArrayMkString[A:Type](

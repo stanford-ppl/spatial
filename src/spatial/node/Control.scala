@@ -67,7 +67,7 @@ import spatial.lang._
   fold:   Option[A],
   iters:  List[I32]
 )(implicit val A: Bits[A]) extends Loop[Void] {
-  override def binds: Seq[Sym[_]] = super.binds ++ reduce.inputs
+  override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def cchains = Seq(cchain -> iters)
   override def bodies  = Seq(iters -> Seq(map,reduce), Nil -> Seq(load,store))
   override def mayBeOuterBlock(i: Int) = i == 0
@@ -88,7 +88,7 @@ import spatial.lang._
   itersMap:  Seq[I32],
   itersRed:  Seq[I32]
 )(implicit val A: Bits[A], val C: LocalMem[A,C]) extends Loop[Void] {
-  override def binds: Seq[Sym[_]] = super.binds ++ reduce.inputs
+  override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def iters: Seq[I32] = itersMap ++ itersRed
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(

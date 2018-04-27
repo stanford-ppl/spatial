@@ -40,7 +40,7 @@ trait Staging { this: Printing =>
     */
   @rig def checkAliases(sym: Sym[_], effects: Effects): Unit = {
     val immutables = effects.writes.filterNot(_.isMutable)
-    val aliases = mutableAliases(op) diff effects.writes
+    val aliases = sym.mutableAliases diff effects.writes
 
     //        logs(s"  aliases: ${aliasSyms(op)}")
     //        logs(s"  copies: ${copySyms(op)}")
@@ -96,6 +96,7 @@ trait Staging { this: Printing =>
           logs(s"$lhs = $op")
           logs(s"Effects: $effects")
         }
+
         checkAliases(sym,effects)
         runFlows(sym,op)
 
@@ -103,6 +104,11 @@ trait Staging { this: Printing =>
         if (effects.mayCSE)  state.cache += op -> sym               // Add to CSE cache
         if (!effects.isPure) state.impure :+= Impure(sym,effects)   // Add to list of impure syms
         if (!effects.isPure) sym.effects = effects                  // Register effects
+
+        // Register aliases
+        if (op.deepAliases.nonEmpty) sym.deepAliases = op.deepAliases
+        if (op.shallowAliases.nonEmpty) sym.shallowAliases = op.shallowAliases
+
         op.inputs.foreach{in => in.consumers += sym }               // Register consumed
         lhs
       }
@@ -122,33 +128,6 @@ trait Staging { this: Printing =>
     val t = register(op, () => symbol(op.R,op))
     op.R.boxed(t).ctx = ctx
     t
-  }
-
-  // TODO: Performance bottleneck here
-  private def aliasSyms(a: Any): Set[Sym[_]]   = recursive.collectSets{case s: Sym[_] => Set(s) case d: Op[_] => d.aliases }(a)
-  private def containSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.contains}(a)
-  private def extractSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.extracts}(a)
-  private def copySyms(a: Any): Set[Sym[_]]    = recursive.collectSets{case d: Op[_] => d.copies}(a)
-  private def noPrims(x: Set[Sym[_]]): Set[Sym[_]] = x.filter{s => !s.tp.isPrimitive}
-
-  @stateful def shallowAliases(x: Any): Set[Sym[_]] = {
-    noPrims(aliasSyms(x)).flatMap{case Stm(s,d) => state.shallowAliasCache.getOrElseAdd(s, () => shallowAliases(d)) + s } ++
-      noPrims(extractSyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) }
-  }
-  @stateful def deepAliases(x: Any): Set[Sym[_]] = {
-    noPrims(aliasSyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) } ++
-      noPrims(copySyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) } ++
-      noPrims(containSyms(x)).flatMap{case Stm(s,d) => state.aliasCache.getOrElseAdd(s,  () => allAliases(d)) + s } ++
-      noPrims(extractSyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) }
-  }
-  @stateful final def allAliases(x: Any): Set[Sym[_]] = {
-    shallowAliases(x) ++ deepAliases(x)
-  }
-  @stateful final def mutableAliases(x: Any): Set[Sym[_]] = allAliases(x).filter(_.isMutable)
-  @stateful final def mutableInputs(d: Op[_]): Set[Sym[_]] = {
-    val bounds = d.binds
-    val actuallyReadSyms = d.reads diff bounds
-    mutableAliases(actuallyReadSyms) filterNot (bounds contains _)
   }
 
   /**
@@ -188,7 +167,7 @@ trait Staging { this: Printing =>
   }
 
   @rig final def allEffects(d: Op[_]): Effects = {
-    val effects = propagateWrites(d.effects) andAlso Effects.Reads(mutableInputs(d))
+    val effects = propagateWrites(d.effects) andAlso Effects.Reads(d.mutableInputs)
     val deps = effectDependencies(effects)
     effects.copy(antiDeps = deps)
   }

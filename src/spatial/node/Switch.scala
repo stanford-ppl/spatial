@@ -56,5 +56,5 @@ object SwitchScheduler extends argon.schedule.Scheduler {
     body.stms.collect{case Op(op:SwitchCase[_]) => op.asInstanceOf[SwitchCase[R]] }
   }
 
-  override def inputs = syms(selects) ++ syms(body)
+  override def inputs = syms(selects).toSeq ++ syms(body)
 }

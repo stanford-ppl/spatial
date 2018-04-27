@@ -2,8 +2,11 @@ package argon
 
 import scala.collection.mutable.{ArrayBuffer,HashSet}
 
+import utils.Instrument
+
 trait FlowRules {
   val IR: State
+
 }
 
 /**
@@ -13,8 +16,9 @@ class Flows {
   private val rules = ArrayBuffer[(String,PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit])]()
   private[argon] val names = HashSet[String]()
 
+  lazy val instrument = new Instrument("flows")
+
   def add(name: String, func: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit]): Unit = if (!names.contains(name)) {
-    //println(s"Added flow rule: $name")
     rules += ((name,func))
     names += name
   }
@@ -22,8 +26,7 @@ class Flows {
   def apply[A](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx, state: State): Unit = {
     val tuple = (lhs,rhs,ctx,state)
     rules.foreach{case (name,rule) =>
-      //dbgs(s"Applying rule $name")
-      if (rule.isDefinedAt(tuple)) rule.apply(tuple)
+      if (rule.isDefinedAt(tuple)) { rule.apply(tuple) }
     }
   }
 }

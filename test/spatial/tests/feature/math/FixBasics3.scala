@@ -1,14 +1,11 @@
 package spatial.tests.feature.math
 
-
 import spatial.dsl._
-
 
 @test class FixBasics3 extends SpatialTest {
   override def runtimeArgs: Args = "5.25 2.125"
 
   type T = FixPt[TRUE,_32,_32]
-
 
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals

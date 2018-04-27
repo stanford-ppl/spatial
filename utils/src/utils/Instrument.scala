@@ -21,11 +21,14 @@ class Instrument(val top: String = "") {
       val fullName = if (scope == "") name else scope + "." + name
       val startTime = System.currentTimeMillis()
       scope = fullName
-      val result = blk
-      scope = outerScope
-      val endTime = System.currentTimeMillis()
-      times(fullName) = times.getOrElse(fullName, 0L) + (endTime - startTime)
-      result
+      try {
+        blk
+      }
+      finally {
+        scope = outerScope
+        val endTime = System.currentTimeMillis()
+        times(fullName) = times.getOrElse(fullName, 0L) + (endTime - startTime)
+      }
     }
   }
 
@@ -53,7 +56,7 @@ class Instrument(val top: String = "") {
   private def dumpCategory(cat: String, keys: Iterable[String])(implicit out: PrintStream): Unit = {
     val depth = cat.count(_ == '.')
     val parent = cat.split('.').dropRight(1).mkString(".")
-    val time = times(cat)
+    val time = times.getOrElse(cat,0L)
     val subs = subcats(cat, keys, depth)
     val parentTime = if (depth == 0) time else times.getOrElse(parent, time)
     out.info(/*"  "*depth +*/ s"$cat: ${time/1000.0}s (" + "%.2f".format(time.toDouble/parentTime*100) + "%)")

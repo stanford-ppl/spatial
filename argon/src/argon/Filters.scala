@@ -4,21 +4,19 @@ import utils.recursive
 
 object Filters {
 
-  val expsFunc: PartialFunction[Any,Seq[Sym[_]]] = {
-    case s: Sym[_] if !s.isType => Seq(s)
+  val expsFunc: PartialFunction[Any,Set[Sym[_]]] = {
+    case s: Sym[_] if !s.isType => Set(s)
     case b: Block[_] => exps(b.result) ++ exps(b.effects.antiDeps)
-    case d: Op[_]    => d.expInputs
-    case l: Iterable[_] => recursive.collectSeqs(expsFunc)(l.iterator)
+    case d: Op[_]    => d.expInputs.toSet
   }
 
-  val symsFunc: PartialFunction[Any,Seq[Sym[_]]] = {
-    case s: Sym[_] if s.isSymbol => Seq(s)
-    case s: Sym[_] if s.isBound  => Seq(s)
+  val symsFunc: PartialFunction[Any,Set[Sym[_]]] = {
+    case s: Sym[_] if s.isSymbol => Set(s)
+    case s: Sym[_] if s.isBound  => Set(s)
     case b: Block[_]    => syms(b.result) ++ syms(b.effects.antiDeps)
-    case d: Op[_]       => d.inputs
-    case l: Iterable[_] => recursive.collectSeqs(symsFunc)(l.iterator)
+    case d: Op[_]       => d.inputs.toSet
   }
 
-  final def exps(a: Any*): Seq[Sym[_]] = if (expsFunc.isDefinedAt(a)) expsFunc(a) else Nil
-  final def syms(a: Any*): Seq[Sym[_]] = if (symsFunc.isDefinedAt(a)) symsFunc(a) else Nil
+  final def exps(a: Any*): Set[Sym[_]] = recursive.collectSets(expsFunc)(a)
+  final def syms(a: Any*): Set[Sym[_]] = recursive.collectSets(symsFunc)(a)
 }

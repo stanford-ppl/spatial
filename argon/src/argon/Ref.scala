@@ -92,6 +92,11 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
       err[A]("Invalid constant")
   }
 
+  /** Attempt to create a symbol of type A from c, where the type of c is unrestricted.
+    * This method should never throw exceptions or produce warnings or errors.
+    * Instead, it should return None if c is not convertible to an A, or return
+    * Some((a,false)) if c can be represented as an A, but not exactly.
+    */
   @rig def getFrom(c: Any, isParam: Boolean = false): Option[(A,Boolean)] = value(c) match {
     case Some((v,exact)) if isParam => Some((_param(this, v), exact))
     case Some((v,exact)) => Some((_const(this, v),exact))

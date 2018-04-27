@@ -40,7 +40,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     */
   @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
-    stage(SRAMRead[A,C](me,addr,Set.empty))
+    stage(SRAMRead[A,C](me,addr,ens))
   }
 
   /** Updates the value at `addr` to `data`.
@@ -49,7 +49,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     */
   @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
-    stage(SRAMWrite[A,C](me,data,addr,Set.empty))
+    stage(SRAMWrite[A,C](me,data,addr,ens))
   }
 
   @rig private def checkDims(given: Int): Unit = {

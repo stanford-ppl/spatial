@@ -74,6 +74,9 @@ import spatial.dsl._
     val gold = x_data.map{ dat => dat * b }
     printArray(gold, "expected: ")
     printArray(result, "got: ")
+    (0 :: gold.length).foreach{i =>
+      if (gold(i) != result(i)) println(r"$i: gold=${gold(i)}, result=${result(i)}")
+    }
 
     val expo_gold = Array.tabulate(1024){ i => exp(((i.to[Float])-512)/128) }
     val expo_got = getMem(expo_dram)

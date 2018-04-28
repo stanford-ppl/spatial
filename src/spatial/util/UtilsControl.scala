@@ -218,7 +218,7 @@ trait UtilsControl {
         val anchor = group.head._1
         val dists = accesses.map{a =>
           val (lca,dist) = LCAWithCoarseDistance(anchor,a)
-          if (lca == metapipe) a -> Some(dist) else a -> None
+          if (lca == metapipe || anchor == a) a -> Some(dist) else a -> None
         }
         val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
         val minDist = buffers.minOrElse(0)

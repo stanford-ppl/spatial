@@ -73,7 +73,7 @@ case class MemoryAllocator(IR: State) extends Pass {
 
         while (capacity(resource.name) > 0 && idx < sortedInsts.length) {
           val (mem, dup, d, _, area) = sortedInsts(idx)
-          val size = constDimsOf(mem).product
+          val size = areaModel.memoryBankDepth(mem,dup)
 
           if (area <= capacity && size >= resource.minDepth) {
             dbg(s"  Assigned $mem#$d to ${resource.name} (uses $area)")

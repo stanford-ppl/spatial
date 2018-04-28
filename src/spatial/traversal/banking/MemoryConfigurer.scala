@@ -23,7 +23,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   def configure(): Unit = {
     dbg("\n\n--------------------------------")
-    dbg(s"${mem.ctx}: Inferring instances for memory $mem")
+    dbg(s"${mem.ctx}: Inferring instances for memory ${mem.fullname}")
     dbg(mem.ctx.content.getOrElse(""))
     val readers = readersOf(mem)
     val writers = writersOf(mem)

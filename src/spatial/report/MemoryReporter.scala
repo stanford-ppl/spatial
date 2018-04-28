@@ -26,7 +26,7 @@ case class MemoryReporter(IR: State) extends Pass {
       val tab = (0 +: total.keys.map{k => k.length }).max
       total.foreach{(key,v) => if (v > 0) emit(s"  $key: ${" "*(key.length - tab)}$v") }
       emit(s"---------------------------")
-      emit(s"\n\n")
+      emit("\n\n")
 
       mems.foreach{case (mem,area) =>
         emit(s"---------------------------------------------------------------------")
@@ -42,7 +42,7 @@ case class MemoryReporter(IR: State) extends Pass {
 
         val readers = readersOf(mem)
         val writers = writersOf(mem)
-        emit(s"\n")
+        emit("\n")
         emit(s"Instance Summary: ")
         duplicates.zipWithIndex.foreach{case (inst,i) =>
           val Memory(banking,depth,isAccum) = inst

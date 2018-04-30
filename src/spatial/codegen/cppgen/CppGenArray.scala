@@ -90,7 +90,7 @@ trait CppGenArray extends CppGenCommon {
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case DataAsBits(bits)       => 
       emit(src"${lhs.tp} $lhs;")
-      emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back($bits >> ${lhs}_i & 1); }")
+      emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & 1); }")
     case BitsAsData(v,mT) => mT match {
       case FltPtType(_,_)   => throw new Exception("Bit-wise operations not supported on floating point values yet")
       case FixPtType(s,i,f) => 
@@ -128,27 +128,29 @@ trait CppGenArray extends CppGenCommon {
       else emit(src"""${lhs.tp} $lhs = *${struct}.$field;""")
 
     case SetMem(dram, data) => 
+      val rawtp = asIntType(dram.tp.typeArgs.head)
       val f = fracBits(dram.tp.typeArgs.head)
       if (f > 0) {
-        emit(src"vector<${dram.tp.typeArgs.head}>* ${dram}_rawified = new vector<${dram.tp.typeArgs.head}>((*${data}).size());")
+        emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
         open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
-          emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${dram.tp.typeArgs.head}) ((*${data})[${dram}_rawified_i] * ((${dram.tp.typeArgs.head})1 << $f));")
+          emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
         close("}")
-        emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${dram.tp.typeArgs.head}));")
+        emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
       } else {
-        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
       }
     case GetMem(dram, data) => 
+      val rawtp = asIntType(dram.tp.typeArgs.head)
       val f = fracBits(dram.tp.typeArgs.head)
       if (f > 0) {
-        emit(src"vector<${dram.tp.typeArgs.head}>* ${data}_rawified = new vector<${dram.tp.typeArgs.head}>((*${data}).size());")
-        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${dram.tp.typeArgs.head}));")
+        emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
+        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
         open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
-          emit(src"${dram.tp.typeArgs.head} ${data}_tmp = (*${data}_rawified)[${data}_i];")
-          emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${dram.tp.typeArgs.head})1 << $f);")
+          emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
+          emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
         close("}")
       } else {
-        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
       }
 
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
@@ -184,6 +186,12 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case op@ArrayFromSeq(seq)   => 
+      emitNewArray(lhs, lhs.tp, getSize(lhs))
+      seq.zipWithIndex.foreach{case (s,i) => 
+        emit(src"(*${lhs})[$i] = $s;")
+      }
+
     case ArrayForeach(array,apply,func) =>
       open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
       visitBlock(apply)
@@ -195,7 +203,7 @@ trait CppGenArray extends CppGenCommon {
       open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
       visitBlock(apply)
       visitBlock(func)
-      emitUpdate(lhs, func.result, src"${func.input}", func.result.tp)
+      emitUpdate(lhs, func.result, src"${apply.inputB}", func.result.tp)
       close("}")
       
 

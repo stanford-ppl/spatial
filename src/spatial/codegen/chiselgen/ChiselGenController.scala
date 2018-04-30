@@ -175,10 +175,10 @@ trait ChiselGenController extends ChiselGenCommon {
         stages.zipWithIndex.foreach{ case (s, i) =>
           emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
           emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
-          emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${DL(swap(s, Done), 0, true)}, ${swap(s, En)}, List($i)) // Used to be delay of 1 on Nov 26, 2017 but not sure why""")
+          emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${DL(swap(s, Done), 0, true)}, ${swap(s, En)}, $i) // Used to be delay of 1 on Nov 26, 2017 but not sure why""")
         }
       }
-      emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.ctrInc)""")
+      emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.doneIn.head)""")
       // Associate bound sym with both ctrl node and that ctrl node's cchain
     }
   }
@@ -214,10 +214,10 @@ trait ChiselGenController extends ChiselGenCommon {
               val s = ss.s.get
               emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
               emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
-              emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.connectStageCtrl(${DL(swap(s, Done), 1, true)}, ${swap(s,En)}, List($i))""")
+              emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.connectStageCtrl(${DL(swap(s, Done), 1, true)}, ${swap(s,En)}, $i)""")
             }
           }
-          emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.chain_pass(${swap(src"${v}${suffix}", Blank)}, ${swap(lhs, SM)}.io.ctrInc)""")
+          emitt(src"""${swap(src"${swap(src"${v}${suffix}", Blank)}", Chain)}.chain_pass(${swap(src"${v}${suffix}", Blank)}, ${swap(lhs, SM)}.io.doneIn.head)""")
         }
       }
     }
@@ -602,6 +602,52 @@ trait ChiselGenController extends ChiselGenCommon {
       }
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
       exitCtrl(lhs)
+
+    case StateMachine(ens,start,notDone,action,nextState) =>
+      val parent_kernel = enterCtrl(lhs)
+      emitController(lhs) // If this is a stream, then each child has its own ctr copy
+      val state = notDone.input
+
+      emit("// Emitting notDone")
+      visitBlock(notDone)
+      emitInhibitor(lhs, None, Some(notDone.result))
+
+      emit(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
+      if (iiOf(lhs) <= 1 | levelOf(lhs) == OuterControl) {
+        emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B""")
+      } else {
+        emit(src"""val ${lhs}_IICtr = Module(new RedxnCtr());""")
+        emitGlobalWire(src"""val ${swap(lhs, IIDone)} = Wire(Bool())""")
+        emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
+        emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
+        val stop = if (levelOf(lhs) == InnerControl) { iiOf(lhs) + 1} else {iiOf(lhs)} // I think innerpipes need one extra delay because of logic inside sm
+        emit(src"""${lhs}_IICtr.io.input.stop := ${stop}.toInt.S // ${swap(lhs, Retime)}.S""")
+        emit(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")  
+        emit(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
+      }
+      // emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B // Maybe this should handled differently""")
+
+      emit("// Emitting action")
+      // emitGlobalWire(src"val ${notDone.result}_doneCondition = Wire(Bool())")
+      // emit(src"${notDone.result}_doneCondition := ~${notDone.result} // Seems unused")
+      inSubGen(src"${lhs}", src"${parent_kernel}") {
+        emit(s"// Controller Stack: ${controllerStack.tail}")
+        visitBlock(action)
+      }
+      emit("// Emitting nextState")
+      visitBlock(nextState)
+      emit(src"${swap(lhs, SM)}.io.input.enable := ${swap(lhs, En)} ")
+      emit(src"${swap(lhs, SM)}.io.input.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Retime)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.output.state.r.asSInt) // Assume always int")
+      emit(src"${swap(lhs, SM)}.io.input.initState := ${start}.r.asSInt")
+      emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
+      emit(src"${state}.r := ${swap(lhs, SM)}.io.output.state.r")
+      emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
+      emit(src"${lhs}_doneCondition := ~${notDone.result}")
+      emit(src"${swap(lhs, SM)}.io.input.doneCondition := ${lhs}_doneCondition")
+      val extraEn = if (ens.toList.length > 0) {src"""List($ens).map(en=>en).reduce{_&&_}"""} else {"true.B"}
+      emit(src"${swap(lhs, Mask)} := ${extraEn}")
+      emitChildrenCxns(lhs, true)
+      controllerStack.pop()
 
 
     case _ => super.gen(lhs, rhs)

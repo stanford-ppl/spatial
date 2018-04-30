@@ -83,7 +83,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val broadcasts = writersOf(mem).filter{w => !portsOf(w).values.head.bufferPort.isDefined & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"$i -> ${accessWidth(a)}"}.toList
 
     val templateName = if (inst.depth == 1) s"${name}("
-                       else if (broadcasts.length > 0) {appPropertyStats += HasNBufSRAM; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
+                       else {appPropertyStats += HasNBufSRAM; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
 
     val depth = if (inst.depth > 1) s"${inst.depth}," else ""
     val nbuf = if (inst.depth > 1) "NBuf" else ""
@@ -95,7 +95,7 @@ trait ChiselGenMem extends ChiselGenCommon {
                                 if (inst.depth > 1) src"$bufp -> XMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",") + ")"
                                 else writes.map{w => src"${portsOf(w).values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",")
                               }.mkString(",") + ")"
-    val XBarR = s"${nbuf}XMap(" + readersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val XBarR = s"${nbuf}XMap(" + readersOf(mem)
                               .filter(!_.isDirectlyBanked)              // Filter out statically banked
                               .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, reads) => 
@@ -106,17 +106,17 @@ trait ChiselGenMem extends ChiselGenCommon {
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> XMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",") + ")"
+                                if (inst.depth > 1) src"$bufp -> DMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",") + ")"
                                 else writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",")
                               }.mkString(",") + ")"
-    val DirectR = s"${nbuf}DMap(" + readersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val DirectR = s"${nbuf}DMap(" + readersOf(mem)
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .groupBy(portsOf(_).values.head.bufferPort.getOrElse(0))      // Group by port
-                              .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> XMap(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",") + ")"
-                                else writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",")
+                              .map{case(bufp, reads) => 
+                                if (inst.depth > 1) src"$bufp -> DMap(" + reads.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",") + ")"
+                                else reads.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","List")}.mkString(",")
                               }.mkString(",") + ")"
-    val bPar = if (broadcasts.length > 0) "XMap(" + broadcasts.mkString(",") + ")," else ""
+    val bPar = if (inst.depth > 1) "XMap(" + broadcasts.mkString(",") + ")," else ""
 
     val dimensions = dims.map(_.toString).mkString("List[Int](", ",", ")")
     val numBanks = inst.nBanks.map(_.toString).mkString("List[Int](", ",", ")")
@@ -150,14 +150,81 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io.almostFull")
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = $fifo.io.output.data(0)")
     case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.io.numel")
-    case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq(Seq()), Seq(), ens)
-    case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq(Seq()), Seq(), ens)
+    case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
+    case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
 
     case _ => super.gen(lhs, rhs)
   }
 
-  override def emitFooter(): Unit = {
+  protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
+    val accesses = readersOf(mem) ++ writersOf(mem)
+    val ports = accesses.filter{a => portsOf(a).values.head.bufferPort.isDefined}.map{a => portsOf(a).values.head.bufferPort.get}.toList
 
+    var specialLB = false
+    // val readCtrls = readPorts.map{case (port, readers) =>
+    //   val readTops = readers.flatMap{a => topControllerOf(a, mem, i) }
+    //   mem match {
+    //     case Def(_:LineBufferNew[_]) => // Allow empty lca, meaning we use a sequential pipe for rotations
+    //       if (readTops.nonEmpty) {
+    //         readTops.headOption.get.node
+    //       } else {
+    //         warn(u"Memory $mem, instance $i, port $port had no read top controllers.  Consider wrapping this linebuffer in a metapipe to get better speedup")
+    //         specialLB = true
+    //         // readTops.headOption.getOrElse{throw new Exception(u"Memory $mem, instance $i, port $port had no read top controllers") }    
+    //         readers.head.node
+    //       }
+    //     case _ =>
+    //       readTops.headOption.getOrElse{throw new Exception(u"Memory $mem, instance $i, port $port had no read top controllers") }.node    
+    //   }
+      
+    // }
+    // if (readCtrls.isEmpty) throw new Exception(u"Memory $mem, instance $i had no readers?")
+
+    // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
+
+    if (!specialLB) {
+      val siblings = accesses.reduce(LCA(_,_).s.get).children.toList
+      val portMatchup = accesses.map{a => siblings.indexOf(siblings.filter{ s => a.ancestors.contains(s) }.head)}
+      val basePort = portMatchup.min
+      val numPorts = ports.max
+
+      val info = (0 to numPorts).map { port => siblings(basePort + port).s.get }
+      info.toList
+    } else {
+      throw new Exception("Implement LB with transient buffering")
+      // // Assume write comes before read and there is only one write
+      // val writer = writers.head.ctrl._1
+      // val reader = readers.head.ctrl._1
+      // val lca = leastCommonAncestorWithPaths[Exp[_]](reader, writer, {node => parentOf(node)})._1.get
+      // val allSiblings = childrenOf(lca)
+      // var writeSibling: Option[Exp[Any]] = None
+      // var candidate = writer
+      // while (!writeSibling.isDefined) {
+      //   if (allSiblings.contains(candidate)) {
+      //     writeSibling = Some(candidate)
+      //   } else {
+      //     candidate = parentOf(candidate).get
+      //   }
+      // }
+      // // Get LCA of read and write
+      // List((writeSibling.get, src"/*seq write*/"))
+    }
+
+  }
+
+  override def emitFooter(): Unit = {
+    enterAccel()
+
+    inGenn(out, "BufferControlCxns", ext) {
+      nbufs.foreach{ mem => 
+        val info = bufferControlInfo(mem)
+        info.zipWithIndex.foreach{ case (node, port) => 
+          emitt(src"""${mem}.connectStageCtrl(${DL(swap(quote(node), Done), 1, true)}, ${swap(quote(node), BaseEn)}, ${port})""")
+        }
+      }
+    }
+
+    exitAccel()
     super.emitFooter()
   }
 

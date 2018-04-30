@@ -67,6 +67,9 @@ object ops {
     def D(delay: Double): Bool = {
       b.D(delay.toInt, true.B)
     }
+    def reverse: Bool = {
+      b
+    }
     
     // Stream version
     def DS(delay: Int, retime_released: Bool, flow: Bool): Bool = {

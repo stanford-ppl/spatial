@@ -20,6 +20,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case InputArguments()       => 
     case ArgInNew(init)  => 
       argIns += (lhs -> argIns.toList.length)
+    case HostIONew(init)  => 
+      argIOs += (lhs -> argIOs.toList.length)
     case ArgOutNew(init) => 
       enterAccel()
       emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)

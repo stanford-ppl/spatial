@@ -16,6 +16,7 @@ object BankedMemory extends BankingMode
 sealed trait MemPrimitive
 object SRAMType extends MemPrimitive
 object FFType extends MemPrimitive
+object FIFOType extends MemPrimitive
 object ShiftRegFileType extends MemPrimitive
 object LineBufferType extends MemPrimitive
 
@@ -197,15 +198,15 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     mem._1.io.wMask := xBarSelect.reduce{_|_} | {if (hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B}
     // Connect matching W port to memory
     
-    if (directSelect.length > 0 & hasXBarW) { 
+    if (directSelect.length > 0 & hasXBarW) {           // Has direct and x
       mem._1.io.w.ofs  := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs, chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs)
       mem._1.io.w.data := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data, chisel3.util.PriorityMux(xBarSelect, io.xBarW).data)
       mem._1.io.w.en   := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarW).en)
-    } else if (hasXBarW) { 
+    } else if (hasXBarW && directSelect.length == 0) {  // Has x only
       mem._1.io.w.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs
       mem._1.io.w.data := chisel3.util.PriorityMux(xBarSelect, io.xBarW).data
       mem._1.io.w.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarW).en 
-    } else { 
+    } else {                                            // Has direct only
       mem._1.io.w.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.w.data := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data
       mem._1.io.w.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
@@ -224,13 +225,13 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     // Unmask write port if any of the above match
     mem._1.io.rMask := {if (hasXBarR) xBarSelect.reduce{_|_} else true.B} & {if (directSelect.length > 0) directSelect.map(_.en).reduce(_|_) else true.B}
     // Connect matching R port to memory
-    if (directSelect.length > 0 & hasXBarR) { 
+    if (directSelect.length > 0 & hasXBarR) {          // Has direct and x
       mem._1.io.r.ofs  := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs, chisel3.util.PriorityMux(xBarSelect, io.xBarR).ofs)
       mem._1.io.r.en   := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarR).en)
-    } else if (hasXBarW) { 
+    } else if (hasXBarR && directSelect.length == 0) { // Has x only
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarR).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarR).en 
-    } else { 
+    } else {                                           // Has direct only
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
     }

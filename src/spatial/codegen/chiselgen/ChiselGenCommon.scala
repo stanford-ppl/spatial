@@ -14,7 +14,7 @@ import spatial.internal.{spatialConfig => cfg}
 trait ChiselGenCommon extends ChiselCodegen { 
 
   // Statistics counters
-  // var itersMap = new scala.collection.mutable.HashMap[Bound[_], List[Sym[_]]]
+  var itersMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var cchainPassMap = new scala.collection.mutable.HashMap[Sym[_], Sym[_]] // Map from a cchain to its ctrl node, for computing suffix on a cchain before we enter the ctrler
   var validPassMap = new scala.collection.mutable.HashMap[(Sym[_], String), Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
@@ -426,6 +426,24 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 
+  override protected def quote(s: Sym[_]): String = s.rhs match {
+    case Def.Bound(id)  => 
+      var result = super.quote(s)
+      if (itersMap.contains(s)) {
+        val siblings = itersMap(s)
+        var nextLevel: Option[Sym[_]] = Some(controllerStack.head)
+        while (nextLevel.isDefined) {
+          if (siblings.contains(nextLevel.get)) {
+            if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
+            nextLevel = None
+          } else {
+            nextLevel = nextLevel.get.parent.s
+          }
+        }
+      }
+      result
+    case _ => super.quote(s)
+  }
 
 
   def swap(tup: (Sym[_], RemapSignal)): String = { swap(tup._1, tup._2) }

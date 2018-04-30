@@ -66,6 +66,7 @@ trait UtilsControl {
     case Host => Nil
     case Controller(Op(loop: Loop[_]), -1) => loop.iters
     case Controller(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
+    case Controller(Op(loop: UnrolledLoop[_]), -1)  => loop.iters
     case _ => Nil
   }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
 
@@ -138,6 +139,7 @@ trait UtilsControl {
   def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {
     Tree.LCAWithPaths(a,b){_.parent}
   }
+
 
   /**
     * Returns the LCA between two controllers a and b along with their pipeline distance.

@@ -72,14 +72,14 @@ trait ImplicitsPriority3 {
     }
   }
 
-  @api implicit def reverseRegLookup[A:Bits](a: A): Reg[A] = a match {
-    case Op(RegRead(reg)) => reg.asInstanceOf[Reg[A]]
-    case Op(GetReg(reg))  => reg.asInstanceOf[Reg[A]]
-    case _ =>
-      error(ctx, s"No register available for ${a.nameOr("value")}")
-      error(ctx)
-      err[Reg[A]]("No register available")
-  }
+  // @api implicit def reverseRegLookup[A:Bits](a: A): Reg[A] = a match {
+  //   case Op(RegRead(reg)) => reg.asInstanceOf[Reg[A]]
+  //   case Op(GetReg(reg))  => reg.asInstanceOf[Reg[A]]
+  //   case _ =>
+  //     error(ctx, s"No register available for ${a.nameOr("value")}")
+  //     error(ctx)
+  //     err[Reg[A]]("No register available")
+  // }
 
 
   // Using Lift[A] is always lowest priority
@@ -212,6 +212,22 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
   }
 
+  class NumericAddOps[A:Numeric](x: A) {
+    @api def +[B:Arith](that: Reg[B]): B = Arith[B].from(x) + that.value
+    @api def -[B:Arith](that: Reg[B]): B = Arith[B].from(x) - that.value
+    @api def *[B:Arith](that: Reg[B]): B = Arith[B].from(x) * that.value
+    @api def /[B:Arith](that: Reg[B]): B = Arith[B].from(x) / that.value
+    @api def %[B:Arith](that: Reg[B]): B = Arith[B].from(x) % that.value
+
+    @api def <[B:Order](that: Reg[B]): Bit = Order[B].from(x) < that.value
+    @api def <=[B:Order](that: Reg[B]): Bit = Order[B].from(x) <= that.value
+    @api def >[B:Order](that: Reg[B]): Bit = Order[B].from(x) > that.value
+    @api def >=[B:Order](that: Reg[B]): Bit = Order[B].from(x) >= that.value
+
+    @api def infix_!=[B:Type](that: Reg[B]): Bit = Type[B].from(x) !== that.value
+    @api def infix_==[B:Type](that: Reg[B]): Bit = Type[B].from(x) === that.value
+
+  }
   class RegNumerics[A:Num](reg: Reg[A])(implicit ctx: SrcCtx, state: State) {
     def :+=(data: A): Void = reg := reg.value + data.unbox
     def :-=(data: A): Void = reg := reg.value - data.unbox

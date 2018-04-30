@@ -54,7 +54,7 @@ trait SpatialVirtualization {
   def __use[T](v: T): T = macro forge.EmbeddedControls.useImpl[T]
   @rig def __use[T](v: Ptr[T]): T = v.__read
   @rig def __use[T](v: Var[T]): T = v.__sread()
-  @rig def __use[T](v: Reg[T]): T = v.value
+  // @rig def __use[T](v: Reg[T]): T = v.value
 
   @rig def __ifThenElse[A:Type](cond: Bit, thenBr: => Lift[A], elseBr: => Lift[A])(implicit ov0: Overload0): A = {
     ifThenElse(cond, () => thenBr.unbox, () => elseBr.unbox)

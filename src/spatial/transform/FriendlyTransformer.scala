@@ -24,13 +24,17 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
     case Some(data) =>
       // Don't get rid of reads being used for DRAM allocations
-      if (lhs.consumers.exists{case Op(DRAMNew(_, _)) => true; case _ => false })
+      if (lhs.consumers.exists{case Op(DRAMNew(_, _)) => true; case _ => false }) {
+        dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
         super.transform(lhs, rhs)
-      else
+      }
+      else {
+        dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data)")
         data.asInstanceOf[Sym[A]]
+      }
 
     case None =>
-      warn(lhs.ctx, s"$tp was used before being set. This will result in 0 at runtime.")
+      warn(lhs.ctx, s"$tp ($lhs) was used before being set. This will result in 0 at runtime.")
       warn(lhs.ctx)
       reg.A.zero
   }
@@ -50,11 +54,11 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
     // Add ArgIns for DRAM dimensions
     case DRAMNew(F(dims),_) =>
       dimMapping ++= dims.distinct.map{
-        case d @ Op(RegRead(reg)) if reg.isArgIn  => d -> d
-        case d @ Op(RegRead(reg)) if reg.isHostIO => d -> d   // TODO[3]: Allow DRAM dims with HostIO?
-        case d if d.isValue                       => d -> d
-        case d if dimMapping.contains(d)          => d -> dimMapping(d)
-        case d                                    => d -> argIn(d).unbox
+        case d @ Op(RegRead(reg)) if reg.isArgIn  => dbg(s"DRAM: $lhs ($dims), dim: $d = ArgIn, mapping to $d");                         d -> d
+        case d @ Op(RegRead(reg)) if reg.isHostIO => dbg(s"DRAM: $lhs ($dims), dim: $d = HostIO, mapping to $d");                        d -> d   // TODO[3]: Allow DRAM dims with HostIO?
+        case d if d.isValue                       => dbg(s"DRAM: $lhs ($dims), dim: $d = isValue, mapping to $d");                       d -> d
+        case d if dimMapping.contains(d)          => dbg(s"DRAM: $lhs ($dims), dim: $d = previously used, mapping to ${dimMapping(d)}"); d -> dimMapping(d)
+        case d                                    => dbg(s"DRAM: $lhs ($dims), dim: $d = other, mapping to ${argIn(d).unbox}");          d -> argIn(d).unbox
       }
       val dims2 = dims.map{d => dimMapping(d) }
       addedArgIns ++= dims.zip(dims2)
@@ -112,6 +116,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
     // reg := data
     case RegWrite(F(reg),F(data),_) =>
       mostRecentWrite += reg -> data
+      dbg(s"Adding $reg -> $data to mostRecentWrite map ($mostRecentWrite)")
 
       def set(tp: String): Sym[A] = {
         warn(ctx, s"Use setArg for setting $tp outside Accel.")
@@ -144,6 +149,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
 
     case SetReg(F(reg),F(data)) =>
       mostRecentWrite += reg -> data
+      dbg(s"Adding $reg -> $data to mostRecentWrite map ($mostRecentWrite)")
 
       def write(tp: String): Sym[A] = {
         warn(ctx, s"Use register assignment syntax, :=, for writing $tp within Accel.")

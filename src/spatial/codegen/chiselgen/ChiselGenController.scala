@@ -480,6 +480,22 @@ trait ChiselGenController extends ChiselGenCommon {
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
       exitCtrl(lhs)
 
+    case ParallelPipe(ens,func) =>
+      val parent_kernel = enterCtrl(lhs)
+      emitController(lhs)
+      emit(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
+      emitGlobalWire(src"""${swap(lhs, IIDone)} := true.B""")
+      inSubGen(src"${lhs}", src"${parent_kernel}") {
+        emit(s"// Controller Stack: ${controllerStack.tail}")
+        emitChildrenCxns(lhs)
+        visitBlock(func)
+      } 
+      emitCopiedCChain(lhs)
+      val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
+      emit(src"${swap(lhs, Mask)} := $en")
+
+      exitCtrl(lhs)
+
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy

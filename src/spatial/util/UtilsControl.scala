@@ -42,7 +42,11 @@ trait UtilsControl {
     def isSequential: Boolean = s.exists(_.schedule == Sched.Seq)
     def isStreamPipe: Boolean = s.exists(_.schedule == Sched.Stream)
 
-    def isMetaPipe: Boolean = isOuterControl && s.exists(_.schedule == Sched.Pipe)
+    def isInnerPipe: Boolean = isInnerControl && isPipeline && toCtrl.isLoop
+    def isMetaPipe: Boolean  = isOuterControl && isPipeline
+
+    def isInnerStream: Boolean = isInnerControl && isStreamPipe
+    def isOuterStream: Boolean = isOuterControl && isStreamPipe
 
 
     def isForever: Boolean = op match {
@@ -88,8 +92,7 @@ trait UtilsControl {
 
     def ctrs: Seq[Counter[_]] = x.node.counters
     def pars: Seq[I32] = ctrs.map(_.ctrPar)
-    def shouldFullyUnroll: Boolean = ctrs.forall(_.shouldFullyUnroll)
-    def mayFullyUnroll: Boolean = ctrs.forall(_.mayFullyUnroll)
+    def willFullyUnroll: Boolean = ctrs.forall(_.willFullyUnroll)
     def isUnit: Boolean = ctrs.forall(_.isUnit)
     def isStatic: Boolean = ctrs.forall(_.isStatic)
   }
@@ -118,11 +121,7 @@ trait UtilsControl {
 
       case _ => None
     }
-    def shouldFullyUnroll: Boolean = (nIters,ctrPar) match {
-      case (Some(Final(nIter)), Final(par)) => par >= nIter
-      case _ => false
-    }
-    def mayFullyUnroll: Boolean = (nIters,ctrPar) match {
+    def willFullyUnroll: Boolean = (nIters,ctrPar) match {
       case (Some(Expect(nIter)), Expect(par)) => par >= nIter
       case _ => false
     }
@@ -213,7 +212,7 @@ trait UtilsControl {
   }
   @stateful def LCAWithCoarseDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     val (lca,dist) = LCAWithDistance(a,b)
-    val coarseDist = if (lca.isOuterControl && lca.isLoop) dist else 0
+    val coarseDist = if (lca.isMetaPipe || lca.isOuterStream) dist else 0
     (lca, coarseDist)
   }
 
@@ -261,11 +260,16 @@ trait UtilsControl {
 
 
 
-  /** Returns true if symbols a and b occur in Parallel (but not metapipeline parallel). */
-  def areInParallel(a: Sym[_], b: Sym[_]): Boolean = {
+  /** Returns true if accesses a and b occur to the same buffer port.
+    * This is true when any of the following hold:
+    *   1. a and b are in the same inner pipeline
+    *   2. a and b are in the same inner streaming pipeline
+    *   3. a and b are in
+    */
+  def requireParallelPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
     val lca = LCA(a,b)
     // TODO[2]: Arbitrary dataflow graph for children
-    lca.isInnerControl || lca.isParallel
+    lca.isInnerPipe || lca.isInnerStream || lca.isParallel
   }
 
 

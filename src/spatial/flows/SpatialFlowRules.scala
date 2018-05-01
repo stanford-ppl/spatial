@@ -45,7 +45,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = op match {
     case ctrl: Control[_] =>
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
-      s.isOuter = children.exists{c => c.isBranch || c.isOuterControl }
+      // Branches (Switch, SwitchCase) only count as controllers here if they are outer controllers
+      s.isOuter = children.exists{c => !c.isBranch || c.isOuter }
       s.cchains.foreach{cchain => cchain.owner = s }
       s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
@@ -61,17 +62,31 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ => // Nothin'
   }
 
+  /** Set the control schedule of controllers based on the following ordered rules:
+    *   1. Parallel is always ForkJoin
+    *   2. Switch is always Fork
+    *   3. For all other controllers:
+    *      a. If the compiler has not yet defined a schedule, take the user schedule if defined.
+    *      b. If the user and compiler both have not defined a schedule:
+    *         - UnitPipe and Accel are Seq by default
+    *         - All other controllers are Pipe by default
+    *      c. Otherwise, use the compiler's schedule
+    *   4. Accel, UnitPipe, and fully unrolled loops cannot be Pipe - override these with Seq.
+    *   5. Inner controllers cannot be Stream - override these with Pipe [TODO: Confirm]
+    */
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
     case _: ParallelPipe => s.schedule = Sched.ForkJoin
     case _: Switch[_]    => s.schedule = Sched.Fork
     case _: Control[_] =>
       (s.getUserSchedule, s.getSchedule) match {
+        case (Some(s1), None)    => s.schedule = s1
         case (None, None) if s.isUnitPipe || s.isAccel => s.schedule = Sched.Seq
         case (None, None)        => s.schedule = Sched.Pipe
-        case (Some(s1), None)    => s.schedule = s1
-        case (None, Some(s1))    => s.schedule = s1
-        case (Some(_), Some(s2)) => s.schedule = s2  // Override user
+        case (_   , Some(s2))    => s.schedule = s2
       }
+      if (!s.isLoop && s.isPipeline) s.schedule = Sched.Seq
+      if (s.isInnerControl && s.isStreamPipe) s.schedule = Sched.Pipe
+
     case _ => // No schedule for non-control nodes
   }
 

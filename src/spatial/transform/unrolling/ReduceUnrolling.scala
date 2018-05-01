@@ -16,7 +16,7 @@ trait ReduceUnrolling extends UnrollingBase {
       implicit val A: Bits[a] = op.A
       val accum2 = accumHack(accum, load)
 
-      if (cchain.shouldFullyUnroll) {
+      if (cchain.willFullyUnroll) {
         fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters)
       }
       else {

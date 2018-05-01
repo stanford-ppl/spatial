@@ -87,6 +87,9 @@ trait Printing {
   @stateful def dbgss(x: => Any): Unit = if (config.enDbg) {
     x.toString.split("\n").foreach{line => dbgs(line) }
   }
+  @stateful def dbgss(prefix: String, x: => Any): Unit = if (config.enDbg) {
+    x.toString.split("\n").foreach{line => dbgs(prefix + line) }
+  }
   @stateful def dbgblk(x: => Unit): Unit = if (config.enDbg) {
     state.logTab += 1
     x

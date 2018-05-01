@@ -10,7 +10,7 @@ trait ForeachUnrolling extends UnrollingBase {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case OpForeach(ens, cchain, func, iters) =>
-      if (cchain.shouldFullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
+      if (cchain.willFullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
       else partiallyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
 
     case _ => super.unrollCtrl(lhs,rhs)

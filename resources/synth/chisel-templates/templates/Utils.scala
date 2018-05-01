@@ -576,12 +576,17 @@ object ops {
 
 object Utils {
 
+  /* List of bank addresses, for direct accesses */
   type Banks = List[Int]
   def Banks(xs: Int*) = List(xs:_*)
-  type XMap = HashMap[Int, Int]
-  def XMap(xs:(Int, Int)*) = HashMap[Int,Int](xs:_*)
-  type DMap = HashMap[Int, List[Banks]]
-  def DMap(xs:(Int,List[Banks])*) = HashMap[Int, List[Banks]](xs:_*)
+  /* Map from muxPort to (parallelization of access, isShift) */
+  type XMap = HashMap[Int, (Int, Option[Int])]
+  def XMap(xs:(Int, Int)*) = HashMap[Int,(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def ShiftXMap(axis: Int, xs:(Int,Int)*) = HashMap[Int, (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
+  /* Map from muxPort to (Banks, isShift) */
+  type DMap = HashMap[Int, (List[Banks],Option[Int])]
+  def DMap(xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def ShiftDMap(axis: Int, xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   type NBufXMap = HashMap[Int, XMap]
   def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
   type NBufDMap = HashMap[Int, DMap]

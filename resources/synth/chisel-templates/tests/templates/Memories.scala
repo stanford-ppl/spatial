@@ -84,6 +84,72 @@ class FFTests(c: FF) extends PeekPokeTester(c) {
   expect(c.io.output.data, initval)
 }
 
+class ShiftRegFileTests(c: ShiftRegFile) extends PeekPokeTester(c) {
+
+
+  if (!c.xBarWMux.values.head._2.isDefined) { // RegFile mode
+    // Fill regfile
+    for (i <- 0 until c.logicalDims(0)) {
+      for (j <- 0 until c.logicalDims(1)) {
+        poke(c.io.xBarW(0).banks(0), i)
+        poke(c.io.xBarW(0).banks(1), j)
+        poke(c.io.xBarW(0).data, i+j)
+        poke(c.io.xBarW(0).en, 1)
+        step(1)
+      }
+    }
+    poke(c.io.xBarW(0).en, 0)
+    step(1)
+
+    // Read RegFile
+    for (i <- 0 until c.logicalDims(0)) {
+      for (j <- 0 until c.logicalDims(1)) {
+        poke(c.io.xBarR(0).banks(0), i)
+        poke(c.io.xBarR(0).banks(1), j)
+        poke(c.io.xBarR(0).en, 1)
+        expect(c.io.output.data(0), i+j)
+        step(1)
+      }
+    }
+  }
+  else { // Shift mode
+    for (wavefront <- 0 until c.logicalDims(1)) {
+      for (i <- 0 until c.logicalDims(0)) {
+        poke(c.io.xBarW(0).banks(0), i)
+        poke(c.io.xBarW(0).banks(1), 0)
+        poke(c.io.xBarW(0).data, i+wavefront*10)
+        poke(c.io.xBarW(0).shiftEn, 1)
+        poke(c.io.xBarW(0).en, 1)
+        step(1)
+      }
+
+      poke(c.io.xBarW(0).en, 0)
+      poke(c.io.xBarW(0).shiftEn, 0)
+      step(1)
+
+
+      println("Shift: " + wavefront)
+      for (i <- 0 until c.logicalDims(0)) {
+        for (j <- 0 until c.logicalDims(1)) {
+          poke(c.io.xBarR(0).banks(0), i)
+          poke(c.io.xBarR(0).banks(1), j)
+          poke(c.io.xBarR(0).en, 1)
+          // if (j < wavefront) expect(c.io.output.data(i), 0)
+          // else expect(c.io.output.data(i), 0)
+          val d = peek(c.io.output.data(0))
+          val g = 0 max {i + wavefront*10 - j*10}
+          expect(c.io.output.data(0), g)
+          step(1)
+          // print(" " + d + "(" + g + ")")
+        }
+        println("")
+      }
+      println("-------------------")
+
+    }
+  }
+
+}
 
 /**
  * SRAM test harness
@@ -95,7 +161,7 @@ class SRAMTests(c: SRAM) extends PeekPokeTester(c) {
   reset(1)
 
   // Write to each address
-  val wPar = c.directWMux.values.toList.head.length
+  val wPar = c.directWMux.values.toList.head._1.length
   for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
     for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
       // Set addrs
@@ -118,7 +184,7 @@ class SRAMTests(c: SRAM) extends PeekPokeTester(c) {
   step(30)
 
   // Check each address
-  val rPar = c.directRMux.values.toList.head.length
+  val rPar = c.directRMux.values.toList.head._1.length
   for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
     for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
       // Set addrs
@@ -175,15 +241,26 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
       poke(c.io.broadcast(0).data, 999)
       poke(c.io.broadcast(0).en, true)
       step(1)
+    case ShiftRegFileType => 
+      for (i <- 0 until c.logicalDims(0)) {
+        for (j <- 0 until c.logicalDims(1)) {
+          poke(c.io.broadcast(0).banks(0), i)
+          poke(c.io.broadcast(0).banks(1), j)
+          poke(c.io.broadcast(0).data, 999)
+          poke(c.io.broadcast(0).en, true)
+          step(1)      
+        }
+      }
   }
   c.io.broadcast.foreach{p => poke(p.en, false)}
   step(1)
 
   // Read all bufs
   for (buf <- 0 until c.numBufs) {
+    println("Buffer: " + buf)
     c.mem match {
       case SRAMType => 
-        val rPar = c.directRMux.values.toList.head.values.toList.flatten.length
+        val rPar = c.directRMux.values.toList.head.values.toList.map(_._1).flatten.length
         val base = c.directRMux.keys.toList.head * rPar
         for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
           for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
@@ -205,6 +282,20 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
         val base = c.xBarRMux.keys.toList.head
         expect(c.io.output.data(0), 999)
         step(1)
+      case ShiftRegFileType => 
+        for (i <- 0 until c.logicalDims(0)) {
+          for (j <- 0 until c.logicalDims(1)) {
+            poke(c.io.xBarR(0).banks(0), i)
+            poke(c.io.xBarR(0).banks(1), j)
+            poke(c.io.xBarR(0).en, true)
+            expect(c.io.output.data(0),999)
+            val x = peek(c.io.output.data(0))
+            print(" " + x)
+            step(1)      
+          }
+          println("")
+        }
+
     }
     c.io.directR.foreach{p => poke(p.en, false)}
     // Rotate buffer
@@ -224,7 +315,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
     c.mem match {
       case SRAMType => 
         // Write to each address
-        val wPar = c.directWMux.values.toList.head.values.toList.flatten.length
+        val wPar = c.directWMux.values.toList.head.values.toList.map(_._1).flatten.length
         for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
           for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
             // Set addrs
@@ -243,6 +334,17 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
         poke(c.io.xBarW(0).data, epoch*100)
         poke(c.io.xBarW(0).en, true)
         step(1)
+      case ShiftRegFileType => 
+        for (i <- 0 until c.logicalDims(0)) {
+          for (j <- 0 until c.logicalDims(1)) {
+            poke(c.io.xBarW(0).banks(0), i)
+            poke(c.io.xBarW(0).banks(1), j)
+            poke(c.io.xBarW(0).data, epoch*100 + (i*c.logicalDims(0)+j)*2)
+            poke(c.io.xBarW(0).en, true)
+            step(1)      
+          }
+        }
+
     }
 
     // Turn off wEn
@@ -266,7 +368,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
     // Check each address
     c.mem match {
       case SRAMType => 
-        val rPar = c.directRMux.values.toList.head.values.toList.flatten.length
+        val rPar = c.directRMux.values.toList.head.values.toList.map(_._1).flatten.length
         for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
           for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
             // Set addrs
@@ -287,7 +389,20 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
         val base = c.xBarRMux.keys.toList.head
         expect(c.io.output.data(0), epoch*100)
         step(1)
+      case ShiftRegFileType => 
+        for (i <- 0 until c.logicalDims(0)) {
+          for (j <- 0 until c.logicalDims(1)) {
+            poke(c.io.xBarR(0).banks(0), i)
+            poke(c.io.xBarR(0).banks(1), j)
+            expect(c.io.output.data(0),epoch*100 + (i*c.logicalDims(0)+j)*2)
+            val x = peek(c.io.output.data(0))
+            print(" " + x)
+            step(1)
+          }
+          println("")
+        }
     }
+    println("")
     
     // Turn off rEn
     c.io.directR.foreach{p => poke(p.en, false)}
@@ -330,9 +445,9 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
 
   // fill FIFO halfway
   var things_pushed = 0
-  for (i <- 0 until c.depth/c.xBarWMux.values.head/2) {
-    val ens = (0 until c.xBarWMux.values.head).map{i => rnd.nextInt(2)}
-    val datas = (0 until c.xBarWMux.values.head).map{i => rnd.nextInt(5)}
+  for (i <- 0 until c.depth/c.xBarWMux.values.head._1/2) {
+    val ens = (0 until c.xBarWMux.values.head._1).map{i => rnd.nextInt(2)}
+    val datas = (0 until c.xBarWMux.values.head._1).map{i => rnd.nextInt(5)}
     things_pushed = things_pushed + ens.reduce{_+_}
     enq(datas, ens)
   }
@@ -342,10 +457,10 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
 
   // pop FIFO halfway
   var things_popped = 0
-  for (i <- 0 until c.depth/c.xBarRMux.values.head/2) {
-    val ens = (0 until c.xBarRMux.values.head).map{i => rnd.nextInt(2)}
+  for (i <- 0 until c.depth/c.xBarRMux.values.head._1/2) {
+    val ens = (0 until c.xBarRMux.values.head._1).map{i => rnd.nextInt(2)}
     things_popped = things_popped + ens.reduce{_+_}
-    deq(if (things_popped > things_pushed) (0 until c.xBarRMux.values.head).map{_ => 0} else ens)
+    deq(if (things_popped > things_pushed) (0 until c.xBarRMux.values.head._1).map{_ => 0} else ens)
   }
 
   

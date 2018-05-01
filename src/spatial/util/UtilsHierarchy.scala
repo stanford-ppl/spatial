@@ -15,7 +15,10 @@ trait UtilsHierarchy {
     }
 
     def isAccel: Boolean = op.isInstanceOf[AccelScope]
-    def isLoop: Boolean = op.isInstanceOf[Loop[_]]
+    def isLoop: Boolean = op match {
+      case loop: Loop[_] => !loop.cchains.forall(_._1.willFullyUnroll)
+      case _ => false
+    }
 
     def isSwitch: Boolean = op.isInstanceOf[Switch[_]]
     def isBranch: Boolean = op match {
@@ -81,7 +84,7 @@ trait UtilsHierarchy {
     def isEphemeral: Boolean = op.exists(_.isEphemeral)
 
     def isAccel: Boolean = op.exists(_.isAccel)
-    def isLoop: Boolean = op.exists{ _.isLoop }
+    def isLoop: Boolean = op.exists(_.isLoop)
     def isSwitch: Boolean = op.exists(_.isSwitch)
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)

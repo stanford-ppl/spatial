@@ -1,4 +1,4 @@
-package spatial.tests.feature.math
+package spatial.tests.feature.unit
 
 import spatial.dsl._
 
@@ -12,15 +12,25 @@ import spatial.dsl._
     val a = args(0).to[Q32]
     val data = Array.tabulate(N){ i => a * i.to[Q32]}
 
+    val q = ArgIn[Q32](N)
+    setArg(q, a)
     val x = DRAM[Q32](N)
+    val y = DRAM[Q32](N)
     setMem(x, data)
 
     Accel {
       val xx = SRAM[Q32](N)
-
+      val yy = SRAM[Q32](N)
+      xx load x(0::N par 16)
+      Foreach(0 until N by 16){i =>
+        yy(i) = xx(i) * q
+      }
+      y(0::N par 16) store yy
     }
 
-
+    val result = getMem(y)
+    val gold = data.map{e => e * a }
+    assert(result == gold)
   }
 
 }

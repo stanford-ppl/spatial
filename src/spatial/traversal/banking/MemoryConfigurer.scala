@@ -73,20 +73,28 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     }
   }
 
-  /** Group accesses on this memory by
-    * 1. Control: If any two accesses must occur simultaneously to the same bank, they are
-    *    potentially grouped together
-    * 2. Space: If these two accesses are guaranteed to be bankable (they never hit the same
-    *    address), they are grouped together
+  /** Group accesses on this memory.
+    * An access a is grouped with a set of accesses S if there exists some b in S such that:
+    *   [Control] a and b occur simultaneously (in Parallel or pipeline parallel)
+    *   [Space]   and a and b are guaranteed to never hit the same address
+    * Otherwise a is placed in a new group
     */
   protected def groupAccesses(accesses: Set[AccessMatrix], tp: String): Set[Set[AccessMatrix]] = {
     val groups = ArrayBuffer[Set[AccessMatrix]]()
 
+    dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
+
     accesses.foreach{a =>
-      val grpId = groups.indexWhere{grp =>
-        a.parent == Host ||       // Always merge host-side accesses into the first group
-          (grp.exists{b => areInParallel(a.access,b.access) } &&
-           grp.forall{b => !a.overlaps(b) })
+      dbg(s"    Access: ${a.access} [${a.parent}]")
+      val grpId = {
+        if (a.parent == Host) { if (groups.isEmpty) -1 else 0 }
+        else groups.zipWithIndex.indexWhere{case (grp, i) =>
+          val pairs = grp.filter{b => requireParallelPortAccess(a.access, b.access) && !a.overlaps(b) }
+          if (pairs.nonEmpty) dbg(s"      Group #$i: ")
+          else                dbg(s"      Group #$i: <none>")
+          pairs.foreach{b => dbgs(s"        ${b.access} [${b.parent}]") }
+          pairs.nonEmpty
+        }
       }
       if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
     }
@@ -95,7 +103,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (groups.isEmpty) dbg(s"\n  <No $tp Groups>") else dbg(s"  ${groups.length} $tp Groups:")
       groups.zipWithIndex.foreach { case (grp, i) =>
         dbg(s"  Group #$i")
-        grp.foreach{matrix => dbgss(matrix) }
+        grp.foreach{matrix => dbgss("    ", matrix) }
       }
     }
     groups.toSet
@@ -122,7 +130,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     seqGrps.zipWithIndex.foreach{case (grp,i) =>
       val prev = seqGrps.take(i).flatten  // The first i groups (the ones before the current)
       val grpPorts = grp.map{a =>
-        val mux = prev.filter{b => areInParallel(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrElse(0)
+        val mux = prev.filter{b => requireParallelPortAccess(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrElse(0)
         a -> Port(mux, bufPorts(a.access))
       }
       ports ++= grpPorts

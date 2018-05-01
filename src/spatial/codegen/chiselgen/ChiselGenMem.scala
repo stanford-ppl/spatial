@@ -15,7 +15,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get //readersOf(mem).find{_.node == lhs}.get.ctrlNode
+    val parent = lhs.parent.s.get //mem.readers.find{_.node == lhs}.get.ctrlNode
     val invisibleEnable = src"""${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -90,33 +90,33 @@ trait ChiselGenMem extends ChiselGenCommon {
     def outerMap(t: String): String = if (inst.depth > 1) s"NBuf${t}Map" else if (false) s"Shift${t}Map" else s"${t}Map"
     def innerMap(t: String): String = if (false) s"Shift${t}Map" else s"${t}Map"
     // Create mapping for (bufferPort -> (muxPort -> width)) for XBar accesses
-    val XBarW = s"${outerMap("X")}(" + writersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val XBarW = s"${outerMap("X")}(" + mem.writers.filter(_.ports.values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(!_.isDirectlyBanked)              // Filter out statically banked
                               .groupBy(_.ports.values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",") + ")"
-                                else writes.map{w => src"${portsOf(w).values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + writes.map{w => src"${w.ports.values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",") + ")"
+                                else writes.map{w => src"${w.ports.values.head.muxPort} -> ${accessWidth(w)}"}.mkString(",")
                               }.mkString(",") + ")"
-    val XBarR = s"${outerMap("X")}(" + readersOf(mem)
+    val XBarR = s"${outerMap("X")}(" + mem.readers
                               .filter(!_.isDirectlyBanked)              // Filter out statically banked
                               .groupBy(_.ports.values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, reads) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + reads.map{r => src"${portsOf(r).values.head.muxPort} -> ${accessWidth(r)}"}.mkString(",") + ")"
-                                else reads.map{r => src"${portsOf(r).values.head.muxPort} -> ${accessWidth(r)}"}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + reads.map{r => src"${r.ports.values.head.muxPort} -> ${accessWidth(r)}"}.mkString(",") + ")"
+                                else reads.map{r => src"${r.ports.values.head.muxPort} -> ${accessWidth(r)}"}.mkString(",")
                               }.mkString(",") + ")"
-    val DirectW = s"${outerMap("D")}(" + writersOf(mem).filter(portsOf(_).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val DirectW = s"${outerMap("D")}(" + mem.writers.filter(_.ports.values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .groupBy(_.ports.values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",") + ")"
-                                else writes.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",") + ")"
+                                else writes.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",")
                               }.mkString(",") + ")"
-    val DirectR = s"${outerMap("D")}(" + readersOf(mem)
+    val DirectR = s"${outerMap("D")}(" + mem.readers
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .groupBy(_.ports.values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, reads) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",") + ")"
-                                else reads.map{w => src"${portsOf(w).values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",") + ")"
+                                else reads.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",")
                               }.mkString(",") + ")"
     val bPar = if (inst.depth > 1) s"${innerMap("X")}(" + broadcasts.mkString(",") + ")," else ""
 

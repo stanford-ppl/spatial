@@ -116,15 +116,15 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
   }
 
   @stateful def areaOfMem(mem: Sym[_]): Area = {
-    val instances = duplicatesOf(mem)
+    val instances = mem.duplicates
     instances.map{instance => areaOfMemory(mem, instance) }.fold(NoArea){_+_}
   }
   @stateful def areaOfAccess(access: Sym[_], mem: Sym[_]): Area = {
     val nbits: Int = wordWidth(mem)
     val dims: Seq[Int] = constDimsOf(mem)
-    val instances = duplicatesOf(mem).zipWithIndex
-                                     .filter{case (d,i) => dispatchOf(access).exists(_._2.contains(i)) }
-                                     .map(_._1)
+    val instances = mem.duplicates.zipWithIndex
+                                  .filter{case (d,i) => access.dispatches.exists(_._2.contains(i)) }
+                                  .map(_._1)
 
     val addrSize = dims.map{d => log2(d) + (if (isPow2(d)) 1 else 0) }.max
     val multiplier = model("FixMulBig")("b"->18) //if (addrSize < DSP_CUTOFF) model("FixMulSmall")("b"->addrSize) else model("FixMulBig")("b"->addrSize)
@@ -147,19 +147,19 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
   @stateful def rawRegArea(reg: Sym[_]): Area = model("Reg")("b" -> wordWidth(reg))
 
   @stateful def areaOfReg(reg: Sym[_]): Area = {
-    val instances = duplicatesOf(reg)
+    val instances = reg.duplicates
     instances.map{instance =>
       rawRegArea(reg) + rawBufferControlArea(wordWidth(reg),instance)
     }.fold(NoArea){_+_}
   }
 
-  @stateful def nDups(e: Sym[_]): Int = duplicatesOf(e).length
+  @stateful def nDups(e: Sym[_]): Int = e.duplicates.length
 
   @stateful def areaInReduce(e: Sym[_], d: Op[_]): Area = areaOfNode(e, d)
 
   // TODO[5]: Update controller area models
   @stateful private def areaOfControl(ctrl: Sym[_]): Area = {
-    if (isInnerControl(ctrl)) NoArea
+    if (ctrl.isInnerControl) NoArea
     //else if (isSeqPipe(ctrl)) model("Sequential")("n" -> nStages(ctrl))
     //else if (isMetaPipe(ctrl)) model("MetaPipe")("n" -> nStages(ctrl))
     //else if (isStreamPipe(ctrl)) model("Stream")("n" -> nStages(ctrl))

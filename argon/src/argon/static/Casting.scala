@@ -8,6 +8,11 @@ import scala.annotation.implicitNotFound
 trait Casting {
   @implicitNotFound(msg = "Casting from ${A} to ${B} is undefined.")
   type Cast[A,B] = Either[Cast2Way[B,A],CastFunc[A,B]]
+  type Lifting[A,B] = Right[Nothing,Lifter[A,B]]
+
+  object Lifting {
+    def apply[A,B:Type]: Lifting[A,B] = Right(new Lifter[A,B])
+  }
 
   implicit class CastOps[A,B](c: Cast[A,B]) {
     @rig def apply(a: A): B = c match {

@@ -40,6 +40,8 @@ object Def {
     override def getOp: Option[Op[B]] = Some(op)
     override def getID: Option[Int] = Some(id)
   }
+
+  def unapply(x: Sym[_]): Option[Op[_]] = x.op
 }
 
 

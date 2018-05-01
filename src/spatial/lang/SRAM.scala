@@ -2,7 +2,7 @@ package spatial.lang
 
 import argon._
 import forge.tags._
-import spatial.data.writeBuffer
+import spatial.data._
 import utils.implicits.collections._
 import spatial.node._
 import spatial.lang.types._
@@ -59,7 +59,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     }
   }
 
-  def buffer: C[A] = { writeBuffer.enableOn(this); me }
+  def buffer: C[A] = { this.isWriteBuffer = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)

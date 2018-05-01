@@ -25,12 +25,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbg("\n\n--------------------------------")
     dbg(s"${mem.ctx}: Inferring instances for memory ${mem.fullname}")
     dbg(mem.ctx.content.getOrElse(""))
-    val readers = readersOf(mem)
-    val writers = writersOf(mem)
+    val readers = mem.readers
+    val writers = mem.writers
     resetData(readers, writers)
 
-    val readMatrices = readers.flatMap{rd => affineMatricesOf(rd) }
-    val writeMatrices = writers.flatMap{wr => affineMatricesOf(wr) }
+    val readMatrices = readers.flatMap{rd => rd.affineMatrices }
+    val writeMatrices = writers.flatMap{wr => wr.affineMatrices }
 
     val instances = bank(readMatrices, writeMatrices)
     summarize(instances)
@@ -61,12 +61,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   protected def finalize(instances: Seq[Instance]): Unit = {
     val duplicates = instances.map{_.toMemory}
-    duplicatesOf(mem) = duplicates
+    mem.duplicates = duplicates
 
     instances.zipWithIndex.foreach{case (inst, id) =>
       (inst.reads.iterator.flatten ++ inst.writes.iterator.flatten).foreach{a =>
-        portsOf.add(a.access, a.unroll, inst.ports(a))
-        dispatchOf.add(a.access, a.unroll, id)
+        a.access.ports += (a.unroll -> inst.ports(a))
+        a.access.addDispatch(a.unroll, id)
         dbgs(s"  Added port ${inst.ports(a)} to ${a.access} {${a.unroll.mkString(",")}}")
         dbgs(s"  Added dispatch $id to ${a.access} {${a.unroll.mkString(",")}}")
       }
@@ -144,7 +144,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val (banking, bankCost) = bankingCosts.minBy(_._2)
       // TODO[5]: Assumption: All memories are at least simple dual port
       val ports = computePorts(rdGroups,bufPorts) ++ computePorts(wrGroups,bufPorts)
-      val accTyp = accumTypeOf(mem) | accumType(reads,reaching)
+      val accTyp = mem.accumType | accumType(reads,reaching)
       Some(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp))
     }
     else None

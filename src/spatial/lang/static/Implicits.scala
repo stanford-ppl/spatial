@@ -24,24 +24,37 @@ trait ImplicitsPriority3 {
   })
 
 
-  // --- Any
-  implicit class VirtualizeAnyMethods(lhs: Any) {
-    @rig def infix_toString(): Text = lhs match {
+  // --- A (Any)
+  implicit class VirtualizeAnyMethods[A](a: A) {
+    @rig def infix_toString(): Text = a match {
       case t: Top[_] => t.toText
       case t => Text(t.toString)
     }
 
-    @rig def infix_!=(rhs: Top[_]): Bit = rhs !== rhs.tp.from(lhs)
-    @rig def infix_==(rhs: Top[_]): Bit = rhs === rhs.tp.from(lhs)
-    def infix_!=(rhs: Any): Boolean = lhs != rhs
-    def infix_==(rhs: Any): Boolean = lhs == rhs
+    @api def +[B:Arith](that: Reg[B])(implicit cast: Lifting[A,B]): B = cast(a) + that.value
+    @api def -[B:Arith](that: Reg[B])(implicit cast: Lifting[A,B]): B = cast(a) - that.value
+    @api def *[B:Arith](that: Reg[B])(implicit cast: Lifting[A,B]): B = cast(a) * that.value
+    @api def /[B:Arith](that: Reg[B])(implicit cast: Lifting[A,B]): B = cast(a) / that.value
+    @api def %[B:Arith](that: Reg[B])(implicit cast: Lifting[A,B]): B = cast(a) % that.value
 
-    def infix_##(rhs: Any): Int = lhs.##
-    def infix_equals(rhs: Any): Boolean = lhs.equals(rhs)
-    def infix_hashCode(): Int = lhs.hashCode()
-    def infix_asInstanceOf[T](): T = lhs.asInstanceOf[T]
-    def infix_isInstanceOf[T:ClassTag](): Boolean = utils.isSubtype(lhs.getClass, classTag[T].runtimeClass)
-    def infix_getClass(): Class[_] = lhs.getClass
+    @api def <[B:Order](that: Reg[B])(implicit cast: Lifting[A,B]): Bit = cast(a) < that.value
+    @api def <=[B:Order](that: Reg[B])(implicit cast: Lifting[A,B]): Bit = cast(a) <= that.value
+    @api def >[B:Order](that: Reg[B])(implicit cast: Lifting[A,B]): Bit = cast(a) > that.value
+    @api def >=[B:Order](that: Reg[B])(implicit cast: Lifting[A,B]): Bit = cast(a) >= that.value
+
+    @api def infix_!=[B:Type](that: Reg[B])(implicit cast: Lifting[A,B]): Bit = cast(a) !== that.value
+    @api def infix_==[B:Type](that: Reg[B])(implicit cast: Lifting[A,B]): Bit = cast(a) === that.value
+    @rig def infix_!=(rhs: Top[_]): Bit = if (rhs.getFrom(a).isDefined) rhs !== rhs.tp.from(a) else rhs !== a
+    @rig def infix_==(rhs: Top[_]): Bit = if (rhs.getFrom(a).isDefined) rhs === rhs.tp.from(a) else rhs !== a
+    @rig def infix_!=(rhs: Any): Boolean = a != rhs
+    @rig def infix_==(rhs: Any): Boolean = a == rhs
+
+    def infix_##(rhs: Any): Int = a.##
+    def infix_equals(rhs: Any): Boolean = a.equals(rhs)
+    def infix_hashCode(): Int = a.hashCode()
+    def infix_asInstanceOf[T](): T = a.asInstanceOf[T]
+    def infix_isInstanceOf[T:ClassTag](): Boolean = utils.isSubtype(a.getClass, classTag[T].runtimeClass)
+    def infix_getClass(): Class[_] = a.getClass
   }
 
 
@@ -71,16 +84,6 @@ trait ImplicitsPriority3 {
       case (a, b)         => Text(a.toString) ++ Text(b.toString)
     }
   }
-
-  // @api implicit def reverseRegLookup[A:Bits](a: A): Reg[A] = a match {
-  //   case Op(RegRead(reg)) => reg.asInstanceOf[Reg[A]]
-  //   case Op(GetReg(reg))  => reg.asInstanceOf[Reg[A]]
-  //   case _ =>
-  //     error(ctx, s"No register available for ${a.nameOr("value")}")
-  //     error(ctx)
-  //     err[Reg[A]]("No register available")
-  // }
-
 
   // Using Lift[A] is always lowest priority
   @rig implicit def liftBoolean(b: Boolean): Lift[Bit] = new Lift(b,b.to[Bit])
@@ -212,28 +215,13 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
   }
 
-  class NumericAddOps[A:Numeric](x: A) {
-    @api def +[B:Arith](that: Reg[B]): B = Arith[B].from(x) + that.value
-    @api def -[B:Arith](that: Reg[B]): B = Arith[B].from(x) - that.value
-    @api def *[B:Arith](that: Reg[B]): B = Arith[B].from(x) * that.value
-    @api def /[B:Arith](that: Reg[B]): B = Arith[B].from(x) / that.value
-    @api def %[B:Arith](that: Reg[B]): B = Arith[B].from(x) % that.value
 
-    @api def <[B:Order](that: Reg[B]): Bit = Order[B].from(x) < that.value
-    @api def <=[B:Order](that: Reg[B]): Bit = Order[B].from(x) <= that.value
-    @api def >[B:Order](that: Reg[B]): Bit = Order[B].from(x) > that.value
-    @api def >=[B:Order](that: Reg[B]): Bit = Order[B].from(x) >= that.value
 
-    @api def infix_!=[B:Type](that: Reg[B]): Bit = Type[B].from(x) !== that.value
-    @api def infix_==[B:Type](that: Reg[B]): Bit = Type[B].from(x) === that.value
-
-  }
   class RegNumerics[A:Num](reg: Reg[A])(implicit ctx: SrcCtx, state: State) {
     def :+=(data: A): Void = reg := reg.value + data.unbox
     def :-=(data: A): Void = reg := reg.value - data.unbox
     def :*=(data: A): Void = reg := reg.value * data.unbox
   }
-
 
   class LiteralWrapper[A](a: A)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[A,B]): B = cast(a)
@@ -314,19 +302,19 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Boolean
-  implicit lazy val castBooleanToBit: Cast[Boolean,Bit] = Right(new Lifter[Boolean,Bit])
-  implicit def CastBooleanToFix[S:BOOL,I:INT,F:INT]: Cast[Boolean,Fix[S,I,F]] = Right(new Lifter[Boolean,Fix[S,I,F]])
-  implicit def CastBooleanToFlt[M:INT,E:INT]: Cast[Boolean,Flt[M,E]] = Right(new Lifter[Boolean,Flt[M,E]])
-  implicit def CastBooleanToNum[A:Num]: Cast[Boolean,A] = Right(new Lifter[Boolean,A])
+  implicit lazy val castBooleanToBit: Lifting[Boolean,Bit] = Lifting[Boolean,Bit]
+  implicit def CastBooleanToFix[S:BOOL,I:INT,F:INT]: Lifting[Boolean,Fix[S,I,F]] = Lifting[Boolean,Fix[S,I,F]]
+  implicit def CastBooleanToFlt[M:INT,E:INT]: Lifting[Boolean,Flt[M,E]] = Lifting[Boolean,Flt[M,E]]
+  implicit def CastBooleanToNum[A:Num]: Lifting[Boolean,A] = Lifting[Boolean,A]
 
   @api implicit def BitFromBoolean(c: Boolean): Bit = c.to[Bit]
   @api implicit def booleanWrapper(c: Boolean): BooleanWrapper = new BooleanWrapper(c)
 
   // --- Byte
-  implicit lazy val castByteToBit: Cast[Byte,Bit] = Right(new Lifter[Byte,Bit])
-  implicit def CastByteToFix[S:BOOL,I:INT,F:INT]: Cast[Byte,Fix[S,I,F]] = Right(new Lifter[Byte,Fix[S,I,F]])
-  implicit def CastByteToFlt[M:INT,E:INT]: Cast[Byte,Flt[M,E]] = Right(new Lifter[Byte,Flt[M,E]])
-  implicit def CastByteToNum[A:Num]: Cast[Byte,A] = Right(new Lifter[Byte,A])
+  implicit lazy val castByteToBit: Lifting[Byte,Bit] = Lifting[Byte,Bit]
+  implicit def CastByteToFix[S:BOOL,I:INT,F:INT]: Lifting[Byte,Fix[S,I,F]] = Lifting[Byte,Fix[S,I,F]]
+  implicit def CastByteToFlt[M:INT,E:INT]: Lifting[Byte,Flt[M,E]] = Lifting[Byte,Flt[M,E]]
+  implicit def CastByteToNum[A:Num]: Lifting[Byte,A] = Lifting[Byte,A]
 
   @api implicit def FixFromByte[S:BOOL,I:INT,F:INT](c: Byte): Fix[S,I,F] = c.to[Fix[S,I,F]]
   @api implicit def FltFromByte[M:INT,E:INT](c: Byte): Flt[M,E] = c.to[Flt[M,E]]
@@ -335,10 +323,10 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Char
-  implicit lazy val castCharToBit: Cast[Char,Bit] = Right(new Lifter[Char,Bit])
-  implicit def CastCharToFix[S:BOOL,I:INT,F:INT]: Cast[Char,Fix[S,I,F]] = Right(new Lifter[Char,Fix[S,I,F]])
-  implicit def CastCharToFlt[M:INT,E:INT]: Cast[Char,Flt[M,E]] = Right(new Lifter[Char,Flt[M,E]])
-  implicit def CastCharToNum[A:Num]: Cast[Char,A] = Right(new Lifter[Char,A])
+  implicit lazy val castCharToBit: Lifting[Char,Bit] = Lifting[Char,Bit]
+  implicit def CastCharToFix[S:BOOL,I:INT,F:INT]: Lifting[Char,Fix[S,I,F]] = Lifting[Char,Fix[S,I,F]]
+  implicit def CastCharToFlt[M:INT,E:INT]: Lifting[Char,Flt[M,E]] = Lifting[Char,Flt[M,E]]
+  implicit def CastCharToNum[A:Num]: Lifting[Char,A] = Lifting[Char,A]
 
   @api implicit def FixFromChar[S:BOOL,I:INT,F:INT](c: Char): Fix[S,I,F] = c.to[Fix[S,I,F]]
   @api implicit def FltFromChar[M:INT,E:INT](c: Char): Flt[M,E] = c.to[Flt[M,E]]
@@ -347,10 +335,10 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Short
-  implicit lazy val castShortToBit: Cast[Short,Bit] = Right(new Lifter[Short,Bit])
-  implicit def CastShortToFix[S:BOOL,I:INT,F:INT]: Cast[Short,Fix[S,I,F]] = Right(new Lifter[Short,Fix[S,I,F]])
-  implicit def CastShortToFlt[M:INT,E:INT]: Cast[Short,Flt[M,E]] = Right(new Lifter[Short,Flt[M,E]])
-  implicit def CastShortToNum[A:Num]: Cast[Short,A] = Right(new Lifter[Short,A])
+  implicit lazy val castShortToBit: Lifting[Short,Bit] = Lifting[Short,Bit]
+  implicit def CastShortToFix[S:BOOL,I:INT,F:INT]: Lifting[Short,Fix[S,I,F]] = Lifting[Short,Fix[S,I,F]]
+  implicit def CastShortToFlt[M:INT,E:INT]: Lifting[Short,Flt[M,E]] = Lifting[Short,Flt[M,E]]
+  implicit def CastShortToNum[A:Num]: Lifting[Short,A] = Lifting[Short,A]
 
   @api implicit def FltFromShort[M:INT,E:INT](c: Short): Flt[M,E] = c.to[Flt[M,E]]
   @api implicit def FixFromShort[S:BOOL,I:INT,F:INT](c: Short): Fix[S,I,F] = c.to[Fix[S,I,F]]
@@ -359,10 +347,10 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Int
-  implicit lazy val castIntToBit: Cast[Int,Bit] = Right(new Lifter[Int,Bit])
-  implicit def CastIntToFix[S:BOOL,I:INT,F:INT]: Cast[Int,Fix[S,I,F]] = Right(new Lifter[Int,Fix[S,I,F]])
-  implicit def CastIntToFlt[M:INT,E:INT]: Cast[Int,Flt[M,E]] = Right(new Lifter[Int,Flt[M,E]])
-  implicit def CastIntToNum[A:Num]: Cast[Int,A] = Right(new Lifter[Int,A])
+  implicit lazy val castIntToBit: Lifting[Int,Bit] = Lifting[Int,Bit]
+  implicit def CastIntToFix[S:BOOL,I:INT,F:INT]: Lifting[Int,Fix[S,I,F]] = Lifting[Int,Fix[S,I,F]]
+  implicit def CastIntToFlt[M:INT,E:INT]: Lifting[Int,Flt[M,E]] = Lifting[Int,Flt[M,E]]
+  implicit def CastIntToNum[A:Num]: Lifting[Int,A] = Lifting[Int,A]
 
   @api implicit def FltFromInt[M:INT,E:INT](c: Int): Flt[M,E] = c.to[Flt[M,E]]
   @api implicit def FixFromInt[S:BOOL,I:INT,F:INT](c: Int): Fix[S,I,F] = c.to[Fix[S,I,F]]
@@ -371,10 +359,10 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Long
-  implicit lazy val castLongToBit: Cast[Long,Bit] = Right(new Lifter[Long,Bit])
-  implicit def CastLongToFix[S:BOOL,I:INT,F:INT]: Cast[Long,Fix[S,I,F]] = Right(new Lifter[Long,Fix[S,I,F]])
-  implicit def CastLongToFlt[M:INT,E:INT]: Cast[Long,Flt[M,E]] = Right(new Lifter[Long,Flt[M,E]])
-  implicit def CastLongToNum[A:Num]: Cast[Long,A] = Right(new Lifter[Long,A])
+  implicit lazy val castLongToBit: Lifting[Long,Bit] = Lifting[Long,Bit]
+  implicit def CastLongToFix[S:BOOL,I:INT,F:INT]: Lifting[Long,Fix[S,I,F]] = Lifting[Long,Fix[S,I,F]]
+  implicit def CastLongToFlt[M:INT,E:INT]: Lifting[Long,Flt[M,E]] = Lifting[Long,Flt[M,E]]
+  implicit def CastLongToNum[A:Num]: Lifting[Long,A] = Lifting[Long,A]
 
   @api implicit def FixFromLong[S:BOOL,I:INT,F:INT](c: Long): Fix[S,I,F] = c.to[Fix[S,I,F]]
   @api implicit def FltFromLong[M:INT,E:INT](c: Long): Flt[M,E] = c.to[Flt[M,E]]
@@ -383,10 +371,10 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Float
-  implicit lazy val castFloatToBit: Cast[Float,Bit] = Right(new Lifter[Float,Bit])
-  implicit def CastFloatToFix[S:BOOL,I:INT,F:INT]: Cast[Float,Fix[S,I,F]] = Right(new Lifter[Float,Fix[S,I,F]])
-  implicit def CastFloatToFlt[M:INT,E:INT]: Cast[Float,Flt[M,E]] = Right(new Lifter[Float,Flt[M,E]])
-  implicit def CastFloatToNum[A:Num]: Cast[Float,A] = Right(new Lifter[Float,A])
+  implicit lazy val castFloatToBit: Lifting[Float,Bit] = Lifting[Float,Bit]
+  implicit def CastFloatToFix[S:BOOL,I:INT,F:INT]: Lifting[Float,Fix[S,I,F]] = Lifting[Float,Fix[S,I,F]]
+  implicit def CastFloatToFlt[M:INT,E:INT]: Lifting[Float,Flt[M,E]] = Lifting[Float,Flt[M,E]]
+  implicit def CastFloatToNum[A:Num]: Lifting[Float,A] = Lifting[Float,A]
 
   @api implicit def FixFromFloat[S:BOOL,I:INT,F:INT](c: Float): Fix[S,I,F] = c.to[Fix[S,I,F]]
   @api implicit def FltFromFloat[M:INT,E:INT](c: Float): Flt[M,E] = c.to[Flt[M,E]]
@@ -395,10 +383,10 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
 
   // --- Double
-  implicit lazy val castDoubleToBit: Cast[Double,Bit] = Right(new Lifter[Double,Bit])
-  implicit def CastDoubleToFix[S:BOOL,I:INT,F:INT]: Cast[Double,Fix[S,I,F]] = Right(new Lifter[Double,Fix[S,I,F]])
-  implicit def CastDoubleToFlt[M:INT,E:INT]: Cast[Double,Flt[M,E]] = Right(new Lifter[Double,Flt[M,E]])
-  implicit def CastDoubleToNum[A:Num]: Cast[Double,A] = Right(new Lifter[Double,A])
+  implicit lazy val castDoubleToBit: Lifting[Double,Bit] = Lifting[Double,Bit]
+  implicit def CastDoubleToFix[S:BOOL,I:INT,F:INT]: Lifting[Double,Fix[S,I,F]] = Lifting[Double,Fix[S,I,F]]
+  implicit def CastDoubleToFlt[M:INT,E:INT]: Lifting[Double,Flt[M,E]] = Lifting[Double,Flt[M,E]]
+  implicit def CastDoubleToNum[A:Num]: Lifting[Double,A] = Lifting[Double,A]
 
   @api implicit def FixFromDouble[S:BOOL,I:INT,F:INT](c: Double): Fix[S,I,F] = c.to[Fix[S,I,F]]
   @api implicit def FltFromDouble[M:INT,E:INT](c: Double): Flt[M,E] = c.to[Flt[M,E]]

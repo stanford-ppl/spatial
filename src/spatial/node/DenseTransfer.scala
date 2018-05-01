@@ -112,7 +112,7 @@ object DenseTransfer {
 
     def alignedStore(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      //isAligned(cmdStream) = true
+      //cmdStream.isAligned = true
       // val issueQueue = FIFO[I32](16)  // TODO: Size of issued queue?
       val dataStream = StreamOut[Tup2[A,Bit]](BurstFullDataBus[A]())
       val ackStream  = StreamIn[Bit](BurstAckBus)
@@ -187,7 +187,7 @@ object DenseTransfer {
 
     def unalignedStore(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      isAligned(cmdStream) = false
+      cmdStream.isAligned = false
       val dataStream = StreamOut[Tup2[A,Bit]](BurstFullDataBus[A]())
       val ackStream  = StreamIn[Bit](BurstAckBus)
 
@@ -230,7 +230,7 @@ object DenseTransfer {
 
     def alignedLoad(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      isAligned(cmdStream) = true
+      cmdStream.isAligned = true
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command generator
@@ -254,7 +254,7 @@ object DenseTransfer {
 
     def unalignedLoad(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      isAligned(cmdStream) = false
+      cmdStream.isAligned = false
       val issueQueue = FIFO[IssuedCmd](16)  // TODO: Size of issued queue?
       val dataStream = StreamIn[A](BurstDataBus[A]())
 

@@ -29,7 +29,7 @@ trait Spatial extends Compiler {
 
   private class SpatialISL extends ISL {
     override def domain[K](key: K): ConstraintMatrix[K] = key match {
-      case s: Sym[_] => domainOf(s).asInstanceOf[ConstraintMatrix[K]]
+      case s: Sym[_] => s.domain.asInstanceOf[ConstraintMatrix[K]]
       case _ => throw new Exception(s"Cannot get domain of $key")
     }
   }

@@ -2,16 +2,16 @@ package spatial.transform
 
 import argon._
 import argon.transform.MutateTransformer
-
 import spatial.data._
 import spatial.util._
 import spatial.lang._
 import spatial.node._
 import spatial.internal._
+import spatial.traversal.BlkTraversal
 
 import scala.collection.mutable.ArrayBuffer
 
-case class PipeInserter(IR: State) extends MutateTransformer {
+case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
   var enable: Set[Bit] = Set.empty
 
   def withEnable[T](en: Bit)(blk: => T)(implicit ctx: SrcCtx): T = {
@@ -42,7 +42,7 @@ case class PipeInserter(IR: State) extends MutateTransformer {
   }
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case switch @ Switch(F(selects), _) if isOuterControl(lhs) =>
+    case switch @ Switch(F(selects), _) if lhs.isOuterControl && inHw =>
       val res: Option[Either[Reg[A],Var[A]]] = if (Type[A].isVoid) None else Some(resFrom(lhs))
 
       val cases = switch.cases.zip(selects).map { case (SwitchCase(body), sel) =>
@@ -65,15 +65,19 @@ case class PipeInserter(IR: State) extends MutateTransformer {
         case None    => switch2.asInstanceOf[Sym[A]]  // Void case
       }
 
-    case _ =>
-      if (isOuterControl(lhs)) {
-        dbgs(s"$lhs = $rhs")
-        rhs.blocks.zipWithIndex.foreach { case (block, id) =>
-          dbgs(s"  block #$id [" + (if (isOuterBlock(Controller(lhs,id))) "Outer]" else "Inner]"))
-          if (isOuterBlock(Controller(lhs, id))) register(block -> insertPipes(block).left.get)
+    case _ if lhs.isControl =>
+      withCtrl(lhs) {
+        if (lhs.isOuterControl && inHw) {
+          dbgs(s"$lhs = $rhs")
+          rhs.blocks.zipWithIndex.foreach { case (block, id) =>
+            dbgs(s"  block #$id [" + (if (Controller(lhs, id).isOuterBlock) "Outer]" else "Inner]"))
+            if (Controller(lhs, id).isOuterBlock) register(block -> insertPipes(block).left.get)
+          }
         }
       }
       super.transform(lhs, rhs)
+
+    case _ => super.transform(lhs, rhs)
   }
 
   def wrapSwitchCase[A:Type](body: Block[A], res: Option[Either[Reg[A],Var[A]]])(implicit ctx: SrcCtx): Block[Void] = {
@@ -131,13 +135,12 @@ case class PipeInserter(IR: State) extends MutateTransformer {
           }
 
           implicit val ctx: SrcCtx = SrcCtx.empty
-          val pipe = Pipe {
+          Pipe {
             isolateSubst{
               stg.nodes.foreach(visit)
               escaping.zip(escapingHolders).foreach{case (s, r) => resWrite(r,s) }
             }
           }
-          isOuter(pipe) = false
           dbgs(s"Escaping: ")
           escaping.zip(escapingHolders).foreach{case (s,r) =>
             val rd = resRead(r)

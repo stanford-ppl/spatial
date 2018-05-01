@@ -13,17 +13,17 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
-    dbgs(s"$lhs = $rhs [ctrl: ${lhs.toCtrl}, inner: ${isInnerControl(lhs.toCtrl)}]")
+    dbgs(s"$lhs = $rhs [ctrl: ${lhs.toCtrl}, inner: ${lhs.toCtrl.isInnerControl}]")
 
     metadata.clear[MUsers](lhs)
 
     def inspect(): Unit = {
       if (inHw) checkUses(lhs, rhs)
-      if (isEphemeral(lhs)) addPendingUse(lhs)
+      if (lhs.isEphemeral) addPendingUse(lhs)
       super.visit(lhs, rhs)
     }
 
-    if (isControl(lhs)) withCtrl(lhs){ inspect() } else inspect()
+    if (lhs.isControl) withCtrl(lhs){ inspect() } else inspect()
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
@@ -45,7 +45,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
-      if (isEphemeral(lhs) && !isInnerControl(lhs.toCtrl)) addPropagatingUse(lhs, pending.toSet)
+      if (lhs.isEphemeral && !lhs.toCtrl.isInnerControl) addPropagatingUse(lhs, pending.toSet)
       else addUse(lhs, pending.toSet, blk)
     }
   }
@@ -54,13 +54,11 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     dbgs(s"  Uses [Block: $block]:")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
-    used.foreach{node =>
-      usersOf(node) = usersOf(node) + User(user, block)
+    used.foreach{use =>
+      use.users += User(user, block)
 
       // Also add stateless nodes that this node uses
-      pendingUses(node).filter(_ != node).foreach{used =>
-        usersOf(used) = usersOf(used) + User(node,block)
-      }
+      pendingUses(use).filter(_ != use).foreach{pend => pend.users += User(use, block) }
     }
   }
 

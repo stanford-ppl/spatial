@@ -41,7 +41,7 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32]
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     logs(s"Fully unrolling reduce $lhs")
-    val lanes = FullUnroller(cchain, iters, isInnerControl(lhs))
+    val lanes = FullUnroller(cchain, iters, lhs.isInnerControl)
     val rfunc = reduce.toFunction2
 
     val pipe = stage(UnitPipe(enables ++ ens, stageLambda1(accum){
@@ -50,7 +50,7 @@ trait ReduceUnrolling extends UnrollingBase {
       val values: Seq[A] = unroll(func, lanes)
       val inputs: Seq[A] = fold.toSeq ++ values
 
-      if (isOuterControl(lhs)) {
+      if (lhs.isOuterControl) {
         dbgs("Fully unrolling outer reduce")
         stage(UnitPipe(Set.empty, stageBlock{
           val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
@@ -81,7 +81,7 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32]                // Bound iterators for map loop
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     logs(s"Unrolling reduce $lhs -> $accum")
-    val lanes = PartialUnroller(cchain, iters, isInnerControl(lhs))
+    val lanes = PartialUnroller(cchain, iters, lhs.isInnerControl)
     val inds2 = lanes.indices
     val vs = lanes.indexValids
     val start = cchain.ctrs.map(_.start.asInstanceOf[I32])
@@ -91,7 +91,7 @@ trait ReduceUnrolling extends UnrollingBase {
       val valids: () => Seq[Bit] = () => lanes.valids.map{_.andTree}
       val values: Seq[A] = unroll(func, lanes)
 
-      if (isOuterControl(lhs)) {
+      if (lhs.isOuterControl) {
         dbgs("Unrolling unit pipe reduce")
         stage(UnitPipe(enables, stageBlock{
           unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, isInner = false)
@@ -118,10 +118,10 @@ trait ReduceUnrolling extends UnrollingBase {
 
     case _ =>
       val contents = load.nestedStms
-      val readers = readersOf(orig)
+      val readers = orig.readers
       readers.find{reader => contents.contains(reader) } match {
         case Some(reader) =>
-          val mapping = dispatchOf(reader)
+          val mapping = reader.dispatches
           if (mapping.isEmpty) throw new Exception(s"No dispatch found in reduce for accumulator $orig")
           val dispatch = mapping.head._2.head
           if (!memories.contains((orig,dispatch))) throw new Exception(s"No duplicate found for accumulator $orig")
@@ -163,7 +163,7 @@ trait ReduceUnrolling extends UnrollingBase {
     start:  Seq[I32],             // Start for each iterator
     isInner: Boolean
   )(implicit ctx: SrcCtx): Void = {
-    val redType = reduceType(reduce.result)
+    val redType = reduce.result.reduceType
     val treeResult = inReduce(redType,isInner){ unrollReduceTree[A](inputs, valids, ident, reduce.toFunction2) }
 
     val result: A = inReduce(redType,isInner){
@@ -177,8 +177,8 @@ trait ReduceUnrolling extends UnrollingBase {
       else fold match {
         // FOLD: On first iteration, use init value rather than zero
         case Some(init) =>
-          val accumOrFirst = mux(isFirst, init, accValue)
-          reduceType(accumOrFirst) = redType
+          val accumOrFirst: A = mux(isFirst, init, accValue)
+          box(accumOrFirst).reduceType = redType
           reduce.reapply(treeResult, accumOrFirst)
 
         // REDUCE: On first iteration, store result of tree, do not include value from accum
@@ -186,7 +186,7 @@ trait ReduceUnrolling extends UnrollingBase {
         case None =>
           val res2   = reduce.reapply(treeResult, accValue)
           val select = mux(isFirst, treeResult, res2)
-          reduceType(select) = redType
+          box(select).reduceType = redType
           select
       }
     }

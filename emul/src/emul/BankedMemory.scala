@@ -2,12 +2,13 @@ package emul
 
 import scala.reflect.ClassTag
 
-class Memory[T:ClassTag](
-  name: String,
-  zero: T
-) {
+class Memory[T:ClassTag](name: String) {
   var data: Array[T] = _
-  def initMem(size: Int): Unit = { data = Array.fill(size)(zero) }
+  private var needsInit: Boolean = true
+  def initMem(size: Int, zero: T): Unit = if (needsInit) {
+    data = Array.fill(size)(zero)
+    needsInit = false
+  }
 
   def apply(i: Int): T = data.apply(i)
   def update(i: Int, x: T): Unit = data.update(i, x)
@@ -21,6 +22,7 @@ class BankedMemory[T:ClassTag](
   invalid:  T,
   saveInit: Boolean
 ) {
+  private var needsInit: Boolean = true
   private val resetValue: Option[Array[Array[T]]] = if (saveInit) Some(data.map(_.clone())) else None
 
   def reset(): Unit = resetValue match {
@@ -51,6 +53,10 @@ class BankedMemory[T:ClassTag](
         if (ens(i).value) data.apply(flattenAddress(banks,bank(i))).update(ofs(i).toInt,elems(i))
       }
     }
+  }
+
+  def initMem(size: Int, zero: T): Unit = if (needsInit) {
+    needsInit = false
   }
 }
 

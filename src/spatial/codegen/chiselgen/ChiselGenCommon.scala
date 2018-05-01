@@ -33,14 +33,14 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getReadStreams).toSet ++
-    localMems.all.filter{mem => readersOf(mem).exists{_.parent.s == ctrl.s }}
+    localMems.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
                  .filter{mem => mem.isStreamIn || mem.isFIFO }
                  // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getWriteStreams).toSet ++
-    localMems.all.filter{mem => writersOf(mem).exists{c => c.parent.s == ctrl.s }}
+    localMems.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
                  .filter{mem => mem.isStreamOut || mem.isFIFO }
                  // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
@@ -150,7 +150,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     var nextLevel: Option[Sym[_]] = Some(lhs)
     var result = false
     while (nextLevel.isDefined) {
-      if (styleOf(nextLevel.get) == Sched.Stream) {
+      if (nextLevel.get.schedule == Sched.Stream) {
         result = true
         nextLevel = None
       } else {
@@ -201,7 +201,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       } else if (switch.isDefined) {
         emit(src"${swap(lhs, Inhibitor)} := ${swap(switch.get, Inhibitor)}")
       } else {
-        if (!lhs.cchains.isEmpty) {
+        if (lhs.cchains.nonEmpty) {
           emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
           emit(src"${swap(lhs, Inhibit)}.io.input.set := ${lhs.cchains.head}.io.output.done")  
           emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${lhs.cchains.head}.io.output.done*/ // Correction not needed because _done should mask dp anyway")
@@ -210,7 +210,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         } else {
           emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
           emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(${swap(lhs, Done)} /*${lhs}_sm.io.output.ctr_inc*/)")
-          val rster = if (levelOf(lhs) == InnerControl & !getReadStreams(lhs.toCtrl).isEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Retime)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
+          val rster = if (lhs.isInnerControl & getReadStreams(lhs.toCtrl).nonEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Retime)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
           emit(src"${swap(lhs, Inhibit)}.io.input.reset := $rster")
           emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data")
           emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
@@ -231,7 +231,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     var nextLevel: Option[Sym[_]] = Some(node.parent.s.get)
     var result = ens.map(quote)
     while (nextLevel.isDefined) {
-      if (styleOf(nextLevel.get) == Sched.Stream) {
+      if (nextLevel.get.schedule == Sched.Stream) {
         nextLevel.get match {
           case Op(UnrolledForeach(_,_,_,_,e)) => 
             ens.foreach{ my_en_exact =>
@@ -264,23 +264,24 @@ trait ChiselGenCommon extends ChiselCodegen {
 
       // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
       val lat = 0 //bodyLatency.sum(c) // FIXME
-      val readiers = getReadStreams(c.toCtrl).map{ pt => pt match {
+      val readiers = getReadStreams(c.toCtrl).map{
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          readersOf(pt).head match {
-            case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(readersOf(pt).head,ens.flatten.toList)})"
+          fifo.readers.head match {
+            case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
           }
         // case fifo @ Op(FILONew(size)) => src"${DL(src"~$fifo.io.empty", lat + 1, true)}"
         case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
         case fifo => src"${fifo}_en" // parent node
-      }}.filter(_ != "").mkString(" & ")
-      val holders = getWriteStreams(c.toCtrl).map { pt => pt match {
+      }.filter(_ != "").mkString(" & ")
+
+      val holders = getWriteStreams(c.toCtrl).map{
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          writersOf(pt).head match {
-            case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(writersOf(pt).head,ens.flatten.toList)})"
+          fifo.writers.head match {
+            case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
           }
         case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
         // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
-      }}.filter(_ != "").mkString(" & ")
+      }.filter(_ != "").mkString(" & ")
 
       val hasHolders = if (holders != "") "&" else ""
       val hasReadiers = if (readiers != "") "&" else ""

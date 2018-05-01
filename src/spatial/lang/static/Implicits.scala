@@ -233,12 +233,12 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
 
   class IntWrapper(b: Int)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Int](b) {
     def until(end: I32): Series[I32] = Series[I32](I32(b), end, I32(1), I32(1))
-    def by(step: I32): Series[I32] = Series[I32](1, b, step, 1)
-    def par(p: I32): Series[I32] = Series[I32](1, b, 1, p)
+    def by(step: I32): Series[I32] = Series[I32](0, b, step, 1)
+    def par(p: I32): Series[I32] = Series[I32](0, b, 1, p)
 
     def until(end: Int): Series[I32] = Series[I32](b, end, 1, 1)
-    def by(step: Int): Series[I32] = Series[I32](1, b, step, 1)
-    def par(p: Int): Series[I32] = Series[I32](1, b, 1, p)
+    def by(step: Int): Series[I32] = Series[I32](0, b, step, 1)
+    def par(p: Int): Series[I32] = Series[I32](0, b, 1, p)
 
     def ::(start: I32): Series[I32] = Series[I32](start, b, 1, 1)
     def ::(start: Int): Series[I32] = Series[I32](start, b, 1, 1)

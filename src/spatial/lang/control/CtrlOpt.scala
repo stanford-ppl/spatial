@@ -8,7 +8,7 @@ case class CtrlOpt(
   sched: Option[Sched] = None,
   ii:    Option[Int] = None,
 ) {
-  def set(x: Sym[_]): Unit = {
+  def set[A](x: Sym[A]): Unit = {
     name.foreach{n => x.name = Some(n) }
     sched.foreach{s => userStyleOf(x) = s }
   }

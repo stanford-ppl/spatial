@@ -114,9 +114,22 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
   override def toString: String = comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs
 }
 
+/** Access pattern metadata for memory accesses.
+  *
+  * Option:  sym.getAccessPattern
+  * Getter:  sym.accessPattern
+  * Setter:  sym.accessPattern = (Set[AddressPattern])
+  * Default: undefined
+  */
 case class AccessPattern(pattern: Seq[AddressPattern]) extends AnalysisData[AccessPattern]
-@data object accessPatternOf {
-  def get(x: Sym[_]): Option[Seq[AddressPattern]] = metadata[AccessPattern](x).map(_.pattern)
-  def apply(x: Sym[_]): Seq[AddressPattern] = accessPatternOf.get(x).getOrElse{throw new Exception(s"No access pattern defined for $x")}
-  def update(x: Sym[_], pattern: Seq[AddressPattern]): Unit = metadata.add(x, AccessPattern(pattern))
+
+
+trait AccessPatternData {
+
+  implicit class AccessPatternOps(s: Sym[_]) {
+    def getAccessPattern: Option[Seq[AddressPattern]] = metadata[AccessPattern](s).map(_.pattern)
+    def accessPattern: Seq[AddressPattern] = getAccessPattern.getOrElse{throw new Exception(s"No access pattern defined for $s")}
+    def accessPattern_=(pattern: Seq[AddressPattern]): Unit = metadata.add(s, AccessPattern(pattern))
+  }
+
 }

@@ -1,56 +1,106 @@
 package spatial.util
 
-import forge.tags._
 import argon._
 import spatial.data._
 import spatial.node._
 
 trait UtilsHierarchy {
-  def isControl(sym: Sym[_]): Boolean = sym.op.exists(isControl)
-  def isControl(op: Op[_]): Boolean = op.isInstanceOf[Control[_]]
 
-  def isPrimitive(sym: Sym[_]): Boolean = sym.op.exists(isPrimitive)
-  def isPrimitive(op: Op[_]): Boolean = op.isInstanceOf[Primitive[_]]
-
-  def isEphemeral(sym: Sym[_]): Boolean = sym.op.exists(isEphemeral)
-  def isEphemeral(op: Op[_]): Boolean = op match {
-    case p: Primitive[_] => p.isEphemeral
-    case _ => false
-  }
-
-  def isAccel(ctrl: Ctrl): Boolean = ctrl.s.exists(isAccel)
-  def isAccel(sym: Sym[_]): Boolean = sym.op.exists(isAccel)
-  def isAccel(op: Op[_]): Boolean = op.isInstanceOf[AccelScope]
-
-  def isLoop(ctrl: Ctrl): Boolean = ctrl.s.exists(isLoop)
-  def isLoop(sym: Sym[_]): Boolean = sym.op.exists{ _.isInstanceOf[Loop[_]] }
-
-  def isSwitch(ctrl: Ctrl): Boolean = ctrl.s.exists(isSwitch)
-  def isSwitch(sym: Sym[_]): Boolean = sym.op.exists(isSwitch)
-  def isSwitch(op: Op[_]): Boolean = op.isInstanceOf[Switch[_]]
-
-  def isBranch(ctrl: Ctrl): Boolean = ctrl.s.exists(isBranch)
-  def isBranch(sym: Sym[_]): Boolean = sym.op.exists(isBranch)
-  def isBranch(op: Op[_]): Boolean = op match {
-    case _:Switch[_] | _:SwitchCase[_] | _:IfThenElse[_] => true
-    case _ => false
-  }
-
-  def isParallel(ctrl: Ctrl): Boolean = ctrl.s.exists(isParallel)
-  def isParallel(sym: Sym[_]): Boolean = sym.op.exists(isParallel)
-  def isParallel(op: Op[_]): Boolean = op.isInstanceOf[ParallelPipe]
-
-
-  def isInnerControl(ctrl: Ctrl): Boolean = ctrl.s.exists(isInnerControl) || !isOuterBlock(ctrl)
-  def isInnerControl(sym: Sym[_]): Boolean = isControl(sym) && !isOuter(sym)
-  def isOuterControl(sym: Sym[_]): Boolean = isControl(sym) && isOuter(sym)
-  def isOuterControl(ctrl: Ctrl): Boolean  = isOuterBlock(ctrl)
-
-  def isOuterBlock(blk: Ctrl): Boolean = blk match {
-    case Controller(sym,id) => sym match {
-      case Op(ctrl: Control[_]) => isOuterControl(sym) && (ctrl.mayBeOuterBlock(blk.id) || blk.id == -1)
-      case _ => isOuterControl(sym)
+  implicit class OpHierarchy(op: Op[_]) {
+    def isControl: Boolean = op.isInstanceOf[Control[_]]
+    def isPrimitive: Boolean = op.isInstanceOf[Primitive[_]]
+    def isEphemeral: Boolean = op match {
+      case p: Primitive[_] => p.isEphemeral
+      case _ => false
     }
-    case Host => true
+
+    def isAccel: Boolean = op.isInstanceOf[AccelScope]
+    def isLoop: Boolean = op.isInstanceOf[Loop[_]]
+
+    def isSwitch: Boolean = op.isInstanceOf[Switch[_]]
+    def isBranch: Boolean = op match {
+      case _:Switch[_] | _:SwitchCase[_] | _:IfThenElse[_] => true
+      case _ => false
+    }
+
+    def isParallel: Boolean = op.isInstanceOf[ParallelPipe]
+
+    def isUnitPipe: Boolean = op.isInstanceOf[UnitPipe]
+
+    def isStreamLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isTileTransfer: Boolean = op match {
+      case _:FringeDenseLoad[_,_]   => true
+      case _:FringeDenseStore[_,_]  => true
+      case _:FringeSparseLoad[_,_]  => true
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
+
+    // TODO[3]: Should this just be any write?
+    def isParEnq: Boolean = op match {
+      case _:FIFOBankedEnq[_] => true
+      case _:LIFOBankedPush[_] => true
+      case _:SRAMBankedWrite[_,_] => true
+      case _:FIFOEnq[_] => true
+      case _:LIFOPush[_] => true
+      case _:SRAMWrite[_,_] => true
+      //case _:ParLineBufferEnq[_] => true
+      case _ => false
+    }
+
+    def isStreamStageEnabler: Boolean = op match {
+      case _:FIFODeq[_] => true
+      case _:FIFOBankedDeq[_] => true
+      case _:LIFOPop[_] => true
+      case _:LIFOBankedPop[_] => true
+      case _:StreamInRead[_] => true
+      case _:StreamInBankedRead[_] => true
+      case _ => false
+    }
+
+    def isStreamStageHolder: Boolean = op match {
+      case _:FIFOEnq[_] => true
+      case _:FIFOBankedEnq[_] => true
+      case _:LIFOPush[_] => true
+      case _:LIFOBankedPush[_] => true
+      case _:StreamOutWrite[_] => true
+      case _:StreamOutBankedWrite[_] => true
+      case _ => false
+    }
   }
+
+  implicit class SymHierarchy(s: Sym[_]) {
+    def isControl: Boolean = s.op.exists(_.isControl)
+    def isPrimitive: Boolean = s.op.exists(_.isPrimitive)
+    def isEphemeral: Boolean = s.op.exists(_.isEphemeral)
+
+    def isAccel: Boolean = s.op.exists(_.isAccel)
+    def isLoop: Boolean = s.op.exists{ _.isLoop }
+    def isSwitch: Boolean = s.op.exists(_.isSwitch)
+    def isBranch: Boolean = s.op.exists(_.isBranch)
+    def isParallel: Boolean = s.op.exists(_.isParallel)
+    def isUnitPipe: Boolean = s.op.exists(_.isUnitPipe)
+
+    def isStreamLoad: Boolean = s.op.exists(_.isStreamLoad)
+    def isTileTransfer: Boolean = s.op.exists(_.isTileTransfer)
+
+    def isParEnq: Boolean = s.op.exists(_.isParEnq)
+
+    def isStreamStageEnabler: Boolean = s.op.exists(_.isStreamStageEnabler)
+    def isStreamStageHolder: Boolean = s.op.exists(_.isStreamStageHolder)
+
+  }
+
+  implicit class CtrlHierarchy(ctrl: Ctrl) {
+    def isAccel: Boolean = ctrl.s.exists(_.isAccel)
+    def isLoop: Boolean = ctrl.s.exists(_.isLoop)
+    def isSwitch: Boolean = ctrl.s.exists(_.isSwitch)
+    def isBranch: Boolean = ctrl.s.exists(_.isBranch)
+    def isParallel: Boolean = ctrl.s.exists(_.isParallel)
+  }
+
 }

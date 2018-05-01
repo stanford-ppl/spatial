@@ -9,9 +9,7 @@ import spatial.internal.spatialConfig
 import spatial.targets.MemoryResource
 import spatial.util._
 
-/**
-  * Abstract class for any banking strategy
-  */
+/** Abstract class for any banking strategy. */
 sealed abstract class Banking {
   def nBanks: Int
   def stride: Int
@@ -19,9 +17,7 @@ sealed abstract class Banking {
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
-/**
-  * Banking address function (alpha*A / B) mod N
-  */
+/** Banking address function (alpha*A / B) mod N. */
 case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int]) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
@@ -40,8 +36,7 @@ object ModBanking {
 }
 
 
-/**
-  * Helper structure for holding metadata for buffer ports
+/** Helper structure for holding metadata for buffer ports
   * The mux port is the time multiplexed slot the associated access has in reference to all other accesses
   * on the same port occurring at the same time.
   *
@@ -52,9 +47,7 @@ object ModBanking {
 case class Port(muxPort: Int, bufferPort: Option[Int])
 
 
-/**
-  * Used during memory analysis to track intermediate results
-  */
+/** Used during memory analysis to track intermediate results. */
 case class Instance(
   reads:    Set[Set[AccessMatrix]], // All reads within this group
   writes:   Set[Set[AccessMatrix]], // All writes within this group
@@ -152,56 +145,101 @@ object Memory {
   def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, AccumType.None)
 }
 
+
+/** Physical duplicates metadata for a single logical memory.
+  * Multiple duplicates may be necessary to help support random access read bandwidth.
+  * After IR unrolling, each memory node should have exactly one duplicate.
+  *
+  * Pre-unrolling:
+  * Option:  sym.getDuplicates
+  * Getter:  sym.duplicates
+  * Setter:  sym.duplicates = (Seq[Memory])
+  * Default: undefined
+  *
+  * Post-unrolling:
+  * Option:  sym.getInstance
+  * Getter:  sym.instance
+  * Setter:  sym.instance = (Memory)
+  * Default: undefined
+  */
 case class Duplicates(d: Seq[Memory]) extends StableData[Duplicates]
-/** Pre-unrolling duplicates (one or more Memory instances per node) */
-object duplicatesOf {
-  def get(x: Sym[_]): Option[Seq[Memory]] = metadata[Duplicates](x).map(_.d)
-  def apply(x: Sym[_]): Seq[Memory] = duplicatesOf.get(x).getOrElse{throw new Exception(s"No duplicates defined for $x")}
-  def update(x: Sym[_], d: Seq[Memory]): Unit = metadata.add(x, Duplicates(d))
-}
-/** Post-unrolling duplicates (exactly one Memory instance per node) */
-object memInfo {
-  def get(x: Sym[_]): Option[Memory] = duplicatesOf.get(x).flatMap(_.headOption)
-  def apply(x: Sym[_]): Memory = memInfo.get(x).getOrElse{throw new Exception(s"No memory info defined for $x") }
-  def update(x: Sym[_], d: Memory): Unit = metadata.add(x, Duplicates(Seq(d)))
-}
 
 
+/** Map of a set of memory dispatch IDs for each unrolled instance of an access node.
+  * Memory duplicates are tracked based on the instance into their duplicates list.
+  * Unrolled instances are tracked by the unrolled IDs (duplicate number) of all surrounding iterators.
+  *
+  * Writers may be dispatched to multiple physical memory duplicates (physical broadcast)
+  * Readers should have at most one dispatch ID.
+  *
+  * Option:  sym.getDispatches     --- for the entire map
+  * Option:  sym.getDispach(uid)   --- for a single unrolled instance id
+  * Getter:  sym.dispatches        --- for the entire map
+  * Getter:  sym.dispatch(uid)     --- for a single unrolled instance id
+  * Setter:  sym.dispatches = (Map[ Seq[Int],Set[Int] ])
+  * Default: empty map             --- for the entire map
+  * Default: undefined             --- for a single unrolled instance id
+  */
 case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends StableData[Dispatch]
-object dispatchOf {
-  def get(x: Sym[_]): Option[Map[Seq[Int],Set[Int]]] = metadata[Dispatch](x).map(_.m)
-  def apply(x: Sym[_]): Map[Seq[Int],Set[Int]] = dispatchOf.get(x).getOrElse{throw new Exception(s"No dispatch defined for $x")}
 
-  def get(x: Sym[_], uid: Seq[Int]): Option[Set[Int]] = dispatchOf.get(x).flatMap(_.get(uid))
-  def apply(x: Sym[_], uid: Seq[Int]): Set[Int] = dispatchOf.get(x,uid).getOrElse{throw new Exception(s"No dispatch defined for $x {${uid.mkString(",")}}")}
 
-  def add(x: Sym[_], m: Map[Seq[Int],Set[Int]]): Unit = metadata.add(x, Dispatch(m))
-  def add(x: Sym[_], uid: Seq[Int], dispatch: Int): Unit = {
-    val map = dispatchOf.get(x).getOrElse(Map.empty)
-    val entry = map.getOrElse(uid, Set.empty) + dispatch
-    dispatchOf.add(x, map + (uid -> entry))
-  }
-}
-
+/** Map of buffer ports for each unrolled instance of an access node.
+  * Unrolled instances are tracked by the unrolled IDs (duplicate number) of all surrounding iterators.
+  *
+  * Option:  sym.getPorts     --- for the entire map
+  * Option:  sym.getPort(uid) --- for a single unrolled instance id
+  * Getter:  sym.ports        --- for the entire map
+  * Getter:  sym.port(uid)    --- for a single unrolled instance id
+  * Setter:  sym.ports = (Map[Seq[Int],Port])
+  * Default: empty map        --- for the entire map
+  * Default: undefined        --- for a single unrolled instance id
+  */
 case class Ports(m: Map[Seq[Int],Port]) extends StableData[Ports]
-object portsOf {
-  def get(x: Sym[_]): Option[Map[Seq[Int],Port]] = metadata[Ports](x).map(_.m)
-  def apply(x: Sym[_]): Map[Seq[Int],Port] = portsOf.get(x).getOrElse{throw new Exception(s"No ports defined for $x")}
-
-  def get(x: Sym[_], uid: Seq[Int]): Option[Port] = portsOf.get(x).flatMap(_.get(uid))
-  def apply(x: Sym[_], uid: Seq[Int]): Port = portsOf.get(x,uid).getOrElse{throw new Exception(s"No ports defined for $x {${uid.mkString(",")}}")}
-
-  def add(x: Sym[_], m: Map[Seq[Int],Port]): Unit = metadata.add(x, Ports(m))
-  def add(x: Sym[_], uid: Seq[Int], port: Port): Unit = {
-    val map = portsOf.get(x).getOrElse(Map.empty)
-    portsOf.add(x, map + (uid -> port))
-  }
-}
 
 
+/** Flag set by the user to allow buffered writes across metapipeline stages.
+  *
+  * Getter:  sym.isWriteBuffer
+  * Setter:  sym.isWriteBuffer = (true | false)
+  * Default: false
+  */
 case class EnableWriteBuffer(flag: Boolean) extends StableData[EnableWriteBuffer]
 
-object writeBuffer {
-  def isEnabled(x: Sym[_]): Boolean = metadata[EnableWriteBuffer](x).exists(_.flag)
-  def enableOn(x: Sym[_]): Unit = metadata.add(x, EnableWriteBuffer(true))
+
+trait BankingData {
+
+  implicit class BankedMemoryOps(s: Sym[_]) {
+    def isWriteBuffer: Boolean = metadata[EnableWriteBuffer](s).exists(_.flag)
+    def isWriteBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableWriteBuffer(flag))
+
+    /** Pre-unrolling duplicates (one or more Memory instances per node) */
+
+    def getDuplicates: Option[Seq[Memory]] = metadata[Duplicates](s).map(_.d)
+    def duplicates: Seq[Memory] = getDuplicates.getOrElse{throw new Exception(s"No duplicates defined for $s")}
+    def duplicates_=(ds: Seq[Memory]): Unit = metadata.add(s, Duplicates(ds))
+
+
+    /** Post-unrolling duplicates (exactly one Memory instance per node) */
+
+    def getInstance: Option[Memory] = getDuplicates.flatMap(_.headOption)
+    def instance: Memory = getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
+    def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
+  }
+
+  implicit class BankedAccessOps(s: Sym[_]) {
+
+    def getDispatches: Option[Map[Seq[Int], Set[Int]]] = metadata[Dispatch](s).map(_.m)
+    def dispatches: Map[Seq[Int], Set[Int]] = getDispatches.getOrElse{ Map.empty }
+    def dispatches_=(ds: Map[Seq[Int],Set[Int]]): Unit = metadata.add(s, Dispatch(ds))
+    def getDispatch(uid: Seq[Int]): Option[Set[Int]] = getDispatches.flatMap(_.get(uid))
+    def dispatch(uid: Seq[Int]): Set[Int] = getDispatch(uid).getOrElse{throw new Exception(s"No dispatch defined for $s {${uid.mkString(",")}}")}
+
+    def getPorts: Option[Map[Seq[Int],Port]] = metadata[Ports](s).map(_.m)
+    def ports: Map[Seq[Int],Port] = getPorts.getOrElse{ Map.empty }
+    def ports_=(ports: Map[Seq[Int],Port]): Unit = metadata.add(s, Ports(ports))
+
+    def getPort(uid: Seq[Int]): Option[Port] = getPorts.flatMap(_.get(uid))
+    def port(uid: Seq[Int]): Port = getPort(uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }
+  }
+
 }

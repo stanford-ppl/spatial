@@ -14,29 +14,28 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
   @flow def accesses(s: Sym[_], op: Op[_]): Unit = op match {
     case Accessor(wr,rd) =>
-      wr.foreach{w => writersOf(w.mem) = writersOf(w.mem) + s }
-      rd.foreach{r => readersOf(r.mem) = readersOf(r.mem) + s }
+      wr.foreach{w => w.mem.writers += s }
+      rd.foreach{r => r.mem.readers += s }
 
     case BankedAccessor(wr,rd) =>
-      wr.foreach{w => writersOf(w.mem) = writersOf(w.mem) + s }
-      rd.foreach{r => readersOf(r.mem) = readersOf(r.mem) + s }
+      wr.foreach{w => w.mem.writers += s }
+      rd.foreach{r => r.mem.readers += s }
 
-    case Resetter(mem,ens) => resettersOf(mem) = resettersOf(mem) + s
+    case Resetter(mem,ens) => mem.resetters += s
 
     case _ =>
   }
 
   @flow def accumulator(s: Sym[_], op: Op[_]): Unit = {
-    if (s.isReader) readUsesOf(s) = readUsesOf(s) + s
-    readUsesOf(s) = readUsesOf(s) ++ s.inputs.flatMap{in => readUsesOf(in) }
+    if (s.isReader) s.readUses += s
+    s.readUses ++= s.inputs.flatMap{in => in.readUses }
 
     s match {
       case Writer(wrMem,_,_,_) =>
-        val readers = readUsesOf(s)
-        readers.foreach{case Reader(rdMem,_,_) =>
+        s.readUses.foreach{case Reader(rdMem,_,_) =>
           if (rdMem == wrMem) {
-            accumTypeOf(rdMem) = AccumType.Fold
-            accumTypeOf(s) = AccumType.Fold
+            rdMem.accumType = AccumType.Fold
+            s.accumType = AccumType.Fold
           }
         }
       case _ =>
@@ -45,9 +44,9 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
   @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = op match {
     case ctrl: Control[_] =>
-      val children = op.blocks.flatMap(_.stms.filter(isControl))
-      isOuter(s) = children.exists{s => !isBranch(s) || isOuterControl(s) }
-      s.cchains.foreach{cchain => ctrlNodeOf(cchain) = s }
+      val children = op.blocks.flatMap(_.stms.filter(_.isControl))
+      s.isOuter = children.exists{c => c.isBranch || c.isOuterControl }
+      s.cchains.foreach{cchain => cchain.owner = s }
       s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
       op.blocks.foreach{blk =>
@@ -62,16 +61,16 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ => // Nothin'
   }
 
-  @flow def controlStyle(s: Sym[_], op: Op[_]): Unit = op match {
-    case _: ParallelPipe => styleOf(s) = Sched.ForkJoin
-    case _: Switch[_]    => styleOf(s) = Sched.Fork
+  @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
+    case _: ParallelPipe => s.schedule = Sched.ForkJoin
+    case _: Switch[_]    => s.schedule = Sched.Fork
     case _: Control[_] =>
-      (userStyleOf.get(s), styleOf.get(s)) match {
-        case (None, None) if s.isUnitPipe || s.isAccelScope => styleOf(s) = Sched.Seq
-        case (None, None)        => styleOf(s) = Sched.Pipe
-        case (Some(s1), None)    => styleOf(s) = s1
-        case (None, Some(s1))    => styleOf(s) = s1
-        case (Some(_), Some(s2)) => styleOf(s) = s2  // Override user
+      (s.getUserSchedule, s.getSchedule) match {
+        case (None, None) if s.isUnitPipe || s.isAccel => s.schedule = Sched.Seq
+        case (None, None)        => s.schedule = Sched.Pipe
+        case (Some(s1), None)    => s.schedule = s1
+        case (None, Some(s1))    => s.schedule = s1
+        case (Some(_), Some(s2)) => s.schedule = s2  // Override user
       }
     case _ => // No schedule for non-control nodes
   }
@@ -79,19 +78,19 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
     case loop: Loop[_] =>
       loop.cchains.foreach{case (cchain,is) =>
-        cchain.ctrs.zip(is).foreach{case (ctr, i) => ctrOf(i) = ctr }
+        cchain.ctrs.zip(is).foreach{case (ctr, i) => i.counter = ctr }
       }
 
     case _ =>
   }
 
   @flow def streams(s: Sym[_], op: Op[_]): Unit = {
-    if (isStreamLoad(s))   streamLoadCtrls += s
-    if (isTileTransfer(s)) tileTransferCtrls += s
-    if (isParEnq(s))       streamParEnqs += s
+    if (s.isStreamLoad)   streamLoadCtrls += s
+    if (s.isTileTransfer) tileTransferCtrls += s
+    if (s.isParEnq)       streamParEnqs += s
 
-    if (isStreamStageEnabler(s)) streamEnablers += s
-    if (isStreamStageHolder(s))  streamHolders += s
+    if (s.isStreamStageEnabler) streamEnablers += s
+    if (s.isStreamStageHolder)  streamHolders += s
   }
 
 
@@ -105,12 +104,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     **/
   @flow def globals(lhs: Sym[_], rhs: Op[_]): Unit = lhs match {
     case Impure(_,_) =>
-    case Op(RegRead(reg)) if reg.isArgIn => isGlobal(lhs) = true
+    case Op(RegRead(reg)) if reg.isArgIn => lhs.isGlobal = true
 
     case Primitive(_) =>
-      if (rhs.inputs.nonEmpty && rhs.inputs.forall(isGlobal(_))) isGlobal(lhs) = true
-
-
+      if (rhs.inputs.nonEmpty && rhs.inputs.forall(_.isGlobal)) lhs.isGlobal = true
 
     case _ => // Not global
   }

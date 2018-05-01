@@ -23,28 +23,45 @@ case class AccessMatrix(
   }
 }
 
-
+/** The unrolled access patterns of a (optionally parallelized) memory access represented as affine matrices.
+  * Random accesses are represented as affine by representing the random symbol as a 'iterator'.
+  *
+  * Option:  sym.getAffineMatrices
+  * Getter:  sym.affineMatrices
+  * Setter:  sym.affineMatrices = (Seq[AccessMatrix])
+  * Default: Nil (no access matrices)
+  */
 case class AffineMatrices(matrices: Seq[AccessMatrix]) extends AnalysisData[AffineMatrices] {
   override def toString: String = s"AffineMatrices(${matrices.length} matrices)"
 }
-@data object affineMatricesOf {
-  def get(access: Sym[_]): Option[Seq[AccessMatrix]] = metadata[AffineMatrices](access).map(_.matrices)
-  def apply(access: Sym[_]): Seq[AccessMatrix] = affineMatricesOf.get(access).getOrElse(Nil)
-  def update(access: Sym[_], matrices: Seq[AccessMatrix]): Unit = metadata.add(access, AffineMatrices(matrices))
-}
 
-
+/** Symbolic domain restrictions of an integer symbol, represented as a symbolic affine constraint matrix
+  *
+  * Option:  sym.getDomain
+  * Getter:  sym.domain
+  * Setter:  sym.domain = (ConstraintMatrix[Idx])
+  * Get/Set: sym.getOrElseUpdateDomain( => ConstraintMatrix[Idx])
+  * Default: Empty constraint matrix (no constraints)
+  */
 case class Domain(domain: ConstraintMatrix[Idx]) extends AnalysisData[Domain]
-@data object domainOf {
-  def get(x: Sym[_]): Option[ConstraintMatrix[Idx]] = metadata[Domain](x).map(_.domain)
-  def apply(x: Sym[_]): ConstraintMatrix[Idx] = domainOf.get(x).getOrElse{ ConstraintMatrix.empty }
-  def update(x: Sym[_], domain: ConstraintMatrix[Idx]): Unit = metadata.add(x, Domain(domain))
 
-  def getOrElseUpdate(x: Sym[_], els: => ConstraintMatrix[Idx]): ConstraintMatrix[Idx] = domainOf.get(x) match {
-    case Some(domain) => domain
-    case None =>
-      val domain = els
-      domainOf(x) = domain
-      domain
+
+trait AffineData {
+
+  implicit class AffineDataOps(s: Sym[_]) {
+    def getAffineMatrices: Option[Seq[AccessMatrix]] = metadata[AffineMatrices](s).map(_.matrices)
+    def affineMatrices: Seq[AccessMatrix] = getAffineMatrices.getOrElse(Nil)
+    def affineMatrices_=(matrices: Seq[AccessMatrix]): Unit = metadata.add(s, AffineMatrices(matrices))
+
+    def getDomain: Option[ConstraintMatrix[Idx]] = metadata[Domain](s).map(_.domain)
+    def domain: ConstraintMatrix[Idx] = getDomain.getOrElse{ ConstraintMatrix.empty }
+    def domain_=(domain: ConstraintMatrix[Idx]): Unit = metadata.add(s, Domain(domain))
+
+    def getOrElseUpdateDomain(els: => ConstraintMatrix[Idx]): ConstraintMatrix[Idx] = getDomain match {
+      case Some(domain) => domain
+      case None =>
+        s.domain = els
+        s.domain
+    }
   }
 }

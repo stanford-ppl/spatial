@@ -50,6 +50,8 @@ class Lifter[A,B:Type] extends CastFunc[A,B] {
   @rig override def unchecked(a: A): B = tB.from(a)
 }
 
+
+
 /**
   * Used when no other evidence exists for how to lift an unstaged type.
   * Unstaged types should have at most one implicit Lift typeclass instance.

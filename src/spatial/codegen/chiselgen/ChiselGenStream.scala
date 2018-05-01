@@ -14,12 +14,12 @@ trait ChiselGenStream extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
-      emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${readersOf(lhs).toList.length}, Bool()))", forceful = true)
+      emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${lhs.readers.toList.length}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
       emitGlobalWire(src"${swap(lhs, Ready)} := ${swap(lhs, ReadyOptions)}.reduce{_|_}", forceful = true)
       emitGlobalWireMap(src"""${lhs}_now_valid""","""Wire(Bool())""", forceful = true)
       emitGlobalWireMap(src"${lhs}_valid", "Wire(Bool())", forceful = true)
-      emitGlobalWire(src"val ${lhs} = Wire(${readersOf(lhs).toList.head.tp})", forceful = true)
+      emitGlobalWire(src"val ${lhs} = Wire(${lhs.readers.toList.head.tp})", forceful = true)
 
     // case op@StreamInBankedRead(strm, ens) =>
     //   open(src"val $lhs = {")
@@ -37,8 +37,8 @@ trait ChiselGenStream extends ChiselGenCommon {
     //   close("}")
 
     case StreamOutNew(bus) =>
-      emitGlobalWireMap(src"${lhs}_valid_options", src"Wire(Vec(${writersOf(lhs).toList.length}, Bool()))", forceful = true)
-      emitGlobalWireMap(src"${lhs}_valid_stops", src"Wire(Vec(${writersOf(lhs).toList.length}, Bool()))", forceful = true)
+      emitGlobalWireMap(src"${lhs}_valid_options", src"Wire(Vec(${lhs.writers.size}, Bool()))", forceful = true)
+      emitGlobalWireMap(src"${lhs}_valid_stops", src"Wire(Vec(${lhs.writers.size}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_valid", "Wire(Bool())", forceful = true)
       emitGlobalWireMap(src"${lhs}_stop", "Wire(Bool())", forceful = true)
       emitGlobalModuleMap(src"${lhs}_valid_srff", "Module(new SRFF())", forceful = true)
@@ -46,9 +46,9 @@ trait ChiselGenStream extends ChiselGenCommon {
       emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_}", forceful = true)
       emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.asyn_reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_} | accelReset", forceful = true)
       emitGlobalModule(src"${swap(lhs, Valid)} := ${swap(src"${lhs}_valid_srff", Blank)}.io.output.data | ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
-      val ens = writersOf(lhs).toList.head match {case Op(StreamOutBankedWrite(_, _, ens)) => ens.toList.length ; case _ => 0}
-	    emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${ens*writersOf(lhs).toList.length}, ${lhs.tp.typeArgs.head}))")
-	    emitGlobalWire(src"""val ${lhs} = Vec((0 until ${ens}).map{i => val ${lhs}_slice_options = (0 until ${writersOf(lhs).toList.length}).map{j => ${swap(lhs, DataOptions)}(i*${writersOf(lhs).toList.length}+j)}; Mux1H(${swap(lhs, ValidOptions)}, ${lhs}_slice_options)}.toList)""")
+      val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, _, ens)) => ens.size; case _ => 0}
+	    emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
+	    emitGlobalWire(src"""val ${lhs} = Vec((0 until ${ens}).map{i => val ${lhs}_slice_options = (0 until ${lhs.writers.size}).map{j => ${swap(lhs, DataOptions)}(i*${lhs.writers.size}+j)}; Mux1H(${swap(lhs, ValidOptions)}, ${lhs}_slice_options)}.toList)""")
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
 
 //     case StreamRead(stream, en) =>
@@ -91,17 +91,23 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
-      val muxPort = portsOf(lhs).values.head.muxPort
-      val base = writersOf(stream).filter(portsOf(_).values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val muxPort = lhs.ports.values.head.muxPort
+      val base = stream.writers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
       val parent = lhs.parent.s.get
-      ens.zipWithIndex.map{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"; emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & $en & ~${parent}_sm.io.ctrDone """)}
+      ens.zipWithIndex.foreach{case(e,i) =>
+        val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
+        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${lhs.fullDelay}.toInt", true)} & $en & ~${parent}_sm.io.ctrDone """)
+      }
+
       emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} | ~${parent}_sm.io.ctrDone // Should be delayed by body latency + ready-off bubbles""")
-      data.zipWithIndex.map{case(d,i) => emit(src"""${swap(stream, DataOptions)}($base + $i) := $d""")}
+      data.zipWithIndex.foreach{case(d,i) =>
+        emit(src"""${swap(stream, DataOptions)}($base + $i) := $d""")
+      }
 
 
     case StreamInBankedRead(strm, ens) =>
-      val muxPort = portsOf(lhs).values.head.muxPort
-      val base = readersOf(strm).filter(portsOf(_).values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val muxPort = lhs.ports.values.head.muxPort
+      val base = strm.readers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
       val parent = lhs.parent.s.get
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)}

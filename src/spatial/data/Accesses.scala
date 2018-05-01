@@ -40,10 +40,10 @@ trait AccessData {
     def isUnusedAccess_=(flag: Boolean): Unit = metadata.add(s, UnusedAccess(flag))
 
     def users: Set[User] = metadata[MUsers](s).map(_.users).getOrElse(Set.empty)
-    def users_=(users: Set[User]): Unit = metadata.add(s, MUsers(users))
+    def users_=(use: Set[User]): Unit = metadata.add(s, MUsers(use))
 
     def readUses: Set[Sym[_]] = metadata[ReadUses](s).map(_.reads).getOrElse(Set.empty)
-    def readUses_=(uses: Set[Sym[_]]): Unit = metadata.add(s, ReadUses(uses))
+    def readUses_=(use: Set[Sym[_]]): Unit = metadata.add(s, ReadUses(use))
   }
 
 }

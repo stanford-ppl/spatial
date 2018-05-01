@@ -66,7 +66,7 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
       error("(If this is what you wanted, use the forever counter '*' notation instead.)")
       error(lhs)
 
-    case RegNew(init) if !isGlobal(init) =>
+    case RegNew(init) if !init.isGlobal =>
       error(lhs.ctx, s"Reset value of register ${lhs.fullname} was not a constant.")
       error(lhs.ctx)
 

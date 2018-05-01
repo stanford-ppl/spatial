@@ -54,13 +54,11 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     dbgs(s"  Uses [Block: $block]:")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
-    used.foreach{node =>
-      node.users += User(user, block)
+    used.foreach{use =>
+      use.users += User(user, block)
 
       // Also add stateless nodes that this node uses
-      pendingUses(node).filter(_ != node).foreach{used =>
-        used.users += User(node, block)
-      }
+      pendingUses(use).filter(_ != use).foreach{pend => pend.users += User(use, block) }
     }
   }
 

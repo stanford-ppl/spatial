@@ -73,34 +73,31 @@ trait UtilsHierarchy {
     }
   }
 
-  implicit class SymHierarchy(s: Sym[_]) {
-    def isControl: Boolean = s.op.exists(_.isControl)
-    def isPrimitive: Boolean = s.op.exists(_.isPrimitive)
-    def isEphemeral: Boolean = s.op.exists(_.isEphemeral)
+  class HierarchyControlOps(s: Option[Sym[_]]) {
+    private def op: Option[Op[_]] = s.flatMap{sym => sym.op : Option[Op[_]] }
 
-    def isAccel: Boolean = s.op.exists(_.isAccel)
-    def isLoop: Boolean = s.op.exists{ _.isLoop }
-    def isSwitch: Boolean = s.op.exists(_.isSwitch)
-    def isBranch: Boolean = s.op.exists(_.isBranch)
-    def isParallel: Boolean = s.op.exists(_.isParallel)
-    def isUnitPipe: Boolean = s.op.exists(_.isUnitPipe)
+    def isControl: Boolean = op.exists(_.isControl)
+    def isPrimitive: Boolean = op.exists(_.isPrimitive)
+    def isEphemeral: Boolean = op.exists(_.isEphemeral)
 
-    def isStreamLoad: Boolean = s.op.exists(_.isStreamLoad)
-    def isTileTransfer: Boolean = s.op.exists(_.isTileTransfer)
+    def isAccel: Boolean = op.exists(_.isAccel)
+    def isLoop: Boolean = op.exists{ _.isLoop }
+    def isSwitch: Boolean = op.exists(_.isSwitch)
+    def isBranch: Boolean = op.exists(_.isBranch)
+    def isParallel: Boolean = op.exists(_.isParallel)
+    def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
 
-    def isParEnq: Boolean = s.op.exists(_.isParEnq)
+    def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
+    def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
 
-    def isStreamStageEnabler: Boolean = s.op.exists(_.isStreamStageEnabler)
-    def isStreamStageHolder: Boolean = s.op.exists(_.isStreamStageHolder)
+    def isParEnq: Boolean = op.exists(_.isParEnq)
+
+    def isStreamStageEnabler: Boolean = op.exists(_.isStreamStageEnabler)
+    def isStreamStageHolder: Boolean = op.exists(_.isStreamStageHolder)
 
   }
 
-  implicit class CtrlHierarchy(ctrl: Ctrl) {
-    def isAccel: Boolean = ctrl.s.exists(_.isAccel)
-    def isLoop: Boolean = ctrl.s.exists(_.isLoop)
-    def isSwitch: Boolean = ctrl.s.exists(_.isSwitch)
-    def isBranch: Boolean = ctrl.s.exists(_.isBranch)
-    def isParallel: Boolean = ctrl.s.exists(_.isParallel)
-  }
+  implicit class SymHierarchy(s: Sym[_]) extends HierarchyControlOps(Some(s))
+  implicit class CtrlHierarchy(ctrl: Ctrl) extends HierarchyControlOps(ctrl.s)
 
 }

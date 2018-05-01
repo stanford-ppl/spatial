@@ -12,9 +12,9 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
   private def visitOuterControl(lhs: Sym[_], rhs: Op[_]): Unit = {
     dbgs(stm(lhs))
     rhs.blocks.foreach{blk => visitBlock(blk) }
-    val interval = (1.0 +: lhs.children.map{child => iiOf(child.sym) }).max
+    val interval = (1.0 +: lhs.children.map{child => child.sym.II }).max
     dbgs(s" - Interval: $interval")
-    iiOf(lhs) = userIIOf(lhs).getOrElse(interval)
+    lhs.II = lhs.userII.getOrElse(interval)
   }
 
   private def visitInnerControl(lhs: Sym[_], rhs: Op[_]): Unit = {
@@ -24,19 +24,19 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
     val interval = (1.0 +: blks.map(_._2)).max
     dbgs(s" - Latency:  $latency")
     dbgs(s" - Interval: $interval")
-    bodyLatency(lhs) = latency
-    iiOf(lhs) = userIIOf(lhs).getOrElse(interval)
+    lhs.bodyLatency = latency
+    lhs.II = lhs.userII.getOrElse(interval)
   }
 
   private def visitControl(lhs: Sym[_], rhs: Op[_]): Unit = {
-    if (isInnerControl(lhs)) visitInnerControl(lhs,rhs) else visitOuterControl(lhs,rhs)
+    if (lhs.isInnerControl) visitInnerControl(lhs,rhs) else visitOuterControl(lhs,rhs)
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel{ visitControl(lhs,rhs) }
 
     // TODO[4]: Still need to verify that this rule is generally correct
-    case StateMachine(_,_,notDone,action,nextState) if isInnerControl(lhs) =>
+    case StateMachine(_,_,notDone,action,nextState) if lhs.isInnerControl =>
       dbgs(stm(lhs))
       rhs.blocks.foreach{blk => visitBlock(blk) }
       val (latNotDone, iiNotDone) = latencyAndInterval(notDone)
@@ -63,21 +63,21 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
 
       dbgs(s" - Latency:  $latency")
       dbgs(s" - Interval: $interval")
-      iiOf(lhs) = userIIOf(lhs).getOrElse(interval)
-      bodyLatency(lhs) = latency
+      lhs.II = lhs.userII.getOrElse(interval)
+      lhs.bodyLatency = latency
 
-    case StateMachine(_,_,notDone,action,nextState) if isOuterControl(lhs) =>
+    case StateMachine(_,_,notDone,action,nextState) if lhs.isOuterControl =>
       dbgs(stm(lhs))
       rhs.blocks.foreach{blk => visitBlock(blk) }
       val (latNotDone, iiNotDone) = latencyAndInterval(notDone)
       val (latNextState, iiNextState) = latencyAndInterval(nextState)
-      val interval = (Seq(1.0, iiNotDone, iiNextState) ++ lhs.children.map{child => iiOf(child.sym) }).max
+      val interval = (Seq(1.0, iiNotDone, iiNextState) ++ lhs.children.map{child => child.sym.II }).max
       dbgs(s" - Latency: $latNotDone, $latNextState")
       dbgs(s" - Interval: $interval")
-      iiOf(lhs) = userIIOf(lhs).getOrElse(interval)
-      bodyLatency(lhs) = Seq(latNotDone, latNextState)
+      lhs.II = lhs.userII.getOrElse(interval)
+      lhs.bodyLatency = Seq(latNotDone, latNextState)
 
-    case _ if isControl(lhs) => visitControl(lhs, rhs)
+    case _ if lhs.isControl => visitControl(lhs, rhs)
     case _ => super.visit(lhs, rhs)
   }
 

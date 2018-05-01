@@ -8,18 +8,16 @@ import spatial.util._
 
 trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaGenMemories {
 
-  def isStreaming(ctrl: Sym[_]): Boolean = ctrl.isStreamPipe
-
   // In Scala simulation, run a pipe until its read fifos and streamIns are empty
   def getReadStreamsAndFIFOs(ctrl: Ctrl): Set[Sym[_]] = {
     ctrl.children.flatMap(getReadStreamsAndFIFOs).toSet ++
-    localMems.all.filter{mem => readersOf(mem).exists{_.parent == ctrl }}
+    localMems.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
                  .filter{mem => mem.isStreamIn || mem.isFIFO }
                  .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   def emitControlBlock(lhs: Sym[_], block: Block[_]): Unit = {
-    if (isOuterControl(lhs) && isStreaming(lhs)) {
+    if (lhs.isOuterControl && lhs.isStreamPipe) {
       val children = lhs.children
       block.stms.foreach { stm =>
         val isChild = children.exists{child => child.s.contains(stm) }

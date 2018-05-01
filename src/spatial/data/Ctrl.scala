@@ -13,7 +13,7 @@ sealed abstract class Ctrl {
   def parent: Ctrl
   @stateful def children: Seq[Controller]
 
-  def isOuterBlk: Boolean
+  def isOuterBlock: Boolean
 }
 
 case class Controller(sym: Sym[_], id: Int) extends Ctrl {
@@ -21,10 +21,10 @@ case class Controller(sym: Sym[_], id: Int) extends Ctrl {
   def parent: Ctrl = if (id != -1) Controller(sym,-1) else sym.parent
   @stateful def children: Seq[Controller] = sym.children
 
-  def isOuterBlk: Boolean = sym.isOuterControl && (id == -1 || (sym match {
+  def isOuterBlock: Boolean = id == -1 || (sym match {
     case Op(ctrl: Control[_]) => ctrl.mayBeOuterBlock(id)
     case _ => true
-  }))
+  })
 }
 
 case object Host extends Ctrl {
@@ -32,5 +32,5 @@ case object Host extends Ctrl {
   def parent: Ctrl = Host
   @stateful def children: Seq[Controller] = hwScopes.all
 
-  def isOuterBlk: Boolean = true
+  def isOuterBlock: Boolean = true
 }

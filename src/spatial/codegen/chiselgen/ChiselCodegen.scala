@@ -23,7 +23,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()
   var maxretime = 0
-  var itersMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
   /** Map for tracking defs of nodes. If they get redeffed anywhere, we map it to a suffix */
   var alphaconv = collection.mutable.HashMap[String, String]()
 

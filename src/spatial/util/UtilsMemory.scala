@@ -87,7 +87,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
       val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
-      dist <= 0 || (dist > 0 && isInLoop(ctrl))
+      dist <= 0 || (dist > 0 && ctrl.isInLoop)
     }
 
     /**
@@ -95,7 +95,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       */
     @stateful def mayFollow(b: Sym[_]): Boolean = {
       val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
-      dist >= 0 || (dist < 0) && isInLoop(ctrl)
+      dist >= 0 || (dist < 0) && ctrl.isInLoop
     }
 
     /**
@@ -108,7 +108,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     @stateful def mustOccurWithin(ctrl: Ctrl): Boolean = {
       val parents = x.ancestors(ctrl)
       val enables = (x +: parents.flatMap(_.s)).flatMap(_.enables)
-      !parents.exists(isSwitch) && enables.forall{case Const(b) => b.value; case _ => false }
+      !parents.exists(_.isSwitch) && enables.forall{case Const(b) => b.value; case _ => false }
      }
 
     /**
@@ -128,8 +128,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       val (ctrlB,distB) = LCAWithDistance(b, p) // Positive if b * p, negative otherwise
       val ctrlAB = LCA(x,b)
       if      (distA > 0 && distB > 0) { distA < distB && x.mustOccurWithin(ctrlAB) }   // b a p
-      else if (distA > 0 && distB < 0) { isInLoop(ctrlA) && x.mustOccurWithin(ctrlAB) } // a p b
-      else if (distA < 0 && distB < 0) { distA < distB && isInLoop(ctrlA) && x.mustOccurWithin(ctrlAB) } // p b a
+      else if (distA > 0 && distB < 0) { ctrlA.isInLoop && x.mustOccurWithin(ctrlAB) } // a p b
+      else if (distA < 0 && distB < 0) { distA < distB && ctrlA.isInLoop && x.mustOccurWithin(ctrlAB) } // p b a
       else false
     }
   }
@@ -164,12 +164,12 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     }
   }
 
-  def readWidths(mem: Sym[_]): Set[Int] = readersOf(mem).map{
+  def readWidths(mem: Sym[_]): Set[Int] = mem.readers.map{
     case Op(read: BankedAccessor[_,_]) => read.width
     case _ => 1
   }
 
-  def writeWidths(mem: Sym[_]): Set[Int] = writersOf(mem).map{
+  def writeWidths(mem: Sym[_]): Set[Int] = mem.writers.map{
     case Op(write: BankedAccessor[_,_]) => write.width
     case _ => 1
   }
@@ -183,9 +183,9 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     case _ => -1
   }
 
-  def wPortMuxWidth(mem: Sym[_], port: Int): Int = writersOf(mem).map{portsOf(_).values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
+  def wPortMuxWidth(mem: Sym[_], port: Int): Int = mem.writers.map{_.ports.values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
 
-  def rPortMuxWidth(mem: Sym[_], port: Int): Int = readersOf(mem).map{portsOf(_).values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
+  def rPortMuxWidth(mem: Sym[_], port: Int): Int = mem.readers.map{_.ports.values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
 
   /**
     * Returns iterators between controller containing access (inclusive) and controller containing mem (exclusive).

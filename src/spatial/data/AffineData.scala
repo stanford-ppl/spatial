@@ -55,7 +55,7 @@ trait AffineData {
 
     def getDomain: Option[ConstraintMatrix[Idx]] = metadata[Domain](s).map(_.domain)
     def domain: ConstraintMatrix[Idx] = getDomain.getOrElse{ ConstraintMatrix.empty }
-    def domain_=(domain: ConstraintMatrix[Idx]): Unit = metadata.add(s, Domain(domain))
+    def domain_=(d: ConstraintMatrix[Idx]): Unit = metadata.add(s, Domain(d))
 
     def getOrElseUpdateDomain(els: => ConstraintMatrix[Idx]): ConstraintMatrix[Idx] = getDomain match {
       case Some(domain) => domain

@@ -19,7 +19,7 @@ trait UtilsIR extends UtilsIRLowPriority {
 
 
   @stateful def canMotion(stms: Seq[Sym[_]]): Boolean = {
-    stms.forall{s => !takesEnables(s) && s.effects.isIdempotent }
+    stms.forall{s => !s.takesEnables && s.effects.isIdempotent }
   }
   @stateful def shouldMotion(stms: Seq[Sym[_]], inHw: Boolean): Boolean = {
     canMotion(stms) && (inHw || stms.length == 1)

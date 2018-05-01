@@ -16,7 +16,7 @@ trait UtilsControl {
 
   /** Operations implicitly defined on both Sym[_] and Ctrl. */
   abstract class ControlOps(s: Option[Sym[_]]) {
-    def op: Option[Op[_]] = s.flatMap(_.op)
+    private def op: Option[Op[_]] = s.flatMap{sym => sym.op : Option[Op[_]] }
     def toCtrl: Ctrl
 
     def takesEnables: Boolean = op.exists{
@@ -29,12 +29,21 @@ trait UtilsControl {
       case _ => Nil
     }
 
-    def isInnerControl: Boolean = s.exists{sym => sym.isControl && !sym.isOuter} || !toCtrl.isOuterBlk
-    def isOuterControl: Boolean = toCtrl.isOuterBlk
+    def isInnerControl: Boolean = toCtrl match {
+      case ctrl @ Controller(sym,_) => sym.isControl && (!sym.isOuter || !ctrl.isOuterBlock)
+      case Host => false
+    }
+    def isOuterControl: Boolean = toCtrl match {
+      case ctrl @ Controller(sym,_) => sym.isControl && sym.isOuter && ctrl.isOuterBlock
+      case Host => true
+    }
 
+    def isPipeline: Boolean = s.exists(_.schedule == Sched.Pipe)
+    def isSequential: Boolean = s.exists(_.schedule == Sched.Seq)
     def isStreamPipe: Boolean = s.exists(_.schedule == Sched.Stream)
 
     def isMetaPipe: Boolean = isOuterControl && s.exists(_.schedule == Sched.Pipe)
+
 
     def isForever: Boolean = op match {
       case Some(op: Control[_]) => op.cchains.exists(_._1.isForever)
@@ -51,7 +60,7 @@ trait UtilsControl {
 
     @stateful def willRunForever: Boolean = isForever || controlChildren.exists(_.willRunForever)
 
-    /** Returns true if either this controller is a loop or exists within a loop. */
+    /** Returns true if either this symbol is a loop or occurs within a loop. */
     def isInLoop: Boolean = s.exists(_.isLoop) || ancestors.exists(_.isLoop)
   }
 
@@ -140,6 +149,8 @@ trait UtilsControl {
     case Host => Nil
     case Controller(Op(loop: Loop[_]), -1) => loop.iters
     case Controller(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
+    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.iters
+    case Controller(Op(loop: UnrolledLoop[_]), i)  => loop.bodiess.apply(i)._1.flatten
     case _ => Nil
   }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
 

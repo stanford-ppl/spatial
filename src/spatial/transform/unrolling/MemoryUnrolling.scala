@@ -42,7 +42,7 @@ trait MemoryUnrolling extends UnrollingBase {
     */
   def unrollStatus[A](lhs: Sym[A], rhs: StatusReader[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     val mem = rhs.mem
-    if (duplicatesOf(mem).length > 1) {
+    if (mem.duplicates.length > 1) {
       warn(lhs.ctx, "Unrolling a status check node on a duplicated memory. Behavior is undefined.")
       warn(lhs.ctx)
     }
@@ -64,10 +64,10 @@ trait MemoryUnrolling extends UnrollingBase {
   def duplicateMemory(mem: Sym[_])(implicit ctx: SrcCtx): Seq[(Sym[_], Int)] = {
     val op = mem.op.getOrElse{ throw new Exception("Could not duplicate memory with no def") }
     dbgs(s"Duplicating ${stm(mem)}")
-    duplicatesOf(mem).zipWithIndex.map{case (inst,d) =>
+    mem.duplicates.zipWithIndex.map{case (inst,d) =>
       dbgs(s"  #$d: $inst")
       val mem2 = cloneOp(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
-      duplicatesOf(mem2) = Seq(inst)
+      mem.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
       dbgs(s"  ${stm(mem2)}")
       strMeta(mem2)
@@ -137,7 +137,7 @@ trait MemoryUnrolling extends UnrollingBase {
     */
   def unrollAccess[A](lhs: Sym[_], rhs: Accessor[A,_])(implicit ctx: SrcCtx): List[Sym[_]] = {
     implicit val A: Bits[A] = rhs.A
-    if (!isUnusedAccess(lhs)) {
+    if (!lhs.isUnusedAccess) {
       val mem  = rhs.mem
       val addr = if (rhs.addr.isEmpty) None else Some(rhs.addr)
       val data = rhs.dataOpt // Note that this is the OLD data symbol, if any
@@ -151,7 +151,7 @@ trait MemoryUnrolling extends UnrollingBase {
         dbgs(s"  Port:     $port")
 
         val ens   = lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }
-        val inst  = memInfo(mem2)
+        val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => (f(a),p) }               // lanes of ND addresses
           val distinct = a2.groupBy(_._1).mapValues(_.map(_._2)).toSeq  // ND address -> lane IDs
@@ -186,7 +186,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens)
 
         banked.s.foreach{s =>
-          portsOf.add(s, Seq(0), port)
+          s.ports += (Seq(0) -> port)
           cloneFuncs.foreach{func => func(s) }
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
@@ -250,7 +250,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val uid = is.map{i => unrollNum(i) }
         val wid = if (len.isDefined) Seq(w) else Nil
         val vid = uid ++ wid
-        val dispatches = dispatchOf(access, vid)
+        val dispatches = access.dispatch(vid)
         if (isLoad && dispatches.size > 1) {
           bug(s"Readers should have exactly one dispatch, $access had ${dispatches.size}.")
           bug(access.ctx)
@@ -263,7 +263,7 @@ trait MemoryUnrolling extends UnrollingBase {
             memory  = memories((mem, dispatchId)),
             dispIds = Seq(dispatchId),
             laneIds = Seq(laneId),
-            port    = portsOf(access,vid),
+            port    = access.ports(vid),
             vecOfs  = wid
           )
         }

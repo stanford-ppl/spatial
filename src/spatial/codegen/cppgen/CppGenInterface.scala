@@ -28,6 +28,9 @@ trait CppGenInterface extends CppGenCommon {
     case ArgInNew(init)  => 
       argIns += (lhs -> argIns.toList.length)
       emit(src"${lhs.tp} $lhs = $init;")
+    case HostIONew(init)  => 
+      argIOs += (lhs -> argIOs.toList.length)
+      emit(src"${lhs.tp} $lhs = $init;")
     case ArgOutNew(init) => 
       argOuts += (lhs -> argOuts.toList.length)
       emit(src"//${lhs.tp}* $lhs = new int32_t {0}; // Initialize cpp argout ???")

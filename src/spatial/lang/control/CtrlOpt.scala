@@ -10,6 +10,7 @@ case class CtrlOpt(
 ) {
   def set[A](x: Sym[A]): Unit = {
     name.foreach{n => x.name = Some(n) }
-    sched.foreach{s => userStyleOf(x) = s }
+    sched.foreach{s => x.userSchedule = s }
+    x.userII = ii.map(_.toDouble)
   }
 }

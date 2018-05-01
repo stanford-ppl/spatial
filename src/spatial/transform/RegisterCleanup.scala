@@ -25,16 +25,20 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     })
   }
 
+  def requiresDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
+    case _:RegRead[_] => true
+    case _ => false
+  }
+
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
-    case node: Primitive[_] if inHw && node.isEphemeral =>
+    case node: Primitive[_] if inHw && node.isEphemeral && requiresDuplication(lhs, rhs) =>
       dbgs("")
-      dbgs("[stateless]")
       dbgs(s"$lhs = $rhs")
-      dbgs(s"users: ${usersOf(lhs)}")
+      dbgs(s"users: ${lhs.users} [stateless]")
 
       // For all uses within a single control node, create a single copy of this node
       // Then associate all uses within that control with that copy
-      val users = usersOf(lhs).groupBy(_.blk)
+      val users = lhs.users.groupBy(_.blk)
 
       users.foreach{case (block, uses) =>
         val read = delayedMirror(lhs, rhs, block)
@@ -48,14 +52,26 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         }
       }
 
-      if (usersOf(lhs).isEmpty) dbgs(s"REMOVING stateless $lhs")
+      if (lhs.users.isEmpty) dbgs(s"REMOVING stateless $lhs")
       Invalid
+
+    case node: Primitive[_] if inHw && node.isEphemeral =>
+      dbgs("")
+      dbgs(s"$lhs = $rhs [stateless]")
+      dbgs(s"users: ${lhs.users}")
+      if (lhs.users.isEmpty) {
+        dbgs(s"REMOVING stateless $lhs")
+        Invalid
+      }
+      else {
+        mirrorWithDuplication(lhs, rhs)
+      }
+
 
     case RegWrite(reg,value,en) =>
       dbgs("")
-      dbgs("[reg write]")
-      dbgs(s"$lhs = $rhs")
-      if (readersOf(reg).isEmpty) {
+      dbgs(s"$lhs = $rhs [reg write]")
+      if (reg.readers.isEmpty) {
         dbgs(s"REMOVING register write $lhs")
         Invalid
       }
@@ -63,15 +79,14 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
 
     case RegNew(_) =>
       dbgs("")
-      dbgs("[reg new]")
-      dbgs(s"$lhs = $rhs")
-      if (readersOf(lhs).isEmpty) {
+      dbgs(s"$lhs = $rhs [reg new]")
+      if (lhs.readers.isEmpty) {
         dbgs(s"REMOVING register $lhs")
         Invalid
       }
       else mirrorWithDuplication(lhs, rhs)
 
-    case _ if isControl(lhs) => withCtrl(lhs){ mirrorWithDuplication(lhs, rhs) }
+    case _ if lhs.isControl => withCtrl(lhs){ mirrorWithDuplication(lhs, rhs) }
     case _ => mirrorWithDuplication(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 
@@ -80,8 +95,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     //statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
     if ( statelessSubstRules.contains((lhs,blk)) ) {
       dbgs("")
-      dbgs(s"[external user, blk = $blk]")
-      dbgs(s"$lhs = $rhs")
+      dbgs(s"$lhs = $rhs [external user, blk = $blk]")
       // Activate / lookup duplication rules
       val rules = statelessSubstRules((lhs,blk)).map{case (s,s2) => s -> s2()}
       rules.foreach{case (s,s2) => dbgs(s"  $s -> ${stm(s2)}") }

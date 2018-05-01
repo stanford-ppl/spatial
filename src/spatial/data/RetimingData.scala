@@ -28,7 +28,7 @@ trait RetimingData {
     def reduceCycle_=(cycle: Seq[Sym[_]]): Unit = metadata.add(s, ReduceCycle(cycle))
 
     def fullDelay: Double = metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
-    def fullDelay(d: Double): Unit = metadata.add(s, FullDelay(d))
+    def fullDelay_=(d: Double): Unit = metadata.add(s, FullDelay(d))
   }
 
 }

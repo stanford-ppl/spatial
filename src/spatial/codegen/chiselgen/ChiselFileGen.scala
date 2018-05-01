@@ -370,7 +370,8 @@ trait ChiselFileGen extends ChiselCodegen {
 // }""")
 //       }
     } else if (cfg.compressWires == 0) {
-      val allTraits = streamExtensions.map{s => List.tabulate(s._2){i => src"${s._1}_${i+1}"}}.flatten.toList.filterNot{a => a.contains("Instantiator") | a.contains("AccelTop") | a.contains("Mapping")}
+      val allTraits = streamExtensions.flatMap{s => List.tabulate(s._2){i => src"${s._1}_${i+1}"}}.toList
+                                      .filterNot{a => a.contains("Instantiator") | a.contains("AccelTop") | a.contains("Mapping")}
 
       val mixers = (0 until allTraits.length by 50).map { i =>
         val numLocalTraits = {allTraits.length - i} min 50

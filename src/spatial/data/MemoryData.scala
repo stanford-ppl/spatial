@@ -35,15 +35,15 @@ trait MemoryData {
 
   implicit class MemoryAccessOps(s: Sym[_]) {
     def readers: Set[Sym[_]] = metadata[Readers](s).map(_.readers).getOrElse(Set.empty)
-    def readers_=(rds: Set[Sym[_]]): Unit = metadata.add(s, Readers(readers))
+    def readers_=(rds: Set[Sym[_]]): Unit = metadata.add(s, Readers(rds))
 
     def writers: Set[Sym[_]] = metadata[Writers](s).map(_.writers).getOrElse(Set.empty)
-    def writers_=(wrs: Set[Sym[_]]): Unit = metadata.add(s, Writers(writers))
+    def writers_=(wrs: Set[Sym[_]]): Unit = metadata.add(s, Writers(wrs))
 
     def accesses: Set[Sym[_]] = s.readers ++ s.writers
 
     def resetters: Set[Sym[_]] = metadata[Resetters](s).map(_.resetters).getOrElse(Set.empty)
-    def resetters_=(rst: Set[Sym[_]]): Unit = metadata.add(s, Resetters(resetters))
+    def resetters_=(rst: Set[Sym[_]]): Unit = metadata.add(s, Resetters(rst))
   }
 
 }

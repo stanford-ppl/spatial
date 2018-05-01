@@ -54,6 +54,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	def storeRaw(dst: RawBits): Unit = {
 		dst.raw := number
 	}
+	def reverse: UInt = chisel3.util.Reverse(this.number)
 
 	def msb():Bool = number(d+f-1)
 
@@ -155,10 +156,10 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	}
 	
 
-	def raw_dec[T] (): UInt = {
+	def raw_dec[T]: UInt = {
 		this.number(d+f-1, f)
 	}
-	def raw_frac[T] (): UInt = {
+	def raw_frac[T]: UInt = {
 		this.number(f, 0)
 	}
 

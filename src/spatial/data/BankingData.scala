@@ -234,9 +234,14 @@ trait BankingData {
     def getDispatch(uid: Seq[Int]): Option[Set[Int]] = getDispatches.flatMap(_.get(uid))
     def dispatch(uid: Seq[Int]): Set[Int] = getDispatch(uid).getOrElse{throw new Exception(s"No dispatch defined for $s {${uid.mkString(",")}}")}
 
+    def addDispatch(uid: Seq[Int], d: Int): Unit = getDispatch(uid) match {
+      case Some(set) => s.dispatches += (uid -> (set + d))
+      case None => s.dispatches += (uid -> Set(d))
+    }
+
     def getPorts: Option[Map[Seq[Int],Port]] = metadata[Ports](s).map(_.m)
     def ports: Map[Seq[Int],Port] = getPorts.getOrElse{ Map.empty }
-    def ports_=(ports: Map[Seq[Int],Port]): Unit = metadata.add(s, Ports(ports))
+    def ports_=(ps: Map[Seq[Int],Port]): Unit = metadata.add(s, Ports(ps))
 
     def getPort(uid: Seq[Int]): Option[Port] = getPorts.flatMap(_.get(uid))
     def port(uid: Seq[Int]): Port = getPort(uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }

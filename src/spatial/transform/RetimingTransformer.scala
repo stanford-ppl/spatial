@@ -288,7 +288,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     newLatencies.toList.map{case (s,l) => s -> scrubNoise(l - latencyOf(s, inReduce = cycles.contains(s))) }
       .sortBy(_._2)
       .foreach{case (s,l) =>
-        symDelay(s) = l
+        s.fullDelay = l
         dbgs(s"  [$l = ${newLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
 
@@ -319,7 +319,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   private def transformCtrl[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if (isInnerControl(lhs) && !isSwitch(rhs)) {
+    if (lhs.isInnerControl && !rhs.isSwitch) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       withRetime(retimeEnables, ctx) { super.transform(lhs, rhs) }
     }

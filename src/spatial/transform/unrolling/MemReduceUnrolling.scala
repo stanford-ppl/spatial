@@ -47,7 +47,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val mvs      = mapLanes.indexValids
     val rvs      = reduceLanes.indexValids
     val start    = cchainMap.ctrs.map(_.start.asInstanceOf[I32])
-    val redType  = reduceType(reduce.result)
+    val redType  = reduce.result.reduceType
     val intermed = func.result
 
     logs(s"  Map iterators: $isMap2")
@@ -129,7 +129,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
                 // REDUCE: On first iteration, store result of tree, do not include value from accum
                 val res2   = reduce.reapply(treeResult, accValue)
                 val select = mux(isFirst, treeResult, res2)
-                reduceType(select) = redType
+                box(select).reduceType = redType
                 select
               }
             }

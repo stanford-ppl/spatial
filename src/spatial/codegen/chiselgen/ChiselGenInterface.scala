@@ -20,10 +20,12 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case InputArguments()       => 
     case ArgInNew(init)  => 
       argIns += (lhs -> argIns.toList.length)
+    case HostIONew(init)  => 
+      argIOs += (lhs -> argIOs.toList.length)
     case ArgOutNew(init) => 
       enterAccel()
-      emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, UInt(64.W)))", forceful=true)
-      emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,writersOf(lhs).size)}, Bool()))", forceful=true)
+      emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))", forceful=true)
+      emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))", forceful=true)
       argOuts += (lhs -> argOuts.toList.length)
       emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
       emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
@@ -95,11 +97,11 @@ trait ChiselGenInterface extends ChiselGenCommon {
       // }
 
       appPropertyStats += HasTileLoad
-      if (isAligned(cmdStream)) appPropertyStats += HasAlignedLoad
+      if (cmdStream.isAligned) appPropertyStats += HasAlignedLoad
       else appPropertyStats += HasUnalignedLoad
       // Get parallelization of datastream
       // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-      val par = readersOf(dataStream).head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+      val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
 
       val id = loadsList.length
       // loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
@@ -121,9 +123,9 @@ trait ChiselGenInterface extends ChiselGenCommon {
       
       // Connect the streams to their IO interface signals
       emit(src"io.memStreams.loads($id).rdata.ready := ${swap(dataStream, Ready)}")
-      emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${symDelay(readersOf(dataStream).head)}.toInt")}}""")
+      emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
       emit(src"""${swap(dataStream, NowValid)} := io.memStreams.loads($id).rdata.valid""")
-      emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${symDelay(readersOf(dataStream).head)}.toInt", true)}""")
+      emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
 
 
     // case FringeSparseLoad(dram,addrStream,dataStream) =>
@@ -181,12 +183,12 @@ trait ChiselGenInterface extends ChiselGenCommon {
       //   }
       // }
 
-      if (isAligned(cmdStream)) appPropertyStats += HasAlignedStore
+      if (cmdStream.isAligned) appPropertyStats += HasAlignedStore
       else appPropertyStats += HasUnalignedStore
 
       // Get parallelization of datastream
       // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-      val par = writersOf(dataStream).head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
+      val par = dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
       val id = storesList.length
       // storeParMapping = storeParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
@@ -216,7 +218,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
       emit(src"${swap(cmdStream, Ready)} := io.memStreams.stores($id).cmd.ready")
       emit(src"""${swap(ackStream, NowValid)} := io.memStreams.stores($id).wresp.valid""")
-      emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${symDelay(readersOf(ackStream).head)}.toInt", true)}""")
+      emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
       emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
 
     // case FringeSparseStore(dram,cmdStream,ackStream) =>

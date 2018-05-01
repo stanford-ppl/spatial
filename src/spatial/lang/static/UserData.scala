@@ -7,7 +7,7 @@ import spatial.data._
 trait UserData {
 
   object bound {
-    def update[A:Type](x: A, bound: Int): Unit = boundOf(x) = UpperBound(bound)
+    def update[A:Type](x: A, bound: Int): Unit = box(x).bound = UpperBound(bound)
   }
 
 

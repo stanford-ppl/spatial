@@ -22,7 +22,9 @@ object Sched {
   * Setter:  sym.isOuter = (true | false)
   * Default: undefined
   */
-case class ControlLevel(isOuter: Boolean) extends StableData[ControlLevel]
+case class ControlLevel(isOuter: Boolean) extends StableData[ControlLevel] {
+  override def toString: String = if (isOuter) "OuterControl" else "InnerControl"
+}
 
 /** A counter or counterchain's owning controller.
   *
@@ -132,9 +134,11 @@ trait ControlData {
     def isOuter: Boolean = getIsOuter.getOrElse{throw new Exception(s"No control level defined for $s") }
     def isOuter_=(flag: Boolean): Unit = metadata.add(s, ControlLevel(flag))
 
+    def level: String = if (isOuter) "OuterControl" else "InnerControl"
+
     def getOwner: Option[Sym[_]] = metadata[CounterOwner](s).map(_.owner)
     def owner: Sym[_] = getOwner.getOrElse{throw new Exception(s"Undefined counter owner for $s") }
-    def owner_=(owner: Sym[_]): Unit = metadata.add(s, CounterOwner(owner))
+    def owner_=(own: Sym[_]): Unit = metadata.add(s, CounterOwner(own))
 
     def getSchedule: Option[Sched] = metadata[ControlSchedule](s).map(_.sched)
     def schedule: Sched = getSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
@@ -156,7 +160,7 @@ trait ControlData {
 
 
     def blk: Ctrl = metadata[ParentBlk](s).map(_.blk).getOrElse{Host}
-    def blk_=(blk: Ctrl): Unit = metadata.add(s, ParentBlk(blk))
+    def blk_=(b: Ctrl): Unit = metadata.add(s, ParentBlk(b))
 
     def bodyLatency: Seq[Double] = metadata[BodyLatency](s).map(_.latency).getOrElse(Nil)
     def bodyLatency_=(latencies: Seq[Double]): Unit = metadata.add(s, BodyLatency(latencies))

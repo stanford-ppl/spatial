@@ -71,7 +71,7 @@ trait ControlSignalData {
     def pushesTo_=(push: List[StreamInfo]): Unit = metadata.add(s, PushStreams(push))
 
     def isAligned: Boolean = metadata[AlignedTransfer](s).exists(_.is)
-    def isAligned(flag: Boolean): Unit = metadata.add(s, AlignedTransfer(flag))
+    def isAligned_=(flag: Boolean): Unit = metadata.add(s, AlignedTransfer(flag))
 
     def loadCtrl: List[Sym[_]] = metadata[LoadMemCtrl](s).map(_.ctrl).getOrElse(Nil)
     def loadCtrl_=(ls: List[Sym[_]]): Unit = metadata.add(s, LoadMemCtrl(ls))

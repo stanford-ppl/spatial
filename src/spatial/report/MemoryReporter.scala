@@ -36,12 +36,12 @@ case class MemoryReporter(IR: State) extends Pass {
         emit(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
         emit(s"---------------------------------------------------------------------")
         emit(s"Symbol:     ${stm(mem)}")
-        val duplicates = duplicatesOf(mem)
+        val duplicates = mem.duplicates
         emit(s"Instances: ${duplicates.length}")
         area.foreach{case (k,v) => if (v > 0) emit(s"  $k: ${" "*(k.length - 10)}$v") }
 
-        val readers = readersOf(mem)
-        val writers = writersOf(mem)
+        val readers = mem.readers
+        val writers = mem.writers
         emit("\n")
         emit(s"Instance Summary: ")
         duplicates.zipWithIndex.foreach{case (inst,i) =>
@@ -56,8 +56,8 @@ case class MemoryReporter(IR: State) extends Pass {
           banking.foreach{grp => emit(s"       $grp") }
           emit(s"     Ports: ")
           def portStr(port: Option[Int], as: Iterable[Sym[_]], tp: String): Iterator[String] = {
-            as.iterator.filter{a => dispatchOf(a).values.exists(_.contains(i)) }
-                       .filter{a => portsOf(a).values.exists(_.bufferPort == port) }
+            as.iterator.filter{a => a.dispatches.values.exists(_.contains(i)) }
+                       .filter{a => a.ports.values.exists(_.bufferPort == port) }
                        .map{a => s"  ${port.map(_.toString).getOrElse("M")}: [$tp] ${a.ctx.content.map(_.trim).getOrElse(stm(a)) } [${a.ctx}]"}
           }
 

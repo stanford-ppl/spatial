@@ -89,7 +89,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   def unroll[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     logs(s"Unrolling $lhs = $rhs")
-    if (isControl(rhs)) duplicateController(lhs,rhs)
+    if (rhs.isControl) duplicateController(lhs,rhs)
     else lanes.duplicate(lhs,rhs)
   }
 
@@ -124,15 +124,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   final override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
     case _ =>
-      val duplicates: List[Sym[_]] = if (isControl(rhs)) duplicateController(lhs,rhs) else unroll(lhs, rhs)
+      val duplicates: List[Sym[_]] = if (rhs.isControl) duplicateController(lhs,rhs) else unroll(lhs, rhs)
       if (duplicates.length == 1) duplicates.head.asInstanceOf[Sym[A]]
       else Invalid.asInstanceOf[Sym[A]]
   }
 
 
   def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = duringClone{e =>
-    if (spatialConfig.noInnerLoopUnroll && !isInner) reduceType(e) = None
-    else reduceType(e) = red
+    if (spatialConfig.noInnerLoopUnroll && !isInner) e.reduceType = None
+    else e.reduceType = red
   }{ blk }
 
 

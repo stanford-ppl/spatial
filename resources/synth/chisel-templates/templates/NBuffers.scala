@@ -18,7 +18,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   val io = IO( new Bundle {
     val sEn = Vec(numBufs, Input(Bool()))
     val sDone = Vec(numBufs, Input(Bool()))
-    val statesInW = Vec(1 max portsWithWriter.length, Output(UInt((1+Utils.log2Up(numBufs)).W)))
+    val statesInW = Vec(1 max portsWithWriter.distinct.length, Output(UInt((1+Utils.log2Up(numBufs)).W)))
     val statesInR = Vec(numBufs, Output(UInt((1+Utils.log2Up(numBufs)).W)))
     val statesOut = Vec(numBufs, Output(UInt((1+Utils.log2Up(numBufs)).W)))
   })
@@ -41,7 +41,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 
   // Counters for reporting writer and reader buffer pointers
   // Mapping input write ports to their appropriate bank
-  val statesInW = portsWithWriter.zipWithIndex.map { case (t,i) =>
+  val statesInW = portsWithWriter.distinct.sorted.zipWithIndex.map { case (t,i) =>
     val c = Module(new NBufCtr(1,Some(t), Some(numBufs), 1+Utils.log2Up(numBufs)))
     c.io.input.enable := swap
     c.io.input.countUp := false.B
@@ -66,6 +66,8 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
     io.statesOut(i) := c.io.output.count
     c
   }
+
+  def lookup(id: Int): Int = { portsWithWriter.sorted.distinct.indexOf(id) }
 
 }
 
@@ -108,7 +110,7 @@ class NBufMem(val mem: MemPrimitive,
     val sDone = Vec(numBufs, Input(Bool()))
     val xBarW = Vec(1 max numXBarW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
     val xBarR = Vec(1 max numXBarR, Input(new R_XBar(ofsWidth, banksWidths))) 
-    val directW = HVec(Array.tabulate(1 max numDirectW){i => Input(new W_Direct(ofsWidth, if (hasDirectW) directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values).flatten.flatten.toList(i) else defaultDirect, bitWidth))})
+    val directW = HVec(Array.tabulate(1 max numDirectW){i => Input(new W_Direct(ofsWidth, if (hasDirectW) directWMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values).flatten.flatten.toList(i) else defaultDirect, bitWidth))})
     val directR = HVec(Array.tabulate(1 max numDirectR){i => Input(new R_Direct(ofsWidth, if (hasDirectR) directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values).flatten.flatten.toList(i) else defaultDirect))})
     val broadcast = Vec(1 max numBroadcastW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
     val flow = Vec(numXBarR + numDirectR, Input(Bool()))
@@ -163,7 +165,7 @@ class NBufMem(val mem: MemPrimitive,
         xBarWMux.foreach { case (bufferPort, portMapping) =>
           val bufferBase = xBarWMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.sum // Index into NBuf io
           val sramXBarWPorts = portMapping.values.sum
-          val wMask = Utils.getRetimed(ctrl.io.statesInW(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+          val wMask = Utils.getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramXBarWPorts).foreach {k => 
             f.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en & wMask
             f.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
@@ -176,7 +178,7 @@ class NBufMem(val mem: MemPrimitive,
         directWMux.foreach { case (bufferPort, portMapping) =>
           val bufferBase = directWMux.filter(_._1 < bufferPort).values.map(_.values).flatten.toList.flatten.length // Index into NBuf io
           val sramDirectWPorts = portMapping.values.flatten.toList.length
-          val wMask = Utils.getRetimed(ctrl.io.statesInW(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+          val wMask = Utils.getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramDirectWPorts).foreach {k => 
             f.io.directW(bufferBase + k).en := io.directW(bufferBase + k).en & wMask
             f.io.directW(bufferBase + k).data := io.directW(bufferBase + k).data
@@ -238,7 +240,7 @@ class NBufMem(val mem: MemPrimitive,
         xBarWMux.foreach { case (bufferPort, portMapping) =>
           val bufferBase = xBarWMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.sum // Index into NBuf io
           val sramXBarWPorts = portMapping.values.sum
-          val wMask = Utils.getRetimed(ctrl.io.statesInW(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+          val wMask = Utils.getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramXBarWPorts).foreach {k => 
             f.io.input(bufferBase + k).en := io.xBarW(bufferBase + k).en & wMask
             f.io.input(bufferBase + k).data := io.xBarW(bufferBase + k).data
@@ -262,6 +264,10 @@ class NBufMem(val mem: MemPrimitive,
         val sel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesOut(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
         io.output.data(bufferBase) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data})        
       }
+    case FIFOType => 
+      val fifo = Module(new FIFO(List(logicalDims.head*depth), bitWidth, 
+                                  banks, combinedXBarWMux, flatXBarRMux))
+      
   }
 
 
@@ -315,11 +321,9 @@ class NBufMem(val mem: MemPrimitive,
     io.broadcast(muxBase) := wBundle
   }
 
-  def connectStageCtrl(done: Bool, en: Bool, ports: List[Int]) {
-    ports.foreach{ port => 
-      io.sEn(port) := en
-      io.sDone(port) := done
-    }
+  def connectStageCtrl(done: Bool, en: Bool, port: Int) {
+    io.sEn(port) := en
+    io.sDone(port) := done
   }
  
   // def connectUntouchedPorts(ports: List[Int]) {
@@ -366,11 +370,9 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
                                   ))
   io <> nbufFF.io
 
-  def connectStageCtrl(done: Bool, en: Bool, ports: List[Int]) {
-    ports.foreach{ port => 
-      io.sEn(port) := en
-      io.sDone(port) := done
-    }
+  def connectStageCtrl(done: Bool, en: Bool, port: Int) {
+    io.sEn(port) := en
+    io.sDone(port) := done
   }
 
   def chain_pass[T](dat: T, en: Bool) { // Method specifically for handling reg chains that pass counter values between metapipe stages

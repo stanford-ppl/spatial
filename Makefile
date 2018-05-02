@@ -1,4 +1,4 @@
-.PHONY: nova all resources apps
+.PHONY: nova all resources apps test
 all: apps
 
 install: 
@@ -19,6 +19,9 @@ clear:
 	rm -rf logs
 	rm -rf gen
 	rm -rf reports
+
+test:
+	sbt test:compile
 
 clean:
 	sbt "; forge/clean; argon/clean; nova/clean"

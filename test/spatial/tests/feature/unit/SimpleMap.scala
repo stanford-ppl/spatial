@@ -12,7 +12,7 @@ import spatial.dsl._
     val a = args(0).to[Q32]
     val data = Array.tabulate(N){ i => a * i.to[Q32]}
 
-    val q = ArgIn[Q32](N)
+    val q = ArgIn[Q32]
     setArg(q, a)
     val x = DRAM[Q32](N)
     val y = DRAM[Q32](N)

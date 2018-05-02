@@ -15,8 +15,6 @@ protected class AccelClass(name: Option[String]) {
   }
 
   @api def apply(scope: => Any): Void = {
-    val pipe = stage(AccelScope(stageBlock{ scope; void }))
-    options.set(pipe)
-    pipe
+    stageWithData(AccelScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
   }
 }

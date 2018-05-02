@@ -1,8 +1,6 @@
 package spatial.tests.feature.math
 
-
 import spatial.dsl._
-
 
 @test class MaxFloat extends SpatialTest {
   override def runtimeArgs: Args = "128"
@@ -31,7 +29,7 @@ import spatial.dsl._
       'Max.Pipe.Foreach (0 until length by tileSize par parN) { i=>
         val sramX    = SRAM[T](tileSize)
         val sramY    = SRAM[T](tileSize)
-        val sramout    = SRAM[T](tileSize)
+        val sramout  = SRAM[T](tileSize)
         sramX load dramX(i::i+tileSize)
         sramY load dramY(i::i+tileSize)
         Foreach (0 until tileSize) { j =>

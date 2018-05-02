@@ -186,6 +186,18 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case ArrayFlatMap(array, apply, func) =>
+      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+      visitBlock(apply)
+      visitBlock(func)
+      emit(src"${lhs}.push_back(${func.result});")
+      close("}")
+
+      open(src"val $lhs = $array.flatMap{${func.input} => ")
+        ret(func)
+      close("}")
+
     case op@ArrayFromSeq(seq)   => 
       emitNewArray(lhs, lhs.tp, getSize(lhs))
       seq.zipWithIndex.foreach{case (s,i) => 

@@ -98,7 +98,7 @@ object Arguments {
     (List(2,2,2), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8)),
     (List(4,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8))
   )
-  val OuterController = List(
+  val OuterControl = List(
     (Sequential, 1, false),
     (Sequential, 2, false),
     (Sequential, 5, false),
@@ -116,7 +116,7 @@ object Arguments {
     // (5, Stream, false),
     // (8, Stream, false),
   )
-  val InnerController = List(
+  val InnerControl = List(
     (Sequential, false, 32)
   )
   val PRNG = List(
@@ -330,18 +330,18 @@ object Launcher {
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.OuterController.zipWithIndex.map{ case(arg,i) => 
-    (s"OuterController$i" -> { (backendName: String) =>
-    	Driver(() => new OuterController(arg), "verilator") {
-          (c) => new OuterControllerTests(c)
+  templates = templates ++ Arguments.OuterControl.zipWithIndex.map{ case(arg,i) => 
+    (s"OuterControl$i" -> { (backendName: String) =>
+    	Driver(() => new OuterControl(arg), "verilator") {
+          (c) => new OuterControlTests(c)
         }
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.InnerController.zipWithIndex.map{ case(arg,i) => 
-    (s"InnerController$i" -> { (backendName: String) =>
-    	Driver(() => new InnerController(arg), "verilator") {
-          (c) => new InnerControllerTests(c)
+  templates = templates ++ Arguments.InnerControl.zipWithIndex.map{ case(arg,i) => 
+    (s"InnerControl$i" -> { (backendName: String) =>
+    	Driver(() => new InnerControl(arg), "verilator") {
+          (c) => new InnerControlTests(c)
         }
       }) 
   }.toMap

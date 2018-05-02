@@ -14,7 +14,7 @@ import spatial.dsl._
     val shiftregfile_dram = DRAM[I32](3,3)
 
     Accel {
-      val init_reg = RegFile[I32](3,3,List.tabulate(9){i => i})
+      val init_reg = RegFile[I32](3,3,List.tabulate[I32](9){i => i})
       init_dram store init_reg
 
       val regfile = RegFile[I32](3,3)

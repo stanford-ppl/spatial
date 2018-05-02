@@ -22,8 +22,12 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixLst(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x < $y")
     case FixLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x <= $y")
-    // case FixNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x =/= $y")
+    case FixNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x =/= $y")
     case FixEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x === $y")
+    case FltLst(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x < $y")
+    case FltLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x <= $y")
+    case FltNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x =/= $y")
+    case FltEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emit(src"$lhs := $x === $y")
     // case UnbMul(x,y) => emit(src"val $lhs = $x *& $y")
     // case UnbDiv(x,y) => emit(src"val $lhs = $x /& $y")
     // case SatAdd(x,y) => emit(src"val $lhs = $x <+> $y")

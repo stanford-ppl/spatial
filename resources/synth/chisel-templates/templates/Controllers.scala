@@ -19,13 +19,13 @@ object Stream extends Sched // Stream extends Sched { override def toString = "S
 object Fork extends Sched // Fork extends Sched { override def toString = "Fork" }
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
-class OuterController(val sched: Sched, val depth: Int, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
+class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
   // Overloaded construters
   // Tuple unpacker
   def this(tuple: (Sched, Int, Boolean)) = this(tuple._1,tuple._2,tuple._3)
 
   val io = IO( new Bundle {
-    // Controller signals
+    // Control signals
     val enable = Input(Bool())
     val done = Output(Bool())
     val rst = Input(Bool())
@@ -136,7 +136,7 @@ class OuterController(val sched: Sched, val depth: Int, val isFSM: Boolean = fal
 
 
 
-class InnerController(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
+class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
@@ -144,7 +144,7 @@ class InnerController(val sched: Sched, val isFSM: Boolean = false, val stateWid
 
   // Module IO
   val io = IO(new Bundle {
-    // Controller signals
+    // Control signals
     val enable = Input(Bool())
     val done = Output(Bool())
     val rst = Input(Bool())

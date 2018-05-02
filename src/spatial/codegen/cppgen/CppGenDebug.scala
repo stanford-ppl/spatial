@@ -12,6 +12,8 @@ trait CppGenDebug extends CppGenCommon {
     case FixToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
     case FltToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
     case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
+    case TextToFlt(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
+    case TextToBit(x) => emit(src"""${lhs.tp} $lhs = $x != "false" & $x != "False" | $x != "0";""")
 
     case TextConcat(strings) => 
     	val paired = strings.map(quote).reduceRight{(r,c) => "string_plus(" + r + "," + c} + ")" * (strings.length-1)
@@ -21,6 +23,9 @@ trait CppGenDebug extends CppGenCommon {
     	else emit(src"""if ( ${cond.toList.mkString(" & ")} ) std::cout << $x;""")
     case BitToText(x) => emit(src"""${lhs.tp} $lhs = $x ? string("true") : string("false");""")
     case DelayLine(_, data) => emit(src"""${lhs.tp} $lhs = $data;""")
+    case op@VarNew(init) => emit(src"${lhs.tp} $lhs = $init;")
+    case VarRead(v)      => emit(src"${lhs.tp} $lhs = $v;")
+    case VarAssign(v, x) => emit(src"$v = $x;")
     case _ => super.gen(lhs, rhs)
   }
 

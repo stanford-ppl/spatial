@@ -108,15 +108,15 @@ trait ChiselGenMem extends ChiselGenCommon {
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .groupBy(_.ports.values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",") + ")"
-                                else writes.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt).mkString("Banks(",",",")"))}".replace("Vector","List")}.mkString(",") + ")"
+                                else writes.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt).mkString("Banks(",",",")"))}".replace("Vector","List")}.mkString(",")
                               }.mkString(",") + ")"
     val DirectR = s"${outerMap("D")}(" + mem.readers
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .groupBy(_.ports.values.head.bufferPort.getOrElse(0))      // Group by port
                               .map{case(bufp, reads) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",") + ")"
-                                else reads.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt))}".replace("Vector","Banks")}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt).mkString("Banks(",",",")"))}".replace("Vector","List")}.mkString(",") + ")"
+                                else reads.map{w => src"${w.ports.values.head.muxPort} -> " + s"${w.banks.map(_.map(_.toInt).mkString("Banks(",",",")"))}".replace("Vector","List")}.mkString(",")
                               }.mkString(",") + ")"
     val bPar = if (inst.depth > 1) s"${innerMap("X")}(" + broadcasts.mkString(",") + ")," else ""
 

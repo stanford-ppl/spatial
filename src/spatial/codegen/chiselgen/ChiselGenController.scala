@@ -525,7 +525,8 @@ trait ChiselGenController extends ChiselGenCommon {
 
         inSubGen(src"${lhs}", src"${parent_kernel}") {
           emitt(s"// Controller Stack: ${controllerStack.tail}")
-          lhs.children.zipWithIndex.foreach { case (c, idx) =>
+          lhs.children.zipWithIndex.foreach { case (cc, idx) =>
+            val c = cc.s.get
             emitParallelizedLoop(iters, cchain, src"_copy$c")
           }
           if (lhs.children.length > 0) {

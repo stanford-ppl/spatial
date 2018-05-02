@@ -19,9 +19,11 @@ elif [[ $type == "nightly" ]]; then
   sbt -Dtest.Scala=true -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "weekly" ]]; then
   sbt -Dtest.Scala=true -Dtest.VCS=true -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "synth_basic" ]]; then
+  sbt -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
 else
   echo "Test type '$type' not recognized" 
-  echo "Supported types: [mini | nightly | weekly]"
+  echo "Supported types: [mini | nightly | weekly | synth_basic]"
   exit 1
 fi
 

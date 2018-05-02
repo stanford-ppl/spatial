@@ -4,7 +4,7 @@ package templates
 import chisel3.iotesters.{PeekPokeTester, Driver, ChiselFlatSpec}
 import org.scalatest.Assertions._
 
-class OuterControllerTests(c: OuterController) extends PeekPokeTester(c) {
+class OuterControlTests(c: OuterControl) extends PeekPokeTester(c) {
   val numIters = List(1,2,3,4,5,6,7,8)
   val latencies = (0 until c.depth).map { i => 
     poke(c.io.maskIn(i), 1)
@@ -80,7 +80,7 @@ class OuterControllerTests(c: OuterController) extends PeekPokeTester(c) {
 
 
 
-class InnerControllerTests(c: InnerController) extends PeekPokeTester(c) {
+class InnerControlTests(c: InnerControl) extends PeekPokeTester(c) {
   step(1)
   reset(1)
   val timeout = 999

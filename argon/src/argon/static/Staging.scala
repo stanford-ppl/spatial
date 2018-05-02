@@ -85,6 +85,9 @@ trait Staging { this: Printing =>
       err_[R](op.R, "Invalid declaration in global namespace")
 
     case None =>
+      val sAliases = op.shallowAliases
+      val dAliases = op.deepAliases
+
       val effects = allEffects(op)
       val mayCSE = effects.mayCSE
 
@@ -92,12 +95,6 @@ trait Staging { this: Printing =>
         val lhs = symbol()
         val sym = op.R.boxed(lhs)
 
-        if (config.enLog) {
-          logs(s"$lhs = $op")
-          logs(s"Effects: $effects")
-        }
-
-        checkAliases(sym,effects)
         data(sym)
         runFlows(sym,op)
 
@@ -107,10 +104,22 @@ trait Staging { this: Printing =>
         if (!effects.isPure) sym.effects = effects                  // Register effects
 
         // Register aliases
-        if (op.deepAliases.nonEmpty) sym.deepAliases = op.deepAliases
-        if (op.shallowAliases.nonEmpty) sym.shallowAliases = op.shallowAliases
+        if (dAliases.nonEmpty) sym.deepAliases = dAliases
+        if (sAliases.nonEmpty) sym.shallowAliases = sAliases
 
-        op.inputs.foreach{in => in.consumers += sym }               // Register consumed
+        op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
+        sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases
+
+        if (config.enLog) {
+          logs(s"$lhs = $op")
+          logs(s"  Effects:   $effects")
+          logs(s"  AliasSyms: ${op.aliasSyms}")
+          logs(s"  Deep:      ${op.deepAliases}")
+          logs(s"  Shallow:   ${op.shallowAliases}")
+          logs(s"  Aliases:   ${sym.allAliases}")
+        }
+        checkAliases(sym,effects)
+
         lhs
       }
       state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {
@@ -207,7 +216,7 @@ trait Staging { this: Printing =>
   @stateful final def propagateWrites(effects: Effects): Effects = {
     if (!config.enableAtomicWrites) effects
     else {
-      val writes = effects.writes.map{s => extractAtomicWrite(s) }
+      val writes = effects.writes.flatMap{s => extractAtomicWrite(s).allAliases }
       effects.copy(writes = writes)
     }
   }

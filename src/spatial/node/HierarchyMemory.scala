@@ -61,6 +61,8 @@ abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) ext
 
   def rank: Int = ranges.head.count(r => !r.isUnit)
   val mutable = true
+
+  override def aliases: Set[Sym[_]] = syms(mem)
 }
 object MemDenseAlias {
   @rig def apply[A,Src[T],Alias[T]](mem: Src[A], ranges: Seq[Series[Idx]])(implicit
@@ -92,6 +94,8 @@ object MemDenseAlias {
   extends MemAlias[A,Src,Alias] {
   def rank: Int = 1
   val mutable = true
+
+  override def aliases: Set[Sym[_]] = syms(mem)
 }
 object MemSparseAlias {
   @rig def apply[A,Addr[T],Src[T],Alias[T]](mem: Src[A], addr: Addr[I32], size: I32)(implicit

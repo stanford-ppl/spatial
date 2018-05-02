@@ -125,10 +125,16 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   def effects_=(eff: Effects): Unit = metadata.add(exp, eff)
   def isMutable: Boolean = effects.isMutable
 
-  def shallowAliases: Set[Sym[_]] = metadata[ShallowAliases](exp).map(_.aliases).getOrElse(Set.empty)
+  /** Returns all "shallow" aliases for this symbol.
+    * Note that a symbol is always an alias of itself.
+    **/
+  def shallowAliases: Set[Sym[_]] = metadata[ShallowAliases](exp).map(_.aliases).getOrElse(Set.empty) + exp
   def shallowAliases_=(aliases: Set[Sym[_]]): Unit = metadata.add(exp, ShallowAliases(aliases))
 
-  def deepAliases: Set[Sym[_]] = metadata[DeepAliases](exp).map(_.aliases).getOrElse(Set.empty)
+  /** Returns all "deep" aliases for this symbol.
+    * Note that a symbol is always an alias of itself.
+    */
+  def deepAliases: Set[Sym[_]] = metadata[DeepAliases](exp).map(_.aliases).getOrElse(Set.empty) + exp
   def deepAliases_=(aliases: Set[Sym[_]]): Unit = metadata.add(exp, DeepAliases(aliases))
 
   def allAliases: Set[Sym[_]] = shallowAliases ++ deepAliases

@@ -44,8 +44,9 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
     val ldBlk  = stageLambda1(acc){ acc.value }
     val redBlk = stageLambda2(lA,rA){ reduce(lA,rA) }
     val stBlk  = stageLambda2(acc,redBlk.result){ acc := redBlk.result.unbox }
-    val pipe = stage(OpReduce[A](Set.empty,cchain,acc,mapBlk,ldBlk,redBlk,stBlk,ident,init,iters))
-    opt.set(pipe)
+    stageWithData(OpReduce[A](Set.empty,cchain,acc,mapBlk,ldBlk,redBlk,stBlk,ident,init,iters)){pipe =>
+      opt.set(pipe)
+    }
     acc
   }
 }

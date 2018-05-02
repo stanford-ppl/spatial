@@ -74,7 +74,7 @@ trait Staging { this: Printing =>
   @rig def rewrite[R](op: Op[R]): Option[R] = state.rewrites.apply(op)(op.R,ctx,state)
   @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = state.flows.apply(sym, op)
 
-  @rig def register[R](op: Op[R], symbol: () => R): R = rewrite(op) match {
+  @rig def register[R](op: Op[R], symbol: () => R, data: Sym[R] => Unit): R = rewrite(op) match {
     case Some(s) => s
     case None if state eq null =>
       // General operations in object/trait constructors are currently disallowed
@@ -98,6 +98,7 @@ trait Staging { this: Printing =>
         }
 
         checkAliases(sym,effects)
+        data(sym)
         runFlows(sym,op)
 
         state.scope :+= sym
@@ -118,16 +119,31 @@ trait Staging { this: Printing =>
       }
   }
 
+  /** For symbols corresponding to nodes: rewrite and flow rules on the given symbol and
+    * add the symbol to the current scope.
+    */
   @rig def restage[R](sym: Sym[R]): Sym[R] = sym match {
     case Op(rhs) =>
-      val lhs: R = register[R](rhs, () => sym.unbox)
+      val lhs: R = register[R](rhs, () => sym.unbox, {_ => ()})
       sym.tp.boxed(lhs)
     case _ => sym
   }
-  @rig def stage[R](op: Op[R]): R = {
-    val t = register(op, () => symbol(op.R,op))
-    op.R.boxed(t).ctx = ctx
-    t
+
+
+  /** Stage the given node as a symbol.
+    * Also compute the effects of the node and adds them to the symbol as metadata and add
+    * the symbol to the current scope.
+    */
+  @rig def stage[R](op: Op[R]): R = register[R](op, () => symbol(op.R,op), {t => t.ctx = ctx})
+
+
+  /** Stage the given node as a symbol.
+    * Use the data function to set symbol metadata _prior_ to @flow rules.
+    * Also compute the effects of the node and adds them to the symbol as metadata and add
+    * the symbol to the current scope.
+    */
+  @rig def stageWithData[R](op: Op[R])(data: Sym[R] => Unit): R = {
+    register[R](op, () => symbol(op.R,op), {t => t.ctx = ctx; data(t) })
   }
 
   /**

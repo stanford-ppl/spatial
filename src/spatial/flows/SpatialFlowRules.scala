@@ -79,13 +79,16 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _: Switch[_]    => s.schedule = Sched.Fork
     case _: Control[_] =>
       (s.getUserSchedule, s.getSchedule) match {
-        case (Some(s1), None)    => s.schedule = s1
-        case (None, None) if s.isUnitPipe || s.isAccel => s.schedule = Sched.Seq
-        case (None, None)        => s.schedule = Sched.Pipe
-        case (_   , Some(s2))    => s.schedule = s2
+        case (Some(s1), None) => s.schedule = s1
+        case (_   , Some(s2)) => s.schedule = s2
+        case (None, None)     =>
+          val default = if (s.isUnitPipe || s.isAccel) Sched.Seq else Sched.Pipe
+          s.schedule = default
       }
       if (!s.isLoop && s.isPipeline) s.schedule = Sched.Seq
       if (s.isInnerControl && s.isStreamPipe) s.schedule = Sched.Pipe
+
+      dbgs(s"Setting $s = $op to ${s.schedule} (user schedule: ${s.getUserSchedule.map(_.toString).getOrElse("<none>")})")
 
     case _ => // No schedule for non-control nodes
   }
@@ -109,8 +112,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
 
-  /**
-    * In Spatial, a "global" is any value which is solely a function of input arguments
+  /** In Spatial, a "global" is any value which is solely a function of input arguments
     * and constants. These are computed prior to starting the main computation, and
     * therefore appear constant to the majority of the program.
     *

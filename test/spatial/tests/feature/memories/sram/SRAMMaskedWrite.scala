@@ -1,8 +1,6 @@
 package spatial.tests.feature.memories.sram
 
-
 import spatial.dsl._
-
 
 @test class SRAMMaskedWrite extends SpatialTest {
   override def runtimeArgs: Args = "2"
@@ -40,5 +38,6 @@ import spatial.dsl._
 
     val cksum = gold.zip(result){_ == _}.reduce{_&&_}
     println("PASS: " + cksum + " (MaskedWrite)")
+    assert(cksum)
   }
 }

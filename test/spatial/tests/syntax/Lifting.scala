@@ -23,8 +23,16 @@ import spatial.dsl._
     val flt = x.to[MyFlt]
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
-    println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    println(r"f32: $f32, f64: $f64, flt: $flt, num: $num)
+    assert(i8 == 1)
+    assert(i16 == 1)
+    assert(i32 == 1)
+    assert(i64 == 1)
+    assert(f32 == 1)
+    assert(f64 == 1)
+    assert(fix == 1)
+    assert(flt == 1)
+    assert(num == 1)
   }
 }
 
@@ -50,7 +58,15 @@ import spatial.dsl._
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    assert(i8 == 32)
+    assert(i16 == 32)
+    assert(i32 == 32)
+    assert(i64 == 32)
+    assert(f32 == 32)
+    assert(f64 == 32)
+    assert(fix == 32)
+    assert(flt == 32)
+    assert(num == 32)
   }
 }
 
@@ -76,7 +92,15 @@ import spatial.dsl._
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    assert(i8 == 32)
+    assert(i16 == 32)
+    assert(i32 == 32)
+    assert(i64 == 32)
+    assert(f32 == 32)
+    assert(f64 == 32)
+    assert(fix == 32)
+    assert(flt == 32)
+    assert(num == 32)
   }
 }
 
@@ -102,7 +126,15 @@ import spatial.dsl._
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    assert(i8 == 32)
+    assert(i16 == 32)
+    assert(i32 == 32)
+    assert(i64 == 32)
+    assert(f32 == 32)
+    assert(f64 == 32)
+    assert(fix == 32)
+    assert(flt == 32)
+    assert(num == 32)
   }
 }
 
@@ -128,7 +160,15 @@ import spatial.dsl._
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    assert(i8 == 32)
+    assert(i16 == 32)
+    assert(i32 == 32)
+    assert(i64 == 32)
+    assert(f32 == 32)
+    assert(f64 == 32)
+    assert(fix == 32)
+    assert(flt == 32)
+    assert(num == 32)
   }
 }
 
@@ -141,7 +181,7 @@ import spatial.dsl._
   def number[A:Num](x: scala.Float): A = x.to[A]
 
   def main(args: Array[String]): Void = {
-    val x = 32
+    val x = 32.0f
     val bit = x.to[Bit]
     val i8  = x.to[I8]
     val i16 = x.to[I16]
@@ -154,7 +194,15 @@ import spatial.dsl._
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    assert(i8 == 32)
+    assert(i16 == 32)
+    assert(i32 == 32)
+    assert(i64 == 32)
+    assert(f32 == 32)
+    assert(f64 == 32)
+    assert(fix == 32)
+    assert(flt == 32)
+    assert(num == 32)
   }
 }
 
@@ -167,7 +215,7 @@ import spatial.dsl._
   def number[A:Num](x: scala.Double): A = x.to[A]
 
   def main(args: Array[String]): Void = {
-    val x = 32
+    val x = 32.0
     val bit = x.to[Bit]
     val i8  = x.to[I8]
     val i16 = x.to[I16]
@@ -180,6 +228,14 @@ import spatial.dsl._
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
     println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
-    println("PASS: true")
+    assert(i8 == 32)
+    assert(i16 == 32)
+    assert(i32 == 32)
+    assert(i64 == 32)
+    assert(f32 == 32)
+    assert(f64 == 32)
+    assert(fix == 32)
+    assert(flt == 32)
+    assert(num == 32)
   }
 }

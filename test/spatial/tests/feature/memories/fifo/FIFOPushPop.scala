@@ -82,5 +82,6 @@ import spatial.dsl._
 
     val cksum = dst == gold
     println("PASS: " + cksum + " (FifoPushPop)")
+    assert(cksum)
   }
 }

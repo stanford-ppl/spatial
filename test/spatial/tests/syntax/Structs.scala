@@ -10,8 +10,12 @@ import spatial.dsl._
   def main(args: Array[String]): Void = {
     val x = random[MyStruct]
     val y = random[MyStruct]
+    val z = x + y
     println(r"x: $x")
     println(r"y: $y")
-    println(r"x + y: ${x + y}")
+    println(r"x + y: $z")
+    assert(x.x + y.x == z.x)
+    assert(x.y + y.y == z.y)
+    assert(x.z + y.z == z.z)
   }
 }

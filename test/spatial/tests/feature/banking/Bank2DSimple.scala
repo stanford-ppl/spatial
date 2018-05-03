@@ -1,8 +1,6 @@
 package spatial.tests.feature.banking
 
-
 import spatial.dsl._
-
 
 @test class Bank2DSimple extends SpatialTest {
   def runtimeArgs: Args = NoArgs
@@ -23,7 +21,10 @@ import spatial.dsl._
       dram store x
     }
 
+    val gold = (0::R,0::C){(i,j) => i + j}
     val data = getMatrix(dram)
     printMatrix(data, "data")
+    printMatrix(gold, "gold")
+    assert(data == gold)
   }
 }

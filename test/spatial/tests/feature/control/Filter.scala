@@ -69,7 +69,14 @@ import spatial.lib._
       }
     }
 
+    val golden = data1.zip(data2){(x,y) => pack(x,y) }.filter{t => t._2 == 1 }.map(_._1)
+
     val result = getMem(outram)
+
+    for (i <- 0 until golden.length) {
+      assert(result(i) == golden(i), r"Mismatch on $i: ${result(i)} != ${golden(i)}")
+    }
+
     printArray(result, "Result : ")
     println("fifofull:"  + getArg(out_fifofull))
     println("fifoempty:"  + getArg(out_fifoempty))
@@ -137,8 +144,13 @@ import spatial.lib._
       }
     }
 
+    val golden = data1.zip(data2){(x,y) => pack(x,y) }.filter{t => t._2 == 1 }.map(_._1)
     val result = getMem(outram)
     printArray(result, "Result : ")
+
+    for (i <- 0 until golden.length) {
+      assert(result(i) == golden(i), r"Mismatch on $i: ${result(i)} != ${golden(i)}")
+    }
   }
 }
 
@@ -170,9 +182,14 @@ import spatial.lib._
         outram(i::i+tileSize) store sramY
       }
     }
+    val golden = data.filter{e => e >= 8 }
     val result = getMem(outram)
     printArray(getMem(dram), " Input : ")
     printArray(getMem(outram), "Output : ")
+
+    for (i <- 0 until golden.length){
+      assert(golden(i) == result(i), r"Mismatch $i: ${result(i)} != ${golden(i)}")
+    }
   }
 }
 
@@ -211,9 +228,15 @@ import spatial.lib._
         outram(i::i+tileSize) store sramY
       }
     }
+    val golden = data.filter{e => e >= 8 }
     val result = getMem(outram)
     printArray(getMem(dram), " Input : ")
-    printArray(getMem(outram), "Output : ")
+    printArray(result, "Output : ")
+    printArray(golden, "Golden : ")
+
+    for (i <- 0 until golden.length){
+      assert(golden(i) == result(i), r"Mismatch $i: ${result(i)} != ${golden(i)}")
+    }
   }
 }
 

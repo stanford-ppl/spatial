@@ -1,12 +1,9 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
-
 
 @test class TransferStruct extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-
 
   def foo() : Int = {
     type Tup = Tup2[Int, Int]
@@ -21,7 +18,9 @@ import spatial.dsl._
       s1 load dr(0::10)
       out := s1(5)._1 * s1(5)._2
     }
-    getArg(out)
+    val x = getArg(out)
+    assert(x == 42*43)
+    x
   }
 
 

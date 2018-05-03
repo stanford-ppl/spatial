@@ -2,8 +2,6 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 @test class OuterProduct extends SpatialTest {
   override def runtimeArgs: Args = "640 640"
   type X = FixPt[TRUE,_32,_0]

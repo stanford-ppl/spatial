@@ -107,10 +107,10 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
-          st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-          open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
-            st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
-          close("}")
+            st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
+            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
+              st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
+            close("}")
           close("};")
         }
       }

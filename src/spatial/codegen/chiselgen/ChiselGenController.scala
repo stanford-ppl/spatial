@@ -665,6 +665,142 @@ trait ChiselGenController extends ChiselGenCommon {
       emitChildrenCxns(lhs, true)
       controllerStack.pop()
 
+    case Switch(cases, body) => 
+      // // emitBlock(body)
+      // val parent_kernel = controllerStack.head 
+      // controllerStack.push(lhs)
+      // emitStandardSignals(lhs)
+      // createInstrumentation(lhs)
+      // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
+      // emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
+      // // emit(src"""//${swap(lhs, BaseEn)} := ${swap(parent_kernel, BaseEn)} // Set by parent""")
+      // emit(src"""${swap(lhs, Mask)} := true.B // No enable associated with switch, never mask it""")
+      // emit(src"""//${swap(lhs, Resetter)} := ${swap(parent_kernel, Resetter)} // Set by parent""")
+      // emit(src"""${swap(lhs, DatapathEn)} := ${swap(parent_kernel, DatapathEn)} // Not really used probably""")
+      // emit(src"""${swap(lhs, CtrTrivial)} := ${swap(parent_kernel, CtrTrivial)} | false.B""")
+      // parentOf(lhs).get match {  // This switch is a condition of another switchcase
+      //   case Def(SwitchCase(_)) => 
+      //     emit(src"""${swap(parentOf(lhs).get, Done)} := ${swap(lhs, Done)} // Route through""")
+      //     emit(src"""${swap(lhs, En)} := ${swap(parent_kernel, En)}""")
+      //   // case Def(e: StateMachine[_]) =>
+      //   //   if (levelOf(parentOf(lhs).get) == InnerControl) emit(src"""${swap(lhs,En)} := ${swap(parent_kernel,En)}""")
+      //   case _ => 
+      //     if (levelOf(parentOf(lhs).get) == InnerControl) {
+      //       emit(src"""${swap(lhs, En)} := ${swap(parent_kernel, En)} // Parent is inner, so doesn't know about me :(""")
+      //     } else {
+      //       emit(src"""//${swap(lhs, En)} := ${swap(parent_kernel, En)} // Parent should have set me""")            
+      //     }
+
+      // }
+
+      // if (levelOf(lhs) == InnerControl) { // If inner, don't worry about condition mutation
+      //   selects.indices.foreach{i => 
+      //     emitGlobalWire(src"""val ${cases(i)}_switch_select = Wire(Bool())""")
+      //     emit(src"""${cases(i)}_switch_select := ${selects(i)}""")
+      //   }
+      // } else { // If outer, latch in selects in case the body mutates the condition
+      //   selects.indices.foreach{i => 
+      //     disableSplit = true
+      //     emit(src"""val ${cases(i)}_switch_sel_reg = RegInit(false.B)""")
+      //     emit(src"""${cases(i)}_switch_sel_reg := Mux(Utils.risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
+      //     emitGlobalWire(src"""val ${cases(i)}_switch_select = Wire(Bool())""")
+      //     emit(src"""${cases(i)}_switch_select := Mux(Utils.risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
+      //     disableSplit = false
+      //   }
+      // }
+
+      // withSubStream(src"${lhs}", src"${parent_kernel}", levelOf(lhs) == InnerControl) {
+      //   emit(s"// Controller Stack: ${controllerStack.tail}")
+      //   if (Bits.unapply(op.mT).isDefined) {
+      //     emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))")
+      //     emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${newWire(lhs.tp)}))")
+      //     selects.indices.foreach { i =>
+      //       emit(src"${lhs}_onehot_selects($i) := ${cases(i)}_switch_select")
+      //       emit(src"${lhs}_data_options($i) := ${cases(i)}")
+      //     }
+      //     emitGlobalWire(src"val $lhs = Wire(${newWire(lhs.tp)})")
+      //     emit(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
+
+      //     cases.collect{case s: Sym[_] => stmOf(s)}.foreach{ stm => 
+      //       visitStm(stm)
+      //       // Probably need to match on type of stm and grab the return values
+      //     }
+      //     if (levelOf(lhs) == InnerControl) {
+      //       emit(src"""${swap(lhs, Done)} := ${swap(parent_kernel, Done)}""")
+      //     } else {
+      //       val anyCaseDone = cases.map{c => 
+      //         emitGlobalWireMap(src"${c}_done", "Wire(Bool())") // Lazy
+      //         src"${swap(c, Done)}"
+      //       }.mkString(" | ")
+      //       emit(src"""${swap(lhs, Done)} := $anyCaseDone // Safe to assume Switch is done when ANY child is done?""")
+      //     }
+
+      //   } else {
+      //     // If this is an innerpipe, we need to route the done of the parent downward.  If this is an outerpipe, we need to route the dones of children upward
+      //     if (levelOf(lhs) == InnerControl) {
+      //       emit(src"""${swap(lhs, Done)} := ${swap(parent_kernel, Done)}""")
+      //       cases.collect{case s: Sym[_] => stmOf(s)}.foreach(visitStm)
+      //     } else {
+      //       val anyCaseDone = cases.map{c => 
+      //         emitGlobalWireMap(src"${c}_done", "Wire(Bool())") // Lazy
+      //         src"${swap(c, Done)}"
+      //       }.mkString(" | ")
+      //       emit(src"""${swap(lhs, Done)} := $anyCaseDone // Safe to assume Switch is done when ANY child is done?""")
+      //       cases.collect{case s: Sym[_] => stmOf(s)}.foreach(visitStm)
+      //     }
+      //   }
+      // }
+      // controllerStack.pop()
+
+
+    case op@SwitchCase(body) =>
+      // // open(src"val $lhs = {")
+      // val parent_kernel = controllerStack.head 
+      // controllerStack.push(lhs)
+      // emitStandardSignals(lhs)
+      // createInstrumentation(lhs)
+      // emit(src"""${swap(lhs,En)} := ${swap(parent_kernel,En)} & ${lhs}_switch_select""")
+      // // emit(src"""${swap(lhs, BaseEn)} := ${swap(parent_kernel, BaseEn)} & ${lhs}_switch_select""")
+      // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
+      // emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
+      // emit(src"""${swap(lhs, Mask)} := true.B // No enable associated with switch, never mask it""")
+      // emit(src"""${swap(lhs, Resetter)} := ${swap(parent_kernel, Resetter)}""")
+      // emit(src"""${swap(lhs, DatapathEn)} := ${swap(parent_kernel, DatapathEn)} // & ${lhs}_switch_select // Do not include switch_select because this signal is retimed""")
+      // emit(src"""${swap(lhs, CtrTrivial)} := ${swap(parent_kernel, CtrTrivial)} | false.B""")
+      // if (levelOf(lhs) == InnerControl) {
+      //   val realctrl = findCtrlAncestor(lhs) // TODO: I don't think this search is needed anymore
+      //   emitInhibitor(lhs, None, None, parentOf(parent_kernel))
+      // }
+      // withSubStream(src"${lhs}", src"${parent_kernel}", levelOf(lhs) == InnerControl) {
+      //   emit(s"// Controller Stack: ${controllerStack.tail}")
+      //   // if (blockContents(body).length > 0) {
+      //   // if (childrenOf(lhs).count(isControlNode) == 1) { // This is an outer pipe
+      //   if (childrenOf(lhs).count(isControlNode) > 1) {// More than one control node is children
+      //     throw new Exception(s"Seems like something is messed up with switch cases ($lhs).  Please put a pipe around your multiple controllers inside the if statement, maybe?")
+      //   } else if (levelOf(lhs) == OuterControl & childrenOf(lhs).count(isControlNode) == 1) { // This is an outer pipe
+      //     emitBlock(body)
+      //   } else if (levelOf(lhs) == OuterControl & childrenOf(lhs).count(isControlNode) == 0) {
+      //     emitBlock(body)
+      //     emit(src"""${swap(lhs, Done)} := ${swap(lhs,En)} // Route through""")
+      //   } else if (levelOf(lhs) == InnerControl) { // Body contains only primitives
+      //     emitBlock(body)
+      //     emit(src"""${swap(lhs, Done)} := ${swap(parent_kernel, Done)} // Route through""")
+      //   }
+      //   val returns_const = lhs match {
+      //     case Const(_) => false
+      //     case _ => true
+      //   }
+      //   if (Bits.unapply(op.mT).isDefined & returns_const) {
+      //     emitGlobalWire(src"val $lhs = Wire(${newWire(lhs.tp)})")
+      //     emit(src"$lhs.r := ${body.result}.r")
+      //   }
+      // }
+      // // val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
+      // // emit(src"${lhs}_mask := $en")
+      // controllerStack.pop()
+
+      // // close("}")
+
 
     case _ => super.gen(lhs, rhs)
   }

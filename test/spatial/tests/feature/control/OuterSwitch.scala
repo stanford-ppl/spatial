@@ -1,16 +1,15 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
 @test class OuterSwitch extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+  override def runtimeArgs: Args = "20" and "30"
 
-   def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
+    val n = args(0).to[Int]
 
     val in = ArgIn[Int]
-    setArg(in, 20)
+    setArg(in, n)
 
     val dram = DRAM[Int](32)
 
@@ -23,5 +22,7 @@ import spatial.dsl._
     }
 
     printArray(getMem(dram), "dram")
+    if (n > 28) assert(getMem(dram) == Array.fill(32){ 0.to[Int] })
+    else        assert(getMem(dram) == Array.tabulate(32){i => if (i < n + 4) i else 0 })
   }
 }

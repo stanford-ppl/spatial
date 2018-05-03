@@ -117,6 +117,7 @@ import spatial.dsl._
     val cksum = gold == result.reduce{_+_}
     printArray(result, "result: ")
     println("Cksum = " + result.reduce{_+_})
+    assert(cksum)
     // println("PASS: " + cksum + " (BFS)")
   }
 

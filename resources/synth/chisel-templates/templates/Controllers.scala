@@ -42,6 +42,9 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     // Signals to children
     val enableOut = Vec(depth, Output(Bool()))
     val childAck = Vec(depth, Output(Bool()))
+
+    // Signals for Stream
+    val ctrCopyDone = Vec(depth, Input(Bool()))
   })
 
   // Create SRFF arrays for stages' actives and dones
@@ -107,7 +110,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
-    case ForkJoin | Stream => 
+    case ForkJoin => 
       // Define rule for when ctr increments
       io.ctrInc := synchronize
 
@@ -120,6 +123,22 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := io.doneIn(i)
         done(i).io.input.set := io.ctrDone & ~io.rst
+      }
+
+    case Stream => 
+      // Define rule for when ctr increments
+      io.ctrInc := synchronize // Don't care, each child has its own copy
+
+      // Configure synchronization
+      synchronize := iterDone.map(_.io.output.data).reduce{_&_}
+
+      // Define logic for all stages
+      for (i <- 0 until depth) {
+        active(i).io.input.set := Mux(~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable, true.B, false.B)
+        active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
+        iterDone(i).io.input.set := io.doneIn(i)
+        iterDone(i).io.input.reset := io.doneIn(i).D(1) // Override iterDone reset
+        done(i).io.input.set := io.ctrCopyDone(i) & ~io.rst
       }
 
 
@@ -136,7 +155,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
 
 
-class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32) extends Module {
+class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
@@ -154,6 +173,11 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     val ctrRst = Output(Bool())
     val parentAck = Input(Bool())
 
+    // Switch signals
+    val selectsIn = Vec(cases, Input(Bool()))
+    val selectsOut = Vec(cases, Output(Bool()))
+    val doneIn = Vec(cases, Input(Bool()))
+
     // FSM signals
     val nextState = Input(SInt(stateWidth.W))
     val initState = Input(SInt(stateWidth.W))
@@ -166,20 +190,19 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
   val done = Module(new SRFF())
 
   if (!isFSM) {
-
     active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data
     active.io.input.reset := io.ctrDone | io.rst | io.parentAck
     active.io.input.asyn_reset := false.B
-    done.io.input.set := io.ctrDone
+    sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := io.ctrDone }
     done.io.input.reset := io.rst | io.parentAck
     done.io.input.asyn_reset := false.B
 
     // Set outputs
+    io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
     io.datapathEn := active.io.output.data & ~io.ctrDone
     io.ctrInc := active.io.output.data
     io.done := Utils.risingEdge(done.io.output.data)
-
 
   } else { // FSM inner
     val stateFSM = Module(new FF(stateWidth))

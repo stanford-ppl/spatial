@@ -153,6 +153,12 @@ trait UtilsControl {
     case _ => Nil
   }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
 
+  def ctrlValids(ctrl: Ctrl): Seq[Bit] = Try(ctrl match {
+    case Host => Nil
+    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.valids
+    case _ => Nil
+  }).getOrElse(throw new Exception(s"$ctrl had invalid valids"))
+
 
 
   /** Returns the least common ancestor (LCA) of the two controllers.
@@ -264,7 +270,7 @@ trait UtilsControl {
     * This is true when any of the following hold:
     *   1. a and b are in the same inner pipeline
     *   2. a and b are in the same inner streaming pipeline
-    *   3. a and b are in
+    *   3. a and b are in parallel
     */
   def requireParallelPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
     val lca = LCA(a,b)

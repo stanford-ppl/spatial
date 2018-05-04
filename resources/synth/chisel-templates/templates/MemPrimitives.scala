@@ -263,8 +263,11 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     wire := d
   }
 
+  var usedMuxPorts = List[(String,(Int,Int))]()
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
     assert(hasXBarW)
+    assert(!usedMuxPorts.contains(("XBarW", (muxPort,vecId))), s"Attempted to connect to XBarW port ($muxPort,$vecId) twice!")
+    usedMuxPorts ::= ("XBarW", (muxPort, vecId))
     val base = xBarWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.map(_._1).sum + vecId
     io.xBarW(base) := wBundle
   }
@@ -273,6 +276,8 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     assert(hasXBarR)
+    assert(!usedMuxPorts.contains(("XBarR", (muxPort,vecId))), s"Attempted to connect to XBarR port ($muxPort,$vecId) twice!")
+    usedMuxPorts ::= ("XBarR", (muxPort, vecId))
     val base = xBarRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.map(_._1).sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
@@ -281,6 +286,8 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
 
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
     assert(hasDirectW)
+    assert(!usedMuxPorts.contains(("DirectW", (muxPort,vecId))), s"Attempted to connect to DirectW port ($muxPort,$vecId) twice!")
+    usedMuxPorts ::= ("DirectW", (muxPort, vecId))
     val base = directWMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.map(_._1).flatten.toList.length + vecId
     io.directW(base) := wBundle
   }
@@ -289,6 +296,8 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
     assert(hasDirectR)
+    assert(!usedMuxPorts.contains(("DirectR", (muxPort,vecId))), s"Attempted to connect to DirectR port ($muxPort,$vecId) twice!")
+    usedMuxPorts ::= ("DirectR", (muxPort, vecId))
     val base = directRMux.toSeq.sortBy(_._1).toMap.filter(_._1 < muxPort).values.map(_._1).flatten.toList.length + vecId
     io.directR(base) := rBundle    
     io.flow(base) := flow
@@ -457,7 +466,7 @@ class ShiftRegFile (val logicalDims: List[Int], val bitWidth: Int,
             val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0, val isBuf: Boolean = false) extends Module {
 
   def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -613,6 +622,8 @@ class LUT(val logicalDims: List[Int], val bitWidth: Int,
             val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
 
   def this(tuple: (List[Int], Int, XMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8)
+
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
   val ofsWidth = Utils.log2Up(depth/logicalDims.product)

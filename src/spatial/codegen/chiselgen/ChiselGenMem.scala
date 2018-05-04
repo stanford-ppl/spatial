@@ -138,11 +138,21 @@ trait ChiselGenMem extends ChiselGenCommon {
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitWrite(lhs, sram, data, bank, ofs, ens)
 
     // Registers
-    case RegNew(init) => emitMem(lhs, "FF", None)
+    case RegNew(init) => emitMem(lhs, "FF", Some(List(init)))
     case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
     case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set())) 
+
+    // RegFiles
+    case op@RegFileNew(_, inits) => emitMem(lhs, "ShiftRegFile", inits)
+    case RegFileReset(rf, en)    => 
+      // val parent = lhs.parent.s.get
+      // val id = resettersOf(rf).map{_._1}.indexOf(lhs)
+      // duplicatesOf(rf).indices.foreach{i => emit(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
+    case RegFileShiftIn(rf,data,addr,en,axis) => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en))
+    case op@RegFileBankedRead(rf,bank,ofs,ens)       => emitRead(lhs,rf,bank,ofs,ens)
+    case op@RegFileBankedWrite(rf,data,bank,ofs,ens) => emitWrite(lhs,rf,data,bank,ofs,ens)
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
@@ -154,6 +164,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.io.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
+    
+    // LUTs
+    case op@LUTNew(dims, init) => emitMem(lhs, "LUT", Some(init))
+    case op@LUTBankedRead(lut,bank,ofs,ens) => emitRead(lhs,lut,bank,ofs,ens)
 
     case _ => super.gen(lhs, rhs)
   }

@@ -4,6 +4,9 @@ package host
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.internal._
+import utils.Overloads._
+import utils.implicits.Readable._
 
 /** A two-dimensional matrix on the host */
 @ref class Matrix[A:Type] extends Struct[Matrix[A]] with Ref[scala.Array[Any],Matrix[A]] {
@@ -51,6 +54,13 @@ import spatial.node._
 
   /** Returns the transpose of this Matrix. */
   @api def t: Matrix[A] = Matrix.tabulate(cols, rows){(i,j) => apply(j,i) }
+
+  /** Returns true if this Matrix and `that` contain the same elements, false otherwise. */
+  @api override def neql(that: Matrix[A]): Bit = data !== that.data
+
+  /** Returns false if this Matrix and `that` differ by at least one element, true otherwise. */
+  @api override def eql(that: Matrix[A]): Bit = data === that.data
+
 }
 object Matrix {
   @api def apply[A:Type](data: Array[A], rows: I32, cols: I32): Matrix[A] = {

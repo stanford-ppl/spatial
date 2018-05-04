@@ -319,7 +319,7 @@ class FF(val bitWidth: Int,
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
+           bankingMode: BankingMode, init: Option[Double], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, if (init.isDefined) Some(List(init.get)) else None, fracBits)
 
   val io = IO(new Bundle{
     val input = Vec(xBarWMux.toList.length max 1, Input(new W_XBar(1, List(1), bitWidth)))
@@ -466,7 +466,12 @@ class ShiftRegFile (val logicalDims: List[Int], val bitWidth: Int,
             val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0, val isBuf: Boolean = false) extends Module {
 
   def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -622,7 +627,11 @@ class LUT(val logicalDims: List[Int], val bitWidth: Int,
             val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
 
   def this(tuple: (List[Int], Int, XMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarRMux, init, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions

@@ -23,7 +23,7 @@ import spatial.dsl._
     val flt = x.to[MyFlt]
     val num = number[MyFix](x)
     println(r"bit: $bit, i8: $i8, i16: $i16, i32: $i32, i64: $i64, fix: $fix")
-    println(r"f32: $f32, f64: $f64, flt: $flt, num: $num)
+    println(r"f32: $f32, f64: $f64, flt: $flt, num: $num")
     assert(i8 == 1)
     assert(i16 == 1)
     assert(i32 == 1)

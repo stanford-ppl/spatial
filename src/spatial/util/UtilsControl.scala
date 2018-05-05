@@ -264,7 +264,7 @@ trait UtilsControl {
     * This is true when any of the following hold:
     *   1. a and b are in the same inner pipeline
     *   2. a and b are in the same inner streaming pipeline
-    *   3. a and b are in
+    *   3. a and b are in a Parallel controller
     */
   def requireParallelPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
     val lca = LCA(a,b)

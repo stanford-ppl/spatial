@@ -121,26 +121,10 @@ trait StaticFileIO {
     closeBinary(file)
   }
 
-  @rig def openNumpy(filename: Text, write: Boolean): NumpyFile = stage(OpenNumpyFile(filename, write))
-  @rig def readNumpy[A:Num](file: NumpyFile): Tensor1[A] = stage(ReadNumpyFile(file))
-  @rig def closeNumpy(file: NumpyFile): Void = stage(CloseNumpyFile(file))
+  /** Creates a placeholder for a numpy array as an @Array. **/
+  @api def loadNumpy1D[T:Num](name: String): Tensor1[T] = stage(NumpyArray(name))
 
-
-  /** Loads the Numpy at `filename`as a @Array. **/
-  @api def loadNumpy1D[T:Num](filename: Text): Tensor1[T] = {
-    val file = openNumpy(filename, write = false)
-    val array = readNumpy[T](file)
-    closeNumpy(file)
-    array
-  }
-
-  /** Loads the Numpy at `filename`as a @Tensor2.**/
-  @api def loadNumpy2D[T:Num](filename: Text): Tensor2[T] = {
-    val file = openNumpy(filename, write = false)
-    val array = readNumpy[T](file)
-    closeNumpy(file)
-    Tensor2(array, array.length, 1)
-  }
-
+  /** Creates a placeholder for a numpy matrix as an @Tensor2.**/
+  @api def loadNumpy2D[T:Num](name: String): Tensor2[T] = stage(NumpyMatrix(name))
 
 }

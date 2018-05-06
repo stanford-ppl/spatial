@@ -20,7 +20,6 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
     val sDone = Vec(numBufs, Input(Bool()))
     val statesInW = Vec(1 max portsWithWriter.distinct.length, Output(UInt((1+Utils.log2Up(numBufs)).W)))
     val statesInR = Vec(numBufs, Output(UInt((1+Utils.log2Up(numBufs)).W)))
-    val statesOut = Vec(numBufs, Output(UInt((1+Utils.log2Up(numBufs)).W)))
     val swap = Output(Bool())
   })
 
@@ -55,17 +54,8 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   val statesInR = (0 until numBufs).map{  i => 
     val c = Module(new NBufCtr(1,Some(i), Some(numBufs), 1+Utils.log2Up(numBufs)))
     c.io.input.enable := swap
-    c.io.input.countUp := true.B // Not sure why this one counts up but the others count down, but it works
-    io.statesInR(i) := c.io.output.count
-    c
-  }
-
-  // Mapping banks to their appropriate output data ports
-  val statesOut = (0 until numBufs).map{  i => 
-    val c = Module(new NBufCtr(1,Some(i), Some(numBufs), 1+Utils.log2Up(numBufs)))
-    c.io.input.enable := swap
     c.io.input.countUp := false.B
-    io.statesOut(i) := c.io.output.count
+    io.statesInR(i) := c.io.output.count
     c
   }
 
@@ -117,6 +107,14 @@ class NBufMem(val mem: MemPrimitive,
     val directR = HVec(Array.tabulate(1 max numDirectR){i => Input(new R_Direct(ofsWidth, if (hasDirectR) directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values.map(_._1)).flatten.flatten.toList(i) else defaultDirect))})
     val broadcast = Vec(1 max numBroadcastW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
     val flow = Vec(numXBarR + numDirectR, Input(Bool()))
+
+    // FIFO Specific
+    val full = Output(Bool())
+    val almostFull = Output(Bool())
+    val empty = Output(Bool())
+    val almostEmpty = Output(Bool())
+    val numel = Output(UInt(32.W))    
+    
     val output = new Bundle {
       val data  = Vec(1 max totalOutputs, Output(UInt(bitWidth.W)))  
     }
@@ -152,6 +150,7 @@ class NBufMem(val mem: MemPrimitive,
                                                             ({base + k} -> v)
                                                           }.toArray:_*)).toArray:_*)
                                                   } else flatXBarWMux
+
   // Create physical mems
   mem match {
     case SRAMType => 
@@ -206,9 +205,9 @@ class NBufMem(val mem: MemPrimitive,
           val bufferBase = xBarRMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.map(_._1).sum // Index into NBuf io
           val sramXBarRPorts = portMapping.values.map(_._1).sum
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-          val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesOut(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
+          val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramXBarRPorts).foreach {k => 
-            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(bufferBase + k)})
+            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en & rMask
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
@@ -223,12 +222,12 @@ class NBufMem(val mem: MemPrimitive,
           val xBarRBase = xBarRMux.values.map(_.values).toList.flatten.map(_._1).sum
           val sramDirectRPorts = portMapping.values.map(_._1).flatten.toList.length
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-          val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesOut(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
+          val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramDirectRPorts).foreach {k => 
-            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(xBarRBase + bufferBase + k)})
-            f.io.directR(bufferBase + k).en := io.directR(bufferBase + k).en & rMask
+            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+            f.io.directR(bufferBase + k).en := io.directR(k).en & rMask
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
-            f.io.directR(bufferBase + k).ofs := io.directR(bufferBase + k).ofs
+            f.io.directR(bufferBase + k).ofs := io.directR(k).ofs
             f.io.flow(k + {if (hasXBarR) numXBarR else 0}) := io.flow(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
           }
         }
@@ -264,12 +263,23 @@ class NBufMem(val mem: MemPrimitive,
       // Connect buffers to output data ports
       xBarRMux.foreach { case (bufferPort, portMapping) => 
         val bufferBase = xBarRMux.filter(_._1 < bufferPort).values.map(_.values).toList.flatten.map(_._1).sum // Index into NBuf io
-        val sel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesOut(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
+        val sel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
         io.output.data(bufferBase) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data})        
       }
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head*depth), bitWidth, 
                                   banks, combinedXBarWMux, flatXBarRMux))
+
+      fifo.io.xBarW := io.xBarW
+      fifo.io.xBarR := io.xBarR
+      fifo.io.flow := io.flow
+      io.output.data := fifo.io.output.data
+      io.full := fifo.io.full
+      io.almostFull := fifo.io.almostFull
+      io.empty := fifo.io.empty
+      io.almostEmpty := fifo.io.almostEmpty
+      io.numel := fifo.io.numel
+
     case ShiftRegFileType => 
       val rfs = (0 until numBufs).map{ i => 
         val combinedXBarWMux = if (hasBroadcastW) {
@@ -444,6 +454,14 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     val directR = HVec(Array.tabulate(1){i => Input(new R_Direct(1, List(1)))})
     val broadcast = Vec(1, Input(new W_XBar(1, List(1), bitWidth)))
     val flow = Vec(numBufs, Input(Bool()))
+
+    // FIFO Specific
+    val full = Output(Bool())
+    val almostFull = Output(Bool())
+    val empty = Output(Bool())
+    val almostEmpty = Output(Bool())
+    val numel = Output(UInt(32.W))    
+
     val output = new Bundle {
       val data  = Vec(numBufs, Output(UInt(bitWidth.W)))  
     }

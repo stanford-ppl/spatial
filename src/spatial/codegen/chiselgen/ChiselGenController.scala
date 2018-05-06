@@ -271,10 +271,10 @@ trait ChiselGenController extends ChiselGenCommon {
         case Op(op@SwitchCase(_)) => 
           emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")
         case _ => 
-          if (!isInner) {
-            emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
-            emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
-          }
+      }
+      if (!isInner) {
+        emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
+        emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
       }
     }
 
@@ -303,6 +303,8 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""${swap(src"${sym.cchains.head}", En)} := ${signalHandle}""")
           emitt(src"""${swap(src"${sym.cchains.head}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
           emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(src"${sym.cchains.head}",Done)}""")
+        } else if (sym.isStreamPipe & sym.cchains.isEmpty) {
+          emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(c, Done)}""")
         }
         emitt(src"""${swap(sym, SM)}.io.doneIn(${idx}) := ${swap(c, Done)};""")
         if (c match { case Op(_: StateMachine[_]) => true; case _ => false}) emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)} | ${DL(swap(c, Done), 1, true)}""") //changed on 12/13 // If this is an fsm, we want it to reset with each iteration, not with the reset of the parent
@@ -322,7 +324,7 @@ trait ChiselGenController extends ChiselGenCommon {
     // Construct controller args
     emitt(src"""//  ---- ${sym.level}: Begin ${sym.schedule.toString} $sym Controller ----""")
     val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
-    val stw = sym match{case Op(x: StateMachine[_]) => s",stateWidth = ${bitWidth(sym.tp.typeArgs.head)}"; case _ => ""}
+    val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
     val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case _ => ""}
 
     // Generate standard control signals for all types
@@ -561,7 +563,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     case StateMachine(ens,start,notDone,action,nextState) =>
       val parent_kernel = enterCtrl(lhs)
-      emitController(lhs) // If this is a stream, then each child has its own ctr copy
+      emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
 
       emit("// Emitting notDone")
@@ -570,10 +572,9 @@ trait ChiselGenController extends ChiselGenCommon {
 
       emit(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
       if (lhs.II <= 1 | lhs.isOuterControl) {
-        emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B""")
+        emit(src"""${swap(lhs, IIDone)} := true.B""")
       } else {
         emit(src"""val ${lhs}_IICtr = Module(new RedxnCtr());""")
-        emitGlobalWire(src"""val ${swap(lhs, IIDone)} = Wire(Bool())""")
         emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
         val stop = if (lhs.isInnerControl) { lhs.II + 1} else { lhs.II } // I think innerpipes need one extra delay because of logic inside sm
@@ -592,14 +593,14 @@ trait ChiselGenController extends ChiselGenCommon {
       }
       emit("// Emitting nextState")
       visitBlock(nextState)
-      emit(src"${swap(lhs, SM)}.io.input.enable := ${swap(lhs, En)} ")
-      emit(src"${swap(lhs, SM)}.io.input.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Retime)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.output.state.r.asSInt) // Assume always int")
-      emit(src"${swap(lhs, SM)}.io.input.initState := ${start}.r.asSInt")
+      emit(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
+      emit(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Retime)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
+      emit(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
-      emit(src"${state}.r := ${swap(lhs, SM)}.io.output.state.r")
+      emit(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
       emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
       emit(src"${lhs}_doneCondition := ~${notDone.result}")
-      emit(src"${swap(lhs, SM)}.io.input.doneCondition := ${lhs}_doneCondition")
+      emit(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
       val extraEn = if (ens.toList.length > 0) {src"""List($ens).map(en=>en).reduce{_&&_}"""} else {"true.B"}
       emit(src"${swap(lhs, Mask)} := ${extraEn}")
       emitChildrenCxns(lhs, true)
@@ -609,7 +610,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       emitChildrenCxns(lhs, false)
-      val cases = op.cases
+      val cases = lhs.children.map(_.s.get)
       
       // Route through signals
       emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
@@ -632,6 +633,8 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(s"// Controller Stack: ${controllerStack.tail}")
         if (op.R.isBits) {
           emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
+          println(src"quote ${selects(0)}")
+          println(s"quote ${cases(0)}")
           selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
           emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emit(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
         }

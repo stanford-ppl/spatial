@@ -20,6 +20,10 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
       emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
       emit(src"$lhs.initMem($init)")
 
+    case op@HostIONew(init)  =>
+      emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
+      emit(src"$lhs.initMem($init)")
+
     case op@ArgOutNew(init) =>
       emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
       emit(src"$lhs.initMem($init)")

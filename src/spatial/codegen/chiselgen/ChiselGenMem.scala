@@ -79,7 +79,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     val inst = mem.instance
-    val dims = constDimsOf(mem)
+    val dims = if (name == "FF") List(1) else constDimsOf(mem)
     val broadcasts = mem.writers.filter{w => w.ports.values.head.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"$i -> ${accessWidth(a)}"}.toList
 
     val templateName = if (inst.depth == 1) s"${name}("
@@ -125,7 +125,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val strides = numBanks // TODO: What to do with strides
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
-    val initStr = src"$init".replace("false.B", "0.0").replace("true.B", "1.0")
+    val initStr = if (init.isDefined) init.get.map(quoteAsScala).mkString("Some(List(",",","))")
+      else "None"
     emitGlobalModule(src"""val $mem = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $bPar $bankingMode, $initStr, ${!cfg.enableAsyncMem && cfg.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}))""")
   }
 
@@ -200,11 +201,12 @@ trait ChiselGenMem extends ChiselGenCommon {
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
 
     if (!specialLB) {
-      val siblings = accesses.reduce(LCA(_,_).s.get).children.toList
+      val siblings = LCA(accesses.toList).children.toList
       val portMatchup = accesses.map{a => siblings.indexOf(siblings.filter{ s => a.ancestors.contains(s) }.head)}
       val basePort = portMatchup.min
-      val numPorts = ports.max
+      val numPorts = ports.max - ports.min
 
+      println(s"working on $mem, sibs $siblings with matchup $portMatchup, baseport $basePort and numPorts is $numPorts")
       val info = (0 to numPorts).map { port => siblings(basePort + port).s.get }
       info.toList
     } else {

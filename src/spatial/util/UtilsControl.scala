@@ -167,6 +167,16 @@ trait UtilsControl {
   def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.parent,b.parent)
   def LCA(a: Ctrl, b: Ctrl): Ctrl= Tree.LCA(a, b){_.parent}
 
+  /** Returns the least common ancestor (LCA) of a list of controllers.
+    * If the controllers have no ancestors in common, returns None.
+    */
+  def LCA(n: => List[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
+  def LCA(n: List[Ctrl]): Ctrl = { 
+    val anchor = n.distinct.head
+    val candidates = n.distinct.drop(1).map{case x => LCA(anchor, x)}
+    if (candidates.distinct.length == 1) candidates.head else LCA(candidates)
+  }
+
   def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {
     Tree.LCAWithPaths(a,b){_.parent}
   }

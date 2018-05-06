@@ -319,7 +319,12 @@ class FF(val bitWidth: Int,
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[Double], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, if (init.isDefined) Some(List(init.get)) else None, fracBits)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, init, fracBits)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, if (init.isDefined) Some(init.get.map(_.toDouble)) else None, fracBits)
 
   val io = IO(new Bundle{
     val input = Vec(xBarWMux.toList.length max 1, Input(new W_XBar(1, List(1), bitWidth)))
@@ -472,6 +477,11 @@ class ShiftRegFile (val logicalDims: List[Int], val bitWidth: Int,
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, if (init.isDefined) Some(init.get.map(_.toDouble)) else None, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -632,6 +642,11 @@ class LUT(val logicalDims: List[Int], val bitWidth: Int,
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarRMux, init, syncMem, fracBits)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarRMux, if (init.isDefined) Some(init.get.map(_.toDouble)) else None, syncMem, fracBits)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -654,7 +669,7 @@ class LUT(val logicalDims: List[Int], val bitWidth: Int,
     val coords = logicalDims.zipWithIndex.map{ case (b,j) => 
       i % (logicalDims.drop(j).product) / logicalDims.drop(j+1).product
     }
-    val initval = if (inits.isDefined) (inits.get.apply(i)*scala.math.pow(2,fracBits)).toLong.U(bitWidth.W) else 0.U(bitWidth.W)
+    val initval = if (inits.isDefined) (inits.get.apply(i)*scala.math.pow(2,fracBits)).toLong.S(bitWidth.W).asUInt else 0.S(bitWidth.W).asUInt
     val mem = RegInit(initval)
     (mem,coords,i)
   }

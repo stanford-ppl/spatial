@@ -24,3 +24,5 @@ clean:
 	sbt "; forge/clean; argon/clean; nova/clean"
 	sbt clean
 
+tests:
+	sbt test:compile

@@ -199,11 +199,12 @@ trait UtilsControl {
     else {
       val (lca, pathA, pathB) = LCAWithPaths(a, b)
       if (lca.isOuterControl && lca != a && lca != b) {
-        val topA = pathA.find{c => c.s != lca.s }.get
-        val topB = pathB.find{c => c.s != lca.s }.get
-        //dbg(s"PathA: " + pathA.mkString(", "))
-        //dbg(s"PathB: " + pathB.mkString(", "))
-        //dbg(s"LCA: $lca")
+        dbgs(s"PathA: " + pathA.mkString(", "))
+        dbgs(s"PathB: " + pathB.mkString(", "))
+        dbgs(s"LCA: $lca")
+
+        val topA = pathA.find{c => c != lca }.get
+        val topB = pathB.find{c => c != lca }.get
         // TODO[2]: Update with arbitrary children graph once defined
         val idxA = lca.children.indexOf(topA)
         val idxB = lca.children.indexOf(topB)
@@ -280,7 +281,7 @@ trait UtilsControl {
     * This is true when any of the following hold:
     *   1. a and b are in the same inner pipeline
     *   2. a and b are in the same inner streaming pipeline
-    *   3. a and b are in parallel
+    *   3. a and b are in a Parallel controller
     */
   def requireParallelPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
     val lca = LCA(a,b)

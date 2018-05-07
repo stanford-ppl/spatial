@@ -8,6 +8,8 @@ import spatial.dsl._
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Unit = {
+    val dram = DRAM[Int](32,32)
+
     Accel {
       val accum = SRAM[Int](32, 32)
       MemReduce(accum)(0 until 32) { i =>
@@ -16,7 +18,11 @@ import spatial.dsl._
         inner
       } { (a, b) => a + b }
 
-      println(accum(0, 0))
+      dram store accum
     }
+
+    val result = getMem(dram)
+    val golden = Matrix.tabulate(32,32){(j,k) => j + k }.map{e => e * 32 }
+    assert(result == golden)
   }
 }

@@ -162,7 +162,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       for (i <- 0 until depth) {
         active(i).io.input.set := Mux(~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable, true.B, false.B)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := io.doneIn(i) | ~io.maskIn(i)
+        iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
         iterDone(i).io.input.reset := io.doneIn(i).D(1) // Override iterDone reset
         done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i) & io.enable)
       }

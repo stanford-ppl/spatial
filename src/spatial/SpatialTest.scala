@@ -47,7 +47,7 @@ trait SpatialTest extends Spatial with DSLTest {
     run  = "bash scripts/regression_run.sh"
   ) {
     override def shouldRun: Boolean = enable("test.VCS")
-    override val makeTimeout: Long = 13000
+    override val makeTimeout: Long = 500
   }
 
   object VCS_noretime extends ChiselBackend(
@@ -57,7 +57,7 @@ trait SpatialTest extends Spatial with DSLTest {
     run  = "bash scripts/regression_run.sh"
   ) {
     override def shouldRun: Boolean = enable("test.VCS_noretime")
-    override val makeTimeout: Long = 13000
+    override val makeTimeout: Long = 500
   }
 
   object Zynq extends ChiselBackend(

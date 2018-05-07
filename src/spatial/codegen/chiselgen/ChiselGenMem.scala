@@ -28,18 +28,18 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
 
     ens.zipWithIndex.foreach{case (e, i) => 
-      if (ens(i).isEmpty) emit(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-      else emit(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(e.head, lhs), true)} & ${e.map(quote).mkString(" & ")}""")
-      if (!ofs.isEmpty) emit(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
+      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
+      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(e.head, lhs), true)} & ${e.map(quote).mkString(" & ")}""")
+      if (!ofs.isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
       if (lhs.isDirectlyBanked) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.toInt)}))") 
-        emit(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
+        emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
       } else {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emit(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
         lhs.tp match {
-          case _: Vec[_] => emit(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
-          case _ => emit(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
+          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
+          case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
         }
       }
     }
@@ -58,21 +58,21 @@ trait ChiselGenMem extends ChiselGenCommon {
     val muxPort = lhs.ports.values.head.muxPort
 
     data.zipWithIndex.foreach{case (d, i) => 
-      if (ens(i).isEmpty) emit(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-      else emit(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(ens(i).head, lhs), true)} & ${ens(i).map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emit(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
-      emit(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
+      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
+      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(ens(i).head, lhs), true)} & ${ens(i).map(quote).mkString(" & ")}""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
+      emitt(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
       if (lhs.isDirectlyBanked && !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_Direct($ofsWidth, ${bank(i).map(_.toInt)}, $width))") 
-        emit(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
+        emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
       } else if (isBroadcast & mem.instance.depth > 1) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emit(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
-        emit(src"""${mem}.connectBroadcastPort(${swap(src"${lhs}_$i", Blank)}, $muxPort, $i)""")        
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        emitt(src"""${mem}.connectBroadcastPort(${swap(src"${lhs}_$i", Blank)}, $muxPort, $i)""")        
       } else {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emit(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
-        emit(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, $muxPort, $i)""")
       }
     }
   }
@@ -151,19 +151,19 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileReset(rf, en)    => 
       // val parent = lhs.parent.s.get
       // val id = resettersOf(rf).map{_._1}.indexOf(lhs)
-      // duplicatesOf(rf).indices.foreach{i => emit(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
+      // duplicatesOf(rf).indices.foreach{i => emitt(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
     case RegFileShiftIn(rf,data,addr,en,axis) => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en))
     case op@RegFileBankedRead(rf,bank,ofs,ens)       => emitRead(lhs,rf,bank,ofs,ens)
     case op@RegFileBankedWrite(rf,data,bank,ofs,ens) => emitWrite(lhs,rf,data,bank,ofs,ens)
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
-    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io.empty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io.full")
-    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io.almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io.almostFull")
-    case op@FIFOPeek(fifo,_) => emit(src"val $lhs = $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.io.numel")
+    case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.empty")
+    case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.almostFull")
+    case op@FIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
+    case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     

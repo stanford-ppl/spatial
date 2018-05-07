@@ -69,7 +69,7 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
     } else if (argOutRange contains i) {
       ff.io.enable := io.argOuts(argOutRange.indexOf(i)).valid | (io.wen & (io.waddr === id.U(addrWidth.W)))
       ff.io.in := Mux(io.argOuts(regIdx2ArgOut(i)).valid, io.argOuts(regIdx2ArgOut(i)).bits, io.wdata)
-      if (argOutLoopbacksMap.contains(regIdx2ArgOut(i))) {Console.println(s"map at $i contained = ${regIdx2ArgOut(i)}");io.argOutLoopbacks(argOutLoopbacksMap(regIdx2ArgOut(i))) := ff.io.out}
+      if (argOutLoopbacksMap.contains(regIdx2ArgOut(i))) {io.argOutLoopbacks(argOutLoopbacksMap(regIdx2ArgOut(i))) := ff.io.out}
       ff.reset := io.reset
       ff.io.reset := reset.toBool //io.reset // reset.toBool 
     } else {

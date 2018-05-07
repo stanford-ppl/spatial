@@ -175,8 +175,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
-    val accesses = mem.accesses
-    val ports = accesses.filter{a => a.ports.values.head.bufferPort.isDefined}.map{a => a.ports.values.head.bufferPort.get}.toList
+    val accesses = mem.accesses.filter(_.ports.values.head.bufferPort.isDefined)
 
     var specialLB = false
     // val readCtrls = readPorts.map{case (port, readers) =>
@@ -201,13 +200,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
 
     if (!specialLB) {
-      val siblings = LCA(accesses.toList).children.toList
-      val portMatchup = accesses.map{a => siblings.indexOf(siblings.filter{ s => a.ancestors.contains(s) }.head)}
-      val basePort = portMatchup.min
-      val numPorts = ports.max - ports.min
+      val (lca, basePort, numPorts) = LCAWithDistanceAndOffset(accesses.toList)
 
-      println(s"working on $mem, sibs $siblings with matchup $portMatchup, baseport $basePort and numPorts is $numPorts")
-      val info = (0 to numPorts).map { port => siblings(basePort + port).s.get }
+      val info = (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
       info.toList
     } else {
       throw new Exception("Implement LB with transient buffering")

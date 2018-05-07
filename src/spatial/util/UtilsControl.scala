@@ -168,13 +168,24 @@ trait UtilsControl {
   def LCA(a: Ctrl, b: Ctrl): Ctrl= Tree.LCA(a, b){_.parent}
 
   /** Returns the least common ancestor (LCA) of a list of controllers.
+      Also returns the pipeline distance between the first and last accesses,
+      and the pipeline distance between the first access and the first stage.
     * If the controllers have no ancestors in common, returns None.
     */
-  def LCA(n: => List[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
-  def LCA(n: List[Ctrl]): Ctrl = { 
+  @stateful def LCAWithDistanceAndOffset(n: => List[Sym[_]]): (Ctrl,Int,Int) = { LCAWithDistanceAndOffset(n.map(_.toCtrl)) }
+  @stateful def LCAWithDistanceAndOffset(n: List[Ctrl]): (Ctrl,Int,Int) = { 
     val anchor = n.distinct.head
     val candidates = n.distinct.drop(1).map{case x => LCA(anchor, x)}
-    if (candidates.distinct.length == 1) candidates.head else LCA(candidates)
+    if (candidates.distinct.length == 1) {
+      val lca = candidates.head
+      val lcaChildren = lca.children.toList
+      val portMatchup = n.map{a => lcaChildren.indexOf(lcaChildren.filter{ s => a.ancestors.contains(s) }.head)}
+      val basePort = portMatchup.min
+      val numPorts = portMatchup.max - portMatchup.min
+
+      (lca, basePort, numPorts)
+    } 
+    else LCAWithDistanceAndOffset(candidates)
   }
 
   def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {

@@ -101,6 +101,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
       warn(ctx, s"Constant division by 0")
       warn(ctx)
       null
+    case (Const(q), Const(r)) => R.from(q/r)
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
     case (Literal(1), _) => stage(FixInv(b))

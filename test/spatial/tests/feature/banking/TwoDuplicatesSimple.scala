@@ -21,14 +21,19 @@ import spatial.dsl._
         }
 
         dram(i::i+16 par 16) store sram
-        dram2(i::i+16 par 16) store sram
+        dram2(i::i+16 par 8) store sram
+     
       }
     }
+
     val result = getMem(dram)
+    val result2 = getMem(dram)
     val gold = Array.tabulate(32){i => i}
 
     printArray(result, "result")
+    printArray(result2, "result2")
     printArray(gold, "gold")
     assert(result == gold)
+    assert(result2 == gold)
   }
 }

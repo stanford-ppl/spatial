@@ -301,4 +301,13 @@ trait UtilsControl {
   }
 
 
+  /** Returns true if accesses a and b occur to the same buffer port and
+    * are bound by a sequential or switch LCA.
+    */
+  def requireTimeMuxPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
+    val lca = LCA(a,b)
+    lca.isSwitch || lca.isSequential
+  }
+
+
 }

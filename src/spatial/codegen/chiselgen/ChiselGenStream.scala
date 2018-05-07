@@ -14,7 +14,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
-      emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${lhs.readers.toList.length}, Bool()))", forceful = true)
+      val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
+      emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
       emitGlobalWire(src"${swap(lhs, Ready)} := ${swap(lhs, ReadyOptions)}.reduce{_|_}", forceful = true)
       emitGlobalWireMap(src"""${lhs}_now_valid""","""Wire(Bool())""", forceful = true)

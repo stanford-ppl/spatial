@@ -51,8 +51,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbg(mem.ctx.content.getOrElse(""))
     dbg("\n\n--------------------------------")
     instances.zipWithIndex.foreach{case (inst,i) =>
-      dbg(s"  Instance #$i")
+      dbg(s"Instance #$i")
       dbgss(inst)
+      dbg("\n\n")
     }
   }
 
@@ -138,6 +139,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     ports
   }
 
+  /** Returns the memory instance required to support the given read and write sets.
+    * Includes banking, buffering depth, and the mapping of accesses to buffer ports.
+    * Also calculates whether the associated memory should be considered a "buffer accumulator";
+    * this occurs if at least one read and write occur in the same controller within a buffer.
+    */
   protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Option[Instance] = {
     val reads = rdGroups.flatten
     val writes = wrGroups.flatten
@@ -152,8 +158,19 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val (banking, bankCost) = bankingCosts.minBy(_._2)
       // TODO[5]: Assumption: All memories are at least simple dual port
       val ports = computePorts(rdGroups,bufPorts) ++ computePorts(wrGroups,bufPorts)
-      val accTyp = mem.accumType | accumType(reads,reaching)
-      Some(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp))
+      val isBuffAccum = metapipe.isDefined &&
+                        writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+      val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
+      val accTyp = mem.accumType | accum
+
+      val instance = Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp)
+
+      dbgs(s"  Reads:  $rdGroups")
+      dbgs(s"  Writes: $wrGroups")
+      dbgs(s"  Instance: ")
+      dbgss("  ", instance)
+
+      Some(instance)
     }
     else None
   }
@@ -169,7 +186,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
 
     if ((a.ctrls intersect b.ctrls).nonEmpty && !isGlobal) Some("Control conflict")
-    else if ((a.accType | b.accType) >= AccumType.Buff)    Some("Accumulator conflict")
+    else if ((a.accType | b.accType) >= AccumType.Buff)    Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
     else if (metapipes.size > 1)                           Some("Ambiguous metapipes")
     else None
   }

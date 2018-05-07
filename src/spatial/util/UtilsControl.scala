@@ -56,8 +56,19 @@ trait UtilsControl {
       case _ => false
     }
 
+    /** Returns all ancestors of the controller or symbol.
+      * Ancestors are ordered outermost to innermost
+      */
     def ancestors: Seq[Ctrl] = Tree.ancestors(this.toCtrl){_.parent}
+
+    /** Returns all ancestors of the controller or symbol, stopping when stop is true (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
     def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(toCtrl, stop){_.parent}
+
+    /** Returns all ancestors of the controller or symbol, stopping at `stop` (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
     def ancestors(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](toCtrl, {c => c == stop}){_.parent}
 
     @stateful protected def controlChildren: Seq[Ctrl]
@@ -183,9 +194,9 @@ trait UtilsControl {
     else {
       val (lca, pathA, pathB) = LCAWithPaths(a, b)
       if (lca.isOuterControl && lca != a && lca != b) {
-        dbgs(s"PathA: " + pathA.mkString(", "))
-        dbgs(s"PathB: " + pathB.mkString(", "))
-        dbgs(s"LCA: $lca")
+        logs(s"PathA: " + pathA.mkString(", "))
+        logs(s"PathB: " + pathB.mkString(", "))
+        logs(s"LCA: $lca")
 
         val topA = pathA.find{c => c != lca }.get
         val topB = pathB.find{c => c != lca }.get

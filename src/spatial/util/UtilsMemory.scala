@@ -74,32 +74,25 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       else false
     }
 
-    /**
-      * Returns the sequence of enables associated with this symbol
-      */
+    /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = x match {
       case Op(d:Enabled[_]) => d.ens
       case _ => Set.empty
     }
 
-    /**
-      * Returns true if an execution of access a may occur before one of access b.
-      */
+    /** Returns true if an execution of access a may occur before one of access b. */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
       val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
       dist <= 0 || (dist > 0 && ctrl.isInLoop)
     }
 
-    /**
-      * Returns true if an execution of access a may occur after one of access b
-      */
+    /** Returns true if an execution of access a may occur after one of access b. */
     @stateful def mayFollow(b: Sym[_]): Boolean = {
       val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
       dist >= 0 || (dist < 0) && ctrl.isInLoop
     }
 
-    /**
-      * Returns true if access b must happen every time the body of controller ctrl is run
+    /** Returns true if access b must happen every time the body of controller ctrl is run
       * This case holds when all of the enables of ctrl are true
       * and when b is not contained in a switch within ctrl
       *
@@ -111,8 +104,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       !parents.exists(_.isSwitch) && enables.forall{case Const(b) => b.value; case _ => false }
      }
 
-    /**
-      * Returns true if access a must always come after access b, relative to some observer access p
+    /** Returns true if access a must always come after access b, relative to some observer access p
       * NOTE: Usable only before unrolling
       *
       * For orderings:
@@ -187,18 +179,30 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
   def rPortMuxWidth(mem: Sym[_], port: Int): Int = mem.readers.map{_.ports.values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
 
-  /**
-    * Returns iterators between controller containing access (inclusive) and controller containing mem (exclusive).
-    * Iterators are ordered outermost to innermost.
+  /** Returns iterators between controller containing access (inclusive) and controller
+    * containing mem (exclusive). Iterators are ordered outermost to innermost.
     */
   @stateful def accessIterators(access: Sym[_], mem: Sym[_]): Seq[Idx] = {
-    access.ancestors(stop = mem.parent).filter(_.id != -1).flatMap(ctrlIters)
+    // Use the parent "master" controller when checking for access iterators if the access and
+    // memory are in different sub-controllers.
+    // This is to account for memories defined, e.g. in the map (block 0) of a MemReduce
+    // with the access defined in the second block.
+    val accessAncestors = access.ancestors
+    val memParent = accessAncestors.indexOf(mem.parent)
+    val ancestors = {
+      if (memParent > -1) accessAncestors.drop(memParent+1)
+      else access.ancestors(stop = mem.parent.master)
+    }
+
+    dbgs(s"Ancestors ($access -> $mem): ${ancestors.mkString(",")}")
+    dbgs(s"Iterators: ${ancestors.flatMap(ctrlIters)}")
+    ancestors.flatMap(ctrlIters)
   }
 
-  /**
-    * Returns two sets of writers which may be visible to the given reader.
+  /** Returns two sets of writers which may be visible to the given reader.
     * The first set contains all writers which always occur before the reader.
-    * The second set contains writers which may occur after the reader (but be seen, e.g. in the second iteration of a loop).
+    * The second set contains writers which may occur after the reader (but be seen, e.g. in the
+    * second iteration of a loop).
     *
     * A write MAY be seen by a reader if it may precede the reader and address spaces intersect.
     */
@@ -225,8 +229,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     preceding.partition{write => !write.access.mayFollow(read.access) }
   }
 
-  /**
-    * Returns true if the given write is entirely overwritten by a subsequent write PRIOR to the given read
+  /** Returns true if the given write is entirely overwritten by a subsequent write PRIOR to the given read
     * (Occurs when another write w MUST follow this write and w contains ALL of the addresses in given write
     */
   @stateful def isKilled(write: AccessMatrix, others: Set[AccessMatrix], read: AccessMatrix)(implicit isl: ISL): Boolean = {
@@ -250,17 +253,6 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       reachingWrites ++= reaching
     }
     reachingWrites
-  }
-
-  /**
-    * Returns whether the associated memory should be considered an accumulator given the set
-    * of reads and writes.
-    * This looks like an accumulator to buffers if a read and write occurs in the same controller.
-    */
-  @stateful def accumType(reads: Set[AccessMatrix], writes: Set[AccessMatrix]): AccumType = {
-    // TODO[4]: Is read/write in a single control only "accumulation" if the read occurs after the write?
-    val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
-    if (isBuffAccum) AccumType.Buff else AccumType.None
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

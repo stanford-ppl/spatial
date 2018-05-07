@@ -93,7 +93,7 @@ import spatial.lang._
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
     itersMap -> Seq(map),
-    (itersMap ++ itersRed) -> Seq(loadRes,reduce),
+    (itersMap ++ itersRed) -> Seq(loadRes, reduce),
     itersRed -> Seq(loadAcc, storeAcc)
   )
   override def mayBeOuterBlock(i: Int): Boolean = i == 0

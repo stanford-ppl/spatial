@@ -10,6 +10,7 @@ sealed abstract class Ctrl {
   def s: Option[Sym[_]] = None
   def id: Int
 
+  def master: Ctrl
   def parent: Ctrl
   @stateful def children: Seq[Controller]
 
@@ -18,6 +19,7 @@ sealed abstract class Ctrl {
 
 case class Controller(sym: Sym[_], id: Int) extends Ctrl {
   override def s: Option[Sym[_]] = Some(sym)
+  def master: Ctrl = Controller(sym, -1)
   def parent: Ctrl = if (id != -1) Controller(sym,-1) else sym.parent
   @stateful def children: Seq[Controller] = {
     if (id == -1) sym match {
@@ -35,6 +37,7 @@ case class Controller(sym: Sym[_], id: Int) extends Ctrl {
 
 case object Host extends Ctrl {
   def id: Int = 0
+  def master: Ctrl = Host
   def parent: Ctrl = Host
   @stateful def children: Seq[Controller] = hwScopes.all
 

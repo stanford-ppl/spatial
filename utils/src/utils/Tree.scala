@@ -3,10 +3,9 @@ package utils
 import scala.collection.mutable.ListBuffer
 
 object Tree {
-  /**
-   * Returns all ancestors of the given node x (inclusive) to optional stop (exclusive)
-   * Ancestors are ordered outermost to innermost
-   */
+  /** Returns all ancestors of the given node x (inclusive) to optional stop (exclusive)
+    * Ancestors are ordered outermost to innermost
+    */
   def ancestors[T](x: T, stop: T => Boolean = {_:T => false})(parent: T => T): Seq[T] = {
     val parents = ListBuffer.empty[T]
     var current: T = x

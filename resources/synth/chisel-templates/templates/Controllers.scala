@@ -95,7 +95,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
         active(i).io.input.set := ((synchronize & iterDone(i-1).io.output.data) | ~io.maskIn(i-1)) & io.enable
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i)) | (~io.maskIn(i) & io.enable)
+        iterDone(i).io.input.set := (io.doneIn(i)) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)
         done(i).io.input.set := done(i-1).io.output.data & synchronize & ~io.rst
       }
     
@@ -117,7 +117,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         for (i <- 1 until depth) {
           active(i).io.input.set := io.doneIn(i-1) | (~io.maskIn(i-1) & ~io.doneIn(i) & io.enable)
           active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-          iterDone(i).io.input.set := (io.doneIn(i) & ~synchronize) | (~io.maskIn(i) & io.enable)
+          iterDone(i).io.input.set := (io.doneIn(i) & ~synchronize) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)
           done(i).io.input.set := io.ctrDone & ~io.rst
         }
       } else {

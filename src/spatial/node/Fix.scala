@@ -121,7 +121,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Literal(0), _) => a
     case (_, Const(r)) if r.isPow2 && r > 0 =>
       val i = INT[F].v + Number.log2(r).toInt - 1
-      if (i <= 0) a.from(0)
+      if (i < 0) a.from(0)
       else a.bits(i::0).asUnchecked[Fix[S,I,F]]
 
     case _ => super.rewrite

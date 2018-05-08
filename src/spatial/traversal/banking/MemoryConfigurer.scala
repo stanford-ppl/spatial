@@ -130,11 +130,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     seqGrps.zipWithIndex.foreach{case (grp,i) =>
       val prev = seqGrps.take(i).flatten  // The first i groups (the ones before the current)
       val grpPorts = grp.map{a =>
-        val mux = prev.filter{b => 
-          val parallel = requireParallelPortAccess(a.access,b.access)
-          dbgs(s"    - $a and $b require parallel port access? ${parallel}.")
-          parallel
-        }.map{b => ports(b).muxPort + 1 }.maxOrElse(0)
+        val mux = prev.filter{b => requireParallelPortAccess(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrElse(0)
         a -> Port(mux, bufPorts(a.access))
       }
       ports ++= grpPorts

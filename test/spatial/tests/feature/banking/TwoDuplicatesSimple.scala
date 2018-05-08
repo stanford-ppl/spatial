@@ -21,7 +21,7 @@ import spatial.dsl._
         }
 
         dram(i::i+16 par 16) store sram
-        dram2(i::i+16 par 8) store sram
+        dram2(i::i+16 par 16) store sram
      
       }
     }

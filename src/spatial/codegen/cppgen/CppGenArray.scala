@@ -107,10 +107,10 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
-          st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-          open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
-            st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
-          close("}")
+            st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
+            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
+              st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
+            close("}")
           close("};")
         }
       }
@@ -184,6 +184,18 @@ trait CppGenArray extends CppGenCommon {
     case SeriesForeach(start,end,step,func) =>
       open(src"for (int ${func.input} = $start; ${func.input} < ${end}; ${func.input} = ${func.input} + $step) {")
         visitBlock(func)
+      close("}")
+
+    case ArrayFlatMap(array, apply, func) =>
+      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+      visitBlock(apply)
+      visitBlock(func)
+      emit(src"${lhs}.push_back(${func.result});")
+      close("}")
+
+      open(src"val $lhs = $array.flatMap{${func.input} => ")
+        ret(func)
       close("}")
 
     case op@ArrayFromSeq(seq)   => 

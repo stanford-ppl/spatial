@@ -71,9 +71,11 @@ object RegFile {
 
   /** Allocates a [[RegFile2]] with size `rows` x `cols` and elements of type A. */
   @api def apply[A:Bits](rows: I32, cols: I32): RegFile2[A] = stage(RegFileNew[A,RegFile2](Seq(rows,cols),None))
+  @api def apply[A:Bits](rows: I32, cols: I32, inits: Seq[Bits[A]]): RegFile2[A] = stage(RegFileNew[A,RegFile2](Seq(rows,cols),Some(inits)))
 
   /** Allocates a [[RegFile3]] with the given dimensions and elements of type A. */
   @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): RegFile3[A] = stage(RegFileNew[A,RegFile3](Seq(d0,d1,d2),None))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, inits: Seq[Bits[A]]): RegFile3[A] = stage(RegFileNew[A,RegFile3](Seq(d0,d1,d2),Some(inits)))
 }
 
 

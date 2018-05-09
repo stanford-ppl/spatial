@@ -67,7 +67,7 @@ trait MemoryUnrolling extends UnrollingBase {
     mem.duplicates.zipWithIndex.map{case (inst,d) =>
       dbgs(s"  #$d: $inst")
       val mem2 = cloneOp(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
-      mem.instance = inst
+      mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
       dbgs(s"  ${stm(mem2)}")
       strMeta(mem2)

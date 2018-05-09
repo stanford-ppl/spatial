@@ -56,6 +56,13 @@ import spatial.node._
 
   /** Reduces the elements in this Tensor5 into a single element using associative function `rfunc`. */
   @api def reduce(rfunc: (A,A) => A): A = data.reduce(rfunc)
+
+  /** Returns true if this Tensor5 and `that` contain the same elements, false otherwise. */
+  @api override def neql(that: Tensor5[A]): Bit = data !== that.data
+
+  /** Returns false if this Tensor5 and `that` differ by at least one element, true otherwise. */
+  @api override def eql(that: Tensor5[A]): Bit = data === that.data
+
 }
 object Tensor5 {
   @api def apply[A:Type](data: Array[A], dim0: I32, dim1: I32, dim2: I32, dim3: I32, dim4: I32): Tensor5[A] = {

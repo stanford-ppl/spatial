@@ -14,7 +14,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
-      emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${lhs.readers.toList.length}, Bool()))", forceful = true)
+      val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
+      emitGlobalWireMap(src"${lhs}_ready_options", src"Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
       emitGlobalWire(src"${swap(lhs, Ready)} := ${swap(lhs, ReadyOptions)}.reduce{_|_}", forceful = true)
       emitGlobalWireMap(src"""${lhs}_now_valid""","""Wire(Bool())""", forceful = true)
@@ -37,8 +38,9 @@ trait ChiselGenStream extends ChiselGenCommon {
     //   close("}")
 
     case StreamOutNew(bus) =>
-      emitGlobalWireMap(src"${lhs}_valid_options", src"Wire(Vec(${lhs.writers.size}, Bool()))", forceful = true)
-      emitGlobalWireMap(src"${lhs}_valid_stops", src"Wire(Vec(${lhs.writers.size}, Bool()))", forceful = true)
+      val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
+      emitGlobalWireMap(src"${lhs}_valid_options", src"Wire(Vec(${ens*lhs.writers.size}, Bool()))", forceful = true)
+      emitGlobalWireMap(src"${lhs}_valid_stops", src"Wire(Vec(${ens*lhs.writers.size}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_valid", "Wire(Bool())", forceful = true)
       emitGlobalWireMap(src"${lhs}_stop", "Wire(Bool())", forceful = true)
       emitGlobalModuleMap(src"${lhs}_valid_srff", "Module(new SRFF())", forceful = true)
@@ -46,7 +48,6 @@ trait ChiselGenStream extends ChiselGenCommon {
       emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_}", forceful = true)
       emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.asyn_reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_} | accelReset", forceful = true)
       emitGlobalModule(src"${swap(lhs, Valid)} := ${swap(src"${lhs}_valid_srff", Blank)}.io.output.data | ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
-      val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, _, ens)) => ens.size; case _ => 0}
 	    emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
 	    emitGlobalWire(src"""val ${lhs} = Vec((0 until ${ens}).map{i => val ${lhs}_slice_options = (0 until ${lhs.writers.size}).map{j => ${swap(lhs, DataOptions)}(i*${lhs.writers.size}+j)}; Mux1H(${swap(lhs, ValidOptions)}, ${lhs}_slice_options)}.toList)""")
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)

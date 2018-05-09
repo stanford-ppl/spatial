@@ -180,6 +180,7 @@ trait UtilsControl {
     /** True if this controller or symbol has an ancestor which runs forever. */
     def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
 
+
     /** Returns true if this is an inner controller which directly contains
       * stream enablers/holder accesses.
       */
@@ -284,6 +285,12 @@ trait UtilsControl {
     case _ => Nil
   }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
 
+  def ctrlValids(ctrl: Ctrl): Seq[Bit] = Try(ctrl match {
+    case Host => Nil
+    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.valids
+    case _ => Nil
+  }).getOrElse(throw new Exception(s"$ctrl had invalid valids"))
+
 
 
   /** Returns the least common ancestor (LCA) of the two controllers.
@@ -291,6 +298,27 @@ trait UtilsControl {
     */
   def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.parent,b.parent)
   def LCA(a: Ctrl, b: Ctrl): Ctrl= Tree.LCA(a, b){_.parent}
+
+  /** Returns the least common ancestor (LCA) of a list of controllers.
+    * Also returns the pipeline distance between the first and last accesses,
+    * and the pipeline distance between the first access and the first stage.
+    * If the controllers have no ancestors in common, returns None.
+    */
+  @stateful def LCAWithDistanceAndOffset(n: => List[Sym[_]]): (Ctrl,Int,Int) = { LCAWithDistanceAndOffset(n.map(_.toCtrl)) }
+  @stateful def LCAWithDistanceAndOffset(n: List[Ctrl]): (Ctrl,Int,Int) = { 
+    val anchor = n.distinct.head
+    val candidates = n.distinct.drop(1).map{x => LCA(anchor, x)}
+    if (candidates.distinct.length == 1) {
+      val lca = candidates.head
+      val lcaChildren = lca.children.toList
+      val portMatchup = n.map{a => lcaChildren.indexOf(lcaChildren.filter{ s => a.ancestors.contains(s) }.head)}
+      val basePort = portMatchup.min
+      val numPorts = portMatchup.max - portMatchup.min
+
+      (lca, basePort, numPorts)
+    } 
+    else LCAWithDistanceAndOffset(candidates)
+  }
 
   def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {
     Tree.LCAWithPaths(a,b){_.parent}
@@ -394,14 +422,13 @@ trait UtilsControl {
 
   /** Returns true if accesses a and b may occur concurrently and to the same buffer port.
     * This is true when any of the following hold:
-    *   1. a and b are in the same inner pipeline
+    *   1. a and b are in the same inner pipeline (fully unrolled or not)
     *   2. a and b are in a Parallel controller
     *   3. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
     */
   def requireConcurrentPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
     val lca = LCA(a,b)
-    lca.isInnerPipeLoop && lca.isParallel
+    lca.isInnerPipeLoop || lca.isParallel
   }
-
 
 }

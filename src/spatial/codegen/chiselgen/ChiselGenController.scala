@@ -322,7 +322,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val lat = 0// bodyLatency.sum(sym) // FIXME
 
     // Construct controller args
-    emitt(src"""//  ---- ${sym.level}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
+    emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
     val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
     val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
     val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case _ => ""}
@@ -333,7 +333,7 @@ trait ChiselGenController extends ChiselGenCommon {
     createInstrumentation(sym)
 
     // Create controller
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $ncases))")
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $ncases))")
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getStreamReadyLogic(sym)}""")
@@ -357,7 +357,7 @@ trait ChiselGenController extends ChiselGenCommon {
     // Update bound sym watchlists
     (ctrlIters(sym.toCtrl) ++ ctrlValids(sym.toCtrl)).foreach{ item => 
       if (sym.isPipeControl) pipeChainPassMap += (item -> sym.children.toList.map(_.s.get))
-      else if (sym.isStreamControl) streamCopyWatchlist = streamCopyWatchlist :+ item
+      else if (sym.isStreamControl) {streamCopyWatchlist = streamCopyWatchlist :+ item}
     }
 
     // Emit counterchain(s)
@@ -385,7 +385,6 @@ trait ChiselGenController extends ChiselGenCommon {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(src"Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)", 1, true)} ${getNowValidLogic(sym)}""")
       }
     }
-    
 
   }
 

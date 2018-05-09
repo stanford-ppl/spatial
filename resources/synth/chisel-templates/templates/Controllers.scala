@@ -13,9 +13,9 @@ import scala.math._
 
 sealed trait Sched
 // Easier to just let codegen use their toString and catch those names here
-object Sequential extends Sched // Seq extends Sched { override def toString = "Sequential" }
-object Pipeline extends Sched // Pipe extends Sched { override def toString = "Pipeline" }
-object Stream extends Sched // Stream extends Sched { override def toString = "Stream" }
+object Sequenced extends Sched // Seq extends Sched { override def toString = "Sequenced" }
+object Pipelined extends Sched // Pipe extends Sched { override def toString = "Pipelined" }
+object Streaming extends Sched // Streaming extends Sched { override def toString = "Streaming" }
 object Fork extends Sched // Fork extends Sched { override def toString = "Fork" }
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
@@ -53,7 +53,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     val doneCondition = Input(Bool())
     val state = Output(SInt(stateWidth.W))
 
-    // Signals for Stream
+    // Signals for Streaming
     val ctrCopyDone = Vec(depth, Input(Bool()))
   })
 
@@ -77,7 +77,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
   // Wire up stage communication
   sched match {
-    case Pipeline => 
+    case Pipelined => 
       // Define rule for when ctr increments
       io.ctrInc := iterDone(0).io.output.data & synchronize
 
@@ -99,7 +99,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         done(i).io.input.set := done(i-1).io.output.data & synchronize & ~io.rst
       }
     
-    case Sequential => 
+    case Sequenced => 
       if (!isFSM) {
         // Define rule for when ctr increments
         io.ctrInc := io.doneIn.last
@@ -151,7 +151,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
-    case Stream => 
+    case Streaming => 
       // Define rule for when ctr increments
       io.ctrInc := synchronize // Don't care, each child has its own copy
 

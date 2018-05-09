@@ -90,7 +90,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val grpId = {
         if (a.parent == Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
-          val pairs = grp.filter{b => requireParallelPortAccess(a.access, b.access) && !a.overlaps(b) }
+          val pairs = grp.filter{b => requireConcurrentPortAccess(a.access, b.access) && !a.overlapsAddress(b) }
           if (pairs.nonEmpty) dbg(s"      Group #$i: ")
           else                dbg(s"      Group #$i: <none>")
           pairs.foreach{b => dbgs(s"        ${b.access} [${b.parent}]") }
@@ -131,7 +131,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     seqGrps.zipWithIndex.foreach{case (grp,i) =>
       val prev = seqGrps.take(i).flatten  // The first i groups (the ones before the current)
       val grpPorts = grp.map{a =>
-        val mux = prev.filter{b => requireParallelPortAccess(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrElse(0)
+        val mux = prev.filter{b => requireConcurrentPortAccess(a.access,b.access)}.map{b => ports(b).muxPort }.maxOrElse(0)
         a -> Port(mux, bufPorts(a.access))
       }
       ports ++= grpPorts

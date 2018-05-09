@@ -146,30 +146,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
-  protected def isStreamChild(lhs: Sym[_]): Boolean = {
-    var nextLevel: Option[Sym[_]] = Some(lhs)
-    var result = false
-    while (nextLevel.isDefined) {
-      if (nextLevel.get.schedule == Sched.Stream) {
-        result = true
-        nextLevel = None
-      } else {
-        if (nextLevel.get.parent.s.isDefined) nextLevel = Some(nextLevel.get.parent.s.get)
-        else nextLevel = None
-      }
-    }
-    result
-  }
-
-  protected def beneathForever(lhs: Sym[_]):Boolean = { // TODO: Make a counterOf() method that will just grab me Some(counter) that I can check
-    if (lhs.parent != Host) {
-      if (lhs.parent.s.get.isForever) true
-      else beneathForever(lhs.parent.s.get)
-    } else {
-      false
-    }
-  }
-
   protected def enableRetimeMatch(en: Sym[_], lhs: Sym[_]): Double = { // With partial retiming, the delay on standard signals needs to match the delay of the enabling input, not necessarily the symDelay(lhs) if en is delayed partially
     // val last_def_delay = en match {
     //   case Def(And(_,_)) => latencyOption("And", None)
@@ -231,12 +207,12 @@ trait ChiselGenCommon extends ChiselCodegen {
     var nextLevel: Option[Sym[_]] = Some(node.parent.s.get)
     var result = ens.map(quote)
     while (nextLevel.isDefined) {
-      if (nextLevel.get.schedule == Sched.Stream) {
+      if (nextLevel.get.isStreamControl) {
         nextLevel.get match {
-          case Op(UnrolledForeach(_,_,_,_,e)) => 
+          case Op(op: UnrolledForeach) =>
             ens.foreach{ my_en_exact =>
               val my_en = my_en_exact match { case Op(DelayLine(_,node)) => node; case _ => my_en_exact}
-              e.foreach{ their_en =>
+              op.ens.foreach{ their_en =>
                 if (src"${my_en}" == src"${their_en}" & !src"${my_en}".contains("true")) {
                   // Hacky way to avoid double-suffixing
                   if (!src"$my_en".contains(src"_copy${previousLevel}") && !src"$my_en".contains("(") /* hack for remapping */) {  
@@ -255,7 +231,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       }
     }
     result.mkString("&")
-
   }
 
   def getStreamEnablers(c: Sym[_]): String = {
@@ -337,7 +312,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     latency match {
       case lat: Int => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {
@@ -350,7 +325,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       case lat: Double => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
           } else {
@@ -363,7 +338,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       case lat: String => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {

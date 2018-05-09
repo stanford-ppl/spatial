@@ -5,7 +5,7 @@ import spatial.data._
 
 case class CtrlOpt(
   name:  Option[String] = None,
-  sched: Option[Sched] = None,
+  sched: Option[CtrlSchedule] = None,
   ii:    Option[Int] = None,
 ) {
   def set[A](x: Sym[A]): Unit = {

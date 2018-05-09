@@ -9,59 +9,59 @@ import spatial.lang._
 import spatial.node._
 
 trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
-  implicit class SymMemories(x: Sym[_]) {
+  implicit class SymMemories(a: Sym[_]) {
     // Weird scalac issue is preventing x.isInstanceOf[C[_,_]]?
 
-    def isLocalMem: Boolean = x match {
+    def isLocalMem: Boolean = a match {
       case _: LocalMem[_,_] => true
       case _ => false
     }
-    def isRemoteMem: Boolean = x match {
+    def isRemoteMem: Boolean = a match {
       case _: RemoteMem[_,_] => true
-      case _: Reg[_] => x.isArgOut || x.isArgIn || x.isHostIO
+      case _: Reg[_] => a.isArgOut || a.isArgIn || a.isHostIO
       case _ => false
     }
     def isMem: Boolean = isLocalMem || isRemoteMem
-    def isDenseAlias: Boolean = x.op.exists{
+    def isDenseAlias: Boolean = a.op.exists{
       case _: MemDenseAlias[_,_,_] => true
       case _ => false
     }
-    def isSparseAlias: Boolean = x.op.exists{
+    def isSparseAlias: Boolean = a.op.exists{
       case _: MemSparseAlias[_,_,_,_] => true
       case _ => false
     }
 
-    def isReg: Boolean = x.isInstanceOf[Reg[_]]
-    def isArgIn: Boolean = x.isReg && x.op.exists{ _.isInstanceOf[ArgInNew[_]] }
-    def isArgOut: Boolean = x.isReg && x.op.exists{ _.isInstanceOf[ArgOutNew[_]] }
-    def isHostIO: Boolean = x.isReg && x.op.exists{ _.isInstanceOf[HostIONew[_]] }
+    def isReg: Boolean = a.isInstanceOf[Reg[_]]
+    def isArgIn: Boolean = a.isReg && a.op.exists{ _.isInstanceOf[ArgInNew[_]] }
+    def isArgOut: Boolean = a.isReg && a.op.exists{ _.isInstanceOf[ArgOutNew[_]] }
+    def isHostIO: Boolean = a.isReg && a.op.exists{ _.isInstanceOf[HostIONew[_]] }
 
-    def isDRAM: Boolean = x match {
+    def isDRAM: Boolean = a match {
       case _:DRAM[_,_] => true
       case _ => false
     }
 
-    def isSRAM: Boolean = x match {
+    def isSRAM: Boolean = a match {
       case _: SRAM[_,_] => true
       case _ => false
     }
-    def isRegFile: Boolean = x match {
+    def isRegFile: Boolean = a match {
       case _: RegFile[_,_] => true
       case _ => false
     }
-    def isFIFO: Boolean = x.isInstanceOf[FIFO[_]]
-    def isLIFO: Boolean = x.isInstanceOf[LIFO[_]]
+    def isFIFO: Boolean = a.isInstanceOf[FIFO[_]]
+    def isLIFO: Boolean = a.isInstanceOf[LIFO[_]]
 
-    def isStreamIn: Boolean = x.isInstanceOf[StreamIn[_]]
-    def isStreamOut: Boolean = x.isInstanceOf[StreamOut[_]]
-    def isInternalStream: Boolean = (x.isStreamIn || x.isStreamOut) && x.parent != Host
+    def isStreamIn: Boolean = a.isInstanceOf[StreamIn[_]]
+    def isStreamOut: Boolean = a.isInstanceOf[StreamOut[_]]
+    def isInternalStream: Boolean = (a.isStreamIn || a.isStreamOut) && a.parent != Host
 
-    def isStatusReader: Boolean = StatusReader.unapply(x).isDefined
-    def isReader: Boolean = Reader.unapply(x).isDefined
-    def isWriter: Boolean = Writer.unapply(x).isDefined
+    def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
+    def isReader: Boolean = Reader.unapply(a).isDefined
+    def isWriter: Boolean = Writer.unapply(a).isDefined
 
     def banks: Seq[Seq[Idx]] = {
-      x match {
+      a match {
         case Op(SRAMBankedRead(_,bank,_,_)) => bank
         case Op(SRAMBankedWrite(_,_,bank,_,_)) => bank
         case _ => Seq(Seq())
@@ -69,27 +69,27 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     }
 
     def isDirectlyBanked: Boolean = {
-      if (x.banks.toList.flatten.isEmpty) false 
-      else if (x.banks.head.head.isConst) true 
+      if (a.banks.toList.flatten.isEmpty) false
+      else if (a.banks.head.head.isConst) true
       else false
     }
 
     /** Returns the sequence of enables associated with this symbol. */
-    @stateful def enables: Set[Bit] = x match {
+    @stateful def enables: Set[Bit] = a match {
       case Op(d:Enabled[_]) => d.ens
       case _ => Set.empty
     }
 
     /** Returns true if an execution of access a may occur before one of access b. */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
-      val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
-      dist <= 0 || (dist > 0 && ctrl.isInLoop)
+      val (ctrl,dist) = LCAWithDistance(b.parent, a.parent)
+      dist <= 0 || (dist > 0 && ctrl.willRunMultiple)
     }
 
     /** Returns true if an execution of access a may occur after one of access b. */
     @stateful def mayFollow(b: Sym[_]): Boolean = {
-      val (ctrl,dist) = LCAWithDistance(b.parent, x.parent)
-      dist >= 0 || (dist < 0) && ctrl.isInLoop
+      val (ctrl,dist) = LCAWithDistance(b.parent, a.parent)
+      dist >= 0 || (dist < 0) && ctrl.willRunMultiple
     }
 
     /** Returns true if access b must happen every time the body of controller ctrl is run
@@ -99,8 +99,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       * NOTE: Usable only before unrolling (so enables will not yet include boundary conditions)
       */
     @stateful def mustOccurWithin(ctrl: Ctrl): Boolean = {
-      val parents = x.ancestors(ctrl)
-      val enables = (x +: parents.flatMap(_.s)).flatMap(_.enables)
+      val parents = a.ancestors(ctrl)
+      val enables = (a +: parents.flatMap(_.s)).flatMap(_.enables)
       !parents.exists(_.isSwitch) && enables.forall{case Const(b) => b.value; case _ => false }
      }
 
@@ -116,12 +116,12 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       *   5. p b a - true if b does not occur within a switch
       */
     @stateful def mustFollow(b: Sym[_], p: Sym[_]): Boolean = {
-      val (ctrlA,distA) = LCAWithDistance(x, p) // Positive if a * p, negative otherwise
+      val (ctrlA,distA) = LCAWithDistance(a, p) // Positive if a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDistance(b, p) // Positive if b * p, negative otherwise
-      val ctrlAB = LCA(x,b)
-      if      (distA > 0 && distB > 0) { distA < distB && x.mustOccurWithin(ctrlAB) }   // b a p
-      else if (distA > 0 && distB < 0) { ctrlA.isInLoop && x.mustOccurWithin(ctrlAB) } // a p b
-      else if (distA < 0 && distB < 0) { distA < distB && ctrlA.isInLoop && x.mustOccurWithin(ctrlAB) } // p b a
+      val ctrlAB = LCA(a,b)
+      if      (distA > 0 && distB > 0) { distA < distB && a.mustOccurWithin(ctrlAB) }   // b a p
+      else if (distA > 0 && distB < 0) { ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // a p b
+      else if (distA < 0 && distB < 0) { distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // p b a
       else false
     }
   }
@@ -194,8 +194,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       else access.ancestors(stop = mem.parent.master)
     }
 
-    dbgs(s"Ancestors ($access -> $mem): ${ancestors.mkString(",")}")
-    dbgs(s"Iterators: ${ancestors.flatMap(ctrlIters)}")
+    logs(s"Ancestors ($access -> $mem): ${ancestors.mkString(",")}")
+    logs(s"Iterators: ${ancestors.flatMap(ctrlIters)}")
     ancestors.flatMap(ctrlIters)
   }
 
@@ -207,21 +207,9 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     * A write MAY be seen by a reader if it may precede the reader and address spaces intersect.
     */
   @stateful def precedingWrites(read: AccessMatrix, writes: Set[AccessMatrix])(implicit isl: ISL): (Set[AccessMatrix], Set[AccessMatrix]) = {
-    //dbgs("  Preceding writers for: ")
-    //dbgss(read)
-
     val preceding = writes.filter{write =>
       val intersects = read intersects write
       val mayPrecede = write.access.mayPrecede(read.access)
-
-      /*if (config.enDbg) {
-        val notAfter = !write.access.mayFollow(read.access)
-        val (ctrl, dist) = LCAWithDistance(read.parent, write.parent)
-        val inLooop = isInLoop(ctrl)
-        dbgss(write)
-        dbgs(s"     LCA=$ctrl, dist=$dist, inLoop=$inLooop")
-        dbgs(s"     notAfter=$notAfter, intersects=$intersects, mayPrecede=$mayPrecede")
-      }*/
 
       intersects && mayPrecede
     }

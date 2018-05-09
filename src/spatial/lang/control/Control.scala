@@ -19,20 +19,20 @@ class Directives(options: CtrlOpt) {
   }
 }
 
-class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(Sched.Pipe),ii)) {
+class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(Pipelined),ii)) {
   /** "Pipelined" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)
   @rig def apply(ens: Set[Bit], func: => Any): Void = unit_pipe(func, ens)
 
   def II(ii: Int) = new Pipe(name, Some(ii))
 }
-class Stream(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sched.Stream))) {
+class Stream(name: Option[String]) extends Directives(CtrlOpt(name,Some(Streaming))) {
   /** "Streaming" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)
 
   @api def apply(wild: Wildcard)(func: => Any): Void = Stream.Foreach(*){_ => func }
 }
-class Sequential(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sched.Seq))) {
+class Sequential(name: Option[String]) extends Directives(CtrlOpt(name,Some(Sequenced))) {
   /** "Sequential" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)
 }

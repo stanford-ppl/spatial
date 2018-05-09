@@ -84,7 +84,7 @@ trait ReduceUnrolling extends UnrollingBase {
     val lanes = PartialUnroller(cchain, iters, lhs.isInnerControl)
     val inds2 = lanes.indices
     val vs = lanes.indexValids
-    val start = cchain.ctrs.map(_.start.asInstanceOf[I32])
+    val start = cchain.counters.map(_.start.asInstanceOf[I32])
 
     val blk = stageLambda1(accum) {
       logs("Unrolling map")

@@ -7,24 +7,30 @@ import spatial.util._
 import spatial.internal.spatialConfig
 
 /** Control node schedule */
-sealed abstract class Sched
-object Sched {
-  case object Seq extends Sched { override def toString = "Sequential" }
-  case object Pipe extends Sched { override def toString = "Pipeline" }
-  case object Stream extends Sched { override def toString = "Stream" }
-  case object Fork extends Sched { override def toString = "Fork" }
-  case object ForkJoin extends Sched { override def toString = "ForkJoin" }
-}
+sealed abstract class CtrlSchedule
+case object Sequenced extends CtrlSchedule
+case object Pipelined extends CtrlSchedule
+case object Streaming extends CtrlSchedule
+case object ForkJoin extends CtrlSchedule
+case object Fork extends CtrlSchedule
+
+/** Control node level. */
+sealed abstract class CtrlLevel
+case object Inner extends CtrlLevel { override def toString = "InnerControl" }
+case object Outer extends CtrlLevel { override def toString = "OuterControl" }
+
+/** Control node looping. */
+sealed abstract class CtrlLooping
+case object Single extends CtrlLooping
+case object Looped extends CtrlLooping
 
 /** A controller's level in the control hierarchy. Flag marks whether this is an outer controller.
   *
-  * Getter:  sym.isOuter
-  * Setter:  sym.isOuter = (true | false)
+  * Getter:  sym.level
+  * Setter:  sym.level = (CtrlLevel)
   * Default: undefined
   */
-case class ControlLevel(isOuter: Boolean) extends StableData[ControlLevel] {
-  override def toString: String = if (isOuter) "OuterControl" else "InnerControl"
-}
+case class ControlLevel(level: CtrlLevel) extends StableData[ControlLevel]
 
 /** A counter or counterchain's owning controller.
   *
@@ -42,7 +48,7 @@ case class CounterOwner(owner: Sym[_]) extends StableData[CounterOwner]
   * Setter:  sym.schedule = (Sched)
   * Default: undefined
   */
-case class ControlSchedule(sched: Sched) extends StableData[ControlSchedule]
+case class ControlSchedule(sched: CtrlSchedule) extends StableData[ControlSchedule]
 
 
 /** The control schedule annotated by the user, if any.
@@ -52,7 +58,7 @@ case class ControlSchedule(sched: Sched) extends StableData[ControlSchedule]
   * Setter:  sym.userSchedule = (Sched)
   * Default: undefined
   */
-case class UserScheduleDirective(sched: Sched) extends StableData[UserScheduleDirective]
+case class UserScheduleDirective(sched: CtrlSchedule) extends StableData[UserScheduleDirective]
 
 
 /** Metadata holding a list of children within a controller.
@@ -130,23 +136,30 @@ case class UserII(interval: Double) extends StableData[UserII]
 
 trait ControlData {
   implicit class ControlDataOps(s: Sym[_]) {
-    def getIsOuter: Option[Boolean] = metadata[ControlLevel](s).map(_.isOuter)
-    def isOuter: Boolean = getIsOuter.getOrElse{throw new Exception(s"No control level defined for $s") }
-    def isOuter_=(flag: Boolean): Unit = metadata.add(s, ControlLevel(flag))
+    def getRawLevel: Option[CtrlLevel] = metadata[ControlLevel](s).map(_.level)
+    def rawLevel: CtrlLevel = getRawLevel.getOrElse{throw new Exception(s"No control level defined for $s") }
+    def rawLevel_=(level: CtrlLevel): Unit = metadata.add(s, ControlLevel(level))
 
-    def level: String = if (isOuter) "OuterControl" else "InnerControl"
+    def isRawOuter: Boolean = rawLevel == Outer
+    def isRawInner: Boolean = rawLevel == Inner
+
+    def getRawSchedule: Option[CtrlSchedule] = metadata[ControlSchedule](s).map(_.sched)
+    def rawSchedule: CtrlSchedule = getRawSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
+    def rawSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, ControlSchedule(sched))
+
+    def isRawSeq: Boolean = rawSchedule == Sequenced
+    def isRawPipe: Boolean = rawSchedule == Pipelined
+    def isRawStream: Boolean = rawSchedule == Streaming
+    def isForkJoin: Boolean = rawSchedule == ForkJoin
+    def isFork: Boolean = rawSchedule == Fork
+
+    def getUserSchedule: Option[CtrlSchedule] = metadata[UserScheduleDirective](s).map(_.sched)
+    def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
+    def userSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, UserScheduleDirective(sched))
 
     def getOwner: Option[Sym[_]] = metadata[CounterOwner](s).map(_.owner)
     def owner: Sym[_] = getOwner.getOrElse{throw new Exception(s"Undefined counter owner for $s") }
     def owner_=(own: Sym[_]): Unit = metadata.add(s, CounterOwner(own))
-
-    def getSchedule: Option[Sched] = metadata[ControlSchedule](s).map(_.sched)
-    def schedule: Sched = getSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
-    def schedule_=(sched: Sched): Unit = metadata.add(s, ControlSchedule(sched))
-
-    def getUserSchedule: Option[Sched] = metadata[UserScheduleDirective](s).map(_.sched)
-    def userSchedule: Sched = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
-    def userSchedule_=(sched: Sched): Unit = metadata.add(s, UserScheduleDirective(sched))
 
     def parent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Host)
     def parent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))

@@ -229,9 +229,9 @@ trait CppGenArray extends CppGenCommon {
       close("}")
 
     case UnrolledForeach(ens,cchain,func,iters,valids) => 
-      val starts = cchain.ctrs.map(_.start)
-      val ends = cchain.ctrs.map(_.end)
-      val steps = cchain.ctrs.map(_.step)
+      val starts = cchain.counters.map(_.start)
+      val ends = cchain.counters.map(_.end)
+      val steps = cchain.counters.map(_.step)
       iters.zipWithIndex.foreach{case (i,idx) => 
         open(src"for (int $i = ${starts(idx)}; $i < ${ends(idx)}; $i = $i + ${steps(idx)}) {")
         valids(idx).foreach{v => emit(src"${v.tp} ${v} = true; // TODO: Safe to assume this in cppgen?")}

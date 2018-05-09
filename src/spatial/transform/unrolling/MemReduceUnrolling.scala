@@ -46,7 +46,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val isRed2   = reduceLanes.indices
     val mvs      = mapLanes.indexValids
     val rvs      = reduceLanes.indexValids
-    val start    = cchainMap.ctrs.map(_.start.asInstanceOf[I32])
+    val start    = cchainMap.counters.map(_.start.asInstanceOf[I32])
     val redType  = reduce.result.reduceType
     val intermed = func.result
 

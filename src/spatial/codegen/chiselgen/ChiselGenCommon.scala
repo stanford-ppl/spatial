@@ -93,8 +93,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     if (!lhs.cchains.isEmpty) {
       val cchain = lhs.cchains.head
       var isForever = cchain.isForever
-      val w = bitWidth(cchain.ctrs.head.typeArgs.head)
-      val counter_data = cchain.ctrs.map{ ctr => ctr match {
+      val w = bitWidth(cchain.counters.head.typeArgs.head)
+      val counter_data = cchain.counters.map{ ctr => ctr match {
         case Op(CounterNew(start, end, step, par)) => 
           val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
           val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
@@ -113,7 +113,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       emitGlobalModule(src"""val ${cchain}_starts = List(${counter_data.map{_._1}}) """)
       emitGlobalModule(src"""val ${cchain} = Module(new templates.Counter(List(${counter_data.map(_._4)}), """ + 
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
-                       src"""List(${counter_data.map(_._8)}), List(${cchain.ctrs.map(c => bitWidth(c.typeArgs.head))})))""") 
+                       src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
       emit(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
       emit(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
@@ -126,10 +126,10 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (streamCopyWatchlist.contains(cchain)) emit(src"""${cchain}.io.input.isStream := true.B""")
       else emit(src"""${cchain}.io.input.isStream := false.B""")      
       emit(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
-      cchain.ctrs.zipWithIndex.foreach { case (c, i) =>
+      cchain.counters.zipWithIndex.foreach { case (c, i) =>
         val x = c.ctrPar.toInt
-        if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)))""")}
-        else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)) }""")}
+        if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
+        else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
         emit(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
       }
 
@@ -146,30 +146,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       }
     } else {
       "None"      
-    }
-  }
-
-  protected def isStreamChild(lhs: Sym[_]): Boolean = {
-    var nextLevel: Option[Sym[_]] = Some(lhs)
-    var result = false
-    while (nextLevel.isDefined) {
-      if (nextLevel.get.schedule == Sched.Stream) {
-        result = true
-        nextLevel = None
-      } else {
-        if (nextLevel.get.parent.s.isDefined) nextLevel = Some(nextLevel.get.parent.s.get)
-        else nextLevel = None
-      }
-    }
-    result
-  }
-
-  protected def beneathForever(lhs: Sym[_]):Boolean = { // TODO: Make a counterOf() method that will just grab me Some(counter) that I can check
-    if (lhs.parent != Host) {
-      if (lhs.parent.s.get.isForever) true
-      else beneathForever(lhs.parent.s.get)
-    } else {
-      false
     }
   }
 
@@ -234,12 +210,12 @@ trait ChiselGenCommon extends ChiselCodegen {
     var nextLevel: Option[Sym[_]] = Some(node.parent.s.get)
     var result = ens.map(quote)
     while (nextLevel.isDefined) {
-      if (nextLevel.get.schedule == Sched.Stream) {
+      if (nextLevel.get.isStreamControl) {
         nextLevel.get match {
-          case Op(UnrolledForeach(_,_,_,_,e)) => 
+          case Op(op: UnrolledForeach) =>
             ens.foreach{ my_en_exact =>
               val my_en = my_en_exact match { case Op(DelayLine(_,node)) => node; case _ => my_en_exact}
-              e.foreach{ their_en =>
+              op.ens.foreach{ their_en =>
                 if (src"${my_en}" == src"${their_en}" & !src"${my_en}".contains("true")) {
                   // Hacky way to avoid double-suffixing
                   if (!src"$my_en".contains(src"_copy${previousLevel}") && !src"$my_en".contains("(") /* hack for remapping */) {  
@@ -258,7 +234,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       }
     }
     result.mkString("&")
-
   }
 
   def getStreamEnablers(c: Sym[_]): String = {
@@ -340,7 +315,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     latency match {
       case lat: Int => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {
@@ -353,7 +328,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       case lat: Double => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
           } else {
@@ -366,7 +341,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       case lat: String => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {
@@ -451,7 +426,7 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   final protected def getCtrSuffix(ctrl: Sym[_]): String = {
     if (ctrl.parent != Host) {
-      if (ctrl.parent.s.get.schedule == Sched.Stream) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}  
+      if (ctrl.parent.isStreamControl) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}
     } else {
       throw new Exception(s"Could not find LCA stream schedule for a bound sym that is definitely in a stream controller.  This error should be impossibru!")
     }

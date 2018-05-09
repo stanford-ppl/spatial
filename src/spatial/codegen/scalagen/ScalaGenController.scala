@@ -17,7 +17,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
   }
 
   def emitControlBlock(lhs: Sym[_], block: Block[_]): Unit = {
-    if (lhs.isOuterControl && lhs.isStreamPipe) {
+    if (lhs.isOuterStreamControl) {
       val children = lhs.children
       block.stms.foreach { stm =>
         val isChild = children.exists{child => child.s.contains(stm) }
@@ -52,7 +52,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     valids: Seq[Seq[Bit]]
   )(func: => Unit): Unit = {
 
-    val ctrs = cchain.ctrs
+    val ctrs = cchain.counters
 
     for (i <- iters.indices) {
       if (ctrs(i).isForever) {

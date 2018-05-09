@@ -46,8 +46,9 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case ctrl: Control[_] =>
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
       // Branches (Switch, SwitchCase) only count as controllers here if they are outer controllers
-      s.isOuter = children.exists{c => !c.isBranch || c.isOuter }
-      s.cchains.foreach{cchain => cchain.owner = s }
+      val isOuter = children.exists{c => !c.isBranch || c.isOuterControl }
+      s.rawLevel = if (isOuter) Outer else Inner
+      s.cchains.foreach{cchain => cchain.owner = s; cchain.counters.foreach{ctr => ctr.owner = s }}
       s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
       op.blocks.foreach{blk =>
@@ -68,27 +69,27 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     *   3. For all other controllers:
     *      a. If the compiler has not yet defined a schedule, take the user schedule if defined.
     *      b. If the user and compiler both have not defined a schedule:
-    *         - UnitPipe and Accel are Seq by default
-    *         - All other controllers are Pipe by default
+    *         - UnitPipe and Accel are Sequenced by default
+    *         - All other controllers are Pipelined by default
     *      c. Otherwise, use the compiler's schedule
-    *   4. Accel, UnitPipe, and fully unrolled loops cannot be Pipe - override these with Seq.
-    *   5. Inner controllers cannot be Stream - override these with Pipe [TODO: Confirm]
+    *   4. "Single" iteration control (Accel, UnitPipe, fully unrolled loops) cannot be Pipelined - override these with Sequenced.
+    *   5. Inner controllers cannot be Streaming - override these with Pipelined
+    *   6. Outer controllers with only one child cannot be Pipelined - override these to Sequenced
     */
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
-    case _: ParallelPipe => s.schedule = Sched.ForkJoin
-    case _: Switch[_]    => s.schedule = Sched.Fork
+    case _: ParallelPipe => s.rawSchedule = ForkJoin
+    case _: Switch[_]    => s.rawSchedule = Fork
     case _: Control[_] =>
-      (s.getUserSchedule, s.getSchedule) match {
-        case (Some(s1), None) => s.schedule = s1
-        case (_   , Some(s2)) => s.schedule = s2
+      (s.getUserSchedule, s.getRawSchedule) match {
+        case (Some(s1), None) => s.rawSchedule = s1
+        case (_   , Some(s2)) => s.rawSchedule = s2
         case (None, None)     =>
-          val default = if (s.isUnitPipe || s.isAccel) Sched.Seq else Sched.Pipe
-          s.schedule = default
+          val default = if (s.isUnitPipe || s.isAccel) Sequenced else Pipelined
+          s.rawSchedule = default
       }
-      if (!s.isLoop && s.isPipeline) s.schedule = Sched.Seq
-      if (s.isInnerControl && s.isStreamPipe) s.schedule = Sched.Pipe
-
-      dbgs(s"Setting $s = $op to ${s.schedule} (user schedule: ${s.getUserSchedule.map(_.toString).getOrElse("<none>")})")
+      if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
+      if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
+      if (s.isOuterControl && s.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
 
     case _ => // No schedule for non-control nodes
   }
@@ -96,7 +97,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
     case loop: Loop[_] =>
       loop.cchains.foreach{case (cchain,is) =>
-        cchain.ctrs.zip(is).foreach{case (ctr, i) => i.counter = ctr }
+        cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = ctr }
       }
 
     case _ =>

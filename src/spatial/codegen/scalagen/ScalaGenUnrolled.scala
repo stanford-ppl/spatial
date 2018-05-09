@@ -13,7 +13,7 @@ trait ScalaGenUnrolled extends ScalaGenMemories with ScalaGenSRAM with ScalaGenC
     iters:  Seq[Seq[I32]],
     valids: Seq[Seq[Bit]]
   )(func: => Unit): Unit = {
-    val ctrs = cchain.ctrs
+    val ctrs = cchain.counters
 
     for (i <- iters.indices) {
       if (ctrs(i).isForever) {

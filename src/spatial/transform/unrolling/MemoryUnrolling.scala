@@ -122,14 +122,14 @@ trait MemoryUnrolling extends UnrollingBase {
     *                             laneIds
     *                          |-----------|
     * Lanes:     0    1    2    3    4    5    6   [Parallelized loop iterations]
-    *            |    |    |    |    |    |    |
-    *            V    V    V    V    V    V    V
+    *            |    |    |    |         |    |
+    *            V    V    V    V         V    V
+    * Masters:                  3         5        [Broadcaster lanes in this chunk]
     *           |_|  |______|  |___________|  |_|
     * Chunk:     0    0    1    0    1    2    0   [Index of lane within chunk]
     *            |         |    |         |    |
     *            V         V    V         V    V
     *                          |0         2|   0
-    *                            laneSelect
     * Vector:   |_|  |______|  |___________|  |_|  [Distinct addresses]
     *            0         0    0         1    0
     *                          |-----------|
@@ -154,30 +154,30 @@ trait MemoryUnrolling extends UnrollingBase {
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => (f(a),p) }               // lanes of ND addresses
-          val distinct = a2.groupBy(_._1).mapValues(_.map(_._2)).toSeq  // ND address -> lane IDs
+          val distinct = a2.groupBy(_._1).mapValues(_.map(_._2)).toSeq  // (ND address, lane IDs) pairs
           val addr: Seq[Seq[Idx]] = distinct.map(_._1)                  // Vector of ND addresses
-          val laneSelect: Seq[Int] = distinct.map(_._2.last)            // Lane ID for each distinct address
+          val masters: Seq[Int] = distinct.map(_._2.last)               // Lane ID for each distinct address
           val lane2Vec: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry._2.map{laneId => laneId -> aId }}.toMap
           val vec2Lane: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry._2.map{laneId => aId -> laneId }}.toMap
-          (addr, laneSelect, lane2Vec, vec2Lane)
+          (addr, masters, lane2Vec, vec2Lane)
         }
         val addr2      = addrOpt.map(_._1)                            // Vector of ND addresses
-        val laneSelect = addrOpt.map(_._2).getOrElse(laneIds.indices) // List of lane IDs which do not require broadcast
+        val masters    = addrOpt.map(_._2).getOrElse(laneIds)         // List of broadcaster lane IDs
         val lane2Vec   = addrOpt.map(_._3)                            // Lane -> Vector ID
         val vec2Lane   = addrOpt.map(_._4)                            // Vector ID -> Lane ID
-        val vecIds     = laneSelect.indices                           // List of Vector IDs
+        val vecIds     = masters.indices                              // List of Vector IDs
         def vecLength: Int = addr2.map(_.length).getOrElse(laneIds.length)
         def laneIdToVecId(lane: Int): Int = lane2Vec.map(_.apply(lane)).getOrElse(laneIds.indexOf(lane))
         def laneIdToChunkId(lane: Int): Int = laneIds.indexOf(lane)
         def vecToLaneAddr(vec: Int): Int = vec2Lane.map(_.apply(vec)).getOrElse(laneIds.apply(vec))
 
-        dbgs(s"  Lane Select: $laneSelect // Non-duplicated lane indices")
+        dbgs(s"  Masters: $masters // Non-duplicated lane indices")
 
         // Writing two different values to the same address currently just writes the last value
+        // Note this defines a race condition, so its behavior is undefined by the language
         val data2 = data.map{d =>
-          val d2 = lanes.inLanes(laneIds){_ => f(d) }   // Chunk of data
-          laneSelect.map{t => d2(laneIdToChunkId(t)) }  // Vector of data
-                    .map{_.asInstanceOf[Bits[A]]}
+          val d2 = lanes.inLanes(laneIds){_ => f(d).asInstanceOf[Bits[A]] }  // Chunk of data
+          masters.map{t => d2(laneIdToChunkId(t)) }                          // Vector of data
         }
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)

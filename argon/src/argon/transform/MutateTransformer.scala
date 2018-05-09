@@ -31,6 +31,20 @@ abstract class MutateTransformer extends ForwardTransformer {
     metadata.addAll(sym, data)
   }
 
+  /**
+    * Visit and transform each statement in the given block.
+    * @return the substitution for the block's result
+    */
+  override protected def inlineBlock[T](block: Block[T], shouldMirror: Boolean = false): Sym[T] = {
+    inlineBlockWith(block){stms => if (shouldMirror) stms.foreach{l => mirrorSym(l); ()} else stms.foreach(visit); f(block.result) }
+  }
+
+  final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
+    () => isolateIf(copy){
+      inlineBlock(b, copy).unbox
+    }
+  }
+
   /** Mutate this symbol's node with the current substitution rules. */
   final def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val ctx: SrcCtx = lhs.ctx

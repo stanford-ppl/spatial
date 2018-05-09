@@ -67,7 +67,7 @@ abstract class SubstTransformer extends Transformer {
     result
   }
 
-  final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
+  override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
     () => isolateIf(copy){
       inlineBlock(b).unbox
     }

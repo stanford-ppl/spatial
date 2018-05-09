@@ -136,9 +136,11 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }{ blk }
 
 
-  override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
+  override protected def inlineBlock[T](block: Block[T], shouldMirror: Boolean = false): Sym[T] = {
     inlineBlockWith(block){stms =>
-      stms.foreach(visit)
+      if (shouldMirror) stms.foreach{l => mirrorSym(l); ()}
+      else stms.foreach(visit)
+      
       lanes.inLane(0){ f(block.result) }
     }
   }

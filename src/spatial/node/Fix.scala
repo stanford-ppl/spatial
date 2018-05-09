@@ -104,7 +104,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(q), Const(r)) => R.from(q/r)
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
-    case (Literal(1), _) => stage(FixInv(b))
+    case (Literal(1), _) => stage(FixRecip(b))
     case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[S,I,_0]].from(Number.log2(r))
     case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[S,I,_0]].from(Number.log2(-r))
     case _ => super.rewrite

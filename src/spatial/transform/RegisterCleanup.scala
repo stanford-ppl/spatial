@@ -107,7 +107,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
   }
 
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
-  override protected def inlineBlock[T](b: Block[T]): Sym[T] = inlineBlockWith(b){stms =>
+  override protected def inlineBlock[T](b: Block[T], shouldMirror: Boolean = false): Sym[T] = inlineBlockWith(b){stms =>
     advanceBlock()
     stms.foreach(visit)
     val rules = blk match {

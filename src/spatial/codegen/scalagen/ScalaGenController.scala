@@ -52,7 +52,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     valids: Seq[Seq[Bit]]
   )(func: => Unit): Unit = {
 
-    val ctrs = cchain.ctrs
+    val ctrs = cchain.counters
 
     for (i <- iters.indices) {
       if (ctrs(i).isForever) {

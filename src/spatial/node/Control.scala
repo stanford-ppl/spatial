@@ -3,6 +3,7 @@ package spatial.node
 import forge.tags._
 import argon._
 import spatial.lang._
+import spatial.util._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
   val A: Num[A] = Num[A]
@@ -52,6 +53,12 @@ import spatial.lang._
   def cchains = Seq(cchain -> iters)
   def bodies = Seq(iters -> Seq(block))
   override def mayBeOuterBlock(i: Int) = true
+
+  // A Foreach with 1 iteration is really a UnitPipe
+  @rig override def rewrite: Void = {
+    if (cchain.isUnit) stage(UnitPipe(ens, block))
+    else super.rewrite
+  }
 }
 
 

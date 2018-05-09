@@ -67,6 +67,9 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         mirrorWithDuplication(lhs, rhs)
       }
 
+    // Remove unused counters and counterchains
+    case _:CounterNew[_] if lhs.getOwner.isEmpty   => Invalid
+    case _:CounterChainNew if lhs.getOwner.isEmpty => Invalid
 
     case RegWrite(reg,value,en) =>
       dbgs("")

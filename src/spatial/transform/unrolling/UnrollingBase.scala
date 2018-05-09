@@ -278,7 +278,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.noInnerLoopUnroll) inds.map{_ => 1}
                        else cchain.pars.map(_.toInt)
 
-    val fs: Seq[Boolean] = cchain.ctrs.map(_.isForever)
+    val fs: Seq[Boolean] = cchain.counters.map(_.isForever)
 
     val indices: Seq[Seq[I32]] = Ps.map{p => List.fill(p){ boundVar[I32] }}
     val indexValids:  Seq[Seq[Bit]] = Ps.map{p => List.fill(p){ boundVar[Bit] }}
@@ -301,10 +301,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   case class FullUnroller(cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     val Ps: Seq[Int] = cchain.pars.map(_.toInt)
 
-    val indices: Seq[Seq[I32]] = cchain.ctrs.map{ctr =>
+    val indices: Seq[Seq[I32]] = cchain.counters.map{ctr =>
       List.tabulate(ctr.ctrPar.toInt){i => I32(ctr.start.toInt + ctr.step.toInt*i) }
     }
-    val indexValids: Seq[Seq[Bit]] = indices.zip(cchain.ctrs).map{case (is,ctr) =>
+    val indexValids: Seq[Seq[Bit]] = indices.zip(cchain.counters).map{case (is,ctr) =>
       is.map{case Const(i) => Bit(i < ctr.end.toInt) }
     }
 

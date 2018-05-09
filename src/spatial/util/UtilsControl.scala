@@ -20,6 +20,10 @@ trait UtilsControl {
       case loop: Loop[_] => !loop.cchains.forall(_._1.willFullyUnroll)
       case _ => false
     }
+    def isFullyUnrolledLoop: Boolean = op match {
+      case loop: Loop[_] => loop.cchains.forall(_._1.willFullyUnroll)
+      case _ => false
+    }
   }
 
   /** Operations implicitly defined on both Sym[_] and Ctrl. */
@@ -88,6 +92,7 @@ trait UtilsControl {
       isCtrl && hasLoop && hasLevel && hasSched
     }
 
+    def isFullyUnrolledLoop: Boolean = op.exists(_.isFullyUnrolledLoop)
 
     /** True if this is a control block which is not run iteratively. */
     def isSingleControl: Boolean = isCtrl(loop = Single)
@@ -108,6 +113,9 @@ trait UtilsControl {
     def isPipeControl: Boolean = isCtrl(sched = Pipelined)
     /** True if this is a streaming scheduled controller. */
     def isStreamControl: Boolean = isCtrl(sched = Streaming)
+
+    /** True if this is an inner, sequential controller. */
+    def isInnerSeqControl: Boolean = isCtrl(level = Inner, sched = Sequenced)
 
     /** True if this is an outer streaming controller.
       * (Note that all streaming controllers should be outer.)
@@ -222,11 +230,11 @@ trait UtilsControl {
       case _ => throw new Exception(s"Could not find counterchain definition for $x")
     }
 
-    def ctrs: Seq[Counter[_]] = x.node.counters
-    def pars: Seq[I32] = ctrs.map(_.ctrPar)
-    def willFullyUnroll: Boolean = ctrs.forall(_.willFullyUnroll)
-    def isUnit: Boolean = ctrs.forall(_.isUnit)
-    def isStatic: Boolean = ctrs.forall(_.isStatic)
+    def counters: Seq[Counter[_]] = x.node.counters
+    def pars: Seq[I32] = counters.map(_.ctrPar)
+    def willFullyUnroll: Boolean = counters.forall(_.isFullyUnrolledLoop)
+    def isUnit: Boolean = counters.forall(_.isUnit)
+    def isStatic: Boolean = counters.forall(_.isStatic)
   }
 
 
@@ -422,13 +430,18 @@ trait UtilsControl {
 
   /** Returns true if accesses a and b may occur concurrently and to the same buffer port.
     * This is true when any of the following hold:
-    *   1. a and b are in the same inner pipeline (fully unrolled or not)
-    *   2. a and b are in a Parallel controller
-    *   3. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
+    *   0. a and b are two different unrolled parts of the same node
+    *   1. a and b are in the same inner pipeline
+    *   2. a and b are in the same fully unrolled inner sequential
+    *   3. a and b are in a Parallel controller
+    *   4. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
     */
-  def requireConcurrentPortAccess(a: Sym[_], b: Sym[_]): Boolean = {
-    val lca = LCA(a,b)
-    lca.isInnerPipeLoop || lca.isParallel
+  def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val lca = LCA(a.access, b.access)
+    (a.access == b.access && a.unroll != b.unroll) ||
+    lca.isInnerPipeLoop ||
+    (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
+    lca.isParallel
   }
 
 }

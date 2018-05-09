@@ -363,7 +363,7 @@ trait ChiselGenController extends ChiselGenCommon {
     // Emit counterchain(s)
     if (sym.isOuterStreamLoop) {
       streamCopyWatchlist = streamCopyWatchlist :+ sym.cchains.head
-      sym.cchains.head.ctrs.foreach{c => streamCopyWatchlist = streamCopyWatchlist :+ c}
+      sym.cchains.head.counters.foreach{c => streamCopyWatchlist = streamCopyWatchlist :+ c}
       forEachChild(sym){case (c, idx) =>
         emitCounterChain(sym)
         emitt(src"""${swap(sym.cchains.head, En)} := ${swap(sym, SM)}.io.ctrInc & ${swap(sym, IIDone)} ${getNowValidLogic(sym)}""")

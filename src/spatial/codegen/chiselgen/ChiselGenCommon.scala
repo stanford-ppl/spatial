@@ -93,8 +93,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     if (!lhs.cchains.isEmpty) {
       val cchain = lhs.cchains.head
       var isForever = cchain.isForever
-      val w = bitWidth(cchain.ctrs.head.typeArgs.head)
-      val counter_data = cchain.ctrs.map{ ctr => ctr match {
+      val w = bitWidth(cchain.counters.head.typeArgs.head)
+      val counter_data = cchain.counters.map{ ctr => ctr match {
         case Op(CounterNew(start, end, step, par)) => 
           val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
           val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
@@ -113,7 +113,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       emitGlobalModule(src"""val ${cchain}_starts = List(${counter_data.map{_._1}}) """)
       emitGlobalModule(src"""val ${cchain} = Module(new templates.Counter(List(${counter_data.map(_._4)}), """ + 
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
-                       src"""List(${counter_data.map(_._8)}), List(${cchain.ctrs.map(c => bitWidth(c.typeArgs.head))})))""") 
+                       src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
       emit(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
       emit(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
@@ -126,10 +126,10 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (streamCopyWatchlist.contains(cchain)) emit(src"""${cchain}.io.input.isStream := true.B""")
       else emit(src"""${cchain}.io.input.isStream := false.B""")      
       emit(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
-      cchain.ctrs.zipWithIndex.foreach { case (c, i) =>
+      cchain.counters.zipWithIndex.foreach { case (c, i) =>
         val x = c.ctrPar.toInt
-        if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)))""")}
-        else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)) }""")}
+        if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
+        else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
         emit(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
       }
 

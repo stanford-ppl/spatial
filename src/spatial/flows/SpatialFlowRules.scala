@@ -48,7 +48,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       // Branches (Switch, SwitchCase) only count as controllers here if they are outer controllers
       val isOuter = children.exists{c => !c.isBranch || c.isOuterControl }
       s.rawLevel = if (isOuter) Outer else Inner
-      s.cchains.foreach{cchain => cchain.owner = s }
+      s.cchains.foreach{cchain => cchain.owner = s; cchain.counters.foreach{ctr => ctr.owner = s }}
       s.children = children.map{c => Controller(c,-1) }
       val bodies = ctrl.bodies
       op.blocks.foreach{blk =>
@@ -97,7 +97,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
     case loop: Loop[_] =>
       loop.cchains.foreach{case (cchain,is) =>
-        cchain.ctrs.zip(is).foreach{case (ctr, i) => i.counter = ctr }
+        cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = ctr }
       }
 
     case _ =>

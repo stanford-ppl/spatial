@@ -68,7 +68,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     * Visit and transform each statement in the given block.
     * @return the substitution for the block's result
     */
-  override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
+  override protected def inlineBlock[T](block: Block[T], shouldMirror: Boolean = false): Sym[T] = {
     inlineBlockWith(block){stms => stms.foreach(visit); f(block.result) }
   }
 

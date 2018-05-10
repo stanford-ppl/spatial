@@ -74,14 +74,14 @@ trait UtilsControl {
           case (Single, Inner) => expectedSchedule match {
             case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
             case Pipelined => false
-            case Streaming => false
+            case Streaming => actualSchedule == Streaming
             case ForkJoin  => actualSchedule == ForkJoin  // Shouldn't occur in practice
             case Fork      => actualSchedule == Fork
           }
           case (Single, Outer) => expectedSchedule match {
             case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
             case Pipelined => false
-            case Streaming => false
+            case Streaming => actualSchedule == Streaming
             case ForkJoin  => actualSchedule == ForkJoin
             case Fork      => actualSchedule == Fork
           }

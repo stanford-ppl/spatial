@@ -43,7 +43,7 @@ abstract class Transformer extends Pass {
         x
     }).asInstanceOf[T]
 
-    if (y.isInstanceOf[Invalid]) throw new Exception(s"Used removed symbol in mirroring of $x")
+    if (y.isInstanceOf[Invalid]) throw new Exception(s"Used removed symbol: $x")
     y
   }
 

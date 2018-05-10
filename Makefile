@@ -15,7 +15,8 @@ resources:
 	bash bin/update_resources.sh
 
 clear: 
-	rm *.sim
+	rm -f *.log	
+	rm -f *.sim
 	rm -rf logs
 	rm -rf gen
 	rm -rf reports

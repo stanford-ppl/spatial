@@ -82,8 +82,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     result
   }
 
+  def unrollWithoutResult(block: Block[_], lanes: Unroller): Unit = inLanes(lanes){
+    state.logTab += 1
+    block.stms.foreach(visit)
+    state.logTab -= 1
+  }
+
   def unroll[A](block: Block[A], lanes: Unroller): List[A] = inLanes(lanes){
-    inlineBlock(block)
+    // Note: We don't use inlineBlock because f(block.result) is meaningless outside a lane
+    unrollWithoutResult(block, lanes)
     lanes.map{_ => f(block.result).unbox }
   }
 

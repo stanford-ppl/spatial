@@ -15,7 +15,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     dbgs(s"$lhs = $rhs [ctrl: ${lhs.toCtrl}, inner: ${lhs.toCtrl.isInnerControl}]")
 
-    metadata.clear[MUsers](lhs)
+    metadata.clear[Users](lhs)
 
     def inspect(): Unit = {
       if (inHw) checkUses(lhs, rhs)

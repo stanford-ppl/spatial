@@ -116,9 +116,6 @@ trait Spatial extends Compiler {
         (cfg.enableSynth ? cppCodegen) ==>
         (cfg.enableDot ? irDotCodegen)
     }
-    //globalAllocation ==>
-    //printer ==>
-    //puDotCodegen ==>
 
     isl.shutdown(100)
     result

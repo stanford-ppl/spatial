@@ -21,7 +21,7 @@ case class User(sym: Sym[_], blk: Ctrl)
   * Setter:  sym.users = (Set[User])
   * Default: empty set
   */
-case class MUsers(users: Set[User]) extends FlowData[MUsers]
+case class Users(users: Set[User]) extends AnalysisData[Users]
 
 /** Set of local memory reads which each symbol uses
   * Used to detect accumulation cycles
@@ -39,8 +39,8 @@ trait AccessData {
     def isUnusedAccess: Boolean = metadata[UnusedAccess](s).exists(_.flag)
     def isUnusedAccess_=(flag: Boolean): Unit = metadata.add(s, UnusedAccess(flag))
 
-    def users: Set[User] = metadata[MUsers](s).map(_.users).getOrElse(Set.empty)
-    def users_=(use: Set[User]): Unit = metadata.add(s, MUsers(use))
+    def users: Set[User] = metadata[Users](s).map(_.users).getOrElse(Set.empty)
+    def users_=(use: Set[User]): Unit = metadata.add(s, Users(use))
 
     def readUses: Set[Sym[_]] = metadata[ReadUses](s).map(_.reads).getOrElse(Set.empty)
     def readUses_=(use: Set[Sym[_]]): Unit = metadata.add(s, ReadUses(use))

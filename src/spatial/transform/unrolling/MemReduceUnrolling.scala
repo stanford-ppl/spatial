@@ -63,7 +63,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     val blk = stageLambda1(accum){
       logs(s"[Accum-fold $lhs] Unrolling map")
-      unroll(func, mapLanes)
+      unrollWithoutResult(func, mapLanes)
       val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
 
       val mvalids = () => mapLanes.valids.map{_.andTree}

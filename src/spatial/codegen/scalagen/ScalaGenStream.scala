@@ -58,10 +58,10 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
       close("""}.mkString(", ")""")
     case tp: Struct[_] =>
       tp.fields.zipWithIndex.foreach{case (field,i) =>
-        emit(s"val field$i = $elem.${field._1}")
-        bitsToString(s"fieldStr$i", s"field$i", field._2)
+        emit(s"val ${elem}_field$i = $elem.${field._1}")
+        bitsToString(s"${elem}_fieldStr$i", s"field$i", field._2)
       }
-      emit(s"val $lhs = List(" + List.tabulate(tp.fields.length){i => s"fieldStr$i"}.mkString(", ") + s""").mkString("; ")""")
+      emit(s"val $lhs = List(" + List.tabulate(tp.fields.length){i => s"${elem}_fieldStr$i"}.mkString(", ") + s""").mkString("; ")""")
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

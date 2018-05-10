@@ -13,17 +13,17 @@ fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"
 echo "Running tests $tests"
 echo "Logging tests to $fileout"
 
-if [[ $type == "mini" ]]; then
+if [[ $type == "sim" ]]; then
   sbt -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "nightly" ]]; then
+elif [[ $type == "vcs" ]]; then
   sbt -Dtest.Scala=true -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "weekly" ]]; then
+elif [[ $type == "zynq" ]]; then
   sbt -Dtest.Scala=true -Dtest.VCS=true -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "synth_basic" ]]; then
+elif [[ $type == "vcs-only" ]]; then
   sbt -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
 else
   echo "Test type '$type' not recognized" 
-  echo "Supported types: [mini | nightly | weekly | synth_basic]"
+  echo "Supported types: [sim | vcs | zynq | vcs-only]"
   exit 1
 fi
 

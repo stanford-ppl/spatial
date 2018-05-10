@@ -31,12 +31,12 @@ abstract class MutateTransformer extends ForwardTransformer {
     else update(lhs,rhs)
   }
 
-  /** Update the metadata on sym using current substitution rules
-    * NOTE: We don't erase invalid metadata here to avoid issues with Effects, etc.
-    */
+  /** Update the metadata on sym using current substitution rules. */
   def updateMetadata(sym: Sym[_]): Unit = {
-    val data = metadata.all(sym).flatMap{case (k,m) => mirror(m) : Option[Data[_]] }
-    metadata.addAll(sym, data)
+    metadata.all(sym).toList.foreach{case (k,m) => mirror(m) match {
+      case Some(m2) => if (!m.ignoreOnTransform) metadata.add(sym, k, merge(m, m2))
+      case None     => metadata.remove(sym, k)
+    }}
   }
 
 

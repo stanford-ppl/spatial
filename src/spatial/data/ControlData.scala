@@ -26,8 +26,8 @@ case object Looped extends CtrlLooping
 
 /** A controller's level in the control hierarchy. Flag marks whether this is an outer controller.
   *
-  * Getter:  sym.level
-  * Setter:  sym.level = (CtrlLevel)
+  * Getter:  sym.rawLevel
+  * Setter:  sym.rawLevel = (CtrlLevel)
   * Default: undefined
   */
 case class ControlLevel(level: CtrlLevel) extends StableData[ControlLevel]
@@ -38,14 +38,14 @@ case class ControlLevel(level: CtrlLevel) extends StableData[ControlLevel]
   * Setter:  sym.owner = (Sym[_])
   * Default: undefined
   */
-case class CounterOwner(owner: Sym[_]) extends StableData[CounterOwner]
+case class CounterOwner(owner: Sym[_]) extends AnalysisData[CounterOwner]
 
 
 /** The control schedule determined by the compiler.
   *
-  * Option:  sym.getSchedule
-  * Getter:  sym.schedule
-  * Setter:  sym.schedule = (Sched)
+  * Option:  sym.getRawSchedule
+  * Getter:  sym.rawSchedule
+  * Setter:  sym.rawSchedule = (Sched)
   * Default: undefined
   */
 case class ControlSchedule(sched: CtrlSchedule) extends StableData[ControlSchedule]

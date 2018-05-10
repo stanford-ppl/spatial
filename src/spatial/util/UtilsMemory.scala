@@ -189,12 +189,13 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     // with the access defined in the second block.
     val accessAncestors = access.ancestors
     val memParent = accessAncestors.indexOf(mem.parent)
-    val ancestors = {
+    val allAncestors = {
       if (memParent > -1) accessAncestors.drop(memParent+1)
       else access.ancestors(stop = mem.parent.master)
     }
+    val ancestors = allAncestors.filterNot(_.id == -1)
 
-    logs(s"Ancestors ($access -> $mem): ${ancestors.mkString(",")}")
+    logs(s"Ancestors ($access -> $mem): ${allAncestors.mkString(",")}")
     logs(s"Iterators: ${ancestors.flatMap(ctrlIters)}")
     ancestors.flatMap(ctrlIters)
   }

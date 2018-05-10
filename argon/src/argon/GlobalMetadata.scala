@@ -21,7 +21,7 @@ class GlobalMetadata {
     case None => data.remove(k)
   }}
   def clearBeforeTransform(): Unit = {
-    val remove = data.collect{case (k,v) if v.skipOnTransform => k }
+    val remove = data.collect{case (k,v) if v.ignoreOnTransform => k }
     remove.foreach{k => data.remove(k) }
   }
 

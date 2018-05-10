@@ -53,12 +53,6 @@ import spatial.util._
   def cchains = Seq(cchain -> iters)
   def bodies = Seq(iters -> Seq(block))
   override def mayBeOuterBlock(i: Int) = true
-
-  // A Foreach with 1 iteration is really a UnitPipe
-  @rig override def rewrite: Void = {
-    if (cchain.isUnit) stage(UnitPipe(ens, block))
-    else super.rewrite
-  }
 }
 
 

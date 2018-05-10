@@ -38,11 +38,11 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
         emit("out")
       close("}.toArray")
     case tp: Struct[_] =>
-      emit(s"""val tokens = $line.split(";").map(_.trim)""")
+      emit(s"""val ${lhs}_tokens = $line.split(";").map(_.trim)""")
       tp.fields.zipWithIndex.foreach{case (field,i) =>
-        bitsFromString(s"field$i", s"tokens($i)", field._2)
+        bitsFromString(s"${lhs}_field$i", s"${lhs}_tokens($i)", field._2)
       }
-      emit(src"val $lhs = $tp(" + List.tabulate(tp.fields.length){i => s"field$i"}.mkString(", ") + ")")
+      emit(src"val $lhs = $tp(" + List.tabulate(tp.fields.length){i => s"${lhs}_field$i"}.mkString(", ") + ")")
 
     case _ => throw new Exception(s"Cannot create Stream with type $tp")
   }
@@ -59,7 +59,7 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
     case tp: Struct[_] =>
       tp.fields.zipWithIndex.foreach{case (field,i) =>
         emit(s"val ${elem}_field$i = $elem.${field._1}")
-        bitsToString(s"${elem}_fieldStr$i", s"field$i", field._2)
+        bitsToString(s"${elem}_fieldStr$i", s"${elem}_field$i", field._2)
       }
       emit(s"val $lhs = List(" + List.tabulate(tp.fields.length){i => s"${elem}_fieldStr$i"}.mkString(", ") + s""").mkString("; ")""")
   }

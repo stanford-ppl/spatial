@@ -1,16 +1,34 @@
 package argon
 
+/** The effects summary of a symbol.
+  *
+  * Effects metadata is "Stable" since it should never be removed, but we always take the "old"
+  * metadata during merging since this is the one created by staging.
+  *
+  * @param unique Should not be CSEd
+  * @param sticky Should not be code motioned out of blocks
+  * @param simple Requires ordering with respect to other simple effects
+  * @param global Modifies execution of the entire program (e.g. exceptions, exiting)
+  * @param mutable Allocates a mutable structure
+  * @param throws May throw exceptions (so speculative execution is unsafe)
+  * @param reads A set of read mutable symbols
+  * @param writes A set of written mutable symbols
+  * @param antiDeps Anti-dependencies of this operation (must come before this symbol)
+  */
 case class Effects(
-  unique:  Boolean = false,           // Should not be CSEd
-  sticky:  Boolean = false,           // Should not be code motioned out of blocks
-  simple:  Boolean = false,           // Requires ordering with respect to other simple effects
-  global:  Boolean = false,           // Modifies execution of entire program (e.g. exceptions, exiting)
-  mutable: Boolean = false,           // Allocates a mutable structure
-  throws:  Boolean = false,           // May throw exceptions (speculative execution may be unsafe)
-  reads:   Set[Sym[_]] = Set.empty,   // Reads given mutable symbols
-  writes:  Set[Sym[_]] = Set.empty,   // Writes given mutable symbols
-  antiDeps: Seq[Impure] = Nil         // Anti-dependencies
-) extends AnalysisData[Effects] {
+  unique:  Boolean = false,
+  sticky:  Boolean = false,
+  simple:  Boolean = false,
+  global:  Boolean = false,
+  mutable: Boolean = false,
+  throws:  Boolean = false,
+  reads:   Set[Sym[_]] = Set.empty,
+  writes:  Set[Sym[_]] = Set.empty,
+  antiDeps: Seq[Impure] = Nil
+) extends StableData[Effects] {
+
+  /** Always prefer the old effects metadata since this is added during staging. */
+  override def merge(old: Effects): Effects = old
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(
     unique  = this.unique || that.unique,

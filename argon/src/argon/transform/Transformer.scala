@@ -72,9 +72,13 @@ abstract class Transformer extends Pass {
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
     dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
-    val data = metadata.all(src).filterNot{case (_,m) => m.skipOnTransform }
-                                .flatMap{case (_,m) => mirror(m) : Option[Data[_]] }
-    metadata.addAll(dest, data)
+
+    metadata.all(src).toList.foreach{case (k,m) =>
+      mirror(m) match {
+        case Some(m2) => if (!m.ignoreOnTransform) metadata.add(dest, k, merge(m, m2))
+        case None     => metadata.remove(dest, k)
+      }
+    }
   }
 
   final protected def transferMetadataIfNew[A](lhs: Sym[A])(tx: => Sym[A]): (Sym[A], Boolean) = {
@@ -90,7 +94,12 @@ abstract class Transformer extends Pass {
     else (lhs2, false)
   }
 
-  final def mirror(m: Data[_]): Option[Data[_]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[_]])
+  final def merge[M1,M2](old: Data[M1], neww: Data[M2]): Data[_] = {
+    if (neww.key != old.key) throw new Exception(s"Cannot merge ${neww.key} and ${old.key} metadata")
+    neww.merge(old.asInstanceOf[Data[M2]])
+  }
+
+  final def mirror[M](m: Data[M]): Option[Data[M]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[M]])
 
   def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.R

@@ -309,7 +309,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     result
   }
 
-  override protected def inlineBlock[T](b: Block[T], shouldMirror: Boolean = false): Sym[T] = {
+  override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
     val doWrap = retimeBlocks.headOption.getOrElse(false)
     if (retimeBlocks.nonEmpty) retimeBlocks = retimeBlocks.drop(1)
     dbgs(s"Transforming Block $b [$retimeBlocks => $doWrap]")

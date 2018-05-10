@@ -5,6 +5,15 @@ import utils.tags.instrument
 
 abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
+  protected var shouldCopy: Boolean = false
+
+  protected def inCopyMode[A](copy: Boolean)(block: => A): A = {
+    val saveCopy = shouldCopy
+    shouldCopy = copy
+    val result = block
+    shouldCopy = saveCopy
+    result
+  }
 
   /*
    * Options when transforming a statement:
@@ -13,17 +22,16 @@ abstract class MutateTransformer extends ForwardTransformer {
    *   2. Subst. it: s -> Some(s'). Substitution s' will appear instead.
    */
 
-  /**
-    * Determine a transformation rule for the given symbol.
+  /** Determine a transformation rule for the given symbol.
     * By default, the rule is to update the symbol's node in place.
     * @return the symbol which should replace lhs
     */
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
-    update(lhs,rhs)
+    if (shouldCopy) super.transform(lhs,rhs)
+    else update(lhs,rhs)
   }
 
-  /**
-    * Update the metadata on sym using current substitution rules
+  /** Update the metadata on sym using current substitution rules
     * NOTE: We don't erase invalid metadata here to avoid issues with Effects, etc.
     */
   def updateMetadata(sym: Sym[_]): Unit = {
@@ -31,17 +39,11 @@ abstract class MutateTransformer extends ForwardTransformer {
     metadata.addAll(sym, data)
   }
 
-  /**
-    * Visit and transform each statement in the given block.
-    * @return the substitution for the block's result
-    */
-  override protected def inlineBlock[T](block: Block[T], shouldMirror: Boolean = false): Sym[T] = {
-    inlineBlockWith(block){stms => if (shouldMirror) stms.foreach{l => mirrorSym(l); ()} else stms.foreach(visit); f(block.result) }
-  }
+
 
   final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
     () => isolateIf(copy){
-      inlineBlock(b, copy).unbox
+      inCopyMode(copy){ inlineBlock(b).unbox }
     }
   }
 

@@ -136,11 +136,9 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }{ blk }
 
 
-  override protected def inlineBlock[T](block: Block[T], shouldMirror: Boolean = false): Sym[T] = {
+  override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
     inlineBlockWith(block){stms =>
-      if (shouldMirror) stms.foreach{l => mirrorSym(l); ()}
-      else stms.foreach(visit)
-      
+      stms.foreach(visit)
       lanes.inLane(0){ f(block.result) }
     }
   }
@@ -223,7 +221,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     // 1. Split a given vector as the substitution for the single original symbol
     def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
-      if (size > 1) map{_ =>
+      if (size > 1 || shouldCopy) map{_ =>
         val s2 = cloneOp(s, d)
         register(s -> s2)
         s2

@@ -55,7 +55,7 @@ abstract class Transformer extends Pass {
     stageScope(f(block.inputs),block.options){ inlineBlock(block) }
   }
 
-  protected def inlineBlock[T](block: Block[T], shouldMirror: Boolean = false): Sym[T]
+  protected def inlineBlock[T](block: Block[T]): Sym[T]
 
   /**
     * Visit and perform some transformation `func` over all statements in the block.

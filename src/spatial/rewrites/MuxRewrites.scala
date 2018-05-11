@@ -13,7 +13,9 @@ trait MuxRewrites extends RewriteRules {
   @rewrite def rewrite_mux(op: Mux[_]): Sym[_] = {
     case Mux(Literal(true), a, _)  => a
     case Mux(Literal(false), _, b) => b
-    case Mux(_, a, b) if a == b => a
+    case Mux(_, a, b) if a == b =>
+      dbgs(s"Removing mux: $a and $b are the same!")
+      a
   }
 
   @rewrite def rewrite_oneHotMux(op: OneHotMux[_]): Sym[_] = {

@@ -187,11 +187,18 @@ trait ReduceUnrolling extends UnrollingBase {
           val res2   = reduce.reapply(treeResult, accValue)
           val select = mux(isFirst, treeResult, res2)
           box(select).reduceType = redType
+
+          dbgs(s"isFirst: ${stm(isFirst)}")
+          dbgs(s"res2:    ${stm(res2)}")
+          dbgs(s"select:  ${stm(select)}")
+
           select
       }
     }
 
     inReduce(redType,isInner){
+      dbgs(s"Store: $result to $accum")
+
       store.reapply(accum, result)
     }
   }

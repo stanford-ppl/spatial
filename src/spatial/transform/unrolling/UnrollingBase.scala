@@ -82,6 +82,13 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     result
   }
 
+  override def isolateIf[A](cond: Boolean)(block: => A): A = {
+    val save = subst
+    val result = lanes.isolateIf(cond){ block }
+    if (cond) subst = save
+    result
+  }
+
   def unrollWithoutResult(block: Block[_], lanes: Unroller): Unit = inLanes(lanes){
     state.logTab += 1
     block.stms.foreach(visit)
@@ -202,6 +209,21 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
 
     def inLanes[A](lns: Seq[Int])(block: Int => A): Seq[A] = lns.map{ln => inLane(ln)(block(ln)) }
+
+    def isolateIf[A](cond: Boolean)(block: => A): A = {
+      // Save
+      val saveContexts = Array.tabulate(contexts.length){i => contexts(i) }
+      val saveMemories = __memContexts.map{arr => Array.tabulate(arr.length){i => arr(i) }}
+
+      val result = block
+
+      // Restore
+      if (cond) {
+        contexts.indices.foreach { i => contexts(i) = saveContexts(i) }
+        __memContexts = saveMemories
+      }
+      result
+    }
 
     def inLane[A](i: Int)(block: => A): A = {
       val save = subst

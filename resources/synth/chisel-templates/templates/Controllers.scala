@@ -179,7 +179,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         active(i).io.input.set := io.selectsIn(i)
         active(i).io.input.reset := synchronize
         iterDone(i).io.input.set := io.doneIn(i)
-        iterDone(i).io.input.reset := synchronize
+        iterDone(i).io.input.reset := done(i).io.output.data
         done(i).io.input.set := synchronize
       }
 
@@ -218,6 +218,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     // Switch signals
     val selectsIn = Vec(cases, Input(Bool()))
     val selectsOut = Vec(cases, Output(Bool()))
+    val childAck = Vec(cases, Output(Bool()))
     val doneIn = Vec(cases, Input(Bool()))
 
     // FSM signals
@@ -245,6 +246,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     io.datapathEn := active.io.output.data & ~io.ctrDone
     io.ctrInc := active.io.output.data
     io.done := Utils.risingEdge(done.io.output.data)
+    io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1)}
 
   } else { // FSM inner
     val stateFSM = Module(new FF(stateWidth))

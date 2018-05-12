@@ -175,7 +175,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
-    val accesses = mem.accesses.filter(_.ports.values.head.bufferPort.isDefined)
+    val accesses = mem.accesses.filter(_.ports.values.head.bufferPort.isDefined).map(lookahead(_))
 
     var specialLB = false
     // val readCtrls = readPorts.map{case (port, readers) =>
@@ -200,8 +200,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
 
     if (!specialLB) {
-      val (lca, basePort, numPorts) = LCAWithDistanceAndOffset(accesses.toList)
-
+      val lca = LCA(accesses.toList)
+      val (basePort, numPorts) = LCAPortMatchup(accesses.toList, lca)
       val info = (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
       info.toList
     } else {

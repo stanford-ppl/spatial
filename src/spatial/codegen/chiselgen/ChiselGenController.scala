@@ -272,10 +272,8 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")
         case _ => 
       }
-      if (!isInner) {
-        emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
-        emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
-      }
+      if (!isInner) emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
+      emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
     }
 
     /* Control Signals to Children Controllers */
@@ -632,8 +630,6 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(s"// Controller Stack: ${controllerStack.tail}")
         if (op.R.isBits) {
           emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
-          println(src"quote ${selects(0)}")
-          println(s"quote ${cases(0)}")
           selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
           emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emit(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
         }

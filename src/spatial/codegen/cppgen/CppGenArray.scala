@@ -108,10 +108,31 @@ trait CppGenArray extends CppGenCommon {
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
             st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
-              st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
+            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){ /* Normal Constructor */")
+              st.foreach{f => emit(src"set${f._1}(*${f._1}_in);")}
             close("}")
+            emit(src"${struct}(){} /* For creating empty array */")
+            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ ${f._1} = &x; }")}
+
+          try {
+            val rawtp = asIntType(lhs.tp)
+            var position = 0
+            open(src"$rawtp toRaw() { /* For compacting struct into one int */")
+              emit(src"$rawtp result = 0;")
+              st.foreach{f => 
+                val field = f._1
+                val t = f._2
+                emit(src"result = result | (($rawtp) (this->$field) << $position); ")
+                position = position + bitWidth(t.tp)
+              }
+              emit(src"return result;")
+            close("}")
+            close(" ")
+          } catch { case _:Throwable => }
+
           close("};")
+          emit(src"typedef $struct ${lhs.tp};")
+
         }
       }
       val fields = st.zipWithIndex.map{case (f,i) => 
@@ -186,12 +207,20 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case ArrayFilter(array, apply, cond) =>
+      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+      visitBlock(apply)
+      visitBlock(cond)
+      emit(src"if (${cond.result}) (*${lhs}).push_back(${apply.result});")
+      close("}")
+
     case ArrayFlatMap(array, apply, func) =>
       emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
       open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
       visitBlock(apply)
       visitBlock(func)
-      emit(src"${lhs}.push_back(${func.result});")
+      emit(src"(*${lhs}).push_back(${func.result});")
       close("}")
 
       open(src"val $lhs = $array.flatMap{${func.input} => ")

@@ -46,7 +46,7 @@ abstract class Loop[R:Type] extends Pipeline[R]
 
 
 /** Unrolled loops */
-abstract class UnrolledLoop[R:Type] extends Pipeline[R] {
+abstract class UnrolledLoop[R:Type] extends Loop[R] {
   def iterss: Seq[Seq[I32]]
   def validss: Seq[Seq[Bit]]
   def cchainss: Seq[(CounterChain, Seq[Seq[I32]])]

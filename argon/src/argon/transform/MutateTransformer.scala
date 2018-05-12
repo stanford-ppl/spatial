@@ -39,8 +39,6 @@ abstract class MutateTransformer extends ForwardTransformer {
     }}
   }
 
-
-
   final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
     () => isolateIf(copy){
       inCopyMode(copy){ inlineBlock(b).unbox }

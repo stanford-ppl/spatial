@@ -37,15 +37,25 @@ trait CppGenCommon extends CppCodegen {
 
   protected def asIntType(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => 
-       if (d+f > 64) s"int128_t"
-       else if (d+f > 32) s"int64_t"
-       else if (d+f > 16) s"int32_t"
-       else if (d+f > 8) s"int16_t"
-       else if (d+f > 4) s"int8_t"
-       else if (d+f > 2) s"int8_t"
-       else if (d+f == 2) s"int8_t"
-       else "bool"
+      if (d+f > 64) s"int128_t"
+      else if (d+f > 32) s"int64_t"
+      else if (d+f > 16) s"int32_t"
+      else if (d+f > 8) s"int16_t"
+      else if (d+f > 4) s"int8_t"
+      else if (d+f > 2) s"int8_t"
+      else if (d+f == 2) s"int8_t"
+      else "bool"
     case FltPtType(m,e) => "float"
+    case _ => 
+      val w = bitWidth(tp)
+      if (w > 64) s"int128_t"
+      else if (w > 32) s"int64_t"
+      else if (w > 16) s"int32_t"
+      else if (w > 8) s"int16_t"
+      else if (w > 4) s"int8_t"
+      else if (w > 2) s"int8_t"
+      else if (w == 2) s"int8_t"
+      else "bool"
   }
 
   override protected def remap(tp: Type[_]): String = tp match {
@@ -67,6 +77,7 @@ trait CppGenCommon extends CppCodegen {
     case _: Text => "string"
     case ai: Reg[_] => remap(ai.typeArgs.head)
     case _: Vec[_] => "vector<" + remap(tp.typeArgs.head) + ">"
+    case t: Tup2[_,_] => s"${super.remap(tp)}".replaceAll("\\[","").replaceAll("\\]","").replaceAll(",","")
     case _ => 
       tp.typePrefix match {
         case "Array" => "vector<" + remap(tp.typeArgs.head) + ">"

@@ -72,6 +72,7 @@ abstract class SubstTransformer extends Transformer {
       inlineBlock(b).unbox
     }
   }
+
   final override protected def lambda1ToFunction1[A,R](lambda1: Lambda1[A,R], copy: Boolean): A => R = {
     {a: A => isolateIf(copy) {
       register(lambda1.input -> a)
@@ -84,6 +85,7 @@ abstract class SubstTransformer extends Transformer {
       register(lambda2.inputA -> a)
       register(lambda2.inputB -> b)
       val block = blockToFunction0(lambda2, copy)
+      dbgs(s"BLOCK IS $a $b ${lambda2.inputA} ${lambda2.inputB} and ${block()}")
       block()
     }}
   }

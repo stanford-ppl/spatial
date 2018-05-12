@@ -108,20 +108,26 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = {
-    cloneOp(lhs,rhs)
+    val lhs2 = cloneOp(lhs,rhs)
+    dbgs(s"Created ${stm(lhs2)}")
+    lhs2
   }
 
   /** Duplicate the controller using the given call-by-name unroll function.
     * Duplication is done based on the global Unroller helper instance lanes.
     */
   final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A]): List[Sym[_]] = {
-    dbgs(s"Duplicating controller:")
-    dbgs(s"$lhs = $rhs")
+    dbgs(s"Duplicating controller $lhs = $rhs")
     def duplicate() = transferMetadataIfNew(lhs){ unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]] }._1
     if (lanes.size > 1) {
       val block = stageBlock {
         lanes.foreach{p =>
-          dbgs(s"$lhs duplicate ${p+1}/${lanes.size}")
+          dbgs(s"$lhs = $rhs [duplicate ${p+1}/${lanes.size}]")
+          if (rhs.blocks.nonEmpty) {
+            rhs.blocks.head.stms.take(15).foreach{s => dbgs(s"  ${stm(s)} [${subst.getOrElse(s,s)}]")}
+            dbgs("")
+          }
+
           duplicate()
         }
       }
@@ -129,7 +135,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       lanes.unify(lhs, lhs2)
     }
     else {
-      dbgs(s"$lhs duplicate 1/1")
+      dbgs(s"$lhs = $rhs [duplicate 1/1]")
       val first = lanes.inLane(0){ duplicate() }
       lanes.unify(lhs, first)
     }

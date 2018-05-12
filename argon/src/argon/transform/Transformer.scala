@@ -101,7 +101,7 @@ abstract class Transformer extends Pass {
 
   final def mirror[M](m: Data[M]): Option[Data[M]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[M]])
 
-  def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
+  final def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.R
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Mirror]")

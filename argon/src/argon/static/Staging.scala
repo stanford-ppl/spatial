@@ -97,20 +97,22 @@ trait Staging { this: Printing =>
           logs(s"Effects: $effects")
         }
 
-        checkAliases(sym,effects)
-        data(sym)
-        runFlows(sym,op)
-
         state.scope :+= sym
         if (effects.mayCSE)  state.cache += op -> sym               // Add to CSE cache
         if (!effects.isPure) state.impure :+= Impure(sym,effects)   // Add to list of impure syms
         if (!effects.isPure) sym.effects = effects                  // Register effects
+
+        checkAliases(sym,effects)
 
         // Register aliases
         if (op.deepAliases.nonEmpty) sym.deepAliases = op.deepAliases
         if (op.shallowAliases.nonEmpty) sym.shallowAliases = op.shallowAliases
 
         op.inputs.foreach{in => in.consumers += sym }               // Register consumed
+
+        data(sym)
+        runFlows(sym,op)
+
         lhs
       }
       state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {

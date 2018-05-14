@@ -28,8 +28,6 @@ trait ChiselGenController extends ChiselGenCommon {
      get to the very top
   */
 
-  /* List of break or exit nodes */
-  var earlyExits: List[Sym[_]] = List()
 
   def createBreakpoint(lhs: Sym[_], id: Int): Unit = {
     // emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).bits := 1.U")
@@ -350,7 +348,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
 
     // Capture datapath_en
-    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
+    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} & ${swap(sym, IIDone)} // Used to have many variations""")
 
     // Update bound sym watchlists
     (ctrlIters(sym.toCtrl) ++ ctrlValids(sym.toCtrl)).foreach{ item => 

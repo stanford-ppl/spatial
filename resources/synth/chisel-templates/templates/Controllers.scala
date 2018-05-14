@@ -100,40 +100,24 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       }
     
     case Sequenced => 
-      if (!isFSM) {
-        // Define rule for when ctr increments
-        io.ctrInc := io.doneIn.last
+      // Define rule for when ctr increments
+      io.ctrInc := io.doneIn.last
 
-        // Configure synchronization
-        synchronize := io.doneIn.last.D(1)
-        
-        // Define logic for first stage
-        active(0).io.input.set := Mux(!done(0).io.output.data & ~io.ctrDone & io.enable & ~io.doneIn(0), true.B, false.B)
-        active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
-        iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
-        done(0).io.input.set := io.ctrDone & ~io.rst
+      // Configure synchronization
+      synchronize := io.doneIn.last.D(1)
+      
+      // Define logic for first stage
+      active(0).io.input.set := Mux(!done(0).io.output.data & ~io.ctrDone & io.enable & ~io.doneIn(0), true.B, false.B)
+      active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
+      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
+      done(0).io.input.set := io.ctrDone & ~io.rst
 
-        // Define logic for the rest of the stages
-        for (i <- 1 until depth) {
-          active(i).io.input.set := io.doneIn(i-1) | (~io.maskIn(i-1) & ~io.doneIn(i) & io.enable)
-          active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-          iterDone(i).io.input.set := (io.doneIn(i) & ~synchronize) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)
-          done(i).io.input.set := io.ctrDone & ~io.rst
-        }
-      } else {
-        val stateFSM = Module(new FF(stateWidth))
-        val doneReg = Module(new SRFF())
-
-        stateFSM.io.input(0).data := io.nextState.asUInt
-        stateFSM.io.input(0).init := io.initState.asUInt
-        stateFSM.io.input(0).en := io.enable
-        stateFSM.io.input(0).reset := reset.toBool | ~io.enable
-        io.state := stateFSM.io.output.data.asSInt
-
-        doneReg.io.input.set := io.doneCondition & io.enable
-        doneReg.io.input.reset := ~io.enable
-        doneReg.io.input.asyn_reset := false.B
-        io.done := doneReg.io.output.data | (io.doneCondition & io.enable)
+      // Define logic for the rest of the stages
+      for (i <- 1 until depth) {
+        active(i).io.input.set := io.doneIn(i-1) | (~io.maskIn(i-1) & ~io.doneIn(i) & io.enable)
+        active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
+        iterDone(i).io.input.set := (io.doneIn(i) & ~synchronize) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)
+        done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
     case ForkJoin => 
@@ -186,12 +170,33 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
   }
 
-  // Connect output signals
+
   iterDone.zip(io.childAck).foreach{ case (id, ca) => ca := id.io.output.data }
-  io.datapathEn := io.enable & ~io.done
   io.enableOut.zipWithIndex.foreach{case (eo,i) => eo := io.enable & active(i).io.output.data & ~iterDone(i).io.output.data & io.maskIn(i) & ~allDone & {if (i == 0) ~io.ctrDone else true.B}}
-  io.done := Utils.risingEdge(allDone)
-  io.ctrRst := Utils.getRetimed(Utils.risingEdge(allDone), 1)
+  io.ctrRst := Utils.getRetimed(Utils.risingEdge(allDone), 1)    
+  
+  // Connect output signals
+  if (isFSM) {
+    val stateFSM = Module(new FF(stateWidth))
+    val doneReg = Module(new SRFF())
+
+    stateFSM.io.input(0).data := io.nextState.asUInt
+    stateFSM.io.input(0).init := io.initState.asUInt
+    stateFSM.io.input(0).en := io.enable & iterDone.last.io.output.data
+    stateFSM.io.input(0).reset := reset.toBool | ~io.enable
+    io.state := stateFSM.io.output.data.asSInt
+
+    doneReg.io.input.set := io.doneCondition & io.enable & iterDone.last.io.output.data
+    doneReg.io.input.reset := ~io.enable
+    doneReg.io.input.asyn_reset := false.B
+    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
+    io.done := doneReg.io.output.data & io.enable
+  }
+  else {
+    io.datapathEn := io.enable & ~io.done
+    io.done := Utils.risingEdge(allDone)
+  }
+
 
 }
 
@@ -261,6 +266,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
+    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
     io.done := doneReg.io.output.data | (io.doneCondition & io.enable)
 
   }

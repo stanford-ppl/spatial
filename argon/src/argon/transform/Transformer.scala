@@ -159,7 +159,7 @@ abstract class Transformer extends Pass {
     def toFunction1: A => R = lambda1ToFunction1(lambda1, copy=true)
   }
   implicit class Lambda2Ops[A,B,R](lambda2: Lambda2[A,B,R]) {
-    def reapply(a: A, b: B): R = { val func = lambda2ToFunction2(lambda2, copy=true); val x = func(a,b); Console.println(s"just applied $func to $a $b"); x }
+    def reapply(a: A, b: B): R = { val func = lambda2ToFunction2(lambda2, copy=true); func(a,b) }
     def toFunction2: (A, B) => R = lambda2ToFunction2(lambda2, copy=true)
   }
   implicit class Lambda3Ops[A,B,C,R](lambda3: Lambda3[A,B,C,R]) {

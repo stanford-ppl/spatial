@@ -101,7 +101,8 @@ trait CppGenArray extends CppGenCommon {
       //   emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
     }
     case SimpleStruct(st) => 
-      val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
+      // val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
+      val struct = src"${lhs.tp}".replaceAll("[<|>]","")
       // Add to struct header if not there already
       if (!struct_list.contains(struct)) {
         struct_list = struct_list :+ struct
@@ -131,7 +132,7 @@ trait CppGenArray extends CppGenCommon {
           } catch { case _:Throwable => }
 
           close("};")
-          emit(src"typedef $struct ${lhs.tp};")
+          // emit(src"typedef $struct ${lhs.tp};")
 
         }
       }
@@ -292,11 +293,11 @@ trait CppGenArray extends CppGenCommon {
     case op@Switch(selects,block) =>
 
       emit(src"/** BEGIN SWITCH $lhs **/")
-      emit(src"${lhs.tp} $lhs;")
+      if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
       selects.indices.foreach { i =>
         open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
           visitBlock(op.cases(i).body)
-          emit(src"${lhs} = ${op.cases(i).body.result};")
+          if (op.R.isBits) emit(src"${lhs} = ${op.cases(i).body.result};")
         close("}")
       }
       emit(src"/** END SWITCH $lhs **/")

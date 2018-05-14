@@ -51,41 +51,22 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     */
   var memories: Map[(Sym[_], Int), Sym[_]] = Map.empty
   def withMemories[A](mems: Seq[((Sym[_],Int), Sym[_])])(blk: => A): A = {
-    val prevMems = memories
+    val saveMems = memories
     memories ++= mems
     val result = blk
-    memories = prevMems
+    memories = saveMems
     result
   }
 
-  /** Clone functions - used to add extra rules (primarily for metadata) during unrolling
-    * Applied directly after mirroring
-    */
-  var cloneFuncs: List[Sym[_] => Unit] = Nil
-  def duringClone[T](func: Sym[_] => Unit)(blk: => T)(implicit ctx: SrcCtx): T = {
-    val prevCloneFuncs = cloneFuncs
-    cloneFuncs = cloneFuncs :+ func   // Innermost is executed last
 
-    val result = blk
-    cloneFuncs = prevCloneFuncs
-
-    result
-  }
 
   /** Lanes tracking duplications in this scope */
-  var lanes: Unroller = UnitUnroller(false)
+  var lanes: Unroller = UnitUnroller("Accel", false)
   def inLanes[T](l: Unroller)(scope: => T): T = {
     val saveLanes = lanes
     lanes = l
     val result = scope
     lanes = saveLanes
-    result
-  }
-
-  override def isolateIf[A](cond: Boolean)(block: => A): A = {
-    val save = subst
-    val result = lanes.isolateIf(cond){ block }
-    if (cond) subst = save
     result
   }
 
@@ -150,7 +131,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
 
-  def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = duringClone{e =>
+  def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = duringMirror{e =>
     if (spatialConfig.noInnerLoopUnroll && !isInner) e.reduceType = None
     else e.reduceType = red
   }{ blk }
@@ -165,7 +146,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   def cloneOp[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     val (lhs2, isNew) = transferMetadataIfNew(lhs){ mirror(lhs, rhs) }
-    if (isNew) cloneFuncs.foreach{func => func(lhs2) }
+    if (isNew) mirrorFuncs.foreach{func => func(lhs2) }
 
     //logs(s"Cloning $lhs = $rhs")
     //logs(s"  Created ${stm(lhs2)}")
@@ -187,6 +168,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     */
   trait Unroller {
     type MemContext = ((Sym[_],Int), Sym[_])
+    val name: String
 
     def inds: Seq[Idx]
     def Ps: Seq[Int]
@@ -216,34 +198,42 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     def inLanes[A](lns: Seq[Int])(block: Int => A): Seq[A] = lns.map{ln => inLane(ln)(block(ln)) }
 
-    def isolateIf[A](cond: Boolean)(block: => A): A = {
-      // Save
-      val saveContexts = Array.tabulate(contexts.length){i => contexts(i) }
-      val saveMemories = __memContexts.map{arr => Array.tabulate(arr.length){i => arr(i) }}
-
-      val result = block
-
-      // Restore
-      if (cond) {
-        contexts.indices.foreach { i => contexts(i) = saveContexts(i) }
-        __memContexts = saveMemories
-      }
-      result
-    }
-
     def inLane[A](i: Int)(block: => A): A = {
-      val save = subst
-      val addr = parAddr(i)
+      val save     = subst
+      val saveMems = memories
+      val addr     = parAddr(i)
       withMemories(memContexts(i)) {
         withUnrollNums(inds.zip(addr)) {
-          isolateSubstWith(contexts(i)) {
+          dbgs(s"Entering $name lane #$i: ")
+          //memContexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
+          contexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
+          dbgs(s"---")
+          //memories.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+
+
+          val result = isolateSubstWith(contexts(i)) {
             withValids(valids(i)) {
+
+              subst.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+
               val result = block
               // Retain only the substitutions added within this scope
               contexts(i) ++= subst.filterNot(save contains _._1)
+              memContexts(i) ++= memories.filterNot(saveMems contains _._1)
+
+              dbgs(s"Exiting $name lane #$i: ")
+              //memContexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
+              contexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
+              dbgs(s"---")
+
               result
             }
           }
+
+          subst.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+          //memories.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+
+          result
         }
       }
     }
@@ -300,7 +290,11 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     def duplicateMem(mem: Sym[_])(blk: Int => Seq[(Sym[_],Int)]): Unit = foreach{p =>
       val duplicates = blk(p)
-      memContexts(p) ++= duplicates.map{case (mem2,d) => (mem,d) -> mem2 }
+      dbgs(s"  Registering duplicates for memory: $mem")
+      memContexts(p) ++= duplicates.map{case (mem2,d) =>
+        dbgs(s"  ($mem,$d) -> $mem2")
+        (mem,d) -> mem2
+      }
     }
 
     // Same symbol for all lanes
@@ -308,7 +302,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
 
-  case class PartialUnroller(cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
+  case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     // HACK: Don't unroll inner loops for CGRA generation
     val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.noInnerLoopUnroll) inds.map{_ => 1}
                        else cchain.pars.map(_.toInt)
@@ -333,7 +327,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
 
 
-  case class FullUnroller(cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
+  case class FullUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     val Ps: Seq[Int] = cchain.pars.map(_.toInt)
 
     val indices: Seq[Seq[I32]] = cchain.counters.map{ctr =>
@@ -354,7 +348,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
   }
 
-  case class UnitUnroller(isInnerLoop: Boolean) extends Unroller {
+  case class UnitUnroller(name: String, isInnerLoop: Boolean) extends Unroller {
     val Ps: Seq[Int] = Seq(1)
     val inds: Seq[I32] = Nil
     val indices: Seq[Seq[I32]] = Seq(Nil)

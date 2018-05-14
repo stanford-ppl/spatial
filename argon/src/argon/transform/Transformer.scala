@@ -9,6 +9,21 @@ import scala.collection.mutable
 abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
+  /** Metadata updating functions - used to add extra rules (primarily for metadata) after mirroring
+    * Applied directly after mirroring
+    */
+  var mirrorFuncs: List[Sym[_] => Unit] = Nil
+
+  def duringMirror[T](func: Sym[_] => Unit)(blk: => T)(implicit ctx: SrcCtx): T = {
+    val saveFuncs = mirrorFuncs
+    mirrorFuncs = mirrorFuncs :+ func   // Innermost is executed last
+
+    val result = blk
+    mirrorFuncs = saveFuncs
+
+    result
+  }
+
   object F {
     def unapply[T](x: T): Option[T] = Some(f(x))
   }

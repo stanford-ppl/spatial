@@ -55,6 +55,8 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
       //   Can occur if some higher scope pre-transformed this block
       //   Action: Mirror the existing symbol, scrub previous substitution from context
       //   to avoid having it show up in effects summaries.
+      dbgs(s"$lhs already had substitution rule ${f(lhs)}!")
+
       val lhs2: Sym[A] = f(lhs)
       val lhs3: Sym[A] = mirrorSym(lhs2)
       if (lhs3 != lhs2 && lhs != lhs2) removeSym(lhs2)

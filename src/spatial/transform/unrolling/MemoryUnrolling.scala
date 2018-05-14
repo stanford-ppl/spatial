@@ -187,7 +187,7 @@ trait MemoryUnrolling extends UnrollingBase {
 
         banked.s.foreach{s =>
           s.ports += (Seq(0) -> port)
-          cloneFuncs.foreach{func => func(s) }
+          mirrorFuncs.foreach{func => func(s) }
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
 

@@ -40,8 +40,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
-    val mapLanes = PartialUnroller(cchainMap, itersMap, isInnerLoop = false)
-    val reduceLanes = PartialUnroller(cchainRed, itersRed, true)
+    val mapLanes = PartialUnroller(s"${lhs}_map", cchainMap, itersMap, isInnerLoop = false)
+    val reduceLanes = PartialUnroller(s"${lhs}_red", cchainRed, itersRed, true)
     val isMap2   = mapLanes.indices
     val isRed2   = reduceLanes.indices
     val mvs      = mapLanes.indexValids
@@ -140,7 +140,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
           logs(s"[Accum-fold $lhs] Unrolling accumulator store")
           // Use a default substitution for the reduction result to satisfy the block scheduler
-          inReduce(redType,false){ isolateSubst{
+          inReduce(redType,false){ isolate{
             register(storeAcc.inputA -> accum)
             register(reduce.result -> results.head)
             unroll(storeAcc, reduceLanes)

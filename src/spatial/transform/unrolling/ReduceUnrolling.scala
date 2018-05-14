@@ -41,7 +41,7 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32]
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     logs(s"Fully unrolling reduce $lhs")
-    val lanes = FullUnroller(cchain, iters, lhs.isInnerControl)
+    val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val rfunc = reduce.toFunction2
 
     val pipe = stage(UnitPipe(enables ++ ens, stageLambda1(accum){
@@ -81,7 +81,7 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32]                // Bound iterators for map loop
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     logs(s"Unrolling reduce $lhs -> $accum")
-    val lanes = PartialUnroller(cchain, iters, lhs.isInnerControl)
+    val lanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val inds2 = lanes.indices
     val vs = lanes.indexValids
     val start = cchain.counters.map(_.start.asInstanceOf[I32])

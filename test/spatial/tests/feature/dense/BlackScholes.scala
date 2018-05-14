@@ -2,14 +2,12 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 @test class BlackScholes extends SpatialTest {
   override def runtimeArgs: Args = "10000"
 
   val margin = 0.5f // Validates true if within +/- margin
-  val innerPar = 16
-  val outerPar = 2
+  val innerPar = 4
+  val outerPar = 1
   val tileSize = 2000
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f

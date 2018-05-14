@@ -206,7 +206,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     case Stm(reader, d) =>
       logs(s"Retiming $reader = $d")
       val inputs = bitBasedInputs(d)
-      val reader2 = isolateSubst{
+      val reader2 = isolate {
         registerDelays(reader, inputs)
         visit(sym)
         f(reader)
@@ -223,7 +223,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     precomputeDelayLines(op)
     dbgs(s"Retiming case ${stm(cas)}")
     // Note: Don't call inBlock here - it's already being called in retimeStms
-    val caseBody2: Block[A] = isolateSubst{ stageBlock{
+    val caseBody2: Block[A] = isolate{ stageBlock{
       retimeStms(body)
       val size = delayConsumers.getOrElse(switch, Nil).find(_.input == cas).map(_.size).getOrElse(0) +
         delayConsumers.getOrElse(cas, Nil).find(_.input == body.result).map(_.size).getOrElse(0)
@@ -258,7 +258,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         }
       }, options)
     }
-    val switch2 = isolateSubst{
+    val switch2 = isolate {
       registerDelays(switch, selects)
       implicit val ctx: SrcCtx = switch.ctx
       stage(Switch(f(selects), body2))
@@ -292,7 +292,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         dbgs(s"  [$l = ${newLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
 
-    isolateSubst{ retimeStms(block) }
+    isolate{ retimeStms(block) }
   }
 
 

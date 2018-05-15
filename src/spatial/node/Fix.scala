@@ -134,6 +134,9 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(x), Const(y)) => R.from(x << y)
     case _ => super.rewrite
   }
+  @rig def lower(): Fix[S,I,F] = {
+    Shifting.expandSLA(a,b)
+  }
 }
 
 /** Fixed point arithmetic shift right */
@@ -142,6 +145,9 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(x), Const(y)) => R.from(x >> y)
     case _ => super.rewrite
   }
+  @rig def lower(): Fix[S,I,F] = {
+    Shifting.expandSRA(a,b)
+  }
 }
 
 /** Fixed point logical (unsigned) shift right */
@@ -149,6 +155,54 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >>> y)
     case _ => super.rewrite
+  }
+  @rig def lower(): Fix[S,I,F] = {
+    Shifting.expandSRU(a,b)
+  }
+}
+
+object Shifting {
+  @rig def expandSLA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F],b:Fix[S,I,_0]): Fix[S,I,F] = {
+    (a,b) match {
+      case (Const(x), Const(y)) => a << b
+      case (_, Const(y)) => a << b
+      case (Const(x), _) => 
+        val x = Reg[Fix[S,I,F]](a)
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a << 1}{case(r,_) => r << 1}
+        x.value
+      case _ => 
+        val x = Reg[Fix[S,I,F]]
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a << 1}{case(r,_) => r << 1}
+        x.value
+    }
+  }
+  @rig def expandSRA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F],b:Fix[S,I,_0]): Fix[S,I,F] = {
+    (a,b) match {
+      case (Const(x), Const(y)) => a >> b
+      case (_, Const(y)) => a >> b
+      case (Const(x), _) => 
+        val x = Reg[Fix[S,I,F]](a)
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >> 1}{case(r,_) => r >> 1}
+        x.value
+      case _ => 
+        val x = Reg[Fix[S,I,F]]
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >> 1}{case(r,_) => r >> 1}
+        x.value
+    }
+  }
+  @rig def expandSRU[S:BOOL,I:INT,F:INT](a:Fix[S,I,F],b:Fix[S,I,_0]): Fix[S,I,F] = {
+    (a,b) match {
+      case (Const(x), Const(y)) => a >>> b
+      case (_, Const(y)) => a >>> b
+      case (Const(x), _) => 
+        val x = Reg[Fix[S,I,F]](a)
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >>> 1}{case(r,_) => r >>> 1}
+        x.value
+      case _ => 
+        val x = Reg[Fix[S,I,F]]
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >>> 1}{case(r,_) => r >>> 1}
+        x.value
+    }
   }
 }
 

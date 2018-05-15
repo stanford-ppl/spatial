@@ -116,7 +116,11 @@ trait CppGenArray extends CppGenCommon {
               st.foreach{f => emit(src"set${f._1}(*${f._1}_in);")}
             close("}")
             emit(src"${struct}(){} /* For creating empty array */")
-            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ ${f._1} = &x; }")}
+            open(src"std::string toString(){")
+              val all = st.map{f => src""" "${f._1}: " + std::to_string(*${f._1}) """}.mkString("+ \", \" + ")
+              emit(src"return $all;")
+            close("}")
+            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = &x; }")}
 
           try {
             val rawtp = asIntType(lhs.tp)

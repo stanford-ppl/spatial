@@ -207,7 +207,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
       mem._1.io.w.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs
       mem._1.io.w.data := chisel3.util.PriorityMux(xBarSelect, io.xBarW).data
       mem._1.io.w.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarW).en 
-    } else {                                            // Has direct only
+    } else if (directSelect.length > 0) {               // Has direct only
       mem._1.io.w.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.w.data := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data
       mem._1.io.w.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
@@ -232,7 +232,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     } else if (hasXBarR && directSelect.length == 0) { // Has x only
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarR).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarR).en 
-    } else {                                           // Has direct only
+    } else if (directSelect.length > 0) {                                           // Has direct only
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
     }
@@ -340,7 +340,10 @@ class FF(val bitWidth: Int,
   ff := Mux(anyReset, io.input(0).init, Mux(anyEnable, wr_data, ff))
   io.output.data := Mux(anyReset, io.input(0).init, ff)
 
+  var usedMuxPorts = List[(String,(Int,Int))]()
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+    assert(!usedMuxPorts.contains(("XBarW", (muxPort,vecId))), s"Attempted to connect to XBarW port ($muxPort,$vecId) twice!")
+    usedMuxPorts ::= ("XBarW", (muxPort, vecId))
     val base = xBarWMux.accessParsBelowMuxPort(muxPort).sum + vecId
     io.input(base) := wBundle
   }

@@ -28,12 +28,10 @@ trait ChiselGenController extends ChiselGenCommon {
      get to the very top
   */
 
-  /* List of break or exit nodes */
-  var earlyExits: List[Sym[_]] = List()
 
   def createBreakpoint(lhs: Sym[_], id: Int): Unit = {
-    // emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).bits := 1.U")
-    // emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).valid := breakpoints($id)")
+    emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).bits := 1.U")
+    emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).valid := breakpoints($id)")
   }
 
   def createInstrumentation(lhs: Sym[_]): Unit = {
@@ -272,10 +270,8 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")
         case _ => 
       }
-      if (!isInner) {
-        emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
-        emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
-      }
+      if (!isInner) emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
+      emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
     }
 
     /* Control Signals to Children Controllers */
@@ -352,7 +348,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
 
     // Capture datapath_en
-    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
+    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} & ${swap(sym, IIDone)} // Used to have many variations""")
 
     // Update bound sym watchlists
     (ctrlIters(sym.toCtrl) ++ ctrlValids(sym.toCtrl)).foreach{ item => 
@@ -632,8 +628,6 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(s"// Controller Stack: ${controllerStack.tail}")
         if (op.R.isBits) {
           emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
-          println(src"quote ${selects(0)}")
-          println(s"quote ${cases(0)}")
           selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
           emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emit(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
         }

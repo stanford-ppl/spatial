@@ -36,8 +36,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     val make: String,
     val run:  String
   ){ backend =>
-    val makeTimeout: Long = 2000 // Timeout for compiling, in seconds
-    val runTimeout: Long  = 2000 // Timeout for running, in seconds
+    val makeTimeout: Long = 3000 // Timeout for compiling, in seconds
+    val runTimeout: Long  = 3000 // Timeout for running, in seconds
     var prev: String = ""
 
     def shouldRun: Boolean

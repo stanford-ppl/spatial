@@ -14,8 +14,8 @@ import spatial.dsl._
     // Declare SW-HW interface vals
     val colpar = 8
     val rowpar = 3
-    val M = 64
-    val N = 32
+    val M = 8//64
+    val N = 3//32
     val x_data = (0::M, 0::N){(i,j) => (i*N + j).to[T]}
     val x = DRAM[T](M,N)
     val s = ArgOut[T]
@@ -29,7 +29,6 @@ import spatial.dsl._
         xx(i,j)
       }{_+_}
     }
-
 
     // Extract results from accelerator
     val result = getArg(s)

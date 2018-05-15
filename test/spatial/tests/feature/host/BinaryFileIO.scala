@@ -37,19 +37,33 @@ import spatial.dsl._
     val intsIn = loadBinary[Int]("ints.dat")
     val uintsIn = loadBinary[UInt32]("uints.dat")
 
+    printArray(nibbles, "nibbles gold")
+    printArray(nibblesIn, "nibbles from file")
     val nibblesMatch = compare(nibbles, nibblesIn, "Nibbles")
+    printArray(bytes, "bytes gold")
+    printArray(bytesIn, "bytes from file")
     val bytesMatch = compare(bytes, bytesIn, "Bytes")
+    printArray(ubytes, "ubytes gold")
+    printArray(ubytesIn, "ubytes from file")
     val ubytesMatch = compare(ubytes, ubytesIn, "UBytes")
+    printArray(shorts, "shorts gold")
+    printArray(shortsIn, "shorts from file")
     val shortsMatch = compare(shorts, shortsIn, "Shorts")
+    printArray(ushorts, "ushorts gold")
+    printArray(ushortsIn, "ushorts from file")
     val ushortsMatch = compare(ushorts, ushortsIn, "UShorts")
+    printArray(ints, "ints gold")
+    printArray(intsIn, "ints from file")
     val intsMatch = compare(ints, intsIn, "Ints")
+    printArray(uints, "uints gold")
+    printArray(uintsIn, "uints from file")
     val uintsMatch = compare(uints, uintsIn, "UInts")
 
     assert(nibblesMatch && bytesMatch && ubytesMatch && shortsMatch && ushortsMatch && intsMatch && uintsMatch, "One or more tests failed")
   }
 
   def compare[T:Num](a: Array[T], b: Array[T], name: gen.String): Boolean = {
-    val matches = a == b
+    val matches = a === b
     if (!matches) {
       println(s"$name: FAIL")
       a.zip(b){(x,y) => pack(x,y) }.foreach{x => if (x._1 != x._2) println("expected: " + x._1 + ", result: " + x._2) else () }

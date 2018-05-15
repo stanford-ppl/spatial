@@ -72,7 +72,7 @@ trait Spatial extends Compiler {
     lazy val friendlyTransformer = FriendlyTransformer(state)
     lazy val switchTransformer = SwitchTransformer(state)
     lazy val switchOptimizer   = SwitchOptimizer(state)
-    lazy val transferLowering  = TransferLowering(state)
+    lazy val blackboxLowering  = BlackboxLowering(state)
     lazy val memoryDealiasing  = MemoryDealiasing(state)
     lazy val pipeInserter      = PipeInserter(state)
     lazy val registerCleanup   = RegisterCleanup(state)
@@ -96,7 +96,7 @@ trait Spatial extends Compiler {
         sanityChecks ==>
         switchTransformer ==>
         switchOptimizer ==> printer ==>
-        transferLowering ==> printer ==>
+        blackboxLowering ==> printer ==>
         memoryDealiasing ==> printer ==>
         pipeInserter ==> printer ==>
         useAnalyzer ==> printer ==>

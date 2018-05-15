@@ -17,6 +17,7 @@ trait ChiselGenDebug extends ChiselGenCommon {
     case TextConcat(_) => 
     case PrintIf(_,_) => 
     case BitToText(_) => 
+    case GenericToText(_) =>
 
     case ExitIf(en) => 
     	val ens = if (en.isEmpty) "true.B" else en.mkString("&")
@@ -26,7 +27,7 @@ trait ChiselGenDebug extends ChiselGenCommon {
     case AssertIf(en,cond,_) => 
     	if (scope == "accel") {
 	    	val ens = if (en.isEmpty) "true.B" else en.mkString("&")
-	        emitt(s"breakpoints(${earlyExits.length}) := ${ens} & ${swap(quote(lhs.parent.s.get), DatapathEn)} & ${quote(cond)}")
+	        emitt(s"breakpoints(${earlyExits.length}) := ${ens} & ${swap(quote(lhs.parent.s.get), DatapathEn)} & ~${quote(cond)}")
 	        earlyExits = earlyExits :+ lhs
 	    }
 

@@ -365,7 +365,7 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
   val N = logicalDims.length // Number of dimensions
   val ofsWidth = Utils.log2Up(depth/banks.product) + 2
   val elsWidth = Utils.log2Up(depth) + 2
-  val banksWidths = banks.map(Utils.log2Up(_))
+  val banksWidths = banks.map(Utils.log2Up(_) + 2)
 
   // Compute info required to set up IO interface
   val numXBarW = xBarWMux.accessPars.sum 
@@ -407,7 +407,8 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
   val m = (0 until numBanks).map{ i => Module(new Mem1D(depth/numBanks, bitWidth))}
 
   // Create compacting network
-  val enqCompactor = Module(new CompactingEnqNetwork(xBarWMux.sortByMuxPort.values.map(_._1).toList, numBanks, ofsWidth, bitWidth))
+
+  val enqCompactor = Module(new CompactingEnqNetwork(xBarWMux.sortByMuxPort.values.map(_._1).toList, numBanks, banksWidths.head, bitWidth))
   enqCompactor.io.headCnt := headCtr.io.output.count
   (0 until numXBarW).foreach{i => enqCompactor.io.in(i).data := io.xBarW(i).data; enqCompactor.io.in(i).en := io.xBarW(i).en}
 
@@ -463,6 +464,146 @@ class FIFO(val logicalDims: List[Int], val bitWidth: Int,
 }
 
 
+class LIFO(val logicalDims: List[Int], val bitWidth: Int, 
+           val banks: List[Int], 
+           val xBarWMux: XMap, val xBarRMux: XMap,
+           val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module {
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, banks, xBarWMux, xBarRMux, init, syncMem, fracBits)
+
+  val depth = logicalDims.product // Size of memory
+  val N = logicalDims.length // Number of dimensions
+  val ofsWidth = Utils.log2Up(depth/banks.product) + 2
+  val elsWidth = Utils.log2Up(depth) + 2
+  val banksWidths = banks.map(Utils.log2Up(_) + 2)
+
+  // Compute info required to set up IO interface
+  val numXBarW = xBarWMux.accessPars.sum 
+  val numXBarR = xBarRMux.accessPars.sum
+  val pW = xBarWMux.accessPars.max
+  val pR = xBarRMux.accessPars.max
+  val p = scala.math.max(pW, pR) // TODO: Update this template because this was from old style
+  val totalOutputs = numXBarR
+  val defaultDirect = List.fill(banks.length)(99)
+
+  val io = IO( new Bundle {
+    val xBarW = Vec(1 max numXBarW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
+    val xBarR = Vec(1 max numXBarR, Input(new R_XBar(ofsWidth, banksWidths))) 
+    val flow = Vec(xBarRMux.accessPars.sum, Input(Bool()))
+    val output = new Bundle {
+      val data  = Vec(totalOutputs, Output(UInt(bitWidth.W)))
+    }
+    val full = Output(Bool())
+    val almostFull = Output(Bool())
+    val empty = Output(Bool())
+    val almostEmpty = Output(Bool())
+    val numel = Output(UInt(32.W))
+  })
+
+  // Register for tracking number of elements in FILO
+  val elements = Module(new IncDincCtr(pW,pR, depth))
+  elements.io.input.inc_en := io.xBarW.map(_.en).reduce{_|_}
+  elements.io.input.dinc_en := io.xBarR.map(_.en).reduce{_|_}
+
+  // Create physical mems
+  val m = (0 until p).map{ i => Module(new Mem1D(depth/p, bitWidth))}
+
+  // Create head and reader sub counters
+  val sa_width = 2 + Utils.log2Up(p)
+  val subAccessor = Module(new SingleSCounterCheap(1,0,p,pW,-pR,0,sa_width))
+  subAccessor.io.input.enable := io.xBarW.map(_.en).reduce{_|_} | io.xBarR.map(_.en).reduce{_|_}
+  subAccessor.io.input.dir := io.xBarW.map(_.en).reduce{_|_}
+  subAccessor.io.input.reset := reset
+  subAccessor.io.input.saturate := false.B
+  val subAccessor_prev = Mux(subAccessor.io.output.count(0) - pR.S(sa_width.W) < 0.S(sa_width.W), (p-pR).S(sa_width.W), subAccessor.io.output.count(0) - pR.S(sa_width.W))
+
+  // Create head and reader counters
+  val a_width = 2 + Utils.log2Up(depth/p)
+  val accessor = Module(new SingleSCounterCheap(1, 0, (depth/p), 1, -1, 0, a_width))
+  accessor.io.input.enable := (io.xBarW.map(_.en).reduce{_|_} & subAccessor.io.output.done) | (io.xBarR.map(_.en).reduce{_|_} & subAccessor_prev === 0.S(sa_width.W))
+  accessor.io.input.dir := io.xBarW.map(_.en).reduce{_|_}
+  accessor.io.input.reset := reset
+  accessor.io.input.saturate := false.B
+
+
+  // Connect pusher
+  if (pW == pR) {
+    m.zipWithIndex.foreach { case (mem, i) => 
+      // Figure out which write port was active in xBar
+      val xBarIds = xBarWMux.accessPars.zipWithIndex.collect{case(x,ii) if (i < x) => xBarRMux.accessParsBelowMuxPort(ii).sum + i }
+      val xBarCandidates = xBarIds.map{case n => io.xBarW(n+i)}
+      // Make connections to memory
+      mem.io.w.ofs := accessor.io.output.count(0).asUInt
+      mem.io.w.data := Mux1H(xBarCandidates.map(_.en), xBarCandidates.map(_.data))
+      mem.io.w.en := xBarCandidates.map(_.en).reduce{_|_}
+      mem.io.wMask := xBarCandidates.map(_.en).reduce{_|_}
+    }
+  } else {
+    (0 until pW).foreach { w_i => 
+      (0 until (p /-/ pW)).foreach { i => 
+        // Figure out which write port was active in xBar
+        val xBarIds = xBarWMux.accessPars.zipWithIndex.collect{case(x,ii) if (i < x) => xBarRMux.accessParsBelowMuxPort(ii).sum + i }
+        val xBarCandidates = xBarIds.map{case n => io.xBarW(n+(i*pW+w_i))}
+        // Make connections to memory
+        m(w_i + i*-*pW).io.w.ofs := accessor.io.output.count(0).asUInt
+        m(w_i + i*-*pW).io.w.data := Mux1H(xBarCandidates.map(_.en), xBarCandidates.map(_.data))
+        m(w_i + i*-*pW).io.w.en := xBarCandidates.map(_.en).reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
+        m(w_i + i*-*pW).io.wMask := xBarCandidates.map(_.en).reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
+      }
+    }
+  }
+
+  // Connect popper
+  if (pW == pR) {
+    m.zipWithIndex.foreach { case (mem, i) => 
+      mem.io.r.ofs := (accessor.io.output.count(0) - 1.S(a_width.W)).asUInt
+      mem.io.r.en := io.xBarR.map(_.en).reduce{_|_}
+      mem.io.rMask := io.xBarR.map(_.en).reduce{_|_}
+      io.output.data(i) := mem.io.output.data
+    }
+  } else {
+    (0 until pR).foreach { r_i => 
+      val rSel = Wire(Vec( (p/pR), Bool()))
+      val rData = Wire(Vec( (p/pR), UInt(bitWidth.W)))
+      (0 until (p /-/ pR)).foreach { i => 
+        m(r_i + i*-*pR).io.r.ofs := (accessor.io.output.count(0) - 1.S(sa_width.W)).asUInt
+        m(r_i + i*-*pR).io.r.en := io.xBarR.map(_.en).reduce{_|_} & (subAccessor_prev === (i*-*pR).S(sa_width.W))
+        m(r_i + i*-*pR).io.rMask := io.xBarR.map(_.en).reduce{_|_} & (subAccessor_prev === (i*-*pR).S(sa_width.W))
+        rSel(i) := subAccessor_prev === i.S
+        rData(i) := m(r_i + i*pR).io.output.data
+      }
+      io.output.data(pR - 1 - r_i) := chisel3.util.PriorityMux(rSel, rData)
+    }
+  }
+
+  // Check if there is data
+  io.empty := elements.io.output.empty
+  io.full := elements.io.output.full
+  io.almostEmpty := elements.io.output.almostEmpty
+  io.almostFull := elements.io.output.almostFull
+  io.numel := elements.io.output.numel.asUInt
+
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+    val base = xBarWMux.accessParsBelowMuxPort(muxPort).sum + vecId
+    io.xBarW(base) := wBundle
+  }
+
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
+
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+    val base = xBarRMux.accessParsBelowMuxPort(muxPort).sum + vecId
+    io.xBarR(base) := rBundle    
+    io.flow(base) := flow
+    io.output.data(vecId)
+  }
+
+
+
+}
 
 
 class ShiftRegFile (val logicalDims: List[Int], val bitWidth: Int, 
@@ -1051,4 +1192,124 @@ class multidimR(val N: Int, val dims: List[Int], val w: Int) extends Bundle {
   val en = Bool()
   
   override def cloneType = (new multidimR(N, dims, w)).asInstanceOf[this.type] // See chisel3 bug 358
+}
+
+
+class enqPort(val w: Int) extends Bundle {
+  val data = UInt(w.W)
+  val en = Bool()
+
+  override def cloneType = (new enqPort(w)).asInstanceOf[this.type] // See chisel3 bug 358
+}
+
+class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
+  val num_compactors = ports.max
+  val io = IO( new Bundle {
+      val numEnabled =Input(UInt(width.W))
+      val in = Vec(ports.reduce{_+_}, Input(new enqPort(bitWidth)))
+      val out = Vec(num_compactors, Output(new enqPort(bitWidth)))
+    })
+
+    val compacted = (0 until num_compactors).map{i => 
+      val num_inputs_per_bundle = ports.map{p => if (i < p) p-i else 0}
+      val mux_selects = num_inputs_per_bundle.zipWithIndex.map{case(j, id) => 
+        val in_start_id = ports.take(id).sum
+        val connect_start_id = num_inputs_per_bundle.take(id).sum
+        val num_holes = if ((ports(id)-j) > 0) {
+          (0 until (ports(id)-j)).map{ k => Mux(!io.in(in_start_id + k).en, 1.U(width.W), 0.U(width.W)) }.reduce{_+_} // number of 0's in this bundle that precede current
+        } else {
+          0.U(width.W)          
+        }
+        (0 until j).map{k => 
+          val ens_below = if (k > 0) {(0 until k).map{l => Mux(io.in(in_start_id + (ports(id) - j + l)).en, 1.U(width.W), 0.U(width.W)) }.reduce{_+_}} else {0.U(width.W)}
+          io.in(in_start_id + (ports(id) - j + k)).en & ens_below >= num_holes
+        }
+      }.flatten
+      val mux_datas = num_inputs_per_bundle.zipWithIndex.map{case(j, id) => 
+        val in_start_id = ports.take(id).sum
+        val connect_start_id = num_inputs_per_bundle.take(id).sum
+        (0 until j).map{k => io.in(in_start_id + (ports(id) - j + k)).data}
+      }.flatten
+      io.out(i).data := chisel3.util.PriorityMux(mux_selects, mux_datas)
+      io.out(i).en := i.U(width.W) < io.numEnabled
+    }
+}
+
+/* This consists of an innermost compactor, surrounded by a router.  The compactor
+   takes all of the enq ports in, has as many priority muxes as required for the largest
+   enq port bundle, and outputs the compacted enq port bundle.  The shifter takes this 
+   compacted bundle and shifts it so that they get connected to the correct fifo banks
+   outside of the module
+*/
+class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
+  val io = IO( new Bundle {
+      val headCnt = Input(SInt(width.W))
+      val in = Vec(ports.reduce{_+_}, Input(new enqPort(bitWidth)))
+      val out = Vec(banks, Output(new enqPort(bitWidth)))
+      val debug1 = Output(Bool())
+      val debug2 = Output(Bool())
+    })
+
+  val numEnabled = io.in.map{i => Mux(i.en, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
+  val num_compactors = ports.max
+
+  // Compactor
+  val compactor = Module(new Compactor(ports, banks, width, bitWidth))
+  compactor.io.in := io.in
+  compactor.io.numEnabled := numEnabled
+
+  // Router
+  val current_base_bank = Utils.singleCycleModulo(io.headCnt, banks.S(width.W))
+  val upper = current_base_bank + numEnabled.asSInt - banks.S(width.W)
+  val num_straddling = Mux(upper < 0.S(width.W), 0.S(width.W), upper)
+  val num_straight = (numEnabled.asSInt) - num_straddling
+  val outs = (0 until banks).map{ i =>
+    val lane_enable = Mux(i.S(width.W) < num_straddling | (i.S(width.W) >= current_base_bank & i.S(width.W) < current_base_bank + numEnabled.asSInt), true.B, false.B)
+    val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, i.S(width.W) - current_base_bank)
+    val port_vals = (0 until num_compactors).map{ i => 
+      (i.U(width.W) -> compactor.io.out(i).data)
+    }
+    val lane_data = chisel3.util.MuxLookup(id_from_base.asUInt, 0.U(bitWidth.W), port_vals)
+    (lane_data,lane_enable)
+  }
+
+  (0 until banks).foreach{i => 
+    io.out(i).data := outs(i)._1
+    io.out(i).en := outs(i)._2
+  }
+}
+
+class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
+  val io = IO( new Bundle {
+      val tailCnt = Input(SInt(width.W))
+      val input = new Bundle{
+        val data = Vec(banks, Input(UInt(bitWidth.W)))
+        val deq = Vec(ports.reduce{_+_}, Input(Bool()))
+      }
+      val output = new Bundle{
+        val data = Vec(ports.max, Output(UInt(bitWidth.W)))
+      }
+    })
+
+  // Compactor
+  val num_compactors = ports.max
+  // val numPort_width = 1 + Utils.log2Up(ports.max)
+  val numEnabled = io.input.deq.map{i => Mux(i, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
+
+  // Router
+  val current_base_bank = Utils.singleCycleModulo(io.tailCnt, banks.S(width.W))
+  val upper = current_base_bank + numEnabled.asSInt - banks.S(width.W)
+  val num_straddling = Mux(upper < 0.S(width.W), 0.S(width.W), upper)
+  val num_straight = (numEnabled.asSInt) - num_straddling
+  // TODO: Probably has a bug if you have more than one dequeuer
+  (0 until ports.max).foreach{ i =>
+    val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, Utils.singleCycleModulo((i.S(width.W) + current_base_bank), banks.S(width.W)))
+    val ens_below = if (i>0) (0 until i).map{j => Mux(io.input.deq(j), 1.U(width.W), 0.U(width.W)) }.reduce{_+_} else 0.U(width.W)
+    val proper_bank = Utils.singleCycleModulo((current_base_bank.asUInt + ens_below), banks.U(width.W))
+    val port_vals = (0 until banks).map{ j => 
+      (j.U(width.W) -> io.input.data(j)) 
+    }
+    io.output.data(i) := chisel3.util.MuxLookup(proper_bank.asUInt, 0.U(bitWidth.W), port_vals)
+  }
+
 }

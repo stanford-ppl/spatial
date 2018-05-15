@@ -166,6 +166,17 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
+
+    // LIFOs
+    case LIFONew(depths) => emitMem(lhs, "LIFO", None)
+    case LIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.empty")
+    case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.almostFull")
+    case op@LIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
+    case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.numel")
+    case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
+    case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     
     // LUTs
     case op@LUTNew(dims, init) => emitMem(lhs, "LUT", Some(init))

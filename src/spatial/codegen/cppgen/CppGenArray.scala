@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.data._
 import spatial.util._
+import host._
 
 
 trait CppGenArray extends CppGenCommon {
@@ -85,7 +86,9 @@ trait CppGenArray extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
-    case ArrayApply(array, i)   => emit(src"${lhs.tp} $lhs = (*${array})[$i];")  
+    case ArrayApply(array, i)   => 
+      val (ast,amp) = if (lhs.tp match {case _:Vec[_] => true; case _:host.Array[_] => true; case _ => false}) ("*","&") else ("","")
+      emit(src"${lhs.tp}${ast} $lhs = ${amp}(*${array})[$i];")  
     case op@ArrayNew(size)      => emitNewArray(lhs, lhs.tp, src"$size")
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case DataAsBits(bits)       => 
@@ -175,6 +178,7 @@ trait CppGenArray extends CppGenCommon {
         emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
       }
 
+    case VecAlloc(elems)     => emit(src"${lhs.tp} $lhs = ${lhs.tp}($elems)")
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
     case VecSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")
                 open(src"""for (int ${lhs}_i = 0; ${lhs}_i < ${start} - ${end} + 1; ${lhs}_i++){""") 
@@ -219,13 +223,9 @@ trait CppGenArray extends CppGenCommon {
     case ArrayFlatMap(array, apply, func) =>
       emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
       open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
-      visitBlock(apply)
-      visitBlock(func)
-      emit(src"(*${lhs}).push_back(${func.result});")
-      close("}")
-
-      open(src"val $lhs = $array.flatMap{${func.input} => ")
-        ret(func)
+        visitBlock(apply)
+        visitBlock(func)
+        emit(src"for (int ${func.result}_idx = 0; ${func.result}_idx < (*${func.result}).size(); ${func.result}_idx++) {(*${lhs}).push_back((*${func.result})[${func.result}_idx]);}")
       close("}")
 
     case op@ArrayFromSeq(seq)   => 

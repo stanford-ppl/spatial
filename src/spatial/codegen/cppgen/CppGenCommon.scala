@@ -9,6 +9,7 @@ import emul.FixedPoint
 import utils.escapeString
 import spatial.util._
 import emul.Bool
+import host._
 
 
 
@@ -78,11 +79,8 @@ trait CppGenCommon extends CppCodegen {
     case ai: Reg[_] => remap(ai.typeArgs.head)
     case _: Vec[_] => "vector<" + remap(tp.typeArgs.head) + ">"
     case t: Tup2[_,_] => s"${super.remap(tp)}".replaceAll("\\[","").replaceAll("\\]","").replaceAll(",","")
-    case _ => 
-      tp.typePrefix match {
-        case "Array" => "vector<" + remap(tp.typeArgs.head) + ">"
-        case _ => super.remap(tp)
-      }
+    case _: host.Array[_] => "vector<" + remap(tp.typeArgs.head) + ">"
+    case _ => super.remap(tp)
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {

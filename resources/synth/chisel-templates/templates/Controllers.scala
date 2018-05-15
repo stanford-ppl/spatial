@@ -149,6 +149,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
         iterDone(i).io.input.reset := io.doneIn(i).D(1) // Override iterDone reset
         done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i) & io.enable)
+        done(i).io.input.reset := synchronize.D(1) // Override done reset
       }
 
     case Fork => 
@@ -248,8 +249,8 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
-    io.datapathEn := active.io.output.data & ~io.ctrDone
-    io.ctrInc := active.io.output.data
+    io.datapathEn := active.io.output.data & ~io.ctrDone & io.enable
+    io.ctrInc := active.io.output.data & io.enable
     io.done := Utils.risingEdge(done.io.output.data)
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1)}
 

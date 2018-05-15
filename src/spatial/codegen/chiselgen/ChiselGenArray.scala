@@ -12,6 +12,7 @@ trait ChiselGenArray extends ChiselGenCommon {
 
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case VecAlloc(elems)     => emitGlobalWire(src"val $lhs = Vec(${elems})")
     case VecSlice(vec, start, stop) => 
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.zipWithIndex.foreach{case(w, i) => w := ${vec}(i+$stop)}")

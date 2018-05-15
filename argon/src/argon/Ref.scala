@@ -74,13 +74,13 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     case Some((v,exact)) =>
       if (!exact && errorOnLoss) {
         error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
-        error(s"(Closest representable value: ${escapeConst(v)}).")
+        error(s"(Closest representable value: ${escapeConst(evRef(v).c.get)}).")
         error(s"""Use .to[${this.tp}] to downgrade to a warning, or .toUnchecked to ignore.""")
         error(ctx)
       }
       else if (!exact && warnOnLoss) {
         warn(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
-        warn(s"(Closest representable value: ${escapeConst(v)})")
+        warn(s"(Closest representable value: ${escapeConst(evRef(v).c.get)})")
         warn(s"""Use .toUnchecked to ignore this warning.""")
         warn(ctx)
       }

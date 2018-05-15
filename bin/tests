@@ -6,7 +6,9 @@
 type=$1
 file_or_tests=$2
 
-if [ -f $file_or_tests ]; then
+if [[ $file_or_tests == "" ]]; then
+   tests="spatial.tests.*" 
+elif [ -f $file_or_tests ]; then
    tests=""
    while read LINE 
    do  
@@ -18,14 +20,10 @@ if [ -f $file_or_tests ]; then
         echo "spatial.tests.$LINE"
       fi
    done <  $file_or_tests
-else
-   if [[ $file_or_tests == "" ]]; then
-      tests="spatial.tests.*" 
-   elif [[ $file_or_tests == spatial.tests.* ]]; then
-      tests="$file_or_tests"
-   else 
-      tests="spatial.tests.$file_or_tests"
-   fi
+elif [[ $file_or_tests == spatial.tests.* ]]; then
+   tests="$file_or_tests"
+else 
+   tests="spatial.tests.$file_or_tests"
 fi
 
 fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"

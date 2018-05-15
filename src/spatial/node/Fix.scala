@@ -101,9 +101,10 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
       warn(ctx, s"Constant division by 0")
       warn(ctx)
       null
+    case (Const(q), Const(r)) => R.from(q/r)
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
-    case (Literal(1), _) => stage(FixInv(b))
+    case (Literal(1), _) => stage(FixRecip(b))
     case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[S,I,_0]].from(Number.log2(r))
     case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[S,I,_0]].from(Number.log2(-r))
     case _ => super.rewrite
@@ -120,7 +121,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Literal(0), _) => a
     case (_, Const(r)) if r.isPow2 && r > 0 =>
       val i = INT[F].v + Number.log2(r).toInt - 1
-      if (i <= 0) a.from(0)
+      if (i < 0) a.from(0)
       else a.bits(i::0).asUnchecked[Fix[S,I,F]]
 
     case _ => super.rewrite

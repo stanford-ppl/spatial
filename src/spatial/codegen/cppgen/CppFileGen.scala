@@ -45,6 +45,10 @@ trait CppFileGen extends CppCodegen {
       emit("using std::vector;")
       emit("#ifndef STRUCTS_HPP")
       emit("#define STRUCTS_HPP")
+      emit("#ifndef ZYNQ")
+      emit("typedef __int128 int128_t;")
+      emit("#endif")
+
     }
 
     inGen(out, "ArgAPI.hpp") {

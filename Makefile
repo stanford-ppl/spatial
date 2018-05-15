@@ -15,7 +15,8 @@ resources:
 	bash bin/update_resources.sh
 
 clear: 
-	rm *.sim
+	rm -f *.log	
+	rm -f *.sim
 	rm -rf logs
 	rm -rf gen
 	rm -rf reports
@@ -27,3 +28,5 @@ clean:
 	sbt "; forge/clean; argon/clean; nova/clean"
 	sbt clean
 
+tests:
+	sbt test:compile

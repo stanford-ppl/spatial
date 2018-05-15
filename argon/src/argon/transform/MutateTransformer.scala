@@ -5,6 +5,15 @@ import utils.tags.instrument
 
 abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
+  protected var shouldCopy: Boolean = false
+
+  protected def inCopyMode[A](copy: Boolean)(block: => A): A = {
+    val saveCopy = shouldCopy
+    shouldCopy = copy
+    val result = block
+    shouldCopy = saveCopy
+    result
+  }
 
   /*
    * Options when transforming a statement:
@@ -13,22 +22,29 @@ abstract class MutateTransformer extends ForwardTransformer {
    *   2. Subst. it: s -> Some(s'). Substitution s' will appear instead.
    */
 
-  /**
-    * Determine a transformation rule for the given symbol.
+  /** Determine a transformation rule for the given symbol.
     * By default, the rule is to update the symbol's node in place.
     * @return the symbol which should replace lhs
     */
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
-    update(lhs,rhs)
+    if (shouldCopy) super.transform(lhs,rhs)
+    else update(lhs,rhs)
   }
 
-  /**
-    * Update the metadata on sym using current substitution rules
-    * NOTE: We don't erase invalid metadata here to avoid issues with Effects, etc.
-    */
+  /** Update the metadata on sym using current substitution rules. */
   def updateMetadata(sym: Sym[_]): Unit = {
-    val data = metadata.all(sym).flatMap{case (k,m) => mirror(m) : Option[Data[_]] }
-    metadata.addAll(sym, data)
+    metadata.all(sym).toList.foreach{case (k,m) => mirror(m) match {
+      case Some(m2) => if (!m.ignoreOnTransform) metadata.add(sym, k, merge(m, m2))
+      case None     => metadata.remove(sym, k)
+    }}
+  }
+
+
+
+  final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
+    () => isolateIf(copy){
+      inCopyMode(copy){ inlineBlock(b).unbox }
+    }
   }
 
   /** Mutate this symbol's node with the current substitution rules. */

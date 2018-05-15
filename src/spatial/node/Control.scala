@@ -3,6 +3,7 @@ package spatial.node
 import forge.tags._
 import argon._
 import spatial.lang._
+import spatial.util._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
   val A: Num[A] = Num[A]
@@ -93,7 +94,7 @@ import spatial.lang._
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
     itersMap -> Seq(map),
-    (itersMap ++ itersRed) -> Seq(loadRes,reduce),
+    (itersMap ++ itersRed) -> Seq(loadRes, reduce),
     itersRed -> Seq(loadAcc, storeAcc)
   )
   override def mayBeOuterBlock(i: Int): Boolean = i == 0

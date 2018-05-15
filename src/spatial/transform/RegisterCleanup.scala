@@ -27,14 +27,17 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
 
   def requiresDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
     case _:RegRead[_] => true
-    case _ => false
+    case _ =>
+      // Duplicate stateless nodes when they have users across control or
+      val blocks = lhs.users.map(_.blk)
+      blocks.size > 1 || blocks.exists(_ != blk)
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case node: Primitive[_] if inHw && node.isEphemeral && requiresDuplication(lhs, rhs) =>
       dbgs("")
       dbgs(s"$lhs = $rhs")
-      dbgs(s"users: ${lhs.users} [stateless]")
+      dbgs(s" - users: ${lhs.users} [stateless]")
 
       // For all uses within a single control node, create a single copy of this node
       // Then associate all uses within that control with that copy
@@ -43,11 +46,11 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
       users.foreach{case (block, uses) =>
         val read = delayedMirror(lhs, rhs, block)
 
-        dbgs(s"ctrl: $block")
+        dbgs(s" - ctrl: $block")
 
         uses.foreach{ case User(use,_) =>
           val subs = (lhs -> read) +: statelessSubstRules.getOrElse((use,block), Nil)
-          dbgs(s"  ($use, $block): $lhs -> $read")
+          dbgs(s"    - ($use, $block): $lhs -> $read")
           statelessSubstRules += (use,block) -> subs
         }
       }
@@ -58,7 +61,8 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     case node: Primitive[_] if inHw && node.isEphemeral =>
       dbgs("")
       dbgs(s"$lhs = $rhs [stateless]")
-      dbgs(s"users: ${lhs.users}")
+      dbgs(s" - users: ${lhs.users}")
+      dbgs(s" - ctrl:  $blk")
       if (lhs.users.isEmpty) {
         dbgs(s"REMOVING stateless $lhs")
         Invalid
@@ -67,6 +71,9 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         mirrorWithDuplication(lhs, rhs)
       }
 
+    // Remove unused counters and counterchains
+    case _:CounterNew[_] if lhs.getOwner.isEmpty   => Invalid
+    case _:CounterChainNew if lhs.getOwner.isEmpty => Invalid
 
     case RegWrite(reg,value,en) =>
       dbgs("")

@@ -9,6 +9,21 @@ import scala.collection.mutable
 abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
+  /** Metadata updating functions - used to add extra rules (primarily for metadata) after mirroring
+    * Applied directly after mirroring
+    */
+  var mirrorFuncs: List[Sym[_] => Unit] = Nil
+
+  def duringMirror[T](func: Sym[_] => Unit)(blk: => T)(implicit ctx: SrcCtx): T = {
+    val saveFuncs = mirrorFuncs
+    mirrorFuncs = mirrorFuncs :+ func   // Innermost is executed last
+
+    val result = blk
+    mirrorFuncs = saveFuncs
+
+    result
+  }
+
   object F {
     def unapply[T](x: T): Option[T] = Some(f(x))
   }
@@ -43,7 +58,7 @@ abstract class Transformer extends Pass {
         x
     }).asInstanceOf[T]
 
-    if (y.isInstanceOf[Invalid]) throw new Exception(s"Used removed symbol in mirroring of $x")
+    if (y.isInstanceOf[Invalid]) throw new Exception(s"Used removed symbol: $x")
     y
   }
 
@@ -72,9 +87,13 @@ abstract class Transformer extends Pass {
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
     dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
-    val data = metadata.all(src).filterNot{case (_,m) => m.skipOnTransform }
-                                .flatMap{case (_,m) => mirror(m) : Option[Data[_]] }
-    metadata.addAll(dest, data)
+
+    metadata.all(src).toList.foreach{case (k,m) =>
+      mirror(m) match {
+        case Some(m2) => if (!m.ignoreOnTransform) metadata.add(dest, k, merge(m, m2))
+        case None     => metadata.remove(dest, k)
+      }
+    }
   }
 
   final protected def transferMetadataIfNew[A](lhs: Sym[A])(tx: => Sym[A]): (Sym[A], Boolean) = {
@@ -90,13 +109,18 @@ abstract class Transformer extends Pass {
     else (lhs2, false)
   }
 
-  final def mirror(m: Data[_]): Option[Data[_]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[_]])
+  final def merge[M1,M2](old: Data[M1], neww: Data[M2]): Data[_] = {
+    if (neww.key != old.key) throw new Exception(s"Cannot merge ${neww.key} and ${old.key} metadata")
+    neww.merge(old.asInstanceOf[Data[M2]])
+  }
 
-  def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
+  final def mirror[M](m: Data[M]): Option[Data[M]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[M]])
+
+  final def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.R
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Mirror]")
-    val (lhs2,_) = try {
+    val (lhs2,isNew) = try {
       transferMetadataIfNew(lhs){
         tA.boxed(stage( mirrorNode(rhs) ))
       }
@@ -105,7 +129,7 @@ abstract class Transformer extends Pass {
       bug(s"An error occurred while mirroring $lhs = $rhs")
       throw t
     }
-    //logs(s"${stm(lhs2)}")
+    if (isNew) mirrorFuncs.foreach{func => func(lhs2) }
     lhs2
   }
 

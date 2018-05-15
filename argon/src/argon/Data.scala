@@ -15,11 +15,17 @@ abstract class Data[T] { self =>
   final def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
 
+  /** Defines how to merge an old instance of this metadata with a mirrored instance.
+    * The old metadata is metadata of this type already on the symbol.
+    */
+  def merge(old: T): Data[T] = self
+  final def merge(old: Data[T]): Data[T] = merge(old.asInstanceOf[T])
+
   /** If true:
     *   Globals: Cleared PRIOR to transformation
-    *   Symbols: Dropped during symbol mirroring (but not updating)
+    *   Symbols: Not explicitly transferred during symbol mirroring or updating
     */
-  val skipOnTransform: Boolean = false
+  val ignoreOnTransform: Boolean = false
 }
 
 /** Globals: Persists across transformers (never dropped)
@@ -32,13 +38,13 @@ abstract class StableData[T] extends Data[T] {
 }
 
 /** Globals: Cleared PRIOR to transformation.
-  * Symbols: Dropped during mirroring but not updating.
+  * Symbols: Not transferred explicitly during mirroring/updating.
   *
   * Primarily used for metadata set by flow rules
   */
 abstract class FlowData[T] extends Data[T] {
   override def mirror(f:Tx): T = this.asInstanceOf[T]
-  override val skipOnTransform: Boolean = true
+  override val ignoreOnTransform: Boolean = true
 }
 
 /** Globals: Cleared AFTER transformation.
@@ -56,11 +62,7 @@ object metadata {
 
   private def keyOf[M<:Data[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]
 
-  def addAll(edge: Sym[_], data: Iterator[Data[_]]): Unit = data.foreach{m => edge._data += (m.key -> m) }
-  def addOrRemoveAll(edge: Sym[_], data: Iterator[(Class[_],Option[Data[_]])]): Unit = data.foreach{
-    case (key,Some(m)) => edge._data += (key -> m)
-    case (key,None)    => edge._data.remove(key)
-  }
+  def add(edge: Sym[_], key: Class[_], m: Data[_]): Unit = edge._data += (key -> m)
 
   def add[M<:Data[M]:Manifest](edge: Sym[_], m: M): Unit = edge._data += (m.key -> m)
   def add[M<:Data[M]:Manifest](edge: Sym[_], m: Option[M]): Unit = m match {
@@ -68,6 +70,8 @@ object metadata {
     case None => edge._data.remove(keyOf[M])
   }
   def all(edge: Sym[_]): Iterator[(Class[_],Data[_])] = edge._data.iterator
+
+  def remove(edge: Sym[_], key: Class[_]): Unit = edge._data.remove(key)
 
   def clear[M<:Data[M]:Manifest](edge: Sym[_]): Unit = edge._data.remove(keyOf[M])
 

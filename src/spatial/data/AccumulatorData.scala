@@ -11,14 +11,17 @@ object AccumType {
   case object Fold extends AccumType {
     def |(that: AccumType): AccumType = this
     def >(that: AccumType): Boolean = that != Fold
+    override def toString = "Fold"
   }
   case object Buff extends AccumType {
     def |(that: AccumType): AccumType = that match {case Fold => Fold; case _ => Buff}
     def >(that: AccumType): Boolean = (that | Reduce) match {case Reduce => true; case _ => false }
+    override def toString = "Buffer"
   }
   case object Reduce extends AccumType {
     def |(that: AccumType): AccumType = that match {case None => Reduce; case _ => that}
     def >(that: AccumType): Boolean = that match {case None => true; case _ => false }
+    override def toString = "Reduce"
   }
   case object None extends AccumType {
     def |(that: AccumType): AccumType = that

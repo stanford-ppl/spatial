@@ -1,10 +1,7 @@
 package spatial.tests.apps
 
-
 import spatial.dsl._
 import spatial.targets._
-
-
 
 @test class AES extends SpatialTest {
   override def runtimeArgs: Args = "50"
@@ -407,7 +404,7 @@ import spatial.targets._
 
     val cksum = ciphertext_gold.zip(ciphertext){_ == _}.reduce{_&&_}
     println("PASS: " + cksum + " (AES) * For retiming, need to fix ^ reduction if not parallelized")
-
+    assert(cksum)
   }
 }
 
@@ -566,7 +563,7 @@ import spatial.targets._
     // Check results
     val cksum = correct_path.zip(path){_ == _}.reduce{_&&_}
     println("PASS: " + cksum + " (Viterbi)")
-
+    assert(cksum)
   }
 }
 
@@ -928,48 +925,16 @@ import spatial.targets._
     val seqa_aligned_string = charArrayToString(seqa_aligned_result.map(_.to[U8]))
     val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
-    // val seqa_gold_string = "cggccgcttag-tgggtgcggtgctaagggggctagagggcttg-tc-gcggggcacgggacatgcg--gcg-t--cgtaaaccaaacat-g-gcgccgggag-attatgctcttgcacg-acag-ta----g-gat-aaagc---agc-t_________________________________________________________________________________________________________".toText
-    // val seqb_gold_string = "--------tagct-ggtaccgt-ctaa-gtggc--ccggg-ttgagcggctgggca--gg-c-tg-gaag-gttagcgt-aaggagatatagtccg-cgggtgcagggtg-gctggcccgtacagctacctggcgctgtgcgcgggagctt_________________________________________________________________________________________________________".toText
-
-    // val seqa_gold_bin = argon.lang.String.string2num(seqa_gold_string)
-    // Array.tabulate[Int](seqa_gold_string.length){i => 
-    //   val char = seqa_gold_string(i)
-    //   if (char == "a") {0.to[Int]}
-    //   else if (char == "c") {1.to[Int]}
-    //   else if (char == "g") {2.to[Int]}
-    //   else if (char == "t") {3.to[Int]}
-    //   else if (char == "-") {4.to[Int]}
-    //   else if (char == "_") {5.to[Int]}
-    //   else {6.to[Int]}
-    // }
-    // val seqb_gold_bin = argon.lang.String.string2num(seqb_gold_string)
-    // Array.tabulate[Int](seqb_gold_string.length){i => 
-    //   val char = seqb_gold_string(i)
-    //   if (char == "a") {0.to[Int]}
-    //   else if (char == "c") {1.to[Int]}
-    //   else if (char == "g") {2.to[Int]}
-    //   else if (char == "t") {3.to[Int]}
-    //   else if (char == "-") {4.to[Int]}
-    //   else if (char == "_") {5.to[Int]}
-    //   else {6.to[Int]}
-    // }
-
     // Pass if >75% match
     val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == dash) || (b == dash)) 1 else 0}.reduce{_+_}
     val cksum = matches.to[Float] > 0.75.to[Float]*measured_length.to[Float]*2
 
     println("Result A: " + seqa_aligned_string)
-    // println("Gold A:   " + seqa_gold_string)
     println("Result B: " + seqb_aligned_string)
-    // println("Gold B:   " + seqb_gold_string)
+
     println("Found " + matches + " matches out of " + measured_length*2 + " elements")
-    // val cksumA = seqa_aligned_string == seqa_gold_string //seqa_aligned_result.zip(seqa_gold_bin){_==_}.reduce{_&&_}
-    // val cksumB = seqb_aligned_string == seqb_gold_string //seqb_aligned_result.zip(seqb_gold_bin){_==_}.reduce{_&&_}
-    // val cksum = cksumA && cksumB
     println("PASS: " + cksum + " (NW)")
-
-
-
+    assert(cksum)
   }
 }
 
@@ -1088,6 +1053,7 @@ import spatial.targets._
     val cksumz = zforce_gold.zip(zforce_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}
     val cksum = cksumx && cksumy && cksumz
     println("PASS: " + cksum + " (MD_KNN)")
+    assert(cksum)
   }
 }      
 
@@ -1278,6 +1244,7 @@ import spatial.targets._
     println("X: " + cksumx + ", Y:" + cksumy + ", Z: " + cksumz)
     val cksum = cksumx && cksumy && cksumz
     println("PASS: " + cksum + " (MD_Grid)")
+    assert(cksum)
   }
 }      
 
@@ -1378,6 +1345,7 @@ import spatial.targets._
 
     val cksum = gold_nmatches.reduce{_+_} == computed_nmatches
     println("PASS: " + cksum + " (KMP) * Implement string find, string file parser, and string <-> hex <-> dec features once argon refactor is done so we can test any strings")
+    assert(cksum)
   }
 }      
 
@@ -1430,6 +1398,7 @@ import spatial.targets._
     val margin = 0.5.to[T]
     val cksum = c_gold.zip(c_result){(a,b) => abs(a-b) < margin}.reduce{_&&_}
     println("PASS: " + cksum + " (GEMM_NCubed)")
+    assert(cksum)
   }
 }      
 
@@ -1698,6 +1667,7 @@ import spatial.targets._
     val margin = 0.5.to[T]
     val cksum = c_gold.zip(c_result){(a,b) => abs(a-b) < margin}.reduce{_&&_}
     println("PASS: " + cksum + " (GEMM_Blocked)")
+    assert(cksum)
   }
 }
 
@@ -1794,6 +1764,7 @@ import spatial.targets._
     // // Use the real way to check if list is sorted instead of using machsuite gold
     // val cksum = Array.tabulate(STOP-1){ i => pack(sorted_result(i), sorted_result(i+1)) }.map{a => a._1 <= a._2}.reduce{_&&_}
     println("PASS: " + cksum + " (Sort_Merge)")
+    assert(cksum)
   }
 }
 
@@ -1952,6 +1923,7 @@ import spatial.targets._
     // // This way says I've done goofed, issue #
     // val cksum = Array.tabulate(STOP-1){ i => pack(sorted_result(i), sorted_result(i+1)) }.map{a => a._1 <= a._2}.reduce{_&&_}
     println("PASS: " + cksum + " (Sort_Radix)")
+    assert(cksum)
   }
 }
 
@@ -2051,8 +2023,7 @@ import spatial.targets._
     val cksum = data_gold.zip(data_result){(a,b) => abs(a-b) < margin}.reduce{_&&_}
 
     println("PASS: " + cksum + " (SPMV_CRS) * Fix gather on arbitrary width elements (64 for better prec here), issue #126")
-
-
+    assert(cksum)
   }
 }
 
@@ -2134,8 +2105,7 @@ import spatial.targets._
     val cksum = data_gold.zip(data_result){(a,b) => abs(a-b) < margin}.reduce{_&&_}
 
     println("PASS: " + cksum + " (SPMV_ELL)")
-
-
+    assert(cksum)
   }
 }
 
@@ -2568,7 +2538,7 @@ import spatial.targets._
 
     val cksum = (cksumW1 + cksumW2 + cksumW3 + cksumB1 + cksumB2 + cksumB3) > 1
     println("PASS: " + cksum + " (Backprop) * seems like this may be saturating, need to revisit when floats are implemented, and add full 163 training points")
-
+    assert(cksum)
   }
 }
 
@@ -2664,7 +2634,7 @@ import spatial.targets._
     val cksumI = gold_img.zip(result_img){(a,b) => abs(a-b) < margin}.reduce{_&&_}
     val cksum = cksumR && cksumI
     println("PASS: " + cksum + " (FFT_Strided)")
-
+    assert(cksum)
   }
 }
 
@@ -2924,7 +2894,7 @@ import spatial.targets._
     val cksum = cksumX && cksumY
     println("X cksum: " + cksumX + ", Y cksum: " + cksumY)
     println("PASS: " + cksum + " (FFT_Transpose)")
-
+    assert(cksum)
   }
 }
 
@@ -3031,7 +3001,7 @@ import spatial.targets._
 
     val cksum = widths_gold.zip(widths_result){_==_}.reduce{_&&_}
     println("PASS: " + cksum + " (BFS_Bulk)")
-
+    assert(cksum)
   }
 }
 
@@ -3133,6 +3103,6 @@ import spatial.targets._
 
     val cksum = widths_gold.zip(widths_result){_==_}.reduce{_&&_}
     println("PASS: " + cksum + " (BFS_Queue)")
-
+    assert(cksum)
   }
 }

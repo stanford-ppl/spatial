@@ -25,8 +25,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     mirror(lhs,rhs)
   }
 
-  /**
-    * Determine a substitution or removal rule for the given symbol.
+  /** Determine a substitution or removal rule for the given symbol.
     * If the result is None, the symbol will be removed.
     * Otherwise, the given substitution rule will be registered.
     */
@@ -34,7 +33,7 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     Some(transform(lhs,rhs))
   }
 
-  protected def createSubstRule[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Unit = {
+  final protected def createSubstRule[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Unit = {
     val lhs2: Option[Sym[A]] = if (!subst.contains(lhs)) {
       // Untransformed case: no rule yet exists for this symbol
       val lhs2 = transformOrRemove(lhs, rhs)
@@ -56,6 +55,8 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
       //   Can occur if some higher scope pre-transformed this block
       //   Action: Mirror the existing symbol, scrub previous substitution from context
       //   to avoid having it show up in effects summaries.
+      dbgs(s"$lhs already had substitution rule ${f(lhs)}!")
+
       val lhs2: Sym[A] = f(lhs)
       val lhs3: Sym[A] = mirrorSym(lhs2)
       if (lhs3 != lhs2 && lhs != lhs2) removeSym(lhs2)
@@ -64,14 +65,12 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     lhs2.foreach{sub => if (sub != lhs) register(lhs -> sub) }
   }
 
-  /**
-    * Visit and transform each statement in the given block.
+  /** Visit and transform each statement in the given block.
     * @return the substitution for the block's result
     */
   override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
     inlineBlockWith(block){stms => stms.foreach(visit); f(block.result) }
   }
-
 
   final override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     implicit val ctx: SrcCtx = lhs.ctx

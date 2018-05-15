@@ -27,7 +27,7 @@ trait Staging { this: Printing =>
 
   @stateful def boundVar[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
 
-  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = {
+  @rig private def symbol[A](tp: Type[A], op: Op[A]): A = {
     if (state eq null) throw new Exception(s"Staging in null state scope")
     if (tp eq null) throw new Exception(s"Staging with null type")
     tp._new(Def.Node(state.nextId(),op), ctx)
@@ -40,7 +40,7 @@ trait Staging { this: Printing =>
     */
   @rig def checkAliases(sym: Sym[_], effects: Effects): Unit = {
     val immutables = effects.writes.filterNot(_.isMutable)
-    val aliases = sym.mutableAliases diff effects.writes
+    val aliases = (sym.mutableAliases diff effects.writes) diff Set(sym)
 
     //        logs(s"  aliases: ${aliasSyms(op)}")
     //        logs(s"  copies: ${copySyms(op)}")
@@ -51,20 +51,23 @@ trait Staging { this: Printing =>
     //        logs(s"  written immutables: $immutables")
     //        logs(s"  mutable aliases: $aliases")
 
-    if (aliases.nonEmpty) {
-      error(ctx, "Illegal sharing of mutable objects: ")
-      (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
+    if (aliases.nonEmpty && !config.enableMutableAliases) {
+      error(sym.ctx, s"${sym.nameOr("Value")} has multiple mutable aliases. Mutable aliasing is disallowed.")
+      (aliases + sym).foreach{alias =>
+        error(alias.ctx, s"${alias.nameOr("Value")} defined here.", noError = true)
+        error(alias.ctx)
+      }
+
+      (aliases + sym).foreach{alias => dbgs(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
     }
     if (immutables.nonEmpty) {
-      error(ctx, "Illegal mutation of immutable symbols")
-      error(ctx)
       immutables.foreach{s =>
-        error(s.ctx, s"Mutation of ${s.nameOr("symbol")} defined here.")
+        error(s.ctx, s"Illegal mutation of immutable ${s.nameOr("value")} defined here.")
         error(s.ctx)
       }
 
       immutables.foreach{s =>
-        dbgs(s"${s.ctx}:  symbol ${stm(s)} defined here")
+        dbgs(s"${s.ctx}:  Illegal mutation: ${stm(s)} defined here")
         dbgs(s"${stm(s)}")
         strMeta(s)
       }
@@ -95,30 +98,33 @@ trait Staging { this: Printing =>
         val lhs = symbol()
         val sym = op.R.boxed(lhs)
 
-        data(sym)
-        runFlows(sym,op)
-
         state.scope :+= sym
         if (effects.mayCSE)  state.cache += op -> sym               // Add to CSE cache
         if (!effects.isPure) state.impure :+= Impure(sym,effects)   // Add to list of impure syms
         if (!effects.isPure) sym.effects = effects                  // Register effects
 
         // Register aliases
-        if (dAliases.nonEmpty) sym.deepAliases = dAliases
-        if (sAliases.nonEmpty) sym.shallowAliases = sAliases
+        if (dAliases.nonEmpty) sym.deepAliases = dAliases           // Set deep aliases
+        if (sAliases.nonEmpty) sym.shallowAliases = sAliases        // Set shallow aliases
 
         op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
         sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases
 
+        data(sym)           // Run immediate staging metadata rules
+        runFlows(sym,op)    // Run flow rules
+
         if (config.enLog) {
+          val writes = effects.writes.map{s => s"$s [${s.allAliases.mkString(",")}]" }.mkString(", ")
           logs(s"$lhs = $op")
           logs(s"  Effects:   $effects")
+          logs(s"  Writes:    $writes")
           logs(s"  AliasSyms: ${op.aliasSyms}")
           logs(s"  Deep:      ${op.deepAliases}")
           logs(s"  Shallow:   ${op.shallowAliases}")
           logs(s"  Aliases:   ${sym.allAliases}")
         }
-        checkAliases(sym,effects)
+
+        checkAliases(sym, effects)
 
         lhs
       }
@@ -214,7 +220,10 @@ trait Staging { this: Printing =>
   }
 
   @stateful final def propagateWrites(effects: Effects): Effects = {
-    if (!config.enableAtomicWrites) effects
+    if (!config.enableAtomicWrites) {
+      val writes = effects.writes.flatMap{s => s.allAliases }
+      effects.copy(writes = writes)
+    }
     else {
       val writes = effects.writes.flatMap{s => extractAtomicWrite(s).allAliases }
       effects.copy(writes = writes)

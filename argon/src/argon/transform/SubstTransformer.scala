@@ -6,8 +6,7 @@ abstract class SubstTransformer extends Transformer {
   var substLazy: Map[Sym[_], () => Sym[_]] = Map.empty
   var blockSubst: Map[Block[_],Block[_]] = Map.empty
 
-  /**
-    * Register a substitution rule.
+  /** Register a substitution rule.
     * Usage: register(a -> a').
     */
   def register[A](rule: (A,A)): Unit = register(rule._1,rule._2)
@@ -35,31 +34,27 @@ abstract class SubstTransformer extends Transformer {
     }
   }
 
-  /**
-    * Isolate all substitution rules created within the given scope.
-    * Substitution rules are reset at the end of this scope.
-    */
-  def isolateSubst[A](scope: => A): A = {
-    val save = subst
-    val result = scope
-    subst = save
-    result
-  }
 
-  /**
-    * Isolate the substitution rules created within the given scope,
+  /** Isolate the substitution rules created within the given scope,
     * with the given rule(s) added within the scope prior to evaluation.
     */
   def isolateSubstWith[A](rules: (Sym[_],Sym[_])*)(scope: => A): A = {
-    isolateSubst{
+    isolate {
       rules.foreach{rule => register(rule) }
       scope
     }
   }
+
+  /** Isolate the substitution rules created within the given scope,
+    * with the given rule(s) added within the scope prior to evaluation.
+    */
   def isolateSubstWith[A](rules: Map[Sym[_],Sym[_]])(scope: => A): A = {
     isolateSubstWith(rules.toSeq:_*){ scope }
   }
 
+  /** Conditionally isolate all substitution rules created within the given scope.
+    * If cond is true, substitution rules are reset at the end of this scope.
+    */
   def isolateIf[A](cond: Boolean)(block: => A): A = {
     val save = subst
     val result = block
@@ -67,7 +62,13 @@ abstract class SubstTransformer extends Transformer {
     result
   }
 
-  final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
+  /** Isolate all substitution rules created within the given scope.
+    * Substitution rules are reset at the end of this scope.
+    */
+  def isolate[A](scope: => A): A = isolateIf(cond=true){ scope }
+
+
+  override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
     () => isolateIf(copy){
       inlineBlock(b).unbox
     }

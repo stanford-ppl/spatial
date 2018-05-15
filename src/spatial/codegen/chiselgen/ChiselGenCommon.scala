@@ -14,10 +14,10 @@ import spatial.internal.{spatialConfig => cfg}
 trait ChiselGenCommon extends ChiselCodegen { 
 
   // Statistics counters
-  var itersMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
+  var pipeChainPassMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
+  var streamCopyWatchlist = List[Sym[_]]()
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
-  var cchainPassMap = new scala.collection.mutable.HashMap[Sym[_], Sym[_]] // Map from a cchain to its ctrl node, for computing suffix on a cchain before we enter the ctrler
-  var validPassMap = new scala.collection.mutable.HashMap[(Sym[_], String), Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
+  var validPassMap = new scala.collection.mutable.HashMap[Sym[_], Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
   var accumsWithIIDlay = new scala.collection.mutable.ListBuffer[Sym[_]]
   var widthStats = new scala.collection.mutable.ListBuffer[Int]
   var depthStats = new scala.collection.mutable.ListBuffer[Int]
@@ -29,7 +29,6 @@ trait ChiselGenCommon extends ChiselCodegen {
   var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argOutLoopbacks = scala.collection.mutable.HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
   var drams = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var streamCtrCopy = List[Sym[_]]()
 
   def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getReadStreams).toSet ++
@@ -73,6 +72,13 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  final protected def quoteAsScala(x: Sym[_]): String = {
+    x.rhs match {
+      case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("false.B","0").replaceAll("true.B","1")
+      case _ => throw new Exception(s"Cannot quote $x as a Scala type!")
+    }
+  }
+
   protected def getField(tp: Type[_],field: String): (Int,Int) = tp match {
     case x: Struct[_] =>
       val idx = x.fields.indexWhere(_._1 == field)
@@ -83,12 +89,12 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
-  def emitCounterChain(lhs: Sym[_], suffix: String = ""): Unit = {
+  def emitCounterChain(lhs: Sym[_]): Unit = {
     if (!lhs.cchains.isEmpty) {
       val cchain = lhs.cchains.head
       var isForever = cchain.isForever
-      val w = bitWidth(cchain.ctrs.head.typeArgs.head)
-      val counter_data = cchain.ctrs.map{ ctr => ctr match {
+      val w = bitWidth(cchain.counters.head.typeArgs.head)
+      val counter_data = cchain.counters.map{ ctr => ctr match {
         case Op(CounterNew(start, end, step, par)) => 
           val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
           val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
@@ -99,35 +105,32 @@ trait ChiselGenCommon extends ChiselCodegen {
           isForever = true
           ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
       }}
-      emitGlobalWireMap(src"""${cchain}${suffix}_done""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${cchain}${suffix}_en""", """Wire(Bool())""") // Dangerous but whatever
-      emitGlobalWireMap(src"""${cchain}${suffix}_resetter""", """Wire(Bool())""")
-      emitGlobalModule(src"""val ${cchain}${suffix}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
-      emitGlobalModule(src"""val ${cchain}${suffix}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
-      emitGlobalModule(src"""val ${cchain}${suffix}_starts = List(${counter_data.map{_._1}}) """)
-      emitGlobalModule(src"""val ${cchain}${suffix} = Module(new templates.Counter(List(${counter_data.map(_._4)}), """ + 
+      emitGlobalWireMap(src"""${cchain}_done""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""") // Dangerous but whatever
+      emitGlobalWireMap(src"""${cchain}_resetter""", """Wire(Bool())""")
+      emitGlobalModule(src"""val ${cchain}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
+      emitGlobalModule(src"""val ${cchain}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
+      emitGlobalModule(src"""val ${cchain}_starts = List(${counter_data.map{_._1}}) """)
+      emitGlobalModule(src"""val ${cchain} = Module(new templates.Counter(List(${counter_data.map(_._4)}), """ + 
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
-                       src"""List(${counter_data.map(_._8)}), List(${cchain.ctrs.map(c => bitWidth(c.typeArgs.head))})))""") 
+                       src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
-      emit(src"""${cchain}${suffix}.io.input.stops.zip(${cchain}${suffix}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
-      emit(src"""${cchain}${suffix}.io.input.strides.zip(${cchain}${suffix}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
-      emit(src"""${cchain}${suffix}.io.input.starts.zip(${cchain}${suffix}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
-      emit(src"""${cchain}${suffix}.io.input.gaps.foreach { gap => gap := 0.S }""")
-      emit(src"""${cchain}${suffix}.io.input.saturate := true.B""")
-      emit(src"""${cchain}${suffix}.io.input.enable := ${swap(src"${cchain}${suffix}", En)}""")
-      emit(src"""${swap(src"${cchain}${suffix}", Done)} := ${cchain}${suffix}.io.output.done""")
-      emit(src"""${cchain}${suffix}.io.input.reset := ${swap(src"${cchain}${suffix}", Resetter)}""")
-      if (suffix != "") {
-        emit(src"""${cchain}${suffix}.io.input.isStream := true.B""")
-      } else {
-        emit(src"""${cchain}${suffix}.io.input.isStream := false.B""")      
-      }
-      emit(src"""val ${cchain}${suffix}_maxed = ${cchain}${suffix}.io.output.saturated""")
-      cchain.ctrs.zipWithIndex.foreach { case (c, i) =>
+      emit(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
+      emit(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
+      emit(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
+      emit(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
+      emit(src"""${cchain}.io.input.saturate := true.B""")
+      emit(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
+      emit(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
+      emit(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
+      if (streamCopyWatchlist.contains(cchain)) emit(src"""${cchain}.io.input.isStream := true.B""")
+      else emit(src"""${cchain}.io.input.isStream := false.B""")      
+      emit(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
+      cchain.counters.zipWithIndex.foreach { case (c, i) =>
         val x = c.ctrPar.toInt
-        if (suffix == "") {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)))""")}
-        else {emitGlobalWire(s"""val ${quote(c)}${suffix} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.ctrs(i).typeArgs.head)}.W)) }""")}
-        emit(s"""(0 until $x).map{ j => ${quote(c)}${suffix}(j) := ${quote(cchain)}${suffix}.io.output.counts($i + j) }""")
+        if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
+        else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
+        emit(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
       }
 
     }
@@ -143,30 +146,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       }
     } else {
       "None"      
-    }
-  }
-
-  protected def isStreamChild(lhs: Sym[_]): Boolean = {
-    var nextLevel: Option[Sym[_]] = Some(lhs)
-    var result = false
-    while (nextLevel.isDefined) {
-      if (nextLevel.get.schedule == Sched.Stream) {
-        result = true
-        nextLevel = None
-      } else {
-        if (nextLevel.get.parent.s.isDefined) nextLevel = Some(nextLevel.get.parent.s.get)
-        else nextLevel = None
-      }
-    }
-    result
-  }
-
-  protected def beneathForever(lhs: Sym[_]):Boolean = { // TODO: Make a counterOf() method that will just grab me Some(counter) that I can check
-    if (lhs.parent != Host) {
-      if (lhs.parent.s.get.isForever) true
-      else beneathForever(lhs.parent.s.get)
-    } else {
-      false
     }
   }
 
@@ -231,12 +210,12 @@ trait ChiselGenCommon extends ChiselCodegen {
     var nextLevel: Option[Sym[_]] = Some(node.parent.s.get)
     var result = ens.map(quote)
     while (nextLevel.isDefined) {
-      if (nextLevel.get.schedule == Sched.Stream) {
+      if (nextLevel.get.isStreamControl) {
         nextLevel.get match {
-          case Op(UnrolledForeach(_,_,_,_,e)) => 
+          case Op(op: UnrolledForeach) =>
             ens.foreach{ my_en_exact =>
               val my_en = my_en_exact match { case Op(DelayLine(_,node)) => node; case _ => my_en_exact}
-              e.foreach{ their_en =>
+              op.ens.foreach{ their_en =>
                 if (src"${my_en}" == src"${their_en}" & !src"${my_en}".contains("true")) {
                   // Hacky way to avoid double-suffixing
                   if (!src"$my_en".contains(src"_copy${previousLevel}") && !src"$my_en".contains("(") /* hack for remapping */) {  
@@ -255,7 +234,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       }
     }
     result.mkString("&")
-
   }
 
   def getStreamEnablers(c: Sym[_]): String = {
@@ -337,7 +315,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     latency match {
       case lat: Int => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {
@@ -350,7 +328,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       case lat: Double => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
           } else {
@@ -363,7 +341,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       case lat: String => 
         if (!controllerStack.isEmpty) {
-          if (isStreamChild(controllerStack.head) & streamOuts != "") {
+          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
           } else {
@@ -427,22 +405,52 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 
-  override protected def quote(s: Sym[_]): String = s.rhs match {
-    case Def.Bound(id)  => 
-      var result = super.quote(s)
-      if (itersMap.contains(s)) {
-        val siblings = itersMap(s)
-        var nextLevel: Option[Sym[_]] = Some(controllerStack.head)
-        while (nextLevel.isDefined) {
-          if (siblings.contains(nextLevel.get)) {
-            if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
-            nextLevel = None
-          } else {
-            nextLevel = nextLevel.get.parent.s
-          }
+  final protected def appendChainPass(s: Sym[_], rawname: String): (String, Boolean) = {
+    var result = rawname
+    var modified = false
+    if (pipeChainPassMap.contains(s)) {
+      val siblings = pipeChainPassMap(s)
+      var nextLevel: Option[Sym[_]] = Some(controllerStack.head)
+      while (nextLevel.isDefined) {
+        if (siblings.contains(nextLevel.get)) {
+          if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
+          modified = true
+          nextLevel = None
+        } else {
+          nextLevel = nextLevel.get.parent.s
         }
       }
-      result
+    }
+    (result, modified)
+  }
+
+  final protected def getCtrSuffix(ctrl: Sym[_]): String = {
+    if (ctrl.parent != Host) {
+      if (ctrl.parent.isStreamControl) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}
+    } else {
+      throw new Exception(s"Could not find LCA stream schedule for a bound sym that is definitely in a stream controller.  This error should be impossibru!")
+    }
+  }
+
+  final protected def appendStreamSuffix(s: Sym[_], rawname: String): (String, Boolean) = {
+    if (streamCopyWatchlist.contains(s)) (rawname + getCtrSuffix(controllerStack.head), true)
+    else                           (rawname,                                      false)
+  }
+
+  override protected def quote(s: Sym[_]): String = s.rhs match {
+    case Def.Bound(id)  => 
+      val base = super.quote(s)
+      val (pipelineRemap, pmod) = appendChainPass(s, base)
+      val (streamRemap, smod) = appendStreamSuffix(s, base)
+      if (pmod & smod) throw new Exception(s"ERROR: Seemingly impossible bound sym that is both part of a pipeline and a stream pipe!")
+      if (smod) streamRemap
+      else if (pmod) pipelineRemap
+      else base
+    case Def.Node(_,_) => // Specifically places suffix on ctrchains
+      val base = super.quote(s)
+      val (streamRemap, smod) = appendStreamSuffix(s, base)
+      if (smod) streamRemap
+      else base
     case _ => super.quote(s)
   }
 

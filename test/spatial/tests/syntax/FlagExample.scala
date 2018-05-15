@@ -1,8 +1,6 @@
 package spatial.tests.syntax
 
-
 import spatial.dsl._
-
 
 @test class FlagExample extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
@@ -17,7 +15,7 @@ import spatial.dsl._
     Console.out.println(s"foo: $x, bar: $y, z: $z")
 
     println(z)
-    assert(x + y == z)
+    assert(x.to[Int] + y.to[Int] == z.to[Int])
 
     Accel { }
   }

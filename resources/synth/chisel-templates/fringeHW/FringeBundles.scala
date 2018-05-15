@@ -40,7 +40,7 @@ class MemoryStream(addrWidth: Int, sizeWidth: Int, memChannel: Int) extends Bund
   }
 }
 
-class LoadStream(p: StreamParInfo) extends MemoryStream(addrWidth = 64, sizeWidth = 16, memChannel = 0) {
+class LoadStream(p: StreamParInfo) extends MemoryStream(addrWidth = 64, sizeWidth = 32, memChannel = 0) {
   val rdata = Decoupled(Vec(p.v, UInt(p.w.W)))
 
   override def cloneType(): this.type = {
@@ -48,7 +48,7 @@ class LoadStream(p: StreamParInfo) extends MemoryStream(addrWidth = 64, sizeWidt
   }
 }
 
-class StoreStream(p: StreamParInfo) extends MemoryStream(addrWidth = 64, sizeWidth = 16, memChannel = 0) {
+class StoreStream(p: StreamParInfo) extends MemoryStream(addrWidth = 64, sizeWidth = 32, memChannel = 0) {
   val wdata = Flipped(Decoupled(Vec(p.v, UInt(p.w.W))))
   val wstrb = Flipped(Decoupled(UInt(p.v.W)))
   val wresp = Decoupled(Bool())

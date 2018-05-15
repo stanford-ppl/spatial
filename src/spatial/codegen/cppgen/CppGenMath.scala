@@ -47,6 +47,7 @@ trait CppGenMath extends CppGenCommon {
     case FltRandom(x) => emit(src"${lhs.tp} $lhs = ((float) rand() / (float) RAND_MAX) * (float) ${x.getOrElse(100)};")
     case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
     case Or(x,y) => emit(src"${lhs.tp} $lhs = $x | $y;")
+    case Xor(x,y) => emit(src"${lhs.tp} $lhs = $x ^ $y;")
     case Not(x) => emit(src"${lhs.tp} $lhs = ~$x;")
     // case FixConvert(x) => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $x;  // should be fixpt ${lhs.tp}")
     // case FixPtToFltPt(x) => lhs.tp match {

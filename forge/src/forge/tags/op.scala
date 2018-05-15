@@ -19,7 +19,7 @@ object op {
     val (cls,obj) = annottees.toList match {
       case List(cd: ClassDef, md: ModuleDef) => (cd,md)
       case List(cd: ClassDef) => (cd, q"object ${cd.nameTerm}".asObject)
-      case _ => invalidAnnotationUse("ref", "classes")
+      case _ => invalidAnnotationUse("op", "classes")
     }
 
     val name = cls.name

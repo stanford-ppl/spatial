@@ -36,4 +36,3 @@ trait Scheduler {
   ): Schedule[R]
 
 }
-

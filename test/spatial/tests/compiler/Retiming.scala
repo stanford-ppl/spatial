@@ -7,8 +7,9 @@ import spatial.node.DelayLine
 
 @test class SimpleRetimePipe extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends = super.backends.filterNot{be => (be == Scala) | (be == VCS_noretime)}
 
-   def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     val a = ArgIn[Int]
     val b = ArgIn[Int]
     val c = ArgIn[Int]
@@ -58,7 +59,9 @@ import spatial.node.DelayLine
 @test class RetimeLoop extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
-   def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
+    val dram = DRAM[Int](16,16)
+
     Accel {
       val x = Reg[Int]
       val sram = SRAM[Int](16, 16)
@@ -67,7 +70,13 @@ import spatial.node.DelayLine
       Foreach(0 until 16, 0 until 16){(i,j) =>
         sram(i,j) = ((i*j + 3) + x + 4) * 3
       }
+
+      dram store sram
     }
+
+    val x = Array.tabulate(16){i => i}.reduce(_+_)
+    val gold = (0::16,0::16){(i,j) => ((i*j + 3) + x + 4) * 3 }
+    assert(getMatrix(dram) == gold)
   }
 }
 

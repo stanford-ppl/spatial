@@ -20,6 +20,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
   protected def configurer[C[_]](mem: Sym[_]): MemoryConfigurer[C] = (mem match {
     case m:SRAM[_,_]    => new MemoryConfigurer(m, strategy)
     case m:RegFile[_,_] => new MemoryConfigurer(m, strategy)
+    case m:LUT[_,_]     => new MemoryConfigurer(m, strategy)
     case m:FIFO[_]      => new MemoryConfigurer(m, strategy)
     case m:LIFO[_]      => new MemoryConfigurer(m, strategy)
     case m:Reg[_]       => new MemoryConfigurer(m, strategy)

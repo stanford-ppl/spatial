@@ -111,15 +111,15 @@ trait StaticDebuggingExternal {
   /** Prints the given SRAM1 to the console, preceded by an optional heading. **/
   @virtualize
   @api def printSRAM[T:Type](array: SRAM1[T]): Void = {
-    (0 until array.length) foreach { i => print(array(i).toString + " ") }
+    Foreach(0 until array.length) { i => print(array(i).toString + " ") }
     println("")
   }
 
   /** Prints the given SRAM2 to the console, preceded by an optional heading. **/
   @virtualize
   @api def printSRAM[T:Type](matrix: SRAM2[T]): Void = {
-    (0 until matrix.rows) foreach { i =>
-      (0 until matrix.cols) foreach { j =>
+    Foreach(0 until matrix.rows){ i =>
+      Foreach(0 until matrix.cols){ j =>
         print(matrix(i, j).toString + "\t")
       }
       println("")
@@ -129,14 +129,14 @@ trait StaticDebuggingExternal {
   /** Prints the given SRAM3 to the console, preceded by an optional heading. **/
   @virtualize
   @api def printSRAM[T:Type](tensor: SRAM3[T]): Void = {
-    (0 until tensor.dim0) foreach { i =>
-      (0 until tensor.dim1) foreach { j =>
-        (0 until tensor.dim2) foreach { k =>
+    Foreach(0 until tensor.dim0) { i =>
+      Foreach(0 until tensor.dim1) { j =>
+        Foreach(0 until tensor.dim2) { k =>
           print(tensor(i, j, k).toString + "\t")
         }
         println("")
       }
-      (0 until tensor.dim2) foreach {_ => print("--\t")}
+      Foreach(0 until tensor.dim2) {_ => print("--\t")}
       println("")
     }
   }

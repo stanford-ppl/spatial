@@ -107,10 +107,10 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
-          st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-          open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
-            st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
-          close("}")
+            st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
+            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
+              st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
+            close("}")
           close("};")
         }
       }
@@ -186,6 +186,18 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case ArrayFlatMap(array, apply, func) =>
+      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+      visitBlock(apply)
+      visitBlock(func)
+      emit(src"${lhs}.push_back(${func.result});")
+      close("}")
+
+      open(src"val $lhs = $array.flatMap{${func.input} => ")
+        ret(func)
+      close("}")
+
     case op@ArrayFromSeq(seq)   => 
       emitNewArray(lhs, lhs.tp, getSize(lhs))
       seq.zipWithIndex.foreach{case (s,i) => 
@@ -217,9 +229,9 @@ trait CppGenArray extends CppGenCommon {
       close("}")
 
     case UnrolledForeach(ens,cchain,func,iters,valids) => 
-      val starts = cchain.ctrs.map(_.start)
-      val ends = cchain.ctrs.map(_.end)
-      val steps = cchain.ctrs.map(_.step)
+      val starts = cchain.counters.map(_.start)
+      val ends = cchain.counters.map(_.end)
+      val steps = cchain.counters.map(_.step)
       iters.zipWithIndex.foreach{case (i,idx) => 
         open(src"for (int $i = ${starts(idx)}; $i < ${ends(idx)}; $i = $i + ${steps(idx)}) {")
         valids(idx).foreach{v => emit(src"${v.tp} ${v} = true; // TODO: Safe to assume this in cppgen?")}

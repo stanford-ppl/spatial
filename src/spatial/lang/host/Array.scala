@@ -5,7 +5,7 @@ import argon._
 import forge.tags._
 import spatial.node._
 import spatial.internal._
-
+import utils.Overloads._
 import utils.implicits.Readable._
 
 /** A one-dimensional array on the host. */
@@ -188,11 +188,14 @@ object Array {
     stage(MapIndices(size, funcBlk))
   }
 
-  /**
-    * Returns an immutable Array with the given `size` and elements defined by `func`.
+  /** Returns an immutable Array with the given `size` and elements defined by `func`.
     * Note that while `func` does not depend on the index, it is still executed `size` times.
     */
-  @api def fill[A:Type](size: I32)(func: => A): Array[A] = this.tabulate(size){ _ => func}
+  @api def fill[A:Type](size: I32)(func: => A): Array[A] = {
+    val i = boundVar[I32]
+    val funcBlk = stageLambda1(i){ func }
+    stage(MapIndices(size, funcBlk))
+  }
 
   /** Returns an empty, mutable Array with the given `size`. */
   @api def empty[A:Type](size: I32): Array[A] = stage(ArrayNew[A](size))

@@ -37,12 +37,11 @@ trait ISL {
     else throw new Exception("Failed isEmpty check")
   }
 
-  /**
-    * True if there exists a reachable multi-dimensional index I such that addr_a(I) = addr_b(I).
+  /** True if there exists a reachable multi-dimensional index I such that addr_a(I) = addr_b(I).
     * True if all given dimensions may intersect.
     * Trivially true for random accesses with no constraints.
     */
-  def overlaps[K](a: SparseMatrix[K], b: SparseMatrix[K]): Boolean = {
+  def overlapsAddress[K](a: SparseMatrix[K], b: SparseMatrix[K]): Boolean = {
     val equal = (a - b).asConstraintEqlZero
     nonEmpty(equal.andDomain)
   }

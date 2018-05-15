@@ -41,6 +41,11 @@ class Config {
   def enLog: Boolean = logLevel >= 2
   def enDbg: Boolean = logLevel >= 1
 
+
+  /** Staging */
+  var enableAtomicWrites: Boolean = true
+  var enableMutableAliases: Boolean = false
+
   /** Paths */
   var cwd: String = new java.io.File(".").getAbsolutePath
 
@@ -60,7 +65,6 @@ class Config {
   /** Codegen */
   var naming: Boolean = true
 
-  var enableAtomicWrites: Boolean = true
 
   def create: Config = new Config
 

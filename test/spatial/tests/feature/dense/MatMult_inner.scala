@@ -97,9 +97,8 @@ import spatial.dsl._
 
     val cksum = result_cksum == gold_cksum
     println("PASS: " + cksum + " (MatMult_inner) * Remember to fix GEMM_MemoryHierarchy once issue #159 is fixed!")
-
+    assert(cksum)
   }
-
 
 }
 

@@ -19,7 +19,7 @@ object Streaming extends Sched // Streaming extends Sched { override def toStrin
 object Fork extends Sched // Fork extends Sched { override def toString = "Fork" }
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
-class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false, val stateWidth: Int = 32, cases: Int = 1) extends Module {
+class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
   // Overloaded construters
   // Tuple unpacker
   def this(tuple: (Sched, Int, Boolean)) = this(tuple._1,tuple._2,tuple._3)
@@ -195,7 +195,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
   }
   else {
     io.datapathEn := io.enable & ~io.done
-    io.done := Utils.risingEdge(allDone)
+    io.done := Utils.getRetimed(Utils.risingEdge(allDone), latency, io.enable)
   }
 
 
@@ -203,7 +203,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
 
 
-class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1) extends Module {
+class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
@@ -268,7 +268,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
-    io.done := doneReg.io.output.data | (io.doneCondition & io.enable)
+    io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency, io.enable)
 
   }
 }

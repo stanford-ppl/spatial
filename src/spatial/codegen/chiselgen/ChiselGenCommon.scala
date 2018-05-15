@@ -175,7 +175,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (fsm.isDefined) {
           emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
           emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(~${fsm.get})")  
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${DL(swap(lhs, Done), src"1 + ${swap(lhs, Retime)}", true)}")
+          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${DL(swap(lhs, Done), src"1 + ${swap(lhs, Latency)}", true)}")
           /* or'ed  back in because of BasicCondFSM!! */
           emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${fsm.get}*/ // Really want inhibit to turn on at last enabled cycle")        
           emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
@@ -191,7 +191,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         } else {
           emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
           emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(${swap(lhs, Done)} /*${lhs}_sm.io.output.ctr_inc*/)")
-          val rster = if (lhs.isInnerControl & getReadStreams(lhs.toCtrl).nonEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Retime)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
+          val rster = if (lhs.isInnerControl & getReadStreams(lhs.toCtrl).nonEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Latency)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
           emit(src"${swap(lhs, Inhibit)}.io.input.reset := $rster")
           emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data")
           emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
@@ -308,7 +308,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   def DLTrace(lhs: Sym[_]): Option[String] = {
     lhs match {
       case Op(DelayLine(_, data)) => DLTrace(data)
-      case _ => lhs.rhs match {case Def.Const(c) => Some(c.toString); case _ => None}
+      case _ => lhs.rhs match {case Def.Const(c) => Some(quote(lhs)); case Def.Param(_,c) => Some(quote(lhs)); case _ => None}
     }
   }
 
@@ -452,7 +452,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       val base = super.quote(s)
       val (streamRemap, smod) = appendStreamSuffix(s, base)
       if (smod) streamRemap
-      else base
+      else DLTrace(s).getOrElse(base)
     case _ => super.quote(s)
   }
 
@@ -487,7 +487,8 @@ trait ChiselGenCommon extends ChiselCodegen {
       case EnOptions => wireMap(src"${lhs}_en_options")
       case RVec => wireMap(src"${lhs}_rVec")
       case WVec => wireMap(src"${lhs}_wVec")
-      case Retime => wireMap(src"${lhs}_retime")
+      case Latency => wireMap(src"${lhs}_latency")
+      case II => wireMap(src"${lhs}_ii")
       case SM => wireMap(src"${lhs}_sm")
       case Inhibit => wireMap(src"${lhs}_inhibit")
     }
@@ -521,7 +522,8 @@ object ReadyOptions extends RemapSignal
 object EnOptions extends RemapSignal
 object RVec extends RemapSignal
 object WVec extends RemapSignal
-object Retime extends RemapSignal
+object Latency extends RemapSignal
+object II extends RemapSignal
 object SM extends RemapSignal
 object Inhibit extends RemapSignal
 

@@ -342,7 +342,7 @@ class FF(val bitWidth: Int,
 
   var usedMuxPorts = List[(String,(Int,Int))]()
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
-    assert(!usedMuxPorts.contains(("XBarW", (muxPort,vecId))), s"Attempted to connect to XBarW port ($muxPort,$vecId) twice!")
+    // assert(!usedMuxPorts.contains(("XBarW", (muxPort,vecId))), s"Attempted to connect to XBarW port ($muxPort,$vecId) twice!")
     usedMuxPorts ::= ("XBarW", (muxPort, vecId))
     val base = xBarWMux.accessParsBelowMuxPort(muxPort).sum + vecId
     io.input(base) := wBundle

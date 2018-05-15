@@ -62,7 +62,9 @@ trait Staging { this: Printing =>
     }
     if (immutables.nonEmpty) {
       immutables.foreach{s =>
-        error(s.ctx, s"Illegal mutation of immutable ${s.nameOr("value")} defined here.")
+        error(sym.ctx, s"Illegal mutation of immutable ${s.nameOr("value")}")
+        error(sym.ctx)
+        error(s.ctx, s"${s.nameOr("value")} originally defined here")
         error(s.ctx)
       }
 

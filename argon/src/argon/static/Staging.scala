@@ -106,8 +106,8 @@ trait Staging { this: Printing =>
         if (!effects.isPure) sym.effects = effects                  // Register effects
 
         // Register aliases
-        if (dAliases.nonEmpty) sym.deepAliases = dAliases           // Set deep aliases
-        if (sAliases.nonEmpty) sym.shallowAliases = sAliases        // Set shallow aliases
+        sym.deepAliases = dAliases                                  // Set deep aliases
+        sym.shallowAliases = sAliases                               // Set shallow aliases
 
         op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
         sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases

@@ -28,6 +28,11 @@ abstract class Transformer extends Pass {
     def unapply[T](x: T): Option[T] = Some(f(x))
   }
 
+  def usedRemovedSymbol[T](x: T): Unit = {
+    dbgs(s"Used removed symbol $x!")
+    throw new Exception(s"Used removed symbol: $x")
+  }
+
   // Default rules for mirroring
   // NOTE: This doesn't currently work for mirroring Products with implicit constructor arguments
   def apply[T](x: T): T = {
@@ -58,7 +63,7 @@ abstract class Transformer extends Pass {
         x
     }).asInstanceOf[T]
 
-    if (y.isInstanceOf[Invalid]) throw new Exception(s"Used removed symbol: $x")
+    if (y.isInstanceOf[Invalid]) usedRemovedSymbol(x)
     y
   }
 

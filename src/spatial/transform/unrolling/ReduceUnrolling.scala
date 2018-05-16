@@ -40,7 +40,7 @@ trait ReduceUnrolling extends UnrollingBase {
     reduce: Lambda2[A,A,A],
     iters:  Seq[I32]
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
-    logs(s"Fully unrolling reduce $lhs")
+    dbgs(s"Fully unrolling reduce $lhs")
     val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val rfunc = reduce.toFunction2
 
@@ -80,14 +80,14 @@ trait ReduceUnrolling extends UnrollingBase {
     reduce: Lambda2[A,A,A],         // Reduce function
     iters:  Seq[I32]                // Bound iterators for map loop
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
-    logs(s"Unrolling reduce $lhs -> $accum")
+    dbgs(s"Unrolling reduce $lhs -> $accum")
     val lanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val inds2 = lanes.indices
     val vs = lanes.indexValids
     val start = cchain.counters.map(_.start.asInstanceOf[I32])
 
     val blk = stageLambda1(accum) {
-      logs("Unrolling map")
+      dbgs(s"Unrolling reduce map $lhs -> $accum")
       val valids: () => Seq[Bit] = () => lanes.valids.map{_.andTree}
       val values: Seq[A] = unroll(func, lanes)
 
@@ -105,7 +105,7 @@ trait ReduceUnrolling extends UnrollingBase {
 
     val lhs2 = stage(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs))
     //accumulatesTo(lhs2) = accum
-    logs(s"Created reduce ${stm(lhs2)}")
+    dbgs(s"Created reduce ${stm(lhs2)}")
     lhs2
   }
 

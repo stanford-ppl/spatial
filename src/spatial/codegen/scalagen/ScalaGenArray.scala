@@ -75,6 +75,11 @@ trait ScalaGenArray extends ScalaCodegen {
         ret(reduce)
       close("}")
 
+    case ArrayFold(array,init,_, reduce) =>
+      open(src"val $lhs = $array.fold($init){(${reduce.inputA},${reduce.inputB}) => ")
+        ret(reduce)
+      close("}")
+
     case ArrayFilter(array, _, cond) =>
       open(src"val $lhs = $array.filter{${cond.input} => ")
         ret(cond)

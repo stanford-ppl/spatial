@@ -5,5 +5,5 @@ import argon._
 import forge.tags._
 
 @ref class BinaryFile extends Top[BinaryFile] with Ref[Any,BinaryFile] {
-  override val __isPrimitive = false
+  override val __neverMutable = false
 }

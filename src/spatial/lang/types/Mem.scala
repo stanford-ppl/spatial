@@ -9,7 +9,7 @@ trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   val evMem: C[A] <:< Mem[A,C]
   implicit val A: Bits[A]
 
-  override protected val __isPrimitive: Boolean = false
+  override protected val __neverMutable: Boolean = false
 }
 
 trait RemoteMem[A,C[_]] extends Mem[A,C] {

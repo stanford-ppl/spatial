@@ -56,10 +56,10 @@ class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
       (if (tp._typeParams.isEmpty) "" else "[" + tp._typeParams.mkString(",") + "]")
   }
 
-  def isPrimitive: Boolean = tp._isPrimitive
   def typeArgs: Seq[Type[_]] = tp._typeArgs
   def typeParams: Seq[Any] = tp._typeParams
   def typePrefix: String = tp._typePrefix
+  def neverMutable: Boolean = tp._neverMutable
 }
 
 class ExpMiscOps[C,A](exp: Exp[C,A]) {

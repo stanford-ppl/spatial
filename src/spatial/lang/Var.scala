@@ -8,7 +8,7 @@ import spatial.node._
 @ref class Var[A:Type] extends Top[Var[A]] with StagedVarLike[A] with Ref[Ptr[Any],Var[A]] {
   val A: Type[A] = Type[A]
 
-  override protected val __isPrimitive: Boolean = A.isPrimitive
+  override protected val __neverMutable: Boolean = A.neverMutable
 
   @rig def __sread(): A = Var.read(this)
   @rig def __sassign(x: A): Unit = Var.assign(this, x)

@@ -30,7 +30,7 @@ import spatial.node._
     case _ => super.value(c)
   }
 
-  override protected val __isPrimitive: Boolean = true
+  override protected val __neverMutable: Boolean = true
 }
 object Text {
   def apply(x: String): Text = uconst[Text](x)

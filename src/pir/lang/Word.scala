@@ -6,7 +6,7 @@ import forge.tags._
 import spatial.lang._
 
 @ref class Word extends Top[Word] with Bits[Word] with Ref[Any,Word] {
-  override protected val __isPrimitive: Boolean = true
+  override protected val __neverMutable: Boolean = true
   val box: Word <:< Bits[Word] = implicitly[Word <:< Bits[Word]]
 
   def nWords: Int = 16 // TODO

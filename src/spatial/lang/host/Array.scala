@@ -11,7 +11,7 @@ import utils.implicits.Readable._
 /** A one-dimensional array on the host. */
 @ref class Array[A:Type] extends Top[Array[A]] with Ref[scala.Array[Any],Array[A]] {
   val A: Type[A] = Type[A]
-  override val __isPrimitive = false
+  override val __neverMutable = false
 
   /** Returns the size of this Array. */
   @api def length: I32 = stage(ArrayLength(this))

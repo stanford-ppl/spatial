@@ -20,8 +20,8 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   protected def me: A = this.asInstanceOf[A]
 
 
-  /** True if this type is a primitive */
-  protected def __isPrimitive: Boolean
+  /** True if an instance of this type can never be mutable. */
+  protected def __neverMutable: Boolean
 
   /** Returns the name of this type */
   protected def __typePrefix: String = r"${this.getClass}"
@@ -31,7 +31,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   protected def __typeParams: Seq[Any] = Nil
 
   final private[argon] def _typePrefix: String = __typePrefix
-  final private[argon] def _isPrimitive: Boolean = __isPrimitive
+  final private[argon] def _neverMutable: Boolean = __neverMutable
   final private[argon] def _typeArgs: Seq[Type[_]] = __typeArgs
   final private[argon] def _typeParams: Seq[Any] = __typeParams
 

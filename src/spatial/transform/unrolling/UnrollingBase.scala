@@ -50,14 +50,6 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     * and dispatch index to an unrolled memory instance
     */
   var memories: Map[(Sym[_], Int), Sym[_]] = Map.empty
-  def withMemories[A](mems: Seq[((Sym[_],Int), Sym[_])])(blk: => A): A = {
-    val saveMems = memories
-    memories ++= mems
-    val result = blk
-    memories = saveMems
-    result
-  }
-
 
 
   /** Lanes tracking duplications in this scope */
@@ -152,6 +144,20 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     case _ => super.updateNode(node)
   }
 
+  override def isolateIf[A](cond: Boolean)(block: => A): A = {
+    super.isolateIf(cond){ lanes.isolateIf(cond){ block } }
+  }
+
+  override def usedRemovedSymbol[T](x: T): Unit = {
+    dbgs(s"Used removed symbol $x!")
+    lanes.contexts.zipWithIndex.foreach{case (ctx,i) =>
+      dbgs(s"Lane #$i:")
+      ctx.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+    }
+    dbgs(s"Subst:")
+    subst.foreach{case (k,v) => dbgs(s"  $k -> $v")}
+    throw new Exception(s"Used removed symbol: $x")
+  }
 
   /** Helper objects for unrolling
     * Tracks multiple substitution contexts in 'contexts' array
@@ -186,39 +192,46 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       vlds
     }
 
+    def isolateIf[A](cond: Boolean)(block: => A): A = {
+      val saveContexts = Array.tabulate(contexts.length){i => contexts(i) }
+      val saveMemories = Array.tabulate(memContexts.length){i => memContexts(i) }
+      val result = block
+      if (cond) {
+        saveContexts.indices.foreach{i => contexts(i) = saveContexts(i) }
+        saveMemories.indices.foreach{i => memContexts(i) = saveMemories(i) }
+        dbgs(s"Exiting scope. Memory contexts: ")
+        memContexts.zipWithIndex.foreach{case (ctx,i) =>
+          dbgs(s"Lane #$i")
+          ctx.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+        }
+      }
+      result
+    }
+
     def inLanes[A](lns: Seq[Int])(block: Int => A): Seq[A] = lns.map{ln => inLane(ln)(block(ln)) }
 
     def inLane[A](i: Int)(block: => A): A = {
+      // Note that we don't use isolateSubst (or similar here) because that would also save/restore lanes
       val save     = subst
       val saveMems = memories
       val addr     = parAddr(i)
-      withMemories(memContexts(i)) {
-        withUnrollNums(inds.zip(addr)) {
-          //dbgs(s"Entering $name lane #$i: ")
-          //dbgs("  " + contexts(i).toList.map{case (k,v) => s"$k -> $v"}.mkString(", "))
 
-          val result = isolateSubstWith(contexts(i)) {
-            withValids(valids(i)) {
+      subst ++= contexts(i)
+      memories ++= memContexts(i)
 
-              //dbgs("  " + subst.toList.map{case (k,v) => s"$k -> $v" }.mkString(", "))
-
-              val result = block
-              // Retain only the substitutions added within this scope
-              contexts(i) ++= subst.filterNot(save contains _._1)
-              memContexts(i) ++= memories.filterNot(saveMems contains _._1)
-
-              //dbgs(s"Exiting $name lane #$i: ")
-              //dbgs("  " + contexts(i).toList.map{case (k,v) => s"$k -> $v"}.mkString(", "))
-
-              result
-            }
-          }
-
-          //dbgs("  " + subst.toList.map{case (k,v) => s"$k -> $v" }.mkString(", "))
-
-          result
+      val result = withUnrollNums(inds.zip(addr)) {
+        withValids(valids(i)) {
+          block
         }
       }
+
+      // Retain the substitutions added within this scope
+      contexts(i) ++= subst.filterNot(save contains _._1)
+      memContexts(i) ++= memories.filterNot(saveMems contains _._1)
+
+      subst = save
+      memories = saveMems
+      result
     }
 
     def map[A](block: Int => A): List[A] = List.tabulate(P){p => inLane(p){ block(p) } }
@@ -229,9 +242,11 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     // 1. Split a given vector as the substitution for the single original symbol
     def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
-      if (size > 1 || shouldCopy) map{_ =>
+      if (size > 1 || shouldCopy) map{i =>
+        dbgs(s"Lane #$i: ")
         val s2 = mirror(s, d)
         register(s -> s2)
+        dbgs(s"${stm(s2)}")
         s2
       }
       else inLane(0){

@@ -30,8 +30,8 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         super.transform(lhs, rhs)
       }
       else {
-        dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data)")
-        data.asInstanceOf[Sym[A]]
+        dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data -> ${f(data)})")
+        f(data).asInstanceOf[Sym[A]]
       }
 
     case Some(data) => super.transform(lhs,rhs)
@@ -117,14 +117,14 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       }
 
     // reg := data
-    case RegWrite(F(reg),F(data),_) =>
+    case RegWrite(F(reg),data,_) =>
       mostRecentWrite += reg -> data
       dbg(s"Adding $reg -> $data to mostRecentWrite map ($mostRecentWrite)")
 
       def set(tp: String): Sym[A] = {
         warn(ctx, s"Use setArg for setting $tp outside Accel.")
         warn(ctx)
-        setArg(reg, data).asInstanceOf[Sym[A]]
+        setArg(reg, f(data)).asInstanceOf[Sym[A]]
       }
       def noHostWrite(tp: String): Sym[A] = {
         error(ctx, s"Writing $tp outside Accel is disallowed. Use a HostIO or ArgIn.")
@@ -150,14 +150,14 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       }
 
 
-    case SetReg(F(reg),F(data)) =>
+    case SetReg(F(reg),data) =>
       mostRecentWrite += reg -> data
       dbg(s"Adding $reg -> $data to mostRecentWrite map ($mostRecentWrite)")
 
       def write(tp: String): Sym[A] = {
         warn(ctx, s"Use register assignment syntax, :=, for writing $tp within Accel.")
         warn(ctx)
-        (reg := data).asInstanceOf[Sym[A]]
+        (reg := f(data)).asInstanceOf[Sym[A]]
       }
       def noHostWrite(tp: String): Sym[A] = {
         error(ctx, s"Setting $tp outside Accel is disallowed. Use a HostIO or ArgIn.")

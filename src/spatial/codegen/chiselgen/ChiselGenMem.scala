@@ -238,18 +238,18 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   override def emitFooter(): Unit = {
-    enterAccel()
+    inAccel{
 
-    inGenn(out, "BufferControlCxns", ext) {
-      nbufs.foreach{ mem => 
-        val info = bufferControlInfo(mem)
-        info.zipWithIndex.foreach{ case (node, port) => 
-          emitt(src"""${mem}.connectStageCtrl(${DL(swap(quote(node), Done), 1, true)}, ${swap(quote(node), BaseEn)}, ${port})""")
+      inGenn(out, "BufferControlCxns", ext) {
+        nbufs.foreach{ mem => 
+          val info = bufferControlInfo(mem)
+          info.zipWithIndex.foreach{ case (node, port) => 
+            emitt(src"""${mem}.connectStageCtrl(${DL(swap(quote(node), Done), 1, true)}, ${swap(quote(node), BaseEn)}, ${port})""")
+          }
         }
       }
-    }
 
-    exitAccel()
+    }
     super.emitFooter()
   }
 

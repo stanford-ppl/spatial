@@ -61,6 +61,12 @@ import argon.Block
     println("y4 = " + getArg(res4))
     println("y5 = " + getArg(res5))
     println("y6 = " + getArg(res6))
+    assert(getArg(res1) == 5760)
+    assert(getArg(res2) == 5760)
+    assert(getArg(res3) == 5760)
+    assert(getArg(res4) == 5)
+    assert(getArg(res5) == 5)
+    assert(getArg(res6) == 5)
   }
 
   override def checkIR(block: Block[_]): Result = {

@@ -26,7 +26,7 @@ trait ChiselGenDebug extends ChiselGenCommon {
 	    earlyExits = earlyExits :+ lhs
 
     case AssertIf(en,cond,_) => 
-    	if (scope == "accel") {
+    	if (inHw) {
 	    	val ens = if (en.isEmpty) "true.B" else en.mkString("&")
 	        emitt(s"breakpoints(${earlyExits.length}) := ${ens} & ${swap(quote(lhs.parent.s.get), DatapathEn)} & ~${quote(cond)}")
 	        earlyExits = earlyExits :+ lhs

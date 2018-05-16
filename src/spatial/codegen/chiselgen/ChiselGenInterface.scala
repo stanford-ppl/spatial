@@ -23,13 +23,13 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case HostIONew(init)  => 
       argIOs += (lhs -> argIOs.toList.length)
     case ArgOutNew(init) => 
-      enterAccel()
-      emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))", forceful=true)
-      emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))", forceful=true)
-      argOuts += (lhs -> argOuts.toList.length)
-      emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
-      emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
-      exitAccel()
+      inAccel{
+        emitGlobalWireMap(src"${swap(lhs, DataOptions)}", src"Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))", forceful=true)
+        emitGlobalWireMap(src"${swap(lhs, EnOptions)}", src"Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))", forceful=true)
+        argOuts += (lhs -> argOuts.toList.length)
+        emitt(src"""io.argOuts(${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""", forceful=true)
+        emitt(src"""io.argOuts(${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""", forceful=true)
+      }
 
     case GetReg(reg) =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -255,55 +255,55 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
   override def emitFooter(): Unit = {
 
-    enterAccel()
-    val intersect = loadsList.distinct.intersect(storesList.distinct)
+    inAccel{
+      val intersect = loadsList.distinct.intersect(storesList.distinct)
 
-    val num_unusedDrams = drams.toList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
+      val num_unusedDrams = drams.toList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
 
-    inGen(out, "Instantiator.scala") {
-      emit("")
-      emit("// Scalars")
-      emit(s"val numArgIns_reg = ${argIns.toList.length}")
-      emit(s"val numArgOuts_reg = ${argOuts.toList.length}")
-      emit(s"val numArgIOs_reg = ${argIOs.toList.length}")
-      argIns.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIns($i) ( ${p._1.name.getOrElse("")} )""") }
-      argOuts.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argOuts($i) ( ${p._1.name.getOrElse("")} )""") }
-      argIOs.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIOs($i) ( ${p._1.name.getOrElse("")} )""") }
-      emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
-      emit("")
-      emit(s"// Memory streams")
-      emit(src"""val loadStreamInfo = List(${loadParMapping.map(_.replace("FringeGlobals.",""))}) """)
-      emit(src"""val storeStreamInfo = List(${storeParMapping.map(_.replace("FringeGlobals.",""))}) """)
-      emit(src"""val numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */""")
-      emit(src"""// $loadsList $storesList)""")
+      inGen(out, "Instantiator.scala") {
+        emit("")
+        emit("// Scalars")
+        emit(s"val numArgIns_reg = ${argIns.toList.length}")
+        emit(s"val numArgOuts_reg = ${argOuts.toList.length}")
+        emit(s"val numArgIOs_reg = ${argIOs.toList.length}")
+        argIns.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIns($i) ( ${p._1.name.getOrElse("")} )""") }
+        argOuts.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argOuts($i) ( ${p._1.name.getOrElse("")} )""") }
+        argIOs.zipWithIndex.foreach { case(p,i) => emit(s"""//${quote(p._1)} = argIOs($i) ( ${p._1.name.getOrElse("")} )""") }
+        emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
+        emit("")
+        emit(s"// Memory streams")
+        emit(src"""val loadStreamInfo = List(${loadParMapping.map(_.replace("FringeGlobals.",""))}) """)
+        emit(src"""val storeStreamInfo = List(${storeParMapping.map(_.replace("FringeGlobals.",""))}) """)
+        emit(src"""val numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */""")
+        emit(src"""// $loadsList $storesList)""")
+      }
+
+      inGenn(out, "IOModule", ext) {
+        emit("// Scalars")
+        emit(s"val io_numArgIns_reg = ${argIns.toList.length}")
+        emit(s"val io_numArgOuts_reg = ${argOuts.toList.length}")
+        emit(s"val io_numArgIOs_reg = ${argIOs.toList.length}")
+        emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
+        emit("// Memory Streams")
+        emit(src"""val io_loadStreamInfo = List($loadParMapping) """)
+        emit(src"""val io_storeStreamInfo = List($storeParMapping) """)
+        emit(src"val io_numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */")
+      }
+
+      inGen(out, "ArgAPI.scala") {
+        emit("package accel")
+        open("object api {")
+        emit("\n// ArgIns")
+        argIns.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
+        emit("\n// ArgIOs")
+        argIOs.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length}")}
+        emit("\n// ArgOuts")
+        argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
+        emit("\n// DRAM Ptrs:")
+        drams.foreach {case (d, id) => emit(src"val ${argHandle(d)}_ptr = ${id+argIns.toList.length+argIOs.toList.length}")}
+        close("}")
+      }
     }
-
-    inGenn(out, "IOModule", ext) {
-      emit("// Scalars")
-      emit(s"val io_numArgIns_reg = ${argIns.toList.length}")
-      emit(s"val io_numArgOuts_reg = ${argOuts.toList.length}")
-      emit(s"val io_numArgIOs_reg = ${argIOs.toList.length}")
-      emit(s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
-      emit("// Memory Streams")
-      emit(src"""val io_loadStreamInfo = List($loadParMapping) """)
-      emit(src"""val io_storeStreamInfo = List($storeParMapping) """)
-      emit(src"val io_numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */")
-    }
-
-    inGen(out, "ArgAPI.scala") {
-      emit("package accel")
-      open("object api {")
-      emit("\n// ArgIns")
-      argIns.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
-      emit("\n// ArgIOs")
-      argIOs.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length}")}
-      emit("\n// ArgOuts")
-      argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
-      emit("\n// DRAM Ptrs:")
-      drams.foreach {case (d, id) => emit(src"val ${argHandle(d)}_ptr = ${id+argIns.toList.length+argIOs.toList.length}")}
-      close("}")
-    }
-    exitAccel()
     super.emitFooter()
   }
 

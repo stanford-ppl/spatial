@@ -40,14 +40,14 @@ trait ChiselGenStream extends ChiselGenCommon {
     case StreamOutNew(bus) =>
       val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
       emitGlobalWireMap(src"${lhs}_valid_options", src"Wire(Vec(${ens*lhs.writers.size}, Bool()))", forceful = true)
-      emitGlobalWireMap(src"${lhs}_valid_stops", src"Wire(Vec(${ens*lhs.writers.size}, Bool()))", forceful = true)
+      // emitGlobalWireMap(src"${lhs}_valid_stops", src"Wire(Vec(${ens*lhs.writers.size}, Bool()))", forceful = true)
       emitGlobalWireMap(src"${lhs}_valid", "Wire(Bool())", forceful = true)
-      emitGlobalWireMap(src"${lhs}_stop", "Wire(Bool())", forceful = true)
-      emitGlobalModuleMap(src"${lhs}_valid_srff", "Module(new SRFF())", forceful = true)
-      emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.set := ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
-      emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_}", forceful = true)
-      emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.asyn_reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_} | accelReset", forceful = true)
-      emitGlobalModule(src"${swap(lhs, Valid)} := ${swap(src"${lhs}_valid_srff", Blank)}.io.output.data | ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
+      // emitGlobalWireMap(src"${lhs}_stop", "Wire(Bool())", forceful = true)
+      // emitGlobalModuleMap(src"${lhs}_valid_srff", "Module(new SRFF())", forceful = true)
+      // emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.set := ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
+      // emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_}", forceful = true)
+      // emitGlobalModule(src"${swap(src"${lhs}_valid_srff", Blank)}.io.input.asyn_reset := ${swap(src"${lhs}_valid_stops", Blank)}.reduce{_|_} | accelReset", forceful = true)
+      emitGlobalModule(src"${swap(lhs, Valid)} := ${swap(lhs, ValidOptions)}.reduce{_|_}", forceful = true)
 	    emitGlobalWireMap(src"${lhs}_data_options", src"Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
 	    emitGlobalWire(src"""val ${lhs} = Vec((0 until ${ens}).map{i => val ${lhs}_slice_options = (0 until ${lhs.writers.size}).map{j => ${swap(lhs, DataOptions)}(i*${lhs.writers.size}+j)}; Mux1H(${swap(lhs, ValidOptions)}, ${lhs}_slice_options)}.toList)""")
       emitGlobalWireMap(src"${lhs}_ready", "Wire(Bool())", forceful = true)
@@ -63,10 +63,10 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       }
 //       val parent = parentOf(lhs).get
 //       emit(src"""val ${lhs}_rId = getStreamInLane("$stream")""")
-//       emit(src"""${swap(stream, ReadyOptions)}(${lhs}_rId) := ${en} & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)
+//       emit(src"""${swap(stream, ReadyOptions)}(${lhs}_rId) := ${en} & (${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)
 
-//       // emit(src"""${swap(stream, ReadyOptions)}(${lhs}_rId) := ${en} & (${swap(parent, Done)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)
-// //      emit(src"""${swap(stream, ReadyOptions)}(${lhs}_rId) := ${en} & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)
+//       // emit(src"""${swap(stream, ReadyOptions)}(${lhs}_rId) := ${en} & (${swap(parent, Done)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)
+// //      emit(src"""${swap(stream, ReadyOptions)}(${lhs}_rId) := ${en} & (${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)
 //       if (!isAck) {
 //         stream match {
 //           case Def(StreamInNew(bus)) => bus match {
@@ -97,10 +97,10 @@ trait ChiselGenStream extends ChiselGenCommon {
       val parent = lhs.parent.s.get
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${lhs.fullDelay}.toInt", true)} & $en & ~${parent}_sm.io.ctrDone """)
+        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${lhs.fullDelay}.toInt", true)} & $en """)
       }
 
-      emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} | ~${parent}_sm.io.ctrDone // Should be delayed by body latency + ready-off bubbles""")
+      // emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} // Should be delayed by body latency + ready-off bubbles""")
       data.zipWithIndex.foreach{case(d,i) =>
         emit(src"""${swap(stream, DataOptions)}($base + $i) := $d""")
       }
@@ -111,7 +111,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val base = strm.readers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
       val parent = lhs.parent.s.get
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}) // Do not delay ready because datapath includes a delayed _valid already """)}
+      ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)}
       emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}(i) }""")
 
 
@@ -122,7 +122,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       val en = ens.map(quote).mkString("&")
 
 //       emit(src"""val ${lhs}_wId = getStreamOutLane("$stream")*-*${ens.length}""")
-//       emit(src"""${swap(stream, ValidOptions)}(${lhs}_wId) := $en & ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & ~${swap(parent, Done)} /*mask off double-enq for sram loads*/""")
+//       emit(src"""${swap(stream, ValidOptions)}(${lhs}_wId) := $en & ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${symDelay(lhs)}.toInt", true)} & ~${swap(parent, Done)} /*mask off double-enq for sram loads*/""")
 //       emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${lhs}_wId) := ${swap(parent, Done)} // Should be delayed by body latency + ready-off bubbles""")
 //       (0 until ens.length).map{ i => emit(src"""${swap(stream, DataOptions)}(${lhs}_wId + ${i}) := ${data(i)}""")}
 //       // emit(src"""${stream} := Vec(List(${datacsv}))""")
@@ -140,7 +140,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 //             emit(src"""// emiiting data for stream ${stream}""")
 //             // emit(src"""${stream} := ${data.head}""")
 //             // emit(src"""converted_data := ${stream}""")
-//             // emit(src"""${stream}_valid := ${ens.mkString("&")} & ShiftRegister(${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}, ${symDelay(lhs)}.toInt)""")
+//             // emit(src"""${stream}_valid := ${ens.mkString("&")} & ShiftRegister(${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}, ${symDelay(lhs)}.toInt)""")
 //           case LEDR =>
 //             // emitGlobalWire(src"""val ${stream} = Wire(UInt(32.W))""")
 //       //      emitGlobalWire(src"""val converted_data = Wire(UInt(32.W))""")
@@ -150,7 +150,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 //             // val datacsv = data.map{d => src"${d}"}.mkString(",")
 //             // val en = ens.map(quote).mkString("&")
 //             // emit(src"${stream} := Vec(List(${datacsv}))")
-//             // emit(src"${stream}_valid := $en & ${DL(src"${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}", src"${symDelay(lhs)}.toInt", true)} & ~${parent}_done /*mask off double-enq for sram loads*/")
+//             // emit(src"${stream}_valid := $en & ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${symDelay(lhs)}.toInt", true)} & ~${parent}_done /*mask off double-enq for sram loads*/")
 //         }
 //       }
 
@@ -158,22 +158,22 @@ trait ChiselGenStream extends ChiselGenCommon {
   }
 
   override def emitFooter(): Unit = {
-  	enterAccel()
-    val insList = List.fill(streamIns.length){ "StreamParInfo(32, 1)" }.mkString(",")
-    val outsList = List.fill(streamOuts.length){ "StreamParInfo(32, 1)" }.mkString(",")
+  	inAccel{
+      val insList = List.fill(streamIns.length){ "StreamParInfo(32, 1)" }.mkString(",")
+      val outsList = List.fill(streamOuts.length){ "StreamParInfo(32, 1)" }.mkString(",")
 
-    inGenn(out, "IOModule", ext) {
-      emitt(src"// Non-memory Streams")
-      emitt(s"""val io_streamInsInfo = List(${insList})""")
-      emitt(s"""val io_streamOutsInfo = List(${outsList})""")
-    }
+      inGenn(out, "IOModule", ext) {
+        emitt(src"// Non-memory Streams")
+        emitt(s"""val io_streamInsInfo = List(${insList})""")
+        emitt(s"""val io_streamOutsInfo = List(${outsList})""")
+      }
 
-    inGen(out, "Instantiator.scala") {
-      emit(src"// Non-memory Streams")
-      emit(s"""val streamInsInfo = List(${insList})""")
-      emit(s"""val streamOutsInfo = List(${outsList})""")
+      inGen(out, "Instantiator.scala") {
+        emit(src"// Non-memory Streams")
+        emit(s"""val streamInsInfo = List(${insList})""")
+        emit(s"""val streamOutsInfo = List(${outsList})""")
+      }
     }
-    exitAccel()
     super.emitFooter()
   }
 }

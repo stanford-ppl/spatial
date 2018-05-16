@@ -18,9 +18,9 @@ trait CppGenAccel extends CppGenCommon {
       controllerStack.push(lhs)
       // Skip everything inside
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-      enterAccel()
-      visitBlock(func)
-      exitAccel()
+      inAccel{
+        visitBlock(func)
+      }
       controllerStack.pop()
       emit(s"// Register ArgIns and ArgIOs in case some are unused")
       emit(s"c1->setNumArgIns(${argIns.toList.length} + ${drams.toList.length} + ${argIOs.toList.length});")
@@ -119,7 +119,7 @@ trait CppGenAccel extends CppGenCommon {
     case ExitIf(en) => 
       // Emits will only happen if outside the accel
       emit(src"exit(1);")
-      if (scope == "accel") earlyExits = earlyExits :+ lhs
+      if (inHw) earlyExits = earlyExits :+ lhs
 
     case AssertIf(en, cond, m) => 
       // Emits will only happen if outside the accel
@@ -127,12 +127,12 @@ trait CppGenAccel extends CppGenCommon {
       emit(src"""string $lhs = string_plus("\n=================\n", string_plus($str, "\n=================\n"));""")
       val enable = if (en.toList.isEmpty) "true" else en.map(quote).mkString("&")
       emit(src"""if ($enable) { ASSERT($cond, ${lhs}.c_str()); }""")
-      if (scope == "accel") earlyExits = earlyExits :+ lhs
+      if (inHw) earlyExits = earlyExits :+ lhs
 
     case BreakpointIf(en) => 
       // Emits will only happen if outside the accel
       emit(src"exit(1);")
-      if (scope == "accel") earlyExits = earlyExits :+ lhs
+      if (inHw) earlyExits = earlyExits :+ lhs
       
     case _ => super.gen(lhs, rhs)
   }

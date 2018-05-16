@@ -12,19 +12,6 @@ trait Codegen extends Traversal {
   def ext: String
   def out: String = s"${config.genDir}${files.sep}${lang}${files.sep}"
   def entryFile: String = s"Main.$ext"
-  protected var backend = ""
-  protected var scope = "host"
-
-  def enterAccel(): Unit = { 
-    if (backend == "cpp") config.enGen = false
-    else if (backend == "accel") config.enGen = true
-    scope = "accel" 
-  }
-  def exitAccel(): Unit = { 
-    if (backend == "cpp") config.enGen = true
-    else if (backend == "accel") config.enGen = false
-    scope = "host" 
-  }
 
   def clearGen(): Unit = {
     files.deleteExts(out, ext, recursive = true)

@@ -36,15 +36,11 @@ elif [[ $type == "vcs" ]]; then
   sbt -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "zynq" ]]; then
   sbt -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "mini" ]]; then
-  sbt -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "weekly" ]]; then
-  sbt -Dtest.Scala=true -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "nightly" ]]; then
-  sbt -Dtest.Scala=true -Dtest.VCS=true -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "vcs-noretime" ]]; then
+  sbt -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
 else
   echo "Test type '$type' not recognized" 
-  echo "Supported types: [sim | vcs | zynq | mini | weekly | nightly]"
+  echo "Supported types: [sim | vcs | zynq | vcs-noretime]"
   exit 1
 fi
 

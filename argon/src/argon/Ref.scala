@@ -62,7 +62,6 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     case x: java.lang.Long    => this.value(x.toLong)
     case x: java.lang.Float   => this.value(x.toFloat)
     case x: java.lang.Double  => this.value(x.toDouble)
-    case _ if isSubtype(c.getClass,classTag[C].runtimeClass) && __isPrimitive => Some((c.asInstanceOf[C],true))
     case _ => None
   }
   final private[argon] def __value(c: Any): Option[C] = value(c).map(_._1)

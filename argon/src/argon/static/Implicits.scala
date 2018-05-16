@@ -34,7 +34,7 @@ class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
   @rig final def const(c: Any, checked: Boolean = false): A = tp.from(c, checked)
 
   /** Create an unchecked constant (no implicit state required) */
-  final def uconst(c: C): A = _const(tp, tp.__value(c).getOrElse(throw new Exception(s"Invalid constant $c for type $tp")))
+  final def uconst(c: C): A = _const(tp, tp.__value(c).getOrElse(throw new Exception(r"Invalid constant type ${c.getClass} for type $tp")))
 
   @rig def canConvertFrom(c: Any): Boolean = tp.getFrom(c).isDefined
 

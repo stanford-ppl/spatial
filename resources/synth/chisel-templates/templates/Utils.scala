@@ -5,8 +5,8 @@ import chisel3.util._
 import chisel3.internal.sourceinfo._
 import types._
 import fringe._
-import emul._
-
+// import emul._
+import scala.collection.immutable.HashMap
 import scala.math._
 
 sealed trait DeviceTarget
@@ -66,6 +66,9 @@ object ops {
     }
     def D(delay: Double): Bool = {
       b.D(delay.toInt, true.B)
+    }
+    def reverse: Bool = {
+      b
     }
     
     // Stream version
@@ -573,6 +576,70 @@ object ops {
 
 object Utils {
 
+  /* List of bank addresses, for direct accesses */
+  type Banks = List[Int]
+  def Banks(xs: Int*) = List(xs:_*)
+  /* Map from muxPort to (parallelization of access, isShift) */
+  type XMap = HashMap[Int, (Int, Option[Int])]
+  implicit class XMapOps(x: XMap) {
+    def muxPorts: Seq[Int] = x.keys.toSeq
+    def accessPars: Seq[Int] = x.sortByMuxPort.values.map(_._1).toSeq
+    def shiftAxis: Option[Int] = x.values.head._2
+    def sortByMuxPort: XMap = XMap(x.toSeq.sortBy(_._1))
+    def accessParsBelowMuxPort(f: Int): Seq[Int] = x.sortByMuxPort.filter(_._1 < f).accessPars
+    def merge(y: XMap): XMap = {
+      if (y.nonEmpty) {
+        HashMap( (x ++ HashMap(y.map{case (k,v) => 
+                                val base = x.toList.length
+                                ({base + k} -> v)
+                              }.toArray:_*)).toArray:_*)
+      } else x
+    }
+  }
+  def XMap(xs:(Int, Int)*) = HashMap[Int,(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def XMap(xs: => Seq[(Int, (Int,Option[Int]))]) = HashMap[Int,(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  def ShiftXMap(axis: Int, xs:(Int,Int)*) = HashMap[Int, (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
+  /* Map from muxPort to (Banks, isShift) */
+  type DMap = HashMap[Int, (List[Banks],Option[Int])]
+  implicit class DMapOps(x: DMap) {
+    def muxPorts: Seq[Int] = x.keys.toSeq
+    def accessPars: Seq[Int] = x.sortByMuxPort.values.map(_._1.length).toSeq
+    def shiftAxis: Option[Int] = x.values.head._2
+    def sortByMuxPort: DMap = DMap(x.toSeq.sortBy(_._1))
+    def accessParsBelowMuxPort(f: Int): Seq[Int] = x.sortByMuxPort.filter(_._1 < f).accessPars
+  }
+  def DMap(xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def DMap(xs: => Seq[(Int, (List[Banks],Option[Int]))]) = HashMap[Int,(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  def ShiftDMap(axis: Int, xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
+  type NBufXMap = HashMap[Int, XMap]
+  def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
+  def NBufXMap(xs: => Seq[(Int, XMap)]) = HashMap[Int,XMap](xs:_*)
+  implicit class NBufXMapOps(x: NBufXMap) {
+    def mergeXMaps: XMap = {
+      HashMap(x.sortByBufferPort.map{case (buf,map) => 
+        val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
+        map.map{case (muxport, par) => ({muxport + base} -> par)} 
+      }.flatten.toArray:_*) 
+    }
+    def accessPars: Seq[Int] = x.mergeXMaps.accessPars
+    def accessParsBelowBufferPort(f: Int): Seq[Int] = x.sortByBufferPort.filter(_._1 < f).mergeXMaps.accessPars
+    def sortByBufferPort: NBufXMap = NBufXMap(x.toSeq.sortBy(_._1))
+  }
+  type NBufDMap = HashMap[Int, DMap]
+  def NBufDMap(xs:(Int,DMap)*) = HashMap[Int, DMap](xs:_*)
+  def NBufDMap(xs: => Seq[(Int, DMap)]) = HashMap[Int,DMap](xs:_*)
+  implicit class NBufDMapOps(x: NBufDMap) {
+    def mergeDMaps: DMap = {
+      HashMap(x.sortByBufferPort.map{case (buf,map) => 
+        val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
+        map.map{case (muxport, banks) => ({muxport + base} -> banks)} 
+      }.flatten.toArray:_*)
+    }
+    def accessPars: Seq[Int] = x.mergeDMaps.accessPars
+    def accessParsBelowBufferPort(f: Int): Seq[Int] = x.sortByBufferPort.filter(_._1 < f).mergeDMaps.accessPars
+    def sortByBufferPort: NBufDMap = NBufDMap(x.toSeq.sortBy(_._1))
+  }
+
   var regression_testing = scala.util.Properties.envOrElse("RUNNING_REGRESSION", "0")
 
   // These properties should be set inside IOModule
@@ -717,6 +784,18 @@ object Utils {
     result
   }
 
+  def fix2flt(a: UInt, s: Boolean, d: Int, f: Int, m: Int, e: Int): UInt = {
+    FringeGlobals.bigIP.fix2flt(a,s,d,f,m,e)
+  }
+  def fix2fix(a: UInt, s: Boolean, d: Int, f: Int): UInt = {
+    FringeGlobals.bigIP.fix2fix(a,s,d,f)
+  }
+  def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int): UInt = {
+    FringeGlobals.bigIP.flt2fix(a,mw,e,sign,dec,frac)
+  }
+  def flt2flt(a: UInt, mwa: Int, ea: Int, mw_out: Int, e_out: Int): UInt = {
+    FringeGlobals.bigIP.flt2flt(a,mwa,ea,mw_out,e_out)
+  }
 
   // def getDoubleBits(num: Double) = java.lang.Double.doubleToRawIntBits(num)
   def delay[T <: chisel3.core.Data](sig: T, length: Int):T = {
@@ -755,6 +834,13 @@ object Utils {
       flt_rng.io.en := true.B
       result.r := flt_rng.io.output
       result
+  }
+
+  def fixrand(seed: Int, bits: Int): FixedPoint = {
+    val prng = Module(new PRNG(seed, bits))
+    val result = Wire(new FixedPoint(false, bits, 0))
+    result := prng.io.output
+    result
   }
 
   def risingEdge(sig:Bool): Bool = {

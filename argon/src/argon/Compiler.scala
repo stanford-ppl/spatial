@@ -14,7 +14,7 @@ trait Compiler { self =>
 
   val script: String
   val desc: String
-  def name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
+  var name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
 
   var directives: Map[String,String] = Map.empty
   def define[T](name: String, default: T)(implicit ctx: SrcCtx): T = directives.get(name.toLowerCase) match {
@@ -124,9 +124,17 @@ trait Compiler { self =>
     block
   }
 
-  def postprocess(block: Block[_]): Unit = { }
+  def postprocess(block: Block[_]): Unit = {
+    info(s"Completed")
+  }
 
   final def compileProgram(args: Array[String]): Unit = instrument("compile"){
+    info(s"Compiling ${config.name} to ${config.genDir}")
+    if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
+    if (config.test) info("Running in testbench mode")
+
+    files.deleteExts(IR.config.logDir, "log")
+
     val block = stageProgram(args)
     if (config.enLog) info(s"Symbols: ${IR.maxId}")
     val result = runPasses(block)
@@ -184,16 +192,10 @@ trait Compiler { self =>
     defineOpts(parser)
     parser.parse(other, ())         // Initialize the Config (from commandline)
     settings()                     // Override config with any DSL or app-specific settings
+    name = config.name
     IR.config.logDir = IR.config.logDir + files.sep + name + files.sep
     IR.config.genDir = IR.config.genDir + files.sep + {if (config.genDirOverride) "" else {name + files.sep}}
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
-
-    info(s"Compiling ${config.name} to ${config.genDir}")
-    if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
-    if (config.test) info("Running in testbench mode")
-
-    files.deleteExts(IR.config.logDir, "log")
-
     flows()
     rewrites()
   }
@@ -252,9 +254,18 @@ trait Compiler { self =>
         val stream = getOrCreateStream(config.logDir,log + ".log")
         i.dumpInstrument(heading, stream)
         stream.println("\n")
+        i.dumpAllInstrument(stream)
+        stream.println("\n")
+
         info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
         i.resetInstrument()
       }
+
+      val heading = s"@flow analyses"
+      val stream = getOrCreateStream(config.logDir,"flows.log")
+      IR.flows.instrument.dump(heading,stream)
+      stream.println("\n")
+      IR.flows.instrument.dumpAll(stream)
     }
 
     val time = instrument.totalTime

@@ -5,7 +5,6 @@ import spatial.dse.DSEMode
 import spatial.targets.HardwareTarget
 
 
-
 class SpatialConfig extends Config {
 
   var targetName: String = _

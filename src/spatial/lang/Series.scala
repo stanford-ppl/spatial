@@ -1,9 +1,10 @@
 package spatial.lang
 
 import argon._
-import emul.FixedPoint
 import forge.tags._
 import utils.implicits.collections._
+
+import spatial.node.SeriesForeach
 
 import scala.annotation.unchecked.{uncheckedVariance => uV}
 
@@ -18,6 +19,7 @@ case class Series[+A:Num](
   def A: Num[A@uV] = Num[A]
 
   def ::(start2: A@uV): Series[A] = Series[A](start2, end, start, par, isUnit=false)
+  def by(stride: A@uV): Series[A] = Series[A](start, end, stride, par, isUnit)
 
   def par(p: I32): Series[A] = Series[A](start, end, step, p, isUnit=false)
 
@@ -39,6 +41,12 @@ case class Series[+A:Num](
 
   /** Returns the `i`'th element in this Series. */
   @api def at(i: I32): A = start + i.to[A]*step
+
+  @api def foreach(func: A => Any): Void = {
+    val i = boundVar[A]
+    val blk = stageLambda1(i){ func(i); void }
+    stage(SeriesForeach(start,end,step,blk))
+  }
 
   def mirror(f:Tx): Series[_] = Series[A](f(start),f(end),f(step),f(par),isUnit)
   override def toString: String = s"Series($start, $end, $step, $par, $isUnit)"

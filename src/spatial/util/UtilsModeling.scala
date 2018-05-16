@@ -27,7 +27,7 @@ case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) exten
 
 trait UtilsModeling {
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
-    val schedule = block.nestedStms.filter{e => e.isBits }
+    val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
     val result   = (block +: schedule.flatMap{_.blocks}).flatMap{b => exps(b) }
     (schedule, result)
   }
@@ -77,7 +77,7 @@ trait UtilsModeling {
     val latency = latencies.values.fold(0.0){(a,b) => Math.max(a,b) }
     // TODO: Safer way of determining if THIS cycle is the reduceType
     val interval = (cycles.map{c =>
-      val scopeContainsSpecial = scope.exists(x => reduceType(x).contains(FixPtSum) )
+      val scopeContainsSpecial = scope.exists(x => x.reduceType.contains(FixPtSum) )
       val cycleContainsAdd = c.symbols.exists{case Op(FixAdd(_,_)) => true; case _ => false}
       val length = if (cycleContainsAdd && scopeContainsSpecial) 1 else c.length
       length
@@ -259,7 +259,7 @@ trait UtilsModeling {
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
       val muxPairs = accesses.map{access =>
-        val muxes = portsOf(access).values.map(_.muxPort)
+        val muxes = access.ports.values.map(_.muxPort)
         (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
       }.toSeq
 

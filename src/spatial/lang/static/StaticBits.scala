@@ -11,13 +11,13 @@ trait StaticBits { this: SpatialStatics =>
     implicit val tA: Bits[A] = a.selfType
     stage(Mux(s,a,b))
   }
-  @api def mux[A,B](s: Bit, a: Bits[A], b: Lift[B]): A = {
+  @api def mux[A](s: Bit, a: Bits[A], b: Literal): A = {
     implicit val tA: Bits[A] = a.selfType
-    stage(Mux(s, a, tA.from(b.orig)))
+    stage(Mux(s, a, tA.from(b.value)))
   }
-  @api def mux[A,B](s: Bit, a: Lift[A], b: Bits[B]): B = {
-    implicit val tB: Bits[B] = b.selfType
-    stage(Mux(s, tB.from(a.orig), b))
+  @api def mux[A](s: Bit, a: Literal, b: Bits[A]): A = {
+    implicit val tB: Bits[A] = b.selfType
+    stage(Mux(s, tB.from(a.value), b))
   }
   @api def mux[A:Bits](s: Bit, a: Lift[A], b: Lift[A]): A = {
     stage(Mux(s,a.unbox,b.unbox))
@@ -30,7 +30,7 @@ trait StaticBits { this: SpatialStatics =>
 
   @api def zero[A:Bits]: A = Bits[A].zero
   @api def one[A:Bits]: A = Bits[A].one
-
+  
   @api def random[A:Bits]: A = Bits[A].random(None)
   @api def random[A:Bits](max: A): A = Bits[A].random(Some(max))
 

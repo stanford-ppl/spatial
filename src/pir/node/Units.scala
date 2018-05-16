@@ -31,6 +31,7 @@ abstract class PU extends Control[Void] {
   override def iters   = iterss.flatten
   override def cchains = ccs.zip(iterss)
   override def bodies  = Seq(iters -> this.blocks)
+  def mayBeOuterBlock(i: Int): Boolean = true
 
   override def binds = super.binds ++ ins.values ++ outs.values ++ iters
 }
@@ -42,7 +43,7 @@ abstract class PU extends Control[Void] {
   ins:    mutable.Map[Int,In[_]] = mutable.Map.empty,
   outs:   mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def inputs = syms(scope)
+  override def inputs = syms(scope).toSeq
 }
 
 // Address Generator
@@ -52,7 +53,7 @@ abstract class PU extends Control[Void] {
   ins:      mutable.Map[Int,In[_]] = mutable.Map.empty,
   outs:     mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def inputs = syms(datapath)
+  override def inputs = syms(datapath).toSeq
 }
 
 // Virtual compute unit
@@ -62,7 +63,7 @@ abstract class PU extends Control[Void] {
   ins:      mutable.Map[Int,In[_]] = mutable.Map.empty,
   outs:     mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
-  override def inputs  = syms(datapath)
+  override def inputs  = syms(datapath).toSeq
 }
 
 // Virtual memory unit
@@ -82,7 +83,7 @@ abstract class PU extends Control[Void] {
   override def bodies = rdPath.map{blk => rdIters.flatten -> Seq(blk) }.toSeq ++
                         wrPath.map{blk => wrIters.flatten -> Seq(blk) }
 
-  override def inputs = syms(rdPath) ++ syms(wrPath) ++ syms(memories)
+  override def inputs = syms(rdPath, wrPath, memories).toSeq
 
   def getWdata(): Option[Sym[_]] = {
     wrPath.flatMap { b =>

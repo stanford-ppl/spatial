@@ -29,7 +29,7 @@ case class MemoryAllocator(IR: State) extends Pass {
     // Memories which can use more specialized memory resources
     val (sramAble,nonSRAM) = localMems.all.partition(canSRAM)
 
-    var unassigned: Set[(Sym[_],Memory,Int)] = sramAble.flatMap{mem => duplicatesOf(mem).zipWithIndex.map{case (d,i) => (mem,d,i) }}
+    var unassigned: Set[(Sym[_],Memory,Int)] = sramAble.flatMap{mem => mem.duplicates.zipWithIndex.map{case (d,i) => (mem,d,i) }}
 
     dbg(s"\n\n")
     dbg("Allocating Memory Resources")
@@ -73,7 +73,7 @@ case class MemoryAllocator(IR: State) extends Pass {
 
         while (capacity(resource.name) > 0 && idx < sortedInsts.length) {
           val (mem, dup, d, _, area) = sortedInsts(idx)
-          val size = constDimsOf(mem).product
+          val size = areaModel.memoryBankDepth(mem,dup)
 
           if (area <= capacity && size >= resource.minDepth) {
             dbg(s"  Assigned $mem#$d to ${resource.name} (uses $area)")
@@ -95,7 +95,7 @@ case class MemoryAllocator(IR: State) extends Pass {
     }
 
     unassigned.foreach{case (mem,dup,_) => dup.resourceType = Some(resources.last) }
-    nonSRAM.foreach{mem => duplicatesOf(mem).foreach{dup => dup.resourceType = Some(resources.last) }}
+    nonSRAM.foreach{mem => mem.duplicates.foreach{dup => dup.resourceType = Some(resources.last) }}
   }
 
 }

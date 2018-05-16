@@ -95,7 +95,7 @@ object DenseTransfer {
         dbg(s"$local => $dram: Using unaligned store ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         unalignedStore(dramAddr, localAddr)
       case _ =>
-        dbg(s"$local => $dram: Using unaligned store (request length is statically unknown)")
+        dbg(s"$local => $dram: Using unaligned store (request length is statically unknown ($requestLength))")
         unalignedStore(dramAddr, localAddr)
     }
     def load(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = requestLength match {
@@ -106,13 +106,13 @@ object DenseTransfer {
         dbg(s"$dram => $local: Using unaligned load ($c * ${A.nbits} % ${target.burstSize}* ${c*A.nbits % target.burstSize})")
         unalignedLoad(dramAddr, localAddr)
       case _ =>
-        dbg(s"$dram => $local: Using unaligned load (request length is statically unknown)")
+        dbg(s"$dram => $local: Using unaligned load (request length is statically unknown ($requestLength))")
         unalignedLoad(dramAddr, localAddr)
     }
 
     def alignedStore(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      //isAligned(cmdStream) = true
+      //cmdStream.isAligned = true
       // val issueQueue = FIFO[I32](16)  // TODO: Size of issued queue?
       val dataStream = StreamOut[Tup2[A,Bit]](BurstFullDataBus[A]())
       val ackStream  = StreamIn[Bit](BurstAckBus)
@@ -187,7 +187,7 @@ object DenseTransfer {
 
     def unalignedStore(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      isAligned(cmdStream) = false
+      cmdStream.isAligned = false
       val dataStream = StreamOut[Tup2[A,Bit]](BurstFullDataBus[A]())
       val ackStream  = StreamIn[Bit](BurstAckBus)
 
@@ -230,7 +230,7 @@ object DenseTransfer {
 
     def alignedLoad(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      isAligned(cmdStream) = true
+      cmdStream.isAligned = true
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command generator
@@ -254,7 +254,7 @@ object DenseTransfer {
 
     def unalignedLoad(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = {
       val cmdStream  = StreamOut[BurstCmd](BurstCmdBus)
-      isAligned(cmdStream) = false
+      cmdStream.isAligned = false
       val issueQueue = FIFO[IssuedCmd](16)  // TODO: Size of issued queue?
       val dataStream = StreamIn[A](BurstDataBus[A]())
 

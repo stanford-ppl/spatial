@@ -8,9 +8,8 @@ import spatial.lang._
 abstract class StructAlloc[S:Struct] extends Primitive[S] {
   def elems: Seq[(String,Sym[_])]
 
-  override def inputs = syms(elems.map(_._2))
   override def reads  = Nil
-  override def aliases = Nil
+  override def aliases = Nul
   override def contains = syms(elems.map(_._2))
   override val isEphemeral: Boolean = true
 }
@@ -19,6 +18,18 @@ abstract class StructAlloc[S:Struct] extends Primitive[S] {
 
 @op case class FieldApply[S,A:Type](struct: Struct[S], field: String) extends Primitive[A] {
   override val isEphemeral: Boolean = true
+
+  @rig override def rewrite: A = struct match {
+    case Op(SimpleStruct(fields)) if !struct.isMutable =>
+      fields.find(_._1 == field) match {
+        case Some((_,f)) => f.asInstanceOf[A]
+        case None =>
+          warn(ctx, s"$field does not appear to be a field of ${struct.tp}")
+          warn(ctx)
+          super.rewrite
+      }
+    case _ => super.rewrite
+  }
 }
 
 @op case class FieldUpdate[S,A:Type](struct: Struct[S], field: String, data: A) extends Primitive[Void] {

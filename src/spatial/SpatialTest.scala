@@ -33,19 +33,31 @@ trait SpatialTest extends Spatial with DSLTest {
   ) {
     def shouldRun: Boolean = enable("test.Scala")
     override def parseRunError(line: String): Result = {
-      if (line.trim.startsWith("at")) Error(prev)   // Scala exception
+      if (line.trim.startsWith("at")) Error(prev) // Scala exception
+      else if (line.trim.contains("Assertion failure")) Error(line) // Assertion failure
+      else if (line.trim.contains("error")) Error(line) // Runtime/compiler error
       else super.parseRunError(line)
     }
   }
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --fpga Default",
+    args = "--synth --fpga Zynq",
     make = "make vcs",
     run  = "bash scripts/regression_run.sh"
   ) {
     override def shouldRun: Boolean = enable("test.VCS")
-    override val makeTimeout: Long = 13000
+    override val makeTimeout: Long = 3600
+  }
+
+  object VCS_noretime extends ChiselBackend(
+    name = "VCS_noretime",
+    args = "--synth --noretime",
+    make = "make vcs",
+    run  = "bash scripts/regression_run.sh"
+  ) {
+    override def shouldRun: Boolean = enable("test.VCS_noretime")
+    override val makeTimeout: Long = 3600
   }
 
   object Zynq extends ChiselBackend(
@@ -60,7 +72,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth",
+    args = "--synth --fgpa ZCU",
     make = "make zcu",
     run  = "bash scripts/scrape.sh ZCU"
   ) {
@@ -78,18 +90,26 @@ trait SpatialTest extends Spatial with DSLTest {
     override val makeTimeout: Long = 32400
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, VCS, AWS)
+  class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)
+  object RequireErrors {
+    def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
+  }
+
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, VCS, AWS, VCS_noretime)
 
   protected def checkIR(block: argon.Block[_]): Result = Unknown
 
   final override def postprocess(block: argon.Block[_]): Unit = {
     import argon._
     import spatial.node.AssertIf
+    super.postprocess(block)
 
-    val stms = block.nestedStms
-    val hasAssert = stms.exists{case Op(_:AssertIf) => true; case _ => false }
-    if (!hasAssert) throw Indeterminate
-    checkIR(block)
+    if (config.test) {
+      val stms = block.nestedStms
+      val hasAssert = stms.exists{case Op(_: AssertIf) => true; case _ => false }
+      if (!hasAssert) throw Indeterminate
+      checkIR(block)
+    }
   }
 
 }

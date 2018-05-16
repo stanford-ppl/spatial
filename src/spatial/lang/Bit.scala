@@ -20,7 +20,7 @@ import spatial.node._
 
   // --- Typeclass Methods
   override val box: Bit <:< Bits[Bit] = implicitly[Bit <:< Bits[Bit]]
-  override val __isPrimitive: Boolean = true
+  override val __neverMutable: Boolean = true
 
   @rig def nbits: Int = 1
   @rig def zero: Bit = this.from(false)

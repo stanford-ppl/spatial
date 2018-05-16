@@ -12,7 +12,6 @@ trait Codegen extends Traversal {
   def ext: String
   def out: String = s"${config.genDir}${files.sep}${lang}${files.sep}"
   def entryFile: String = s"Main.$ext"
-  var cliArgs: Map[Int,String] = Map.empty
   protected var backend = ""
   protected var scope = "host"
 
@@ -66,6 +65,7 @@ trait Codegen extends Traversal {
 
   protected def quoteOrRemap(arg: Any): String = arg match {
     case p: Seq[_]     => p.map(quoteOrRemap).mkString(", ")  // By default, comma separate Seq
+    case p: Array[_]   => p.map(quoteOrRemap).mkString(", ")
     case e: Ref[_,_]   => quote(e)
     case s: String     => s
     case c: Int        => c.toString
@@ -75,6 +75,7 @@ trait Codegen extends Traversal {
     case l: BigDecimal => l.toString
     case l: BigInt     => l.toString
     case o: Option[_] if !o.isDefined => "None"
+    case o: Option[_] if o.isDefined => "Some(" + quoteOrRemap(o.get) + ")"
     case _ => throw new RuntimeException(s"[$name] Could not quote or remap $arg (${arg.getClass})")
   }
 

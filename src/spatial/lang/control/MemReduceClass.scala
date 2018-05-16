@@ -43,20 +43,20 @@ protected class MemReduceAccum[A,C[T]](
 
     //logs(s"Creating MemReduce on accumulator of rank ${acc.rank}")
 
-    val itersMap = List.fill(domain.length){ bound[I32] }
-    val itersRed = List.fill(acc.rank){ bound[I32] }
+    val itersMap = List.fill(domain.length){ boundVar[I32] }
+    val itersRed = List.fill(acc.rank){ boundVar[I32] }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")
 
-    val lA = bound[A]
-    val rA = bound[A]
+    val lA = boundVar[A]
+    val rA = boundVar[A]
     val mapBlk: Block[C[A]] = stageBlock{ map(itersMap) }
     val redBlk: Lambda2[A,A,A] = stageLambda2(lA,rA){ reduce(lA, rA) }
     val resLd:  Lambda1[C[A],A] = stageLambda1(mapBlk.result){ C.evMem(mapBlk.result.unbox).__read(itersRed, Set.empty) }
     val accLd:  Lambda1[C[A],A] = stageLambda1(acc){ acc.__read(itersRed, Set.empty) }
     val accSt:  Lambda2[C[A],A,Void] = stageLambda2(acc, redBlk.result){ acc.__write(redBlk.result.unbox,itersRed,Set.empty) }
-    val pipe = stage(OpMemReduce[A,C](
+    stageWithData(OpMemReduce[A,C](
       ens = Set.empty,
       cchainMap,
       cchainRed,
@@ -69,8 +69,10 @@ protected class MemReduceAccum[A,C[T]](
       ident,
       fold,
       itersMap,
-      itersRed))
-    opt.set(pipe)
+      itersRed)
+    ){pipe =>
+      opt.set(pipe)
+    }
     accum
   }
 }

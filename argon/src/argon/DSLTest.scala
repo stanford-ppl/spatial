@@ -21,7 +21,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
   def backends: Seq[Backend]
   def enable(str: String): Boolean = sys.props.get(str).exists(v => v.trim.toLowerCase == "true")
-  lazy val DISABLE: Seq[Backend] = Seq(IGNORE_TEST)
+  lazy val DISABLED: Seq[Backend] = Seq(IGNORE_TEST)
 
   /** A backend which can compile and run a given application.
     *
@@ -36,8 +36,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     val make: String,
     val run:  String
   ){ backend =>
-    val makeTimeout: Long = 2000 // Timeout for compiling, in seconds
-    val runTimeout: Long  = 2000 // Timeout for running, in seconds
+    val makeTimeout: Long = 3000 // Timeout for compiling, in seconds
+    val runTimeout: Long  = 3000 // Timeout for running, in seconds
     var prev: String = ""
 
     def shouldRun: Boolean
@@ -61,25 +61,25 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     final def runApp(): Result = {
       var result: Result = Unknown
       runtimeArgs.cmds.foreach { args =>
-        val a = args.split(" ").map(_.trim).filter(_.nonEmpty)
-        result = result orElse command("run", runArgs ++ a, backend.runTimeout, backend.parseRunError)
+        result = result orElse command("run", runArgs :+ args, backend.runTimeout, backend.parseRunError)
       }
       result orElse Pass
     }
     final def compile(): Iterator[() => Result] = {
       import scala.concurrent.ExecutionContext.Implicits.global   // implicit execution context for Futures
 
-      val name = this.name.replace("_", "/")
+      val name = test.name.replace("_", "/")
       val stageArgs = test.compileArgs.cmds
       stageArgs.iterator.map{cmd => () => {
         try {
-          val backArgs = backend.args.split(" ").map(_.trim)
-          val stageArgs = cmd.split(" ").map(_.trim)
-          val args = backArgs ++ stageArgs ++ Seq("-v")
+          val backArgs = backend.args.split(" ").map(_.trim).filterNot(_.isEmpty)
+          val stageArgs = cmd.split(" ").map(_.trim).filterNot(_.isEmpty)
+          val args = backArgs ++ stageArgs ++ Seq("-v", "--test")
           val f = Future{ scala.concurrent.blocking {
             init(args)
             IR.config.genDir = s"${IR.config.cwd}/gen/$backend/$name/"
             IR.config.logDir = s"${IR.config.cwd}/logs/$backend/$name/"
+            IR.config.repDir = s"${IR.config.cwd}/reports/$backend/$name/"
             compileProgram(args)
           }}
           Await.result(f, duration.Duration(backend.makeTimeout, "sec"))
@@ -96,7 +96,10 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
       val cmdLog = new PrintStream(IR.config.logDir + s"/$pass.log")
       var cause: Result = Unknown
-      val cmd = new Subprocess(args:_*)({case (line,_) =>
+      Console.out.println(s"Backend $pass in ${IR.config.logDir}/$pass.log")
+      Console.out.println(args.mkString(" "))
+      val cmd = new Subprocess(args:_*)({case (lline,_) =>
+        val line = lline.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt","")
         val err = parse(line)
         cause = cause.orElse(err)
         cmdLog.println(line)
@@ -107,7 +110,12 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       try {
         val f = Future{ scala.concurrent.blocking{ cmd.block(IR.config.genDir) } }
         val code = Await.result(f, duration.Duration(timeout, "sec"))
-        if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code: $code"))
+        val lines = cmd.stdout()
+        val errs  = cmd.errors()
+        lines.foreach{ll => val l = ll.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(l); cmdLog.println(l) } // replaceAll to prevent JUnit crash
+        errs.foreach{ee => val e = ee.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(e); cmdLog.println(e) } // replaceAll to prevent JUnit crash
+        if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code during backend $pass: $code.\n${errs.take(4).mkString("\n")}"))
+        if (code == 0) cause = Unknown
       }
       catch {
         case e: Throwable =>
@@ -137,23 +145,23 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     }
   }
 
-  object IllegalExample extends Backend(
+  class IllegalExample(args: String, errors: Int) extends Backend(
     name = "IllegalExample",
-    args = "",
+    args = args,
     make = "",
     run  = ""
   ) {
-    def shouldRun = true
+    def shouldRun: Boolean = true
     override def runBackend(): Unit = {
-      s"${test.name}" should "have compiler errors" in {
+      s"${test.name}" should s"have $errors compiler errors" in {
         compile().foreach{err =>
           err()
           IR.hadErrors shouldBe true
+          IR.errors shouldBe errors
         }
       }
     }
   }
-
 
   object IGNORE_TEST extends Backend(
     name = "Ignore",

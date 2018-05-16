@@ -7,6 +7,10 @@ import spatial.node._
 import emul.FloatPoint
 import emul.FixedPoint
 import utils.escapeString
+import spatial.util._
+import emul.Bool
+import host._
+
 
 
 trait CppGenCommon extends CppCodegen { 
@@ -16,6 +20,44 @@ trait CppGenCommon extends CppCodegen {
   var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
   var drams = scala.collection.mutable.HashMap[Sym[_], Int]()
+
+  /* Represent a FixPt with nonzero number of f bits as a bit-shifted int */
+  protected def toTrueFix(x: String, tp: Type[_]): String = {
+    tp match {
+      case FixPtType(s,d,f) if (f != 0) => src"(${asIntType(tp)}) ($x * ((${asIntType(tp)})1 << $f))"
+      case _ => src"$x"
+    }
+  }
+  /* Represent a FixPt with nonzero number of f bits as a float */
+  protected def toApproxFix(x: String, tp: Type[_]): String = {
+    tp match {
+      case FixPtType(s,d,f) if (f != 0) => src"(${tp}) ($x / ((${asIntType(tp)})1 << $f))"
+      case _ => src"$x"
+    }
+  }
+
+  protected def asIntType(tp: Type[_]): String = tp match {
+    case FixPtType(s,d,f) => 
+      if (d+f > 64) s"int128_t"
+      else if (d+f > 32) s"int64_t"
+      else if (d+f > 16) s"int32_t"
+      else if (d+f > 8) s"int16_t"
+      else if (d+f > 4) s"int8_t"
+      else if (d+f > 2) s"int8_t"
+      else if (d+f == 2) s"int8_t"
+      else "bool"
+    case FltPtType(m,e) => "float"
+    case _ => 
+      val w = bitWidth(tp)
+      if (w > 64) s"int128_t"
+      else if (w > 32) s"int64_t"
+      else if (w > 16) s"int32_t"
+      else if (w > 8) s"int16_t"
+      else if (w > 4) s"int8_t"
+      else if (w > 2) s"int8_t"
+      else if (w == 2) s"int8_t"
+      else "bool"
+  }
 
   override protected def remap(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => 
@@ -34,19 +76,18 @@ trait CppGenCommon extends CppCodegen {
     case DoubleType() => "double"
     case _: Bit => "bool"
     case _: Text => "string"
-    case ai: ArgIn[_] => remap(ai.typeArgs.head)
+    case ai: Reg[_] => remap(ai.typeArgs.head)
     case _: Vec[_] => "vector<" + remap(tp.typeArgs.head) + ">"
-    case _ => 
-      tp.typePrefix match {
-        case "Array" => "vector<" + remap(tp.typeArgs.head) + ">"
-        case _ => super.remap(tp)
-      }
+    case t: Tup2[_,_] => s"${super.remap(tp)}".replaceAll("\\[","").replaceAll("\\]","").replaceAll(",","")
+    case _: host.Array[_] => "vector<" + remap(tp.typeArgs.head) + ">"
+    case _ => super.remap(tp)
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
     case (FixPtType(s,d,f), _) => c.toString + {if (f+d > 32) "L" else ""}
     case (FltPtType(g,e), _) => c.toString
     case (_:Text, cc: String) => "string(" + escapeString(cc) + ")"
+    case (_:Bit, c:Bool) => s"${c.value}"
     case _ => super.quoteConst(tp,c)
   }
 
@@ -68,6 +109,8 @@ trait CppGenCommon extends CppCodegen {
     }
   }
 
+
+  protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
 
   protected def bitWidth(tp: Type[_]): Int = tp match {
     case FixPtType(s,d,f) => d+f; 

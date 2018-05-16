@@ -28,7 +28,16 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
     }
     case v => that match {
       case t: Top[_] if t.tp =:= this.tp => v.neql(t.asInstanceOf[A])
-      case _ => unrelated(that); !this.equals(that)
+      case _ =>
+        // (Silently) Attempt to create a constant from the rhs
+        // Fall back to unstaged comparison if this fails.
+        if (this.tp.canConvertFrom(that)) {
+          v.neql(this.tp.from(that))
+        }
+        else {
+          unrelated(that)
+          !this.equals(that)
+        }
     }
   }
   @api def ===(that: Any): Bit = this match {
@@ -38,7 +47,16 @@ abstract class Top[A](implicit ev: A <:< Ref[Any,A]) extends Ref[Any,A] { self =
     }
     case v => that match {
       case t: Top[_] if t.tp =:= this.tp => v.eql(t.asInstanceOf[A])
-      case _ => unrelated(that); this.equals(that)
+      case _ =>
+        // (Silently) Attempt to create a constant from the rhs
+        // Fall back to unstaged comparison if this fails.
+        if (this.tp.canConvertFrom(that)) {
+          v.eql(this.tp.from(that))
+        }
+        else {
+          unrelated(that)
+          this.equals(that)
+        }
     }
   }
 

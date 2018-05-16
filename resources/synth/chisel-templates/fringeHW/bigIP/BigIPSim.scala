@@ -62,6 +62,14 @@ class BigIPSim extends BigIP {
     }
   }
 
+  override def sqrt(num: UInt, latency: Int): UInt = {
+    num // TODO    
+  }
+
+  override def fsqrt(num: UInt, latency: Int): UInt = {
+    num // TODO
+  }
+
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt = {
     val result = Wire(new FloatingPoint(m, e))
     val fma = Module(new MulAddRecFN(m, e))

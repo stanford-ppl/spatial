@@ -8,7 +8,7 @@ import utils.tags.instrument
 
 trait Staging { this: Printing =>
   /** Create a checked parameter (implicit state required) */
-  @stateful def param[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
+  @stateful def parameter[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
 
   /** Create a checked constant (implicit state required) */
   @stateful def const[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked)
@@ -25,9 +25,9 @@ trait Staging { this: Printing =>
   @stateful def err[A:Type](msg: String): A = Type[A]._new(Def.Error[A](state.nextId(),msg), ctx)
   @stateful def err_[A](tp: Type[A], msg: String): A = tp._new(Def.Error[A](state.nextId(),msg), ctx)
 
-  @stateful def bound[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
+  @stateful def boundVar[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
 
-  @stateful private def symbol[A](tp: Type[A], op: Op[A]): A = {
+  @rig private def symbol[A](tp: Type[A], op: Op[A]): A = {
     if (state eq null) throw new Exception(s"Staging in null state scope")
     if (tp eq null) throw new Exception(s"Staging with null type")
     tp._new(Def.Node(state.nextId(),op), ctx)
@@ -40,7 +40,7 @@ trait Staging { this: Printing =>
     */
   @rig def checkAliases(sym: Sym[_], effects: Effects): Unit = {
     val immutables = effects.writes.filterNot(_.isMutable)
-    val aliases = mutableAliases(op) diff effects.writes
+    val aliases = (sym.mutableAliases diff effects.writes) diff Set(sym)
 
     //        logs(s"  aliases: ${aliasSyms(op)}")
     //        logs(s"  copies: ${copySyms(op)}")
@@ -51,20 +51,25 @@ trait Staging { this: Printing =>
     //        logs(s"  written immutables: $immutables")
     //        logs(s"  mutable aliases: $aliases")
 
-    if (aliases.nonEmpty) {
-      error(ctx, "Illegal sharing of mutable objects: ")
-      (aliases + sym).foreach{alias => error(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
+    if (aliases.nonEmpty && !config.enableMutableAliases) {
+      error(sym.ctx, s"${sym.nameOr("Value")} has multiple mutable aliases. Mutable aliasing is disallowed.")
+      (aliases + sym).foreach{alias =>
+        error(alias.ctx, s"${alias.nameOr("Value")} defined here.", noError = true)
+        error(alias.ctx)
+      }
+
+      (aliases + sym).foreach{alias => dbgs(s"${alias.ctx}:  symbol ${stm(alias)} defined here") }
     }
     if (immutables.nonEmpty) {
-      error(ctx, "Illegal mutation of immutable symbols")
-      error(ctx)
       immutables.foreach{s =>
-        error(s.ctx, s"Mutation of ${s.nameOr("symbol")} defined here.")
+        error(sym.ctx, s"Illegal mutation of immutable ${s.nameOr("value")}")
+        error(sym.ctx)
+        error(s.ctx, s"${s.nameOr("value")} originally defined here")
         error(s.ctx)
       }
 
       immutables.foreach{s =>
-        dbgs(s"${s.ctx}:  symbol ${stm(s)} defined here")
+        dbgs(s"${s.ctx}:  Illegal mutation: ${stm(s)} defined here")
         dbgs(s"${stm(s)}")
         strMeta(s)
       }
@@ -74,7 +79,7 @@ trait Staging { this: Printing =>
   @rig def rewrite[R](op: Op[R]): Option[R] = state.rewrites.apply(op)(op.R,ctx,state)
   @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = state.flows.apply(sym, op)
 
-  @rig def register[R](op: Op[R], symbol: () => R): R = rewrite(op) match {
+  @rig def register[R](op: Op[R], symbol: () => R, data: Sym[R] => Unit): R = rewrite(op) match {
     case Some(s) => s
     case None if state eq null =>
       // General operations in object/trait constructors are currently disallowed
@@ -85,6 +90,9 @@ trait Staging { this: Printing =>
       err_[R](op.R, "Invalid declaration in global namespace")
 
     case None =>
+      val sAliases = op.shallowAliases
+      val dAliases = op.deepAliases
+
       val effects = allEffects(op)
       val mayCSE = effects.mayCSE
 
@@ -92,18 +100,34 @@ trait Staging { this: Printing =>
         val lhs = symbol()
         val sym = op.R.boxed(lhs)
 
-        if (config.enLog) {
-          logs(s"$lhs = $op")
-          logs(s"Effects: $effects")
-        }
-        checkAliases(sym,effects)
-        runFlows(sym,op)
-
         state.scope :+= sym
         if (effects.mayCSE)  state.cache += op -> sym               // Add to CSE cache
         if (!effects.isPure) state.impure :+= Impure(sym,effects)   // Add to list of impure syms
         if (!effects.isPure) sym.effects = effects                  // Register effects
-        op.inputs.foreach{in => in.consumers += sym }               // Register consumed
+
+        // Register aliases
+        sym.deepAliases = dAliases                                  // Set deep aliases
+        sym.shallowAliases = sAliases                               // Set shallow aliases
+
+        op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
+        sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases
+
+        data(sym)           // Run immediate staging metadata rules
+        runFlows(sym,op)    // Run flow rules
+
+        if (config.enLog) {
+          val writes = effects.writes.map{s => s"$s [${s.allAliases.mkString(",")}]" }.mkString(", ")
+          logs(s"$lhs = $op")
+          logs(s"  Effects:   $effects")
+          logs(s"  Writes:    $writes")
+          logs(s"  AliasSyms: ${op.aliasSyms}")
+          logs(s"  Deep:      ${op.deepAliases}")
+          logs(s"  Shallow:   ${op.shallowAliases}")
+          logs(s"  Aliases:   ${sym.allAliases}")
+        }
+
+        checkAliases(sym, effects)
+
         lhs
       }
       state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {
@@ -112,43 +136,31 @@ trait Staging { this: Printing =>
       }
   }
 
+  /** For symbols corresponding to nodes: rewrite and flow rules on the given symbol and
+    * add the symbol to the current scope.
+    */
   @rig def restage[R](sym: Sym[R]): Sym[R] = sym match {
     case Op(rhs) =>
-      val lhs: R = register[R](rhs, () => sym.unbox)
+      val lhs: R = register[R](rhs, () => sym.unbox, {_ => ()})
       sym.tp.boxed(lhs)
     case _ => sym
   }
-  @rig def stage[R](op: Op[R]): R = {
-    val t = register(op, () => symbol(op.R,op))
-    op.R.boxed(t).ctx = ctx
-    t
-  }
 
-  // TODO: Performance bottleneck here
-  private def aliasSyms(a: Any): Set[Sym[_]]   = recursive.collectSets{case s: Sym[_] => Set(s) case d: Op[_] => d.aliases }(a)
-  private def containSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.contains}(a)
-  private def extractSyms(a: Any): Set[Sym[_]] = recursive.collectSets{case d: Op[_] => d.extracts}(a)
-  private def copySyms(a: Any): Set[Sym[_]]    = recursive.collectSets{case d: Op[_] => d.copies}(a)
-  private def noPrims(x: Set[Sym[_]]): Set[Sym[_]] = x.filter{s => !s.tp.isPrimitive}
 
-  @stateful def shallowAliases(x: Any): Set[Sym[_]] = {
-    noPrims(aliasSyms(x)).flatMap{case Stm(s,d) => state.shallowAliasCache.getOrElseAdd(s, () => shallowAliases(d)) + s } ++
-      noPrims(extractSyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) }
-  }
-  @stateful def deepAliases(x: Any): Set[Sym[_]] = {
-    noPrims(aliasSyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) } ++
-      noPrims(copySyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) } ++
-      noPrims(containSyms(x)).flatMap{case Stm(s,d) => state.aliasCache.getOrElseAdd(s,  () => allAliases(d)) + s } ++
-      noPrims(extractSyms(x)).flatMap{case Stm(s,d) => state.deepAliasCache.getOrElseAdd(s, () => deepAliases(d)) }
-  }
-  @stateful final def allAliases(x: Any): Set[Sym[_]] = {
-    shallowAliases(x) ++ deepAliases(x)
-  }
-  @stateful final def mutableAliases(x: Any): Set[Sym[_]] = allAliases(x).filter(_.isMutable)
-  @stateful final def mutableInputs(d: Op[_]): Set[Sym[_]] = {
-    val bounds = d.binds
-    val actuallyReadSyms = d.reads diff bounds
-    mutableAliases(actuallyReadSyms) filterNot (bounds contains _)
+  /** Stage the given node as a symbol.
+    * Also compute the effects of the node and adds them to the symbol as metadata and add
+    * the symbol to the current scope.
+    */
+  @rig def stage[R](op: Op[R]): R = register[R](op, () => symbol(op.R,op), {t => t.ctx = ctx})
+
+
+  /** Stage the given node as a symbol.
+    * Use the data function to set symbol metadata _prior_ to @flow rules.
+    * Also compute the effects of the node and adds them to the symbol as metadata and add
+    * the symbol to the current scope.
+    */
+  @rig def stageWithData[R](op: Op[R])(data: Sym[R] => Unit): R = {
+    register[R](op, () => symbol(op.R,op), {t => t.ctx = ctx; data(t) })
   }
 
   /**
@@ -188,7 +200,7 @@ trait Staging { this: Printing =>
   }
 
   @rig final def allEffects(d: Op[_]): Effects = {
-    val effects = propagateWrites(d.effects) andAlso Effects.Reads(mutableInputs(d))
+    val effects = propagateWrites(d.effects) andAlso Effects.Reads(d.mutableInputs)
     val deps = effectDependencies(effects)
     effects.copy(antiDeps = deps)
   }
@@ -210,9 +222,12 @@ trait Staging { this: Printing =>
   }
 
   @stateful final def propagateWrites(effects: Effects): Effects = {
-    if (!config.enableAtomicWrites) effects
+    if (!config.enableAtomicWrites) {
+      val writes = effects.writes.flatMap{s => s.allAliases }
+      effects.copy(writes = writes)
+    }
     else {
-      val writes = effects.writes.map{s => extractAtomicWrite(s) }
+      val writes = effects.writes.flatMap{s => extractAtomicWrite(s).allAliases }
       effects.copy(writes = writes)
     }
   }

@@ -8,6 +8,7 @@ import emul.FloatPoint
 import emul.FixedPoint
 import spatial.lang._
 import spatial.node._
+import emul.Bool
 
 trait ChiselCodegen extends NamedCodegen with FileDependencies {
   override val lang: String = "chisel"
@@ -17,12 +18,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   var streamLines = collection.mutable.Map[String, Int]() // Map from filename number of lines it has
   var streamExtensions = collection.mutable.Map[String, Int]() // Map from filename to number of extensions it has
   val tabWidth: Int = 2
-  val maxLinesPerFile = 200
+  val maxLinesPerFile = 400
   var compressorMap = collection.mutable.HashMap[String, (String,Int)]()
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()
   var maxretime = 0
-  var itersMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
   /** Map for tracking defs of nodes. If they get redeffed anywhere, we map it to a suffix */
   var alphaconv = collection.mutable.HashMap[String, String]()
 
@@ -42,10 +42,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
+    enterAccel()
     inGenn(out, "RootController", ext) {
       exitAccel()
       visitBlock(b)
-      enterAccel()
     }
     // if (withReturn) emitt(src"${b.result}")
   }
@@ -53,6 +53,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
     case (FixPtType(s,d,f), _) => c.toString + {if (f == 0 && !s) s".U($d.W)" else s".FP($s, $d, $f)"}
     case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
+    case (_:Bit, c:Bool) => s"${c.value}.B"
     case _ => super.quoteConst(tp,c)
   }
 
@@ -60,7 +61,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
     case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
     case BitType() => "Bool()"
-    // case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
+    case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => super.remap(tp)
   }
@@ -202,20 +203,25 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     case _ => super.named(s, id)
   }
 
-  final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
-    val prnts = List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"}
-    emit(src"// Creating sub kernel ${name}_1")
-    inGenn(out, name, ext) {
+  final protected def startFile(): Unit = {
       emit("""package accel""")
       emit("import templates._")
       emit("import templates.ops._")
       emit("import types._")
+      emit("import api._")
       emit("import chisel3._")
       emit("import chisel3.util._")
+      emit("import Utils._")    
+      emit("import scala.collection.immutable._")
+  }
+
+  final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
+    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"}.mkString(" with ") else ""
+    emitt(src"// Creating sub kernel ${name}_1")
+    inGenn(out, name, ext) {
+      startFile()
       open(src"""trait ${name}_1 extends ${prnts} {""")
-      if (cfg.compressWires == 2) {
-        emit(src"""def method_${name}_1() {""")
-      }
+      if (cfg.compressWires == 2) { emit(src"""def method_${name}_1() {""") }
       try { body }
       finally {
         inGennAll(out, name, ext){
@@ -234,18 +240,35 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
 
   final protected def inGenn[T](out: String, base: String, ext: String)(blk: => T): Unit = {
     // Lookup current split extension and number of lines
-    if (!streamExtensions.contains(base)) streamExtensions += base -> 1
-    val currentOverflow = s"_${streamExtensions(base)}"
-    if (!streamLines.contains(base + currentOverflow + "." + ext)) streamLines += {base + currentOverflow + "." + ext} -> 0
-    inGen(out, base + currentOverflow + "." + ext)(blk)
+    if (scope == "accel") {
+      if (!streamExtensions.contains(base)) streamExtensions += base -> 1
+      val currentOverflow = s"_${streamExtensions(base)}"
+      if (!streamLines.contains(base + currentOverflow + "." + ext)) streamLines += {base + currentOverflow + "." + ext} -> 0
+      inGen(out, base + currentOverflow + "." + ext)(blk)
+    }
   }
 
   protected def emitt(x: String, forceful: Boolean = false): Unit = {
-    val lineCount = streamLines(state.streamName.split("/").last)
-    streamLines(state.streamName.split("/").last) += 1
-    if (lineCount > maxLinesPerFile) Console.println("exceeded!")
+    val curStream = state.streamName.split("/").last
+    val curStreamNoExt = curStream.split("\\.").dropRight(1).last
+    val base = curStream.split("_").dropRight(1).mkString("_")
+    val lineCount = streamLines(curStream)
     val on = config.enGen
     if (forceful) {config.enGen = true}
+    if (config.enGen) {
+      streamLines(curStream) += 1
+      if (lineCount > maxLinesPerFile) {
+        val newExt = streamExtensions(base) + 1
+        streamExtensions += base -> newExt
+        val newStreamString = (curStream.split("_").dropRight(1) :+ s"${newExt}").mkString("_")
+        val newStream = getOrCreateStream(out, newStreamString + "." + ext)
+        streamLines += {newStreamString + "." + ext} -> 0
+        state.gen = newStream
+        startFile()
+        open(src"""trait ${newStreamString} extends ${curStreamNoExt} {""")
+        if (cfg.compressWires == 2) { emit(src"""def method_${newStreamString}() {""") }
+      }
+    }
     emit(x)
     config.enGen = on
   }

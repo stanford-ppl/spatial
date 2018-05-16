@@ -90,7 +90,7 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
   @rig def undefinedOp(op: String): A = {
     error(ctx, s"$op is not defined for inputs of type $this")
     error(ctx)
-    bound[A]
+    boundVar[A]
   }
 }
 

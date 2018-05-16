@@ -145,10 +145,10 @@ def main():
 
   java_cmd = ""
   if isTest:
-    java_cmd = "sbt -batch \"; test:runMain " + name + " " + ' '.join(args) + "\""
+    java_cmd = "sbt -batch \"; test:runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
 
   else:
-    java_cmd = "sbt -batch \"" + sbt_project + "runMain " + name + " " + ' '.join(args) + "\""
+    java_cmd = "sbt -batch \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
 
   print(java_cmd)
 

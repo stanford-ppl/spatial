@@ -9,7 +9,6 @@ import spatial.util._
 import utils.implicits.collections._
 
 case class MemoryDealiasing(IR: State) extends MutateTransformer {
-  override val allowUnsafeSubst: Boolean = true // Allow mem -> Invalid (to drop)
 
   def recomputeAddr(series: Series[Idx], idx: Idx): Idx = {
     def _recomputeAddr[A<:Exp[_,A]:IntLike](series: Series[A], idx: A): Idx = {
@@ -84,15 +83,15 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     // These are still needed to track accumulators for Reduce, MemReduce
     // MemDenseAlias and MemSparseAlias are removed after unrolling in AliasCleanup
-    //case _: MemDenseAlias[_,_,_]    => Invalid.asInstanceOf[Sym[A]]
-    //case _: MemSparseAlias[_,_,_,_] => Invalid.asInstanceOf[Sym[A]]
+    case op: MemDenseAlias[_,_,_]    if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
+    case op: MemSparseAlias[_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
 
     case op @ GetDRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
       implicit val ba: Bits[_] = op.A
       val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]])) }
       oneHotMux(conds, addrs)
 
-    case op @ GetDRAMAddress(Op(MemSparseAlias(F(conds), F(mems), F(ranges)))) =>
+    case op @ GetDRAMAddress(Op(MemSparseAlias(F(conds), F(mems), F(ranges), F(size)))) =>
       implicit val ba: Bits[_] = op.A
       val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]]))}
       oneHotMux(conds, addrs)
@@ -103,7 +102,7 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)
 
-    case MemDim(Op(MemSparseAlias(F(conds),F(ms),_)),d) =>
+    case MemDim(Op(MemSparseAlias(F(conds),F(ms),_,_)),d) =>
       val mems = ms.map(_.asInstanceOf[Sym[_]])
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)

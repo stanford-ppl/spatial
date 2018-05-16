@@ -46,22 +46,17 @@ object FixFmt {
   @api def *(that: Fix[S,I,F]): Fix[S,I,F] = stage(FixMul(this,that))
   @api def /(that: Fix[S,I,F]): Fix[S,I,F] = stage(FixDiv(this,that))
   @api def %(that: Fix[S,I,F]): Fix[S,I,F] = stage(FixMod(this,that))
-  @api def <<(that: Idx): Fix[S,I,F] = stage(FixSLA(this,that))
-  @api def >>[W](that: Fix[TRUE,W,_0]): Fix[S,I,F] = stage(FixSRA(this,that))
-  @api def >>>[W](that: Fix[TRUE,W,_0]): Fix[S,I,F] = stage(FixSRU(this,that))
+  @api def <<(that: Fix[S,I,_0]): Fix[S,I,F] = stage(FixSLA(this,that))
+  @api def >>(that: Fix[S,I,_0]): Fix[S,I,F] = stage(FixSRA(this,that))
+  @api def >>>(that: Fix[S,I,_0]): Fix[S,I,F] = stage(FixSRU(this,that))
 
   @api def <(that: Fix[S,I,F]): Bit = stage(FixLst(this,that))
   @api def <=(that: Fix[S,I,F]): Bit = stage(FixLeq(this,that))
 
-  @api def ::(start: Fix[S,I,F]): Series[Fix[S,I,F]]  = Series[Fix[S,I,F]](start, this, 1, 1, isUnit = false)
-  @api def par(p: I32): Series[Fix[S,I,F]]            = Series[Fix[S,I,F]](zero, this, one, p, isUnit = false)
-  @api def by(step: Fix[S,I,F]): Series[Fix[S,I,F]]   = Series[Fix[S,I,F]](zero, this, step, 1, isUnit = false)
-  @api def until(end: Fix[S,I,F]): Series[Fix[S,I,F]] = Series[Fix[S,I,F]](this, end, one, 1, isUnit = false)
 
   @api override def neql(that: Fix[S,I,F]): Bit = stage(FixNeq(this,that))
   @api override def eql(that: Fix[S,I,F]): Bit = stage(FixEql(this,that))
 
-  @rig def toSeries: Series[Fix[S,I,F]] = Series[Fix[S,I,F]](this, this+1, 1, 1, isUnit=true)
 
   // --- Typeclass Methods
   @rig def random(max: Option[Fix[S,I,F]]): Fix[S,I,F] = stage(FixRandom(max))
@@ -69,6 +64,62 @@ object FixFmt {
   @rig def min(a: Fix[S,I,F], b: Fix[S,I,F]): Fix[S,I,F] = stage(FixMin(a,b))
   @rig def max(a: Fix[S,I,F], b: Fix[S,I,F]): Fix[S,I,F] = stage(FixMax(a,b))
 
+
+  /**
+    * Fixed point multiplication with unbiased rounding.
+    *
+    * After multiplication, probabilistically rounds up or down to the closest representable number.
+    */
+  @api def *& (that: Fix[S,I,F]): Fix[S,I,F] = stage(UnbMul(this,that))
+
+  /**
+    * Fixed point division with unbiased rounding.
+    *
+    * After division, probabilistically rounds up or down to the closest representable number.
+    */
+  @api def /& (that: Fix[S,I,F]): Fix[S,I,F] = stage(UnbDiv(this,that))
+
+  // Saturating operators
+  /**
+    * Saturating fixed point addition.
+    *
+    * Addition which saturates at the largest or smallest representable number upon over/underflow.
+    */
+  @api def +! (that: Fix[S,I,F]): Fix[S,I,F] = stage(SatAdd(this,that))
+  /**
+    * Saturating fixed point subtraction.
+    *
+    * Subtraction which saturates at the largest or smallest representable number upon over/underflow.
+    */
+  @api def -! (that: Fix[S,I,F]): Fix[S,I,F] = stage(SatSub(this,that))
+  /**
+    * Saturating fixed point multiplication.
+    *
+    * Multiplication which saturates at the largest or smallest representable number upon over/underflow.
+    */
+  @api def *! (that: Fix[S,I,F]): Fix[S,I,F] = stage(SatMul(this,that))
+  /**
+    * Saturating fixed point division.
+    *
+    * Division which saturates at the largest or smallest representable number upon over/underflow.
+    */
+  @api def /! (that: Fix[S,I,F]): Fix[S,I,F] = stage(SatDiv(this,that))
+
+  // Saturating and unbiased rounding operators
+  /**
+    * Saturating fixed point multiplication with unbiased rounding.
+    *
+    * After multiplication, probabilistically rounds up or down to the closest representable number.
+    * After rounding, also saturates at the largest or smallest representable number upon over/underflow.
+    */
+  @api def *&! (that: Fix[S,I,F]): Fix[S,I,F] = stage(UnbSatMul(this,that))
+  /**
+    * Saturating fixed point division with unbiased rounding.
+    *
+    * After division, probabilistically rounds up or down to the closest representable number.
+    * After rounding, also saturates at the largest or smallest representable number upon over/underflow.
+    */
+  @api def /&! (that: Fix[S,I,F]): Fix[S,I,F] = stage(UnbSatDiv(this,that))
 
   @rig def abs(a: Fix[S,I,F]): Fix[S,I,F] = stage(FixAbs(a))
   @rig def ceil(a: Fix[S,I,F]): Fix[S,I,F] = stage(FixCeil(a))
@@ -143,7 +194,7 @@ object Fix {
 }
 object I32 {
   def apply(c: Int): I32 = uconst[I32](FixedPoint.fromInt(c))
-  @rig def p(c: Int): I32 = param[I32](FixedPoint.fromInt(c))
+  @rig def p(c: Int): I32 = parameter[I32](FixedPoint.fromInt(c))
 }
 
 object FixPtType {

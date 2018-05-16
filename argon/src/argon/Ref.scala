@@ -20,8 +20,8 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   protected def me: A = this.asInstanceOf[A]
 
 
-  /** True if this type is a primitive */
-  protected def __isPrimitive: Boolean
+  /** True if an instance of this type can never be mutable. */
+  protected def __neverMutable: Boolean
 
   /** Returns the name of this type */
   protected def __typePrefix: String = r"${this.getClass}"
@@ -31,7 +31,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   protected def __typeParams: Seq[Any] = Nil
 
   final private[argon] def _typePrefix: String = __typePrefix
-  final private[argon] def _isPrimitive: Boolean = __isPrimitive
+  final private[argon] def _neverMutable: Boolean = __neverMutable
   final private[argon] def _typeArgs: Seq[Type[_]] = __typeArgs
   final private[argon] def _typeParams: Seq[Any] = __typeParams
 
@@ -62,7 +62,6 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     case x: java.lang.Long    => this.value(x.toLong)
     case x: java.lang.Float   => this.value(x.toFloat)
     case x: java.lang.Double  => this.value(x.toDouble)
-    case _ if isSubtype(c.getClass,classTag[C].runtimeClass) => Some((c.asInstanceOf[C],true))
     case _ => None
   }
   final private[argon] def __value(c: Any): Option[C] = value(c).map(_._1)
@@ -70,23 +69,39 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   /** Create a checked value from the given constant
     * Value may be either a constant or a parameter
     */
-  @rig final def from(c: Any, checked: Boolean = false, isParam: Boolean = false): A = value(c) match {
+  @rig final def from(c: Any, warnOnLoss: Boolean = false, errorOnLoss: Boolean = false, isParam: Boolean = false): A = getFrom(c,isParam) match {
     case Some((v,exact)) =>
-      if (!exact && checked) {
-        error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent value ${escapeConst(c)}.")
-        error(s"""Use the explicit annotation "${escapeConst(c)}.to[${this.tp}]" to ignore this error.""")
+      if (!exact && errorOnLoss) {
+        error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
+        error(s"(Closest representable value: ${escapeConst(evRef(v).c.get)}).")
+        error(s"""Use .to[${this.tp}] to downgrade to a warning, or .toUnchecked to ignore.""")
         error(ctx)
       }
-
-      if (isParam) _param(this, v)
-      else         _const(this, v)
-
+      else if (!exact && warnOnLoss) {
+        warn(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
+        warn(s"(Closest representable value: ${escapeConst(evRef(v).c.get)})")
+        warn(s"""Use .toUnchecked to ignore this warning.""")
+        warn(ctx)
+      }
+      v
     case None =>
       implicit val tA: Type[A] = this
       error(ctx, r"Cannot convert ${escapeConst(c)} with type ${c.getClass} to a ${this.tp}")
       error(ctx)
       err[A]("Invalid constant")
   }
+
+  /** Attempt to create a symbol of type A from c, where the type of c is unrestricted.
+    * This method should never throw exceptions or produce warnings or errors.
+    * Instead, it should return None if c is not convertible to an A, or return
+    * Some((a,false)) if c can be represented as an A, but not exactly.
+    */
+  @rig def getFrom(c: Any, isParam: Boolean = false): Option[(A,Boolean)] = value(c) match {
+    case Some((v,exact)) if isParam => Some((_param(this, v), exact))
+    case Some((v,exact)) => Some((_const(this, v),exact))
+    case None => None
+  }
+
 }
 
 

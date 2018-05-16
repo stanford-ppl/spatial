@@ -7,9 +7,13 @@ trait Enabled[R] { this: Op[R] =>
   var ens: Set[Bit]
 
   def mirrorEn(f: Tx, addEns: Set[Bit]): Op[R] = {
+    val saveEns = ens
     ens ++= addEns
-    this.mirror(f)
+    val op2 = this.mirror(f)
+    ens = saveEns
+    op2
   }
+
   def updateEn(f: Tx, addEns: Set[Bit]): Unit = {
     ens ++= addEns
     this.update(f)

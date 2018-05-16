@@ -57,8 +57,8 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
     case c: VPCU => super.transform(lhs,rhs)
     case c: VPMU => super.transform(lhs,rhs)
 
-    case c: Control[_] if isInnerControl(lhs) => innerBlock(lhs,c.blocks.head,c.iters)
-    case c: Control[_] if isOuterControl(lhs) => outerBlock(lhs,c.blocks.head,c.iters)
+    case c: Control[_] if lhs.isInnerControl => innerBlock(lhs,c.blocks.head,c.iters)
+    case c: Control[_] if lhs.isOuterControl => outerBlock(lhs,c.blocks.head,c.iters)
 
     case _ => super.transform(lhs,rhs)
   }
@@ -118,7 +118,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
       dataSyms.contains(x) || (!wrSyms.contains(x) && !rdSyms.contains(x) && !memAllocs.contains(x))
     }
     def isRemoteMemory(mem: Sym[_]): Boolean = !mem.isReg || {
-      accessesOf(mem).exists{access => !access.parent.s.contains(lhs) }
+      mem.accesses.exists{access => !access.parent.s.contains(lhs) }
     }
     scope.reverseIterator.foreach{
       case s @ Reader(mem,addr,_) =>
@@ -126,7 +126,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
         if (isRemoteMemory(mem)) {
           rdSyms += s -> Set(mem)
           // Push read address computation to PMU if this is the only reader
-          if (readersOf(mem).size == 1) addr.foreach{a => addRd(a, Set(mem)) }
+          if (mem.readers.size == 1) addr.foreach{a => addRd(a, Set(mem)) }
         }
 
       case s @ Writer(mem,data,addr,_) =>
@@ -135,7 +135,7 @@ case class GlobalAllocation(IR: State) extends MutateTransformer {
         if (isRemoteMemory(mem)) {
           wrSyms += s -> Set(mem)
           // Push write address to PMU if this is the only writer
-          if (writersOf(mem).size == 1) addr.foreach{a => addWr(a, Set(mem)) }
+          if (mem.writers.size == 1) addr.foreach{a => addWr(a, Set(mem)) }
         }
 
       case MemAlloc(s) if !s.isReg => memAllocs += s

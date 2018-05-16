@@ -30,7 +30,7 @@ trait Spatial extends Compiler {
 
   private class SpatialISL extends ISL {
     override def domain[K](key: K): ConstraintMatrix[K] = key match {
-      case s: Sym[_] => domainOf(s).asInstanceOf[ConstraintMatrix[K]]
+      case s: Sym[_] => s.domain.asInstanceOf[ConstraintMatrix[K]]
       case _ => throw new Exception(s"Cannot get domain of $key")
     }
   }
@@ -58,6 +58,7 @@ trait Spatial extends Compiler {
     lazy val sanityChecks = SanityChecks(state)
 
     // --- Analysis
+    lazy val cliNaming          = CLINaming(state)
     lazy val useAnalyzer        = UseAnalyzer(state)
     lazy val accessAnalyzer     = AccessAnalyzer(state)
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
@@ -72,12 +73,11 @@ trait Spatial extends Compiler {
     lazy val friendlyTransformer = FriendlyTransformer(state)
     lazy val switchTransformer = SwitchTransformer(state)
     lazy val switchOptimizer   = SwitchOptimizer(state)
-    lazy val transferLowering  = TransferLowering(state)
+    lazy val blackboxLowering  = BlackboxLowering(state)
     lazy val memoryDealiasing  = MemoryDealiasing(state)
     lazy val pipeInserter      = PipeInserter(state)
     lazy val registerCleanup   = RegisterCleanup(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
-    lazy val aliasCleanup      = AliasCleanup(state)
     lazy val retiming          = RetimingTransformer(state)
 
     lazy val globalAllocation = GlobalAllocation(state)
@@ -93,12 +93,13 @@ trait Spatial extends Compiler {
 
     val result = {
       block ==> printer ==>
+        cliNaming ==>
         friendlyTransformer ==>
         sanityChecks ==>
         switchTransformer ==>
         switchOptimizer ==> printer ==>
-        transferLowering ==> printer ==>
-        memoryDealiasing ==>
+        blackboxLowering ==> printer ==>
+        memoryDealiasing ==> printer ==>
         pipeInserter ==> printer ==>
         useAnalyzer ==> printer ==>
         registerCleanup ==> printer ==>
@@ -107,7 +108,6 @@ trait Spatial extends Compiler {
         memoryAllocator ==>
         memoryReporter  ==>
         unrollTransformer ==> printer ==>
-        aliasCleanup ==> printer ==>
         (cfg.enableRetiming ? retiming) ==> printer ==>
         (cfg.enableRetiming ? retimeReporter) ==>
         initiationAnalyzer ==>
@@ -119,9 +119,6 @@ trait Spatial extends Compiler {
         (cfg.enableDot ? irDotCodegen) ==>
         (cfg.enablePIR ? pirCodegen)
     }
-    //globalAllocation ==>
-    //printer ==>
-    //puDotCodegen ==>
 
     isl.shutdown(100)
     result
@@ -217,6 +214,9 @@ trait Spatial extends Compiler {
   }
 
   override def settings(): Unit = {
+    // Spatial allows mutable aliases for DRAM, SRAM, etc.
+    config.enableMutableAliases = true
+
     if (this.target eq null) {
       if (cfg.targetName eq null) {
         if (!cfg.enableRetiming) {

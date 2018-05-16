@@ -9,7 +9,12 @@ import forge.tags._
   @api override def eql(that: Void): Bit = true
 
   // --- Typeclass Methods
-  override protected val __isPrimitive: Boolean = true
+  override protected def value(c: Any): Option[(Unit, Boolean)] = c match {
+    case u: Unit => Some((u,true))
+    case _ => super.value(c)
+  }
+
+  override protected val __neverMutable: Boolean = true
 }
 object Void {
   def c: Void = uconst[Void](())

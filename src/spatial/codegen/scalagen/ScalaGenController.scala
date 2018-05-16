@@ -8,18 +8,16 @@ import spatial.util._
 
 trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaGenMemories {
 
-  def isStreaming(ctrl: Sym[_]): Boolean = ctrl.isStreamPipe
-
   // In Scala simulation, run a pipe until its read fifos and streamIns are empty
   def getReadStreamsAndFIFOs(ctrl: Ctrl): Set[Sym[_]] = {
     ctrl.children.flatMap(getReadStreamsAndFIFOs).toSet ++
-    localMems.all.filter{mem => readersOf(mem).exists{_.parent == ctrl }}
+    localMems.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
                  .filter{mem => mem.isStreamIn || mem.isFIFO }
                  .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   def emitControlBlock(lhs: Sym[_], block: Block[_]): Unit = {
-    if (isOuterControl(lhs) && isStreaming(lhs)) {
+    if (lhs.isOuterStreamControl) {
       val children = lhs.children
       block.stms.foreach { stm =>
         val isChild = children.exists{child => child.s.contains(stm) }
@@ -54,7 +52,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     valids: Seq[Seq[Bit]]
   )(func: => Unit): Unit = {
 
-    val ctrs = cchain.ctrs
+    val ctrs = cchain.counters
 
     for (i <- iters.indices) {
       if (ctrs(i).isForever) {
@@ -89,8 +87,8 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
 
   private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_])(contents: => Unit): Unit = {
     val ins    = func.nestedInputs
-    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Nil)
-    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).distinct.filterNot(_.isMem) diff binds
+    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Set.empty).toSeq
+    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).filterNot(_.isMem).distinct diff binds
     val en = if (ens.isEmpty) "true" else ens.map(quote).mkString(" && ")
 
     dbgs(s"${stm(lhs)}")
@@ -100,7 +98,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
       emitHeader()
       open(src"object $lhs {")
       open(src"def run(")
-      inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.length-1) "" else ",")) }
+      inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
       closeopen("): Unit = {")
       open(src"if ($en) {")
       contents

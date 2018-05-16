@@ -6,7 +6,8 @@ import chisel3.iotesters.{PeekPokeTester, Driver, ChiselFlatSpec}
 import utils.TemplateRunner
 import scala.reflect.runtime._ 
 import scala.reflect.runtime.universe
-import scala.collection.mutable.HashMap
+import scala.collection.immutable.HashMap
+import templates.Utils._
 
 // Ripped from http://stackoverflow.com/questions/1469958/scala-how-do-i-dynamically-instantiate-an-object-and-invoke-a-method-using-refl
 object Inst {
@@ -45,9 +46,9 @@ object Arguments {
     // (18,"max","FloatingPoint",List(24,8))
   )
   val FF = List(
-    (16, HashMap(0 -> 1)),
-    (32, HashMap(0 -> 1)),
-    (64, HashMap(0 -> 1))
+    (16, XMap(0 -> 1)),
+    (32, XMap(0 -> 1)),
+    (64, XMap(0 -> 1))
   )
   val FFNoInit = List(
     32
@@ -65,22 +66,13 @@ object Arguments {
     "null"
   )
   val FIFO = List(
-    (1,1,10,1,1),
-    (2,2,30,1,1),
-    (4,4,52,1,1),
-    (4,1,56,1,1),
-    (1,4,56,1,1),
-    (3,6,48,1,1),
-    (6,3,48,1,1)
-  )
-  val GeneralFIFO = List(
-    (List(1),List(1),80,16),
-    (List(1),List(5),80,16),
-    (List(1),List(8),80,16),
-    (List(2),List(1),80,16),
-    (List(5),List(1),80,16),
-    (List(6),List(3),80,16),
-    (List(1),List(2),50,32)
+    (List(80), 16, List(1), XMap(0 -> 1),XMap(0 -> 1)),
+    (List(80), 16, List(5), XMap(0 -> 1),XMap(0 -> 5)),
+    (List(80), 16, List(8), XMap(0 -> 1),XMap(0 -> 8)),
+    (List(80), 16, List(2), XMap(0 -> 2),XMap(0 -> 1)),
+    (List(80), 16, List(5), XMap(0 -> 5),XMap(0 -> 1)),
+    (List(80), 16, List(6), XMap(0 -> 6),XMap(0 -> 3)),
+    (List(80), 16, List(2), XMap(0 -> 1),XMap(0 -> 2))
   )
   val FILO = List(
     (1,1,10,1,1),
@@ -106,7 +98,7 @@ object Arguments {
     (List(2,2,2), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8)),
     (List(4,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8))
   )
-  val OuterController = List(
+  val OuterControl = List(
     (Sequential, 1, false),
     (Sequential, 2, false),
     (Sequential, 5, false),
@@ -124,7 +116,7 @@ object Arguments {
     // (5, Stream, false),
     // (8, Stream, false),
   )
-  val InnerController = List(
+  val InnerControl = List(
     (Sequential, false, 32)
   )
   val PRNG = List(
@@ -136,41 +128,57 @@ object Arguments {
     50,
     1024
   )
+  val ShiftRegFile = List(
+           ( List(16,16), 32, 
+             XMap(0 -> 1), XMap(0 -> 1),
+             DMap(),  DMap()
+           ),
+           ( List(6,10), 32, 
+             ShiftXMap(1, 0 -> 1), ShiftXMap(1, 0 -> 1),
+             DMap(),  DMap()
+           )
+        )
   val SRAM = List(
            ( List(1,16), 32, 
              List(1,1), List(1,1),
-             HashMap[Int,Int](), HashMap[Int,Int](),
-             HashMap(0 -> List(List(0,0))),  HashMap(0 -> List(List(0,0))),
+             XMap(), XMap(),
+             DMap(0 -> List(Banks(0,0))),  DMap(0 -> List(Banks(0,0))),
              BankedMemory ),
            ( List(1,32), 32, 
              List(1,2), List(1,1),
-             HashMap[Int,Int](), HashMap[Int,Int](),
-             HashMap(0 -> List(List(0,0), List(0,1))),  HashMap(0 -> List(List(0,0),List(0,1))),
+             XMap(), XMap(),
+             DMap(0 -> List(Banks(0,0), Banks(0,1))),  DMap(0 -> List(Banks(0,0),Banks(0,1))),
              BankedMemory ),
            ( List(32,32), 32, 
              List(2,2), List(1,1),
-             HashMap[Int,Int](), HashMap[Int,Int](),
-             HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1))),  HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1))),
+             XMap(), XMap(),
+             DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1))),  DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1))),
              BankedMemory )
         )
   val NBufMem = List( 
            ( SRAMType, List(8,12), 2, 32, 
              List(1,2), List(1,1),
-             HashMap[Int, HashMap[Int,Int]](), HashMap[Int, HashMap[Int,Int]](),
-             HashMap(0 -> HashMap(0 -> List(List(0,0), List(0,1)))),  HashMap(1 -> HashMap(0 -> List(List(0,0),List(0,1)))),
-             HashMap(0 -> 1),
+             NBufXMap(), NBufXMap(),
+             NBufDMap(0 -> DMap(0 -> List(Banks(0,0), Banks(0,1)))),  NBufDMap(1 -> DMap(0 -> List(Banks(0,0),Banks(0,1)))),
+             XMap(0 -> 1),
              BankedMemory),
            ( SRAMType, List(8,12), 5, 32, 
              List(2,2), List(1,1),
-             HashMap[Int, HashMap[Int,Int]](), HashMap[Int, HashMap[Int,Int]](),
-             HashMap(0 -> HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1)))),  HashMap(4 -> HashMap(0 -> List(List(0,0), List(0,1), List(1,0), List(1,1)))),
-             HashMap(0 -> 1),
+             NBufXMap(), NBufXMap(),
+             NBufDMap(0 -> DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)))),  NBufDMap(4 -> DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)))),
+             XMap(0 -> 1),
              BankedMemory),
            ( FFType, List(1), 2, 32, 
              List(1), List(1),
-             HashMap(0 -> HashMap(0 -> 1)), HashMap(1 -> HashMap(0 -> 1)),
-             HashMap[Int, HashMap[Int,List[List[Int]]]](), HashMap[Int, HashMap[Int,List[List[Int]]]](),
-             HashMap(0 -> 1),
+             NBufXMap(0 -> XMap(0 -> 1)), NBufXMap(1 -> XMap(0 -> 1)),
+             NBufDMap(), NBufDMap(),
+             XMap(0 -> 1),
+             BankedMemory),
+           ( ShiftRegFileType, List(16,16), 4, 32, 
+             List(16,16), List(1),
+             NBufXMap(0 -> XMap(0 -> 1)), NBufXMap(3 -> XMap(0 -> 1)),
+             NBufDMap(), NBufDMap(),
+             XMap(0 -> 1),
              BankedMemory)
         )
   val SystolicArray2D = List(
@@ -181,27 +189,6 @@ object Arguments {
     (List(5,5), List(3,2), List(1.0,1.0,1.0,0,0,1.0), List(0,0,0,0,1,0,0,0,0), None, Sum, 32, 0),
     (List(5,5), List(3,3), List(0,1.0,0,1.0,0,1.0,0,1.0,0), List(0,0,0,0,1,0,0,0,0), None, Max, 32, 0)
   )
-  val ShiftRegFile = List(
-    (List(6),List(1),6,None,1,1,false,1,32,0),
-    (List(6),List(1),6,None,2,1,false,1,32,0),
-    (List(21),List(1),21,None,4,1,false,1,32,0),
-    (List(1,3),List(1),3,None,1,1,false,1,32,0),
-    (List(4,12),List(4),12,None,4,4,false,1,32,0),
-    (List(3,7),List(3),7,None,1,3,false,1,32,0)
-  )
-
-  // Need to retest     (List(3,3,5),List(1),None,2,9,false,32,0) above
-  
-  val NBufShiftRegFile = List(
-    (List(8),List(1),8,None,1,2,Map((0->1)),List(1,1),32,0),
-    (List(8),List(1),8,None,2,2,Map((0->1)),List(1,1),32,0),
-    (List(1,8),List(1),8,None,1,3,Map((0->1)),List(1,1,1),32,0),
-    (List(3,7),List(3),7,None,1,3,Map((0->3)),List(1,1,1),32,0),
-    (List(3,9),List(3),9,None,3,3,Map((0->3)),List(1,1,1),32,0),
-    (List(3,3),List(3),3,None,1,3,Map((0->3)),List(1,1,1),32,0)
-  )
-
-    // (List(3,4,7),None,1,12,Map((0->12)),32,0)
 
   val LineBuffer = List( 
     (3,10,1,1,1,1,1,1,3,0,2),
@@ -303,14 +290,6 @@ object Launcher {
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.GeneralFIFO.zipWithIndex.map{ case(arg,i) => 
-    (s"GeneralFIFO$i" -> { (backendName: String) =>
-    	Driver(() => new GeneralFIFO(arg), "verilator") {
-          (c) => new GeneralFIFOTests(c)
-        }
-      }) 
-  }.toMap
-
   templates = templates ++ Arguments.FILO.zipWithIndex.map{ case(arg,i) => 
     (s"FILO$i" -> { (backendName: String) =>
     	Driver(() => new FILO(arg), "verilator") {
@@ -351,18 +330,18 @@ object Launcher {
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.OuterController.zipWithIndex.map{ case(arg,i) => 
-    (s"OuterController$i" -> { (backendName: String) =>
-    	Driver(() => new OuterController(arg), "verilator") {
-          (c) => new OuterControllerTests(c)
+  templates = templates ++ Arguments.OuterControl.zipWithIndex.map{ case(arg,i) => 
+    (s"OuterControl$i" -> { (backendName: String) =>
+    	Driver(() => new OuterControl(arg), "verilator") {
+          (c) => new OuterControlTests(c)
         }
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.InnerController.zipWithIndex.map{ case(arg,i) => 
-    (s"InnerController$i" -> { (backendName: String) =>
-    	Driver(() => new InnerController(arg), "verilator") {
-          (c) => new InnerControllerTests(c)
+  templates = templates ++ Arguments.InnerControl.zipWithIndex.map{ case(arg,i) => 
+    (s"InnerControl$i" -> { (backendName: String) =>
+    	Driver(() => new InnerControl(arg), "verilator") {
+          (c) => new InnerControlTests(c)
         }
       }) 
   }.toMap
@@ -379,6 +358,14 @@ object Launcher {
     (s"Mem1D$i" -> { (backendName: String) =>
     	Driver(() => new Mem1D(arg), "verilator") {
           (c) => new Mem1DTests(c)
+        }
+      }) 
+  }.toMap
+
+  templates = templates ++ Arguments.ShiftRegFile.zipWithIndex.map{ case(arg,i) => 
+    (s"ShiftRegFile$i" -> { (backendName: String) =>
+    	Driver(() => new ShiftRegFile(arg), "verilator") {
+          (c) => new ShiftRegFileTests(c)
         }
       }) 
   }.toMap
@@ -403,22 +390,6 @@ object Launcher {
     (s"SystolicArray2D$i" -> { (backendName: String) =>
     	Driver(() => new SystolicArray2D(arg), "verilator") {
           (c) => new SystolicArray2DTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.ShiftRegFile.zipWithIndex.map{ case(arg,i) => 
-    (s"ShiftRegFile$i" -> { (backendName: String) =>
-    	Driver(() => new ShiftRegFile(arg), "verilator") {
-          (c) => new ShiftRegFileTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.NBufShiftRegFile.zipWithIndex.map{ case(arg,i) => 
-    (s"NBufShiftRegFile$i" -> { (backendName: String) =>
-    	Driver(() => new NBufShiftRegFile(arg), "verilator") {
-          (c) => new NBufShiftRegFileTests(c)
         }
       }) 
   }.toMap

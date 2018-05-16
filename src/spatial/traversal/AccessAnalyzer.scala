@@ -41,7 +41,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Expect(_) => true
     case Op(RegRead(reg)) =>
       val loop = loops(i)
-      writersOf(reg).forall{writer => LCA(writer.parent,x.parent) != loop.toCtrl }
+      reg.writers.forall{writer => LCA(writer.parent,x.parent) != loop.toCtrl }
     case _ => !scopes(i).contains(x)
   }
 
@@ -66,7 +66,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   private lazy val Zero = Sum.single(0)
   private lazy val One  = Prod.single(1)
-  private def stride[W](i: Ind[W]): Prod = if (ctrOf.get(i).isDefined) Prod.single(i.ctrStep) else One
+  private def stride[W](i: Ind[W]): Prod = if (i.getCounter.isDefined) Prod.single(i.ctrStep) else One
 
   implicit class AffineComponents(x: Seq[AffineComponent]) {
     def unary_-(): Seq[AffineComponent] = x.map{c => -c}
@@ -118,8 +118,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx]): Unit = {
     val pattern = addr.map(getAddressPattern)
     val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
-    accessPatternOf(access) = pattern
-    affineMatricesOf(access) = matrices
+    access.accessPattern = pattern
+    access.affineMatrices = matrices
 
     dbgs(s"${stm(access)}")
     dbgs(s"  Access pattern: ")
@@ -146,8 +146,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
     val pattern = Seq(ap)
     val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
-    accessPatternOf(access) = pattern
-    affineMatricesOf(access) = matrices
+    access.accessPattern = pattern
+    access.affineMatrices = matrices
 
     dbgs(s"${stm(access)} [STREAMING]")
     dbgs(s"  Access pattern: ")
@@ -158,12 +158,17 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
     case Op(op@CounterNew(start,end,step,_)) if op.A.isIdx =>
-      accessPatternOf(start) = Seq(getAddressPattern(start.asInstanceOf[Idx]))
-      accessPatternOf(end)   = Seq(getAddressPattern(end.asInstanceOf[Idx]))
-      accessPatternOf(step)  = Seq(getAddressPattern(step.asInstanceOf[Idx]))
+      start.accessPattern = Seq(getAddressPattern(start.asInstanceOf[Idx]))
+      end.accessPattern   = Seq(getAddressPattern(end.asInstanceOf[Idx]))
+      step.accessPattern  = Seq(getAddressPattern(step.asInstanceOf[Idx]))
 
     case Op(loop: Loop[_]) =>
-      loop.bodies.foreach{case (is,blocks) => inLoop(lhs, is, blocks) }
+      loop.bodies.foreach{case (is,blocks) =>
+        dbgs(s"$lhs = $rhs [LOOP]")
+        dbgs(s"  Blocks: $blocks")
+        dbgs(s"  Iterators: $is")
+        inLoop(lhs, is, blocks)
+      }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
     case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)

@@ -1,7 +1,8 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
+
+import spatial.data._
 
 trait CppFileGen extends CppCodegen {
 
@@ -25,11 +26,37 @@ trait CppFileGen extends CppCodegen {
       emit("""#include "functions.hpp" """)
     }
 
+    inGen(out, "structs.hpp") {
+      emit("#include <vector>")
+      emit("""#include <stdint.h>""")
+      emit("""#include <sys/time.h>""")
+      emit("""#include <iostream>""")
+      emit("""#include <fstream>""")
+      emit("""#include <string> """)
+      emit("""#include <sstream> """)
+      emit("""#include <stdarg.h>""")
+      emit("""#include <signal.h>""")
+      emit("""#include <sys/wait.h>""")
+      emit("""#include <pwd.h>""")
+      emit("""#include <unistd.h>""")
+      emit("""#include <stdlib.h>""")
+      emit("""#include <stdio.h>""")
+      emit("""#include <errno.h>""")
+      emit("using std::vector;")
+      emit("#ifndef STRUCTS_HPP")
+      emit("#define STRUCTS_HPP")
+      emit("#ifndef ZYNQ")
+      emit("typedef __int128 int128_t;")
+      emit("#endif")
+
+    }
+
     inGen(out, "ArgAPI.hpp") {
       emit(s"// API for args in app ${config.name}")
     }
 
     inGen(out, entryFile) {
+      emit("""#include "structs.hpp"""")
       emit("""#include <stdint.h>""")
       emit("""#include <sys/time.h>""")
       emit("""#include <iostream>""")
@@ -74,21 +101,19 @@ trait CppFileGen extends CppCodegen {
       emit("""#endif""")
     }
 
+    inGen(out, "structs.hpp") {
+      emit("#endif // STRUCTS_HPP ///:~ ")
+    }
+    
     inGen(out, entryFile) {
       emit("delete c1;")
       close("}")
       emit("")
       open("void printHelp() {")
-        val argInts = cliArgs.toSeq.map(_._1)
-        val argsList = if (argInts.nonEmpty) {
-          (0 to argInts.max).map{i =>
-            if (cliArgs.contains(i)) s"<$i- ${cliArgs(i)}>" else s"<$i - UNUSED>"
-          }.mkString(" ")
-        }
-        else {"<No input args>"}
+        val argsList = CLIArgs.listNames.mkString(" ")
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
   	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
-  	    emit(s"""return;""")
+  	    emit(s"""exit(0);""")
       close("}")
 
       emit("")

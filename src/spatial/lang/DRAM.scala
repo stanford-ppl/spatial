@@ -62,21 +62,38 @@ object DRAM {
 
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
   @api def apply(addrs: SRAM1[I32]): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,SRAM1,DRAM1,DRAMSparseTile](this,addrs))
+    stage(MemSparseAlias[A,SRAM1,DRAM1,DRAMSparseTile](this,addrs,addrs.length))
+  }
+  /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */
+  @api def apply(addrs: SRAM1[I32], size: I32): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,SRAM1,DRAM1,DRAMSparseTile](this,addrs,size))
   }
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
   @api def apply(addrs: FIFO[I32]): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,FIFO,DRAM1,DRAMSparseTile](this,addrs))
+    stage(MemSparseAlias[A,FIFO,DRAM1,DRAMSparseTile](this,addrs,addrs.numel))
+  }
+  /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */
+  @api def apply(addrs: FIFO[I32], size: I32): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,FIFO,DRAM1,DRAMSparseTile](this,addrs,size))
   }
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
   @api def apply(addrs: LIFO[I32]): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,LIFO,DRAM1,DRAMSparseTile](this,addrs))
+    stage(MemSparseAlias[A,LIFO,DRAM1,DRAMSparseTile](this,addrs,addrs.numel))
+  }
+  /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */
+  @api def apply(addrs: LIFO[I32], size: I32): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,LIFO,DRAM1,DRAMSparseTile](this,addrs,size))
   }
 
   /** Creates a dense, burst transfer from the on-chip `local` to this DRAM's region of main memory. */
   @api def store[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = {
     stage(DenseTransfer(this,local,isLoad = false))
   }
+
+  /** Creates a dense, burst transfer from the on-chip `local` to this DRAM's region of main memory.
+    * Restricted to the first `len` elements in local.
+    **/
+  @api def store(local: SRAM1[A], len: I32): Void = stage(DenseTransfer(this,local.apply(0::len),isLoad = false))
 }
 
 /** A 2-dimensional [[DRAM]] with elements of type A. */

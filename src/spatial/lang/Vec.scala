@@ -113,7 +113,7 @@ import spatial.node._
   @api override def eql(that: Vec[A]): Bit = this.zip(that){(a,b) => a.eql(b) }.reduce{_&&_}
 
   // --- Typeclass Methods
-  override protected val __isPrimitive: Boolean = false
+  override protected val __neverMutable: Boolean = false
 
   @rig def nbits: Int = A.nbits * width
   @rig def zero: Vec[A] = Vec.ZeroLast(Seq.fill(width){ A.zero }:_*)

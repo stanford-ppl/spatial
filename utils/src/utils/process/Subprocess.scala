@@ -2,6 +2,8 @@ package utils.process
 
 import java.io._
 
+import scala.collection.mutable.ListBuffer
+
 class Subprocess(args: String*)(react: (String,BufferedReader) => Option[String]) {
   private var reader: BufferedReader = _
   private var writer: BufferedWriter = _
@@ -12,6 +14,22 @@ class Subprocess(args: String*)(react: (String,BufferedReader) => Option[String]
     writer.write(x)
     writer.newLine()
     writer.flush()
+  }
+
+  /** Returns the current list of lines in the error stream. */
+  def errors(): List[String] = {
+    val lines = ListBuffer[String]()
+    while (logger.ready()) {
+      lines += logger.readLine()
+    }
+    lines.toList
+  }
+  def stdout(): List[String] = {
+    val lines = ListBuffer[String]()
+    while (reader.ready()) {
+      lines += reader.readLine()
+    }
+    lines.toList
   }
 
   def run(dir: String = ""): Unit = if (p eq null) {

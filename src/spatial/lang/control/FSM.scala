@@ -11,7 +11,7 @@ object FSM {
   }
 
   @rig def fsm[A:Bits](start: A, notDone: A => Bit, action: A => Void, nextState: A => A): Void = {
-    val cur = bound[A]
+    val cur = boundVar[A]
     val dBlk = stageLambda1(cur){ notDone(cur) }
     val aBlk = stageLambda1(cur){ action(cur) }
     val nBlk = stageLambda1(cur){ nextState(cur) }

@@ -36,25 +36,25 @@ trait CppGenAccel extends CppGenCommon {
       emit(s"""std::cout << "Kernel done, test run time = " << elapsed << " ms" << std::endl;""")
       emit(s"""c1->flushCache(1024);""")
  
-      //  if (earlyExits.length > 0) {
-      //    emit("// Capture breakpoint-style exits")
-      //    emit("bool early_exit = false;")
-      //    val numInstrs = if (cfg.enableInstrumentation) {2*instrumentCounters.length} else 0
-      //    earlyExits.zipWithIndex.foreach{ case (b, i) =>
-      //      emit(src"long ${b}_act = c1->getArg(${argIOs.length + argOuts.length + numInstrs + i}, false);")
-      //      val msg = b match {
-      //        case Def(AssertIf(_,_,m)) => 
-      //          val mm = m match {
-      //            case Some(Const(message)) => s"${message}".replace("\"","'")
-      //            case _ => "No Assert Message :("
-      //          }
-      //          s"""${b.ctx} - """ + s"""${mm}"""
-      //        case _ => s"${b.ctx}"
-      //      }
-      //      emit(s"""if (${b}_act) {std::cout << "===================\\n  Breakpoint $i triggered!\\n    ${msg} \\n===================" << std::endl; early_exit = true;}  """)
-      //    }
-      //    emit("""if (!early_exit) {std::cout << "No breakpoints triggered :)" << std::endl;} """)
-      //  }
+       if (earlyExits.length > 0) {
+         emit("// Capture breakpoint-style exits")
+         emit("bool early_exit = false;")
+         val numInstrs = if (cfg.enableInstrumentation) {2*instrumentCounters.length} else 0
+         earlyExits.zipWithIndex.foreach{ case (b, i) =>
+           emit(src"long ${b}_act = c1->getArg(${argIOs.toList.length + argOuts.toList.length + numInstrs + i}, false);")
+           val msg = b match {
+             case Def(AssertIf(_,_,m)) => 
+               val mm = m match {
+                 case Some(Const(message)) => s"${message}".replace("\"","'")
+                 case _ => "No Assert Message :("
+               }
+               s"""${b.ctx} - """ + s"""${mm}"""
+             case _ => s"${b.ctx}"
+           }
+           emit(s"""if (${b}_act) {std::cout << "===================\\n  Breakpoint $i triggered!\\n    ${msg} \\n===================" << std::endl; early_exit = true;}  """)
+         }
+         emit("""if (!early_exit) {std::cout << "No breakpoints triggered :)" << std::endl;} """)
+       }
  
       //  if (cfg.enableInstrumentation) {
       //    emit(src"""std::ofstream instrumentation ("./instrumentation.txt");""")
@@ -81,11 +81,6 @@ trait CppGenAccel extends CppGenCommon {
       //    emit(src"""instrumentation.close();""")
       //  }
       //  emit(src"// $lhs $reg $v $en reg write")
-
-    case ArgInRead(reg)    => 
-      emit(src"${lhs.tp} $lhs = $reg;")
-    case ArgOutWrite(reg,v,en) => 
-      emit(src"// $lhs $reg $v $en reg write")
 
     case UnitPipe(_,func) => 
       controllerStack.push(lhs)
@@ -128,9 +123,10 @@ trait CppGenAccel extends CppGenCommon {
 
     case AssertIf(en, cond, m) => 
       // Emits will only happen if outside the accel
-      val str = src"""${m.getOrElse("API assert failed with no message provided")}"""
+      val str = src"""${m.getOrElse("\"API assert failed with no message provided\"")}"""
       emit(src"""string $lhs = string_plus("\n=================\n", string_plus($str, "\n=================\n"));""")
-      emit(src"""if ($en) { ASSERT($cond, ${lhs}.c_str()); }""")
+      val enable = if (en.toList.isEmpty) "true" else en.map(quote).mkString("&")
+      emit(src"""if ($enable) { ASSERT($cond, ${lhs}.c_str()); }""")
       if (scope == "accel") earlyExits = earlyExits :+ lhs
 
     case BreakpointIf(en) => 

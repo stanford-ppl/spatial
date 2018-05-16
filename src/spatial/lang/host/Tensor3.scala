@@ -42,6 +42,13 @@ import forge.tags._
   @api def zip[B:Type,C:Type](that: Tensor3[B])(func: (A,B) => C): Tensor3[C] = Tensor3(data.zip(that.data)(func), dim0, dim1, dim2)
   /** Reduces the elements in this Tensor3 into a single element using associative function `rfunc`. */
   @api def reduce(rfunc: (A,A) => A): A = data.reduce(rfunc)
+
+  /** Returns true if this Tensor3 and `that` contain the same elements, false otherwise. */
+  @api override def neql(that: Tensor3[A]): Bit = data !== that.data
+
+  /** Returns false if this Tensor3 and `that` differ by at least one element, true otherwise. */
+  @api override def eql(that: Tensor3[A]): Bit = data === that.data
+
 }
 object Tensor3 {
   @api def apply[A:Type](data: Array[A], dim0: I32, dim1: I32, dim2: I32): Tensor3[A] = {

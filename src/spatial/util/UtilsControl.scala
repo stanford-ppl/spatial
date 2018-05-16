@@ -14,84 +14,243 @@ import scala.util.Try
 
 trait UtilsControl {
 
-  def takesEnables(x: Sym[_]): Boolean = x.op.exists{
-    case _:EnPrimitive[_] | _:EnControl[_] => true
-    case _ => false
+  implicit class ControlOpOps(op: Op[_]) {
+    /** True if this Op is a loop which has a body which is run multiple times at runtime. */
+    def isLoop: Boolean = op match {
+      case loop: Loop[_] => !loop.cchains.forall(_._1.willFullyUnroll)
+      case _ => false
+    }
+    def isFullyUnrolledLoop: Boolean = op match {
+      case loop: Loop[_] => loop.cchains.forall(_._1.willFullyUnroll)
+      case _ => false
+    }
   }
 
-  implicit class SymControl(x: Sym[_]) {
-    def toCtrl: Ctrl = if (isControl(x)) Controller(x,-1) else x.parent
+  /** Operations implicitly defined on both Sym[_] and Ctrl. */
+  abstract class ControlOps(s: Option[Sym[_]]) {
+    private def op: Option[Op[_]] = s.flatMap{sym => sym.op : Option[Op[_]] }
+    def toCtrl: Ctrl
 
-    def parent: Ctrl = metadata[ParentController](x).map(_.parent).getOrElse(Host)
-    def parent_=(p: Ctrl): Unit = metadata.add(x, ParentController(p))
-
-    def blk: Ctrl = metadata[ParentBlk](x).map(_.blk).getOrElse{Host}
-    def blk_=(blk: Ctrl): Unit = metadata.add(x, ParentBlk(blk))
-
-    @stateful def children: Seq[Controller] = {
-      if (!isControl(x)) throw new Exception(s"Cannot get children of non-controller.")
-      metadata[Children](x).map(_.children).getOrElse(Nil)
+    /** True if this symbol or Ctrl block takes enables as inputs. */
+    def takesEnables: Boolean = op.exists{
+      case _:EnPrimitive[_] | _:EnControl[_] => true
+      case _ => false
     }
-    def children_=(cs: Seq[Controller]): Unit = metadata.add(x, Children(cs))
 
-    def ancestors: Seq[Ctrl] = Tree.ancestors(x.toCtrl){_.parent}
-    def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = x.toCtrl.ancestors(stop)
-    def ancestors(stop: Ctrl): Seq[Ctrl] = x.toCtrl.ancestors(stop)
-
-    def cchains: Seq[CounterChain] = x.op match {
+    /** Returns a list of all counterhains in this controller. */
+    def cchains: Seq[CounterChain] = op match {
       case Some(op: Control[_]) => op.cchains.map(_._1).distinct
       case _ => Nil
     }
 
-    def isUnitPipe: Boolean = x.op.exists(_.isInstanceOf[UnitPipe])
-    def isAccelScope: Boolean = x.op.exists(_.isInstanceOf[AccelScope])
-    def isStreamPipe: Boolean = styleOf(x) == Sched.Stream
-    def isForever: Boolean = x.op match {
-      case Some(op: Control[_]) => x.cchains.exists(_.isForever)
+    def level: CtrlLevel = toCtrl match {
+      case ctrl @ Controller(sym,_) if sym.isRawOuter && ctrl.isOuterBlock => Outer
+      case Host => Outer
+      case _    => Inner
+    }
+    def looping: CtrlLooping = if (op.exists(_.isLoop)) Looped else Single
+
+    def isCtrl(
+      loop:  CtrlLooping = null,
+      level: CtrlLevel = null,
+      sched: CtrlSchedule = null
+    ): Boolean = {
+      val isCtrl  = this.isControllerOrHost
+      if (!isCtrl) false
+      else {
+        val _loop  = Option(loop)
+        val _level = Option(level)
+        val _sched = Option(sched)
+        val ctrlLoop  = this.looping
+        val ctrlLevel = this.level
+        val ctrlSched = s.map(_.rawSchedule)
+
+        val hasLoop = _loop.isEmpty || _loop.contains(ctrlLoop)
+        val hasLevel = _level.isEmpty || _level.contains(ctrlLevel)
+        val hasSched = (_sched, ctrlSched) match {
+          case (None, _) => true
+          case (_, None) => false
+          case (Some(expectedSchedule), Some(actualSchedule)) => (ctrlLoop, ctrlLevel) match {
+            case (Looped, Inner) => expectedSchedule == actualSchedule
+            case (Looped, Outer) => expectedSchedule == actualSchedule
+            case (Single, Inner) => expectedSchedule match {
+              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
+              case Pipelined => false
+              case Streaming => actualSchedule == Streaming
+              case ForkJoin  => actualSchedule == ForkJoin  // Shouldn't occur in practice
+              case Fork      => actualSchedule == Fork
+            }
+            case (Single, Outer) => expectedSchedule match {
+              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
+              case Pipelined => false
+              case Streaming => actualSchedule == Streaming
+              case ForkJoin  => actualSchedule == ForkJoin
+              case Fork      => actualSchedule == Fork
+            }
+          }
+
+        }
+
+        isCtrl && hasLoop && hasLevel && hasSched
+      }
+    }
+
+    def isFullyUnrolledLoop: Boolean = op.exists(_.isFullyUnrolledLoop)
+
+    /** True if this is a control block which is not run iteratively. */
+    def isSingleControl: Boolean = isCtrl(loop = Single)
+
+    /** True if this is a loop whose body will be executed for multiple iterations at runtime.
+      * False for fully unrolled loops and UnitPipe.
+      */
+    def isLoopControl: Boolean = isCtrl(loop = Looped)
+
+    /** True if this is an inner scope Ctrl stage or symbol. */
+    def isInnerControl: Boolean = isCtrl(level = Inner)
+    /** True if this is an outer scope Ctrl stage or symbol. */
+    def isOuterControl: Boolean = isCtrl(level = Outer)
+
+    /** True if this is a sequential controller. */
+    def isSeqControl: Boolean = isCtrl(sched = Sequenced)
+    /** True if this is a pipelined controller. */
+    def isPipeControl: Boolean = isCtrl(sched = Pipelined)
+    /** True if this is a streaming scheduled controller. */
+    def isStreamControl: Boolean = isCtrl(sched = Streaming)
+
+    /** True if this is an inner, sequential controller. */
+    def isInnerSeqControl: Boolean = isCtrl(level = Inner, sched = Sequenced)
+
+    /** True if this is an outer streaming controller.
+      * (Note that all streaming controllers should be outer.)
+      */
+    def isOuterStreamControl: Boolean = isCtrl(level = Outer, sched = Streaming)
+
+    /** True if this is an outer pipelined controller.
+      * (Note that all outer pipelined controllers are loops.)
+      */
+    def isOuterPipeControl: Boolean = isCtrl(level = Outer, sched = Pipelined)
+
+    /** True if this is an inner controller for a loop. */
+    def isInnerLoop: Boolean = isCtrl(loop = Looped, level = Inner)
+    /** True if this is an outer controller for a loop. */
+    def isOuterLoop: Boolean = isCtrl(loop = Looped, level = Outer)
+
+    /** True if this is a sequential controller for a loop. */
+    def isSeqLoop: Boolean = isCtrl(loop = Looped, sched = Sequenced)
+
+    /** True if this is a pipelined controller for a loop. */
+    def isPipeLoop: Boolean = isCtrl(loop = Looped, sched = Pipelined)
+
+    /** True if this is an inner pipelined controller for a loop. */
+    def isInnerPipeLoop: Boolean = isCtrl(loop = Looped, level = Inner, sched = Pipelined)
+
+    /** True if this is an outer pipelined controller for a loop. */
+    def isOuterPipeLoop: Boolean = isCtrl(loop = Looped, level = Outer, sched = Pipelined)
+
+    /** True if this is an outer streaming controller for a loop. */
+    def isOuterStreamLoop: Boolean = isCtrl(loop = Looped, level = Outer, sched = Streaming)
+
+
+    /** True if this controller, counterchain, or counter is statically known to run for an
+      * infinite number of iterations. */
+    def isForever: Boolean = op match {
+      case Some(op: Control[_]) => op.cchains.exists(_._1.isForever)
       case Some(op: CounterChainNew) => op.counters.exists(_.isForever)
       case Some(_: ForeverNew) => true
       case _ => false
     }
-    @stateful def willRunForever: Boolean = x.isForever || x.children.exists(_.willRunForever)
-  }
-  implicit class CtrlControl(x: Ctrl) {
-    def isStreamPipe: Boolean = x.s.exists(_.isStreamPipe)
-    @stateful def willRunForever: Boolean = x.s.exists(_.willRunForever)
+
+    /** Returns all ancestors of the controller or symbol.
+      * Ancestors are ordered outermost to innermost
+      */
+    def ancestors: Seq[Ctrl] = Tree.ancestors(this.toCtrl){_.parent}
+
+    /** Returns all ancestors of the controller or symbol, stopping when stop is true (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
+    def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(toCtrl, stop){_.parent}
+
+    /** Returns all ancestors of the controller or symbol, stopping at `stop` (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
+    def ancestors(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](toCtrl, {c => c == stop}){_.parent}
+
+    @stateful protected def controlChildren: Seq[Ctrl]
+    protected def isControllerOrHost: Boolean
+
+    /** True if this controller, counterchain, or counter is statically known to run forever.
+      * Also true if any of this controller's descendants will run forever.
+      */
+    @stateful def willRunForever: Boolean = isForever || controlChildren.exists(_.willRunForever)
+
+    /** True if this controller or symbol has a streaming controller ancestor. */
+    def hasStreamAncestor: Boolean = ancestors.exists(_.isStreamControl)
+    /** True if this controller or symbol has a streaming controller parent. */
+    def hasStreamParent: Boolean = toCtrl.parent.isStreamControl
+
+    /** True if this controller or symbol has an ancestor which runs forever. */
+    def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
+
+
+    /** Returns true if this is an inner controller which directly contains
+      * stream enablers/holder accesses.
+      */
+    def hasStreamAccess: Boolean = isInnerControl && (op match {
+      case Some(o) => o.blocks.flatMap(_.nestedStms).exists{ sym =>
+        sym.isStreamStageEnabler || sym.isStreamStageHolder
+      }
+      case None => false
+    })
+
+    /** Returns true if this control or symbol occurs within a loop. */
+    def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
+
+    /** Returns true if this control or symbol is a loop or occurs within a loop. */
+    def willRunMultiple: Boolean = s.exists(_.isLoopControl) || hasLoopAncestor
   }
 
-  def getCChains(block: Block[_]): Seq[CounterChain] = getCChains(block.stms)
-  def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}
 
-  def ctrlIters(ctrl: Ctrl): Seq[I32] = Try(ctrl match {
-    case Host => Nil
-    case Controller(Op(loop: Loop[_]), -1) => loop.iters
-    case Controller(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
-    case _ => Nil
-  }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
+  implicit class SymControl(s: Sym[_]) extends ControlOps(Some(s)) {
+    def toCtrl: Ctrl = if (s.isControl) Controller(s,-1) else s.parent
+    protected def isControllerOrHost: Boolean = s.isControl
 
-  def ctrDef[F](x: Counter[F]): CounterNew[F] = x match {
-    case Op(c: CounterNew[_]) => c.asInstanceOf[CounterNew[F]]
-    case _ => throw new Exception(s"Could not find counter definition for $x")
+    @stateful protected def controlChildren: Seq[Ctrl] = s.children
   }
-  def cchainDef(x: CounterChain): CounterChainNew = x match {
-    case Op(c: CounterChainNew) => c
-    case _ => throw new Exception(s"Could not find counterchain definition for $x")
+
+
+  implicit class CtrlControl(ctrl: Ctrl) extends ControlOps(ctrl.s) {
+    def toCtrl: Ctrl = ctrl
+    @stateful protected def controlChildren: Seq[Ctrl] = ctrl.children
+    protected def isControllerOrHost: Boolean = true
   }
+
+
+
 
   implicit class CounterChainHelperOps(x: CounterChain) {
-    def ctrs: Seq[Counter[_]] = cchainDef(x).counters
-    def pars: Seq[I32] = ctrs.map(_.ctrPar)
-    def shouldFullyUnroll: Boolean = ctrs.forall(_.shouldFullyUnroll)
-    def mayFullyUnroll: Boolean = ctrs.forall(_.mayFullyUnroll)
-    def isUnit: Boolean = ctrs.forall(_.isUnit)
-    def isStatic: Boolean = ctrs.forall(_.isStatic)
+    def node: CounterChainNew = x match {
+      case Op(c: CounterChainNew) => c
+      case _ => throw new Exception(s"Could not find counterchain definition for $x")
+    }
+
+    def counters: Seq[Counter[_]] = x.node.counters
+    def pars: Seq[I32] = counters.map(_.ctrPar)
+    def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
+    def isUnit: Boolean = counters.forall(_.isUnit)
+    def isStatic: Boolean = counters.forall(_.isStatic)
   }
 
+
   implicit class CounterHelperOps[F](x: Counter[F]) {
-    def start: Sym[F] = ctrDef(x).start
-    def step: Sym[F] = ctrDef(x).step
-    def end: Sym[F] = ctrDef(x).end
-    def ctrPar: I32 = ctrDef(x).par
+    def node: CounterNew[F] = x match {
+      case Op(c: CounterNew[_]) => c.asInstanceOf[CounterNew[F]]
+      case _ => throw new Exception(s"Could not find counter definition for $x")
+    }
+
+    def start: Sym[F] = x.node.start
+    def step: Sym[F] = x.node.step
+    def end: Sym[F] = x.node.end
+    def ctrPar: I32 = x.node.par
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
@@ -105,11 +264,7 @@ trait UtilsControl {
 
       case _ => None
     }
-    def shouldFullyUnroll: Boolean = (nIters,ctrPar) match {
-      case (Some(Final(nIter)), Final(par)) => par >= nIter
-      case _ => false
-    }
-    def mayFullyUnroll: Boolean = (nIters,ctrPar) match {
+    def willFullyUnroll: Boolean = (nIters,ctrPar) match {
       case (Some(Expect(nIter)), Expect(par)) => par >= nIter
       case _ => false
     }
@@ -120,47 +275,89 @@ trait UtilsControl {
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
-    @stateful def ctrStart: Ind[W] = ctrOf(i).start.unbox
-    @stateful def ctrStep: Ind[W] = ctrOf(i).step.unbox
-    @stateful def ctrEnd: Ind[W] = ctrOf(i).end.unbox
-    @stateful def ctrPar: I32 = ctrOf(i).ctrPar
-    @stateful def ctrParOr1: Int = ctrOf.get(i).map(_.ctrPar.toInt).getOrElse(1)
+    def ctrStart: Ind[W] = i.counter.start.unbox
+    def ctrStep: Ind[W] = i.counter.step.unbox
+    def ctrEnd: Ind[W] = i.counter.end.unbox
+    def ctrPar: I32 = i.counter.ctrPar
+    def ctrParOr1: Int = i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
   }
 
 
-  /**
-    * Returns the least common ancestor (LCA) of the two controllers.
+  def getCChains(block: Block[_]): Seq[CounterChain] = getCChains(block.stms)
+  def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}
+
+
+  def ctrlIters(ctrl: Ctrl): Seq[I32] = Try(ctrl match {
+    case Host => Nil
+    case Controller(Op(loop: Loop[_]), -1) => loop.iters
+    case Controller(Op(loop: Loop[_]), i)  => loop.bodies(i)._1
+    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.iters
+    case Controller(Op(loop: UnrolledLoop[_]), i)  => loop.bodiess.apply(i)._1.flatten
+    case _ => Nil
+  }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
+
+  def ctrlValids(ctrl: Ctrl): Seq[Bit] = Try(ctrl match {
+    case Host => Nil
+    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.valids
+    case _ => Nil
+  }).getOrElse(throw new Exception(s"$ctrl had invalid valids"))
+
+
+
+  /** Returns the least common ancestor (LCA) of the two controllers.
     * If the controllers have no ancestors in common, returns None.
     */
-  def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.parent,b.parent)
+  def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.toCtrl,b.toCtrl)
   def LCA(a: Ctrl, b: Ctrl): Ctrl= Tree.LCA(a, b){_.parent}
+
+  /** Returns the least common ancestor (LCA) of a list of controllers.
+    * Also returns the pipeline distance between the first and last accesses,
+    * and the pipeline distance between the first access and the first stage.
+    * If the controllers have no ancestors in common, returns None.
+    */
+  @stateful def LCA(n: => List[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
+  @stateful def LCA(n: List[Ctrl]): Ctrl = { 
+    val anchor = n.distinct.head
+    val candidates = n.distinct.drop(1).map{x => if (x.ancestors.map(_.master).contains(anchor.master)) anchor else if (anchor.ancestors.map(_.master).contains(x)) x else LCA(anchor, x)}
+    if (candidates.distinct.length == 1) candidates.head 
+    else LCA(candidates)
+  }
+  @stateful def LCAPortMatchup(n: List[Sym[_]], lca: Ctrl): (Int,Int) = {
+    val lcaChildren = lca.children.toList.map(_.master)
+    val portMatchup = n.map{a => lcaChildren.indexOf(lcaChildren.filter{ s => a.ancestors.map(_.master).contains(s) }.head)}
+    val basePort = portMatchup.min
+    val numPorts = portMatchup.max - portMatchup.min
+    (basePort, numPorts) 
+  }
 
   def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {
     Tree.LCAWithPaths(a,b){_.parent}
   }
 
-  /**
-    * Returns the LCA between two controllers a and b along with their pipeline distance.
+  /** Returns the LCA between two symbols a and b along with their pipeline distance.
     *
-    * Pipeline distance between controllers a and b:
-    *   If a and b have a least common ancestor which is neither a nor b,
+    * Pipeline distance between a and b:
+    *   If a and b have a least common control ancestor which is neither a nor b,
     *   this is defined as the dataflow distance between the LCA's children which contain a and b
-    *   When a and b are equal, the distance is defined as zero.
+    *   If a and b are equal, the distance is defined as zero.
     *
     *   The distance is undefined when the LCA is a xor b, or if a and b occur in parallel
     *   The distance is positive if a comes before b, negative otherwise
     */
-  @stateful def LCAWithDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithDistance(a.parent,b.parent)
+  @stateful def LCAWithDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithDistance(a.toCtrl,b.toCtrl)
+
+
   @stateful def LCAWithDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     if (a == b) (a,0)
     else {
       val (lca, pathA, pathB) = LCAWithPaths(a, b)
-      if (isOuterControl(lca) && lca != a && lca != b) {
-        val topA = pathA.find{c => c.s != lca.s }.get
-        val topB = pathB.find{c => c.s != lca.s }.get
-        //dbg(s"PathA: " + pathA.mkString(", "))
-        //dbg(s"PathB: " + pathB.mkString(", "))
-        //dbg(s"LCA: $lca")
+      if (lca.isOuterControl && lca != a && lca != b) {
+        logs(s"PathA: " + pathA.mkString(", "))
+        logs(s"PathB: " + pathB.mkString(", "))
+        logs(s"LCA: $lca")
+
+        val topA = pathA.find{c => c != lca }.get
+        val topB = pathB.find{c => c != lca }.get
         // TODO[2]: Update with arbitrary children graph once defined
         val idxA = lca.children.indexOf(topA)
         val idxB = lca.children.indexOf(topB)
@@ -174,31 +371,33 @@ trait UtilsControl {
     }
   }
 
-  /**
-    * Returns the LCA and coarse-grained pipeline distance between accesses a and b.
+  /** Returns the LCA and coarse-grained pipeline distance between accesses a and b.
     *
     * Coarse-grained pipeline distance:
     *   If the LCA controller of a and b is a metapipeline, the pipeline distance
     *   is the distance between the respective controllers for a and b. Otherwise zero.
     */
   @stateful def LCAWithCoarseDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = {
-    LCAWithCoarseDistance(a.parent, b.parent)
+    LCAWithCoarseDistance(a.toCtrl, b.toCtrl)
   }
   @stateful def LCAWithCoarseDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     val (lca,dist) = LCAWithDistance(a,b)
-    val coarseDist = if (isOuterControl(lca) && isLoop(lca)) dist else 0
+    val coarseDist = if (lca.isOuterPipeLoop || lca.isOuterStreamLoop) dist else 0
     (lca, coarseDist)
   }
 
-  /**
-    * Returns all metapipeline parents between all pairs of (w in writers, a in readers U writers)
-    */
+  @stateful def lookahead(a: Sym[_]): Sym[_] = {
+    if (a.consumers.nonEmpty && a.consumers.head.isCtrl()) a.consumers.head else a
+  }
+
+  /** Returns all metapipeline parents between all pairs of (w in writers, a in readers U writers). */
   @stateful def findAllMetaPipes(readers: Set[Sym[_]], writers: Set[Sym[_]]): Map[Ctrl,Set[(Sym[_],Sym[_])]] = {
     if (writers.isEmpty && readers.isEmpty) Map.empty
     else {
       val ctrlGrps: Set[(Ctrl,(Sym[_],Sym[_]))] = writers.flatMap{w =>
         (readers ++ writers).flatMap{a =>
-          val (lca,dist) = LCAWithCoarseDistance(w,a)
+          val (lca,dist) = LCAWithCoarseDistance(lookahead(w),lookahead(a))
+          dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
           if (dist != 0) Some(lca,(w,a)) else None
         }
       }
@@ -217,8 +416,11 @@ trait UtilsControl {
         val group  = metapipeLCAs(metapipe)
         val anchor = group.head._1
         val dists = accesses.map{a =>
-          val (lca,dist) = LCAWithCoarseDistance(anchor,a)
-          if (lca == metapipe) a -> Some(dist) else a -> None
+          val (lca,dist) = LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
+
+          dbgs(s"$a <-> $anchor # LCA: $lca, Dist: $dist")
+
+          if (lca == metapipe || anchor == a) a -> Some(dist) else a -> None
         }
         val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
         val minDist = buffers.minOrElse(0)
@@ -231,67 +433,21 @@ trait UtilsControl {
   }
 
 
-  /** Returns true if either this symbol is a loop or exists within a loop. */
-  def isInLoop(s: Sym[_]): Boolean = isLoop(s) || s.ancestors.exists(isLoop)
-  def isInLoop(ctrl: Ctrl): Boolean = isLoop(ctrl) || ctrl.ancestors.exists(isLoop)
 
-  /**
-    * Returns true if symbols a and b occur in Parallel (but not metapipeline parallel).
+  /** Returns true if accesses a and b may occur concurrently and to the same buffer port.
+    * This is true when any of the following hold:
+    *   0. a and b are two different unrolled parts of the same node
+    *   1. a and b are in the same inner pipeline
+    *   2. a and b are in the same fully unrolled inner sequential
+    *   3. a and b are in a Parallel controller
+    *   4. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
     */
-  def areInParallel(a: Sym[_], b: Sym[_]): Boolean = {
-    val lca = LCA(a,b)
-    // TODO[2]: Arbitrary dataflow graph for children
-    isInnerControl(lca) || isParallel(lca)
-  }
-
-
-  def isStreamLoad(e: Sym[_]): Boolean = e match {
-    case Op(_:FringeDenseLoad[_,_]) => true
-    case _ => false
-  }
-
-  def isTileTransfer(e: Sym[_]): Boolean = e match {
-    case Op(_:FringeDenseLoad[_,_]) => true
-    case Op(_:FringeDenseStore[_,_]) => true
-    case Op(_:FringeSparseLoad[_,_]) => true
-    case Op(_:FringeSparseStore[_,_]) => true
-    case _ => false
-  }
-
-  // TODO[3]: Should this just be any write?
-  def isParEnq(e: Sym[_]): Boolean = e match {
-    case Op(_:FIFOBankedEnq[_]) => true
-    case Op(_:LIFOBankedPush[_]) => true
-    case Op(_:SRAMBankedWrite[_,_]) => true
-    case Op(_:FIFOEnq[_]) => true
-    case Op(_:LIFOPush[_]) => true
-    case Op(_:SRAMWrite[_,_]) => true
-    //case Op(_:ParLineBufferEnq[_]) => true
-    case _ => false
-  }
-
-  def isStreamStageEnabler(e: Sym[_]): Boolean = e match {
-    case Op(_:FIFODeq[_]) => true
-    case Op(_:FIFOBankedDeq[_]) => true
-    case Op(_:LIFOPop[_]) => true
-    case Op(_:LIFOBankedPop[_]) => true
-    case Op(_:StreamInRead[_]) => true
-    case Op(_:StreamInBankedRead[_]) => true
-    //case Op(_:DecoderTemplateNew[_]) => true
-    //case Op(_:DMATemplateNew[_]) => true
-    case _ => false
-  }
-
-  def isStreamStageHolder(e: Sym[_]): Boolean = e match {
-    case Op(_:FIFOEnq[_]) => true
-    case Op(_:FIFOBankedEnq[_]) => true
-    case Op(_:LIFOPush[_]) => true
-    case Op(_:LIFOBankedPush[_]) => true
-    case Op(_:StreamOutWrite[_]) => true
-    case Op(_:StreamOutBankedWrite[_]) => true
-    //case Op(_:BufferedOutWrite[_]) => true
-    //case Op(_:DecoderTemplateNew[_]) => true
-    case _ => false
+  def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val lca = LCA(a.access, b.access)
+    (a.access == b.access && a.unroll != b.unroll) ||
+    lca.isInnerPipeLoop ||
+    (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
+    lca.isParallel
   }
 
 }

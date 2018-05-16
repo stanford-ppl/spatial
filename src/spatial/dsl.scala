@@ -2,7 +2,7 @@ package spatial
 
 trait SpatialDSL extends lang.static.FrontendStatics
 
-object lib extends SpatialDSL {
+object libview extends SpatialDSL {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag
@@ -33,6 +33,12 @@ object dsl extends SpatialDSL with lang.static.ShadowingStatics {
     def macroTransform(annottees: Any*): Any = macro test.impl
   }
   private object test extends TestTag("spatial", "SpatialTest", "SpatialApp")
+
+  // Used for debugging virtualization macros
+  final class testv extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro testv.impl
+  }
+  private object testv extends TestTag("spatial", "SpatialTest", "SpatialApp", verbose = true)
 
   final class struct extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl

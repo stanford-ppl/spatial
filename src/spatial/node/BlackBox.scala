@@ -5,7 +5,9 @@ import forge.tags._
 
 import spatial.lang._
 
-abstract class BlackBox[R:Type] extends Control[R]
+abstract class BlackBox[R:Type] extends Control[R] {
+  def mayBeOuterBlock(i: Int): Boolean = false
+}
 
 /** Black box which must be expanded early in compiler (after initial analyses). */
 abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {

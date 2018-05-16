@@ -32,10 +32,8 @@ trait NamedCodegen extends Codegen {
       case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}"
       case LUTNew(_,_)  => s"${s}_${s.nameOr("lut")}"
 
-      case SetArgIn(reg,_)      => s"${s}_${s.nameOr(src"set_$reg")}"
-      case ArgInRead(reg)       => s"${s}_${s.nameOr(src"rd_$reg")}"
-      case ArgOutWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"
-      case GetArgOut(reg)       => s"${s}_${s.nameOr(src"get_$reg")}"
+      case SetReg(reg,_)      => s"${s}_${s.nameOr(src"set_$reg")}"
+      case GetReg(reg)       => s"${s}_${s.nameOr(src"get_$reg")}"
 
       case RegRead(reg)      => s"${s}_${s.nameOr(src"rd_$reg")}"
       case RegWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"
@@ -71,6 +69,12 @@ trait NamedCodegen extends Codegen {
       case FixSub(_,_)  => s"${s}_${s.nameOr("sub")}"
       case FixDiv(_,_)  => s"${s}_${s.nameOr("div")}"
       case FixMul(_,_)  => s"${s}_${s.nameOr("mul")}"
+
+      case DelayLine(size, data) => data match {
+            case Const(_) => Console.println(s"quoting const as $data");src"$data"
+            case _ => s"${s}_D${size}"
+            // case _ => wireMap(s"${quote(data)}_D$size" + alphaconv.getOrElse(s"${quote(data)}_D$size", ""))
+      }
 
       case _ => super.named(s,id)
     }

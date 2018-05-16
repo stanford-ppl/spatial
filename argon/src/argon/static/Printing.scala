@@ -51,9 +51,9 @@ trait Printing {
     if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, showCaret) }
     if (config.enError) state.out.error(ctx,showCaret)
   }
-  @stateful def error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
+  @stateful def   error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
   @stateful def error(ctx: SrcCtx, x: => String, noError: Boolean): Unit = {
-    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, x, noError) }
+    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, x) }
     if (config.enError) state.out.error(ctx, x)
     if (!noError) state.logError()
   }
@@ -86,6 +86,9 @@ trait Printing {
   @stateful def dbgs(x: => Any): Unit = if (config.enDbg) state.log.println("  "*state.logTab + x)
   @stateful def dbgss(x: => Any): Unit = if (config.enDbg) {
     x.toString.split("\n").foreach{line => dbgs(line) }
+  }
+  @stateful def dbgss(prefix: String, x: => Any): Unit = if (config.enDbg) {
+    x.toString.split("\n").foreach{line => dbgs(prefix + line) }
   }
   @stateful def dbgblk(x: => Unit): Unit = if (config.enDbg) {
     state.logTab += 1

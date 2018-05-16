@@ -1,6 +1,7 @@
 package forge
 
 import language.experimental.macros
+import scala.reflect.{ClassTag,classTag}
 import scala.reflect.macros.whitebox
 
 /**
@@ -40,16 +41,12 @@ trait EmbeddedControls {
 
   /** Val definitions */
   def __newVar[T](init: T): VarLike[T] = new forge.Ptr[T](init)
-  def __assign[T](lhs: VarLike[T], rhs: T): Unit = lhs.__assign(rhs)
-  def __readVar[T](v: VarLike[T]): T = v.__read
 
   def __valName(init: Any, name: String): Unit = ()
-
-  //  def __lazyValDef[T](init: T): T = macro lazyValDefImpl[T]
-  //  def __valDef[T](init: T): T = macro valDefImpl[T]
+  def __use[T](v: T): T = macro useImpl[T]
 
   /** Control structures */
-  //def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T = macro ifThenElseImpl[T]
+  def __ifThenElse[T](cond: Boolean, thenBr: T, elseBr: T): T = macro ifThenElseImpl[T]
   def __return(expr: Any): Nothing = macro returnImpl
   def __whileDo(cond: Boolean, body: Unit): Unit = macro whileDoImpl
   def __doWhile(body: Unit, cond: Boolean): Unit = macro doWhileImpl
@@ -59,33 +56,36 @@ trait EmbeddedControls {
   // def __match[A,R](selector: A, cases: Seq[A => R]): R = macro matchImpl[A,R]
   // def __typedCase[A,T,R](bind: T, guard: Boolean, body: R): A => R = macro typedCaseImpl[A,T,R]
 
-  /** `Any` Infix Methods */
-  //def infix_+(x1: String, x2: Any): String = macro string_+
-  //def infix_+(x1: Any, x2: Any): Any = macro any_+ // don't know the return type => should actually never be produced by Virtualizer
-  def infix_==(x1: Any, x2: Any): Boolean = macro any_==
-  def infix_!=(x1: Any, x2: Any): Boolean = macro any_!=
-  def infix_##(x: Any): Int = macro any_##
-  def infix_equals(x1: Any, x2: Any): Boolean = macro any_equals
-  def infix_hashCode(x: Any): Int = macro any_hashCode
-  def infix_asInstanceOf[T](x: Any): T = macro any_asInstanceOf[T]
-  def infix_isInstanceOf[T](x: Any): Boolean = macro any_isInstanceOf[T]
-  //def infix_toString(x: Any): String = macro any_toString
-  def infix_getClass(x: Any): Class[_] = macro any_getClass
+  implicit class DefaultStringMethods(lhs: String) {
+    def infix_+(rhs: Any): String = lhs + rhs
+  }
 
-  /** `AnyRef` Infix Methods */
-  def infix_eq(x1: AnyRef, x2: AnyRef): Boolean = macro anyRef_eq
-  def infix_ne(x1: AnyRef, x2: AnyRef): Boolean = macro anyRef_ne
-  def infix_notify(x: AnyRef): Unit = macro anyRef_notify
-  def infix_notifyAll(x: AnyRef): Unit = macro anyRef_notifyAll
-  def infix_synchronized[T](x: AnyRef, body: T): T = macro anyRef_synchronized[T]
-  def infix_wait(x: AnyRef): Unit = macro anyRef_wait0
-  def infix_wait(x: AnyRef, timeout: Long): Unit = macro anyRef_wait1
-  def infix_wait(x: AnyRef, timeout: Long, nanos: Int): Unit = macro anyRef_wait2
-  def infix_clone(x: AnyRef): AnyRef = macro anyRef_clone
-  def infix_finalize(x: AnyRef): Unit = macro anyRef_finalize
+  def __assign(lhs: Any, rhs: Any): Unit = macro assignImpl
 
-  // Define universal arithmetic for all primitive types
-  def infix_+[A<:AnyVal, B<:AnyVal](lhs: A, rhs: B): AnyVal = macro anyVal_+[A,B]
+  implicit class DefaultAnyMethods(lhs: Any) {
+    def infix_toString(): String = lhs.toString
+    def infix_!=(rhs: Any): Boolean = lhs != rhs
+    def infix_==(rhs: Any): Boolean = lhs == rhs
+    def infix_##(): Int = lhs.##
+    def infix_equals(rhs: Any): Boolean = lhs.equals(rhs)
+    def infix_hashCode(): Int = lhs.hashCode()
+    def infix_asInstanceOf[T](): T = lhs.asInstanceOf[T]
+    def infix_isInstanceOf[T:ClassTag](): Boolean = utils.isSubtype(lhs.getClass, classTag[T].runtimeClass)
+    def infix_getClass(): Class[_] = lhs.getClass
+  }
+
+  implicit class DefaultAnyRefMethods(lhs: AnyRef) {
+    def infix_eq(rhs: AnyRef): Boolean = lhs eq rhs
+    def infix_ne(rhs: AnyRef): Boolean = lhs ne rhs
+    def infix_notify(): Unit = lhs.notify()
+    def infix_notifyAll(): Unit = lhs.notifyAll()
+    def infix_synchronized[T](body: T): T = lhs.synchronized(body)
+    def infix_wait(): Unit = lhs.wait()
+    def infix_wait(timeout: Long): Unit = lhs.wait(timeout)
+    def infix_wait(timeout: Long, nanos: Int): Unit = lhs.wait(timeout, nanos)
+    def infix_clone(): AnyRef = lhs.clone()
+    def infix_finalize(): Unit = lhs.finalize()
+  }
 
 }
 
@@ -93,6 +93,11 @@ trait EmbeddedControls {
   * EmbeddedControls companion object containing macro implementations.
   */
 object EmbeddedControls {
+
+  def useImpl[T](c: whitebox.Context)(v: c.Expr[T]): c.Expr[T] = {
+    import c.universe._
+    c.Expr(q"$v")
+  }
 
   /** Val/Var Definitions */
   def newVarImpl[T](c: whitebox.Context)(init: c.Expr[T]): c.Expr[T] = {
@@ -107,7 +112,7 @@ object EmbeddedControls {
     c.Expr(q"()")
   }
 
-  def assignImpl[T](c: whitebox.Context)(lhs: c.Expr[T], rhs: c.Expr[T]): c.Expr[Unit] = {
+  def assignImpl(c: whitebox.Context)(lhs: c.Expr[Any], rhs: c.Expr[Any]): c.Expr[Unit] = {
     import c.universe._
     c.Expr(q"$lhs = $rhs")
   }
@@ -187,8 +192,7 @@ object EmbeddedControls {
     c.Expr(q"$x.asInstanceOf[${tt.tpe}]")
   }
 
-  def any_isInstanceOf[T](c: whitebox.Context)(x: c.Expr[Any])(
-    implicit tt: c.WeakTypeTag[T]): c.Expr[Boolean] = {
+  def any_isInstanceOf[T](c: whitebox.Context)(x: c.Expr[Any])(implicit tt: c.WeakTypeTag[T]): c.Expr[Boolean] = {
 
     import c.universe._
     c.Expr[Boolean](q"$x.isInstanceOf[${tt.tpe}]")

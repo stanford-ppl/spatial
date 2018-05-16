@@ -61,7 +61,7 @@ object StagedStructsMacro {
     val fieldTypes  = fields.map{field => q"${field.nameLiteral} -> argon.Type[${field.tpTree}]" }
     val fieldNames  = fields.map{field => q"${field.nameLiteral} -> ${field.name}"}
     val fieldOpts   = fields.map{field => field.withRHS(q"null") }
-    val fieldOrElse = fields.map{field => q"Option(${field.name}).getOrElse{this.${field.name}}" }
+    val fieldOrElse = fields.map{field => q"Option(${field.name}).getOrElse{this.${field.name}(ctx,state)}" }
 
     var cls2 = q"class ${cls.name}[..${cls.tparams}]() extends spatial.lang.Struct[${cls.fullName}]".asClass
     var obj2 = obj
@@ -87,7 +87,7 @@ object StagedStructsMacro {
     obj2 = {
       obj2.injectMethod(
         q"""def apply[..${cls.tparams}](..$fields)(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
-              spatial.lang.Struct[${cls.fullName}]( ..$fieldNames )
+              spatial.lang.Struct[${cls.fullName}]( ..$fieldNames )(spatial.lang.Struct.tp[${cls.fullName}], ctx, state)
             }
          """.asDef)
     }

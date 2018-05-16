@@ -56,7 +56,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   def requiresRegisters(x: Sym[_]): Boolean = latencyModel.requiresRegisters(x, cycles.contains(x))
   def retimingDelay(x: Sym[_]): Double = if (requiresRegisters(x)) latencyOf(x, cycles.contains(x)) else 0.0
 
-  def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filter{_.isBits}.distinct
+  def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filter{_.isBits}.toSeq
 
   def delayLine[A](size: Int, data: Sym[A])(implicit ctx: SrcCtx): Sym[A] = data.tp match {
     case Bits(bits) =>
@@ -206,7 +206,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     case Stm(reader, d) =>
       logs(s"Retiming $reader = $d")
       val inputs = bitBasedInputs(d)
-      val reader2 = isolateSubst{
+      val reader2 = isolate {
         registerDelays(reader, inputs)
         visit(sym)
         f(reader)
@@ -223,7 +223,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     precomputeDelayLines(op)
     dbgs(s"Retiming case ${stm(cas)}")
     // Note: Don't call inBlock here - it's already being called in retimeStms
-    val caseBody2: Block[A] = isolateSubst{ stageBlock{
+    val caseBody2: Block[A] = isolate{ stageBlock{
       retimeStms(body)
       val size = delayConsumers.getOrElse(switch, Nil).find(_.input == cas).map(_.size).getOrElse(0) +
         delayConsumers.getOrElse(cas, Nil).find(_.input == body.result).map(_.size).getOrElse(0)
@@ -258,7 +258,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         }
       }, options)
     }
-    val switch2 = isolateSubst{
+    val switch2 = isolate {
       registerDelays(switch, selects)
       implicit val ctx: SrcCtx = switch.ctx
       stage(Switch(f(selects), body2))
@@ -288,11 +288,11 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     newLatencies.toList.map{case (s,l) => s -> scrubNoise(l - latencyOf(s, inReduce = cycles.contains(s))) }
       .sortBy(_._2)
       .foreach{case (s,l) =>
-        symDelay(s) = l
+        s.fullDelay = l
         dbgs(s"  [$l = ${newLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
 
-    isolateSubst{ retimeStms(block) }
+    isolate{ retimeStms(block) }
   }
 
 
@@ -319,7 +319,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   private def transformCtrl[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if (isInnerControl(lhs) && !isSwitch(rhs)) {
+    if (lhs.isInnerControl && !rhs.isSwitch) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       withRetime(retimeEnables, ctx) { super.transform(lhs, rhs) }
     }

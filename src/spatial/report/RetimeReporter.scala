@@ -35,7 +35,7 @@ case class RetimeReporter(IR: State) extends AccelTraversal {
     if (rhs.blocks.nonEmpty) emit(s"$lhs = $rhs {")
     else                     emit(s"$lhs = $rhs")
     lhs.name.foreach{name => emit(s" - Name: $name") }
-    val cycle = reduceCycleOf(lhs)
+    val cycle = lhs.reduceCycle
     val inReduce = cycle.nonEmpty
     emit(s" - Type: ${lhs.tp}")
     if (cycle.isEmpty) {

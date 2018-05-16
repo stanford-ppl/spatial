@@ -19,6 +19,10 @@ trait Constructors {
       val cols = domain._2.length
       Tensor2.tabulate(rows, cols){(i,j) => func(domain._1.at(i), domain._2.at(j)) }
     }
+
+    @api def foreach(func: (A,B) => Any): Void = {
+      domain._1.foreach{i => domain._2.foreach{j => func(i,j); void }}
+    }
   }
 
   implicit class Tensor3Constructor[A,B,C](ranges: (Series[A], Series[B], Series[C]) ) {
@@ -27,6 +31,10 @@ trait Constructors {
       val dim1 = ranges._2.length
       val dim2 = ranges._3.length
       Tensor3.tabulate(dim0,dim1,dim2){(i,j,k) => func(ranges._1.at(i), ranges._2.at(j), ranges._3.at(k)) }
+    }
+
+    @api def foreach(func: (A,B,C) => Any): Void = {
+      ranges._1.foreach{i => ranges._2.foreach{j => ranges._3.foreach{k => func(i,j,k); void }}}
     }
   }
 
@@ -40,6 +48,12 @@ trait Constructors {
         func(ranges._1.at(i0), ranges._2.at(i1), ranges._3.at(i2), ranges._4.at(i3))
       }
     }
+
+    @api def foreach(func: (A,B,C,D) => Any): Void = {
+      ranges._1.foreach{i => ranges._2.foreach{j =>
+        ranges._3.foreach{k => ranges._4.foreach{l => func(i,j,k,l); void }}
+      }}
+    }
   }
 
   implicit class Tensor5Constructor[A,B,C,D,E](ranges: (Series[A], Series[B], Series[C], Series[D], Series[E]) ) {
@@ -52,6 +66,14 @@ trait Constructors {
       Tensor5.tabulate(dim0,dim1,dim2,dim3,dim4){(i0,i1,i2,i3,i4) =>
         func(ranges._1.at(i0), ranges._2.at(i1), ranges._3.at(i2), ranges._4.at(i3), ranges._5.at(i4))
       }
+    }
+
+    @api def foreach(func: (A,B,C,D,E) => Any): Void = {
+      ranges._1.foreach{i => ranges._2.foreach{j =>
+        ranges._3.foreach{k => ranges._4.foreach{l =>
+          ranges._5.foreach{m => func(i,j,k,l,m); void }
+        }}
+      }}
     }
   }
 

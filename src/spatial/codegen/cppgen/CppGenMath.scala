@@ -21,21 +21,35 @@ trait CppGenMath extends CppGenCommon {
     //     case _ => emit(src"${lhs.tp} $lhs = $x >> $y;")
     //   }
     // case FixURsh(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
-    case FixInv(x)   => emit(src"${lhs.tp} $lhs = ~$x;")
+    case FixInv(x)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"~(${toTrueFix(quote(x), x.tp)})", x.tp)};")
     case FixNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
     case FixAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
     case FixSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
     case FixMul(x,y) => emit(src"${lhs.tp} $lhs = $x * $y;")
     case FixDiv(x,y) => emit(src"${lhs.tp} $lhs = $x / $y;")
+    case FixRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
+    case FltAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
+    case FltSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
+    case FltMul(x,y) => emit(src"${lhs.tp} $lhs = $x * $y;")
+    case FltDiv(x,y) => emit(src"${lhs.tp} $lhs = $x / $y;")
     case FixAnd(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
     case FixOr(x,y)  => emit(src"${lhs.tp} $lhs = $x | $y;")
     case FixXor(x,y)  => emit(src"${lhs.tp} $lhs = $x ^ $y;")
-    // case FixLt(x,y)  => emit(src"${lhs.tp} $lhs = $x < $y;")
+    case FixLst(x,y)  => emit(src"${lhs.tp} $lhs = $x < $y;")
     case FixLeq(x,y) => emit(src"${lhs.tp} $lhs = $x <= $y;")
     case FixNeq(x,y) => emit(src"${lhs.tp} $lhs = $x != $y;")
     case FixEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
-    case FixMod(x,y) => emit(src"${lhs.tp} $lhs = $x % $y;")
+    case FltLst(x,y)  => emit(src"${lhs.tp} $lhs = $x < $y;")
+    case FltLeq(x,y) => emit(src"${lhs.tp} $lhs = $x <= $y;")
+    case FltNeq(x,y) => emit(src"${lhs.tp} $lhs = $x != $y;")
+    case FltEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
+    case FixMod(x,y) => emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"${toTrueFix(quote(x), x.tp)} % ${toTrueFix(quote(y), y.tp)}", lhs.tp)};")
     case FixRandom(x) => emit(src"${lhs.tp} $lhs = rand() % ${x.getOrElse(100)};")
+    case FltRandom(x) => emit(src"${lhs.tp} $lhs = ((float) rand() / (float) RAND_MAX) * (float) ${x.getOrElse(100)};")
+    case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
+    case Or(x,y) => emit(src"${lhs.tp} $lhs = $x | $y;")
+    case Xor(x,y) => emit(src"${lhs.tp} $lhs = $x ^ $y;")
+    case Not(x) => emit(src"${lhs.tp} $lhs = !$x;")
     // case FixConvert(x) => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $x;  // should be fixpt ${lhs.tp}")
     // case FixPtToFltPt(x) => lhs.tp match {
     //   case DoubleType() => emit(src"${lhs.tp} $lhs = (double) $x;")
@@ -73,14 +87,9 @@ trait CppGenMath extends CppGenCommon {
     //   case DoubleType() => emit(src"${lhs.tp} $lhs = log($x);")
     //   case FloatType()  => emit(src"${lhs.tp} $lhs = log($x);")
     // }
-    case FltExp(x)  => x.tp match {
-      case DoubleType() => emit(src"${lhs.tp} $lhs = exp($x);")
-      case FloatType()  => emit(src"${lhs.tp} $lhs = exp($x);")
-    }
-    case FltSqrt(x) => x.tp match {
-      case DoubleType() => emit(src"${lhs.tp} $lhs = sqrt($x);")
-      case FloatType()  => emit(src"${lhs.tp} $lhs = sqrt($x);")
-    }
+    case FltExp(x)  => emit(src"${lhs.tp} $lhs = exp($x);")
+    case FltSqrt(x) => emit(src"${lhs.tp} $lhs = sqrt($x);")
+    case FixSqrt(x) => emit(src"${lhs.tp} $lhs = sqrt($x);")
 
     case FltPow(x,exp) => emit(src"${lhs.tp} $lhs = pow($x, $exp);")
     case FltSin(x)     => emit(src"${lhs.tp} $lhs = sin($x);")
@@ -94,7 +103,9 @@ trait CppGenMath extends CppGenCommon {
     case FltAtan(x)    => emit(src"${lhs.tp} $lhs = atan($x);")
     case FixFloor(x)   => emit(src"${lhs.tp} $lhs = floor($x);")
     case FixCeil(x)    => emit(src"${lhs.tp} $lhs = ceil($x);")
-
+    case FixToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FixToFlt(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FltToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
 
     case Mux(sel, a, b) => 
       emit(src"${lhs.tp} $lhs;")

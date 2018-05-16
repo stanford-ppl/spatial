@@ -10,7 +10,7 @@ trait ForeachUnrolling extends UnrollingBase {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case OpForeach(ens, cchain, func, iters) =>
-      if (cchain.shouldFullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
+      if (cchain.willFullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
       else partiallyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
 
     case _ => super.unrollCtrl(lhs,rhs)
@@ -24,7 +24,7 @@ trait ForeachUnrolling extends UnrollingBase {
     iters:  Seq[I32]
   )(implicit ctx: SrcCtx): Void = {
     dbgs(s"Fully unrolling foreach $lhs")
-    val lanes = FullUnroller(cchain, iters, isInnerControl(lhs))
+    val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val blk   = inLanes(lanes){ transformBlock(func) }
     val lhs2  = stage(UnitPipe(enables ++ ens, blk))
     dbgs(s"Created unit pipe ${stm(lhs2)}")
@@ -39,7 +39,7 @@ trait ForeachUnrolling extends UnrollingBase {
     iters:  Seq[I32]
   )(implicit ctx: SrcCtx): Sym[_] = {
     dbgs(s"Unrolling foreach $lhs")
-    val lanes = PartialUnroller(cchain, iters, isInnerControl(lhs))
+    val lanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val is    = lanes.indices
     val vs    = lanes.indexValids
     val blk   = inLanes(lanes){ transformBlock(func) }

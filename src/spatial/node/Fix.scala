@@ -61,6 +61,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixAdd[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_+_) {
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def isAssociative: Boolean = true
+
+  @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (Op(FixSub(x,c)), _) if c == b => x  // (x - b) + b = x
+    case (_, Op(FixSub(x,c))) if c == a => x  // a + (x - a) = x
+    case _ => super.rewrite
+  }
 }
 
 /** Fixed point subtraction */
@@ -68,6 +74,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (_, Literal(0)) => a
     case (Literal(0), _) => -b
+
+    case (Op(FixAdd(x,c)),_) if c == b => x  // (x + b) - b = x
+    case (Op(FixAdd(c,x)),_) if c == b => x  // (b + x) - b = x
+
+    case (_,Op(FixAdd(x,c))) if c == a => -x // a - (x + a) = -x
+    case (_,Op(FixAdd(c,x))) if c == a => -x // a - (a + x) = -x
     case _ => super.rewrite
   }
 }
@@ -89,11 +101,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
       warn(ctx, s"Constant division by 0")
       warn(ctx)
       null
+    case (Const(q), Const(r)) => R.from(q/r)
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
-    case (Literal(1), _) => stage(FixInv(b))
-    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[TRUE,I,_0]].from(Number.log2(r))
-    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[TRUE,I,_0]].from(Number.log2(-r))
+    case (Literal(1), _) => stage(FixRecip(b))
+    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[S,I,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[S,I,_0]].from(Number.log2(-r))
     case _ => super.rewrite
   }
 }
@@ -108,7 +121,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Literal(0), _) => a
     case (_, Const(r)) if r.isPow2 && r > 0 =>
       val i = INT[F].v + Number.log2(r).toInt - 1
-      if (i <= 0) a.from(0)
+      if (i < 0) a.from(0)
       else a.bits(i::0).asUnchecked[Fix[S,I,F]]
 
     case _ => super.rewrite
@@ -116,26 +129,80 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point arithmetic shift left */
-@op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
+@op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x << y)
     case _ => super.rewrite
   }
+  @rig def lower(): Fix[S,I,F] = {
+    Shifting.expandSLA(a,b)
+  }
 }
 
 /** Fixed point arithmetic shift right */
-@op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
+@op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >> y)
     case _ => super.rewrite
   }
+  @rig def lower(): Fix[S,I,F] = {
+    Shifting.expandSRA(a,b)
+  }
 }
 
 /** Fixed point logical (unsigned) shift right */
-@op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Idx) extends FixOp1[S,I,F] {
+@op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) => R.from(x >>> y)
     case _ => super.rewrite
+  }
+  @rig def lower(): Fix[S,I,F] = {
+    Shifting.expandSRU(a,b)
+  }
+}
+
+object Shifting {
+  @rig def expandSLA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F],b:Fix[S,I,_0]): Fix[S,I,F] = {
+    (a,b) match {
+      case (Const(x), Const(y)) => a << b
+      case (_, Const(y)) => a << b
+      case (Const(x), _) => 
+        val x = Reg[Fix[S,I,F]](a)
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a << 1}{case(r,_) => r << 1}
+        x.value
+      case _ => 
+        val x = Reg[Fix[S,I,F]]
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a << 1}{case(r,_) => r << 1}
+        x.value
+    }
+  }
+  @rig def expandSRA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F],b:Fix[S,I,_0]): Fix[S,I,F] = {
+    (a,b) match {
+      case (Const(x), Const(y)) => a >> b
+      case (_, Const(y)) => a >> b
+      case (Const(x), _) => 
+        val x = Reg[Fix[S,I,F]](a)
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >> 1}{case(r,_) => r >> 1}
+        x.value
+      case _ => 
+        val x = Reg[Fix[S,I,F]]
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >> 1}{case(r,_) => r >> 1}
+        x.value
+    }
+  }
+  @rig def expandSRU[S:BOOL,I:INT,F:INT](a:Fix[S,I,F],b:Fix[S,I,_0]): Fix[S,I,F] = {
+    (a,b) match {
+      case (Const(x), Const(y)) => a >>> b
+      case (_, Const(y)) => a >>> b
+      case (Const(x), _) => 
+        val x = Reg[Fix[S,I,F]](a)
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >>> 1}{case(r,_) => r >>> 1}
+        x.value
+      case _ => 
+        val x = Reg[Fix[S,I,F]]
+        Reduce(x)(Counter[I32](0,b.to[I32],1,1)){_ => a >>> 1}{case(r,_) => r >>> 1}
+        x.value
+    }
   }
 }
 

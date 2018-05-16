@@ -90,7 +90,7 @@ object LUT {
   @api override def size: I32 = dims.head
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: Idx): A = stage(LUTRead(this,Seq(pos),Set.empty))
+  @api def apply(pos: I32): A = stage(LUTRead(this,Seq(pos),Set.empty))
 }
 
 /** A 2-dimensional LUT with elements of type A. */
@@ -104,7 +104,7 @@ object LUT {
   @api def cols: I32 = dim1
 
   /** Returns the value at (`row`, `col`). */
-  @api def apply(row: Idx, col: Idx): A = stage(LUTRead(this,Seq(row,col),Set.empty))
+  @api def apply(row: I32, col: I32): A = stage(LUTRead(this,Seq(row,col),Set.empty))
 }
 
 /** A 3-dimensional LUT with elements of type A. */
@@ -117,7 +117,7 @@ object LUT {
   def rank: Int = 3
 
   /** Returns the value at (`d0`,`d1`,`d2`). */
-  @api def apply(d0: Idx, d1: Idx, d2: Idx): A = stage(LUTRead(this,Seq(d0,d1,d2),Set.empty))
+  @api def apply(d0: I32, d1: I32, d2: I32): A = stage(LUTRead(this,Seq(d0,d1,d2),Set.empty))
 }
 
 /** A 4-dimensional LUT with elements of type A. */
@@ -130,7 +130,7 @@ object LUT {
   def rank: Int = 4
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`). */
-  @api def apply(d0: Idx, d1: Idx, d2: Idx, d3: Idx): A = {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3: I32): A = {
     stage(LUTRead(this,Seq(d0,d1,d2,d3),Set.empty))
   }
 }
@@ -145,7 +145,7 @@ object LUT {
   def rank: Int = 5
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`,`d4`). */
-  @api def apply(d0: Idx, d1: Idx, d2: Idx, d3: Idx, d4: Idx): A = {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): A = {
     stage(LUTRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
   }
 }

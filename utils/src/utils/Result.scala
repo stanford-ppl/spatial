@@ -1,7 +1,10 @@
 package utils
 
-case object Indeterminate extends Exception("Indeterminate result. Test had no validation checks.")
-case object FailedValidation extends Exception("Test did not pass validation.")
+import scala.util.control.NoStackTrace
+
+case object Indeterminate extends Exception("Indeterminate result. Test had no validation checks.") with NoStackTrace
+case object FailedValidation extends Exception("Test did not pass validation.") with NoStackTrace
+case class BackendError(msg: String) extends Exception(msg) with NoStackTrace
 
 sealed abstract class Result {
   def ==>(func: => Result): Result
@@ -43,7 +46,7 @@ object Result {
     def continues: Boolean = false
   }
   object Error {
-    def apply(msg: String): Error = Error(new Exception(msg))
+    def apply(msg: String): Error = Error(BackendError(msg))
   }
 }
 

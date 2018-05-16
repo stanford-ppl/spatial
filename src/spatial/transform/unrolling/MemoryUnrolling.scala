@@ -42,14 +42,14 @@ trait MemoryUnrolling extends UnrollingBase {
     */
   def unrollStatus[A](lhs: Sym[A], rhs: StatusReader[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     val mem = rhs.mem
-    if (duplicatesOf(mem).length > 1) {
+    if (mem.duplicates.length > 1) {
       warn(lhs.ctx, "Unrolling a status check node on a duplicated memory. Behavior is undefined.")
       warn(lhs.ctx)
     }
     dbgs(s"Unrolling status ${stm(lhs)}")
     dbgs(s"  on memory $mem -> ${memories((mem,0))}")
     val lhs2s = lanes.map{i =>
-      val lhs2 = isolateSubstWith(mem -> memories((mem,0)) ){ cloneOp(lhs, rhs) }
+      val lhs2 = isolateSubstWith(mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
       dbgs(s"  Lane #$i: ${stm(lhs2)}")
       register(lhs -> lhs2)     // Use this duplicate in this lane
       lhs2
@@ -64,10 +64,10 @@ trait MemoryUnrolling extends UnrollingBase {
   def duplicateMemory(mem: Sym[_])(implicit ctx: SrcCtx): Seq[(Sym[_], Int)] = {
     val op = mem.op.getOrElse{ throw new Exception("Could not duplicate memory with no def") }
     dbgs(s"Duplicating ${stm(mem)}")
-    duplicatesOf(mem).zipWithIndex.map{case (inst,d) =>
+    mem.duplicates.zipWithIndex.map{case (inst,d) =>
       dbgs(s"  #$d: $inst")
-      val mem2 = cloneOp(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
-      duplicatesOf(mem2) = Seq(inst)
+      val mem2 = mirror(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
+      mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
       dbgs(s"  ${stm(mem2)}")
       strMeta(mem2)
@@ -87,7 +87,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Assumption: Global memories are never duplicated, since they correspond to external pins / memory spaces
     */
   def unrollGlobalMemory[A](mem: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    val mem2 = lanes.inLane(0){ cloneOp(mem, rhs) }
+    val mem2 = lanes.inLane(0){ mirror(mem, rhs) }
     memories += (mem,0) -> mem2
     lanes.unify(mem, mem2)
   }
@@ -98,7 +98,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
       isolateSubstWith(mem -> memories(dup)){
-        val lhs2 = lanes.inLane(0){ cloneOp(lhs, rhs) }
+        val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
         lhs2
       }
     }
@@ -122,14 +122,14 @@ trait MemoryUnrolling extends UnrollingBase {
     *                             laneIds
     *                          |-----------|
     * Lanes:     0    1    2    3    4    5    6   [Parallelized loop iterations]
-    *            |    |    |    |    |    |    |
-    *            V    V    V    V    V    V    V
+    *            |    |    |    |         |    |
+    *            V    V    V    V         V    V
+    * Masters:                  3         5        [Broadcaster lanes in this chunk]
     *           |_|  |______|  |___________|  |_|
     * Chunk:     0    0    1    0    1    2    0   [Index of lane within chunk]
     *            |         |    |         |    |
     *            V         V    V         V    V
     *                          |0         2|   0
-    *                            laneSelect
     * Vector:   |_|  |______|  |___________|  |_|  [Distinct addresses]
     *            0         0    0         1    0
     *                          |-----------|
@@ -137,10 +137,10 @@ trait MemoryUnrolling extends UnrollingBase {
     */
   def unrollAccess[A](lhs: Sym[_], rhs: Accessor[A,_])(implicit ctx: SrcCtx): List[Sym[_]] = {
     implicit val A: Bits[A] = rhs.A
-    if (!isUnusedAccess(lhs)) {
+    if (!lhs.isUnusedAccess) {
       val mem  = rhs.mem
       val addr = if (rhs.addr.isEmpty) None else Some(rhs.addr)
-      val data = f(rhs.dataOpt)
+      val data = rhs.dataOpt // Note that this is the OLD data symbol, if any
       val mems = getInstances(lhs, mem, isLoad = data.isEmpty, None)
 
       dbgs(s"Unrolling ${stm(lhs)}"); strMeta(lhs)
@@ -151,33 +151,33 @@ trait MemoryUnrolling extends UnrollingBase {
         dbgs(s"  Port:     $port")
 
         val ens   = lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }
-        val inst  = memInfo(mem2)
+        val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => (f(a),p) }               // lanes of ND addresses
-          val distinct = a2.groupBy(_._1).mapValues(_.map(_._2)).toSeq  // ND address -> lane IDs
+          val distinct = a2.groupBy(_._1).mapValues(_.map(_._2)).toSeq  // (ND address, lane IDs) pairs
           val addr: Seq[Seq[Idx]] = distinct.map(_._1)                  // Vector of ND addresses
-          val laneSelect: Seq[Int] = distinct.map(_._2.last)            // Lane ID for each distinct address
+          val masters: Seq[Int] = distinct.map(_._2.last)               // Lane ID for each distinct address
           val lane2Vec: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry._2.map{laneId => laneId -> aId }}.toMap
           val vec2Lane: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry._2.map{laneId => aId -> laneId }}.toMap
-          (addr, laneSelect, lane2Vec, vec2Lane)
+          (addr, masters, lane2Vec, vec2Lane)
         }
         val addr2      = addrOpt.map(_._1)                            // Vector of ND addresses
-        val laneSelect = addrOpt.map(_._2).getOrElse(laneIds.indices) // List of lane IDs which do not require broadcast
+        val masters    = addrOpt.map(_._2).getOrElse(laneIds)         // List of broadcaster lane IDs
         val lane2Vec   = addrOpt.map(_._3)                            // Lane -> Vector ID
         val vec2Lane   = addrOpt.map(_._4)                            // Vector ID -> Lane ID
-        val vecIds     = laneSelect.indices                           // List of Vector IDs
+        val vecIds     = masters.indices                              // List of Vector IDs
         def vecLength: Int = addr2.map(_.length).getOrElse(laneIds.length)
         def laneIdToVecId(lane: Int): Int = lane2Vec.map(_.apply(lane)).getOrElse(laneIds.indexOf(lane))
         def laneIdToChunkId(lane: Int): Int = laneIds.indexOf(lane)
         def vecToLaneAddr(vec: Int): Int = vec2Lane.map(_.apply(vec)).getOrElse(laneIds.apply(vec))
 
-        dbgs(s"  Lane Select: $laneSelect // Non-duplicated lane indices")
+        dbgs(s"  Masters: $masters // Non-duplicated lane indices")
 
         // Writing two different values to the same address currently just writes the last value
+        // Note this defines a race condition, so its behavior is undefined by the language
         val data2 = data.map{d =>
-          val d2 = lanes.inLanes(laneIds){_ => f(d) }   // Chunk of data
-          laneSelect.map{t => d2(laneIdToChunkId(t)) }  // Vector of data
-                    .map{_.asInstanceOf[Bits[A]]}
+          val d2 = lanes.inLanes(laneIds){_ => f(d).asInstanceOf[Bits[A]] }  // Chunk of data
+          masters.map{t => d2(laneIdToChunkId(t)) }                          // Vector of data
         }
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
@@ -186,8 +186,8 @@ trait MemoryUnrolling extends UnrollingBase {
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens)
 
         banked.s.foreach{s =>
-          portsOf.add(s, Seq(0), port)
-          cloneFuncs.foreach{func => func(s) }
+          s.ports += (Seq(0) -> port)
+          mirrorFuncs.foreach{func => func(s) }
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
 
@@ -250,7 +250,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val uid = is.map{i => unrollNum(i) }
         val wid = if (len.isDefined) Seq(w) else Nil
         val vid = uid ++ wid
-        val dispatches = dispatchOf(access, vid)
+        val dispatches = access.dispatch(vid)
         if (isLoad && dispatches.size > 1) {
           bug(s"Readers should have exactly one dispatch, $access had ${dispatches.size}.")
           bug(access.ctx)
@@ -263,7 +263,7 @@ trait MemoryUnrolling extends UnrollingBase {
             memory  = memories((mem, dispatchId)),
             dispIds = Seq(dispatchId),
             laneIds = Seq(laneId),
-            port    = portsOf(access,vid),
+            port    = access.ports(vid),
             vecOfs  = wid
           )
         }
@@ -329,12 +329,8 @@ trait MemoryUnrolling extends UnrollingBase {
 
     case _:RegRead[_]        => URead(stage(RegRead(mem.asInstanceOf[Reg[A]])))
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))
-
-    case _:ArgInRead[_]      => URead(stage(ArgInRead(mem.asInstanceOf[ArgIn[A]])))
-    case _:SetArgIn[_]       => UWrite[A](stage(SetArgIn(mem.asInstanceOf[ArgIn[A]], data.head)))
-
-    case _:GetArgOut[_]      => URead(stage(GetArgOut(mem.asInstanceOf[ArgOut[A]])))
-    case _:ArgOutWrite[_]    => UWrite[A](stage(ArgOutWrite(mem.asInstanceOf[ArgOut[A]], data.head, enss.head)))
+    case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
+    case _:GetReg[_]         => URead(stage(GetReg(mem.asInstanceOf[Reg[A]])))
 
     case op:RegFileShiftIn[_,_] =>
       UMultiWrite(data.zipWithIndex.map{case (d,i) =>

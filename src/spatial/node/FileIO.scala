@@ -19,7 +19,9 @@ import spatial.lang._
     delim: Text,
     len:   I32,
     token: Lambda1[I32,Text])
-  extends Op[Void]
+  extends Op[Void] {
+  override def effects: Effects = Effects.Writes(file)
+}
 
 
 
@@ -27,7 +29,9 @@ import spatial.lang._
   override def effects: Effects = Effects.Mutable
 }
 
-@op case class CloseBinaryFile(file: BinaryFile) extends Op[Void]
+@op case class CloseBinaryFile(file: BinaryFile) extends Op[Void] {
+  override def effects: Effects = Effects.Writes(file)
+}
 
 @op case class ReadBinaryFile[A:Num](file: BinaryFile) extends Op2[A,Tensor1[A]] {
   override val A: Num[A] = Num[A]
@@ -39,4 +43,11 @@ import spatial.lang._
     value: Lambda1[I32, A])
   extends Op2[A,Void]{
   override val A: Num[A] = Num[A]
+  override def effects: Effects = Effects.Writes(file)
 }
+
+
+@op case class NumpyArray[A:Type](v: String) extends Op[Tensor1[A]]
+
+@op case class NumpyMatrix[A:Type](v: String) extends Op[Tensor2[A]]
+

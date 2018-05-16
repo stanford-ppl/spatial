@@ -15,11 +15,11 @@ trait ScalaGenDRAM extends ScalaGenMemories {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMNew(dims,zero) =>
       emitMemObject(lhs){
-        emit(src"""object $lhs extends Memory[${op.A}]("${lhs.fullname}", $zero)""")
+        emit(src"""object $lhs extends Memory[${op.A}]("${lhs.fullname}")""")
       }
       val elementsPerBurst = spatialConfig.target.burstSize / op.A.nbits
       val size = src"""${dims.map(quote).mkString("*")} + $elementsPerBurst"""
-      emit(src"$lhs.initMem($size)")
+      emit(src"$lhs.initMem($size,$zero)")
 
     case GetDRAMAddress(dram) =>
       emit(src"val $lhs = 0")
@@ -80,6 +80,23 @@ trait ScalaGenDRAM extends ScalaGenMemories {
       close("}")
       emit(src"$cmdStream.clear()")
 
+    case MemDenseAlias(cond, mems, _) =>
+      open(src"val $lhs = {")
+        cond.zip(mems).zipWithIndex.foreach{case ((c,mem),idx) =>
+          if (idx == 0) emit(src"if ($c) $mem")
+          else          emit(src"else if ($c) $mem")
+        }
+        emit(src"else null.asInstanceOf[${lhs.tp}]")
+      close("}")
+
+    case MemSparseAlias(cond, mems, _, _) =>
+      open(src"val $lhs = {")
+      cond.zip(mems).zipWithIndex.foreach{case ((c,mem),idx) =>
+        if (idx == 0) emit(src"if ($c) $mem")
+        else          emit(src"else if ($c) $mem")
+      }
+      emit(src"else null.asInstanceOf[${lhs.tp}]")
+      close("}")
 
     case _ => super.gen(lhs, rhs)
   }

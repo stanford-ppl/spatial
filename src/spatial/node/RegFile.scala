@@ -66,14 +66,16 @@ import spatial.lang._
   extends Resetter[A]
 
 
-//@op case class RegFileVectorShiftIn[A:Bits](
-//  mem:  RegFile[A],
-//  data: Vec[T],
-//  addr: Seq[Idx],
-//  ens:  Set[Bit],
-//  ax:   Int,
-//  len:  Int
-//) extends VectorEnqueuer[A]
+@op case class RegFileShiftInVector[A:Bits,C[T]](
+  mem:  RegFile[A,C],
+  data: Vec[A],
+  adr: Seq[Idx],
+  ens:  Set[Bit],
+  ax:   Int,
+  len:  Int
+) extends VectorEnqueuer[A] {
+    override def addr: Seq[Idx] = adr
+}
 
 /** A banked read of a vector of elements from a RegFile.
   * @param mem the RegFile being read

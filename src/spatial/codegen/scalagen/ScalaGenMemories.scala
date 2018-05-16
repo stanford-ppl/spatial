@@ -67,7 +67,7 @@ trait ScalaGenMemories extends ScalaGenBits {
   }
 
   def emitBankedInitMem(mem: Sym[_], init: Option[Seq[Sym[_]]], tp: ExpType[_,_]): Unit = {
-    val inst = memInfo(mem)
+    val inst = mem.instance
     val dims = constDimsOf(mem)
     implicit val ctx: SrcCtx = mem.ctx
 
@@ -104,7 +104,7 @@ trait ScalaGenMemories extends ScalaGenBits {
 
     if (mem.isRegFile) {
       // HACK: Stage, then generate, the banking and offset addresses for the regfile on the fly
-      val addr = Seq.fill(rankOf(mem)){ bound[I32] }
+      val addr = Seq.fill(rankOf(mem)){ boundVar[I32] }
       val bankAddrFunc = stageBlock{
         val bank = inst.bankSelects(addr)
         implicit val vT: Type[Vec[I32]] = Vec.bits[I32](bank.length)

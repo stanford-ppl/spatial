@@ -21,7 +21,7 @@ sealed class Block[R](
   def nestedStmsAndInputs: (Set[Sym[_]], Set[Sym[_]]) = {
     val stms = this.nestedStms.toSet
     val used = stms.flatMap(_.inputs) ++ inputs
-    val made = stms.flatMap{s => s +: s.op.map(_.binds).getOrElse(Nil) }
+    val made = stms.flatMap{s => s.op.map(_.binds).getOrElse(Set.empty) + s }
     val ins  = (used diff made).filterNot(_.isValue)
     (stms, ins)
   }
@@ -29,7 +29,7 @@ sealed class Block[R](
   override def toString: String = {
     if (inputs.isEmpty) s"Block($result)" else s"""Block(${inputs.mkString("(", ",", ")")} => $result)"""
   }
-  override def hashCode() = (inputs, result, effects, options).hashCode()
+  override def hashCode(): Int = (inputs, result, effects, options).hashCode()
   override def equals(x: Any): Boolean = x match {
     case that: Block[_] =>
         that.result == this.result && that.effects == this.effects &&

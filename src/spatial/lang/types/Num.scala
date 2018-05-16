@@ -10,8 +10,19 @@ trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   def box: A <:< Num[A]
   private implicit def evv: A <:< Num[A] = box
   private implicit def A: Num[A] = this.selfType
-  override protected val __isPrimitive: Boolean = true
+  override protected val __neverMutable: Boolean = true
 
+  @api def **(e: A): A = pow(me, e)
+
+  @api def ::(start: A): Series[A]  = Series[A](start, me, 1, 1, isUnit = false)
+  @api def par(p: I32): Series[A]   = Series[A](zero, me, one, p, isUnit = false)
+  @api def by(step: A): Series[A]   = Series[A](zero, me, step, 1, isUnit = false)
+  @api def until(end: A): Series[A] = Series[A](me, end, one, 1, isUnit = false)
+
+  @api def toSeries: Series[A] = Series[A](me, me+1, 1, 1, isUnit=true)
+
+
+  // --- Typeclass Methods
   @rig def one: A = this.from(1)
   @rig def zero: A = this.from(0)
 

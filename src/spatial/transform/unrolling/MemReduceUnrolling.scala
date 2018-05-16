@@ -40,14 +40,14 @@ trait MemReduceUnrolling extends ReduceUnrolling {
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
-    val mapLanes = PartialUnroller(cchainMap, itersMap, isInnerLoop = false)
-    val reduceLanes = PartialUnroller(cchainRed, itersRed, true)
+    val mapLanes = PartialUnroller(s"${lhs}_map", cchainMap, itersMap, isInnerLoop = false)
+    val reduceLanes = PartialUnroller(s"${lhs}_red", cchainRed, itersRed, true)
     val isMap2   = mapLanes.indices
     val isRed2   = reduceLanes.indices
     val mvs      = mapLanes.indexValids
     val rvs      = reduceLanes.indexValids
-    val start    = cchainMap.ctrs.map(_.start.asInstanceOf[I32])
-    val redType  = reduceType(reduce.result)
+    val start    = cchainMap.counters.map(_.start.asInstanceOf[I32])
+    val redType  = reduce.result.reduceType
     val intermed = func.result
 
     logs(s"  Map iterators: $isMap2")
@@ -63,7 +63,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     val blk = stageLambda1(accum){
       logs(s"[Accum-fold $lhs] Unrolling map")
-      unroll(func, mapLanes)
+      unrollWithoutResult(func, mapLanes)
       val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
 
       val mvalids = () => mapLanes.valids.map{_.andTree}
@@ -129,7 +129,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
                 // REDUCE: On first iteration, store result of tree, do not include value from accum
                 val res2   = reduce.reapply(treeResult, accValue)
                 val select = mux(isFirst, treeResult, res2)
-                reduceType(select) = redType
+                box(select).reduceType = redType
                 select
               }
             }
@@ -140,7 +140,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
           logs(s"[Accum-fold $lhs] Unrolling accumulator store")
           // Use a default substitution for the reduction result to satisfy the block scheduler
-          inReduce(redType,false){ isolateSubst{
+          inReduce(redType,false){ isolate{
             register(storeAcc.inputA -> accum)
             register(reduce.result -> results.head)
             unroll(storeAcc, reduceLanes)

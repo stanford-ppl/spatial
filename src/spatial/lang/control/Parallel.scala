@@ -8,7 +8,7 @@ import spatial.node._
 
 object Parallel {
   @api def apply(scope: => Any): Void = {
-    val block = stageBlock{ scope; () }
+    val block = stageBlock{ scope; void }
     stage(ParallelPipe(Set.empty, block))
   }
 }

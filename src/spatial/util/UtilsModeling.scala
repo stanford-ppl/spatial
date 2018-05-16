@@ -27,7 +27,7 @@ case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) exten
 
 trait UtilsModeling {
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
-    val schedule = block.nestedStms.filter{e => e.isBits }
+    val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
     val result   = (block +: schedule.flatMap{_.blocks}).flatMap{b => exps(b) }
     (schedule, result)
   }

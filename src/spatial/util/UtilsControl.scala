@@ -55,41 +55,44 @@ trait UtilsControl {
       level: CtrlLevel = null,
       sched: CtrlSchedule = null
     ): Boolean = {
-      val _loop  = Option(loop)
-      val _level = Option(level)
-      val _sched = Option(sched)
-      val ctrlLoop  = this.looping
-      val ctrlLevel = this.level
-      val ctrlSched = s.map(_.rawSchedule)
-
       val isCtrl  = this.isControllerOrHost
-      val hasLoop = _loop.isEmpty || _loop.contains(ctrlLoop)
-      val hasLevel = _level.isEmpty || _level.contains(ctrlLevel)
-      val hasSched = (_sched, ctrlSched) match {
-        case (None, _) => true
-        case (_, None) => false
-        case (Some(expectedSchedule), Some(actualSchedule)) => (ctrlLoop, ctrlLevel) match {
-          case (Looped, Inner) => expectedSchedule == actualSchedule
-          case (Looped, Outer) => expectedSchedule == actualSchedule
-          case (Single, Inner) => expectedSchedule match {
-            case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
-            case Pipelined => false
-            case Streaming => actualSchedule == Streaming
-            case ForkJoin  => actualSchedule == ForkJoin  // Shouldn't occur in practice
-            case Fork      => actualSchedule == Fork
+      if (!isCtrl) false
+      else {
+        val _loop  = Option(loop)
+        val _level = Option(level)
+        val _sched = Option(sched)
+        val ctrlLoop  = this.looping
+        val ctrlLevel = this.level
+        val ctrlSched = s.map(_.rawSchedule)
+
+        val hasLoop = _loop.isEmpty || _loop.contains(ctrlLoop)
+        val hasLevel = _level.isEmpty || _level.contains(ctrlLevel)
+        val hasSched = (_sched, ctrlSched) match {
+          case (None, _) => true
+          case (_, None) => false
+          case (Some(expectedSchedule), Some(actualSchedule)) => (ctrlLoop, ctrlLevel) match {
+            case (Looped, Inner) => expectedSchedule == actualSchedule
+            case (Looped, Outer) => expectedSchedule == actualSchedule
+            case (Single, Inner) => expectedSchedule match {
+              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
+              case Pipelined => false
+              case Streaming => actualSchedule == Streaming
+              case ForkJoin  => actualSchedule == ForkJoin  // Shouldn't occur in practice
+              case Fork      => actualSchedule == Fork
+            }
+            case (Single, Outer) => expectedSchedule match {
+              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
+              case Pipelined => false
+              case Streaming => actualSchedule == Streaming
+              case ForkJoin  => actualSchedule == ForkJoin
+              case Fork      => actualSchedule == Fork
+            }
           }
-          case (Single, Outer) => expectedSchedule match {
-            case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
-            case Pipelined => false
-            case Streaming => actualSchedule == Streaming
-            case ForkJoin  => actualSchedule == ForkJoin
-            case Fork      => actualSchedule == Fork
-          }
+
         }
 
+        isCtrl && hasLoop && hasLevel && hasSched
       }
-
-      isCtrl && hasLoop && hasLevel && hasSched
     }
 
     def isFullyUnrolledLoop: Boolean = op.exists(_.isFullyUnrolledLoop)
@@ -304,7 +307,7 @@ trait UtilsControl {
   /** Returns the least common ancestor (LCA) of the two controllers.
     * If the controllers have no ancestors in common, returns None.
     */
-  def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.parent,b.parent)
+  def LCA(a: Sym[_], b: Sym[_]): Ctrl = LCA(a.toCtrl,b.toCtrl)
   def LCA(a: Ctrl, b: Ctrl): Ctrl= Tree.LCA(a, b){_.parent}
 
   /** Returns the least common ancestor (LCA) of a list of controllers.
@@ -312,20 +315,19 @@ trait UtilsControl {
     * and the pipeline distance between the first access and the first stage.
     * If the controllers have no ancestors in common, returns None.
     */
-  @stateful def LCAWithDistanceAndOffset(n: => List[Sym[_]]): (Ctrl,Int,Int) = { LCAWithDistanceAndOffset(n.map(_.toCtrl)) }
-  @stateful def LCAWithDistanceAndOffset(n: List[Ctrl]): (Ctrl,Int,Int) = { 
+  @stateful def LCA(n: => List[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
+  @stateful def LCA(n: List[Ctrl]): Ctrl = { 
     val anchor = n.distinct.head
-    val candidates = n.distinct.drop(1).map{x => LCA(anchor, x)}
-    if (candidates.distinct.length == 1) {
-      val lca = candidates.head
-      val lcaChildren = lca.children.toList
-      val portMatchup = n.map{a => lcaChildren.indexOf(lcaChildren.filter{ s => a.ancestors.contains(s) }.head)}
-      val basePort = portMatchup.min
-      val numPorts = portMatchup.max - portMatchup.min
-
-      (lca, basePort, numPorts)
-    } 
-    else LCAWithDistanceAndOffset(candidates)
+    val candidates = n.distinct.drop(1).map{x => if (x.ancestors.map(_.master).contains(anchor.master)) anchor else if (anchor.ancestors.map(_.master).contains(x)) x else LCA(anchor, x)}
+    if (candidates.distinct.length == 1) candidates.head 
+    else LCA(candidates)
+  }
+  @stateful def LCAPortMatchup(n: List[Sym[_]], lca: Ctrl): (Int,Int) = {
+    val lcaChildren = lca.children.toList.map(_.master)
+    val portMatchup = n.map{a => lcaChildren.indexOf(lcaChildren.filter{ s => a.ancestors.map(_.master).contains(s) }.head)}
+    val basePort = portMatchup.min
+    val numPorts = portMatchup.max - portMatchup.min
+    (basePort, numPorts) 
   }
 
   def LCAWithPaths(a: Ctrl, b: Ctrl): (Ctrl, Seq[Ctrl], Seq[Ctrl]) = {
@@ -376,7 +378,7 @@ trait UtilsControl {
     *   is the distance between the respective controllers for a and b. Otherwise zero.
     */
   @stateful def LCAWithCoarseDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = {
-    LCAWithCoarseDistance(a.parent, b.parent)
+    LCAWithCoarseDistance(a.toCtrl, b.toCtrl)
   }
   @stateful def LCAWithCoarseDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
     val (lca,dist) = LCAWithDistance(a,b)
@@ -384,6 +386,9 @@ trait UtilsControl {
     (lca, coarseDist)
   }
 
+  @stateful def lookahead(a: Sym[_]): Sym[_] = {
+    if (a.consumers.nonEmpty && a.consumers.head.isCtrl()) a.consumers.head else a
+  }
 
   /** Returns all metapipeline parents between all pairs of (w in writers, a in readers U writers). */
   @stateful def findAllMetaPipes(readers: Set[Sym[_]], writers: Set[Sym[_]]): Map[Ctrl,Set[(Sym[_],Sym[_])]] = {
@@ -391,7 +396,8 @@ trait UtilsControl {
     else {
       val ctrlGrps: Set[(Ctrl,(Sym[_],Sym[_]))] = writers.flatMap{w =>
         (readers ++ writers).flatMap{a =>
-          val (lca,dist) = LCAWithCoarseDistance(w,a)
+          val (lca,dist) = LCAWithCoarseDistance(lookahead(w),lookahead(a))
+          dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
           if (dist != 0) Some(lca,(w,a)) else None
         }
       }
@@ -410,7 +416,7 @@ trait UtilsControl {
         val group  = metapipeLCAs(metapipe)
         val anchor = group.head._1
         val dists = accesses.map{a =>
-          val (lca,dist) = LCAWithCoarseDistance(anchor,a)
+          val (lca,dist) = LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
 
           dbgs(s"$a <-> $anchor # LCA: $lca, Dist: $dist")
 

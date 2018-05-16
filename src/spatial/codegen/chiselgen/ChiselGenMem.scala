@@ -16,7 +16,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //mem.readers.find{_.node == lhs}.get.ctrlNode
-    val invisibleEnable = src"""${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}"""
+    val invisibleEnable = src"""${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val bufferPort = lhs.ports.values.head.bufferPort.getOrElse(0)
@@ -50,7 +50,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
-    val invisibleEnable = src"""${swap(parent, DatapathEn)} & ~${swap(parent, Inhibitor)}"""
+    val invisibleEnable = src"""${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val isBroadcast = !lhs.ports.values.head.bufferPort.isDefined & mem.instance.depth > 1
@@ -166,6 +166,17 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
+
+    // LIFOs
+    case LIFONew(depths) => emitMem(lhs, "LIFO", None)
+    case LIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.empty")
+    case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.almostFull")
+    case op@LIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
+    case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.numel")
+    case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
+    case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     
     // LUTs
     case op@LUTNew(dims, init) => emitMem(lhs, "LUT", Some(init))
@@ -175,7 +186,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
-    val accesses = mem.accesses.filter(_.ports.values.head.bufferPort.isDefined)
+    val accesses = mem.accesses.filter(_.ports.values.head.bufferPort.isDefined).map(lookahead(_))
 
     var specialLB = false
     // val readCtrls = readPorts.map{case (port, readers) =>
@@ -200,8 +211,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
 
     if (!specialLB) {
-      val (lca, basePort, numPorts) = LCAWithDistanceAndOffset(accesses.toList)
-
+      val lca = LCA(accesses.toList)
+      val (basePort, numPorts) = LCAPortMatchup(accesses.toList, lca)
       val info = (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
       info.toList
     } else {

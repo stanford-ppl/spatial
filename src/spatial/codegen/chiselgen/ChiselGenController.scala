@@ -28,12 +28,10 @@ trait ChiselGenController extends ChiselGenCommon {
      get to the very top
   */
 
-  /* List of break or exit nodes */
-  var earlyExits: List[Sym[_]] = List()
 
   def createBreakpoint(lhs: Sym[_], id: Int): Unit = {
-    // emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).bits := 1.U")
-    // emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).valid := breakpoints($id)")
+    emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).bits := 1.U")
+    emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).valid := breakpoints($id)")
   }
 
   def createInstrumentation(lhs: Sym[_]): Unit = {
@@ -121,7 +119,7 @@ trait ChiselGenController extends ChiselGenCommon {
     emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${swap(lhs, BaseEn)}""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${swap(lhs, IIDone)}""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
+    // emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
     emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
@@ -272,10 +270,8 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")
         case _ => 
       }
-      if (!isInner) {
-        emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
-        emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
-      }
+      if (!isInner) emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
+      emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
     }
 
     /* Control Signals to Children Controllers */
@@ -319,7 +315,8 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = 0// bodyLatency.sum(sym) // FIXME
+    val lat = sym.bodyLatency.sum
+    val ii = sym.II
 
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
@@ -328,12 +325,13 @@ trait ChiselGenController extends ChiselGenCommon {
     val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case _ => ""}
 
     // Generate standard control signals for all types
-    emitGlobalRetimeMap(src"""${sym}_retime""", s"$lat.toInt")
+    emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
+    emitGlobalRetimeMap(src"""${sym}_ii""", s"$lat.toInt")
     emitControlSignals(sym)
     createInstrumentation(sym)
 
     // Create controller
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $ncases))")
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $ncases, latency = ${swap(sym, Latency)}))")
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getStreamReadyLogic(sym)}""")
@@ -345,11 +343,12 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Capture sm done, and handle pipeline stalls for streaming case
     val streamOuts = getAllReadyLogic(sym.toCtrl).mkString(" && ")
-    if (!(streamOuts.replaceAll(" ", "") == "")) {
-      emitt(src"""${swap(sym, Done)} := Utils.streamCatchDone(${swap(sym, SM)}.io.done, $streamOuts, ${swap(sym, Retime)}, rr, accelReset) // Directly connecting *_done.D* creates a hazard on stream pipes if ~*_ready turns off for that exact cycle, since the retime reg will reject it""")
-    } else {
-      emitt(src"""${swap(sym, Done)} := ${DL(src"${swap(sym, SM)}.io.done", swap(sym, Retime), true)} // Used to catch risingEdge""")
-    }
+    emitt(src"""${swap(sym, Done)} := ${swap(sym, SM)}.io.done // Used to do something different for stream and have delay""")
+    // if (!(streamOuts.replaceAll(" ", "") == "")) {
+    //   emitt(src"""${swap(sym, Done)} := Utils.streamCatchDone(${swap(sym, SM)}.io.done, $streamOuts, ${swap(sym, Retime)}, rr, accelReset) // Directly connecting *_done.D* creates a hazard on stream pipes if ~*_ready turns off for that exact cycle, since the retime reg will reject it""")
+    // } else {
+    //   emitt(src"""${swap(sym, Done)} := ${DL(src"${swap(sym, SM)}.io.done", swap(sym, Retime), true)} // Used to catch risingEdge""")
+    // }
 
     // Capture datapath_en
     emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
@@ -403,21 +402,21 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.II <= 1) {
         emitt(src"""${swap(lhs, IIDone)} := true.B""")
       } else {
-        emitt(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, Retime)})));""")
+        emitt(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
         emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${lhs.II}.toInt.S // ${swap(lhs, Retime)}.S""")
+        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
         emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
         emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
       }
-      emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_retime), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-      // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_retime.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
+      emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+      // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_latency.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
       emitt(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := accelReset; retime_counter.io.input.enable := true.B;""")
       emitGlobalWire(src"""val retime_released_reg = RegInit(false.B)""")
       emitGlobalWire(src"""val retime_released = ${DL("retime_released_reg", 1)}""")
       emitGlobalWire(src"""val rr = retime_released // Shorthand""")
       emitt(src"""retime_released := ${DL("retime_counter.io.output.done",1)} // break up critical path by delaying this """)
-      if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
+      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
 
       emitt(src"""${swap(lhs, SM)}.io.parentAck := io.done""")
       visitBlock(func)
@@ -439,12 +438,12 @@ trait ChiselGenController extends ChiselGenCommon {
 
     case UnitPipe(ens,func) =>
       // emitGlobalWireMap(src"${lhs}_II_done", "Wire(Bool())")
-      // emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())") // hack
+      // // emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())") // hack
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs)
       emitt(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(parent_kernel, CtrTrivial), 1, true)} | false.B""")
       emitGlobalWire(src"""${swap(lhs, IIDone)} := true.B""")
-      if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
+      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
       inSubGen(src"${lhs}", src"${parent_kernel}") {
         emitt(s"// Controller Stack: ${controllerStack.tail}")
         emitChildrenCxns(lhs)
@@ -471,15 +470,15 @@ trait ChiselGenController extends ChiselGenCommon {
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
-      if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
+      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
       if (lhs.II <= 1) {
         emitt(src"""${swap(lhs, IIDone)} := true.B""")
       }
       else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, Retime)})));""")
+        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
         emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, Retime)}.S //${lhs.II}.S""")
+        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
         emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
         emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
       }
@@ -517,15 +516,15 @@ trait ChiselGenController extends ChiselGenCommon {
     case UnrolledReduce(ens,cchain,func,iters,valids) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
-      if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
+      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
       if (lhs.II <= 1) {
         emitt(src"""${swap(lhs, IIDone)} := true.B""")
       }
       else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, Retime)})));""")
+        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
         emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, Retime)}.S //${lhs.II}.S""")
+        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
         emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
         emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
       }
@@ -567,7 +566,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
       emit("// Emitting notDone")
       visitBlock(notDone)
-      emitInhibitor(lhs, Some(notDone.result), None)
+      // emitInhibitor(lhs, Some(notDone.result), None)
 
       emit(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
       if (lhs.II <= 1 | lhs.isOuterControl) {
@@ -577,7 +576,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
         val stop = if (lhs.isInnerControl) { lhs.II + 1} else { lhs.II } // I think innerpipes need one extra delay because of logic inside sm
-        emit(src"""${lhs}_IICtr.io.input.stop := ${stop}.toInt.S // ${swap(lhs, Retime)}.S""")
+        emit(src"""${lhs}_IICtr.io.input.stop := ${stop}.toInt.S""")
         emit(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")  
         emit(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
       }
@@ -593,7 +592,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit("// Emitting nextState")
       visitBlock(nextState)
       emit(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
-      emit(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Retime)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
+      emit(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Latency)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
       emit(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emit(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
@@ -632,8 +631,6 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(s"// Controller Stack: ${controllerStack.tail}")
         if (op.R.isBits) {
           emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
-          println(src"quote ${selects(0)}")
-          println(s"quote ${cases(0)}")
           selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
           emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emit(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
         }
@@ -646,7 +643,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       emitChildrenCxns(lhs, false)
-      emitInhibitor(lhs, None, Some(lhs.parent.s.get))
+      // emitInhibitor(lhs, None, Some(lhs.parent.s.get))
       emit(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
         emit(s"// Controller Stack: ${controllerStack.tail}")
@@ -672,7 +669,7 @@ trait ChiselGenController extends ChiselGenCommon {
       }
     }
 
-    emitGlobalWire(s"val max_retime = $maxretime")
+    emitGlobalWire(s"val max_latency = $maxretime")
 
     inGenn(out, "GlobalModules", ext) {
       emitt(src"val breakpt_activators = List.fill(${earlyExits.length}){Wire(Bool())}")

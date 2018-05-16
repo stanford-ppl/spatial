@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.data._
 import spatial.util._
+import host._
 
 
 trait CppGenArray extends CppGenCommon {
@@ -85,7 +86,9 @@ trait CppGenArray extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
-    case ArrayApply(array, i)   => emit(src"${lhs.tp} $lhs = (*${array})[$i];")  
+    case ArrayApply(array, i)   => 
+      val (ast,amp) = if (lhs.tp match {case _:Vec[_] => true; case _:host.Array[_] => true; case _ => false}) ("*","&") else ("","")
+      emit(src"${lhs.tp}${ast} $lhs = ${amp}(*${array})[$i];")  
     case op@ArrayNew(size)      => emitNewArray(lhs, lhs.tp, src"$size")
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case DataAsBits(bits)       => 
@@ -101,17 +104,43 @@ trait CppGenArray extends CppGenCommon {
       //   emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
     }
     case SimpleStruct(st) => 
-      val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
+      // val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
+      val struct = src"${lhs.tp}".replaceAll("[<|>]","")
       // Add to struct header if not there already
       if (!struct_list.contains(struct)) {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
             st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){")
-              st.foreach{f => emit(src"${f._1} = ${f._1}_in;")}
+            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){ /* Normal Constructor */")
+              st.foreach{f => emit(src"set${f._1}(*${f._1}_in);")}
             close("}")
+            emit(src"${struct}(){} /* For creating empty array */")
+            open(src"std::string toString(){")
+              val all = st.map{f => src""" "${f._1}: " + std::to_string(*${f._1}) """}.mkString("+ \", \" + ")
+              emit(src"return $all;")
+            close("}")
+            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = &x; }")}
+
+          try {
+            val rawtp = asIntType(lhs.tp)
+            var position = 0
+            open(src"$rawtp toRaw() { /* For compacting struct into one int */")
+              emit(src"$rawtp result = 0;")
+              st.foreach{f => 
+                val field = f._1
+                val t = f._2
+                emit(src"result = result | (($rawtp) (this->$field) << $position); ")
+                position = position + bitWidth(t.tp)
+              }
+              emit(src"return result;")
+            close("}")
+            close(" ")
+          } catch { case _:Throwable => }
+
           close("};")
+          // emit(src"typedef $struct ${lhs.tp};")
+
         }
       }
       val fields = st.zipWithIndex.map{case (f,i) => 
@@ -153,6 +182,7 @@ trait CppGenArray extends CppGenCommon {
         emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
       }
 
+    case VecAlloc(elems)     => emit(src"${lhs.tp} $lhs = ${lhs.tp}($elems)")
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
     case VecSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")
                 open(src"""for (int ${lhs}_i = 0; ${lhs}_i < ${start} - ${end} + 1; ${lhs}_i++){""") 
@@ -186,16 +216,20 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
-    case ArrayFlatMap(array, apply, func) =>
+    case ArrayFilter(array, apply, cond) =>
       emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
       open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
       visitBlock(apply)
-      visitBlock(func)
-      emit(src"${lhs}.push_back(${func.result});")
+      visitBlock(cond)
+      emit(src"if (${cond.result}) (*${lhs}).push_back(${apply.result});")
       close("}")
 
-      open(src"val $lhs = $array.flatMap{${func.input} => ")
-        ret(func)
+    case ArrayFlatMap(array, apply, func) =>
+      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+        visitBlock(apply)
+        visitBlock(func)
+        emit(src"for (int ${func.result}_idx = 0; ${func.result}_idx < (*${func.result}).size(); ${func.result}_idx++) {(*${lhs}).push_back((*${func.result})[${func.result}_idx]);}")
       close("}")
 
     case op@ArrayFromSeq(seq)   => 
@@ -263,11 +297,11 @@ trait CppGenArray extends CppGenCommon {
     case op@Switch(selects,block) =>
 
       emit(src"/** BEGIN SWITCH $lhs **/")
-      emit(src"${lhs.tp} $lhs;")
+      if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
       selects.indices.foreach { i =>
         open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
           visitBlock(op.cases(i).body)
-          emit(src"${lhs} = ${op.cases(i).body.result};")
+          if (op.R.isBits) emit(src"${lhs} = ${op.cases(i).body.result};")
         close("}")
       }
       emit(src"/** END SWITCH $lhs **/")

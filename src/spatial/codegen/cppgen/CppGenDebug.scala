@@ -14,6 +14,8 @@ trait CppGenDebug extends CppGenCommon {
     case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
     case TextToFlt(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
     case TextToBit(x) => emit(src"""${lhs.tp} $lhs = $x != "false" & $x != "False" | $x != "0";""")
+    case TextEql(a,b) => emit(src"""${lhs.tp} $lhs = $a == $b;""")
+    case GenericToText(x) => emit(src"""${lhs.tp} $lhs = $x.toString();""")
 
     case TextConcat(strings) => 
     	val paired = strings.map(quote).reduceRight{(r,c) => "string_plus(" + r + "," + c} + ")" * (strings.length-1)

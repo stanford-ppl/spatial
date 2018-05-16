@@ -29,7 +29,9 @@ import spatial.lang._
   override def effects: Effects = Effects.Mutable
 }
 
-@op case class CloseBinaryFile(file: BinaryFile) extends Op[Void]
+@op case class CloseBinaryFile(file: BinaryFile) extends Op[Void] {
+  override def effects: Effects = Effects.Writes(file)
+}
 
 @op case class ReadBinaryFile[A:Num](file: BinaryFile) extends Op2[A,Tensor1[A]] {
   override val A: Num[A] = Num[A]

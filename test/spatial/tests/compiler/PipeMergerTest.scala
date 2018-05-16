@@ -1,6 +1,7 @@
 package spatial.tests.compiler
 
 import spatial.dsl._
+import argon.Block
 
 @test class PipeMergerTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
@@ -60,4 +61,14 @@ import spatial.dsl._
     println("y5 = " + getArg(res5))
     println("y6 = " + getArg(res6))
   }
+
+  override def checkIR(block: Block[_]): Result = {
+    val pipes = block.nestedStms.collect{case p:spatial.node.UnitPipe => p }
+
+    require(pipes.length == 5, r"There should (probably) only be 5 Unit Pipes in this app, found ${pipes.length}")
+
+    super.checkIR(block)
+  }
+
+
 }

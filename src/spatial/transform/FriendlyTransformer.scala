@@ -2,9 +2,10 @@ package spatial.transform
 
 import argon._
 import argon.transform.MutateTransformer
+import spatial.traversal.AccelTraversal
+import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.traversal.AccelTraversal
 import spatial.util._
 import spatial.internal._
 
@@ -22,7 +23,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
-    case Some(data) =>
+    case Some(data) if lhs.parent.hasAncestor(data.parent) =>
       // Don't get rid of reads being used for DRAM allocations
       if (lhs.consumers.exists{case Op(DRAMNew(_, _)) => true; case _ => false }) {
         dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
@@ -32,6 +33,8 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data)")
         data.asInstanceOf[Sym[A]]
       }
+
+    case Some(data) => super.transform(lhs,rhs)
 
     case None =>
       warn(lhs.ctx, s"$tp ($lhs) was used before being set. This will result in 0 at runtime.")

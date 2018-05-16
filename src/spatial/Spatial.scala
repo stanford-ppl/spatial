@@ -204,6 +204,9 @@ trait Spatial extends Compiler {
   }
 
   override def settings(): Unit = {
+    // Spatial allows mutable aliases for DRAM, SRAM, etc.
+    config.enableMutableAliases = true
+
     if (this.target eq null) {
       if (cfg.targetName eq null) {
         if (!cfg.enableRetiming) {

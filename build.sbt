@@ -14,11 +14,8 @@ val common = Seq(
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
-    "org.scalatest" %% "scalatest" % scalatestVersion,
-    "com.github.scopt" %% "scopt" % "3.7.0",
-
-    // Alternative library for testing
-    //"com.lihaoyi" %% "utest" % "0.6.3" % "test",         // Testing
+    "org.scalatest" %% "scalatest" % scalatestVersion,	 // Testing
+    "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args         
 
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",

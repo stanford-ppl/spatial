@@ -30,19 +30,20 @@ trait Scoping {
       state.impure ++= schedule.motionedImpure
     }
 
-    /*if (config.enLog) {
+    if (config.enLog) {
       logs(s"Completed block ${schedule.block}")
-      logs(s"Inputs:  $inputs")
-      schedule.block.stms.foreach{s => logs(s"  ${stm(s)}") }
-      logs(s"Effects: ${schedule.block.effects}")
-      logs(s"Escaping: ")
-      schedule.motioned.foreach{s => logs(s"  ${stm(s)}")}
+      logs(s"  Inputs:  $inputs")
+      logs(s"  Effects: ${schedule.block.effects}")
+      logs(s"  Scope:")
+      schedule.block.stms.foreach{s => logs(s"    ${stm(s)}") }
+      logs(s"  Escaping: ")
+      schedule.motioned.foreach{s => logs(s"    ${stm(s)}")}
       val dropped = scope diff (schedule.block.stms ++ schedule.motioned)
       if (dropped.nonEmpty) {
-        logs(s"Dropped: ")
-        dropped.foreach{s => logs(s"  ${stm(s)}") }
+        logs(s"  Dropped: ")
+        dropped.foreach{s => logs(s"    ${stm(s)}") }
       }
-    }*/
+    }
 
     schedule.block
   }

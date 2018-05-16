@@ -51,9 +51,9 @@ trait Printing {
     if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, showCaret) }
     if (config.enError) state.out.error(ctx,showCaret)
   }
-  @stateful def error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
+  @stateful def   error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
   @stateful def error(ctx: SrcCtx, x: => String, noError: Boolean): Unit = {
-    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, x, noError) }
+    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, x) }
     if (config.enError) state.out.error(ctx, x)
     if (!noError) state.logError()
   }

@@ -83,20 +83,19 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   def unroll[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    logs(s"Unrolling $lhs = $rhs")
-    if (rhs.isControl) duplicateController(lhs,rhs)
-    else lanes.duplicate(lhs,rhs)
-  }
-
-  def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = {
-    val lhs2 = cloneOp(lhs,rhs)
-    dbgs(s"Created ${stm(lhs2)}")
+    dbgs(s"Unrolling $lhs = $rhs")
+    val lhs2 =  if (rhs.isControl) duplicateController(lhs,rhs)
+                else lanes.duplicate(lhs,rhs)
+    dbgs(s"[$lhs] ${lhs2.zipWithIndex.map{case (l2,i) => s"$i: $l2"}.mkString(", ")}")
     lhs2
   }
 
-  /** Duplicate the controller using the given call-by-name unroll function.
-    * Duplication is done based on the global Unroller helper instance lanes.
-    */
+  def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = {
+    // By default, use a unit unroller (only one lane)
+    inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
+  }
+
+  /** Duplicate the given controller based on the global Unroller helper instance lanes. */
   final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A]): List[Sym[_]] = {
     dbgs(s"Duplicating controller $lhs = $rhs")
     def duplicate() = transferMetadataIfNew(lhs){ unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]] }._1
@@ -125,7 +124,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   final override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
     case _ =>
-      val duplicates: List[Sym[_]] = if (rhs.isControl) duplicateController(lhs,rhs) else unroll(lhs, rhs)
+      val duplicates: List[Sym[_]] = unroll(lhs, rhs)
       if (duplicates.length == 1) duplicates.head.asInstanceOf[Sym[A]]
       else Invalid.asInstanceOf[Sym[A]]
   }
@@ -142,15 +141,6 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       stms.foreach(visit)
       lanes.inLane(0){ f(block.result) }
     }
-  }
-
-  def cloneOp[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
-    val (lhs2, isNew) = transferMetadataIfNew(lhs){ mirror(lhs, rhs) }
-    if (isNew) mirrorFuncs.foreach{func => func(lhs2) }
-
-    //logs(s"Cloning $lhs = $rhs")
-    //logs(s"  Created ${stm(lhs2)}")
-    lhs2
   }
 
   override def mirrorNode[A](rhs: Op[A]): Op[A] = rhs match {
@@ -204,34 +194,27 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       val addr     = parAddr(i)
       withMemories(memContexts(i)) {
         withUnrollNums(inds.zip(addr)) {
-          dbgs(s"Entering $name lane #$i: ")
-          //memContexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
-          contexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
-          dbgs(s"---")
-          //memories.foreach{case (k,v) => dbgs(s"  $k -> $v") }
-
+          //dbgs(s"Entering $name lane #$i: ")
+          //dbgs("  " + contexts(i).toList.map{case (k,v) => s"$k -> $v"}.mkString(", "))
 
           val result = isolateSubstWith(contexts(i)) {
             withValids(valids(i)) {
 
-              subst.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+              //dbgs("  " + subst.toList.map{case (k,v) => s"$k -> $v" }.mkString(", "))
 
               val result = block
               // Retain only the substitutions added within this scope
               contexts(i) ++= subst.filterNot(save contains _._1)
               memContexts(i) ++= memories.filterNot(saveMems contains _._1)
 
-              dbgs(s"Exiting $name lane #$i: ")
-              //memContexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
-              contexts(i).foreach{case (k,v) => dbgs(s"  $k -> $v") }
-              dbgs(s"---")
+              //dbgs(s"Exiting $name lane #$i: ")
+              //dbgs("  " + contexts(i).toList.map{case (k,v) => s"$k -> $v"}.mkString(", "))
 
               result
             }
           }
 
-          subst.foreach{case (k,v) => dbgs(s"  $k -> $v") }
-          //memories.foreach{case (k,v) => dbgs(s"  $k -> $v") }
+          //dbgs("  " + subst.toList.map{case (k,v) => s"$k -> $v" }.mkString(", "))
 
           result
         }
@@ -247,12 +230,12 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     // 1. Split a given vector as the substitution for the single original symbol
     def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
       if (size > 1 || shouldCopy) map{_ =>
-        val s2 = cloneOp(s, d)
+        val s2 = mirror(s, d)
         register(s -> s2)
         s2
       }
       else inLane(0){
-        List(update(s, d))
+        List(mirror(s, d))
       }
     }
     // 2. Make later stages depend on the given substitution across all lanes

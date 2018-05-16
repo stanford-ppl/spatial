@@ -104,7 +104,7 @@ abstract class Op[R:Type] extends Serializable with Product {
     actuallyReadSyms.flatMap(_.mutableAliases) diff bounds
   }
 
-  private def noPrims(ss: Set[Sym[_]]): Set[Sym[_]] = ss.filter{s => !s.tp.isPrimitive}
+  private def noPrims(ss: Set[Sym[_]]): Set[Sym[_]] = syms(ss).filter{s => !s.tp.neverMutable}
 
   protected def Nul[A]: Set[A] = Set.empty[A]
 }

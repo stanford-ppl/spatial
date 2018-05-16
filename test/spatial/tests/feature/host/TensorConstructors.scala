@@ -1,12 +1,9 @@
 package spatial.tests.feature.host
 
-
 import spatial.dsl._
-
 
 @test class TensorConstructors extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-
 
   def main(args: Array[String]): Unit = {
     val array = Array.tabulate(32){i => random[Int](10) }
@@ -16,6 +13,8 @@ import spatial.dsl._
 
     printArray(array)
     printMatrix(matrix)
+    assert(array.length == 32)
+    assert(matrix.rows == 4 && matrix.cols == 10)
   }
 
 }

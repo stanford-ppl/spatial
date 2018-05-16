@@ -7,7 +7,7 @@ import pir.node.CounterChainCopy
 
 /** Types */
 @ref class CounterChain extends Top[CounterChain] with Ref[Array[Range],CounterChain] {
-  override protected val __isPrimitive: Boolean = false
+  override protected val __neverMutable: Boolean = false
 }
 object CounterChain {
   @api def apply(ctrs: Seq[Counter[_]]): CounterChain = stage(CounterChainNew(ctrs))

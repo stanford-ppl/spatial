@@ -120,7 +120,7 @@ abstract class Transformer extends Pass {
     implicit val tA: Type[A] = rhs.R
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Mirror]")
-    val (lhs2,_) = try {
+    val (lhs2,isNew) = try {
       transferMetadataIfNew(lhs){
         tA.boxed(stage( mirrorNode(rhs) ))
       }
@@ -129,7 +129,7 @@ abstract class Transformer extends Pass {
       bug(s"An error occurred while mirroring $lhs = $rhs")
       throw t
     }
-    //logs(s"${stm(lhs2)}")
+    if (isNew) mirrorFuncs.foreach{func => func(lhs2) }
     lhs2
   }
 

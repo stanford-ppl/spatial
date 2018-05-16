@@ -2,8 +2,6 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 @test class TPCHQ6 extends SpatialTest {
   override def runtimeArgs: Args = "3840"
 
@@ -97,5 +95,6 @@ import spatial.dsl._
 
     val cksum = (gold < result + margin && gold > result - margin)
     println("PASS: " + cksum + " (TPCHQ6)")
+    assert(cksum)
   }
 }

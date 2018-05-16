@@ -2545,6 +2545,7 @@ import spatial.targets._
 
 @test class FFT_Strided extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends: Seq[Backend] = DISABLED // TODO: Producing huge logs during run, disabling for now
 
  /*                                                                                                  
 

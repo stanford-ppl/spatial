@@ -5,7 +5,7 @@ import argon._
 import spatial.node._
 
 trait Struct[A] extends Top[A] with Ref[Nothing,A] {
-  override val __isPrimitive = false
+  override val __neverMutable = false
   val box: A <:< Struct[A]
   private implicit lazy val A: Struct[A] = this.selfType
   @rig def field[F:Type](name: String): F = Struct.field[A,F](me, name)

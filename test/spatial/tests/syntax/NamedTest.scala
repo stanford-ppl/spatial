@@ -4,6 +4,7 @@ import spatial.dsl._
 
 @test class NamedTest extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
+  override def backends: Seq[Backend] = DISABLED // TODO: Just a syntax example for now
 
   def funcA(parent: Label, N: Int, sram: SRAM1[Int]): Unit = {
     Named(s"${parent}_FuncA").Foreach(0 until N){i => println(sram(i)) }

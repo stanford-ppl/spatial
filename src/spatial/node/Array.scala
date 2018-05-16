@@ -26,7 +26,10 @@ import spatial.lang.host._
 @op case class MapIndices[A:Type](
     size: I32,
     func: Lambda1[I32,A])
-  extends Op2[A,Array[A]]
+  extends Op2[A,Array[A]] {
+
+  override def aliases: Set[Sym[_]] = Nul
+}
 
 @op case class ArrayForeach[A:Type](
     array: Array[A],
@@ -56,14 +59,20 @@ import spatial.lang.host._
     array:  Array[A],
     apply:  Lambda2[Array[A],I32,A],
     reduce: Lambda2[A,A,A])
-  extends Op[A]
+  extends Op[A] {
+
+  override def aliases: Set[Sym[_]] = Nul
+}
 
 @op case class ArrayFold[A:Type](
     array:  Array[A],
     init:   Sym[A],
     apply:  Lambda2[Array[A],I32,A],
     reduce: Lambda2[A,A,A])
-  extends Op[A]
+  extends Op[A] {
+
+  override def aliases: Set[Sym[_]] = Nul
+}
 
 @op case class ArrayFilter[A:Type](
     array: Array[A],

@@ -25,7 +25,12 @@ import spatial.node._
   @api def toCharArray: Tensor1[U8] = this.map{c => c}
 
   // --- Typeclass Methods
-  override protected val __isPrimitive: Boolean = true
+  override protected def value(c: Any): Option[(String, Boolean)] = c match {
+    case s: String=> Some((s,true))
+    case _ => super.value(c)
+  }
+
+  override protected val __neverMutable: Boolean = true
 }
 object Text {
   def apply(x: String): Text = uconst[Text](x)

@@ -10,7 +10,7 @@ trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   def box: A <:< Num[A]
   private implicit def evv: A <:< Num[A] = box
   private implicit def A: Num[A] = this.selfType
-  override protected val __isPrimitive: Boolean = true
+  override protected val __neverMutable: Boolean = true
 
   @api def **(e: A): A = pow(me, e)
 

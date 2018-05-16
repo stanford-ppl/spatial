@@ -20,8 +20,8 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   protected def me: A = this.asInstanceOf[A]
 
 
-  /** True if this type is a primitive */
-  protected def __isPrimitive: Boolean
+  /** True if an instance of this type can never be mutable. */
+  protected def __neverMutable: Boolean
 
   /** Returns the name of this type */
   protected def __typePrefix: String = r"${this.getClass}"
@@ -31,7 +31,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   protected def __typeParams: Seq[Any] = Nil
 
   final private[argon] def _typePrefix: String = __typePrefix
-  final private[argon] def _isPrimitive: Boolean = __isPrimitive
+  final private[argon] def _neverMutable: Boolean = __neverMutable
   final private[argon] def _typeArgs: Seq[Type[_]] = __typeArgs
   final private[argon] def _typeParams: Seq[Any] = __typeParams
 
@@ -62,7 +62,6 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     case x: java.lang.Long    => this.value(x.toLong)
     case x: java.lang.Float   => this.value(x.toFloat)
     case x: java.lang.Double  => this.value(x.toDouble)
-    case _ if isSubtype(c.getClass,classTag[C].runtimeClass) && __isPrimitive => Some((c.asInstanceOf[C],true))
     case _ => None
   }
   final private[argon] def __value(c: Any): Option[C] = value(c).map(_._1)
@@ -74,13 +73,13 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     case Some((v,exact)) =>
       if (!exact && errorOnLoss) {
         error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
-        error(s"(Closest representable value: ${escapeConst(v)}).")
+        error(s"(Closest representable value: ${escapeConst(evRef(v).c.get)}).")
         error(s"""Use .to[${this.tp}] to downgrade to a warning, or .toUnchecked to ignore.""")
         error(ctx)
       }
       else if (!exact && warnOnLoss) {
         warn(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
-        warn(s"(Closest representable value: ${escapeConst(v)})")
+        warn(s"(Closest representable value: ${escapeConst(evRef(v).c.get)})")
         warn(s"""Use .toUnchecked to ignore this warning.""")
         warn(ctx)
       }

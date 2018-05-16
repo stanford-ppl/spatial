@@ -34,7 +34,7 @@ class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
   @rig final def const(c: Any, checked: Boolean = false): A = tp.from(c, checked)
 
   /** Create an unchecked constant (no implicit state required) */
-  final def uconst(c: C): A = _const(tp, tp.__value(c).getOrElse(throw new Exception(s"Invalid constant $c for type $tp")))
+  final def uconst(c: C): A = _const(tp, tp.__value(c).getOrElse(throw new Exception(r"Invalid constant type ${c.getClass} for type $tp")))
 
   @rig def canConvertFrom(c: Any): Boolean = tp.getFrom(c).isDefined
 
@@ -56,10 +56,10 @@ class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
       (if (tp._typeParams.isEmpty) "" else "[" + tp._typeParams.mkString(",") + "]")
   }
 
-  def isPrimitive: Boolean = tp._isPrimitive
   def typeArgs: Seq[Type[_]] = tp._typeArgs
   def typeParams: Seq[Any] = tp._typeParams
   def typePrefix: String = tp._typePrefix
+  def neverMutable: Boolean = tp._neverMutable
 }
 
 class ExpMiscOps[C,A](exp: Exp[C,A]) {
@@ -125,10 +125,16 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   def effects_=(eff: Effects): Unit = metadata.add(exp, eff)
   def isMutable: Boolean = effects.isMutable
 
-  def shallowAliases: Set[Sym[_]] = metadata[ShallowAliases](exp).map(_.aliases).getOrElse(Set.empty)
+  /** Returns all "shallow" aliases for this symbol.
+    * Note that a symbol is always an alias of itself.
+    **/
+  def shallowAliases: Set[Sym[_]] = metadata[ShallowAliases](exp).map(_.aliases).getOrElse(Set.empty) + exp
   def shallowAliases_=(aliases: Set[Sym[_]]): Unit = metadata.add(exp, ShallowAliases(aliases))
 
-  def deepAliases: Set[Sym[_]] = metadata[DeepAliases](exp).map(_.aliases).getOrElse(Set.empty)
+  /** Returns all "deep" aliases for this symbol.
+    * Note that a symbol is always an alias of itself.
+    */
+  def deepAliases: Set[Sym[_]] = metadata[DeepAliases](exp).map(_.aliases).getOrElse(Set.empty) + exp
   def deepAliases_=(aliases: Set[Sym[_]]): Unit = metadata.add(exp, DeepAliases(aliases))
 
   def allAliases: Set[Sym[_]] = shallowAliases ++ deepAliases

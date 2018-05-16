@@ -2,12 +2,9 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 @test class Differentiator extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE,_16,_16]
@@ -58,5 +55,6 @@ import spatial.dsl._
 
     val cksum = gold.zip(results){case (a,b) => abs(a-b) < margin}.reduce{_&&_}
     println("PASS: " + cksum + " (Differentiator) * Look into issue with addr 1 screwing up with --retiming on and --naming off but only with waveforms off in dc6db05")
+    assert(cksum)
   }
 }

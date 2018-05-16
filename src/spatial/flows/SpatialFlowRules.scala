@@ -66,6 +66,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   /** Set the control schedule of controllers based on the following ordered rules:
     *   1. Parallel is always ForkJoin
     *   2. Switch is always Fork
+    *   3. Sparse and dense transfer black boxes are always Pipe
     *   3. For all other controllers:
     *      a. If the compiler has not yet defined a schedule, take the user schedule if defined.
     *      b. If the user and compiler both have not defined a schedule:
@@ -77,8 +78,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     *   6. Outer controllers with only one child cannot be Pipelined - override these to Sequenced
     */
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
-    case _: ParallelPipe => s.rawSchedule = ForkJoin
-    case _: Switch[_]    => s.rawSchedule = Fork
+    case _: ParallelPipe         => s.rawSchedule = ForkJoin
+    case _: Switch[_]            => s.rawSchedule = Fork
+    case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
+    case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
     case _: Control[_] =>
       (s.getUserSchedule, s.getRawSchedule) match {
         case (Some(s1), None) => s.rawSchedule = s1

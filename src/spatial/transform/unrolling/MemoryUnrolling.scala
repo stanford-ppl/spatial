@@ -49,7 +49,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dbgs(s"Unrolling status ${stm(lhs)}")
     dbgs(s"  on memory $mem -> ${memories((mem,0))}")
     val lhs2s = lanes.map{i =>
-      val lhs2 = isolateSubstWith(mem -> memories((mem,0)) ){ cloneOp(lhs, rhs) }
+      val lhs2 = isolateSubstWith(mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
       dbgs(s"  Lane #$i: ${stm(lhs2)}")
       register(lhs -> lhs2)     // Use this duplicate in this lane
       lhs2
@@ -66,7 +66,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dbgs(s"Duplicating ${stm(mem)}")
     mem.duplicates.zipWithIndex.map{case (inst,d) =>
       dbgs(s"  #$d: $inst")
-      val mem2 = cloneOp(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
+      val mem2 = mirror(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
       mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
       dbgs(s"  ${stm(mem2)}")
@@ -87,7 +87,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Assumption: Global memories are never duplicated, since they correspond to external pins / memory spaces
     */
   def unrollGlobalMemory[A](mem: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    val mem2 = lanes.inLane(0){ cloneOp(mem, rhs) }
+    val mem2 = lanes.inLane(0){ mirror(mem, rhs) }
     memories += (mem,0) -> mem2
     lanes.unify(mem, mem2)
   }
@@ -98,7 +98,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
       isolateSubstWith(mem -> memories(dup)){
-        val lhs2 = lanes.inLane(0){ cloneOp(lhs, rhs) }
+        val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
         lhs2
       }
     }

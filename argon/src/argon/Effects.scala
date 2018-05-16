@@ -27,7 +27,7 @@ case class Effects(
   antiDeps: Seq[Impure] = Nil
 ) extends StableData[Effects] {
 
-  /** Always prefer the old effects metadata since this is added during staging. */
+  /** Always prefer the old effects metadata since this is updated during staging. */
   override def merge(old: Effects): Effects = old
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(

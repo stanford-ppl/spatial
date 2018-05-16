@@ -76,6 +76,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   final protected def quoteAsScala(x: Sym[_]): String = {
     x.rhs match {
       case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("false.B","0").replaceAll("true.B","1")
+      case Def.Node(id,_) => x match {
+        case Op(SimpleStruct(fields)) => 
+          var shift = 0
+          fields.reverse.map{f => 
+            val x = src"(${quoteAsScala(f._2)} << $shift).toDouble"
+            shift = shift + bitWidth(f._2.tp)
+            x
+          }.mkString(" + ")
+        case _ => throw new Exception(s"Cannot quote $x as a Scala type!") 
+      }
       case _ => throw new Exception(s"Cannot quote $x as a Scala type!")
     }
   }

@@ -69,4 +69,5 @@ lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, a
 lazy val apps = project.settings(common).dependsOn(nova)
 
 /** Set number of threads for testing **/
-Global / concurrentRestrictions += Tags.limit(Tags.Test, 8)
+val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
+Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)

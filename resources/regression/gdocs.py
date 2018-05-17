@@ -330,7 +330,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		new_entry=(lasthash != hash or lastapphash != apphash)
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
-		alink='NA'
+		alink=apphash
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
@@ -353,7 +353,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		# Do new test anyway if results are over 24h old
 		if (tdelta.total_seconds() > 129600):
 			link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
-			alink='NA'
+			alink=apphash
 			numsheets = len(sh.worksheets())
 			for x in range(0,numsheets):
 				# worksheet = sh.get_worksheet(x)

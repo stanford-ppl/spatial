@@ -35,6 +35,9 @@ fi
 echo $tid > ${REGRESSION_HOME}/data/tid
 echo $hash > ${REGRESSION_HOME}/data/hash
 echo $apphash > ${REGRESSION_HOME}/data/ahash
+ls ${REGRESSION_HOME}
+ls ${REGRESSION_HOME}/next-spatial
+echo $hash
 echo $tid > ${REGRESSION_HOME}/next-spatial/spatial/tid
 echo $hash > ${REGRESSION_HOME}/next-spatial/spatial/hash
 echo $apphash > ${REGRESSION_HOME}/next-spatial/spatial/ahash
@@ -62,7 +65,7 @@ else
 	mv ${REGRESSION_HOME}/current-spatial ${REGRESSION_HOME}/last-spatial
 	mv ${REGRESSION_HOME}/next-spatial ${REGRESSION_HOME}/current-spatial
 
-	echo "Moving to ${REGRESSION_HOME}/spatial/spatial"
+	echo "Moving to ${REGRESSION_HOME}/spatial"
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
 	bin/tests $1 3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/${1}_tests

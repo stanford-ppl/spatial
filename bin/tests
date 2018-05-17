@@ -4,7 +4,8 @@
 # export TEST_DATA_HOME="$PWD/../data/"
 
 type=$1
-file_or_tests=$2
+numthreads=$2
+file_or_tests=$3
 
 if [[ $file_or_tests == "" ]]; then
    tests="spatial.tests.*" 
@@ -26,25 +27,33 @@ else
    tests="spatial.tests.$file_or_tests"
 fi
 
+if [[ $numthreads == "" ]]; then
+  threads=1
+else
+  threads=$numthreads
+fi
+
 fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"
 echo "Running tests $tests"
 echo "Logging tests to $fileout"
 
 if [[ $type == "sim" ]]; then
-  sbt -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
+  sbt -Dmaxthreads=$threads -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "vcs" ]]; then
-  sbt -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+  sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "zynq" ]]; then
-  sbt -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "mini" ]]; then
-  sbt -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "weekly" ]]; then
-  sbt -Dtest.Scala=true -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "nightly" ]]; then
-  sbt -Dtest.Scala=true -Dtest.VCS=true -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+  sbt -Dmaxthreads=$threads -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "aws" ]]; then
+  sbt -Dmaxthreads=$threads -Dtest.AWS=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "zcu" ]]; then
+  sbt -Dmaxthreads=$threads -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "arria10" ]]; then
+  sbt -Dmaxthreads=$threads -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "vcs-noretime" ]]; then
+  sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
 else
   echo "Test type '$type' not recognized" 
-  echo "Supported types: [sim | vcs | zynq | mini | weekly | nightly]"
+  echo "Supported types: [sim | vcs | zynq | aws | zcu | arria10 | vcs-noretime]"
   exit 1
 fi
 

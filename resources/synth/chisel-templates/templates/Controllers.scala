@@ -147,9 +147,9 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         active(i).io.input.set := Mux(~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable, true.B, false.B)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
-        iterDone(i).io.input.reset := io.doneIn(i).D(1) // Override iterDone reset
+        iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
         done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i) & io.enable)
-        done(i).io.input.reset := synchronize.D(1) // Override done reset
+        done(i).io.input.reset := synchronize.D(1) | io.parentAck // Override done reset
       }
 
     case Fork => 
@@ -194,8 +194,8 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     io.done := doneReg.io.output.data & io.enable
   }
   else {
-    io.datapathEn := io.enable & ~io.done
-    io.done := Utils.getRetimed(Utils.risingEdge(allDone), latency, io.enable)
+    io.datapathEn := io.enable & ~allDone
+    io.done := Utils.getRetimed(Utils.risingEdge(allDone), latency + 1, io.enable)
   }
 
 
@@ -249,9 +249,9 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
-    io.datapathEn := active.io.output.data & ~io.ctrDone & io.enable
+    io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
     io.ctrInc := active.io.output.data & io.enable
-    io.done := Utils.risingEdge(done.io.output.data)
+    io.done := Utils.getRetimed(Utils.risingEdge(done.io.output.data), latency)
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1)}
 
   } else { // FSM inner
@@ -268,7 +268,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
-    io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency, io.enable)
+    io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, io.enable)
 
   }
 }

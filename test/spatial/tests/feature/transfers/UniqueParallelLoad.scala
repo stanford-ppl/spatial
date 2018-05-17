@@ -7,7 +7,7 @@ import spatial.dsl._
 @test class UniqueParallelLoad extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
-  val dim0 = 144
+  val dim0 = 144//144
   val dim1 = 96
 
 
@@ -43,8 +43,8 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE,_32,_32]
-    val srcA = Array.tabulate(dim0) { i => Array.tabulate(dim1){ j => ((j + i) % 8) }}
-    val srcB = Array.tabulate(dim1) { i => Array.tabulate(dim1){ j => ((j + i) % 8) }}
+    val srcA = Array.tabulate(dim0) { i => Array.tabulate(dim1){ j => -((j + i*dim1) % 256) }}
+    val srcB = Array.tabulate(dim1) { i => Array.tabulate(dim1){ j => ((j + i*dim1) % 256) }}
 
     val dst = awkwardload(srcA.flatten, srcB.flatten)
 

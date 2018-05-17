@@ -9,9 +9,25 @@ trait AccelTraversal extends argon.passes.Traversal {
 
   protected def inAccel[A](blk: => A): A = {
     val saveHW = inHw
+    val saveEnGen = config.enGen
     inHw = true
+    if (backend == "accel") config.enGen = true
+    else config.enGen = false
     val result = blk
     inHw = saveHW
+    config.enGen = saveEnGen
+    result
+  }
+
+  protected def outsideAccel[A](blk: => A): A = {
+    val saveHW = inHw
+    val saveEnGen = config.enGen
+    inHw = false
+    if (backend == "accel") config.enGen = false
+    else config.enGen = true
+    val result = blk
+    inHw = saveHW
+    config.enGen = saveEnGen
     result
   }
 

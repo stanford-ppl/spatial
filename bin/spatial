@@ -183,8 +183,8 @@ def main():
   if ecode != 0:
     print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Spatial compilation failed")
   else:
-    if not any("--withoutSrc" in s for s in args):
-      getSrcCode(opts.app, args)
+    # if not any("--withoutSrc" in s for s in args):
+    #   getSrcCode(opts.app, args)
     simScript = open(opts.app + ".sim", 'w')
     simScript.write("#!/bin/bash\n\n")
     simScript.write("cd gen/" + opts.app + "\n")

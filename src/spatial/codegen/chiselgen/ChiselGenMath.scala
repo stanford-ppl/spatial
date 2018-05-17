@@ -35,13 +35,13 @@ trait ChiselGenMath extends ChiselGenCommon {
     // case SatMul(x,y) => emitt(src"val $lhs = $x <*> $y")
     // case SatDiv(x,y) => emitt(src"val $lhs = $x </> $y")
     case FixSLA(x,y) => 
-      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel"))
+      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x << $shift).r // TODO: cast to proper type (chisel expands bits)")
     case FixSRA(x,y) => 
-      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel"))
+      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x >> $shift).r")
     case FixSRU(x,y) => 
-      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel"))
+      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x >>> $shift).r")
     case BitRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}) === 1.U")
     case FixRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)})")

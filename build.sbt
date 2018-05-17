@@ -67,3 +67,7 @@ lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
 
 lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)
 lazy val apps = project.settings(common).dependsOn(nova)
+
+/** Set number of threads for testing **/
+val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
+Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)

@@ -2,8 +2,9 @@ package spatial.codegen.cppgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
+import spatial.traversal.AccelTraversal
 
-trait CppCodegen extends FileDependencies  {
+trait CppCodegen extends FileDependencies with AccelTraversal  {
   override val lang: String = "cpp"
   override val ext: String = "cpp"
   override def entryFile: String = s"TopHost.$ext"

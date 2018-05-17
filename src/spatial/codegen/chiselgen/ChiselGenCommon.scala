@@ -48,9 +48,8 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def latencyOption(op: String, b: Option[Int]): Double = {
     if (cfg.enableRetiming) {
-      // if (b.isDefined) {cfg.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
-      // else cfg.target.latencyModel.model(op)()("LatencyOf") 
-      0.0 // FIXME
+      if (b.isDefined) {cfg.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
+      else cfg.target.latencyModel.model(op)()("LatencyOf") 
     } else {
       0.0
     }
@@ -77,6 +76,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   final protected def quoteAsScala(x: Sym[_]): String = {
     x.rhs match {
       case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("false.B","0").replaceAll("true.B","1")
+      case Def.Node(id,_) => x match {
+        case Op(SimpleStruct(fields)) => 
+          var shift = 0
+          fields.reverse.map{f => 
+            val x = src"(${quoteAsScala(f._2)} << $shift).toDouble"
+            shift = shift + bitWidth(f._2.tp)
+            x
+          }.mkString(" + ")
+        case _ => throw new Exception(s"Cannot quote $x as a Scala type!") 
+      }
       case _ => throw new Exception(s"Cannot quote $x as a Scala type!")
     }
   }
@@ -151,7 +160,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
-  protected def enableRetimeMatch(en: Sym[_], lhs: Sym[_]): Double = { // With partial retiming, the delay on standard signals needs to match the delay of the enabling input, not necessarily the symDelay(lhs) if en is delayed partially
+  protected def enableRetimeMatch(en: Sym[_], lhs: Sym[_]): Double = { 
     // val last_def_delay = en match {
     //   case Def(And(_,_)) => latencyOption("And", None)
     //   case Def(Or(_,_)) => latencyOption("Or", None)
@@ -163,9 +172,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     //   case b: Bound[_] => 0.0
     //   case _ => throw new Exception(s"Node enable $en not yet handled in partial retiming")
     // }
-    // // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
-    // if (spatialConfig.enableRetiming) symDelay(lhs) else 0.0
-    0.0 // FIXME
+    // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
+    if (cfg.enableRetiming) lhs.fullDelay else 0.0
   }
 
 

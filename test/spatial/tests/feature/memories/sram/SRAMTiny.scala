@@ -4,7 +4,7 @@ import spatial.dsl._
 
 @test class SRAMTiny extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
-  override def backends = Seq(Scala)
+  override def backends = super.backends.filterNot{be => (be == VCS_noretime)}
 
   def main(args: Array[String]): Unit = {
   	val x = ArgOut[Int]

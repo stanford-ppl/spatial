@@ -66,7 +66,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
           emitt(src"""${swap(reg, DataOptions)}(${lhs}_wId) := ${v}.r""")
       }
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), src"${if (en.isEmpty) 0 else enableRetimeMatch(en.head, lhs)}.toInt")}""")
+      emitt(src"""${swap(reg, EnOptions)}(${lhs}_wId) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), lhs.fullDelay)}""")
 
     case DRAMNew(dims, _) => 
       drams += (lhs -> drams.toList.length)

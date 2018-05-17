@@ -16,7 +16,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //mem.readers.find{_.node == lhs}.get.ctrlNode
-    val invisibleEnable = src"""${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}"""
+    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val bufferPort = lhs.ports.values.head.bufferPort.getOrElse(0)
@@ -50,7 +50,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
-    val invisibleEnable = src"""${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}"""
+    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val isBroadcast = !lhs.ports.values.head.bufferPort.isDefined & mem.instance.depth > 1

@@ -16,7 +16,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //mem.readers.find{_.node == lhs}.get.ctrlNode
-    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay)}"""
+    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val bufferPort = lhs.ports.values.head.bufferPort.getOrElse(0)
@@ -29,7 +29,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     ens.zipWithIndex.foreach{case (e, i) => 
       if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(e.head, lhs), true)} & ${e.map(quote).mkString(" & ")}""")
+      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
       if (!ofs.isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
       if (lhs.isDirectlyBanked) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.toInt)}))") 
@@ -50,7 +50,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
-    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay)}"""
+    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val isBroadcast = !lhs.ports.values.head.bufferPort.isDefined & mem.instance.depth > 1
@@ -59,7 +59,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     data.zipWithIndex.foreach{case (d, i) => 
       if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${DL(invisibleEnable, enableRetimeMatch(ens(i).head, lhs), true)} & ${ens(i).map(quote).mkString(" & ")}""")
+      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${ens(i).map(quote).mkString(" & ")}""")
       if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
       emitt(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
       if (lhs.isDirectlyBanked && !isBroadcast) {

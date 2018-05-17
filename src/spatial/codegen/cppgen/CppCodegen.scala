@@ -27,10 +27,10 @@ trait CppCodegen extends FileDependencies with AccelTraversal  {
     dependencies ::= DirDep(cppResourcesPath, "fringeSW")
     dependencies ::= DirDep(cppResourcesPath, "fringeZynq")
     dependencies ::= DirDep(cppResourcesPath, "fringeZCU")
-    dependencies ::= DirDep(cppResourcesPath, "fringeArria10")
-    dependencies ::= DirDep(cppResourcesPath, "fringeDE1SoC")
+    // dependencies ::= DirDep(cppResourcesPath, "fringeArria10")
+    // dependencies ::= DirDep(cppResourcesPath, "fringeDE1SoC")
     dependencies ::= DirDep(cppResourcesPath, "fringeVCS")
-    dependencies ::= DirDep(cppResourcesPath, "fringeXSIM")
+    // dependencies ::= DirDep(cppResourcesPath, "fringeXSIM")
     dependencies ::= DirDep(cppResourcesPath, "fringeAWS")
 
 

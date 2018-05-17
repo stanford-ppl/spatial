@@ -11,8 +11,24 @@ case class UpperBound(x: Int) extends Bound(x)
 
 case class SymbolBound(bound: Bound) extends FlowData[SymbolBound]
 
+/** Flags that a symbol is a "global".
+  * In Spatial, a "global" is any value which is solely a function of input arguments
+  * and constants. These are computed prior to starting the main computation, and
+  * therefore appear constant to the majority of the program.
+  *
+  * Getter:  sym.isFixedBits
+  * Setter:  sym.isFixedBits = (true|false)
+  * Default: false
+  */
 case class Global(flag: Boolean) extends FlowData[Global]
 
+/** Flags that a symbol is representable as a statically known list of bits.
+  *
+  * Getter:  sym.isFixedBits
+  * Setter:  sym.isFixedBits = (true|false)
+  * Default: false
+  */
+case class FixedBits(flag: Boolean) extends FlowData[FixedBits]
 
 object Final {
   def unapply(x: Bound): Option[Int] = x match {
@@ -50,6 +66,10 @@ trait BoundData {
 
     def isGlobal: Boolean = s.isValue || metadata[Global](s).exists(_.flag)
     def isGlobal_=(flag: Boolean): Unit = metadata.add(s, Global(flag))
+
+
+    def isFixedBits: Boolean = s.isValue || metadata[FixedBits](s).exists(_.flag)
+    def isFixedBits_=(flag: Boolean): Unit = metadata.add(s, FixedBits(flag))
   }
 
 

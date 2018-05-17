@@ -42,6 +42,7 @@ case class MPendingUses(nodes: HashMap[Sym[_],Set[Sym[_]]]) extends FlowData[MPe
 @data object pendingUses {
   def all: HashMap[Sym[_],Set[Sym[_]]] = globals[MPendingUses].map(_.nodes).getOrElse(HashMap.empty)
   def apply(x: Sym[_]): Set[Sym[_]] = pendingUses.all.getOrElse(x, Set.empty)
+  def contains(x: Sym[_]): Boolean = pendingUses.all.contains(x)
   def +=(entry: (Sym[_], Set[Sym[_]])): Unit = pendingUses.all += entry
   def reset(): Unit = globals.add(MPendingUses(HashMap.empty))
 }

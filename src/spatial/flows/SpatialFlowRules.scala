@@ -128,7 +128,15 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case Op(RegRead(reg)) if reg.isArgIn => lhs.isGlobal = true
 
     case Primitive(_) =>
-      if (rhs.inputs.nonEmpty && rhs.inputs.forall(_.isGlobal)) lhs.isGlobal = true
+      if (rhs.expInputs.nonEmpty && rhs.expInputs.forall(_.isGlobal)) lhs.isGlobal = true
+      if (rhs.expInputs.nonEmpty && rhs.expInputs.forall(_.isFixedBits)) lhs.isFixedBits = true
+
+      if (rhs.expInputs.isEmpty || rhs.expInputs.exists{in => !in.isFixedBits}) {
+        dbgs(s"$lhs = $rhs [Not fixed: ${rhs.inputs.filterNot(_.isFixedBits).mkString(",")}]")
+      }
+      else {
+        dbgs(s"$lhs = $rhs [Fixed Bits]")
+      }
 
     case _ => // Not global
   }

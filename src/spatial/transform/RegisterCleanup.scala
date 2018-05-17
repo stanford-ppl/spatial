@@ -113,10 +113,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     else mirror(lhs, rhs)
   }
 
-  /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
-  override protected def inlineBlock[T](b: Block[T]): Sym[T] = inlineBlockWith(b){stms =>
-    advanceBlock()
-    stms.foreach(visit)
+  def withBlockSubsts[A](block: => A): A = {
     val rules = blk match {
       case Host            => Nil
       case Controller(s,_) =>
@@ -125,10 +122,23 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         val block = (s, blk)
         dbgs(s"node: $node, block: $block")
         statelessSubstRules.getOrElse(node, Nil).map{case (s1, s2) => s1 -> s2() } ++
-        statelessSubstRules.getOrElse(block, Nil).map{case (s1, s2) => s1 -> s2() }
+          statelessSubstRules.getOrElse(block, Nil).map{case (s1, s2) => s1 -> s2() }
     }
     if (rules.nonEmpty) rules.foreach{rule => dbgs(s"  ${rule._1} -> ${rule._2}") }
-    isolateSubstWith(rules: _*){ f(b.result) }
+    isolateSubstWith(rules: _*){ block }
+  }
+
+  /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
+  override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
+    advanceBlock() // Advance block counter before transforming inputs
+
+    withBlockSubsts {
+      inlineBlockWith(b){stms =>
+        stms.foreach(visit)
+        withBlockSubsts{ f(b.result) } // Have to call again in case subst was added inside block
+      }
+    }
+
   }
 
 }

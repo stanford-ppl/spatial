@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.util._
 
 case class UseAnalyzer(IR: State) extends BlkTraversal {
+  var boundSyms: Set[Sym[_]] = Set.empty
 
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     pendingUses.reset()
@@ -27,12 +28,22 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
+    val saveBounds = boundSyms
+    boundSyms ++= block.inputs
+
     advanceBlock()
+    block.result.blk match {
+      case Host =>
+      case Controller(ctrl,_) => addUse(ctrl, block.inputs.toSet, blk)
+    }
+
     val result = super.visitBlock(block)
     block.result.blk match {
       case Host =>
       case Controller(ctrl,_) => addUse(ctrl, pendingUses(block.result), blk)
     }
+
+    boundSyms = saveBounds
     result
   }
 
@@ -50,6 +61,11 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
   }
 
+  /** Mark the given stateless symbols as being consumed by a user (sync).
+    * @param user Consumer symbol
+    * @param used Consumed symbol(s)
+    * @param block The control block this use occurs in
+    */
   private def addUse(user: Sym[_], used: Set[Sym[_]], block: Ctrl): Unit = {
     dbgs(s"  Uses [Block: $block]:")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
@@ -58,7 +74,9 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       use.users += User(user, block)
 
       // Also add stateless nodes that this node uses
-      pendingUses(use).filter(_ != use).foreach{pend => pend.users += User(use, block) }
+      if (!boundSyms.contains(use)) {
+        (pendingUses(use) - use).foreach{pend => pend.users += User(use, block) }
+      }
     }
   }
 

@@ -126,6 +126,7 @@ def getRow(sh, hash, apphash):
 		if (lol[i][0] == hash and lol[i][1] == apphash and lol[i][4] == socket.gethostname()):
 			row = i + 1
 			break
+	if (row == -1):	print("ERROR: Could not find row for %s, %s" % (hash, apphash))
 	return row
 
 def isPerf(title):

@@ -25,7 +25,7 @@ trait ForeachUnrolling extends UnrollingBase {
   )(implicit ctx: SrcCtx): Void = {
     dbgs(s"Fully unrolling foreach $lhs")
     val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
-    val blk   = inLanes(lanes){ transformBlock(func) }
+    val blk   = inLanes(lanes){ substituteBlock(func) }
     val lhs2  = stage(UnitPipe(enables ++ ens, blk))
     dbgs(s"Created unit pipe ${stm(lhs2)}")
     lhs2
@@ -42,7 +42,7 @@ trait ForeachUnrolling extends UnrollingBase {
     val lanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val is    = lanes.indices
     val vs    = lanes.indexValids
-    val blk   = inLanes(lanes){ transformBlock(func) }
+    val blk   = inLanes(lanes){ substituteBlock(func) }
     val lhs2  = stage(UnrolledForeach(enables ++ ens, cchain, blk, is, vs))
     dbgs(s"Created foreach ${stm(lhs2)}")
     lhs2

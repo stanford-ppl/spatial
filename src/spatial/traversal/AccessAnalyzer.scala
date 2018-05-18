@@ -30,9 +30,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     scopes = saveScopes
   }
 
-  /**
-    * Returns true if symbol x is known to be constant for the duration
-    * of all iterations of i.
+  /** True if symbol x is known to be constant for the duration of all iterations of i.
     * - True when this value is constant
     * - True when this value is a register read, with the register written outside this loop
     * - Otherwise true if this symbol is defined OUTSIDE of the scope of this iterator
@@ -45,15 +43,13 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case _ => !scopes(i).contains(x)
   }
 
-  /**
-    * Returns true if all symbols in xs are invariant to all iterators in is.
-    */
+  /** True if all symbols in xs are invariant to all iterators in is. */
   private def isAllInvariant(is: Seq[Idx], xs: Seq[Sym[_]]): Boolean = {
     xs.forall{x => is.forall{i => isInvariant(i,x) }}
   }
 
-  /**
-    * Returns the innermost iterator which the symbols in xs vary with.
+  /** Returns the innermost iterator which the symbols in xs vary with.
+    * If x is entirely loop invariant, returns None.
     */
   private def lastVariantIter(is: Seq[Idx], x: Sym[_]): Option[Idx] = {
     is.reverseIterator.find{i => !isInvariant(i,x) }
@@ -107,23 +103,54 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     }
   }
 
-  private def getAddressPattern(x: Idx): AddressPattern = {
-    val Affine(products, offset) = x
-    val components = products.toAffineProducts
-    val lastIters  = offset.syms.mapping{x => lastVariantIter(iters,x) }
-    val lastIter   = lastIters.values.maxByOrElse(None){i => i.map{iters.indexOf}.getOrElse(-1) }
+  private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum): AddressPattern = {
+    val lastIters = offset.syms.mapping{x => lastVariantIter(is,x) } ++
+                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }}
+
+    val lastIter  = lastIters.values.maxByOrElse(None){i => i.map{is.indexOf}.getOrElse(-1) }
+
     AddressPattern(components, offset, lastIters, lastIter)
   }
 
+  /** Return the affine access pattern of the given address component x as an AddressPattern.
+    * @param mem the memory being accessed
+    * @param access the symbol of the memory access
+    * @param x a single dimension of the (potentially multi-dimensional) access address
+    */
+  private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx): AddressPattern = {
+    val Affine(products, offset) = x
+    val components = products.toAffineProducts
+    val is = accessIterators(access, mem)
+    makeAddressPattern(is, components, offset)
+  }
+
+  /** Return the affine pattern of the given value x as an AddressPattern.
+    * Not intended for use with memory access addresses.
+    * For general use in discovering access patterns in general integer values.
+    */
+  private def getValueAddressPattern(x: Idx): AddressPattern = {
+    val Affine(products, offset) = x
+    val components = products.toAffineProducts
+    makeAddressPattern(iters, components, offset)
+  }
+
+  /** Spoof an address pattern for a streaming access to a memory (e.g. fifo push, regfile shift)
+    * and return the result as an AddressPattern.
+    * This spoofing is done by treating the streaming access as a linear access and is used so that
+    * streaming and addressed accesses can be analyzed using the same affine pattern logic.
+    */
   private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx]): Unit = {
-    val pattern = addr.map(getAddressPattern)
+    dbgs(s"${stm(access)}")
+
+    val pattern = addr.map{x => getAccessAddressPattern(mem, access, x) }
+
+    dbgs(s"  Access pattern: ")
+    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
+
     val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
-    dbgs(s"${stm(access)}")
-    dbgs(s"  Access pattern: ")
-    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
     dbgs(s"  Access matrices: ")
     matrices.foreach{m => dbgss(m) }
   }
@@ -138,29 +165,33 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * will have access pattern (8*i + j)
     */
   private def setStreamingPattern(mem: Sym[_], access: Sym[_]): Unit = {
+    dbgs(s"${stm(access)} [STREAMING]")
+
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrPar.toInt)
     val as = Array.tabulate(is.length){d => ps.drop(d+1).product }
+    val offset = Sum.single(0)
     val components = as.zip(is).map{case (a,i) => AffineProduct(Sum.single(a),i) }
-    val ap = AddressPattern(components, Sum.single(0), Map.empty, is.lastOption)
+    val ap = makeAddressPattern(is, components, offset)
 
     val pattern = Seq(ap)
+
+    dbgs(s"  Access pattern: ")
+    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
+
     val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
-    dbgs(s"${stm(access)} [STREAMING]")
-    dbgs(s"  Access pattern: ")
-    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
     dbgs(s"  Access matrices: ")
     matrices.foreach{m => dbgss(m) }
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
     case Op(op@CounterNew(start,end,step,_)) if op.A.isIdx =>
-      start.accessPattern = Seq(getAddressPattern(start.asInstanceOf[Idx]))
-      end.accessPattern   = Seq(getAddressPattern(end.asInstanceOf[Idx]))
-      step.accessPattern  = Seq(getAddressPattern(step.asInstanceOf[Idx]))
+      start.accessPattern = Seq(getValueAddressPattern(start.asInstanceOf[Idx]))
+      end.accessPattern   = Seq(getValueAddressPattern(end.asInstanceOf[Idx]))
+      step.accessPattern  = Seq(getValueAddressPattern(step.asInstanceOf[Idx]))
 
     case Op(loop: Loop[_]) =>
       loop.bodies.foreach{case (is,blocks) =>

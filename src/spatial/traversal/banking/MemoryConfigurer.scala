@@ -72,6 +72,16 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Added dispatch $id to ${a.access} {${a.unroll.mkString(",")}}")
       }
     }
+
+    val unused = mem.accesses diff instances.flatMap(_.accesses).toSet
+    unused.foreach{access =>
+      val msg = if (access.isReader) s"Read of ${mem.nameOr("memory")} was unused. Read will be removed."
+                else s"Write to memory ${mem.nameOr("memory")} is never used. Write will be removed."
+      warn(access.ctx, msg)
+      warn(access.ctx)
+
+      access.isUnusedAccess = true
+    }
   }
 
   /** Group accesses on this memory.

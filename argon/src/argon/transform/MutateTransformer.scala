@@ -5,30 +5,30 @@ import utils.tags.instrument
 
 abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
-  protected var shouldCopy: Boolean = false
+
+  /** Determines whether the default transform rule is to mirror (copy) or update nodes. */
+  protected var copyMode: Boolean = false
 
   protected def inCopyMode[A](copy: Boolean)(block: => A): A = {
-    val saveCopy = shouldCopy
-    shouldCopy = copy
+    val saveCopy = copyMode
+    copyMode = copy
     val result = block
-    shouldCopy = saveCopy
+    copyMode = saveCopy
     result
   }
 
-  /*
-   * Options when transforming a statement:
-   *   0. Remove it: s -> None. Statement will not appear in resulting graph.
-   *   1. Update it: s -> Some(s). Statement will not change except for inputs.
-   *   2. Subst. it: s -> Some(s'). Substitution s' will appear instead.
-   */
-
-  /** Determine a transformation rule for the given symbol.
+  /** Transformation rule for the given symbol.
+    *
+    * Options when transforming a statement:
+    *   0. Remove it: s -> Invalid. Statement will not appear in resulting graph, uses are disallowed.
+    *   1. Update it: s -> s. Statement will not change (but inputs may be updated).
+    *   2. Subst. it: s -> s'. Substitution s' will be used by consumers instead.
+    *
     * By default, the rule is to update the symbol's node in place.
     * @return the symbol which should replace lhs
     */
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
-    if (shouldCopy) super.transform(lhs,rhs)
-    else update(lhs,rhs)
+    update(lhs,rhs)
   }
 
   /** Update the metadata on sym using current substitution rules. */
@@ -39,14 +39,14 @@ abstract class MutateTransformer extends ForwardTransformer {
     }}
   }
 
-  final override protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = {
-    () => isolateIf(copy){
-      inCopyMode(copy){ inlineBlock(b).unbox }
+  final override protected def blockToFunction0[R](b: Block[R]): () => R = {
+    () => isolate(){
+      inCopyMode(copy = true){ inlineBlock(b).unbox }
     }
   }
 
   /** Mutate this symbol's node with the current substitution rules. */
-  final def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
+  final def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = if (copyMode) mirror(lhs,rhs) else {
     implicit val ctx: SrcCtx = lhs.ctx
     //logs(s"$lhs = $rhs [Update]")
     try {

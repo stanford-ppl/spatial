@@ -1,5 +1,7 @@
 #!/bin/bash
 
+maxthreads=3
+
 jobs=`ps aux | grep "mattfel.*sbt" | wc -l`
 if [[ $jobs -gt 40 ]]; then
 	echo "Too many sbt jobs running!  quitting..." > /tmp/last_synth
@@ -68,5 +70,5 @@ else
 	echo "Moving to ${REGRESSION_HOME}/spatial"
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
-	bin/tests $1 3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/${1}_tests
+	bin/tests $1 $maxthreads ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/${1}_tests
 fi

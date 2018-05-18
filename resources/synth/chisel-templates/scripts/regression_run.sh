@@ -24,8 +24,8 @@ if [[ $GDOCS -eq 1 ]]; then
 	fi
 
 	# Hacky go back until $SPATIAL_HOME
-	hash=`cat ../../../../hash`
-	ahash=`cat ../../../../ahash`
+	hash=`git rev-parse HEAD`
+	ahash=nova-spatial
 	appname=`basename \`pwd\``
 	properties=`cat chisel/IOModule.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
 
@@ -39,7 +39,9 @@ if [[ $GDOCS -eq 1 ]]; then
 		REGRESSION_HOME="/home/mattfel/regression/synth/arria10"
 	fi
 
-	python3 ../../../../utilities/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $ahash "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
+	curpath=`pwd`
+	basepath=`echo $curpath | sed "s/\/spatial\/.*/\/spatial\//g"`
+	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $ahash "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
 
 fi
 

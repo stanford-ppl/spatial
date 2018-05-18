@@ -66,13 +66,13 @@ def getDoc(title):
 
 	if (title == "vcs-noretime"):
 		try: 
-			sh = gc.open_by_key("/")
+			sh = gc.open_by_key("1gfJvD6QHxJ276wyvtApqSB6NHme1GPqmQXo_fp10t8A")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
 	elif (title == "vcs"):
 		try: 
-			sh = gc.open_by_key("")
+			sh = gc.open_by_key("1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
@@ -84,13 +84,13 @@ def getDoc(title):
 			exit()
 	elif (title == "AWS"):
 		try: 
-			sh = gc.open_by_key("")
+			sh = gc.open_by_key("1t9jSxurcFXgtrtCW5EZGiy9T3pApXfX1nsgA1U9i-Bs")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
 	elif (title == "ZCU"):
 		try: 
-			sh = gc.open_by_key("")
+			sh = gc.open_by_key("1HuaKHe0Gp5bEbM969IZqYzcJEUfOfpwb-nIcBXpmsgQ")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
@@ -101,7 +101,7 @@ def getDoc(title):
 			print("ERROR: Couldn't get sheet")
 			exit()
 	else:
-		print("No spreadsheet for " + title)
+		print("No spreadsheet for " + title + "!")
 		exit()
 
 	return sh
@@ -126,6 +126,7 @@ def getRow(sh, hash, apphash):
 		if (lol[i][0] == hash and lol[i][1] == apphash and lol[i][4] == socket.gethostname()):
 			row = i + 1
 			break
+	if (row == -1):	print("ERROR: Could not find row for %s, %s" % (hash, apphash))
 	return row
 
 def isPerf(title):
@@ -137,17 +138,9 @@ def isPerf(title):
 		perf=False
 	elif (title == "AWS"):
 		perf=False
-	elif (title == "fpga"):
+	elif (title == "vcs"):
 		perf=True
-	elif (title == "develop"):
-		perf=True
-	elif (title == "retime"):
-		perf=True
-	elif (title == "syncMem"):
-		perf=True
-	elif (title == "pre-master"):
-		perf=True
-	elif (title == "master"):
+	elif (title == "vcs-noretime"):
 		perf=True
 	else:
 		print("No spreadsheet for " + title)
@@ -314,7 +307,6 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if ("test timestamp" in lol[1]):
 		ttcol=lol[1].index("test timestamp")
 
-	# Oldest first
 	if (len(lol) < 3): 
 		lasthash="NA"
 		lastapphash="NA"
@@ -384,6 +376,18 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
+def delete_n_rows(n, backend):
+	sh = getDoc(backend)
+	perf = isPerf(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		# worksheet = sh.get_worksheet(x)
+		worksheet = sh.worksheet('index', x)
+		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+			for i in range(0,int(n)):
+				worksheet.delete_rows(3)
+
 
 
 
@@ -398,8 +402,11 @@ elif (sys.argv[1] == "report_synth_results"):
 	print("report_synth_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11], sys.argv[12], sys.argv[13], sys.argv[14]))
 	report_synth_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11], sys.argv[12], sys.argv[13], sys.argv[14])
 elif (sys.argv[1] == "prepare_sheet"):
-	# print("prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
+	print("prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
 	prepare_sheet(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+elif (sys.argv[1] == "delete_n_rows"):
+	print("delete_n_rows('%s', '%s')" % (sys.argv[2], sys.argv[3]))
+	delete_n_rows(sys.argv[2], sys.argv[3])
 elif (sys.argv[1] == "dev"):
 	print("dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	dev(sys.argv[2], sys.argv[3], sys.argv[4])

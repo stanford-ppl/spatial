@@ -567,7 +567,7 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.II <= 1 | lhs.isOuterControl) {
         emit(src"""${swap(lhs, IIDone)} := true.B""")
       } else {
-        emit(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, ));""")
+        emit(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
         emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
         val stop = if (lhs.isInnerControl) { lhs.II + 1} else { lhs.II } // I think innerpipes need one extra delay because of logic inside sm

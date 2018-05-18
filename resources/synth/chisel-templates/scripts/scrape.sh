@@ -13,8 +13,8 @@ elif [[ $1 = "AWS" ]]; then
 	REGRESSION_HOME="/home/mattfel/regression/synth/arria10"
 fi
 
-hash=`cat ../../../../hash`
-ahash=`cat ../../../../ahash`
+hash=`cat ${REGRESSION_HOME}/current-spatial/spatial/hash`
+ahash=`cat ${REGRESSION_HOME}/current-spatial/spatial/ahash`
 
 appname=`basename \`pwd\``
 if [[ $1 = "Zynq" ]]; then
@@ -134,7 +134,7 @@ if [[ $1 = "Zynq" ]]; then
     locked=`if [[ $(cat log | grep "Board locked" | wc -l) -gt 0 ]]; then cat log | grep "Board locked"; else echo 0; fi`
     runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
-    pass=`if [[ $(cat log | grep "PASS: 1" | wc -l) -gt 0 ]]; then echo Passed!; else echo FAILED; fi`
+    pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
     python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$ahash"
 elif [[ $1 = "ZCU" ]]; then
 	APP=$(basename $(pwd))
@@ -161,7 +161,7 @@ elif [[ $1 = "ZCU" ]]; then
     locked=`if [[ $(cat log | grep "Board locked" | wc -l) -gt 0 ]]; then cat log | grep "Board locked"; else echo 0; fi`
     runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
-    pass=`if [[ $(cat log | grep "PASS: 1" | wc -l) -gt 0 ]]; then echo Passed!; else echo FAILED; fi`
+    pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
     python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$ahash"	
 elif [[ $1 = "Arria10" ]]; then
 	APP=$(basename $(pwd))
@@ -184,7 +184,7 @@ elif [[ $1 = "Arria10" ]]; then
     locked=`if [[ $(cat log | grep "Board locked" | wc -l) -gt 0 ]]; then cat log | grep "Board locked"; else echo 0; fi`
     runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
-    pass=`if [[ $(cat log | grep "PASS: 1" | wc -l) -gt 0 ]]; then echo Passed!; else echo FAILED; fi`
+    pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
     python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$ahash"	
 fi
 

@@ -66,13 +66,13 @@ def getDoc(title):
 
 	if (title == "vcs-noretime"):
 		try: 
-			sh = gc.open_by_key("/")
+			sh = gc.open_by_key("1gfJvD6QHxJ276wyvtApqSB6NHme1GPqmQXo_fp10t8A")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
 	elif (title == "vcs"):
 		try: 
-			sh = gc.open_by_key("")
+			sh = gc.open_by_key("1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
@@ -84,13 +84,13 @@ def getDoc(title):
 			exit()
 	elif (title == "AWS"):
 		try: 
-			sh = gc.open_by_key("")
+			sh = gc.open_by_key("1t9jSxurcFXgtrtCW5EZGiy9T3pApXfX1nsgA1U9i-Bs")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
 	elif (title == "ZCU"):
 		try: 
-			sh = gc.open_by_key("")
+			sh = gc.open_by_key("1HuaKHe0Gp5bEbM969IZqYzcJEUfOfpwb-nIcBXpmsgQ")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()

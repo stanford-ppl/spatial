@@ -41,6 +41,14 @@ if [[ $type == "sim" ]]; then
   sbt -Dmaxthreads=$threads -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "vcs" ]]; then
   sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "vcs-noretime" ]]; then
+  sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "vcs-gdocs" ]]; then
+  export GDOCS=1
+  sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "vcs-noretime-gdocs" ]]; then
+  export GDOCS=1
+  sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "zynq" ]]; then
   sbt -Dmaxthreads=$threads -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "aws" ]]; then
@@ -49,11 +57,9 @@ elif [[ $type == "zcu" ]]; then
   sbt -Dmaxthreads=$threads -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "arria10" ]]; then
   sbt -Dmaxthreads=$threads -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "vcs-noretime" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
 else
   echo "Test type '$type' not recognized" 
-  echo "Supported types: [sim | vcs | zynq | aws | zcu | arria10 | vcs-noretime]"
+  echo "Supported types: [sim | vcs(-gdocs) | vcs-noretime(-gdocs) | zynq | aws | zcu | arria10]"
   exit 1
 fi
 

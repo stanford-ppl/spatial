@@ -4,16 +4,14 @@
 # $2+ = args
 bash run.sh $2 $3 $4 $5 $6 $7 $8 $9 | tee log
 
-if [[ $REGRESSION_ENV -eq 1 ]]; then
+if [[ $GDOCS -eq 1 ]]; then
 
-	pass_line=`cat log | grep "PASS"`
+	pass_line=`cat log | grep "Assertion" | wc -l`
 
-	if [[ ${pass_line} = *": 1"* ]]; then
-		pass=1
-	elif [[ ${pass_line} = *": 0"* ]]; then
+	if [[ ${pass_line} -gt 0 ]]; then
 		pass=0
 	else
-		pass="?"
+		pass=1
 	fi
 
 	timeout_wc=`cat log | grep "TIMEOUT" | wc -l`
@@ -43,4 +41,13 @@ if [[ $REGRESSION_ENV -eq 1 ]]; then
 
 	python3 ../../../../utilities/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $ahash "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
 
+fi
+
+timeout=`if [[ $(cat log | grep TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+
+if [[ $pass = 0 && $timeout = 0 ]]; then
+	exit 0
+else
+	exit 1
 fi

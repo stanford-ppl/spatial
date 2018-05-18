@@ -1,3 +1,9 @@
+./regression/gdocs.py
+./regression/gspread_key.json.aes-128-cbc
+./regression/pygsheets_key.json.aes-128-cbc
+./regression/synth_regression.sh
+./regression/zynq_tests
+./regression/synth_launcher.sh
 ./files_list
 ./synth/run.sh
 ./synth/chisel-templates/hardfloat/ValExec_RecFNToIN.scala

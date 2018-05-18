@@ -403,12 +403,10 @@ trait ChiselGenController extends ChiselGenCommon {
         if (lhs.II <= 1) {
           emitt(src"""${swap(lhs, IIDone)} := true.B""")
         } else {
-          emitt(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
+          emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
           emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
           emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
-          emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
-          emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
-          emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
+          emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
         }
         emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
         // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_latency.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
@@ -476,12 +474,10 @@ trait ChiselGenController extends ChiselGenCommon {
         emitt(src"""${swap(lhs, IIDone)} := true.B""")
       }
       else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
+        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
         emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
-        emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
+        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
       }
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
@@ -522,12 +518,10 @@ trait ChiselGenController extends ChiselGenCommon {
         emitt(src"""${swap(lhs, IIDone)} := true.B""")
       }
       else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
+        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
         emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
-        emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
+        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
       }
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
@@ -573,13 +567,11 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.II <= 1 | lhs.isOuterControl) {
         emit(src"""${swap(lhs, IIDone)} := true.B""")
       } else {
-        emit(src"""val ${lhs}_IICtr = Module(new RedxnCtr());""")
+        emit(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, ));""")
         emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
         emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
         val stop = if (lhs.isInnerControl) { lhs.II + 1} else { lhs.II } // I think innerpipes need one extra delay because of logic inside sm
-        emit(src"""${lhs}_IICtr.io.input.stop := ${stop}.toInt.S""")
-        emit(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")  
-        emit(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
+        emit(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")  
       }
       // emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B // Maybe this should handled differently""")
 

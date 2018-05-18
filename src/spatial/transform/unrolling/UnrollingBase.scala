@@ -129,7 +129,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
 
   override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
-    inlineBlockWith(block){stms =>
+    inlineWith(block){stms =>
       stms.foreach(visit)
       lanes.inLane(0){ f(block.result) }
     }
@@ -144,11 +144,11 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     case _ => super.updateNode(node)
   }
 
-  override def isolateIf[A](cond: Boolean)(block: => A): A = {
-    super.isolateIf(cond){ lanes.isolateIf(cond){ block } }
+  override def isolateIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
+    super.isolateIf(cond, escape){ lanes.isolateIf(cond, escape){ block } }
   }
 
-  override def usedRemovedSymbol[T](x: T): Unit = {
+  override def usedRemovedSymbol[T](x: T): Nothing = {
     dbgs(s"Used removed symbol $x!")
     lanes.contexts.zipWithIndex.foreach{case (ctx,i) =>
       dbgs(s"Lane #$i:")
@@ -192,19 +192,28 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       vlds
     }
 
-    def isolateIf[A](cond: Boolean)(block: => A): A = {
+    def isolateIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
+      contexts.zipWithIndex.foreach{case (ctx,i) =>
+        dbgs(s"[Enter] Lane #$i: " + ctx.map{case (s1,s2) => s"$s1->$s2" }.mkString(","))
+      }
+
       val saveContexts = Array.tabulate(contexts.length){i => contexts(i) }
       val saveMemories = Array.tabulate(memContexts.length){i => memContexts(i) }
       val result = block
-      if (cond) {
-        saveContexts.indices.foreach{i => contexts(i) = saveContexts(i) }
-        saveMemories.indices.foreach{i => memContexts(i) = saveMemories(i) }
-        dbgs(s"Exiting scope. Memory contexts: ")
-        memContexts.zipWithIndex.foreach{case (ctx,i) =>
-          dbgs(s"Lane #$i")
-          ctx.foreach{case (k,v) => dbgs(s"  $k -> $v") }
-        }
+
+      contexts.zipWithIndex.foreach{case (ctx,i) =>
+        dbgs(s"[Inside] Lane #$i: " + ctx.map{case (s1,s2) => s"$s1->$s2" }.mkString(","))
       }
+
+      if (cond) {
+        saveContexts.indices.foreach{i => contexts(i) = contexts(i).filter{s => escape.contains(s._1) } ++ saveContexts(i) }
+        saveMemories.indices.foreach{i => memContexts(i) = saveMemories(i) }
+      }
+
+      contexts.zipWithIndex.foreach{case (ctx,i) =>
+        dbgs(s"[Exit] Lane #$i: " + ctx.map{case (s1,s2) => s"$s1->$s2" }.mkString(","))
+      }
+
       result
     }
 
@@ -242,7 +251,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     // 1. Split a given vector as the substitution for the single original symbol
     def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
-      if (size > 1 || shouldCopy) map{i =>
+      if (size > 1 || copyMode) map{i =>
         dbgs(s"Lane #$i: ")
         val s2 = mirror(s, d)
         register(s -> s2)
@@ -250,7 +259,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
         s2
       }
       else inLane(0){
-        List(mirror(s, d))
+        val s2 = mirror(s,d) // TODO[5]: Can change to update?
+        dbgs(s"${stm(s2)}")
+        register(s -> s2)
+        List(s2)
       }
     }
     // 2. Make later stages depend on the given substitution across all lanes

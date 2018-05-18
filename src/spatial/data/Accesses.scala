@@ -21,7 +21,7 @@ case class User(sym: Sym[_], blk: Ctrl)
   * Setter:  sym.users = (Set[User])
   * Default: empty set
   */
-case class Users(users: Set[User]) extends AnalysisData[Users]
+case class Users(users: Set[User]) extends ConsumerData[Users]
 
 /** Set of local memory reads which each symbol uses
   * Used to detect accumulation cycles
@@ -30,7 +30,7 @@ case class Users(users: Set[User]) extends AnalysisData[Users]
   * Setter:  sym.readUses
   * Default: empty set
   */
-case class ReadUses(reads: Set[Sym[_]]) extends FlowData[ReadUses]
+case class ReadUses(reads: Set[Sym[_]]) extends ConsumerData[ReadUses]
 
 
 trait AccessData {

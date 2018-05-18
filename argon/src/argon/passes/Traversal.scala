@@ -7,6 +7,7 @@ package passes
 trait Traversal extends Pass { self =>
   object Recurse extends Enumeration {
     type Recurse = Value
+    // TODO[5]: Breadth-first recursive search mode
     val Always, Default, Never = Value
   }
   type Recurse = Recurse.Recurse
@@ -17,26 +18,12 @@ trait Traversal extends Pass { self =>
   protected var backend = ""
   
   // --- Methods
-  /** Run a single traversal, including pre- and post- processing */
-  final protected def runSingle[R](b: Block[R]): Block[R] = {
-    val b2 = preprocess(b)
-    val b3 = visitBlock(b2)
-    postprocess(b3)
-  }
 
-  /** Called to execute this traversal, including optional pre- and post- processing.
-    * Default is to run pre-processing, then a single traversal, then post-processing
-    */
-  protected def process[R](block: Block[R]): Block[R] = runSingle(block)
-
-  /** By default, called before the top-level block is traversed. */
-  protected def preprocess[R](block: Block[R]): Block[R] = { block }
-
-  /** By default, called after the top-level block is traversed. */
-  protected def postprocess[R](block: Block[R]): Block[R] = { block }
+  /** Called to run the main part of this traversal. */
+  override protected def process[R](block: Block[R]): Block[R] = visitBlock(block)
 
   /** Visits the statements in the block with the given visit function. */
-  final protected def visitBlock[R,A](block: Block[R], func: Seq[Sym[_]] => A): A = {
+  final protected def visitWith[R,A](block: Block[R])(func: Seq[Sym[_]] => A): A = {
     state.logTab += 1
     val result = func(block.stms)
     state.logTab -= 1
@@ -44,7 +31,7 @@ trait Traversal extends Pass { self =>
   }
 
   protected def visitBlock[R](block: Block[R]): Block[R] = {
-    visitBlock(block, {stms => stms.foreach(visit); block})
+    visitWith(block){stms => stms.foreach(visit); block }
   }
 
   final protected def visit(lhs: Sym[Any]): Unit = lhs.op match {

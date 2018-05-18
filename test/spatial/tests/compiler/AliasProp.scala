@@ -9,7 +9,7 @@ import spatial.dsl._
     val dram = DRAM[Int](32)
     Accel { }
 
-    val golden = Array.tabulate(32){i => i }
+    val golden = Array.tabulate(32){i => 0.to[Int] }
     val result = getMem(dram)
     val result2 = Array.tabulate(32){i => result(i) }
 

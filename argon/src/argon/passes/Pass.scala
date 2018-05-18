@@ -4,8 +4,7 @@ package passes
 import utils.implicits.Readable._
 
 
-/**
-  * Common trait for all passes which can be run by the compiler,
+/** Common trait for all passes which can be run by the compiler,
   * including analysis, code generation, and transformers
   *
   * Extend this trait directly if you don't need to traverse the graph.
@@ -47,7 +46,7 @@ trait Pass { self =>
     ) {
       withLog(config.logDir, logFile) {
         val start = System.currentTimeMillis()
-        val result = process(block)
+        val result = execute(block)
         val time = (System.currentTimeMillis - start).toFloat
         lastTime = time
         totalTime += time
@@ -57,5 +56,19 @@ trait Pass { self =>
   } else block
 
   /** Called to execute this pass. Override to implement custom IR processing */
+  protected def execute[R](block: Block[R]): Block[R] = {
+    val b2 = preprocess(block)
+    val b3 = process(b2)
+    postprocess(b3)
+  }
+
+  /** Called before the top-level block is traversed. */
+  protected def preprocess[R](block: Block[R]): Block[R] = { block }
+
+  /** Called to run the main part of this traversal. */
   protected def process[R](block: Block[R]): Block[R]
+
+  /** Called after the top-level block is completely traversed. */
+  protected def postprocess[R](block: Block[R]): Block[R] = { block }
+
 }

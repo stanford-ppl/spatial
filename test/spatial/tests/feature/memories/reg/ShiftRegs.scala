@@ -29,13 +29,13 @@ import spatial.dsl._
 
       val shiftregfile = RegFile[I32](3,3)
       Foreach(3 by 1){j => 
-      	Foreach(3 by 1){i => parshiftregfile(i,*) <<= i+1+j}
+      	Foreach(3 by 1){i => shiftregfile(i,*) <<= i+1+j}
       }
       shiftregfile_dram store shiftregfile
 
     }
 
-    assert(init_dram == Array.tabulate(9){i => i})
+    assert(getMem(init_dram) == Array.tabulate(9){i => i})
     val regfile_result = getMatrix(regfile_dram)
     val parshiftregfile_result = getMatrix(parshiftregfile_dram)
     val shiftregfile_result = getMatrix(shiftregfile_dram)
@@ -44,7 +44,7 @@ import spatial.dsl._
     	for (j <- 0 until 3){
     		assert(regfile_result(i,j) == i+j)
     		assert(shiftregfile_result(i,j) == i+1+j)
-    		assert(regfile_result(i,j) == i+1+j)
+    		assert(parshiftregfile_result(i,j) == i+1+j)
     	}
     }
 

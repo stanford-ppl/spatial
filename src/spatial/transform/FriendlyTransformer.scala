@@ -51,7 +51,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       // Add ArgIns for arbitrary bit inputs
       addedArgIns ++= bitsInputs.map{s => s -> argIn(f(s)) }
 
-      isolateSubstWith(addedArgIns:_*){ super.transform(lhs,rhs) }
+      isolateWith(escape=Nil, addedArgIns:_*){ super.transform(lhs,rhs) }
     }
 
     // Add ArgIns for DRAM dimensions
@@ -65,7 +65,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       }
       val dims2 = dims.map{d => dimMapping(d) }
       addedArgIns ++= dims.zip(dims2)
-      isolateSubstWith(dims.zip(dims2):_*){ super.transform(lhs,rhs) }
+      isolateWith(escape=Nil, dims.zip(dims2):_*){ super.transform(lhs,rhs) }
 
     case GetReg(F(reg)) =>
       def read(tp: String): Sym[A] = {

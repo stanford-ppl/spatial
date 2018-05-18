@@ -13,6 +13,30 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     super.preprocess(block)
   }
 
+  override protected def postprocess[R](block: Block[R]): Block[R] = {
+    def isUnusedRead(read: Sym[_]): Boolean = {
+      if (read.isEphemeral) read.users.isEmpty
+      else read.consumers.isEmpty
+    }
+
+    localMems.all.foreach{mem =>
+      if (mem.isReg && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead))) {
+        mem.isUnusedMemory = true
+        if (mem.name.isDefined) {
+          warn(mem.ctx, s"${mem.name.get} is defined but never used.")
+          warn(mem.ctx)
+        }
+      }
+      else if (mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) {
+        if (mem.name.isDefined) {
+          warn(mem.ctx, s"${mem.name.get} is defined but never used.")
+          warn(mem.ctx)
+        }
+      }
+    }
+    super.postprocess(block)
+  }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     dbgs(s"$lhs = $rhs [ctrl: ${lhs.toCtrl}, inner: ${lhs.toCtrl.isInnerControl}]")
 

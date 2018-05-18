@@ -61,6 +61,9 @@ case class Instance(
 ) {
   def toMemory: Memory = Memory(banking, depth, accType)
 
+  def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
+  def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
+
   override def toString: String = {
     import scala.math.Ordering.Implicits._
 

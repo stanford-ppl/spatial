@@ -6,6 +6,19 @@ import utils.tags.instrument
 
 import scala.collection.mutable
 
+/** An IR transformation pass.
+  *
+  * Transformers have two parts: a transform rule and a substitution method.
+  *
+  * The transform rule determines how a given (symbol, node) pair is altered.
+  *
+  * The substitution rule determines how transformed symbols are tracked.
+  *
+  * Several important terms:
+  *   Copy   - Create a (recursive) duplicate of a value
+  *   Mirror - Create a recursive copy of a value with substitutions
+  *   Update - Modify the existing value with substitutions
+  */
 abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
@@ -24,25 +37,29 @@ abstract class Transformer extends Pass {
     result
   }
 
+  /** Helper method for performing substitutions within pattern matching. */
   object F {
+    /** Returns the substitution for the given value. */
     def unapply[T](x: T): Option[T] = Some(f(x))
   }
 
-  def usedRemovedSymbol[T](x: T): Unit = {
+
+  def usedRemovedSymbol[T](x: T): Nothing = {
     dbgs(s"Used removed symbol $x!")
     throw new Exception(s"Used removed symbol: $x")
   }
 
-  // Default rules for mirroring
-  // NOTE: This doesn't currently work for mirroring Products with implicit constructor arguments
+  /** Returns the substitution x' for the given value x.
+    * By default, this recursively mirrors most iterable collections, including Products.
+    */
   def apply[T](x: T): T = {
     val y = (x match {
       case x: Mirrorable[_]    => mirrorMirrorable(x)
-      case x: Sym[_]           => transformSym(x)
-      case x: Lambda1[a,_]     => transformBlock(x).asLambda1[a]
-      case x: Lambda2[a,b,_]   => transformBlock(x).asLambda2[a,b]
-      case x: Lambda3[a,b,c,_] => transformBlock(x).asLambda3[a,b,c]
-      case x: Block[_]         => transformBlock(x)
+      case x: Sym[_]           => substituteSym(x)
+      case x: Lambda1[a,_]     => substituteBlock(x).asLambda1[a]
+      case x: Lambda2[a,b,_]   => substituteBlock(x).asLambda2[a,b]
+      case x: Lambda3[a,b,c,_] => substituteBlock(x).asLambda3[a,b,c]
+      case x: Block[_]         => substituteBlock(x)
       case x: Option[_]        => x.map{this.apply}
       case x: Seq[_]           => x.map{this.apply}
       case x: Map[_,_]         => x.map{case (k,v) => f(k) -> f(v) }
@@ -67,37 +84,38 @@ abstract class Transformer extends Pass {
     y
   }
 
-  def tx[T](block: Block[T]): () => T = () => inlineBlock(block).asInstanceOf[T]
+  /** Defines the substitution rule for a symbol s, i.e. the result of f(s). */
+  protected def substituteSym[T](s: Sym[T]): Sym[T]
 
-  protected def transformSym[T](sym: Sym[T]): Sym[T]
-  protected def transformBlock[T](block: Block[T]): Block[T] = {
-    logs(s"Transformed block inputs: ${block.inputs} -> ${f(block.inputs)}")
-    stageScope(f(block.inputs),block.options){ inlineBlock(block) }
-  }
+  /** Defines the substitution rule for a block b, i.e. the result of f(b). */
+  protected def substituteBlock[T](b: Block[T]): Block[T]
 
-  protected def inlineBlock[T](block: Block[T]): Sym[T]
-
-  /**
-    * Visit and perform some transformation `func` over all statements in the block.
-    * @return the substitution for the block's result
+  /** Perform the transformation t over all statements in block b as part of the current scope.
+    * @return the transformed version of the block's result.
     */
-  final protected def inlineBlockWith[T](block: Block[T])(func: Seq[Sym[_]] => Sym[T]): Sym[T] = {
+  final protected def inlineWith[T](b: Block[T])(t: Seq[Sym[_]] => Sym[T]): Sym[T] = {
     state.logTab += 1
-    val result = func(block.stms)
+    val result = t(b.stms)
     state.logTab -= 1
     result
   }
 
+  /** Perform some default transformation over all statements in block b as part of the current scope.
+    * @return the transformed version of the block's result.
+    */
+  protected def inlineBlock[T](b: Block[T]): Sym[T]
+
+
   def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = transferMetadata(srcDest._1, srcDest._2)
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
-    dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
+    if (dest != src) {
+      dest.prevNames = (state.paddedPass(state.pass - 1), s"$src") +: src.prevNames
+    }
 
     metadata.all(src).toList.foreach{case (k,m) =>
-      mirror(m) match {
-        case Some(m2) => if (!m.ignoreOnTransform) metadata.add(dest, k, merge(m, m2))
-        case None     => metadata.remove(dest, k)
-      }
+      if (!m.invalidateOnTransform) metadata.add(dest, k, mirror(m))
+      else metadata.remove(dest, k)
     }
   }
 
@@ -114,12 +132,16 @@ abstract class Transformer extends Pass {
     else (lhs2, false)
   }
 
-  final def merge[M1,M2](old: Data[M1], neww: Data[M2]): Data[_] = {
-    if (neww.key != old.key) throw new Exception(s"Cannot merge ${neww.key} and ${old.key} metadata")
-    neww.merge(old.asInstanceOf[Data[M2]])
+  final def mirror[M](m: Data[M]): Data[M] = {
+    val m2 = m.mirror(f).asInstanceOf[Data[M]]
+    m2.merge(m)
   }
 
-  final def mirror[M](m: Data[M]): Option[Data[M]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[M]])
+
+  final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {
+    case Op(rhs) => mirror(sym,rhs)
+    case _ => sym
+  }
 
   final def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.R
@@ -160,35 +182,47 @@ abstract class Transformer extends Pass {
     }
   }
 
-  final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {
-    case Op(rhs) => mirror(sym,rhs)
-    case _ => sym
-  }
-
+  /** Explicitly removes a symbol from the scope currently being staged.
+    * Does nothing for symbols defined outside this scope.
+    */
   final protected def removeSym(sym: Sym[_]): Unit = {
     state.scope = state.scope.filterNot(_ == sym)
     state.impure = state.impure.filterNot(_.sym == sym)
   }
 
   implicit class BlockOps[R](block: Block[R]) {
-    def inline(): R = { val func = blockToFunction0(block, copy=true); func() }
-    def toFunction0: () => R = blockToFunction0(block, copy=true)
+    /** Inline all statements in the block into the current scope. */
+    def inline(): R = { val func = blockToFunction0(block); func() }
+    /** Turn this block into a callable Function0, where each call will inline the block. */
+    def toFunction0: () => R = blockToFunction0(block)
   }
   implicit class Lambda1Ops[A,R](lambda1: Lambda1[A,R]) {
-    def reapply(a: A): R = { val func = lambda1ToFunction1(lambda1, copy=true); func(a) }
-    def toFunction1: A => R = lambda1ToFunction1(lambda1, copy=true)
+    /** Inline all statements in the block into the current scope with the given input. */
+    def reapply(a: A): R = { val func = lambda1ToFunction1(lambda1); func(a) }
+    /** Turn this block into a callable Function1, where each call will reapply the Lambda. */
+    def toFunction1: A => R = lambda1ToFunction1(lambda1)
   }
   implicit class Lambda2Ops[A,B,R](lambda2: Lambda2[A,B,R]) {
-    def reapply(a: A, b: B): R = { val func = lambda2ToFunction2(lambda2, copy=true); func(a,b) }
-    def toFunction2: (A, B) => R = lambda2ToFunction2(lambda2, copy=true)
+    /** Inline all statements in the block into the current scope with the given inputs. */
+    def reapply(a: A, b: B): R = { val func = lambda2ToFunction2(lambda2); func(a,b) }
+    def toFunction2: (A, B) => R = lambda2ToFunction2(lambda2)
   }
   implicit class Lambda3Ops[A,B,C,R](lambda3: Lambda3[A,B,C,R]) {
-    def reapply(a: A, b: B, c: C): R = { val func = lambda3ToFunction3(lambda3, copy=true); func(a,b,c) }
-    def toFunction3: (A, B, C) => R = lambda3ToFunction3(lambda3, copy=true)
+    def reapply(a: A, b: B, c: C): R = { val func = lambda3ToFunction3(lambda3); func(a,b,c) }
+    def toFunction3: (A, B, C) => R = lambda3ToFunction3(lambda3)
   }
 
-  protected def blockToFunction0[R](b: Block[R], copy: Boolean): () => R = () => inlineBlock(b).unbox
-  protected def lambda1ToFunction1[A,R](b: Lambda1[A,R], copy: Boolean): A => R
-  protected def lambda2ToFunction2[A,B,R](b: Lambda2[A,B,R], copy: Boolean): (A,B) => R
-  protected def lambda3ToFunction3[A,B,C,R](b: Lambda3[A,B,C,R], copy: Boolean): (A,B,C) => R
+  protected def blockToFunction0[R](b: Block[R]): () => R = () => inlineBlock(b).unbox
+  protected def lambda1ToFunction1[A,R](b: Lambda1[A,R]): A => R
+  protected def lambda2ToFunction2[A,B,R](b: Lambda2[A,B,R]): (A,B) => R
+  protected def lambda3ToFunction3[A,B,C,R](b: Lambda3[A,B,C,R]): (A,B,C) => R
+
+
+  /** Called before the top-level block is traversed. */
+  override protected def preprocess[R](block: Block[R]): Block[R] = {
+    state.cache = Map.empty              // Clear CSE cache prior to transforming
+    globals.invalidateBeforeTransform()  // Reset unstable global metadata
+    block
+  }
+
 }

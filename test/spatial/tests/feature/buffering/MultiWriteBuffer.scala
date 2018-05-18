@@ -1,8 +1,6 @@
 package spatial.tests.feature.buffering
 
-
 import spatial.dsl._
-
 
 @test class MultiWriteBuffer extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
@@ -26,7 +24,7 @@ import spatial.dsl._
           sram_seq(row-1, col) = 32*(row-1 + col)
         }
         sram_seq
-      }  { (sr1, sr2) => sr1 + sr2 }
+      }{ (sr1, sr2) => sr1 + sr2 }
 
       mem store accum
     }

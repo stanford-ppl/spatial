@@ -16,12 +16,8 @@ class GlobalMetadata {
   def apply[M<:Data[M]:Manifest]: Option[M] = data.get(keyOf[M]).map(_.asInstanceOf[M])
   def clear[M<:Data[M]:Manifest]: Unit = data.remove(keyOf[M])
 
-  def mirrorAfterTransform(f:Tx): Unit = data.foreach{case (k,v) => Option(v.mirror(f)) match {
-    case Some(v2) => data(k) = v2.asInstanceOf[Data[_]]
-    case None => data.remove(k)
-  }}
-  def clearBeforeTransform(): Unit = {
-    val remove = data.collect{case (k,v) if v.ignoreOnTransform => k }
+  def invalidateBeforeTransform(): Unit = {
+    val remove = data.collect{case (k,v) if v.invalidateOnTransform => k }
     remove.foreach{k => data.remove(k) }
   }
 

@@ -9,7 +9,7 @@ case class Final(x: Int) extends Bound(x)
 case class Expect(x: Int) extends Bound(x)
 case class UpperBound(x: Int) extends Bound(x)
 
-case class SymbolBound(bound: Bound) extends FlowData[SymbolBound]
+case class SymbolBound(bound: Bound) extends StableData[SymbolBound]
 
 /** Flags that a symbol is a "global".
   * In Spatial, a "global" is any value which is solely a function of input arguments
@@ -20,7 +20,7 @@ case class SymbolBound(bound: Bound) extends FlowData[SymbolBound]
   * Setter:  sym.isFixedBits = (true|false)
   * Default: false
   */
-case class Global(flag: Boolean) extends FlowData[Global]
+case class Global(flag: Boolean) extends StableData[Global]
 
 /** Flags that a symbol is representable as a statically known list of bits.
   *
@@ -28,7 +28,7 @@ case class Global(flag: Boolean) extends FlowData[Global]
   * Setter:  sym.isFixedBits = (true|false)
   * Default: false
   */
-case class FixedBits(flag: Boolean) extends FlowData[FixedBits]
+case class FixedBits(flag: Boolean) extends StableData[FixedBits]
 
 object Final {
   def unapply(x: Bound): Option[Int] = x match {

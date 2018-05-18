@@ -9,7 +9,7 @@ import argon._
   * Setter:  sym.reduceCycle = (Seq[ Sym[_] ])
   * Default: Nil
   */
-case class ReduceCycle(x: Seq[Sym[_]]) extends FlowData[ReduceCycle]
+case class ReduceCycle(x: Seq[Sym[_]]) extends ConsumerData[ReduceCycle]
 
 
 /** The delay of the given symbol from the start of its parent controller.

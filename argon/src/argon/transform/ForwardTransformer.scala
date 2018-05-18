@@ -72,9 +72,5 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     block2
   }
 
-  override protected def preprocess[S](block: Block[S]): Block[S] = {
-    subst = Map.empty
-    state.cache = Map.empty
-    super.preprocess(block)
-  }
+
 }

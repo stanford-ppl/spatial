@@ -73,7 +73,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       }
     }
 
-    val unused = mem.accesses diff instances.flatMap(_.accesses).toSet
+    val used = instances.flatMap(_.accesses).toSet
+    val unused = mem.accesses diff used
     unused.foreach{access =>
       val msg = if (access.isReader) s"Read of ${mem.nameOr("memory")} was unused. Read will be removed."
                 else s"Write to memory ${mem.nameOr("memory")} is never used. Write will be removed."
@@ -81,6 +82,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       warn(access.ctx)
 
       access.isUnusedAccess = true
+
+      dbgs(s"  Unused access: ${stm(access)}")
     }
   }
 

@@ -107,4 +107,8 @@ abstract class SubstTransformer extends Transformer {
     }}
   }
 
+  override protected def preprocess[S](block: Block[S]): Block[S] = {
+    subst = Map.empty         // No substitutions should persist across runs
+    super.preprocess(block)
+  }
 }

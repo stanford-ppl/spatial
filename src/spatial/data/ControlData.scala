@@ -38,7 +38,7 @@ case class ControlLevel(level: CtrlLevel) extends StableData[ControlLevel]
   * Setter:  sym.owner = (Sym[_])
   * Default: undefined
   */
-case class CounterOwner(owner: Sym[_]) extends AnalysisData[CounterOwner]
+case class CounterOwner(owner: Sym[_]) extends ConsumerData[CounterOwner]
 
 
 /** The control schedule determined by the compiler.
@@ -68,7 +68,7 @@ case class UserScheduleDirective(sched: CtrlSchedule) extends StableData[UserSch
   * Setter:  sym.children = (Seq[Controller])
   * Default: Nil
   */
-case class Children(children: Seq[Controller]) extends FlowData[Children]
+case class Children(children: Seq[Controller]) extends InputData[Children]
 
 /** The controller (Ctrl) parent of a symbol within the controller hierarchy.
   * Operations defined outside Accel always have the Host as their parent.
@@ -80,7 +80,7 @@ case class Children(children: Seq[Controller]) extends FlowData[Children]
   * Setter:  sym.parent = (Ctrl)
   * Default: Host
   */
-case class ParentCtrl(parent: Ctrl) extends FlowData[ParentCtrl]
+case class ParentCtrl(parent: Ctrl) extends ConsumerData[ParentCtrl]
 
 
 /** The block a symbol is defined in within the controller hierarchy.
@@ -93,7 +93,7 @@ case class ParentCtrl(parent: Ctrl) extends FlowData[ParentCtrl]
   * Setter:  sym.blk = (Ctrl)
   * Default: Host
   */
-case class ParentBlk(blk: Ctrl) extends FlowData[ParentBlk]
+case class ParentBlk(blk: Ctrl) extends ConsumerData[ParentBlk]
 
 
 /** The counter associated with a loop iterator.
@@ -104,7 +104,7 @@ case class ParentBlk(blk: Ctrl) extends FlowData[ParentBlk]
   * Setter:  sym.counter = (Counter)
   * Default: undefined
   */
-case class IndexCounter(ctr: Counter[_]) extends FlowData[IndexCounter]
+case class IndexCounter(ctr: Counter[_]) extends ConsumerData[IndexCounter]
 
 
 /** Latency of a given inner pipe body - used for control signal generation.

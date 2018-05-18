@@ -43,6 +43,7 @@ abstract class Transformer extends Pass {
     def unapply[T](x: T): Option[T] = Some(f(x))
   }
 
+
   def usedRemovedSymbol[T](x: T): Nothing = {
     dbgs(s"Used removed symbol $x!")
     throw new Exception(s"Used removed symbol: $x")
@@ -108,13 +109,13 @@ abstract class Transformer extends Pass {
   def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = transferMetadata(srcDest._1, srcDest._2)
   def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
-    dest.prevNames = (state.paddedPass(state.pass-1),s"$src") +: src.prevNames
+    if (dest != src) {
+      dest.prevNames = (state.paddedPass(state.pass - 1), s"$src") +: src.prevNames
+    }
 
     metadata.all(src).toList.foreach{case (k,m) =>
-      mirror(m) match {
-        case Some(m2) => if (!m.ignoreOnTransform) metadata.add(dest, k, merge(m, m2))
-        case None     => metadata.remove(dest, k)
-      }
+      if (!m.invalidateOnTransform) metadata.add(dest, k, mirror(m))
+      else metadata.remove(dest, k)
     }
   }
 
@@ -131,12 +132,10 @@ abstract class Transformer extends Pass {
     else (lhs2, false)
   }
 
-  final def merge[M1,M2](old: Data[M1], neww: Data[M2]): Data[_] = {
-    if (neww.key != old.key) throw new Exception(s"Cannot merge ${neww.key} and ${old.key} metadata")
-    neww.merge(old.asInstanceOf[Data[M2]])
+  final def mirror[M](m: Data[M]): Data[M] = {
+    val m2 = m.mirror(f).asInstanceOf[Data[M]]
+    m2.merge(m)
   }
-
-  final def mirror[M](m: Data[M]): Option[Data[M]] = Option(m.mirror(f)).map(_.asInstanceOf[Data[M]])
 
 
   final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {
@@ -217,4 +216,13 @@ abstract class Transformer extends Pass {
   protected def lambda1ToFunction1[A,R](b: Lambda1[A,R]): A => R
   protected def lambda2ToFunction2[A,B,R](b: Lambda2[A,B,R]): (A,B) => R
   protected def lambda3ToFunction3[A,B,C,R](b: Lambda3[A,B,C,R]): (A,B,C) => R
+
+
+  /** Called before the top-level block is traversed. */
+  override protected def preprocess[R](block: Block[R]): Block[R] = {
+    state.cache = Map.empty              // Clear CSE cache prior to transforming
+    globals.invalidateBeforeTransform()  // Reset unstable global metadata
+    block
+  }
+
 }

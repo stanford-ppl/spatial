@@ -138,7 +138,7 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
   * Setter:  sym.accessPattern = (Set[AddressPattern])
   * Default: undefined
   */
-case class AccessPattern(pattern: Seq[AddressPattern]) extends AnalysisData[AccessPattern]
+case class AccessPattern(pattern: Seq[AddressPattern]) extends InputData[AccessPattern]
 
 
 trait AccessPatternData {

@@ -78,7 +78,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     case RegWrite(reg,value,en) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg write]")
-      if (reg.readers.isEmpty) {
+      if (reg.isUnusedMemory) {
         dbgs(s"REMOVING register write $lhs")
         Invalid
       }
@@ -87,7 +87,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     case RegNew(_) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg new]")
-      if (lhs.readers.isEmpty) {
+      if (lhs.isUnusedMemory) {
         dbgs(s"REMOVING register $lhs")
         Invalid
       }
@@ -138,7 +138,5 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         withBlockSubsts(b.result){ f(b.result) } // Have to call again in case subst was added inside block
       }
     }
-
   }
-
 }

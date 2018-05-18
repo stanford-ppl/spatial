@@ -31,14 +31,6 @@ abstract class MutateTransformer extends ForwardTransformer {
     update(lhs,rhs)
   }
 
-  /** Update the metadata on sym using current substitution rules. */
-  def updateMetadata(sym: Sym[_]): Unit = {
-    metadata.all(sym).toList.foreach{case (k,m) => mirror(m) match {
-      case Some(m2) => if (!m.ignoreOnTransform) metadata.add(sym, k, merge(m, m2))
-      case None     => metadata.remove(sym, k)
-    }}
-  }
-
   final override protected def blockToFunction0[R](b: Block[R]): () => R = {
     () => isolate(){
       inCopyMode(copy = true){ inlineBlock(b).unbox }
@@ -53,7 +45,7 @@ abstract class MutateTransformer extends ForwardTransformer {
       updateNode(rhs)
       val lhs2 = restage(lhs)
       // TODO[5]: Small inefficiency where metadata created through flows is immediately mirrored
-      if (lhs2 == lhs) updateMetadata(lhs2)
+      if (lhs2 == lhs) transferMetadata(lhs -> lhs2)
       lhs2
     }
     catch {case t: Throwable =>
@@ -64,5 +56,4 @@ abstract class MutateTransformer extends ForwardTransformer {
   }
 
   def updateNode[A](node: Op[A]): Unit = node.update(f)
-
 }

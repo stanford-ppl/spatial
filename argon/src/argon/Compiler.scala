@@ -79,12 +79,7 @@ trait Compiler { self =>
 
   def runPasses[R](b: Block[R]): Block[R]
 
-
-
   final def runPass[R](t: Pass, block: Block[R]): Block[R] = instrument(t.name){
-    if (t.isInstanceOf[Transformer]) {
-      globals.clearBeforeTransform()
-    }
     val issuesBefore = state.issues
 
     if (config.enMemLog) memWatch.note(t.name)
@@ -97,14 +92,6 @@ trait Compiler { self =>
     persistingIssues.foreach{_.onUnresolved(t.name) }
     checkBugs(t.name)
     checkErrors(t.name)
-
-    // Mirror after transforming
-    t match {
-      case f: Transformer =>
-        globals.mirrorAfterTransform(f)
-        if (config.enLog) info(s"Symbols: ${IR.maxId}")
-      case _ =>
-    }
 
     result
   }

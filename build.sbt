@@ -70,4 +70,4 @@ lazy val apps = project.settings(common).dependsOn(nova)
 
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
-Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
+Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)

@@ -241,6 +241,17 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
+  final private def emitIICounter(lhs: Sym[_]): Unit = {
+    if (lhs.II <= 1 | !cfg.enableRetiming) {
+      emitt(src"""${swap(lhs, IIDone)} := true.B""")
+    } else {
+      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
+      emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
+      emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
+      emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
+    }
+  }
+
   final private def emitIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
     val Op(CounterChainNew(counters)) = cchain
 
@@ -400,14 +411,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emitt(s"""${swap(lhs, Resetter)} := Utils.getRetimed(accelReset, 1)""")
         emitt(src"""${swap(lhs, CtrTrivial)} := false.B""")
         emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
-        if (lhs.II <= 1) {
-          emitt(src"""${swap(lhs, IIDone)} := true.B""")
-        } else {
-          emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
-          emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-          emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
-          emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
-        }
+        emitIICounter(lhs)
         emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
         // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_latency.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
         emitt(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := accelReset; retime_counter.io.input.enable := true.B;""")
@@ -470,15 +474,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-      if (lhs.II <= 1) {
-        emitt(src"""${swap(lhs, IIDone)} := true.B""")
-      }
-      else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
-        emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
-      }
+      emitIICounter(lhs)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
@@ -514,15 +510,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-      if (lhs.II <= 1) {
-        emitt(src"""${swap(lhs, IIDone)} := true.B""")
-      }
-      else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
-        emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
-      }
+      emitIICounter(lhs)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
@@ -564,15 +552,7 @@ trait ChiselGenController extends ChiselGenCommon {
       // emitInhibitor(lhs, Some(notDone.result), None)
 
       emit(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
-      if (lhs.II <= 1 | lhs.isOuterControl) {
-        emit(src"""${swap(lhs, IIDone)} := true.B""")
-      } else {
-        emit(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
-        emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
-        val stop = if (lhs.isInnerControl) { lhs.II + 1} else { lhs.II } // I think innerpipes need one extra delay because of logic inside sm
-        emit(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")  
-      }
+      emitIICounter(lhs)
       // emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B // Maybe this should handled differently""")
 
       emit("// Emitting action")

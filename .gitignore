@@ -29,10 +29,7 @@ resources/synth/chisel-templates/fringeXSIM/
 *.pgm
 *.pyc
 /emulator/
-#*.cpp
-#*.h
 *.out
-#*.v
 *.hex
 *.flo
 *.vcd

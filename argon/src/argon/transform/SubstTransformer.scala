@@ -12,10 +12,13 @@ abstract class SubstTransformer extends Transformer {
   def register[A](rule: (A,A)): Unit = register(rule._1,rule._2)
 
   /** Register a substitution rule orig -> sub. */
-  def register[A,B](orig: A, sub: B): Unit = (orig, sub) match {
-    case (s1: Sym[_], s2: Sym[_])       => subst += s1 -> s2
+  def register[A,B](orig: A, sub: B): Unit = {
+    dbgs(s"  - actually gonna register $orig -> $sub")
+    (orig, sub) match {
+    case (s1: Sym[_], s2: Sym[_])       => dbgs("  - DONE");subst += s1 -> s2
     case (b1: Block[_], b2: Block[_])   => blockSubst += b1 -> b2
     case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
+    }
   }
 
   /** Defines the substitution rule for a symbol s, i.e. the result of f(s). */

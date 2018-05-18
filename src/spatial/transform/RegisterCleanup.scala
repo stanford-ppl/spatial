@@ -21,7 +21,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
   private def delayedMirror[T](lhs: Sym[T], rhs: Op[T], ctrl: Ctrl)(implicit ctx: SrcCtx): () => Sym[_] = () => {
     val key = (lhs, ctrl)
     completedMirrors.getOrElseAdd(key, () => {
-      withCtrl(ctrl){ inCopyMode(copy = true){ updateWithContext(lhs, rhs) } }
+      withCtrl(ctrl){ mirrorWithDuplication(lhs, rhs) }
     })
   }
 
@@ -56,7 +56,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
       }
 
       if (lhs.users.isEmpty) dbgs(s"REMOVING stateless $lhs")
-      Invalid // Must know context to use this symbol
+      Invalid
 
     case node: Primitive[_] if inHw && node.isEphemeral =>
       dbgs("")
@@ -68,7 +68,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         Invalid
       }
       else {
-        updateWithContext(lhs, rhs)
+        mirrorWithDuplication(lhs, rhs)
       }
 
     // Remove unused counters and counterchains
@@ -78,26 +78,26 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     case RegWrite(reg,value,en) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg write]")
-      if (reg.isUnusedMemory) {
+      if (reg.readers.isEmpty) {
         dbgs(s"REMOVING register write $lhs")
         Invalid
       }
-      else updateWithContext(lhs, rhs)
+      else mirrorWithDuplication(lhs, rhs)
 
     case RegNew(_) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg new]")
-      if (lhs.isUnusedMemory) {
+      if (lhs.readers.isEmpty) {
         dbgs(s"REMOVING register $lhs")
         Invalid
       }
-      else updateWithContext(lhs, rhs)
+      else mirrorWithDuplication(lhs, rhs)
 
-    case _ if lhs.isControl => withCtrl(lhs){ updateWithContext(lhs, rhs) }
-    case _ => updateWithContext(lhs, rhs)
+    case _ if lhs.isControl => withCtrl(lhs){ mirrorWithDuplication(lhs, rhs) }
+    case _ => mirrorWithDuplication(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 
-  private def updateWithContext[T](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
+  private def mirrorWithDuplication[T](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     dbgs(s"${stm(lhs)} [$blk]")
     //statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
     if ( statelessSubstRules.contains((lhs,blk)) ) {
@@ -106,14 +106,18 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
       // Activate / lookup duplication rules
       val rules = statelessSubstRules((lhs,blk)).map{case (s,s2) => s -> s2()}
       rules.foreach{case (s,s2) => dbgs(s"  $s -> ${stm(s2)}") }
-      val lhs2 = isolateWith(escape=Nil, rules:_*){ update(lhs,rhs) }
+      val lhs2 = isolateSubstWith(rules:_*){ mirror(lhs, rhs) }
       dbgs(s"${stm(lhs2)}")
       lhs2
     }
-    else update(lhs, rhs)
+    else {
+      val x = mirror(lhs, rhs)
+      dbgs(s"  - basic mirroring of $lhs = $rhs -> $x = ${x.rhs} with subst rules")
+      x
+    }
   }
 
-  def withBlockSubsts[A](escape: Sym[_]*)(block: => A): A = {
+  def withBlockSubsts[A](block: => A): A = {
     val rules = blk match {
       case Host            => Nil
       case Controller(s,_) =>
@@ -125,18 +129,20 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
           statelessSubstRules.getOrElse(block, Nil).map{case (s1, s2) => s1 -> s2() }
     }
     if (rules.nonEmpty) rules.foreach{rule => dbgs(s"  ${rule._1} -> ${rule._2}") }
-    isolateWith(escape, rules: _*){ block }
+    isolateSubstWith(rules: _*){ block }
   }
 
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
     advanceBlock() // Advance block counter before transforming inputs
 
-    withBlockSubsts(b.result) {
-      inlineWith(b){stms =>
+    withBlockSubsts {
+      inlineBlockWith(b){stms =>
         stms.foreach(visit)
-        withBlockSubsts(b.result){ f(b.result) } // Have to call again in case subst was added inside block
+        withBlockSubsts{ f(b.result) } // Have to call again in case subst was added inside block
       }
     }
+
   }
+
 }

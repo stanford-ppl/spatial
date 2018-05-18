@@ -71,15 +71,12 @@ trait Codegen extends Traversal {
   }
 
   override protected def process[R](block: Block[R]): Block[R] = {
-    preprocess(block)
-
     inGen(out, entryFile) {
       emitHeader()
       emitEntry(block)
       emitFooter()
     }
-
-    postprocess(block)
+    block
   }
 
   protected def gen(block: Block[_], withReturn: Boolean = false): Unit = {

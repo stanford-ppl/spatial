@@ -2,6 +2,7 @@ package argon
 package passes
 
 import utils.implicits.Readable._
+import utils.tags.instrument
 
 
 /** Common trait for all passes which can be run by the compiler,
@@ -10,7 +11,7 @@ import utils.implicits.Readable._
   * Extend this trait directly if you don't need to traverse the graph.
   * Otherwise, extend Traversal.
   */
-trait Pass { self =>
+@instrument trait Pass { self =>
   val IR: State
   final implicit def __IR: State = IR
   def name: String = r"${self.getClass}".split('.').last

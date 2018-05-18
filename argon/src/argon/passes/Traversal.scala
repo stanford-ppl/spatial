@@ -1,10 +1,12 @@
 package argon
 package passes
 
+import utils.tags.instrument
+
 /**
   * Single traversal of the IR with pre- and post- processing
   */
-trait Traversal extends Pass { self =>
+@instrument trait Traversal extends Pass { self =>
   object Recurse extends Enumeration {
     type Recurse = Value
     // TODO[5]: Breadth-first recursive search mode

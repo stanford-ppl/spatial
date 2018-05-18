@@ -4,7 +4,7 @@ package transform
 import argon.passes.Traversal
 import utils.tags.instrument
 
-abstract class ForwardTransformer extends SubstTransformer with Traversal {
+@instrument abstract class ForwardTransformer extends SubstTransformer with Traversal {
   override val recurse = Recurse.Never
 
   /** Determine a substitution rule for the given symbol.

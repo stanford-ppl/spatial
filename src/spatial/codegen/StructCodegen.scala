@@ -10,7 +10,7 @@ trait StructCodegen extends Codegen {
   val encounteredStructs = mutable.HashMap[Struct[_], String]()
   var structNumber: Int = 0
 
-  override protected def remap(tp: Type[_]) = tp match {
+  override protected def remap(tp: Type[_]): String = tp match {
     case t: Struct[_] =>
       encounteredStructs.getOrElseUpdate(t, { structNumber += 1; structName(t, structNumber) })
 

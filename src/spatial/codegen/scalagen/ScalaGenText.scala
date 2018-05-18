@@ -29,6 +29,8 @@ trait ScalaGenText extends ScalaCodegen {
     case TextLength(x)      => emit(src"val $lhs = FixedPoint.fromInt($x.length)")
     case TextApply(x,i)     => emit(src"val $lhs = FixedPoint.fromChar($x.charAt($i))")
 
+    case CharArrayToText(array) => emit(src"""val $lhs = $array.map(_.toChar).mkString("")""")
+
     //case StringSlice(x,start,end) => emit(src"val $lhs = $x.substring($start,$end);")
     //case StringLength(x) => emit(src"val $lhs = $x.length();")
     case _ => super.gen(lhs, rhs)

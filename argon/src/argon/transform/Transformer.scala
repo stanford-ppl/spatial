@@ -19,7 +19,7 @@ import scala.collection.mutable
   *   Mirror - Create a recursive copy of a value with substitutions
   *   Update - Modify the existing value with substitutions
   */
-abstract class Transformer extends Pass {
+@instrument abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
   /** Metadata updating functions - used to add extra rules (primarily for metadata) after mirroring

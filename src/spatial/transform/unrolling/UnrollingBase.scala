@@ -193,26 +193,26 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
 
     def isolateIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
-      contexts.zipWithIndex.foreach{case (ctx,i) =>
+      /*contexts.zipWithIndex.foreach{case (ctx,i) =>
         dbgs(s"[Enter] Lane #$i: " + ctx.map{case (s1,s2) => s"$s1->$s2" }.mkString(","))
-      }
+      }*/
 
       val saveContexts = Array.tabulate(contexts.length){i => contexts(i) }
       val saveMemories = Array.tabulate(memContexts.length){i => memContexts(i) }
       val result = block
 
-      contexts.zipWithIndex.foreach{case (ctx,i) =>
+      /*contexts.zipWithIndex.foreach{case (ctx,i) =>
         dbgs(s"[Inside] Lane #$i: " + ctx.map{case (s1,s2) => s"$s1->$s2" }.mkString(","))
-      }
+      }*/
 
       if (cond) {
         saveContexts.indices.foreach{i => contexts(i) = contexts(i).filter{s => escape.contains(s._1) } ++ saveContexts(i) }
         saveMemories.indices.foreach{i => memContexts(i) = saveMemories(i) }
       }
 
-      contexts.zipWithIndex.foreach{case (ctx,i) =>
+      /*contexts.zipWithIndex.foreach{case (ctx,i) =>
         dbgs(s"[Exit] Lane #$i: " + ctx.map{case (s1,s2) => s"$s1->$s2" }.mkString(","))
-      }
+      }*/
 
       result
     }

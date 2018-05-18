@@ -1,8 +1,10 @@
 package argon
 package transform
 
+import utils.tags.instrument
+
 /** An IR transformation pass which tracks substitutions using a scoped hash map. */
-abstract class SubstTransformer extends Transformer {
+@instrument abstract class SubstTransformer extends Transformer {
   var subst: Map[Sym[_],Sym[_]] = Map.empty
   var blockSubst: Map[Block[_],Block[_]] = Map.empty
 
@@ -59,12 +61,12 @@ abstract class SubstTransformer extends Transformer {
     */
   def isolateIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
     val save = subst
-    dbgs("[Enter] Escape: " + escape.mkString(","))
-    dbgs("[Enter] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
+    //dbgs("[Enter] Escape: " + escape.mkString(","))
+    //dbgs("[Enter] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
     val result = block
-    dbgs("[Inside] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
+    //dbgs("[Inside] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
     if (cond) subst = save ++ subst.filter{case (s1,_) => escape.contains(s1) }
-    dbgs("[Exit] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
+    //dbgs("[Exit] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
     result
   }
 

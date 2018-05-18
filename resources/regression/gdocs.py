@@ -376,7 +376,8 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
-def delete_n_rows(n, backend):
+# ofs = 0 means start deleting from spreadsheet "row 3" and down
+def delete_n_rows(n, ofs, backend):
 	sh = getDoc(backend)
 	perf = isPerf(backend)
 
@@ -386,7 +387,7 @@ def delete_n_rows(n, backend):
 		worksheet = sh.worksheet('index', x)
 		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 			for i in range(0,int(n)):
-				worksheet.delete_rows(3)
+				worksheet.delete_rows(3 + int(ofs))
 
 
 
@@ -405,11 +406,11 @@ elif (sys.argv[1] == "prepare_sheet"):
 	print("prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
 	prepare_sheet(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 elif (sys.argv[1] == "delete_n_rows"):
-	print("delete_n_rows('%s', '%s')" % (sys.argv[2], sys.argv[3]))
-	delete_n_rows(sys.argv[2], sys.argv[3])
+	print("delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "dev"):
-	print("dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
-	dev(sys.argv[2], sys.argv[3], sys.argv[4])
+	print("dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
+	dev(sys.argv[2], sys.argv[3])
 else:
 	print("ERROR: Not a valid spreadsheet interaction! %s" % sys.argv[1])
 	exit()

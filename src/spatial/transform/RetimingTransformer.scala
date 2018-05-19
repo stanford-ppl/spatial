@@ -193,7 +193,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
   private def retimeStms[A](block: Block[A]): Sym[A] = inBlock(block) {
-    inlineBlockWith(block){stms =>
+    inlineWith(block){stms =>
       stms.foreach{
         case Stm(switch, op: Switch[_]) => retimeSwitch(switch, op.asInstanceOf[Switch[Any]])
         case stm => retimeStm(stm)
@@ -206,7 +206,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     case Stm(reader, d) =>
       logs(s"Retiming $reader = $d")
       val inputs = bitBasedInputs(d)
-      val reader2 = isolate {
+      val reader2 = isolate() {
         registerDelays(reader, inputs)
         visit(sym)
         f(reader)
@@ -223,7 +223,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     precomputeDelayLines(op)
     dbgs(s"Retiming case ${stm(cas)}")
     // Note: Don't call inBlock here - it's already being called in retimeStms
-    val caseBody2: Block[A] = isolate{ stageBlock{
+    val caseBody2: Block[A] = isolate(body.result){ stageBlock{
       retimeStms(body)
       val size = delayConsumers.getOrElse(switch, Nil).find(_.input == cas).map(_.size).getOrElse(0) +
         delayConsumers.getOrElse(cas, Nil).find(_.input == body.result).map(_.size).getOrElse(0)
@@ -249,7 +249,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     dbgs(s"Retiming switch $switch = $op")
     val body2 = inBlock(body){
       stageBlock({
-        inlineBlockWith(body){ stms =>
+        inlineWith(body){stms =>
           stms.foreach {
             case Stm(cas, sc: SwitchCase[_]) => retimeSwitchCase(cas, sc.asInstanceOf[SwitchCase[Any]], switch)
             case stm => retimeStm(stm)
@@ -258,7 +258,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         }
       }, options)
     }
-    val switch2 = isolate {
+    val switch2 = isolate() {
       registerDelays(switch, selects)
       implicit val ctx: SrcCtx = switch.ctx
       stage(Switch(f(selects), body2))
@@ -292,7 +292,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         dbgs(s"  [$l = ${newLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
 
-    isolate{ retimeStms(block) }
+    isolate(){ retimeStms(block) }
   }
 
 

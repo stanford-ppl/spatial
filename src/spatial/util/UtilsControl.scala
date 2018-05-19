@@ -192,7 +192,7 @@ trait UtilsControl {
     def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
 
 
-    /** Returns true if this is an inner controller which directly contains
+    /** True if this is an inner controller which directly contains
       * stream enablers/holder accesses.
       */
     def hasStreamAccess: Boolean = isInnerControl && (op match {
@@ -202,10 +202,13 @@ trait UtilsControl {
       case None => false
     })
 
-    /** Returns true if this control or symbol occurs within a loop. */
+    /** True if this control or symbol occurs within a loop. */
     def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
 
-    /** Returns true if this control or symbol is a loop or occurs within a loop. */
+    /** True if this control or symbol has the given ancestor controller. */
+    def hasAncestor(ctrl: Ctrl): Boolean = ancestors.contains(ctrl)
+
+    /** True if this control or symbol is a loop or occurs within a loop. */
     def willRunMultiple: Boolean = s.exists(_.isLoopControl) || hasLoopAncestor
   }
 

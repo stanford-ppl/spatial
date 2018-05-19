@@ -41,8 +41,15 @@ trait SpatialVirtualization {
     case _ => new Ptr[T](init)
   }
 
+  // TODO[4]: Implicit staged conversions when assigning to vars
   @rig def __assign[T](v: VarLike[T], rhs: Any): Unit = v match {
-    case v: Var[a] => v.__assign(v.A.from(rhs).asInstanceOf[T])
+    case v: Var[a] => rhs match {
+      case data:Top[_] if data.tp <:< v.A => v.__assign(data.asInstanceOf[T])
+      case data:Top[_] =>
+        error(ctx, s"Type mismatch: Cannot assign ${data.tp} to var of type ${v.A}")
+        error(ctx)
+      case data => v.__assign(v.A.from(data).asInstanceOf[T])
+    }
     case _ =>
       try { v.__assign(rhs.asInstanceOf[T]) }
       catch {case _:Throwable =>

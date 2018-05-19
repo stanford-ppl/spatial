@@ -2,9 +2,10 @@ package spatial.transform
 
 import argon._
 import argon.transform.MutateTransformer
+import spatial.traversal.AccelTraversal
+import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.traversal.AccelTraversal
 import spatial.util._
 import spatial.internal._
 
@@ -22,16 +23,18 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
-    case Some(data) =>
+    case Some(data) if lhs.parent.hasAncestor(data.parent) =>
       // Don't get rid of reads being used for DRAM allocations
       if (lhs.consumers.exists{case Op(DRAMNew(_, _)) => true; case _ => false }) {
         dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
         super.transform(lhs, rhs)
       }
       else {
-        dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data)")
-        data.asInstanceOf[Sym[A]]
+        dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data -> ${f(data)})")
+        f(data).asInstanceOf[Sym[A]]
       }
+
+    case Some(data) => super.transform(lhs,rhs)
 
     case None =>
       warn(lhs.ctx, s"$tp ($lhs) was used before being set. This will result in 0 at runtime.")
@@ -48,7 +51,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       // Add ArgIns for arbitrary bit inputs
       addedArgIns ++= bitsInputs.map{s => s -> argIn(f(s)) }
 
-      isolateSubstWith(addedArgIns:_*){ super.transform(lhs,rhs) }
+      isolateWith(escape=Nil, addedArgIns:_*){ super.transform(lhs,rhs) }
     }
 
     // Add ArgIns for DRAM dimensions
@@ -62,7 +65,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       }
       val dims2 = dims.map{d => dimMapping(d) }
       addedArgIns ++= dims.zip(dims2)
-      isolateSubstWith(dims.zip(dims2):_*){ super.transform(lhs,rhs) }
+      isolateWith(escape=Nil, dims.zip(dims2):_*){ super.transform(lhs,rhs) }
 
     case GetReg(F(reg)) =>
       def read(tp: String): Sym[A] = {
@@ -114,14 +117,14 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       }
 
     // reg := data
-    case RegWrite(F(reg),F(data),_) =>
+    case RegWrite(F(reg),data,_) =>
       mostRecentWrite += reg -> data
       dbg(s"Adding $reg -> $data to mostRecentWrite map ($mostRecentWrite)")
 
       def set(tp: String): Sym[A] = {
         warn(ctx, s"Use setArg for setting $tp outside Accel.")
         warn(ctx)
-        setArg(reg, data).asInstanceOf[Sym[A]]
+        setArg(reg, f(data)).asInstanceOf[Sym[A]]
       }
       def noHostWrite(tp: String): Sym[A] = {
         error(ctx, s"Writing $tp outside Accel is disallowed. Use a HostIO or ArgIn.")
@@ -147,14 +150,14 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       }
 
 
-    case SetReg(F(reg),F(data)) =>
+    case SetReg(F(reg),data) =>
       mostRecentWrite += reg -> data
       dbg(s"Adding $reg -> $data to mostRecentWrite map ($mostRecentWrite)")
 
       def write(tp: String): Sym[A] = {
         warn(ctx, s"Use register assignment syntax, :=, for writing $tp within Accel.")
         warn(ctx)
-        (reg := data).asInstanceOf[Sym[A]]
+        (reg := f(data)).asInstanceOf[Sym[A]]
       }
       def noHostWrite(tp: String): Sym[A] = {
         error(ctx, s"Setting $tp outside Accel is disallowed. Use a HostIO or ArgIn.")

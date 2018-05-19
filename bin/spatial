@@ -70,28 +70,54 @@ Experimental:
   #sys.exit(0)
 
 
-def getSrcCode(opts, args):
-  outdir = "gen/%s" % opts.app 
+def getSrcCode(app, args):
+  outdir = "gen/%s" % app 
   for arg in args:
     if ("--out=" in arg):
       outdir = arg.replace("--out=","")
 
-  outfile = open(os.path.join(os.getcwd(), './%s/%s.ref' % (outdir, opts.app)), 'w+')
-  os.chdir( "apps/src" )
+  src = getFullyQualifiedSourceName(app)
+  
+  outfile = open(os.path.join(os.getcwd(), './%s/%s.ref' % (outdir, app)), 'w+')
   found = False
-  for files in glob.glob( "*.scala" ):
-      f = open( files, 'r' )
-      for line in f:
-          if re.match("^@spatial object %s[ ]*{" % opts.app, line) is not None:
-            found = True
-          if (found):
-            outfile.write(line)
-          if (found and re.match("^}.*", line) is not None):
-            found = False
+  f = open( src, 'r' )
+  for line in f:
+    if re.match(".*%s[ ]*{" % app, line) is not None:
+      found = True
+    if (found):
+      outfile.write(line)
+    if (found and re.match("^}.*", line) is not None):
+      found = False
   outfile.close()
-  os.chdir("../..")
 
-def getFullyQualifiedName(app):
+
+def getFullyQualifiedSourceName(app):
+  path_cmd = "grep -rEl 'class.*%s.*{|object.*%s.*{'" % (app,app)
+  p = subprocess.Popen(path_cmd, stdout=subprocess.PIPE, shell=True)
+  p.wait()
+  paths = []
+  while True:
+    path = p.stdout.readline().rstrip()
+    if path == b'': break
+    else:
+      paths.append(path)
+
+  path = ""
+  if len(paths) == 1:
+    path = paths[0].decode("utf-8")
+  elif len(paths) == 0:
+    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] No source files found for " + app + ".\n")
+    exit(1)
+  else:
+    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Ambiguous source files found for " + app + ".\n")
+    for path in paths:
+      print(path + "\n")
+    exit(1)
+  
+  return path
+
+
+def getFullyQualifiedClassName(app):
   path_cmd = "find ./ -name '" + app + ".class'"
   p = subprocess.Popen(path_cmd, stdout=subprocess.PIPE, shell=True)
   p.wait()
@@ -108,10 +134,10 @@ def getFullyQualifiedName(app):
   if len(paths) == 1:
     path = paths[0].decode("utf-8")
   elif len(paths) == 0:
-    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] No application with name " + app + " found.\n")
+    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] No class found for application with name " + app + ".\n")
     exit(1)
   else:
-    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Ambiguous application name\n")
+    print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Ambiguous classes found for " + app + ".\n")
     for path in paths:
       print(path + "\n")
     exit(1)
@@ -141,7 +167,7 @@ def main():
   ecode = os.system("sbt test:compile")
   if ecode != 0: exit(1)
 
-  name, isTest = getFullyQualifiedName(opts.app)
+  name, isTest = getFullyQualifiedClassName(opts.app)
 
   java_cmd = ""
   if isTest:
@@ -157,8 +183,8 @@ def main():
   if ecode != 0:
     print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Spatial compilation failed")
   else:
-    if not any("--withoutSrc" in s for s in args):
-      getSrcCode(opts, args)
+    # if not any("--withoutSrc" in s for s in args):
+    #   getSrcCode(opts.app, args)
     simScript = open(opts.app + ".sim", 'w')
     simScript.write("#!/bin/bash\n\n")
     simScript.write("cd gen/" + opts.app + "\n")

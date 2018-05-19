@@ -46,7 +46,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case ctrl: Control[_] =>
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
       // Branches (Switch, SwitchCase) only count as controllers here if they are outer controllers
-      val isOuter = children.exists{c => !c.isBranch || c.isOuterControl }
+      // MemReduce is always an outer controller
+      val isOuter = children.exists{c => !c.isBranch || c.isOuterControl } || op.isMemReduce
       s.rawLevel = if (isOuter) Outer else Inner
       s.cchains.foreach{cchain => cchain.owner = s; cchain.counters.foreach{ctr => ctr.owner = s }}
       s.children = children.map{c => Controller(c,-1) }
@@ -92,7 +93,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
       if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
-      if (s.isOuterControl && s.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
+      if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
 
     case _ => // No schedule for non-control nodes
   }
@@ -128,7 +129,15 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case Op(RegRead(reg)) if reg.isArgIn => lhs.isGlobal = true
 
     case Primitive(_) =>
-      if (rhs.inputs.nonEmpty && rhs.inputs.forall(_.isGlobal)) lhs.isGlobal = true
+      if (rhs.expInputs.nonEmpty && rhs.expInputs.forall(_.isGlobal)) lhs.isGlobal = true
+      if (rhs.expInputs.nonEmpty && rhs.expInputs.forall(_.isFixedBits)) lhs.isFixedBits = true
+
+      if (rhs.expInputs.isEmpty || rhs.expInputs.exists{in => !in.isFixedBits}) {
+        dbgs(s"$lhs = $rhs [Not fixed: ${rhs.inputs.filterNot(_.isFixedBits).mkString(",")}]")
+      }
+      else {
+        dbgs(s"$lhs = $rhs [Fixed Bits]")
+      }
 
     case _ => // Not global
   }

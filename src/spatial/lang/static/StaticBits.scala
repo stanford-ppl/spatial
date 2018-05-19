@@ -48,13 +48,17 @@ trait StaticBits { this: SpatialStatics =>
       */
     @rig def recastUnchecked[A:Bits]: A = Bits[A] match {
       case struct: Struct[_] =>
+        dbgs(s"Converting $vec (${vec.nbits} bits) to a $struct (${struct.nbits} bits)")
+
         val fieldNames = struct.fields.map{case (name,_) => name }
         val fieldTypes = struct.fields.map{case (_, mT) => mT }
         val sizes = struct.fields.map{case (_, Bits(bT)) => bT.nbits }
         val offsets = List.tabulate(sizes.length){i => sizes.drop(i+1).sum }
 
-        val fields = (fieldTypes,offsets).zipped.toSeq.collect{case (b: Bits[_],offset) =>
-          b.boxed(vec.sliceUnchecked(msb = offset+b.nbits, lsb = offset).asType(b))
+        val fields = (fieldNames,fieldTypes,offsets).zipped.toSeq.collect{case (field, b: Bits[_],offset) =>
+          dbgs(s"Grabbing field $field: msb=${offset+b.nbits-1}, lsb=$offset")
+
+          b.boxed(vec.sliceUnchecked(msb = offset+b.nbits-1, lsb = offset).asType(b))
         }
         val namedFields = fieldNames.zip(fields)
 

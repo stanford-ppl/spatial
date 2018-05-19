@@ -61,6 +61,9 @@ case class Instance(
 ) {
   def toMemory: Memory = Memory(banking, depth, accType)
 
+  def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
+  def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
+
   override def toString: String = {
     import scala.math.Ordering.Implicits._
 
@@ -162,7 +165,7 @@ object Memory {
   * Setter:  sym.instance = (Memory)
   * Default: undefined
   */
-case class Duplicates(d: Seq[Memory]) extends StableData[Duplicates]
+case class Duplicates(d: Seq[Memory]) extends Data[Duplicates](Transfer.Mirror)
 
 
 /** Map of a set of memory dispatch IDs for each unrolled instance of an access node.
@@ -180,7 +183,7 @@ case class Duplicates(d: Seq[Memory]) extends StableData[Duplicates]
   * Default: empty map             --- for the entire map
   * Default: undefined             --- for a single unrolled instance id
   */
-case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends StableData[Dispatch]
+case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends Data[Dispatch](Transfer.Mirror)
 
 
 /** Map of buffer ports for each unrolled instance of an access node.
@@ -194,7 +197,7 @@ case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends StableData[Dispatch]
   * Default: empty map        --- for the entire map
   * Default: undefined        --- for a single unrolled instance id
   */
-case class Ports(m: Map[Seq[Int],Port]) extends StableData[Ports]
+case class Ports(m: Map[Seq[Int],Port]) extends Data[Ports](Transfer.Mirror)
 
 
 /** Flag set by the user to allow buffered writes across metapipeline stages.
@@ -203,7 +206,7 @@ case class Ports(m: Map[Seq[Int],Port]) extends StableData[Ports]
   * Setter:  sym.isWriteBuffer = (true | false)
   * Default: false
   */
-case class EnableWriteBuffer(flag: Boolean) extends StableData[EnableWriteBuffer]
+case class EnableWriteBuffer(flag: Boolean) extends Data[EnableWriteBuffer](SetBy.User)
 
 
 trait BankingData {

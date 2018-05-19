@@ -8,7 +8,7 @@ import argon._
   * Setter:  sym.readers = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class Readers(readers: Set[Sym[_]]) extends FlowData[Readers]
+case class Readers(readers: Set[Sym[_]]) extends Data[Readers](SetBy.Flow.Consumer)
 
 
 /**
@@ -18,7 +18,7 @@ case class Readers(readers: Set[Sym[_]]) extends FlowData[Readers]
   * Setter:  sym.writers = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class Writers(writers: Set[Sym[_]]) extends FlowData[Writers]
+case class Writers(writers: Set[Sym[_]]) extends Data[Writers](SetBy.Flow.Consumer)
 
 
 /** Set of resetters for a given memory.
@@ -27,8 +27,16 @@ case class Writers(writers: Set[Sym[_]]) extends FlowData[Writers]
   * Setter:  sym.resetters = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class Resetters(resetters: Set[Sym[_]]) extends FlowData[Resetters]
+case class Resetters(resetters: Set[Sym[_]]) extends Data[Resetters](SetBy.Flow.Consumer)
 
+
+/** Marks that a memory is never used (and can be removed)
+  *
+  * Getter: sym.isUnusedMemory
+  * Setter: sym.isUnusedMemory = (true|false)
+  * Default: false
+  */
+case class UnusedMemory(flag: Boolean) extends Data[UnusedMemory](SetBy.Analysis.Consumer)
 
 
 trait MemoryData {
@@ -44,6 +52,9 @@ trait MemoryData {
 
     def resetters: Set[Sym[_]] = metadata[Resetters](s).map(_.resetters).getOrElse(Set.empty)
     def resetters_=(rst: Set[Sym[_]]): Unit = metadata.add(s, Resetters(rst))
+
+    def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
+    def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
   }
 
 }

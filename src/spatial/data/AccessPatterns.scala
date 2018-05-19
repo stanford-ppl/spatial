@@ -70,16 +70,33 @@ object Sum {
 }
 
 case class AffineComponent(a: Prod, i: Idx) {
+  def syms: Seq[Idx] = i +: a.syms
   def unary_-(): AffineComponent = AffineComponent(-a, i)
   def *(s: Sum): Seq[AffineComponent] = (s * a).ps.map{p => AffineComponent(p,i) }
   override def toString: String = s"$a*$i"
 }
 
 case class AffineProduct(a: Sum, i: Idx) {
+  def syms: Seq[Idx] = i +: a.syms
   override def toString: String = s"($a)$i"
 }
 
 
+/** Represents a generalized symbolic affine address function.
+  * Each component of the affine function is represented as a sum of products, where each sum is
+  * a multiplier for a distinct loop index.
+  *
+  * The offset is represented as a separate sum of products, where each sum is a multiplier for some
+  * symbol.
+  *
+  * e.g. for x(32*i + m*i + 15*j + 2*x + 13), this is represented as:
+  *  comps = AffineProduct(Sum(Prod(32), Prod(m)), i), AffineProduct(Sum(Prod(15)), j)
+  *  ofs   = Sum(Prod(2,x),Prod(13))
+  *
+  * @param comps A list of sum of products multipliers for distinct loop indices
+  * @param ofs   A sum of products representing the symbolic offset
+  * @param lastIters A map from each symbol to its
+  */
 case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Idx,Option[Idx]], last: Option[Idx]) {
 
   /** Convert this to a sparse vector representation if it is representable as an affine equation with
@@ -121,7 +138,7 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
   * Setter:  sym.accessPattern = (Set[AddressPattern])
   * Default: undefined
   */
-case class AccessPattern(pattern: Seq[AddressPattern]) extends AnalysisData[AccessPattern]
+case class AccessPattern(pattern: Seq[AddressPattern]) extends Data[AccessPattern](Transfer.Remove)
 
 
 trait AccessPatternData {

@@ -60,7 +60,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
         val ctrs = ranges.map{r => Counter.from(r) }
         CounterChain(ctrs)
         val addr = path(indices)
-        stage(Addr(addr))
+        stage(AddrWire(addr))
       }
       u.setRd(block, Seq(indices))
     }
@@ -80,8 +80,8 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
         val ctrs = ranges.map{r => Counter.from(r) }
         CounterChain(ctrs)
         val (addr,data) = path(indices)
-        stage(Addr(addr))
-        stage(Data(data))
+        stage(AddrWire(addr))
+        stage(DataWire(data))
       }
       u.setWr(block, Seq(indices))
     }
@@ -89,7 +89,7 @@ case class PMUPtr(protected[pir] var unit: Option[VPMU] = None) extends PUPtr {
   }
 }
 
-case class CurrentPtr(ptr: PUPtr) extends FlowData[CurrentPtr]
+case class CurrentPtr(ptr: PUPtr) extends Data[CurrentPtr](GlobalData.User)
 @data object curPtr {
   def get: Option[PUPtr] = globals[CurrentPtr].map(_.ptr)
   def set(ptr: PUPtr): Unit = globals.add(CurrentPtr(ptr))

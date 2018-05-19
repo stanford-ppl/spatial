@@ -184,7 +184,7 @@ trait ChiselGenController extends ChiselGenCommon {
           stages.zipWithIndex.foreach{ case (s, i) =>
             emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
             emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
-            emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${DL(swap(s, Done), 0, true)}, ${swap(s, En)}, $i) // Used to be delay of 1 on Nov 26, 2017 but not sure why""")
+            emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${swap(s, Done)}, ${swap(s, En)}, $i) // Used to be delay of 1 on Nov 26, 2017 but not sure why""")
           }
         }
         emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.doneIn.head)""")
@@ -241,6 +241,17 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
+  final private def emitIICounter(lhs: Sym[_]): Unit = {
+    if (lhs.II <= 1 | !cfg.enableRetiming | lhs.isOuterControl) {
+      emitt(src"""${swap(lhs, IIDone)} := true.B""")
+    } else {
+      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
+      emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
+      emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
+      emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
+    }
+  }
+
   final private def emitIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
     val Op(CounterChainNew(counters)) = cchain
 
@@ -287,7 +298,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
         // If this is a stream controller, need to set up counter copy for children
         if (sym.isOuterStreamLoop) {
-          emitt(src"""${swap(sym, SM)}.io.parentAck := ${swap(src"${sym.cchains.head}", Done)}""")
+          emitt(src"""// ${swap(sym, SM)}.io.parentAck := ${swap(src"${sym.cchains.head}", Done)} // Not sure why this used to be connected, since it can cause an extra command issued""")
           emitGlobalWireMap(src"""${swap(src"${sym.cchains.head}", En)}""", """Wire(Bool())""") 
           val unitKid = c.isUnitPipe
           val snooping = getNowValidLogic(c).replace(" ", "") != ""
@@ -315,7 +326,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = sym.bodyLatency.sum
+    val lat = if (cfg.enableRetiming & sym.isInnerControl) sym.bodyLatency.sum else 0.0
     val ii = sym.II
 
     // Construct controller args
@@ -351,7 +362,8 @@ trait ChiselGenController extends ChiselGenCommon {
     // }
 
     // Capture datapath_en
-    emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
+    if (sym.cchains.isEmpty) emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} // Used to have many variations""")
+    else emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} & ~${swap(sym, SM)}.io.ctrDone // Used to have many variations""")
 
     // Update bound sym watchlists
     (ctrlIters(sym.toCtrl) ++ ctrlValids(sym.toCtrl)).foreach{ item => 
@@ -381,7 +393,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.head.s.get}", Done)}""")
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
       } else {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(src"Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)", 1, true)} ${getNowValidLogic(sym)}""")
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc) // Used to be delayed by 1 & validNow""")
       }
     }
 
@@ -390,51 +402,42 @@ trait ChiselGenController extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     case AccelScope(func) =>
-      enterAccel()
-      hwblock = Some(enterCtrl(lhs))
-      val streamAddition = getStreamEnablers(lhs)
-      emitController(lhs)
-      emitGlobalWire(src"val accelReset = reset.toBool | io.reset")
-      emitt(s"""${swap(lhs, En)} := io.enable & !io.done ${streamAddition}""")
-      emitt(s"""${swap(lhs, Resetter)} := Utils.getRetimed(accelReset, 1)""")
-      emitt(src"""${swap(lhs, CtrTrivial)} := false.B""")
-      emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
-      if (lhs.II <= 1) {
-        emitt(src"""${swap(lhs, IIDone)} := true.B""")
-      } else {
-        emitt(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
-        emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
-        emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
-      }
-      emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-      // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_latency.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
-      emitt(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := accelReset; retime_counter.io.input.enable := true.B;""")
-      emitGlobalWire(src"""val retime_released_reg = RegInit(false.B)""")
-      emitGlobalWire(src"""val retime_released = ${DL("retime_released_reg", 1)}""")
-      emitGlobalWire(src"""val rr = retime_released // Shorthand""")
-      emitt(src"""retime_released := ${DL("retime_counter.io.output.done",1)} // break up critical path by delaying this """)
-      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
+      inAccel{
+        hwblock = Some(enterCtrl(lhs))
+        val streamAddition = getStreamEnablers(lhs)
+        emitController(lhs)
+        emitGlobalWire(src"val accelReset = reset.toBool | io.reset")
+        emitt(s"""${swap(lhs, En)} := io.enable & !io.done ${streamAddition}""")
+        emitt(s"""${swap(lhs, Resetter)} := Utils.getRetimed(accelReset, 1)""")
+        emitt(src"""${swap(lhs, CtrTrivial)} := false.B""")
+        emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
+        emitIICounter(lhs)
+        emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+        // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_latency.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
+        emitt(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := accelReset; retime_counter.io.input.enable := true.B;""")
+        emitGlobalWire(src"""val retime_released_reg = RegInit(false.B)""")
+        emitGlobalWire(src"""val retime_released = ${DL("retime_released_reg", 1)}""")
+        emitGlobalWire(src"""val rr = retime_released // Shorthand""")
+        emitt(src"""retime_released := ${DL("retime_counter.io.output.done",1)} // break up critical path by delaying this """)
+        // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
 
-      emitt(src"""${swap(lhs, SM)}.io.parentAck := io.done""")
-      visitBlock(func)
-      emitChildrenCxns(lhs)
+        emitt(src"""${swap(lhs, SM)}.io.parentAck := io.done""")
+        visitBlock(func)
+        emitChildrenCxns(lhs)
 
-      emitt(s"""val done_latch = Module(new SRFF())""")
-      if (earlyExits.nonEmpty) {
-        appPropertyStats += HasBreakpoint
-        emitGlobalWire(s"""val breakpoints = Wire(Vec(${earlyExits.length}, Bool()))""")
-        emitt(s"""done_latch.io.input.set := ${swap(lhs, Done)} | breakpoints.reduce{_|_}""")        
-      } else {
-        emitt(s"""done_latch.io.input.set := ${swap(lhs, Done)}""")                
+        emitt(s"""val done_latch = Module(new SRFF())""")
+        if (earlyExits.nonEmpty) {
+          appPropertyStats += HasBreakpoint
+          emitGlobalWire(s"""val breakpoints = Wire(Vec(${earlyExits.length}, Bool()))""")
+          emitt(s"""done_latch.io.input.set := ${swap(lhs, Done)} | breakpoints.reduce{_|_}""")        
+        } else {
+          emitt(s"""done_latch.io.input.set := ${swap(lhs, Done)}""")                
+        }
+        emitt(s"""done_latch.io.input.reset := ${swap(lhs, Resetter)}""")
+        emitt(s"""done_latch.io.input.asyn_reset := ${swap(lhs, Resetter)}""")
+        emitt(s"""io.done := done_latch.io.output.data""")
+        exitCtrl(lhs)
       }
-      emitt(s"""done_latch.io.input.reset := ${swap(lhs, Resetter)}""")
-      emitt(s"""done_latch.io.input.asyn_reset := ${swap(lhs, Resetter)}""")
-      emitt(s"""io.done := done_latch.io.output.data""")
-      exitCtrl(lhs)
-      exitAccel()
 
     case UnitPipe(ens,func) =>
       // emitGlobalWireMap(src"${lhs}_II_done", "Wire(Bool())")
@@ -471,17 +474,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-      if (lhs.II <= 1) {
-        emitt(src"""${swap(lhs, IIDone)} := true.B""")
-      }
-      else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
-        emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
-        emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
-      }
+      emitIICounter(lhs)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
@@ -517,17 +510,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-      if (lhs.II <= 1) {
-        emitt(src"""${swap(lhs, IIDone)} := true.B""")
-      }
-      else {
-        emitGlobalModule(src"""val ${lhs}_IICtr = Module(new RedxnCtr(2 + Utils.log2Up(${swap(lhs, II)})));""")
-        emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, DatapathEn)}""")
-        emitt(src"""${lhs}_IICtr.io.input.stop := ${swap(lhs, II)}.S""")
-        emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")
-        emitt(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
-      }
+      emitIICounter(lhs)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
@@ -569,17 +552,7 @@ trait ChiselGenController extends ChiselGenCommon {
       // emitInhibitor(lhs, Some(notDone.result), None)
 
       emit(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
-      if (lhs.II <= 1 | lhs.isOuterControl) {
-        emit(src"""${swap(lhs, IIDone)} := true.B""")
-      } else {
-        emit(src"""val ${lhs}_IICtr = Module(new RedxnCtr());""")
-        emit(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-        emit(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs, En)}""")
-        val stop = if (lhs.isInnerControl) { lhs.II + 1} else { lhs.II } // I think innerpipes need one extra delay because of logic inside sm
-        emit(src"""${lhs}_IICtr.io.input.stop := ${stop}.toInt.S""")
-        emit(src"""${lhs}_IICtr.io.input.reset := accelReset | ${DL(swap(lhs, IIDone), 1, true)}""")  
-        emit(src"""${lhs}_IICtr.io.input.saturate := false.B""")       
-      }
+      emitIICounter(lhs)
       // emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B // Maybe this should handled differently""")
 
       emit("// Emitting action")
@@ -662,53 +635,92 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   override def emitFooter(): Unit = {
-    enterAccel()
-    if (cfg.compressWires >= 1) {
+    inAccel{
+      if (cfg.compressWires >= 1) {
+        inGenn(out, "GlobalModules", ext) {
+          emitt(src"val ic = List.fill(${instrumentCounters.length*2}){Module(new InstrumentationCounter())}")
+        }
+      }
+
+      emitGlobalWire(s"val max_latency = $maxretime")
+
       inGenn(out, "GlobalModules", ext) {
-        emitt(src"val ic = List.fill(${instrumentCounters.length*2}){Module(new InstrumentationCounter())}")
+        emitt(src"val breakpt_activators = List.fill(${earlyExits.length}){Wire(Bool())}")
       }
-    }
 
-    emitGlobalWire(s"val max_latency = $maxretime")
-
-    inGenn(out, "GlobalModules", ext) {
-      emitt(src"val breakpt_activators = List.fill(${earlyExits.length}){Wire(Bool())}")
-    }
-
-    inGen(out, "Instantiator.scala") {
-      emit ("")
-      emit ("// Instrumentation")
-      emit (s"val numArgOuts_instr = ${instrumentCounters.length*2}")
-      instrumentCounters.zipWithIndex.foreach { case(p,i) =>
-        val depth = " "*p._2
-        emit (src"""// ${depth}${quote(p._1)}""")
+      inGen(out, "Instantiator.scala") {
+        emit ("")
+        emit ("// Instrumentation")
+        emit (s"val numArgOuts_instr = ${instrumentCounters.length*2}")
+        instrumentCounters.zipWithIndex.foreach { case(p,i) =>
+          val depth = " "*p._2
+          emit (src"""// ${depth}${quote(p._1)}""")
+        }
+        emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
+        emit ("""/* Breakpoint Contexts:""")
+        earlyExits.zipWithIndex.foreach {case (p,i) => 
+          createBreakpoint(p, i)
+          emit (s"breakpoint ${i}: ${p.ctx}")
+        }
+        emit ("""*/""")
       }
-      emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
-      emit ("""/* Breakpoint Contexts:""")
-      earlyExits.zipWithIndex.foreach {case (p,i) => 
-        createBreakpoint(p, i)
-        emit (s"breakpoint ${i}: ${p.ctx}")
+
+      inGenn(out, "IOModule", ext) {
+        emit (src"// Root controller for app: ${config.name}")
+        // emit (src"// Complete config: ${config.printer()}")
+        // emit (src"// Complete cfg: ${cfg.printer()}")
+        emit ("")
+        emit (src"// Widths: ${widthStats.sorted}")
+        emit (src"//   Widest Outer Controller: ${if (widthStats.length == 0) 0 else widthStats.max}")
+        emit (src"// Depths: ${depthStats.sorted}")
+        emit (src"//   Deepest Inner Controller: ${if (depthStats.length == 0) 0 else depthStats.max}")
+        emit (s"// App Characteristics: ${appPropertyStats.toList.map(_.getClass.getName.split("\\$").last.split("\\.").last).mkString(",")}")
+        emit ("// Instrumentation")
+        emit (s"val io_numArgOuts_instr = ${instrumentCounters.length*2}")
+        emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
+
+        // emit("""// Set Build Info""")
+        // val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
+        // if (config.multifile == 5 || config.multifile == 6) {
+        //   pipeRtMap.groupBy(_._1._1).map{x => 
+        //     val listBuilder = x._2.toList.sortBy(_._1._2).map(_._2)
+        //     emit(src"val ${listHandle(x._1)}_rtmap = List(${listBuilder.mkString(",")})")
+        //   }
+        //   // TODO: Make the things below more efficient
+        //   compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
+        //     if (wire == "_retime") {
+        //       emit(src"val ${listHandle(wire)} = List[Int](${retimeList.mkString(",")})")  
+        //     }
+        //   }
+        //   compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
+        //     if (wire == "_retime") {
+        //     } else if (wire.contains("pipe(") || wire.contains("inner(")) {
+        //       val numel = compressorMap.filter(_._2._1 == wire).size
+        //       emit(src"val ${listHandle(wire)} = List.tabulate(${numel}){i => ${wire.replace("))", src",retime=${listHandle("_retime")}(${listHandle(wire)}_rtmap(i))))")}}")
+        //     } else {
+        //       val numel = compressorMap.filter(_._2._1 == wire).size
+        //       emit(src"val ${listHandle(wire)} = List.fill(${numel}){${wire}}")            
+        //     }
+        //   }
+        // }
+
+        emit(s"Utils.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
+        emit(s"Utils.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
+        emit(s"Utils.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
+        emit(s"Utils.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
+        emit(s"Utils.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
+        emit(s"Utils.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
+        // emit(s"Utils.tight_control   = ${spatialConfig.enableTightControl}")
+        emit(s"Utils.mux_latency    = ${latencyOption("Mux", None)}.toInt")
+        emit(s"Utils.sramload_latency    = ${latencyOption("SRAMLoad", None)}.toInt")
+        emit(s"Utils.sramstore_latency    = ${latencyOption("SRAMStore", None)}.toInt")
+        emit(s"Utils.SramThreshold = 4")
+        // emit(s"""Utils.target = ${trgt}""")
+        emit(s"""Utils.retime = ${cfg.enableRetiming}""")
+
       }
-      emit ("""*/""")
-    }
-
-    inGenn(out, "IOModule", ext) {
-      emitt(src"// Root controller for app: ${config.name}")
-      // emitt(src"// Complete config: ${config.printer()}")
-      // emitt(src"// Complete cfg: ${cfg.printer()}")
-      emitt("")
-      emitt(src"// Widths: ${widthStats.sorted}")
-      emitt(src"//   Widest Outer Controller: ${if (widthStats.length == 0) 0 else widthStats.max}")
-      emitt(src"// Depths: ${depthStats.sorted}")
-      emitt(src"//   Deepest Inner Controller: ${if (depthStats.length == 0) 0 else depthStats.max}")
-      emitt(s"// App Characteristics: ${appPropertyStats.toList.map(_.getClass.getName.split("\\$").last.split("\\.").last).mkString(",")}")
-      emitt("// Instrumentation")
-      emitt(s"val io_numArgOuts_instr = ${instrumentCounters.length*2}")
-      emitt(s"val io_numArgOuts_breakpts = ${earlyExits.length}")
 
     }
-
-    exitAccel()
     super.emitFooter()
   }
 

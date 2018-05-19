@@ -9,7 +9,7 @@ import argon._
   * Setter:  sym.reduceCycle = (Seq[ Sym[_] ])
   * Default: Nil
   */
-case class ReduceCycle(x: Seq[Sym[_]]) extends FlowData[ReduceCycle]
+case class ReduceCycle(x: Seq[Sym[_]]) extends Data[ReduceCycle](Transfer.Remove)
 
 
 /** The delay of the given symbol from the start of its parent controller.
@@ -18,7 +18,7 @@ case class ReduceCycle(x: Seq[Sym[_]]) extends FlowData[ReduceCycle]
   * Setter:  sym.fullDelay = (Double)
   * Default: 0.0
   */
-case class FullDelay(latency: Double) extends StableData[FullDelay]
+case class FullDelay(latency: Double) extends Data[FullDelay](Transfer.Mirror)
 
 
 trait RetimingData {

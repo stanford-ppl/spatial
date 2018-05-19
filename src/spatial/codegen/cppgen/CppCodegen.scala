@@ -2,8 +2,9 @@ package spatial.codegen.cppgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
+import spatial.traversal.AccelTraversal
 
-trait CppCodegen extends FileDependencies  {
+trait CppCodegen extends FileDependencies with AccelTraversal  {
   override val lang: String = "cpp"
   override val ext: String = "cpp"
   override def entryFile: String = s"TopHost.$ext"
@@ -26,10 +27,10 @@ trait CppCodegen extends FileDependencies  {
     dependencies ::= DirDep(cppResourcesPath, "fringeSW")
     dependencies ::= DirDep(cppResourcesPath, "fringeZynq")
     dependencies ::= DirDep(cppResourcesPath, "fringeZCU")
-    dependencies ::= DirDep(cppResourcesPath, "fringeArria10")
-    dependencies ::= DirDep(cppResourcesPath, "fringeDE1SoC")
+    // dependencies ::= DirDep(cppResourcesPath, "fringeArria10")
+    // dependencies ::= DirDep(cppResourcesPath, "fringeDE1SoC")
     dependencies ::= DirDep(cppResourcesPath, "fringeVCS")
-    dependencies ::= DirDep(cppResourcesPath, "fringeXSIM")
+    // dependencies ::= DirDep(cppResourcesPath, "fringeXSIM")
     dependencies ::= DirDep(cppResourcesPath, "fringeAWS")
 
 

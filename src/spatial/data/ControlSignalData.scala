@@ -11,7 +11,7 @@ case class PortMap(memId: Int, argInId: Int, argOutId: Int)
   * Setter:  sym.listensTo = (List[StreamInfo])
   * Default: Nil
   */
-case class ListenStreams(listen: List[StreamInfo]) extends AnalysisData[ListenStreams]
+case class ListenStreams(listen: List[StreamInfo]) extends Data[ListenStreams](Transfer.Remove)
 
 
 /** List of fifos or streams pushed in a given controller, for handling streampipe control flow.
@@ -20,7 +20,7 @@ case class ListenStreams(listen: List[StreamInfo]) extends AnalysisData[ListenSt
   * Setter:  sym.pushesTo = (List[StreamInfo])
   * Default: Nil
   */
-case class PushStreams(push: List[StreamInfo]) extends AnalysisData[PushStreams]
+case class PushStreams(push: List[StreamInfo]) extends Data[PushStreams](Transfer.Remove)
 
 
 /** List of fifos or streams popped in a given controller, for handling streampipe control flow.
@@ -29,7 +29,7 @@ case class PushStreams(push: List[StreamInfo]) extends AnalysisData[PushStreams]
   * Setter:  sym.isAligned = (true | false)
   * Default: false
   */
-case class AlignedTransfer(is: Boolean) extends StableData[AlignedTransfer]
+case class AlignedTransfer(is: Boolean) extends Data[AlignedTransfer](Transfer.Mirror)
 
 
 /** Map for tracking which control nodes are the tile transfer nodes for a given memory, since this
@@ -39,7 +39,7 @@ case class AlignedTransfer(is: Boolean) extends StableData[AlignedTransfer]
   * Setter:  sym.loadCtrl = (List[ Sym[_] ])
   * Default: Nil
   **/
-case class LoadMemCtrl(ctrl: List[Sym[_]]) extends AnalysisData[LoadMemCtrl]
+case class LoadMemCtrl(ctrl: List[Sym[_]]) extends Data[LoadMemCtrl](Transfer.Remove)
 
 
 /** TODO: Update description
@@ -48,7 +48,7 @@ case class LoadMemCtrl(ctrl: List[Sym[_]]) extends AnalysisData[LoadMemCtrl]
   * Setter:  sym.argMapping = (PortMap)
   * Default: PortMap(-1,-1,-1)
   */
-case class ArgMap(map: PortMap) extends StableData[ArgMap]
+case class ArgMap(map: PortMap) extends Data[ArgMap](Transfer.Mirror)
 
 
 /** Fringe that the StreamIn or StreamOut is associated with.
@@ -57,7 +57,7 @@ case class ArgMap(map: PortMap) extends StableData[ArgMap]
   * Setter:  sym.setFringe(_ : Sym[_])
   * Default: undefined
   */
-case class Fringe(fringe: Sym[_]) extends AnalysisData[Fringe]
+case class Fringe(fringe: Sym[_]) extends Data[Fringe](SetBy.Analysis.Consumer)
 
 
 

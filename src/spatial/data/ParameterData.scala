@@ -10,7 +10,7 @@ import spatial.lang._
   * Setter:  sym.paramDomain = (min,step,max)
   * Default: min=1, max=1, step=1
   */
-case class ParamDomain(min: Int, step: Int, max: Int) extends StableData[ParamDomain]
+case class ParamDomain(min: Int, step: Int, max: Int) extends Data[ParamDomain](SetBy.User)
 
 
 trait ParameterData {

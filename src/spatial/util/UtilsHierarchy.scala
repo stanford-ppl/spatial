@@ -26,6 +26,11 @@ trait UtilsHierarchy {
 
     def isUnitPipe: Boolean = op.isInstanceOf[UnitPipe]
 
+    def isMemReduce: Boolean = op match {
+      case _:OpMemReduce[_,_] => true
+      case _ => false
+    }
+
     def isStreamLoad: Boolean = op match {
       case _:FringeDenseLoad[_,_] => true
       case _ => false
@@ -84,6 +89,8 @@ trait UtilsHierarchy {
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
+
+    def isMemReduce: Boolean = op.exists(_.isMemReduce)
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)

@@ -2,8 +2,6 @@ package spatial.tests.feature.vectors
 
 import spatial.dsl._
 
-
-
 @test class TwiddlingWithStructs extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 

@@ -9,8 +9,9 @@ import emul.FixedPoint
 import spatial.lang._
 import spatial.node._
 import emul.Bool
+import spatial.traversal.AccelTraversal
 
-trait ChiselCodegen extends NamedCodegen with FileDependencies {
+trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTraversal {
   override val lang: String = "chisel"
   override val ext: String = "scala"
   override def entryFile: String = s"RootController_1.$ext"
@@ -42,10 +43,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    enterAccel()
-    inGenn(out, "RootController", ext) {
-      exitAccel()
-      visitBlock(b)
+    inGenn(out, "RootController", ext, forceful=true) {
+      outsideAccel{
+        visitBlock(b)
+      }
     }
     // if (withReturn) emitt(src"${b.result}")
   }
@@ -216,7 +217,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
   }
 
   final protected def inSubGen[A](name: String, parent: String)(body: => A): Unit = { // Places body inside its own trait file and includes it at the end
-    val prnts = if (scope == "accel") List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"}.mkString(" with ") else ""
+    val prnts = if (inHw) List.tabulate(streamExtensions(parent)){i => src"${parent}_${i+1}"}.mkString(" with ") else ""
     emitt(src"// Creating sub kernel ${name}_1")
     inGenn(out, name, ext) {
       startFile()
@@ -238,9 +239,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     ()
   }
 
-  final protected def inGenn[T](out: String, base: String, ext: String)(blk: => T): Unit = {
+  final protected def inGenn[T](out: String, base: String, ext: String, forceful: Boolean = false)(blk: => T): Unit = {
     // Lookup current split extension and number of lines
-    if (scope == "accel") {
+    if (inHw | forceful) {
       if (!streamExtensions.contains(base)) streamExtensions += base -> 1
       val currentOverflow = s"_${streamExtensions(base)}"
       if (!streamLines.contains(base + currentOverflow + "." + ext)) streamLines += {base + currentOverflow + "." + ext} -> 0
@@ -416,13 +417,12 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies {
     dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
     dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
     dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
+    // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
     // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
     dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
+    // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
     dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
+    // dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
     dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
 
     dependencies ::= FileDep(resourcesPath, "Top.scala", outputPath = Some("Top.scala"))

@@ -44,7 +44,7 @@ case object OtherReduction extends ReduceFunction
   * Setter:  sym.accumType = (AccumType)
   * Default: AccumType.None
   */
-case class Accumulator(tp: AccumType) extends StableData[Accumulator]
+case class Accumulator(tp: AccumType) extends Data[Accumulator](SetBy.Flow.Consumer)
 
 
 /** TODO: Update description
@@ -52,7 +52,7 @@ case class Accumulator(tp: AccumType) extends StableData[Accumulator]
   * Setter:  sym.reduceType = (ReduceFunction | Option[ReduceFunction])
   * Default: None
   */
-case class ReduceType(func: ReduceFunction) extends StableData[ReduceType]
+case class ReduceType(func: ReduceFunction) extends Data[ReduceType](SetBy.Analysis.Consumer)
 
 
 trait AccumulatorData {

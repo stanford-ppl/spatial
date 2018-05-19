@@ -100,28 +100,25 @@ class IncDincCtr(inc: Int, dinc: Int, stop: Int, width: Int = 32) extends Module
 
 
 /**
- * RedxnCtr: 1-dimensional counter. Basically a cheap, wrapping for reductions
+ * IICounter: 1-dimensional counter. Basically a cheap, wrapping for reductions
  */
-class RedxnCtr(val width: Int = 32) extends Module {
+class IICounter(val ii: Int, val width: Int = 32) extends Module {
   val io = IO(new Bundle {
     val input = new Bundle {
-      val stop      = Input(SInt((width).W))
       val enable = Input(Bool())
       val reset = Input(Bool())
-      val saturate = Input(Bool())
     }
     val output = new Bundle {
       val done      = Output(Bool())
     }
   })
 
-  val cnt = RegInit(0.S((width).W))
+  val cnt = RegInit((ii-1).S(width.W))
+  val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
 
-  val fudge_stop = io.input.stop + Mux(io.input.stop === 1.S((width).W), 1.S((width).W), 0.S((width).W))
-  val isDone = (cnt + 1.S((width).W) >= (fudge_stop))
-
-  val nextCntUp = Mux(io.input.enable, Mux(cnt + 1.S((width).W) === fudge_stop, Mux(io.input.saturate, cnt, 0.S((width).W)), cnt+1.S((width).W)), cnt)
-  cnt := Mux(io.input.reset, 0.S, nextCntUp)
+  val nextLive = Mux(cnt === 0.S(width.W), (ii-1).S(width.W), cnt-1.S(width.W))
+  val next = Mux(io.input.enable, nextLive, cnt)
+  cnt := Mux(io.input.reset, (ii-1).S(width.W), next)
 
   io.output.done := isDone
 }

@@ -25,7 +25,7 @@ import spatial.dsl._
     Accel {
       val accum = Reg[T](0.to[T])
       val local = SRAM[T](1920)
-      local load v1
+      local load v1(0::N)
       Reduce(accum)(0 until 1920 par 16){i => local(i) }{_+_}
       Pipe { out := accum }
     }

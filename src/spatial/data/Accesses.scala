@@ -10,7 +10,7 @@ import scala.collection.mutable.HashMap
   * Setter:  sym.isUnusedAccess = (true | false)
   * Default: false
   */
-case class UnusedAccess(flag: Boolean) extends StableData[UnusedAccess]
+case class UnusedAccess(flag: Boolean) extends Data[UnusedAccess](SetBy.Analysis.Consumer)
 
 /** Tuple class for holding a user symbol and usage location. */
 case class User(sym: Sym[_], blk: Ctrl)
@@ -21,7 +21,7 @@ case class User(sym: Sym[_], blk: Ctrl)
   * Setter:  sym.users = (Set[User])
   * Default: empty set
   */
-case class Users(users: Set[User]) extends AnalysisData[Users]
+case class Users(users: Set[User]) extends Data[Users](SetBy.Analysis.Consumer)
 
 /** Set of local memory reads which each symbol uses
   * Used to detect accumulation cycles
@@ -30,7 +30,7 @@ case class Users(users: Set[User]) extends AnalysisData[Users]
   * Setter:  sym.readUses
   * Default: empty set
   */
-case class ReadUses(reads: Set[Sym[_]]) extends FlowData[ReadUses]
+case class ReadUses(reads: Set[Sym[_]]) extends Data[ReadUses](SetBy.Flow.Consumer)
 
 
 trait AccessData {

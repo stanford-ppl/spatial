@@ -44,7 +44,7 @@ trait SpatialTest extends Spatial with DSLTest {
     name = "VCS",
     args = "--synth --fpga Zynq",
     make = "make vcs",
-    run  = "bash scripts/regression_run.sh"
+    run  = "bash scripts/regression_run.sh vcs"
   ) {
     override def shouldRun: Boolean = enable("test.VCS")
     override val makeTimeout: Long = 3600
@@ -54,7 +54,7 @@ trait SpatialTest extends Spatial with DSLTest {
     name = "VCS_noretime",
     args = "--synth --noretime",
     make = "make vcs",
-    run  = "bash scripts/regression_run.sh"
+    run  = "bash scripts/regression_run.sh vcs-noretime"
   ) {
     override def shouldRun: Boolean = enable("test.VCS_noretime")
     override val makeTimeout: Long = 3600

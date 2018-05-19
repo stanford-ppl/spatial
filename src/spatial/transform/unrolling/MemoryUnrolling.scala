@@ -49,7 +49,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dbgs(s"Unrolling status ${stm(lhs)}")
     dbgs(s"  on memory $mem -> ${memories((mem,0))}")
     val lhs2s = lanes.map{i =>
-      val lhs2 = isolateSubstWith(mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
+      val lhs2 = isolateWith(escape=Nil, mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
       dbgs(s"  Lane #$i: ${stm(lhs2)}")
       register(lhs -> lhs2)     // Use this duplicate in this lane
       lhs2
@@ -97,7 +97,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val mem = rhs.mem
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
-      isolateSubstWith(mem -> memories(dup)){
+      isolateWith(escape=Nil, mem -> memories(dup)){
         val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
         lhs2
       }
@@ -326,6 +326,9 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileBankedWrite(mem.asInstanceOf[RegFilex[A]], data, bank, ofs, enss)))
     case _:SRAMWrite[_,_]    => UWrite[A](stage(SRAMBankedWrite(mem.asInstanceOf[SRAMx[A]], data, bank, ofs, enss)))
     case _:StreamOutWrite[_] => UWrite[A](stage(StreamOutBankedWrite(mem.asInstanceOf[StreamOut[A]], data, enss)))
+
+    case _:FIFOPeek[_]       => URead(stage(FIFOPeek(mem.asInstanceOf[FIFO[A]], enss.flatten.toSet)))
+    case _:LIFOPeek[_]       => URead(stage(LIFOPeek(mem.asInstanceOf[LIFO[A]], enss.flatten.toSet)))
 
     case _:RegRead[_]        => URead(stage(RegRead(mem.asInstanceOf[Reg[A]])))
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))

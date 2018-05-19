@@ -242,7 +242,7 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   final private def emitIICounter(lhs: Sym[_]): Unit = {
-    if (lhs.II <= 1 | !cfg.enableRetiming) {
+    if (lhs.II <= 1 | !cfg.enableRetiming | lhs.isOuterControl) {
       emitt(src"""${swap(lhs, IIDone)} := true.B""")
     } else {
       emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
@@ -326,7 +326,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = if (cfg.enableRetiming) sym.bodyLatency.sum else 0.0
+    val lat = if (cfg.enableRetiming & sym.isInnerControl) sym.bodyLatency.sum else 0.0
     val ii = sym.II
 
     // Construct controller args

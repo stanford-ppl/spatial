@@ -95,7 +95,7 @@ trait SpatialTest extends Spatial with DSLTest {
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, VCS, AWS, VCS_noretime)
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, VCS_noretime)
 
   protected def checkIR(block: argon.Block[_]): Result = Unknown
 

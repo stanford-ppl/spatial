@@ -7,7 +7,7 @@ import spatial.dsl._
 @test class UniqueParallelLoad extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
-  val dim0 = 144//144
+  val dim0 = 144
   val dim1 = 96
 
 

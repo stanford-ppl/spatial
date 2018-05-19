@@ -47,7 +47,7 @@ import spatial.dsl._
     println("Reduce XOR: ")
     println("  expected: " + gold_reduce_xor)
     println("  result: " + reduce_xor_result)
-    println("Reduce XOR: ")
+    println("Fold XOR: ")
     println("  expected: " + gold_fold_xor)
     println("  result: " + fold_xor_result)
 

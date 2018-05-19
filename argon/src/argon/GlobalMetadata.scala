@@ -17,8 +17,12 @@ class GlobalMetadata {
   def clear[M<:Data[M]:Manifest]: Unit = data.remove(keyOf[M])
 
   def invalidateBeforeTransform(): Unit = {
-    val remove = data.collect{case (k,v) if v.invalidateOnTransform => k }
-    remove.foreach{k => data.remove(k) }
+    val remove = data.filter{case (k,v) => v.transfer match {
+      case Transfer.Ignore => true
+      case Transfer.Remove => true
+      case Transfer.Mirror => false
+    }}
+    remove.foreach{k => data.remove(k._1) }
   }
 
   def copyTo(that: GlobalMetadata): Unit = data.foreach{case (k,v) => that.add(k,v) }

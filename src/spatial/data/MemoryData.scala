@@ -8,7 +8,7 @@ import argon._
   * Setter:  sym.readers = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class Readers(readers: Set[Sym[_]]) extends ConsumerData[Readers]
+case class Readers(readers: Set[Sym[_]]) extends Data[Readers](SetBy.Flow.Consumer)
 
 
 /**
@@ -18,7 +18,7 @@ case class Readers(readers: Set[Sym[_]]) extends ConsumerData[Readers]
   * Setter:  sym.writers = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class Writers(writers: Set[Sym[_]]) extends ConsumerData[Writers]
+case class Writers(writers: Set[Sym[_]]) extends Data[Writers](SetBy.Flow.Consumer)
 
 
 /** Set of resetters for a given memory.
@@ -27,7 +27,7 @@ case class Writers(writers: Set[Sym[_]]) extends ConsumerData[Writers]
   * Setter:  sym.resetters = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class Resetters(resetters: Set[Sym[_]]) extends ConsumerData[Resetters]
+case class Resetters(resetters: Set[Sym[_]]) extends Data[Resetters](SetBy.Flow.Consumer)
 
 
 /** Marks that a memory is never used (and can be removed)
@@ -36,7 +36,7 @@ case class Resetters(resetters: Set[Sym[_]]) extends ConsumerData[Resetters]
   * Setter: sym.isUnusedMemory = (true|false)
   * Default: false
   */
-case class UnusedMemory(flag: Boolean) extends StableData[UnusedMemory]
+case class UnusedMemory(flag: Boolean) extends Data[UnusedMemory](SetBy.Analysis.Consumer)
 
 
 trait MemoryData {

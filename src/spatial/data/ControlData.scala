@@ -30,7 +30,7 @@ case object Looped extends CtrlLooping
   * Setter:  sym.rawLevel = (CtrlLevel)
   * Default: undefined
   */
-case class ControlLevel(level: CtrlLevel) extends StableData[ControlLevel]
+case class ControlLevel(level: CtrlLevel) extends Data[ControlLevel](SetBy.Flow.Self)
 
 /** A counter or counterchain's owning controller.
   *
@@ -38,7 +38,7 @@ case class ControlLevel(level: CtrlLevel) extends StableData[ControlLevel]
   * Setter:  sym.owner = (Sym[_])
   * Default: undefined
   */
-case class CounterOwner(owner: Sym[_]) extends ConsumerData[CounterOwner]
+case class CounterOwner(owner: Sym[_]) extends Data[CounterOwner](SetBy.Flow.Consumer)
 
 
 /** The control schedule determined by the compiler.
@@ -48,7 +48,7 @@ case class CounterOwner(owner: Sym[_]) extends ConsumerData[CounterOwner]
   * Setter:  sym.rawSchedule = (Sched)
   * Default: undefined
   */
-case class ControlSchedule(sched: CtrlSchedule) extends StableData[ControlSchedule]
+case class ControlSchedule(sched: CtrlSchedule) extends Data[ControlSchedule](SetBy.Flow.Self)
 
 
 /** The control schedule annotated by the user, if any.
@@ -58,7 +58,7 @@ case class ControlSchedule(sched: CtrlSchedule) extends StableData[ControlSchedu
   * Setter:  sym.userSchedule = (Sched)
   * Default: undefined
   */
-case class UserScheduleDirective(sched: CtrlSchedule) extends StableData[UserScheduleDirective]
+case class UserScheduleDirective(sched: CtrlSchedule) extends Data[UserScheduleDirective](SetBy.User)
 
 
 /** Metadata holding a list of children within a controller.
@@ -68,7 +68,7 @@ case class UserScheduleDirective(sched: CtrlSchedule) extends StableData[UserSch
   * Setter:  sym.children = (Seq[Controller])
   * Default: Nil
   */
-case class Children(children: Seq[Controller]) extends InputData[Children]
+case class Children(children: Seq[Controller]) extends Data[Children](SetBy.Flow.Self)
 
 /** The controller (Ctrl) parent of a symbol within the controller hierarchy.
   * Operations defined outside Accel always have the Host as their parent.
@@ -80,7 +80,7 @@ case class Children(children: Seq[Controller]) extends InputData[Children]
   * Setter:  sym.parent = (Ctrl)
   * Default: Host
   */
-case class ParentCtrl(parent: Ctrl) extends ConsumerData[ParentCtrl]
+case class ParentCtrl(parent: Ctrl) extends Data[ParentCtrl](SetBy.Flow.Consumer)
 
 
 /** The block a symbol is defined in within the controller hierarchy.
@@ -93,7 +93,7 @@ case class ParentCtrl(parent: Ctrl) extends ConsumerData[ParentCtrl]
   * Setter:  sym.blk = (Ctrl)
   * Default: Host
   */
-case class ParentBlk(blk: Ctrl) extends ConsumerData[ParentBlk]
+case class ParentBlk(blk: Ctrl) extends Data[ParentBlk](SetBy.Flow.Consumer)
 
 
 /** The counter associated with a loop iterator.
@@ -104,7 +104,7 @@ case class ParentBlk(blk: Ctrl) extends ConsumerData[ParentBlk]
   * Setter:  sym.counter = (Counter)
   * Default: undefined
   */
-case class IndexCounter(ctr: Counter[_]) extends ConsumerData[IndexCounter]
+case class IndexCounter(ctr: Counter[_]) extends Data[IndexCounter](SetBy.Flow.Consumer)
 
 
 /** Latency of a given inner pipe body - used for control signal generation.
@@ -113,7 +113,7 @@ case class IndexCounter(ctr: Counter[_]) extends ConsumerData[IndexCounter]
   * Setter:  sym.bodyLatency = (Seq[Double])
   * Default: Nil
   */
-case class BodyLatency(latency: Seq[Double]) extends StableData[BodyLatency]
+case class BodyLatency(latency: Seq[Double]) extends Data[BodyLatency](SetBy.Analysis.Self)
 
 
 /** Initiation interval of a given controller - used for control signal generation.
@@ -122,7 +122,7 @@ case class BodyLatency(latency: Seq[Double]) extends StableData[BodyLatency]
   * Setter:  sym.II = (Double)
   * Default: 1.0
   */
-case class InitiationInterval(interval: Double) extends StableData[InitiationInterval]
+case class InitiationInterval(interval: Double) extends Data[InitiationInterval](SetBy.Analysis.Self)
 
 
 /** User-defined initiation interval of a given controller.
@@ -131,7 +131,7 @@ case class InitiationInterval(interval: Double) extends StableData[InitiationInt
   * Setter:  sym.userII = (Option[Double])
   * Default: None
   */
-case class UserII(interval: Double) extends StableData[UserII]
+case class UserII(interval: Double) extends Data[UserII](SetBy.User)
 
 
 trait ControlData {

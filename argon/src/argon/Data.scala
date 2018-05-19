@@ -5,79 +5,75 @@ import argon.transform.Transformer
 
 import scala.collection.mutable
 
+sealed abstract class SetBy
+object SetBy {
+  /** Metadata is set by the user. */
+  case object User extends SetBy { override def toString: String = "SymData.User" }
+  /** Metadata is set by a @flow rule. */
+  case object Flow {
+    /** Metadata is set by a @flow rule on itself. */
+    case object Self extends SetBy { override def toString: String = "SymData.Flow.Self" }
+    /** Metadata is set by a @flow rule of one of its consumers. */
+    case object Consumer extends SetBy { override def toString: String = "SymData.Flow.Consumer" }
+  }
+  /** Metadata is set by an analysis pass. */
+  case object Analysis {
+    /** Metadata is set by visiting that node in an analysis pass. */
+    case object Self extends SetBy { override def toString: String = "SymData.Analysis.Self" }
+    /** Metadata is set by visiting some consumer in an analysis pass. */
+    case object Consumer extends SetBy { override def toString: String = "SymData.Analysis.Consumer" }
+  }
+}
+object GlobalData {
+  /** Metadata is set by the user. */
+  case object User extends SetBy { override def toString: String = "GlobalData.User" }
+  /** Metadata is set by a @flow. */
+  case object Flow extends SetBy { override def toString: String = "GlobalData.Flow" }
+  /** Metadata is set by an analysis pass. */
+  case object Analysis extends SetBy { override def toString: String = "GlobalData.Analysis" }
+}
+
+object Transfer extends Enumeration {
+  type Transfer = Value
+  val Remove, Ignore, Mirror = Value
+
+  def apply(src: SetBy): Transfer = src match {
+    case SetBy.User          => Mirror
+    case SetBy.Flow.Self     => Ignore
+    case SetBy.Flow.Consumer => Remove
+    case SetBy.Analysis.Self => Mirror
+    case SetBy.Analysis.Consumer => Remove
+    case GlobalData.User       => Ignore
+    case GlobalData.Flow       => Remove
+    case GlobalData.Analysis   => Remove
+  }
+}
+
 /** Any kind of IR graph metadata.
+  * Transfer determines how metadata is transferred across Transformers.
+  *   Ignore - Nothing is explicitly done. Metadata is assumed to be updated by a @flow or else dropped
+  *   Mirror - Metadata is mirrored (using its mirror rule) and explicitly transferred
+  *   Remove - Metadata is dropped (explicitly removed) during symbol transformation
   *
-  * DSL metadata instances should extend either StableData or AnalysisData.
-  * StableData is for values that can persist safely across transformations.
-  * AnalysisData is for any kind of metadata that needs updating during or after transformation.
+  * For consistency, global analysis data is dropped before transformers are run if it is Mirror or Remove.
   *
-  * For consistency, global analysis data is dropped before transformers are run.
+  * If you're not sure which one is right, use the SetBy subclasses instead to specify how the
+  * metadata is created.
   */
-sealed abstract class Data[T] { self =>
+abstract class Data[T](val transfer: Transfer.Transfer) { self =>
   final type Tx = Transformer
+
+  type Transfer = Transfer.Transfer
+
+  def this(setBy: SetBy) = this(Transfer(setBy))
 
   /** Defines how to copy metadata during mirroring/updating. */
   def mirror(f: Tx): T = this.asInstanceOf[T]
 
   final def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
-
-  /** Defines how to merge an old instance of this metadata with a mirrored instance.
-    * The old metadata is metadata of this type already on the symbol.
-    */
-  def merge(old: T): Data[T] = self
-  final def merge(old: Data[T]): Data[T] = merge(old.asInstanceOf[T])
-
-  /** If true, metadata is:
-    *   Globals: Invalidated BEFORE transformer runs
-    *   Symbols: Invalidated (dropped) during mirroring / updating.
-    */
-  val invalidateOnTransform: Boolean = false
 }
 
-/** Globals: Persists across transformers (never dropped)
-  * Symbols: Persists across transformers (never dropped)
-  *
-  * Primarily used for metadata which does not include symbols.
-  * Use the merge method to define how to merge old and new instances.
-  */
-abstract class StableData[T] extends Data[T]
-
-/** Metadata based only on node inputs (or functions thereof).
-  * Note that subgraphs are considered node inputs here.
-  *
-  * Metadata is typically set when visiting the node it is defined on.
-  *
-  * Globals: Invalidated (dropped) BEFORE transformation.
-  * Symbols: Invalidated (dropped) during mirroring / updating.
-  *
-  * Primarily used for metadata with symbols.
-  */
-abstract class InputData[T] extends Data[T] {
-  override val invalidateOnTransform: Boolean = false
-}
-
-/** Metadata based on consumers of the node (or functions thereof).
-  * Note that parents of subgraphs are considered node consumers here.
-  *
-  * Metadata is typically set when visiting node(s) that consume the output of that node.
-  *
-  * Globals: Invalidated (dropped) BEFORE transformation.
-  * Symbols: Invalidated (dropped) during mirroring / updating.
-  *
-  * Primarily used for metadata with symbols.
-  */
-abstract class ConsumerData[T] extends Data[T] {
-  override val invalidateOnTransform: Boolean = true
-}
-
-/** Global metadata which needs to be dropped before transformation.
-  *
-  * Globals: Invalidated (dropped) BEFORE transformation.
-  */
-abstract class GlobalData[T] extends Data[T] {
-  override val invalidateOnTransform: Boolean = true
-}
 
 
 /** Shortcuts for metadata */

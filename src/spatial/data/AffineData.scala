@@ -49,7 +49,7 @@ case class AccessMatrix(
   * Setter:  sym.affineMatrices = (Seq[AccessMatrix])
   * Default: Nil (no access matrices)
   */
-case class AffineMatrices(matrices: Seq[AccessMatrix]) extends InputData[AffineMatrices] {
+case class AffineMatrices(matrices: Seq[AccessMatrix]) extends Data[AffineMatrices](Transfer.Remove) {
   override def toString: String = s"AffineMatrices(${matrices.length} matrices)"
 }
 
@@ -61,7 +61,7 @@ case class AffineMatrices(matrices: Seq[AccessMatrix]) extends InputData[AffineM
   * Get/Set: sym.getOrElseUpdateDomain( => ConstraintMatrix[Idx])
   * Default: Empty constraint matrix (no constraints)
   */
-case class Domain(domain: ConstraintMatrix[Idx]) extends InputData[Domain]
+case class Domain(domain: ConstraintMatrix[Idx]) extends Data[Domain](Transfer.Remove)
 
 
 trait AffineData {

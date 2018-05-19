@@ -11,7 +11,7 @@ import scala.collection.mutable.HashMap
   * Getter: hwScopes.all
   * Default: Nil
   */
-case class AccelScopes(scopes: Seq[Controller]) extends GlobalData[AccelScopes]
+case class AccelScopes(scopes: Seq[Controller]) extends Data[AccelScopes](GlobalData.Flow)
 @data object hwScopes {
   def all: Seq[Controller] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)
 }
@@ -22,7 +22,7 @@ case class AccelScopes(scopes: Seq[Controller]) extends GlobalData[AccelScopes]
   * Append:  localMems += (mem)
   * Default: empty set
   */
-case class LocalMemories(memories: Set[Sym[_]]) extends GlobalData[LocalMemories]
+case class LocalMemories(memories: Set[Sym[_]]) extends Data[LocalMemories](GlobalData.Flow)
 @data object localMems {
   def all: Set[Sym[_]] = globals[LocalMemories].map(_.memories).getOrElse(Set.empty)
   def +=(mem: Sym[_]): Unit = globals.add(LocalMemories(localMems.all + mem ))
@@ -38,7 +38,7 @@ case class LocalMemories(memories: Set[Sym[_]]) extends GlobalData[LocalMemories
   * Reset:   pendingUses.reset()
   * Default: Empty map
   */
-case class MPendingUses(nodes: HashMap[Sym[_],Set[Sym[_]]]) extends GlobalData[MPendingUses]
+case class MPendingUses(nodes: HashMap[Sym[_],Set[Sym[_]]]) extends Data[MPendingUses](GlobalData.Analysis)
 @data object pendingUses {
   def all: HashMap[Sym[_],Set[Sym[_]]] = globals[MPendingUses].map(_.nodes).getOrElse(HashMap.empty)
   def apply(x: Sym[_]): Set[Sym[_]] = pendingUses.all.getOrElse(x, Set.empty)
@@ -57,7 +57,7 @@ case class MPendingUses(nodes: HashMap[Sym[_],Set[Sym[_]]]) extends GlobalData[M
   * Default: empty map               --- for entire map
   * Default: "???"                   --- for a single argument index
   */
-case class CLIArgs(map: Map[Int,String]) extends StableData[CLIArgs]
+case class CLIArgs(map: Map[Int,String]) extends Data[CLIArgs](Transfer.Mirror)
 
 @data object CLIArgs {
   def all: Map[Int,String] = globals[CLIArgs].map(_.map).getOrElse(Map.empty)
@@ -90,35 +90,35 @@ case class CLIArgs(map: Map[Int,String]) extends StableData[CLIArgs]
 }
 
 
-case class StreamLoads(ctrls: Set[Sym[_]]) extends GlobalData[StreamLoads]
+case class StreamLoads(ctrls: Set[Sym[_]]) extends Data[StreamLoads](GlobalData.Flow)
 @data object streamLoadCtrls {
   def all: Set[Sym[_]] = globals[StreamLoads].map(_.ctrls).getOrElse(Set.empty)
   def +=(ctrl: Sym[_]): Unit = globals.add(StreamLoads(streamLoadCtrls.all + ctrl))
 }
 
 
-case class TileTransfers(ctrls: Set[Sym[_]]) extends GlobalData[TileTransfers]
+case class TileTransfers(ctrls: Set[Sym[_]]) extends Data[TileTransfers](GlobalData.Flow)
 @data object tileTransferCtrls {
   def all: Set[Sym[_]] = globals[TileTransfers].map(_.ctrls).getOrElse(Set.empty)
   def +=(ctrl: Sym[_]): Unit = globals.add(TileTransfers(tileTransferCtrls.all + ctrl))
 }
 
 
-case class MStreamEnablers(streams: Set[Sym[_]]) extends GlobalData[MStreamEnablers]
+case class MStreamEnablers(streams: Set[Sym[_]]) extends Data[MStreamEnablers](GlobalData.Flow)
 @data object streamEnablers {
   def all: Set[Sym[_]] = globals[MStreamEnablers].map(_.streams).getOrElse(Set.empty)
   def +=(stream: Sym[_]): Unit = globals.add(MStreamEnablers(streamEnablers.all + stream))
 }
 
 
-case class MStreamHolders(streams: Set[Sym[_]]) extends GlobalData[MStreamHolders]
+case class MStreamHolders(streams: Set[Sym[_]]) extends Data[MStreamHolders](GlobalData.Flow)
 @data object streamHolders {
   def all: Set[Sym[_]] = globals[MStreamHolders].map(_.streams).getOrElse(Set.empty)
   def +=(stream: Sym[_]): Unit = globals.add(MStreamHolders(streamHolders.all + stream))
 }
 
 
-case class MStreamParEnqs(ctrls: Set[Sym[_]]) extends GlobalData[MStreamParEnqs]
+case class MStreamParEnqs(ctrls: Set[Sym[_]]) extends Data[MStreamParEnqs](GlobalData.Flow)
 @data object streamParEnqs {
   def all: Set[Sym[_]] = globals[MStreamParEnqs].map(_.ctrls).getOrElse(Set.empty)
   def +=(ctrl: Sym[_]): Unit = globals.add(MStreamParEnqs(streamParEnqs.all + ctrl))

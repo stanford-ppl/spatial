@@ -87,7 +87,7 @@ abstract class PU extends Control[Void] {
 
   def getWdata(): Option[Sym[_]] = {
     wrPath.flatMap { b =>
-      b.stms.find { case s @ Op(_:Data) => true; case _ => false }
+      b.stms.find { case s @ Op(_:DataWire) => true; case _ => false }
     }
   }
 

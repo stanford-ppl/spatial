@@ -22,5 +22,5 @@ object ICBus {
 @op case class ReadIn[A:Bits](bus: In[A]) extends Primitive[A]
 @op case class WriteOut[A:Bits,B:Bits](bus: Out[A], b: Bits[B]) extends Primitive[Void]
 
-@op case class Addr(addr: I32) extends Primitive[Void]
-@op case class Data(data: Bits[_]) extends Primitive[Void]
+@op case class AddrWire(addr: I32) extends Primitive[Void]
+@op case class DataWire(data: Bits[_]) extends Primitive[Void]

@@ -113,10 +113,11 @@ import scala.collection.mutable
       dest.prevNames = (state.paddedPass(state.pass - 1), s"$src") +: src.prevNames
     }
 
-    metadata.all(src).toList.foreach{case (k,m) =>
-      if (!m.invalidateOnTransform) metadata.add(dest, k, mirror(m))
-      else metadata.remove(dest, k)
-    }
+    metadata.all(src).toList.foreach{case (k,m) => m.transfer match {
+      case Transfer.Ignore => // Do nothing
+      case Transfer.Mirror => metadata.add(dest, k, mirror(m))
+      case Transfer.Remove => metadata.remove(dest, k)
+    }}
   }
 
   final protected def transferMetadataIfNew[A](lhs: Sym[A])(tx: => Sym[A]): (Sym[A], Boolean) = {
@@ -132,10 +133,7 @@ import scala.collection.mutable
     else (lhs2, false)
   }
 
-  final def mirror[M](m: Data[M]): Data[M] = {
-    val m2 = m.mirror(f).asInstanceOf[Data[M]]
-    m2.merge(m)
-  }
+  final def mirror[M](m: Data[M]): Data[M] = m.mirror(f).asInstanceOf[Data[M]]
 
 
   final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {

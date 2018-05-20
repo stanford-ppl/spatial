@@ -72,7 +72,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth --fgpa ZCU",
+    args = "--synth --fpga ZCU",
     make = "make zcu",
     run  = "bash scripts/scrape.sh ZCU"
   ) {

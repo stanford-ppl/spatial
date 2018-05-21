@@ -250,32 +250,30 @@ trait ChiselGenCommon extends ChiselCodegen {
       // If we are inside a stream pipe, the following may be set
       // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
 
-      // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
-      val lat = 0 //bodyLatency.sum(c) // FIXME
-      val readiers = getReadStreams(c.toCtrl).map{
-        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          fifo.readers.head match {
-            case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-          }
-        // case fifo @ Op(FILONew(size)) => src"${DL(src"~$fifo.io.empty", lat + 1, true)}"
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-        case fifo => src"${fifo}_en" // parent node
-      }.filter(_ != "").mkString(" & ")
+      if (c.hasStreamAncestor) {
+        // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
+        val lat = c.bodyLatency.sum
+        val readsFrom = getReadStreams(c.toCtrl).map{
+          case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+            fifo.readers.head match {
+              // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+              case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+              case Op(FIFOPeek(_,_)) => src""
+            }
+          case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+        }
 
-      val holders = getWriteStreams(c.toCtrl).map{
-        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          fifo.writers.head match {
-            case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-          }
-        case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-        // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
-      }.filter(_ != "").mkString(" & ")
+        val writesTo = getWriteStreams(c.toCtrl).map{
+          case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+            fifo.writers.head match {
+              case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+            }
+          case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
+          // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
+        }
 
-      val hasHolders = if (holders != "") "&" else ""
-      val hasReadiers = if (readiers != "") "&" else ""
-
-      src"${hasHolders} ${holders} ${hasReadiers} ${readiers}"
-
+        {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
+      } else {""}
   }
 
   def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
@@ -365,45 +363,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
-  // Stream helpers
-  // def getStreamEnablers(c: Sym[Any]): String = {
-  //     // If we are inside a stream pipe, the following may be set
-  //     // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
-  //     val lat = bodyLatency.sum(c)
-  //     val readiers = listensTo(c).distinct.map{ pt => pt.memory match {
-  //       case fifo @ Def(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         pt.access match {
-  //           case Def(FIFODeq(_,en)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(pt.access,List(en))})"
-  //           case Def(ParFIFODeq(_,ens)) => src"""(${DL(src"~$fifo.io.empty", lat+1, true)} | ~(${remappedEns(pt.access, ens.toList)}))"""
-  //         }
-  //       case fifo @ Def(FILONew(size)) => src"${DL(src"~$fifo.io.empty", lat + 1, true)}"
-  //       case fifo @ Def(StreamInNew(bus)) => bus match {
-  //         case SliderSwitch => ""
-  //         case _ => src"${swap(fifo, Valid)}"
-  //       }
-  //       case fifo => src"${fifo}_en" // parent node
-  //     }}.filter(_ != "").mkString(" & ")
-  //     val holders = pushesTo(c).distinct.map { pt => pt.memory match {
-  //       case fifo @ Def(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         pt.access match {
-  //           case Def(FIFOEnq(_,_,en)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(pt.access,List(en))})"
-  //           case Def(ParFIFOEnq(_,_,ens)) => src"""(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~(${remappedEns(pt.access, ens.toList)}))"""
-  //         }
-  //       case fifo @ Def(FILONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         pt.access match {
-  //           case Def(FILOPush(_,_,en)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(pt.access,List(en))})"
-  //           case Def(ParFILOPush(_,_,ens)) => src"""(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~(${remappedEns(pt.access, ens.toList)}))"""
-  //         }
-  //       case fifo @ Def(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-  //       case fifo @ Def(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
-  //     }}.filter(_ != "").mkString(" & ")
-
-  //     val hasHolders = if (holders != "") "&" else ""
-  //     val hasReadiers = if (readiers != "") "&" else ""
-
-  //     src"${hasHolders} ${holders} ${hasReadiers} ${readiers}"
-
-  // }
 
   protected def bitWidth(tp: Type[_]): Int = tp match {
     case FixPtType(s,d,f) => d+f; 

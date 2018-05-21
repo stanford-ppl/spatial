@@ -36,15 +36,15 @@ protected class MemReduceAccum[A,C[T]](
     val strides = acc.steps()
     val ends    = acc.ends()
     val pars    = acc.pars()
-    val ctrsRed = (0 to acc.rank-1).map{i =>
-        Counter[I32](start = starts(i), step = strides(i), end = ends(i), par = pars(i))
+    val ctrsRed = (0 to acc.rank.length-1).map{i =>
+        Counter[I32](start = starts(acc.rank(i)), step = strides(acc.rank(i)), end = ends(acc.rank(i)), par = pars(acc.rank(i)))
       }
     val cchainRed = CounterChain(ctrsRed)
 
-    //logs(s"Creating MemReduce on accumulator of rank ${acc.rank}")
+    //logs(s"Creating MemReduce on accumulator of rank ${acc.rank.length}")
 
     val itersMap = List.fill(domain.length){ boundVar[I32] }
-    val itersRed = List.fill(acc.rank){ boundVar[I32] }
+    val itersRed = List.fill(acc.rank.length){ boundVar[I32] }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")

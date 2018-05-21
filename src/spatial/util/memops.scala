@@ -11,35 +11,35 @@ import utils.implicits.collections._
 object memops {
 
   implicit class AliasOps[A](x: Sym[A]) {
-    def rank: Int = rankOf(x)
+    def rank: Seq[Int] = rankOf(x)
 
     @rig def starts(): Seq[I32] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get starts of sparse alias")
-      Seq.tabulate(rank){i => stage(MemStart(x, i)) }
+      Seq.tabulate(rank.length){i => stage(MemStart(x, rank(i))) }
     }
     @rig def steps(): Seq[I32] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get steps of sparse alias")
-      Seq.tabulate(rank){i => stage(MemStep(x, i)) }
+      Seq.tabulate(rank.length){i => stage(MemStep(x, rank(i))) }
     }
     @rig def ends(): Seq[I32] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get ends of sparse alias")
-      Seq.tabulate(rank){i => stage(MemEnd(x, i)) }
+      Seq.tabulate(rank.length){i => stage(MemEnd(x, rank(i))) }
     }
     @rig def pars(): Seq[I32] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get pars of sparse alias")
-      Seq.tabulate(rank){i => stage(MemPar(x, i)) }
+      Seq.tabulate(rank.length){i => stage(MemPar(x, rank(i))) }
     }
     @rig def lens(): Seq[I32] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get lens of sparse alias")
-      Seq.tabulate(rank){i => stage(MemLen(x, i)) }
+      Seq.tabulate(rank.length){i => stage(MemLen(x, rank(i))) }
     }
     @rig def series(): Seq[Series[I32]] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
-      Seq.tabulate(rank){i =>
-        val start = stage(MemStart(x, i))
-        val end   = stage(MemEnd(x, i))
-        val step  = stage(MemStep(x, i))
-        val par   = stage(MemPar(x, i))
+      Seq.tabulate(rank.length){i =>
+        val start = stage(MemStart(x, rank(i)))
+        val end   = stage(MemEnd(x, rank(i)))
+        val step  = stage(MemStep(x, rank(i)))
+        val par   = stage(MemPar(x, rank(i)))
         Series(start, end, step, par)
       }
     }

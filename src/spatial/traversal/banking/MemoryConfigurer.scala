@@ -14,9 +14,10 @@ import spatial.internal.spatialConfig
 import scala.collection.mutable.ArrayBuffer
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected val rank: Int = rankOf(mem)
+  protected val rank: Int = rankOf(mem).length
   protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
+  // TODO: This may need to be tweaked based on the fix for issue #23
   final val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
   final val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
   val dimGrps: Seq[Seq[Seq[Int]]] = if (rank > 1) Seq(FLAT_BANKS, NEST_BANKS) else Seq(FLAT_BANKS)

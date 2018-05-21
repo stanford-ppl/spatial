@@ -107,8 +107,8 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)
 
-    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank)
-    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank)
+    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank.length)
+    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank.length)
 
     // --- The remaining operations are currently disallowed for SparseAlias:
 

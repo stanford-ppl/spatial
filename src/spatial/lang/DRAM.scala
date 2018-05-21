@@ -14,9 +14,9 @@ abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends
   protected def M3: Type[DRAM3[A]] = implicitly[Type[DRAM3[A]]]
   protected def M4: Type[DRAM4[A]] = implicitly[Type[DRAM4[A]]]
   protected def M5: Type[DRAM5[A]] = implicitly[Type[DRAM5[A]]]
-  def rank: Int
+  def rank: Seq[Int]
   @api def size: I32 = product(dims:_*)
-  @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
+  @api def dims: Seq[I32] = Seq.tabulate(rank.length){d => stage(MemDim(this,rank(d))) }
   @api def dim0: I32 = dims.head
   @api def dim1: I32 = dims.indexOrElse(1, I32(1))
   @api def dim2: I32 = dims.indexOrElse(2, I32(1))
@@ -56,7 +56,7 @@ object DRAM {
 
 /** A 1-dimensional [[DRAM]] with elements of type A. */
 @ref class DRAM1[A:Bits] extends DRAM[A,DRAM1] with Ref[Array[Any],DRAM1[A]] with Mem1[A,DRAM1] {
-  def rank: Int = 1
+  def rank: Seq[Int] = Seq(0)
   @api def length: I32 = dims.head
   @api override def size: I32 = dims.head
 
@@ -98,7 +98,7 @@ object DRAM {
 
 /** A 2-dimensional [[DRAM]] with elements of type A. */
 @ref class DRAM2[A:Bits] extends DRAM[A,DRAM2] with Ref[Array[Any],DRAM2[A]] with Mem2[A,DRAM1,DRAM2] {
-  def rank: Int = 2
+  def rank: Seq[Int] = Seq(0,1)
   @api def rows: I32 = dims.head
   @api def cols: I32 = dim1
 
@@ -111,7 +111,7 @@ object DRAM {
 
 /** A 3-dimensional [[DRAM]] with elements of type A. */
 @ref class DRAM3[A:Bits] extends DRAM[A,DRAM3] with Ref[Array[Any],DRAM3[A]] with Mem3[A,DRAM1,DRAM2,DRAM3] {
-  def rank: Int = 3
+  def rank: Seq[Int] = Seq(0,1,2)
 
   /** Creates a dense, burst transfer from the SRAM3 `data` to this region of main memory. */
   @api def store(data: SRAM3[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
@@ -122,7 +122,7 @@ object DRAM {
 
 /** A 4-dimensional [[DRAM]] with elements of type A. */
 @ref class DRAM4[A:Bits] extends DRAM[A,DRAM4] with Ref[Array[Any],DRAM4[A]] with Mem4[A,DRAM1,DRAM2,DRAM3,DRAM4] {
-  def rank: Int = 4
+  def rank: Seq[Int] = Seq(0,1,2,3)
 
   /** Creates a dense, burst transfer from the SRAM4 `data` to this region of main memory. */
   @api def store(data: SRAM4[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
@@ -130,7 +130,7 @@ object DRAM {
 
 /** A 5-dimensional [[DRAM]] with elements of type A. */
 @ref class DRAM5[A:Bits] extends DRAM[A,DRAM5] with Ref[Array[Any],DRAM5[A]] with Mem5[A,DRAM1,DRAM2,DRAM3,DRAM4,DRAM5] {
-  def rank: Int = 5
+  def rank: Seq[Int] = Seq(0,1,2,3,4)
 
   /** Creates a dense, burst transfer from the SRAM5 `data` to this region of main memory. */
   @api def store(data: SRAM5[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
@@ -138,7 +138,7 @@ object DRAM {
 
 /** A sparse, 1-dimensional region of DRAM with elements of type A. */
 @ref class DRAMSparseTile[A:Bits] extends DRAM[A,DRAMSparseTile] with Ref[Array[Any],DRAMSparseTile[A]] {
-  def rank: Int = 1
+  def rank: Seq[Int] = Seq(0)
 
   /** Creates a sparse transfer from the on-chip `data` to this sparse region of main memory. */
   @api def scatter[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit L: Type[Local[A]]): Void = {

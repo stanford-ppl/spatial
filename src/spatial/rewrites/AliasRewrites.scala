@@ -97,8 +97,8 @@ trait AliasRewrites extends RewriteRules {
   }
 
   @rewrite def mem_rank(op: MemRank): Sym[_] = {
-    case MemRank(Op(alloc: MemAlloc[_,_]))   => I32(alloc.rank)
-    case MemRank(Op(alias: MemAlias[_,_,_])) => I32(alias.rank)
+    case MemRank(Op(alloc: MemAlloc[_,_]))   => I32(alloc.rank.length)
+    case MemRank(Op(alias: MemAlias[_,_,_])) => I32(alias.rank.length)
   }
 
 }

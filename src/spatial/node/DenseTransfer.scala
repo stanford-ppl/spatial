@@ -59,6 +59,7 @@ object DenseTransfer {
 
     val dramOffsets: Seq[I32] = dram.starts()
     val lens: Seq[I32] = dram.lens()
+    println(s"lens of $dram are $lens")
     val dims: Seq[I32] = dram.dims
     val strides: Seq[I32] = dram.steps()
     val pars: Seq[I32] = dram.pars()
@@ -103,7 +104,7 @@ object DenseTransfer {
         dbg(s"$dram => $local: Using aligned load ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         alignedLoad(dramAddr, localAddr)
       case Expect(c) =>
-        dbg(s"$dram => $local: Using unaligned load ($c * ${A.nbits} % ${target.burstSize}* ${c*A.nbits % target.burstSize})")
+        dbg(s"$dram => $local: Using unaligned load ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         unalignedLoad(dramAddr, localAddr)
       case _ =>
         dbg(s"$dram => $local: Using unaligned load (request length is statically unknown ($requestLength))")

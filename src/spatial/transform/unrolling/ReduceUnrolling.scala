@@ -44,7 +44,7 @@ trait ReduceUnrolling extends UnrollingBase {
     val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val rfunc = reduce.toFunction2
 
-    val pipe = stage(UnitPipe(enables ++ ens, stageLambda1(accum){
+    val pipe = stageWithFlow(UnitPipe(enables ++ ens, stageLambda1(accum){
       val foldValid: Option[Bit] = fold.map(_ => Bit(true))
       val valids: () => Seq[Bit] = () => foldValid.toSeq ++ lanes.valids.map{vs => vs.andTree }
       val values: Seq[A] = unroll(func, lanes)
@@ -62,7 +62,7 @@ trait ReduceUnrolling extends UnrollingBase {
         val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
         store.reapply(accum, result)
       }
-    }))
+    })){lhs2 => transferData(lhs,lhs2) }
     dbgs(s"Created unit pipe ${stm(pipe)}")
     pipe
   }
@@ -103,7 +103,7 @@ trait ReduceUnrolling extends UnrollingBase {
       }
     }
 
-    val lhs2 = stage(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs))
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs)){lhs2 => transferData(lhs,lhs2) }
     //accumulatesTo(lhs2) = accum
     dbgs(s"Created reduce ${stm(lhs2)}")
     lhs2

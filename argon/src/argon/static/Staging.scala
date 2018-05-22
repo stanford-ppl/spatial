@@ -3,10 +3,9 @@ package static
 
 import forge.tags._
 import utils.implicits.collections._
-import utils.recursive
 import utils.tags.instrument
 
-@instrument trait Staging { this: Printing =>
+trait Staging { this: Printing =>
   /** Create a checked parameter (implicit state required) */
   @stateful def parameter[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
 
@@ -79,7 +78,6 @@ import utils.tags.instrument
   @rig def rewrite[R](op: Op[R]): Option[R] = state.rewrites.apply(op)(op.R,ctx,state)
   @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = state.flows.apply(sym, op)
 
-
   /** Creates and registers a symbol for the given operation.
     *
     * 0. Check that we are in a valid staging scope.
@@ -126,7 +124,7 @@ import utils.tags.instrument
 
             // 5. Set effects and aliases
             if (!effects.isPure) state.impure :+= Impure(sym,effects)     // Add to list of impure syms
-            if (!effects.isPure) sym.effects = effects                    // Register effects
+            sym.effects = effects                                         // Set effects
             sym.deepAliases = dAliases                                    // Set deep aliases
             sym.shallowAliases = sAliases                                 // Set shallow aliases
             sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases
@@ -189,10 +187,10 @@ import utils.tags.instrument
   }
 
   /** Add the given flow rule(s) for the duration of the given scope. */
-  @stateful def withFlow[A](name: String, flow: Sym[_] => Unit)(scope: => A): A = {
+  @stateful def withFlow[A](name: String, flow: Sym[_] => Unit, prepend: Boolean = false)(scope: => A): A = {
     val rule: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit] = {case (lhs,_,_,_) => flow(lhs) }
     val saveFlows = state.flows.save()
-    state.flows.add(name, rule)
+    if (prepend) state.flows.prepend(name, rule) else state.flows.add(name, rule)
     val result = scope
     state.flows.restore(saveFlows)
     result
@@ -269,7 +267,8 @@ import utils.tags.instrument
 
   final def exps(a: Any*): Set[Sym[_]] = a.flatMap{
     case s: Sym[_] if !s.isType => Seq(s)
-    case b: Block[_]            => exps(b.result, b.effects.antiDeps)
+    case s: Impure              => exps(s.sym)
+    case b: Block[_]            => (b.result +: b.effects.antiDeps.map(_.sym)).filterNot(_.isType)
     case d: Op[_]               => d.expInputs
     case i: Iterator[_]         => i.flatMap(e => exps(e))
     case i: Iterable[_]         => i.flatMap(e => exps(e))
@@ -280,7 +279,8 @@ import utils.tags.instrument
   final def syms(a: Any*): Set[Sym[_]] = a.flatMap{
     case s: Sym[_] if s.isSymbol => Seq(s)
     case s: Sym[_] if s.isBound  => Seq(s)
-    case b: Block[_]             => syms(b.result, b.effects.antiDeps)
+    case s: Impure               => syms(s.sym)
+    case b: Block[_]             => (b.result +: b.effects.antiDeps.map(_.sym)).filter(s => s.isBound || s.isSymbol)
     case d: Op[_]                => d.inputs
     case i: Iterator[_]          => i.flatMap(e => syms(e))
     case i: Iterable[_]          => i.flatMap(e => syms(e))

@@ -18,6 +18,11 @@ class Flows {
 
   lazy val instrument = new Instrument("flows")
 
+  def prepend(name: String, func: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit]): Unit = {
+    rules.prepend((name,func))
+    names += name
+  }
+
   def add(name: String, func: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit]): Unit = {
     rules += ((name,func))
     names += name

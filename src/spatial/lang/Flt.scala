@@ -102,7 +102,7 @@ object FltFmt {
 
   @api override def toText: Text = stage(FltToText(this))
   @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = this.to[Fix[S2,I2,F2]]
-  @rig def __toFlt[M:INT,E:INT]: Flt[M,E] = this.to[Flt[M,E]]
+  @rig def __toFlt[M2:INT,E2:INT]: Flt[M2,E2] = this.to[Flt[M2,E2]]
 }
 
 object Flt {

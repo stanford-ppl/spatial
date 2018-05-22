@@ -138,7 +138,7 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
 
       val reads = conds.zip(mems).map{case (c,mem2) =>
         isolateWith(escape=Nil, mem -> mem2.asInstanceOf[Sym[_]]){
-          transferDataToAllNew(lhs){ stage(op.mirrorEn(f, Set(c))).asInstanceOf[Sym[A]] }
+          stageWithFlow(op.mirrorEn(f, Set(c))){lhs2 => transferData(lhs,lhs2) }.asInstanceOf[Sym[A]]
         }
       }
       implicit val A: Bits[A] = op.R.asInstanceOf[Bits[A]]

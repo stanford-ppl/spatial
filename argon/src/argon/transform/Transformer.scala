@@ -19,7 +19,7 @@ import scala.collection.mutable
   *   Mirror - Create a recursive copy of a value with substitutions
   *   Update - Modify the existing value with substitutions
   */
-@instrument abstract class Transformer extends Pass {
+abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
   /** Helper method for performing substitutions within pattern matching. */
@@ -103,7 +103,6 @@ import scala.collection.mutable
     }
 
     metadata.all(src).toList.foreach{case (k,m) => m.transfer match {
-      case Transfer.Ignore => // Do nothing
       case Transfer.Mirror => metadata.add(dest, k, mirror(m))
       case Transfer.Remove => metadata.remove(dest, k)
     }}
@@ -111,7 +110,7 @@ import scala.collection.mutable
 
   /** Transfers the metadata of src to all symbols created within the given scope. */
   final protected def transferDataToAll[R](src: Sym[_])(scope: => R): R = {
-    withFlow(s"transferDataToAll_$src", {dest => transferData(src, dest) })(scope)
+    withFlow(s"transferDataToAll_$src", {dest => transferData(src, dest) }, prepend = true)(scope)
   }
 
   /** Transfers the metadata of src to dest if dest is "newer" than src.
@@ -131,7 +130,7 @@ import scala.collection.mutable
 
   /** Transfers the metadata of src to all new symbols created within the given scope. */
   final protected def transferDataToAllNew[R](src: Sym[_])(scope: => R): R = {
-    withFlow(s"transferDataToAllNew_$src", {dest => transferDataIfNew(src, dest) })(scope)
+    withFlow(s"transferDataToAllNew_$src", {dest => transferDataIfNew(src, dest) }, prepend = true)(scope)
   }
 
 

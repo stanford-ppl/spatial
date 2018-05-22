@@ -4,7 +4,7 @@ package transform
 import utils.tags.instrument
 
 /** An IR transformation pass which tracks substitutions using a scoped hash map. */
-@instrument abstract class SubstTransformer extends Transformer {
+abstract class SubstTransformer extends Transformer {
   var subst: Map[Sym[_],Sym[_]] = Map.empty
   var blockSubst: Map[Block[_],Block[_]] = Map.empty
 

@@ -18,7 +18,6 @@ class GlobalMetadata {
 
   def invalidateBeforeTransform(): Unit = {
     val remove = data.filter{case (k,v) => v.transfer match {
-      case Transfer.Ignore => true
       case Transfer.Remove => true
       case Transfer.Mirror => false
     }}

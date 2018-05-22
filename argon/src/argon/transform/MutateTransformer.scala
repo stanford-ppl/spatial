@@ -3,7 +3,7 @@ package transform
 
 import utils.tags.instrument
 
-@instrument abstract class MutateTransformer extends ForwardTransformer {
+abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
 
   /** Determines whether the default transform rule is to mirror (copy) or update nodes. */

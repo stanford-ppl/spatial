@@ -33,27 +33,33 @@ object GlobalData {
   case object Analysis extends SetBy { override def toString: String = "GlobalData.Analysis" }
 }
 
+/** Transfer determines how metadata is transferred across Transformers.
+  * Symbol metadata:
+  *   Mirror - Metadata is mirrored (using its mirror rule) and explicitly transferred
+  *   Remove - Metadata is dropped (explicitly removed) during symbol transformation
+  *
+  * Global metadata:
+  *   Mirror - Nothing is explicitly done (metadata is assumed to be stable or  updated explicitly)
+  *   Remove - Metadata is dropped (explicitly removed) prior to transformation
+  */
 object Transfer extends Enumeration {
   type Transfer = Value
-  val Remove, Ignore, Mirror = Value
+  val Remove, Mirror = Value
 
   def apply(src: SetBy): Transfer = src match {
-    case SetBy.User          => Mirror
-    case SetBy.Flow.Self     => Ignore
-    case SetBy.Flow.Consumer => Remove
-    case SetBy.Analysis.Self => Mirror
+    case SetBy.User              => Mirror
+    case SetBy.Flow.Self         => Mirror
+    case SetBy.Flow.Consumer     => Remove
+    case SetBy.Analysis.Self     => Mirror
     case SetBy.Analysis.Consumer => Remove
-    case GlobalData.User       => Ignore
-    case GlobalData.Flow       => Remove
-    case GlobalData.Analysis   => Remove
+    case GlobalData.User         => Mirror
+    case GlobalData.Flow         => Remove
+    case GlobalData.Analysis     => Remove
   }
 }
 
 /** Any kind of IR graph metadata.
-  * Transfer determines how metadata is transferred across Transformers.
-  *   Ignore - Nothing is explicitly done. Metadata is assumed to be updated by a @flow or else dropped
-  *   Mirror - Metadata is mirrored (using its mirror rule) and explicitly transferred
-  *   Remove - Metadata is dropped (explicitly removed) during symbol transformation
+
   *
   * For consistency, global analysis data is dropped before transformers are run if it is Mirror or Remove.
   *

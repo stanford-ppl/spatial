@@ -80,6 +80,8 @@ trait Compiler { self =>
   def runPasses[R](b: Block[R]): Block[R]
 
   final def runPass[R](t: Pass, block: Block[R]): Block[R] = instrument(t.name){
+    if (config.stop > -1 && state.pass >= config.stop) throw EarlyStop(t.name)
+
     val issuesBefore = state.issues
 
     if (config.enMemLog) memWatch.note(t.name)
@@ -123,7 +125,6 @@ trait Compiler { self =>
     files.deleteExts(IR.config.logDir, "log")
 
     val block = stageProgram(args)
-    if (config.enLog) info(s"Symbols: ${IR.maxId}")
     val result = runPasses(block)
     postprocess(result)
   }
@@ -145,6 +146,10 @@ trait Compiler { self =>
     cli.opt[Unit]("nonaming").action{(_,_) => config.naming = false }.text("Disable verbose naming")
 
     cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.").hidden()
+    cli.opt[Int]("stop").action{(i,_) =>
+      config.stop = i
+      warn(s"Compiler will stop after pass $i")
+    }.text("Stop compilation at the given compiler pass.").hidden()
     cli.help("X").hidden()
   }
 
@@ -243,6 +248,7 @@ trait Compiler { self =>
         stream.println("\n")
         i.dumpAllInstrument(stream)
         stream.println("\n")
+        stream.close()
 
         info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
         i.resetInstrument()
@@ -253,6 +259,16 @@ trait Compiler { self =>
       IR.flows.instrument.dump(heading,stream)
       stream.println("\n")
       IR.flows.instrument.dumpAll(stream)
+      stream.close()
+
+
+      OutlierFinder.set.foreach{f =>
+        val log = f.finderName + ".log"
+        val stream = getOrCreateStream(config.logDir, log)
+        f.report(stream)
+        stream.close()
+        info(s"Outlier profiling results for ${f.finderName} dumped to ${config.logDir}$log")
+      }
     }
 
     val time = instrument.totalTime

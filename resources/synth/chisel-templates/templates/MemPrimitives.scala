@@ -92,10 +92,10 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
         (i.U(addrWidth.W) -> reg)
       }
       val radder = Utils.getRetimed(io.r.ofs,1)
-      io.output.data := MuxLookup(radder, 0.U(bitWidth.W), m)
+      io.output.data := Utils.getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1)
     } else {
       val m = Module(new fringe.SRAM(UInt(bitWidth.W), size, "BRAM"))
-      m.io.raddr     := io.r.ofs
+      m.io.raddr     := Utils.getRetimed(io.r.ofs, 1, io.flow)
       m.io.waddr     := io.w.ofs
       m.io.wen       := io.w.en & wInBound & io.wMask
       m.io.wdata     := io.w.data
@@ -251,10 +251,10 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ mem => 
       val xBarWants = if (xBarCandidates.toList.length > 0) xBarCandidates.map {x => 
-        x.banks.zip(mem._2).map{case (b, coord) => Utils.getRetimed(b, Utils.sramload_latency) === coord.U}.reduce{_&&_} && x.en
+        x.banks.zip(mem._2).map{case (b, coord) => Utils.getRetimed(b, Utils.sramload_latency) === coord.U}.reduce{_&&_} && Utils.getRetimed(x.en, Utils.sramload_latency)
       }.reduce{_||_} else false.B
       val directWants = if (directCandidates.toList.length > 0) directCandidates.map {x => 
-        x.banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && x.en
+        x.banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && Utils.getRetimed(x.en, Utils.sramload_latency)
       }.reduce{_||_} else false.B
       xBarWants || directWants
     }

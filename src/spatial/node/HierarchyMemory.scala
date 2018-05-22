@@ -35,6 +35,7 @@ object MemAlloc {
 abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) extends Alloc[Alias[A]] {
   def mem: Seq[Src[A]]
   def rank: Seq[Int]
+  def rawRank: Seq[Int]
   def mutable: Boolean
   def A: Type[A]
   def Src: Type[Src[A]]
@@ -60,6 +61,7 @@ abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) ext
   extends MemAlias[A,Src,Alias] {
 
   def rank: Seq[Int] = ranges.head.zipWithIndex.collect{case(r,i) if (!r.isUnit) => i}
+  def rawRank: Seq[Int] = Seq.tabulate(ranges.head.length){i => i}
   val mutable = true
 
   override def aliases: Set[Sym[_]] = syms(mem)
@@ -93,6 +95,7 @@ object MemDenseAlias {
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
   def rank: Seq[Int] = Seq(0)
+  def rawRank: Seq[Int] = Seq(0)
   val mutable = true
 
   override def aliases: Set[Sym[_]] = syms(mem)

@@ -28,8 +28,8 @@ trait SpatialVirtualization {
     def infix_finalize(): Unit = lhs.finalize()
   }
 
-  def __valName(init: Any, name: String): Unit = init match {
-    case s: Sym[_] => s.name = Some(name)
+  @stateful def __valName(init: Any, name: String): Unit = init match {
+    case s: Sym[_] if state.isStaging => s.name = Some(name)
     case _ => ()
   }
 

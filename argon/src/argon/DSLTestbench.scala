@@ -9,11 +9,16 @@ import scala.reflect.{ClassTag, classTag}
 trait DSLTestbench extends utils.Testbench { self =>
   def name: String = self.getClass.getName.replace("class ", "").replace('.','/').replace("$","")
   def initConfig(): Config = new Config
-  implicit val IR: State = new State
-  IR.config = initConfig()
-  val cwd = new File(".").getAbsolutePath
-  val logDir = s"$cwd/logs/testbench/$name/"
-  config.logDir = logDir
+  implicit lazy val IR: State = {
+    val state = new State
+    state.config = initConfig()
+    val cwd = new File(".").getAbsolutePath
+    state.config.logDir = s"$cwd/logs/testbench/$name/"
+    state.config.genDir = s"$cwd/gen/testbench/$name/"
+    state.config.repDir = s"$cwd/reports/testbench/$name/"
+    state.newScope(motion=false)  // Start a new scope (allows global declarations)
+    state
+  }
 
   def req[A,B](res: A, gold: B, msg: => String)(implicit ctx: SrcCtx): Unit = {
     if (!(res equals gold)) res shouldBe gold
@@ -30,5 +35,7 @@ trait DSLTestbench extends utils.Testbench { self =>
     val lines = capture.dump.split("\n")
     require(lines.exists{line => line.contains("warn") && line.contains(expect)}, s"$msg. Expected warning $expect")
   }
+
+  s"$name" should "complete without requirement failures" in { true }
 }
 

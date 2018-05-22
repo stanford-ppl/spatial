@@ -86,9 +86,9 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
           Unknown
         }
         catch {
-          case e: Throwable =>
-            onException(e)
-            Error(e)
+          case t: Throwable =>
+            handleException(t)
+            Error(t)
         }
       }}
     }

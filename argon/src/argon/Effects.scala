@@ -2,8 +2,8 @@ package argon
 
 /** The effects summary of a symbol.
   *
-  * Effects metadata is "Flow" since it should never be removed, but we always take the "old"
-  * metadata during merging since this is the one created by staging (not a @flow, but close).
+  * Effects metadata is "Ignore" since it should never be removed, but we always take the "old"
+  * metadata during mirroring since this is always created at staging time.
   *
   * @param unique Should not be CSEd
   * @param sticky Should not be code motioned out of blocks
@@ -25,7 +25,7 @@ case class Effects(
   reads:   Set[Sym[_]] = Set.empty,
   writes:  Set[Sym[_]] = Set.empty,
   antiDeps: Seq[Impure] = Nil
-) extends Data[Effects](SetBy.Flow.Self) {
+) extends Data[Effects](transfer = Transfer.Ignore) {
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(
     unique  = this.unique || that.unique,

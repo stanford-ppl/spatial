@@ -37,14 +37,16 @@ object GlobalData {
   * Symbol metadata:
   *   Mirror - Metadata is mirrored (using its mirror rule) and explicitly transferred
   *   Remove - Metadata is dropped (explicitly removed) during symbol transformation
+  *   Ignore - Nothing is explicitly done (metadata is dropped if not set by some external rule)
   *
   * Global metadata:
   *   Mirror - Nothing is explicitly done (metadata is assumed to be stable or  updated explicitly)
   *   Remove - Metadata is dropped (explicitly removed) prior to transformation
+  *   Ignore - Nothing is explicitly done (metadata is assumed to be stable or  updated explicitly)
   */
 object Transfer extends Enumeration {
   type Transfer = Value
-  val Remove, Mirror = Value
+  val Remove, Mirror, Ignore = Value
 
   def apply(src: SetBy): Transfer = src match {
     case SetBy.User              => Mirror

@@ -1,8 +1,6 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
-
 
 @test class ControlEnable extends SpatialTest {
   override def runtimeArgs: Args = "9"

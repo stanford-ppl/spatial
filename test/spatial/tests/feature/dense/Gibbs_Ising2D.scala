@@ -162,7 +162,7 @@ x_par=4  |       --->       X                XX    |
     println("Found " + blips_inside + " blips inside the bias region and " + blips_outside + " blips outside the bias region")
     val cksum = (blips_inside + blips_outside) < (ROWS*COLS/8)
     println("PASS: " + cksum + " (Gibbs_Ising2D)")
-
+    assert(cksum)
   }
 }
 

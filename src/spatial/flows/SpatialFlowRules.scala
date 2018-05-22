@@ -84,6 +84,11 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
     case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
     case _: Control[_] =>
+      dbgs(s"Determining schedule of $s = $op")
+      dbgs(s"  User Schedule:    ${s.getUserSchedule}")
+      dbgs(s"  Raw Schedule:     ${s.getRawSchedule}")
+      dbgs(s"  Control Level:    ${s.rawLevel}")
+
       (s.getUserSchedule, s.getRawSchedule) match {
         case (Some(s1), None) => s.rawSchedule = s1
         case (_   , Some(s2)) => s.rawSchedule = s2
@@ -91,9 +96,17 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
           val default = if (s.isUnitPipe || s.isAccel) Sequenced else Pipelined
           s.rawSchedule = default
       }
+      dbgs(s"=>")
+      dbgs(s"  Initial Schedule: ${s.rawSchedule}")
+      dbgs(s"  Single Control:   ${s.isSingleControl}")
+      dbgs(s"  # Children:       ${s.children.size}")
+      dbgs(s"  # Childen (Ctrl): ${s.toCtrl.children.size}")
+
       if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
       if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
+
+      dbgs(s"  Final Schedule:   ${s.rawSchedule}")
 
     case _ => // No schedule for non-control nodes
   }
@@ -131,13 +144,6 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case Primitive(_) =>
       if (rhs.expInputs.nonEmpty && rhs.expInputs.forall(_.isGlobal)) lhs.isGlobal = true
       if (rhs.expInputs.nonEmpty && rhs.expInputs.forall(_.isFixedBits)) lhs.isFixedBits = true
-
-      if (rhs.expInputs.isEmpty || rhs.expInputs.exists{in => !in.isFixedBits}) {
-        dbgs(s"$lhs = $rhs [Not fixed: ${rhs.inputs.filterNot(_.isFixedBits).mkString(",")}]")
-      }
-      else {
-        dbgs(s"$lhs = $rhs [Fixed Bits]")
-      }
 
     case _ => // Not global
   }

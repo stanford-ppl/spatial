@@ -22,7 +22,7 @@ trait ScalaGenDRAM extends ScalaGenMemories {
       emit(src"$lhs.initMem($size,$zero)")
 
     case GetDRAMAddress(dram) =>
-      emit(src"val $lhs = 0")
+      emit(src"val $lhs = FixedPoint.fromInt(0)")
 
     case op@SetMem(dram, data) =>
       open(src"val $lhs = {")

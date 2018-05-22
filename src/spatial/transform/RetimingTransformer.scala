@@ -236,8 +236,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         f(body.result)
       }
     }}
-    val cas2 = stage(SwitchCase(caseBody2))
-    transferMetadata(cas, cas2)
+    val cas2 = stageWithFlow(SwitchCase(caseBody2)){cas2 => transferData(cas, cas2) }
     register(cas -> cas2)
   }
 
@@ -261,9 +260,8 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     val switch2 = isolate() {
       registerDelays(switch, selects)
       implicit val ctx: SrcCtx = switch.ctx
-      stage(Switch(f(selects), body2))
+      stageWithFlow(Switch(f(selects), body2)){switch2 => transferData(switch, switch2) }
     }
-    transferMetadata(switch, switch2)
     register(switch -> switch2)
   }
 

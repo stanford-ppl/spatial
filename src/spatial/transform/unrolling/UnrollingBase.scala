@@ -90,7 +90,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   /** Duplicate the given controller based on the global Unroller helper instance lanes. */
   final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A]): List[Sym[_]] = {
     dbgs(s"Duplicating controller $lhs = $rhs")
-    def duplicate() = transferMetadataIfNew(lhs){ unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]] }._1
+    def duplicate(): Sym[A] = transferDataToAllNew(lhs){ unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]] }
     if (lanes.size > 1) {
       val block = stageBlock {
         lanes.foreach{p =>
@@ -122,10 +122,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
 
-  def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = duringMirror{e =>
+  def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = withFlow("inReduce",{e =>
     if (spatialConfig.noInnerLoopUnroll && !isInner) e.reduceType = None
     else e.reduceType = red
-  }{ blk }
+  }){ blk }
 
 
   override protected def inlineBlock[T](block: Block[T]): Sym[T] = {

@@ -58,8 +58,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
           op_case(body2)
         }
       }
-      val switch2: Void = op_switch(selects, cases)
-      transferMetadata(lhs -> switch2)
+      val switch2: Void = transferDataToAllNew(lhs){ op_switch(selects, cases) }
       res match {
         case Some(r) => resRead(r)                    // non-void
         case None    => switch2.asInstanceOf[Sym[A]]  // Void case

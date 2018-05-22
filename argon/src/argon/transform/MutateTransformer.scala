@@ -40,13 +40,9 @@ import utils.tags.instrument
   /** Mutate this symbol's node with the current substitution rules. */
   final def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = if (copyMode) mirror(lhs,rhs) else {
     implicit val ctx: SrcCtx = lhs.ctx
-    //logs(s"$lhs = $rhs [Update]")
     try {
       updateNode(rhs)
-      val lhs2 = restage(lhs)
-      // TODO[5]: Small inefficiency where metadata created through flows is immediately mirrored
-      if (lhs2 == lhs) transferMetadata(lhs -> lhs2)
-      lhs2
+      restageWithFlow(lhs){lhs2 => transferDataIfNew(lhs, lhs2) }
     }
     catch {case t: Throwable =>
       bug("Encountered exception while updating node")

@@ -15,6 +15,6 @@ protected class AccelClass(name: Option[String]) {
   }
 
   @api def apply(scope: => Any): Void = {
-    stageWithData(AccelScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
+    stageWithFlow(AccelScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
   }
 }

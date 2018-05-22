@@ -1,5 +1,5 @@
 val nova_version      = "1.0"
-val scala_version     = "2.12.5"
+val scala_version     = "2.12.6"
 val paradise_version  = "2.1.0"
 val scalatestVersion  = "3.0.5"
 

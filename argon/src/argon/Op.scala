@@ -1,10 +1,8 @@
 package argon
 
 import Freq._
-import Filters._
 import argon.transform.Transformer
 import forge.tags.rig
-import utils.recursive
 
 /** Any staged operation.
   *
@@ -37,7 +35,7 @@ abstract class Op[R:Type] extends Serializable with Product {
 
   // Scopes: scopes associated with this Def
   // Default: All blocks and lambdas in the Def's case class constructor
-  def blocks: Seq[Block[_]] = recursive.collectSeq{case b: Block[_] => b}(productIterator)
+  def blocks: Seq[Block[_]] = collectBlocks(productIterator)
 
   // Binds: symbols "bound" by this Def
   // Bound symbols define the start of scopes. Effectful symbols in a scope typically must be bound.

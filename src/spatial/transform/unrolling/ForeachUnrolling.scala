@@ -43,7 +43,7 @@ trait ForeachUnrolling extends UnrollingBase {
     val is    = lanes.indices
     val vs    = lanes.indexValids
     val blk   = inLanes(lanes){ substituteBlock(func) }
-    val lhs2  = stage(UnrolledForeach(enables ++ ens, cchain, blk, is, vs))
+    val lhs2  = stage   (UnrolledForeach(enables ++ ens, cchain, blk, is, vs))
     dbgs(s"Created foreach ${stm(lhs2)}")
     lhs2
   }

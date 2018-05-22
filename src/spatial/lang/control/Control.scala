@@ -15,7 +15,7 @@ class Directives(options: CtrlOpt) {
 
   @rig protected def unit_pipe(func: => Any, ens: Set[Bit] = Set.empty): Void = {
     val block = stageBlock{ func; void }
-    stageWithData(UnitPipe(Set.empty, block)){pipe => options.set(pipe) }
+    stageWithFlow(UnitPipe(Set.empty, block)){pipe => options.set(pipe) }
   }
 }
 

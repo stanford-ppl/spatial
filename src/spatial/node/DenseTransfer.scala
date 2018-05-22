@@ -63,7 +63,7 @@ object DenseTransfer {
     val dims: Seq[I32] = dram.dims
     val strides: Seq[I32] = dram.steps()
     val pars: Seq[I32] = dram.pars()
-    val counters: Seq[() => Counter[I32]] = lens.zip(pars).map{case (d,p) => () => Counter[I32](start = 0, end = d, par = p) }
+      val counters: Seq[() => Counter[I32]] = lens.zip(pars).map{case (d,p) => () => Counter[I32](start = 0, end = d, par = p) }
 
     val p = pars.last
     val requestLength: I32 = lens.last

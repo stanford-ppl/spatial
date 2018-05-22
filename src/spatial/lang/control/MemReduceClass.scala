@@ -56,7 +56,7 @@ protected class MemReduceAccum[A,C[T]](
     val resLd:  Lambda1[C[A],A] = stageLambda1(mapBlk.result){ C.evMem(mapBlk.result.unbox).__read(itersRed, Set.empty) }
     val accLd:  Lambda1[C[A],A] = stageLambda1(acc){ acc.__read(itersRed, Set.empty) }
     val accSt:  Lambda2[C[A],A,Void] = stageLambda2(acc, redBlk.result){ acc.__write(redBlk.result.unbox,itersRed,Set.empty) }
-    stageWithData(OpMemReduce[A,C](
+    stageWithFlow(OpMemReduce[A,C](
       ens = Set.empty,
       cchainMap,
       cchainRed,

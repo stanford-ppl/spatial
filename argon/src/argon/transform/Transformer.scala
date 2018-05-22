@@ -22,21 +22,6 @@ import scala.collection.mutable
 @instrument abstract class Transformer extends Pass {
   protected val f: Transformer = this
 
-  /** Metadata updating functions - used to add extra rules (primarily for metadata) after mirroring
-    * Applied directly after mirroring
-    */
-  var mirrorFuncs: List[Sym[_] => Unit] = Nil
-
-  def duringMirror[T](func: Sym[_] => Unit)(blk: => T)(implicit ctx: SrcCtx): T = {
-    val saveFuncs = mirrorFuncs
-    mirrorFuncs = mirrorFuncs :+ func   // Innermost is executed last
-
-    val result = blk
-    mirrorFuncs = saveFuncs
-
-    result
-  }
-
   /** Helper method for performing substitutions within pattern matching. */
   object F {
     /** Returns the substitution for the given value. */
@@ -106,8 +91,12 @@ import scala.collection.mutable
   protected def inlineBlock[T](b: Block[T]): Sym[T]
 
 
-  def transferMetadata(srcDest: (Sym[_],Sym[_])): Unit = transferMetadata(srcDest._1, srcDest._2)
-  def transferMetadata(src: Sym[_], dest: Sym[_]): Unit = {
+  /** Explicitly transfer metadata from src to dest.
+    *
+    * Note that this will happen after staging and flow rules if called independently.
+    * Use transferDataToAll to transfer as part of staging before flow rules.
+    */
+  final protected def transferData(src: Sym[_], dest: Sym[_]): Unit = {
     dest.name = src.name
     if (dest != src) {
       dest.prevNames = (state.paddedPass(state.pass - 1), s"$src") +: src.prevNames
@@ -120,20 +109,34 @@ import scala.collection.mutable
     }}
   }
 
-  final protected def transferMetadataIfNew[A](lhs: Sym[A])(tx: => Sym[A]): (Sym[A], Boolean) = {
-    val lhs2 = tx
-    val shouldTransfer = (lhs.rhs.getID,lhs2.rhs.getID) match {
+  /** Transfers the metadata of src to all symbols created within the given scope. */
+  final protected def transferDataToAll[R](src: Sym[_])(scope: => R): R = {
+    withFlow(s"transferDataToAll_$src", {dest => transferData(src, dest) })(scope)
+  }
+
+  /** Transfers the metadata of src to dest if dest is "newer" than src.
+    *
+    * Note that this happens after staging/flows. Use transferDataToAllNew for a flow rule version.
+    */
+  final protected def transferDataIfNew(src: Sym[_], dest: Sym[_]): Unit = {
+    // TODO[5]: Better way to determine "newness" of dest?
+    val shouldTransfer = (src.rhs.getID,dest.rhs.getID) match {
       case (Some(id1),Some(id2)) => id1 <= id2
       case _ => true
     }
     if (shouldTransfer) {
-      transferMetadata(lhs -> lhs2)
-      (lhs2, true)
+      transferData(src, dest)
     }
-    else (lhs2, false)
   }
 
-  final def mirror[M](m: Data[M]): Data[M] = m.mirror(f).asInstanceOf[Data[M]]
+  /** Transfers the metadata of src to all new symbols created within the given scope. */
+  final protected def transferDataToAllNew[R](src: Sym[_])(scope: => R): R = {
+    withFlow(s"transferDataToAllNew_$src", {dest => transferDataIfNew(src, dest) })(scope)
+  }
+
+
+
+  private[argon] def mirror[M](m: Data[M]): Data[M] = m.mirror(f).asInstanceOf[Data[M]]
 
 
   final protected def mirrorSym[A](sym: Sym[A]): Sym[A] = sym match {
@@ -144,21 +147,16 @@ import scala.collection.mutable
   final def mirror[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
     implicit val tA: Type[A] = rhs.R
     implicit val ctx: SrcCtx = lhs.ctx
-    //logs(s"$lhs = $rhs [Mirror]")
-    val (lhs2,isNew) = try {
-      transferMetadataIfNew(lhs){
-        tA.boxed(stage( mirrorNode(rhs) ))
-      }
+    try {
+      tA.boxed(stageWithFlow( mirrorNode(rhs) ){lhs2 => transferDataIfNew(lhs,lhs2) })
     }
     catch {case t: Throwable =>
       bug(s"An error occurred while mirroring $lhs = $rhs")
       throw t
     }
-    if (isNew) mirrorFuncs.foreach{func => func(lhs2) }
-    lhs2
   }
 
-  def mirrorNode[A](rhs: Op[A]): Op[A] = rhs.mirror(f)
+  protected def mirrorNode[A](rhs: Op[A]): Op[A] = rhs.mirror(f)
 
   final def mirrorMirrorable(x: Mirrorable[_]): Mirrorable[_] = {
     x.mirror(f).asInstanceOf[Mirrorable[_]]

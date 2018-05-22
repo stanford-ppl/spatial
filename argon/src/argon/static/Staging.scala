@@ -6,7 +6,7 @@ import utils.implicits.collections._
 import utils.recursive
 import utils.tags.instrument
 
-trait Staging { this: Printing =>
+@instrument trait Staging { this: Printing =>
   /** Create a checked parameter (implicit state required) */
   @stateful def parameter[A<:Sym[A]:Type](c: A#L, checked: Boolean = false): A = Type[A].from(c, checked, isParam = true)
 
@@ -79,69 +79,94 @@ trait Staging { this: Printing =>
   @rig def rewrite[R](op: Op[R]): Option[R] = state.rewrites.apply(op)(op.R,ctx,state)
   @rig def runFlows[A](sym: Sym[A], op: Op[A]): Unit = state.flows.apply(sym, op)
 
-  @rig def register[R](op: Op[R], symbol: () => R, data: Sym[R] => Unit): R = rewrite(op) match {
-    case Some(s) => s
-    case None if state eq null =>
+
+  /** Creates and registers a symbol for the given operation.
+    *
+    * 0. Check that we are in a valid staging scope.
+    * 1. Check for any matching rewrite rules, rewrites the op to some subgraph if possible.
+    * 2. Check for subexpression elimination opportunities. If any exist, uses existing symbol.
+    * 3. Create a new symbol
+    * 4. Add the symbol to the scope, CSE cache
+    * 5. Set the symbol’s effects and aliases, register reverse aliases
+    * 6. Set the consumers metadata (forward edges) for all inputs
+    * 7. Set “immediate” (stageWithMetadata) metadata
+    * 8. Run @flow passes registered with the compiler (more later)
+    * 9. Check for mutable aliases, mutation of immutable values
+    */
+  @rig def register[R](op: Op[R], symbol: () => R, flowImmediate: Sym[R] => Unit): R = {
+    if (state eq null) {
       // General operations in object/trait constructors are currently disallowed
       // because it can mess up namespaces in the output code
-      // TODO[6]: Allow global namespace operations?
+      // TODO[6]: Any cases where we should allow global namespace operations?
       error(ctx, "Only constant declarations are allowed in the global namespace.")
       error(ctx)
       err_[R](op.R, "Invalid declaration in global namespace")
+    }
+    // 1. Attempt to rewrite the operation to a subgraph
+    else rewrite(op) match {
+      case Some(s) => s
+      case None    =>
+        val sAliases = op.shallowAliases
+        val dAliases = op.deepAliases
 
-    case None =>
-      val sAliases = op.shallowAliases
-      val dAliases = op.deepAliases
+        val effects = allEffects(op)
+        val mayCSE = effects.mayCSE
 
-      val effects = allEffects(op)
-      val mayCSE = effects.mayCSE
+        // 2. Check for CSE opportunities
+        state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {
+          case Some(s) if s.tp <:< op.R => s.asInstanceOf[R]  // Use existing symbol
+          case None =>
+            // 3. Create a symbol
+            val lhs = symbol()
+            val sym = op.R.boxed(lhs)
 
-      def stageEffects(addToCache: Boolean): R = {
-        val lhs = symbol()
-        val sym = op.R.boxed(lhs)
+            // 4. Add symbol to scope, CSE cache
+            state.scope :+= sym
+            if (effects.mayCSE)  state.cache += op -> sym                 // Add to CSE cache
 
-        state.scope :+= sym
-        if (effects.mayCSE)  state.cache += op -> sym               // Add to CSE cache
-        if (!effects.isPure) state.impure :+= Impure(sym,effects)   // Add to list of impure syms
-        if (!effects.isPure) sym.effects = effects                  // Register effects
+            // 5. Set effects and aliases
+            if (!effects.isPure) state.impure :+= Impure(sym,effects)     // Add to list of impure syms
+            if (!effects.isPure) sym.effects = effects                    // Register effects
+            sym.deepAliases = dAliases                                    // Set deep aliases
+            sym.shallowAliases = sAliases                                 // Set shallow aliases
+            sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases
 
-        // Register aliases
-        sym.deepAliases = dAliases                                  // Set deep aliases
-        sym.shallowAliases = sAliases                               // Set shallow aliases
+            // 6. Set consumer metadata
+            op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
 
-        op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
-        sym.allAliases.foreach{alias => alias.shallowAliases += sym } // Register reverse aliases
+            // 7. Run immediate (stageWithFlow)
+            flowImmediate(sym)
 
-        data(sym)           // Run immediate staging metadata rules
-        runFlows(sym,op)    // Run flow rules
+            // 8. Run @flow passes
+            runFlows(sym,op)
 
-        if (config.enLog) {
-          val writes = effects.writes.map{s => s"$s [${s.allAliases.mkString(",")}]" }.mkString(", ")
-          logs(s"$lhs = $op")
-          logs(s"  Effects:   $effects")
-          logs(s"  Writes:    $writes")
-          logs(s"  AliasSyms: ${op.aliasSyms}")
-          logs(s"  Deep:      ${op.deepAliases}")
-          logs(s"  Shallow:   ${op.shallowAliases}")
-          logs(s"  Aliases:   ${sym.allAliases}")
+            if (config.enLog) {
+              val writes = effects.writes.map{s => s"$s [${s.allAliases.mkString(",")}]" }.mkString(", ")
+              logs(s"$lhs = $op")
+              logs(s"  Effects:   $effects")
+              logs(s"  Writes:    $writes")
+              logs(s"  AliasSyms: ${op.aliasSyms}")
+              logs(s"  Deep:      ${op.deepAliases}")
+              logs(s"  Shallow:   ${op.shallowAliases}")
+              logs(s"  Aliases:   ${sym.allAliases}")
+            }
+
+            // 9. Check for mutable aliases, mutation of immutable values
+            checkAliases(sym, effects)
+
+            lhs
         }
-
-        checkAliases(sym, effects)
-
-        lhs
-      }
-      state.cache.get(op).filter{s => mayCSE && s.effects == effects} match {
-        case Some(s) if s.tp <:< op.R => s.asInstanceOf[R]
-        case None => stageEffects(addToCache = mayCSE)
-      }
+    }
   }
 
   /** For symbols corresponding to nodes: rewrite and flow rules on the given symbol and
     * add the symbol to the current scope.
     */
-  @rig def restage[R](sym: Sym[R]): Sym[R] = sym match {
+  @rig def restage[R](sym: Sym[R]): Sym[R] = restageWithFlow(sym){_ => ()}
+
+  @rig def restageWithFlow[R](sym: Sym[R])(flow: Sym[R] => Unit): Sym[R] = sym match {
     case Op(rhs) =>
-      val lhs: R = register[R](rhs, () => sym.unbox, {_ => ()})
+      val lhs: R = register[R](rhs, () => sym.unbox, flow)
       sym.tp.boxed(lhs)
     case _ => sym
   }
@@ -159,8 +184,18 @@ trait Staging { this: Printing =>
     * Also compute the effects of the node and adds them to the symbol as metadata and add
     * the symbol to the current scope.
     */
-  @rig def stageWithData[R](op: Op[R])(data: Sym[R] => Unit): R = {
-    register[R](op, () => symbol(op.R,op), {t => t.ctx = ctx; data(t) })
+  @rig def stageWithFlow[R](op: Op[R])(flow: Sym[R] => Unit): R = {
+    register[R](op, () => symbol(op.R,op), {t => t.ctx = ctx; flow(t) })
+  }
+
+  /** Add the given flow rule(s) for the duration of the given scope. */
+  @stateful def withFlow[A](name: String, flow: Sym[_] => Unit)(scope: => A): A = {
+    val rule: PartialFunction[(Sym[_],Op[_],SrcCtx,State),Unit] = {case (lhs,_,_,_) => flow(lhs) }
+    val saveFlows = state.flows.save()
+    state.flows.add(name, rule)
+    val result = scope
+    state.flows.restore(saveFlows)
+    result
   }
 
   /**
@@ -231,4 +266,35 @@ trait Staging { this: Printing =>
       effects.copy(writes = writes)
     }
   }
+
+  final def exps(a: Any*): Set[Sym[_]] = a.flatMap{
+    case s: Sym[_] if !s.isType => Seq(s)
+    case b: Block[_]            => exps(b.result, b.effects.antiDeps)
+    case d: Op[_]               => d.expInputs
+    case i: Iterator[_]         => i.flatMap(e => exps(e))
+    case i: Iterable[_]         => i.flatMap(e => exps(e))
+    case p: Product             => p.productIterator.flatMap(e => exps(e))
+    case _ => Nil
+  }.toSet
+
+  final def syms(a: Any*): Set[Sym[_]] = a.flatMap{
+    case s: Sym[_] if s.isSymbol => Seq(s)
+    case s: Sym[_] if s.isBound  => Seq(s)
+    case b: Block[_]             => syms(b.result, b.effects.antiDeps)
+    case d: Op[_]                => d.inputs
+    case i: Iterator[_]          => i.flatMap(e => syms(e))
+    case i: Iterable[_]          => i.flatMap(e => syms(e))
+    case p: Product              => p.productIterator.flatMap(e => syms(e))
+    case _ => Nil
+  }.toSet
+
+  final def collectBlocks(a: Any*): Seq[Block[_]] = a.flatMap{
+    case b: Block[_]             => Seq(b)
+    case d: Op[_]                => d.blocks
+    case i: Iterator[_]          => i.flatMap(e => collectBlocks(e))
+    case i: Iterable[_]          => i.flatMap(e => collectBlocks(e))
+    case p: Product              => p.productIterator.flatMap(e => collectBlocks(e))
+    case _ => Nil
+  }
+
 }

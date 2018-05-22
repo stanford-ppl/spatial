@@ -88,7 +88,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     if (size <= Utils.SramThreshold) {
       val m = (0 until size).map{ i =>
         val reg = RegInit(0.U(bitWidth.W))
-        reg := Mux(io.w.en & (io.w.ofs === i.U(addrWidth.W)), io.w.data, reg)
+        reg := Mux(io.w.en & (io.w.ofs === i.U(addrWidth.W)) & io.wMask, io.w.data, reg)
         (i.U(addrWidth.W) -> reg)
       }
       val radder = Utils.getRetimed(io.r.ofs,1)

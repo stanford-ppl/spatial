@@ -51,6 +51,12 @@ def getRuntimeCol(wksh, appname):
 		print("ERROR: pygsheets failed getRuntimeCol... -_-")	
 		exit()
 
+def deleteRows(wksh, id):
+	try:
+		wksh.delete_rows(id)
+	except:
+		print("ERROR: pygsheets could not delete row %d" % id)
+
 def getDoc(title):
 	# # gspread auth
 	# json_key = '/home/mattfel/regression/synth/key.json'
@@ -284,7 +290,7 @@ def dev(arg1, arg2, backend):
 		worksheet = sh.worksheet('index', x)
 		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 			worksheet.insert_rows(row = 2, values = [arg1, arg2, t])
-			worksheet.delete_rows(75)
+			deleteRows(worksheet, 75)
 		if (worksheet.title == "Properties" and perf):
 			worksheet.update_cells('B3:DQ3', [[' ']*120]) # Clear old pass bitmask
 	sys.stdout.write(str(3))
@@ -329,7 +335,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			worksheet = sh.worksheet('index', x)
 			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
-				worksheet.delete_rows(75)
+				deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
 				# worksheet.update_cell(id,2, alink)
 				# worksheet.update_cell(id,3, t)
@@ -352,7 +358,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 				worksheet = sh.worksheet('index', x)
 				if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
-					worksheet.delete_rows(75)
+					deleteRows(worksheet, 75)
 					# worksheet.update_cell(id,1, link)
 					# worksheet.update_cell(id,2, alink)
 					# worksheet.update_cell(id,3, t)
@@ -387,7 +393,7 @@ def delete_n_rows(n, ofs, backend):
 		worksheet = sh.worksheet('index', x)
 		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 			for i in range(0,int(n)):
-				worksheet.delete_rows(3 + int(ofs))
+				deleteRows(worksheet, 3 + int(ofs))
 
 
 

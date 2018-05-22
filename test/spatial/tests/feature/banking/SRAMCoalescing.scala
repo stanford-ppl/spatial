@@ -14,7 +14,7 @@ import spatial.dsl._
       Foreach(16 by 1){i =>
         Foreach(16 by 1){j => sram(j) = i*j + 1 }
         val sum = Reduce(0)(16 par 2){j => sram(j) }{_+_}
-        val product = Reduce(1)(16 par 3){j => sram(j) }{_*_}
+        val product = Reduce(1)(16 par 3){j => sram(j) }{_^_}
         out1 := sum
         out2 := product
       }
@@ -22,7 +22,7 @@ import spatial.dsl._
 
     val data = Array.tabulate(16){j => j*15 + 1 }
     val goldSum = data.reduce{_+_}
-    val goldProd = data.reduce{_*_}
+    val goldProd = data.reduce{_^_}
     println(r"goldSum $goldSum =?= ${getArg(out1)}")
     println(r"goldProd $goldProd =?= ${getArg(out2)}")
     assert(getArg(out1) == goldSum)

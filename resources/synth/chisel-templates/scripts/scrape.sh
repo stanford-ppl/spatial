@@ -16,7 +16,8 @@ fi
 hash=`cat ${REGRESSION_HOME}/current-spatial/spatial/hash`
 ahash=`cat ${REGRESSION_HOME}/current-spatial/spatial/ahash`
 
-appname=`basename \`pwd\``
+#appname=`basename \`pwd\``
+appname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`
 if [[ $1 = "Zynq" ]]; then
 	par_util=`pwd`/verilog-zynq/par_utilization.rpt
 	if [[ ! -f ${par_util} ]]; then par_util=`pwd`/verilog-zynq/synth_utilization.rpt; fi

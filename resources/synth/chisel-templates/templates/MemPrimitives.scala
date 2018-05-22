@@ -237,7 +237,7 @@ class SRAM(val logicalDims: List[Int], val bitWidth: Int,
       mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
     }
 
-    mem._1.io.flow := io.flow.reduce{_&_} // TODO: Dangerous but probably works
+    mem._1.io.flow := io.flow.reduce{_|_} // TODO: Dangerous but probably works
   }
 
   // Connect read data to output

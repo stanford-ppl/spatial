@@ -25,7 +25,7 @@ def readAllVals(wksh):
 		print("WARN: pygsheets failed readAllVals... -_-")
 		exit()
 
-def getCol(wksh, appname):
+def getColOrAppend(wksh, appname):
 	try: 
 		lol = readAllVals(wksh)
 		if (appname in lol[0]):
@@ -35,7 +35,19 @@ def getCol(wksh, appname):
 			write(wksh,1,col,appname)	
 		return col
 	except:
-		print("ERROR: pygsheets failed getCol... -_-")	
+		print("ERROR: pygsheets failed getColOrAppend... -_-")	
+		exit()
+
+def getCol(wksh, appname):
+	try: 
+		lol = readAllVals(wksh)
+		if (appname in lol[0]):
+			col=lol[0].index(appname)+1
+		else:
+			col=-1
+		return col
+	except:
+		print("ERROR: pygsheets failed getColOrAppend... -_-")	
 		exit()
 
 def getRuntimeCol(wksh, appname):
@@ -54,6 +66,12 @@ def getRuntimeCol(wksh, appname):
 def deleteRows(wksh, id):
 	try:
 		wksh.delete_rows(id)
+	except:
+		print("ERROR: pygsheets could not delete row %d" % id)
+
+def deleteCols(wksh, id):
+	try:
+		wksh.delete_cols(id)
 	except:
 		print("ERROR: pygsheets could not delete row %d" % id)
 
@@ -164,7 +182,7 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, cs
 	# Page 0 - Timestamps
 	stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 	worksheet = sh.worksheet_by_title('Timestamps')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row,col, stamp)
 
 	# Page 1 - Runtime
@@ -176,7 +194,7 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, cs
 
 	# Page 2 - Properties
 	worksheet = sh.worksheet_by_title('Properties')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row,col,passed)
 	lol = readAllVals(worksheet)
 	for prop in csv.split(","):
@@ -203,7 +221,7 @@ def report_board_runtime(appname, timeout, runtime, passed, args, backend, locke
 
 	# Page 10 - Results
 	worksheet = sh.worksheet_by_title("Runtime")
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	if (timeout == "1"):
 		write(worksheet, row,col, args + "\nTimed Out!\nFAILED")
 	elif (locked_board == "0"):
@@ -220,53 +238,53 @@ def report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time
 	stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 	worksheet = sh.worksheet_by_title('Timestamps')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col, stamp)
 
 	# Page 1 - Slice LUT
 	worksheet = sh.worksheet_by_title(word + ' LUTs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,lut)
 
 	# Page 2 - Slice Reg
 	worksheet = sh.worksheet_by_title(word + ' Regs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,reg)
 
 	# Page 3 - Mem
 	worksheet = sh.worksheet_by_title('BRAMs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,ram)
 
 	if (backend == "AWS"):
 		# Page 4 - URAM
 		worksheet = sh.worksheet_by_title('URAMs')
-		col = getCol(worksheet, appname)
+		col = getColOrAppend(worksheet, appname)
 		write(worksheet,row,col,uram)
 
 	# Page 5 - DSP
 	worksheet = sh.worksheet_by_title('DSPs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,dsp)
 
 	# Page 6 - LUT as Logic
 	worksheet = sh.worksheet_by_title('LUT as Logic')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,lal)
 
 	# Page 7 - LUT as Memory
 	worksheet = sh.worksheet_by_title('LUT as Memory')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,lam)
 
 	# Page 8 - Synth time
 	worksheet = sh.worksheet_by_title('Synth Time')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,float(synth_time) / 3600.)
 
 	# Page 9 - Timing met
 	worksheet = sh.worksheet_by_title('Timing Met')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,timing_met)
 
 	# Tell last update
@@ -385,7 +403,6 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 # ofs = 0 means start deleting from spreadsheet "row 3" and down
 def delete_n_rows(n, ofs, backend):
 	sh = getDoc(backend)
-	perf = isPerf(backend)
 
 	numsheets = len(sh.worksheets())
 	for x in range(0,numsheets):
@@ -394,6 +411,24 @@ def delete_n_rows(n, ofs, backend):
 		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 			for i in range(0,int(n)):
 				deleteRows(worksheet, 3 + int(ofs))
+
+def delete_app_column(appname, backend):
+	sh = getDoc(backend)
+	perf = isPerf(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		# worksheet = sh.get_worksheet(x)
+		worksheet = sh.worksheet('index', x)
+		col = getCol(worksheet, appname)
+		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+			if (col >= 0):
+				deleteCols(worksheet, col)
+				if (perf and worksheet.title == "Runtime"):
+					# Delete the bit column also
+					deleteCols(worksheet, col)
+			else:
+				print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
 
 
 
@@ -414,6 +449,9 @@ elif (sys.argv[1] == "prepare_sheet"):
 elif (sys.argv[1] == "delete_n_rows"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "delete_app_column"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	delete_app_column(sys.argv[2], sys.argv[3])
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3])
@@ -424,6 +462,7 @@ elif (len(sys.argv) == 1 or sys.argv[1] == "-h"):
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - delete_n_rows(n, ofs (0=row 3, 1=row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - delete_app_column(appname, backend (vcs, vcs-noretime, Zynq, etc...))")
 else:
 	print("ERROR: Not a valid spreadsheet interaction! %s" % sys.argv[1])
 	exit()

@@ -258,16 +258,21 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     val stateFSM = Module(new FF(stateWidth))
     val doneReg = Module(new SRFF())
 
+    // With retime turned off (i.e latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
+    val depulser = RegInit(true.B) 
+    if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
+    else depulser := true.B
+
     stateFSM.io.input(0).data := io.nextState.asUInt
     stateFSM.io.input(0).init := io.initState.asUInt
-    stateFSM.io.input(0).en := io.enable
+    stateFSM.io.input(0).en := io.enable & ~depulser
     stateFSM.io.input(0).reset := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data.asSInt
 
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
-    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
+    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & depulser
     io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, io.enable)
 
   }

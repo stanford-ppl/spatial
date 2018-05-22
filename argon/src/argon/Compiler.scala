@@ -206,6 +206,22 @@ trait Compiler { self =>
     def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
   }
 
+  final protected def handleException(t: Throwable): Option[Throwable] = t match {
+    case t: CompilerBugs =>
+      onException(t)
+      Some(t)
+
+    case t @ CompilerErrors(stage,n) =>
+      error(s"${IR.errors} ${plural(n,"error")} found during $stage")
+      Some(t)
+
+    case t: Throwable =>
+      onException(t)
+      val except = UnhandledException(t)
+      except.setStackTrace(t.getStackTrace)
+      Some(except)
+  }
+
   /**
     * The "real" entry point for the application
     */
@@ -215,21 +231,7 @@ trait Compiler { self =>
     try {
       execute(args)
     }
-    catch {
-      case t: CompilerBugs =>
-        onException(t)
-        failure = Some(t)
-
-      case t @ CompilerErrors(stage,n) =>
-        error(s"${IR.errors} ${plural(n,"error")} found during $stage")
-        failure = Some(t)
-
-      case t: Throwable =>
-        onException(t)
-        val except = UnhandledException(t)
-        except.setStackTrace(t.getStackTrace)
-        failure = Some(except)
-    }
+    catch {case t: Throwable => failure = handleException(t) }
 
     checkWarnings()
     val tag = {

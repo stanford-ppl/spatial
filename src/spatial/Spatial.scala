@@ -97,6 +97,8 @@ trait Spatial extends Compiler {
         switchTransformer ==>
         switchOptimizer ==> printer ==>
         blackboxLowering ==> printer ==>
+        switchTransformer ==>                  // Re-run switch lowering after black box lowering
+        switchOptimizer ==> printer ==>
         memoryDealiasing ==> printer ==>
         pipeInserter ==> printer ==>
         useAnalyzer ==> printer ==>

@@ -28,8 +28,8 @@ trait SpatialVirtualization {
     def infix_finalize(): Unit = lhs.finalize()
   }
 
-  def __valName(init: Any, name: String): Unit = init match {
-    case s: Sym[_] => s.name = Some(name)
+  @stateful def __valName(init: Any, name: String): Unit = init match {
+    case s: Sym[_] if state.isStaging => s.name = Some(name)
     case _ => ()
   }
 
@@ -84,11 +84,14 @@ trait SpatialVirtualization {
     ifThenElse(cond, () => { thenBr }, () => { elseBr })
   }
 
-  @rig def ifThenElse[A](cond: Bit, thenBr: () => Sym[A], elseBr: () => Sym[A]): A = {
-    val blkThen = stageBlock{ thenBr() }
-    val blkElse = stageBlock{ elseBr() }
-    implicit val A: Type[A] = blkThen.tp
-    stage(IfThenElse[A](cond,blkThen,blkElse))
+  @rig def ifThenElse[A](cond: Bit, thenBr: () => Sym[A], elseBr: () => Sym[A]): A = cond match {
+    case Literal(true)  => thenBr().unbox
+    case Literal(false) => elseBr().unbox
+    case _ =>
+      val blkThen = stageBlock{ thenBr() }
+      val blkElse = stageBlock{ elseBr() }
+      implicit val A: Type[A] = blkThen.tp
+      stage(IfThenElse[A](cond,blkThen,blkElse))
   }
 
   @rig def __return(expr: Any): Unit = {

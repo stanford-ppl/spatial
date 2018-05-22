@@ -22,6 +22,7 @@ import spatial.lang._
 }
 @op case class VarAssign[A:Type](v: Var[A], x: A) extends Primitive[Void] {
   val A: Type[A] = Type[A]
+  override def effects: Effects = Effects.Writes(v)
   override def aliases = Nul
   override def contains = syms(x)
   override def extracts = syms(v)

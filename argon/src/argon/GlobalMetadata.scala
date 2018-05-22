@@ -20,6 +20,7 @@ class GlobalMetadata {
     val remove = data.filter{case (k,v) => v.transfer match {
       case Transfer.Remove => true
       case Transfer.Mirror => false
+      case Transfer.Ignore => false
     }}
     remove.foreach{k => data.remove(k._1) }
   }

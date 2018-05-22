@@ -25,6 +25,9 @@ import spatial.node._
 
   override def checkIR(block: Block[_]): Result = {
     val regs = block.nestedStms.collect{case s @ Op(_:RegNew[_]) => s}
+
+    regs.foreach{s => Console.out.println(stm(s) + s" (${s.name})")}
+
     val regDuplicates = regs.filter{r => r.name.isDefined && r.name.get.startsWith("reg") }
 
     regDuplicates.length shouldBe 1

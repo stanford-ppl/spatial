@@ -92,7 +92,7 @@ trait Staging { this: Printing =>
     * 9. Check for mutable aliases, mutation of immutable values
     */
   @rig def register[R](op: Op[R], symbol: () => R, flowImmediate: Sym[R] => Unit): R = {
-    if (state eq null) {
+    if ((state eq null) || (state.scope eq null) || (state.impure eq null)) {
       // General operations in object/trait constructors are currently disallowed
       // because it can mess up namespaces in the output code
       // TODO[6]: Any cases where we should allow global namespace operations?
@@ -133,9 +133,11 @@ trait Staging { this: Printing =>
             op.inputs.foreach{in => in.consumers += sym }                 // Register consumed
 
             // 7. Run immediate (stageWithFlow)
+            // (Includes transferring metadata during mirror for transformers)
             flowImmediate(sym)
 
             // 8. Run @flow passes
+            // (First includes transferring metadata during transform)
             runFlows(sym,op)
 
             if (config.enLog) {

@@ -105,6 +105,7 @@ abstract class Transformer extends Pass {
     metadata.all(src).toList.foreach{case (k,m) => m.transfer match {
       case Transfer.Mirror => metadata.add(dest, k, mirror(m))
       case Transfer.Remove => metadata.remove(dest, k)
+      case Transfer.Ignore => // Do nothing
     }}
   }
 

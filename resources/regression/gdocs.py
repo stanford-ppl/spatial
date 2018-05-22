@@ -417,6 +417,13 @@ elif (sys.argv[1] == "delete_n_rows"):
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3])
+elif (len(sys.argv) == 1 or sys.argv[1] == "-h"):
+	print("Commands:")
+	print(" - report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args)")
+	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
+	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
+	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
+	print(" - delete_n_rows(n, ofs (0=row 3, 1=row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
 else:
 	print("ERROR: Not a valid spreadsheet interaction! %s" % sys.argv[1])
 	exit()

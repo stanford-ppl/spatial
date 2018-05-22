@@ -94,7 +94,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
       val radder = Utils.getRetimed(io.r.ofs,1)
       io.output.data := Utils.getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1)
     } else {
-      val m = Module(new fringe.SRAM(UInt(bitWidth.W), size, "BRAM"))
+      val m = Module(new fringe.SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
       m.io.raddr     := Utils.getRetimed(io.r.ofs, 1, io.flow)
       m.io.waddr     := io.w.ofs
       m.io.wen       := io.w.en & wInBound & io.wMask

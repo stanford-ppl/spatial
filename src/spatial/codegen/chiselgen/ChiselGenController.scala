@@ -247,7 +247,7 @@ trait ChiselGenController extends ChiselGenCommon {
     } else {
       emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
       emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ${swap(lhs, CtrTrivial)}""")
-      emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,En)}""")
+      emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,DatapathEn)}""")
       emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
     }
   }
@@ -712,8 +712,8 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(s"Utils.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
         // emit(s"Utils.tight_control   = ${spatialConfig.enableTightControl}")
         emit(s"Utils.mux_latency    = ${latencyOption("Mux", None)}.toInt")
-        emit(s"Utils.sramload_latency    = ${latencyOption("SRAMLoad", None)}.toInt")
-        emit(s"Utils.sramstore_latency    = ${latencyOption("SRAMStore", None)}.toInt")
+        emit(s"Utils.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
+        emit(s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
         emit(s"Utils.SramThreshold = 4")
         // emit(s"""Utils.target = ${trgt}""")
         emit(s"""Utils.retime = ${cfg.enableRetiming}""")

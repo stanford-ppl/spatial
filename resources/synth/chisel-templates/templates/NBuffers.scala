@@ -77,7 +77,6 @@ class NBufMem(val mem: MemPrimitive,
   def this(tuple: (MemPrimitive, List[Int], Int, Int, List[Int], List[Int], NBufXMap, NBufXMap, 
     NBufDMap, NBufDMap, XMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, None, false, 0)
 
-  assert(logicalDims.length == banks.length)
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
   val ofsWidth = Utils.log2Up(depth/banks.product)

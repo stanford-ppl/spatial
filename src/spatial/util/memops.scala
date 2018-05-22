@@ -12,6 +12,7 @@ object memops {
 
   implicit class AliasOps[A](x: Sym[A]) {
     def rank: Seq[Int] = rankOf(x)
+    def rawRank: Seq[Int] = rawRankOf(x)
 
     @rig def starts(): Seq[I32] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get starts of sparse alias")
@@ -33,6 +34,17 @@ object memops {
       if (x.isSparseAlias) throw new Exception(s"Cannot get lens of sparse alias")
       Seq.tabulate(rank.length){i => stage(MemLen(x, rank(i))) }
     }
+
+    @rig def rawStarts(): Seq[I32] = {
+      if (x.isSparseAlias) throw new Exception(s"Cannot get rawStarts of sparse alias")
+      Seq.tabulate(rawRank.length){i => stage(MemStart(x, rawRank(i))) }
+    }
+
+    @rig def rawDims(): Seq[I32] = {
+      if (x.isSparseAlias) throw new Exception(s"Cannot get rawDims of sparse alias")
+      Seq.tabulate(rawRank.length){i => stage(MemDim(x, rawRank(i))) }
+    }
+
     @rig def series(): Seq[Series[I32]] = {
       if (x.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
       Seq.tabulate(rank.length){i =>

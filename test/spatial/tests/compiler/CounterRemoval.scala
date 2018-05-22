@@ -30,15 +30,18 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](16)
+    val x = ArgIn[Int]
+    val y = ArgOut[Int]
+    setArg(x, 15)
     Accel {
       val sram = SRAM[Int](16)
 
       Foreach(16 par 16){i => sram(i) = i }
 
-      dram store sram
+      y := sram(x)
     }
-    val gold = Array.tabulate(16){i => i }
-    assert(getMem(dram) == gold)
+    
+    assert(getArg(y) == 15)
   }
 
 

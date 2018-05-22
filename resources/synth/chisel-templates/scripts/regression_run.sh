@@ -26,7 +26,8 @@ if [[ $GDOCS -eq 1 ]]; then
 	# Hacky go back until $SPATIAL_HOME
 	hash=`git rev-parse HEAD`
 	ahash=nova-spatial
-	appname=`basename \`pwd\``
+	#appname=`basename \`pwd\``
+	appname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`
 	properties=`cat chisel/IOModule.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
 
 	if [[ $1 = "Zynq" ]]; then

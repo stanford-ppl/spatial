@@ -29,23 +29,27 @@ export REGRESSION_HOME="/home/mattfel/regression/synth/$inputarg"
 
 export SPATIAL_HOME=${REGRESSION_HOME}/current-spatial/
 
-rm ${REGRESSION_HOME}/protocol/done
-rm -rf ${REGRESSION_HOME}/next-spatial/
-mkdir ${REGRESSION_HOME}/next-spatial
-cd ${REGRESSION_HOME}/next-spatial
-git clone git@github.com:stanford-ppl/spatial
-cd spatial
-export apphash="nova-spatial"
-export hash=`git rev-parse HEAD`
-export timestamp=`git show -s --format=%ci`
-echo $hash > ${REGRESSION_HOME}/data/hash
-echo $apphash > ${REGRESSION_HOME}/data/apphash
-echo $timestamp > ${REGRESSION_HOME}/data/timestamp
+if [[ ! -f ${REGRESSION_HOME}/protocol/lock ]]; then
+	touch ${REGRESSION_HOME}/protocol/lock
+	rm ${REGRESSION_HOME}/protocol/done
+	rm -rf ${REGRESSION_HOME}/next-spatial/
+	mkdir ${REGRESSION_HOME}/next-spatial
+	cd ${REGRESSION_HOME}/next-spatial
+	git clone git@github.com:stanford-ppl/spatial
+	cd spatial
+	export apphash="nova-spatial"
+	export hash=`git rev-parse HEAD`
+	export timestamp=`git show -s --format=%ci`
+	echo $hash > ${REGRESSION_HOME}/data/hash
+	echo $apphash > ${REGRESSION_HOME}/data/apphash
+	echo $timestamp > ${REGRESSION_HOME}/data/timestamp
 
-# Run tests
-cd ${REGRESSION_HOME}/next-spatial/spatial
-set $inputarg
-echo "Running synth_regression with $inputarg"
-bash resources/regression/synth_regression.sh $inputarg
+	# Run tests
+	cd ${REGRESSION_HOME}/next-spatial/spatial
+	set $inputarg
+	echo "Running synth_regression with $inputarg"
+	bash resources/regression/synth_regression.sh $inputarg
 
-touch ${REGRESSION_HOME}/protocol/done
+	rm ${REGRESSION_HOME}/protocol/lock
+	touch ${REGRESSION_HOME}/protocol/done
+fi

@@ -317,13 +317,13 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   private def transformCtrl[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if (lhs.isInnerControl && !rhs.isSwitch) {
+    if (lhs.isInnerControl && !rhs.isSwitch && inHw) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       withRetime(retimeEnables, ctx) { super.transform(lhs, rhs) }
     }
     else rhs match {
       case _:StateMachine[_] => withRetime(List(true,false,true), ctx){ super.transform(lhs, rhs) }
-      case _ => withRetime(Nil, ctx){ super.transform(lhs, rhs) }
+      case _ => if (inHw) withRetime(Nil, ctx){ super.transform(lhs, rhs) } else super.transform(lhs, rhs)
     }
   }
 

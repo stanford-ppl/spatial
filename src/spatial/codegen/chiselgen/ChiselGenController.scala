@@ -300,14 +300,14 @@ trait ChiselGenController extends ChiselGenCommon {
         if (sym.isOuterStreamLoop) {
           emitt(src"""// ${swap(sym, SM)}.io.parentAck := ${swap(src"${sym.cchains.head}", Done)} // Not sure why this used to be connected, since it can cause an extra command issued""")
           emitGlobalWireMap(src"""${swap(src"${sym.cchains.head}", En)}""", """Wire(Bool())""") 
-          val unitKid = c.isUnitPipe
-          val snooping = getNowValidLogic(c).replace(" ", "") != ""
-          val innerKid = c.isInnerControl
-          val signalHandle = if (unitKid & innerKid & snooping) { // If this is a unit pipe that listens, we just need to snoop the now_valid & _ready overlap
-            src"true.B ${getStreamReadyLogic(c)} ${getNowValidLogic(c)}"
-          } else src"${swap(c, Done)}"
+          // val unitKid = c.isUnitPipe
+          // val snooping = getNowValidLogic(c).replace(" ", "") != ""
+          // val innerKid = c.isInnerControl
+          // val signalHandle = if (unitKid & innerKid & snooping) { // If this is a unit pipe that listens, we just need to snoop the now_valid & _ready overlap
+          //   src"true.B ${getStreamReadyLogic(c)} ${getNowValidLogic(c)}"
+          // } else src"${swap(c, Done)}"
 
-          emitt(src"""${swap(src"${sym.cchains.head}", En)} := ${signalHandle}""")
+          emitt(src"""${swap(src"${sym.cchains.head}", En)} := ${swap(c,Done)}//${if (getStreamAdvancement(c) != "") getStreamAdvancement(c) else swap(c, Done)}""")
           emitt(src"""${swap(src"${sym.cchains.head}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
           emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(src"${sym.cchains.head}",Done)}""")
         } else if (sym.isOuterStreamControl) {

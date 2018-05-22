@@ -2,12 +2,9 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 @test class EdgeDetector extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE,_16,_16]
@@ -64,5 +61,6 @@ import spatial.dsl._
 
     val cksum = results.zip(gold) {case (a,b) => a < b + margin && a > b - margin}.reduce{_&&_}
     println("PASS: " + cksum + " (EdgeDetector)")
+    assert(cksum)
   }
 }

@@ -153,7 +153,7 @@ import spatial.targets._
 
     val cksum = hashed_gold == hashed_result
     println("PASS: " + cksum + " (SHA1)")
-
+    assert(cksum)
   }
 }
 

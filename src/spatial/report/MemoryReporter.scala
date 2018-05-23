@@ -57,25 +57,36 @@ case class MemoryReporter(IR: State) extends Pass {
           emit(s"     Banks:    $banks <$format>")
           banking.foreach{grp => emit(s"       $grp") }
           emit(s"     Ports: ")
-          def portStr(port: Option[Int], as: Iterable[Sym[_]], tp: String): Iterator[String] = {
-            val accesses = as.filter{a => a.dispatches.values.exists(_.contains(i)) }
-                             .filter{a => a.ports.values.exists(_.bufferPort == port) }
 
-            val muxSize  = accesses.map{a => a.ports.values.filter(_.bufferPort == port).map(_.muxSize).maxOrElse(1) }
+          def portStr(prefix: String, port: Option[Int], as: Iterable[Sym[_]], tp: String): Unit = {
+            val p = port.map(_.toString).getOrElse("M")
 
-            accesses.iterator.map{a =>
-              val mux = a.ports.values.filter(_.bufferPort == port).map(_.mux)
-              s"  ${port.map(_.toString).getOrElse("M")}: [$tp, Mux: ] ${a.ctx.content.map(_.trim).getOrElse(stm(a)) } [${a.ctx}]"
+            // Find all accesses connected to this buffer port
+            val accesses: Iterable[(Sym[_],Seq[Int],Port)] = {
+              as.filter{a => a.dispatches.values.exists(_.contains(i)) }
+                .flatMap{a => a.ports.filter(_._2.bufferPort == port).map{case (unroll,pt) => (a,unroll,pt) }}
+            }
+
+            // Find the maximum width of this buffer port
+            val muxSize: Int = accesses.map{case (a,uid,pt) => pt.muxSize }.maxOrElse(0)
+
+            emit(s"$prefix  $p [Type:$tp, Width:$muxSize]:")
+            accesses.groupBy(_._3.muxPort).foreach{case (muxPort, accs) =>
+              emit(s"$prefix    - Mux Port #$muxPort: ")
+              accs.foreach{case (a,uid,pt) =>
+                val line = a.ctx.content.map(_.trim).getOrElse(stm(a))
+                emit(s"$prefix      [Ofs: ${pt.muxOfs}] $line {${uid.mkString(",")}} (${a.ctx})")
+              }
             }
           }
 
           (0 until inst.depth).foreach{p =>
-            val lines = portStr(Some(p), writers,"WR") ++ portStr(Some(p), readers,"RD")
-            lines.foreach{line => emit(s"       $line")}
+            portStr("       ", Some(p), writers,"WR")
+            portStr("       ", Some(p), readers,"RD")
           }
           if (inst.depth > 1) {
-            val lines = portStr(None, writers, "WR") ++ portStr(None, readers, "RD")
-            lines.foreach { line => emit(s"       $line") }
+            portStr("       ", None, writers,"WR")
+            portStr("       ", None, readers,"RD")
           }
         }
 

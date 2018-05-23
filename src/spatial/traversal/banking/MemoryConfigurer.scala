@@ -47,15 +47,21 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   protected def summarize(instances: Seq[Instance]): Unit = {
-    dbg(s"\n\nSUMMARY for memory $mem")
-    dbg(s"${mem.ctx}: ${stm(mem)}")
-    dbg(mem.ctx.content.getOrElse(""))
-    dbg("\n\n--------------------------------")
+    dbg(s"---------------------------------------------------------------------")
+    dbg(s"Name: ${mem.fullname}")
+    dbg(s"Type: ${mem.tp}")
+    dbg(s"Src:  ${mem.ctx}")
+    dbg(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
+    dbg(s"---------------------------------------------------------------------")
+    dbg(s"Symbol:     ${stm(mem)}")
+    dbg(s"Instances: ${instances.length}")
     instances.zipWithIndex.foreach{case (inst,i) =>
       dbg(s"Instance #$i")
-      dbgss(inst)
+      dbgss("  ", inst)
       dbg("\n\n")
     }
+    dbg(s"---------------------------------------------------------------------")
+    dbg("\n\n\n")
   }
 
   /** Complete memory analysis by adding banking and buffering metadata to the memory and
@@ -124,6 +130,23 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     groups.toSet
   }
 
+  /** True if accesses a and b may occur concurrently and to the same buffer port.
+    * This is true when any of the following hold:
+    *   0. a and b are two different unrolled parts of the same node
+    *   1. a and b are in the same inner pipeline
+    *   2. a and b are in the same fully unrolled inner sequential
+    *   3. a and b are in a Parallel controller
+    *   4. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
+    */
+  def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val lca = LCA(a.access, b.access)
+    (a.access == b.access && a.unroll != b.unroll) ||
+      lca.isInnerPipeLoop ||
+      (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
+      lca.isParallel
+  }
+
+
   protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix]): Seq[Instance] = {
     val rdGroups = groupAccesses(readers, "Read")
     val wrGroups = groupAccesses(writers, "Write")
@@ -138,18 +161,61 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     depth * totalBanks
   }
 
-  /** Computes the mux IDs for accesses that occur in parallel. */
+  /** Computes the Ports for all accesses in all groups
+    *
+    *            |--------------|--------------|
+    *            |   Buffer 0   |   Buffer 1   |
+    *            |--------------|--------------|
+    * bufferPort         0              1           The buffer port (None for access outside pipeline)
+    * muxSize            3              3           Width of a single time multiplexed vector
+    *                 |x x x|        |x x x|
+    *
+    *                /       \      /       \
+    *
+    *              |x x x|x x|     |x x x|x x x|
+    * muxPort         0    1          0     1       The ID for the given time multiplexed vector
+    *
+    *              |( ) O|O O|    |(   )|( ) O|
+    * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
+    *
+    */
   protected def computePorts(groups: Set[Set[AccessMatrix]], bufPorts: Map[Sym[_],Option[Int]]): Map[AccessMatrix,Port] = {
     var ports: Map[AccessMatrix,Port] = Map.empty
-    val seqGrps = groups.toSeq
-    seqGrps.zipWithIndex.foreach{case (grp,i) =>
-      val prev = seqGrps.take(i).flatten  // The first i groups (the ones before the current)
-      val grpPorts = grp.map{a =>
-        val mux = prev.filter{b => requireConcurrentPortAccess(a, b) }.map{b => ports(b).muxPort }.maxOrElse(0)
-        a -> Port(mux, bufPorts(a.access))
+
+    val bufferPorts: Map[Option[Int],Set[Set[AccessMatrix]]] = groups.flatMap{grp =>
+      grp.groupBy{m => bufPorts(m.access) }.toSeq // These should generally always be all the same?
+    }.groupBy(_._1).mapValues(_.map(_._2))
+
+    bufferPorts.foreach{case (bufferPort, grps) =>
+      var muxPortMap: Map[AccessMatrix,Int] = Map.empty
+
+      // Each group is banked together, so all accesses in a group must be connected to the same muxPort
+      grps.zipWithIndex.foreach{case (grp,muxPort) =>
+        grp.foreach{m => muxPortMap += m -> muxPort }
       }
-      ports ++= grpPorts
+
+      val muxPorts: Map[Int,Set[AccessMatrix]] = grps.flatten.groupBy{m => muxPortMap(m) }
+      val muxSize: Int = muxPorts.values.map(_.size).maxOrElse(0)
+
+      muxPorts.foreach{case (muxPort, matrices) =>
+        var muxOfs: Int = 0
+        matrices.groupBy(_.access).values.foreach{mats =>
+          import scala.math.Ordering.Implicits._
+          mats.toSeq.sortBy(_.unroll).foreach{m =>
+            val port = Port(
+              bufferPort = bufferPort,
+              muxPort    = muxPort,
+              muxSize    = muxSize,
+              muxOfs     = muxOfs,
+              broadcast  = 0
+            )
+            ports += m -> port
+            muxOfs += 1
+          }
+        }
+      }
     }
+
     ports
   }
 
@@ -179,8 +245,10 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
       val instance = Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp)
 
-      dbgs(s"  Reads:  $rdGroups")
-      dbgs(s"  Writes: $wrGroups")
+      dbgs(s"  Reads:")
+      rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+      dbgs(s"  Writes:")
+      wrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
       dbgs(s"  Instance: ")
       dbgss("  ", instance)
 

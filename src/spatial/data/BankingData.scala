@@ -47,13 +47,17 @@ object ModBanking {
   *            |--------------|--------------|
   *            |   Buffer 0   |   Buffer 1   |
   *            |--------------|--------------|
-  * bufferPort        0              1            The buffer port (None for access outside pipeline)
-  * muxSize           3              3            Width of a single time multiplexed vector
-  *              |x x x|x x x|  |x x x|x x x|
-  * muxPort         0     1        0     1        The ID for the given time multiplexed vector
+  * bufferPort         0              1           The buffer port (None for access outside pipeline)
+  * muxSize            3              3           Width of a single time multiplexed vector
+  *                 |x x x|        |x x x|
   *
-  *              |( ) O|O ( )|  |(   )|( ) O|
-  * muxOfs        0   2 0  1       0    0  2      Start offset into the time multiplexed vector
+  *                /       \      /       \
+  *
+  *              |x x x|x x|     |x x x|x x x|
+  * muxPort         0    1          0     1       The ID for the given time multiplexed vector
+  *
+  *              |( ) O|O O|    |(   )|( ) O|
+  * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
   *
   */
 case class Port(bufferPort: Option[Int], muxPort: Int, muxSize: Int, muxOfs: Int, broadcast: Int)
@@ -79,23 +83,41 @@ case class Instance(
   override def toString: String = {
     import scala.math.Ordering.Implicits._
 
-    def prtStr(port: Option[Int], grps: Set[Set[AccessMatrix]], tp: String): Iterator[String] = {
-      grps.iterator.flatten
-          .filter{a => ports(a).bufferPort == port }    // All accesses on this port
-          .toSeq.groupBy(_.access)                      // Group by access (symbol)
-          .iterator.flatMap(_._2.sortBy(_.unroll))      // Lexicographic sort by unroll ID
-          .map{a => s"  ${port.getOrElse("M")}: (mux:${ports(a).muxPort}) [$tp] ${stm(a.access)} {${a.unroll.mkString(", ")}}" }
+    def prtStr(port: Option[Int], grps: Set[Set[AccessMatrix]], tp: String): String = {
+      val accesses = grps.flatten.toSeq
+                         .filter{a => ports(a).bufferPort == port }    // All accesses on this port
+
+      val muxSize: Int = accesses.map{a => ports(a).muxSize }.maxOrElse(0)
+
+      val head = s"${port.getOrElse("M")} [Type:$tp, Width:$muxSize]:"
+      val lines: Seq[String] = Seq(head) ++ {
+        accesses.groupBy{a => ports(a).muxPort }.toSeq.sortBy(_._1).flatMap{case (muxPort, matrices) =>
+          Seq(s" - Mux Port #$muxPort: ") ++
+          matrices.groupBy(_.access).iterator.flatMap(_._2.sortBy(_.unroll))
+                .map{ a => s"  [Ofs: ${ports(a).muxOfs}] ${a.access.ctx.content.getOrElse(stm(a.access))} {${a.unroll.mkString(",")}} (${a.access.ctx})" }
+        }
+      }
+      lines.mkString("\n")
     }
 
-    val ps = (0 until depth).map{Some(_)} :+ None
+    val ps = (0 until depth).map{Some(_)} ++ (if (depth > 1) Seq(None) else Nil)
 
-    s"""
-       |accumType:  $accType
-       |Depth:      $depth
-       |Banking:    $banking
-       |Controller: ${metapipe.map(_.toString).getOrElse("---")}
-       |Buffer Ports:""".stripMargin + "\n" +
-    ps.flatMap{port => prtStr(port,writes,"WR") ++ prtStr(port,reads,"RD") }.mkString("\n")
+    /*emit(s"  #$i: Banked")
+          emit(s"     Resource: ${inst.resource.name}")
+          emit(s"     Depth:    $depth")
+          emit(s"     Accum:    $isAccum")
+          emit(s"     Banks:    $banks <$format>")
+          banking.foreach{grp => emit(s"       $grp") }*/
+
+    val format = if (banking.length == 1) "Flat" else "Hierarchical"
+
+    s"""<Banked>
+       |Depth:    $depth
+       |Accum:    $accType
+       |Banking:  $banking <$format>
+       |Pipeline: ${metapipe.map(_.toString).getOrElse("---")}
+       |Ports:""".stripMargin + "\n" +
+    ps.map{port => prtStr(port,writes,"WR") + "\n" + prtStr(port,reads,"RD") }.mkString("\n")
   }
 
 }

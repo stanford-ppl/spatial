@@ -437,20 +437,6 @@ trait UtilsControl {
 
 
 
-  /** Returns true if accesses a and b may occur concurrently and to the same buffer port.
-    * This is true when any of the following hold:
-    *   0. a and b are two different unrolled parts of the same node
-    *   1. a and b are in the same inner pipeline
-    *   2. a and b are in the same fully unrolled inner sequential
-    *   3. a and b are in a Parallel controller
-    *   4. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
-    */
-  def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
-    val lca = LCA(a.access, b.access)
-    (a.access == b.access && a.unroll != b.unroll) ||
-    lca.isInnerPipeLoop ||
-    (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
-    lca.isParallel
-  }
+
 
 }

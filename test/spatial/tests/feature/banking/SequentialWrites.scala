@@ -1,8 +1,6 @@
 package spatial.tests.feature.banking
 
-
 import spatial.dsl._
-
 
 @test class SequentialWrites extends SpatialTest {
   override def runtimeArgs: Args = "32"
@@ -24,7 +22,7 @@ import spatial.dsl._
 
       MemFold(in)(N by 1){ i =>
         val d = SRAM[A](T)
-        Foreach(T by 1){ i => d(i) = xx.value + i.to[A] }
+        Foreach(T by 1 par P){ i => d(i) = xx.value + i.to[A] }
         d
       }{_+_}
 

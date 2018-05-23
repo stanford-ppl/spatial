@@ -91,9 +91,7 @@ trait AliasRewrites extends RewriteRules {
 
   @rewrite def mem_dim(op: MemDim): Sym[_] = {
     case MemDim(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => mem.head.asInstanceOf[Sym[_]] match {
-      case Op(alloc: MemAlloc[_,_]) => 
-        val dim = alloc.dims.indexOrElse(d, I32(1))
-        dim match {case x @ Op(RegRead(r)) if (x.parent == Host /*&& op.mem.parent != Host*/) => stage(RegRead(r)); case x => x}
+      case Op(alloc: MemAlloc[_,_]) => alloc.dims.indexOrElse(d, I32(1))
       case _ => Invalid
     }
     case MemDim(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))

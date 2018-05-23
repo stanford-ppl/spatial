@@ -5,6 +5,8 @@ import argon.passes.Pass
 import spatial.data._
 import spatial.util._
 
+import utils.implicits.collections._
+
 case class MemoryReporter(IR: State) extends Pass {
   override def shouldRun: Boolean = config.enInfo
 
@@ -56,9 +58,15 @@ case class MemoryReporter(IR: State) extends Pass {
           banking.foreach{grp => emit(s"       $grp") }
           emit(s"     Ports: ")
           def portStr(port: Option[Int], as: Iterable[Sym[_]], tp: String): Iterator[String] = {
-            as.iterator.filter{a => a.dispatches.values.exists(_.contains(i)) }
-                       .filter{a => a.ports.values.exists(_.bufferPort == port) }
-                       .map{a => s"  ${port.map(_.toString).getOrElse("M")}: [$tp] ${a.ctx.content.map(_.trim).getOrElse(stm(a)) } [${a.ctx}]"}
+            val accesses = as.filter{a => a.dispatches.values.exists(_.contains(i)) }
+                             .filter{a => a.ports.values.exists(_.bufferPort == port) }
+
+            val muxSize  = accesses.map{a => a.ports.values.filter(_.bufferPort == port).map(_.muxSize).maxOrElse(1) }
+
+            accesses.iterator.map{a =>
+              val mux = a.ports.values.filter(_.bufferPort == port).map(_.mux)
+              s"  ${port.map(_.toString).getOrElse("M")}: [$tp, Mux: ] ${a.ctx.content.map(_.trim).getOrElse(stm(a)) } [${a.ctx}]"
+            }
           }
 
           (0 until inst.depth).foreach{p =>

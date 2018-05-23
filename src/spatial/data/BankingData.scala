@@ -43,8 +43,20 @@ object ModBanking {
   * The buffer port is the port at which the associated access should be connected for N-buffers.
   * If the buffer is depth 1, this is always Some(0).
   * If the access occurs outside of the metapipeline that uses this buffer, the port will be None.
+  *
+  *            |--------------|--------------|
+  *            |   Buffer 0   |   Buffer 1   |
+  *            |--------------|--------------|
+  * bufferPort        0              1            The buffer port (None for access outside pipeline)
+  * muxSize           3              3            Width of a single time multiplexed vector
+  *              |x x x|x x x|  |x x x|x x x|
+  * muxPort         0     1        0     1        The ID for the given time multiplexed vector
+  *
+  *              |( ) O|O ( )|  |(   )|( ) O|
+  * muxOfs        0   2 0  1       0    0  2      Start offset into the time multiplexed vector
+  *
   */
-case class Port(muxPort: Int, bufferPort: Option[Int])
+case class Port(bufferPort: Option[Int], muxPort: Int, muxSize: Int, muxOfs: Int, broadcast: Int)
 
 
 /** Used during memory analysis to track intermediate results. */

@@ -1,8 +1,6 @@
 package spatial.tests.compiler
 
-
 import spatial.dsl._
-
 
 @test class IllegalFIFOParallelization extends SpatialTest {
   override def runtimeArgs: Args = NoArgs

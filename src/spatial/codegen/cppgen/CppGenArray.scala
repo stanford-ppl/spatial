@@ -273,7 +273,19 @@ trait CppGenArray extends CppGenCommon {
       visitBlock(func)
       iters.foreach{_ => close("}")}
 
-      // 
+    case ArrayFold(array,init,apply,reduce) => 
+      if (isArrayType(lhs.tp)) {
+        throw new Exception(s"Codegen for ArrayFold onto an Array needs to be implemented!")
+      }
+      emit(src"${lhs.tp} $lhs = $init;")
+
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
+        emitApply(reduce.inputA, array, src"${apply.inputB}")
+        emit(src"""${reduce.inputB.tp}${if (isArrayType(reduce.inputB.tp)) "*" else ""} ${reduce.inputB} = $lhs;""")
+        visitBlock(reduce)
+        emit(src"$lhs = ${reduce.result};")
+      close("}")
+
     case ArrayReduce(array, apply, reduce) =>
       if (isArrayType(lhs.tp)) {
         emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""") 

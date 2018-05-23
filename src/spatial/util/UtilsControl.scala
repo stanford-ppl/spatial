@@ -392,7 +392,7 @@ trait UtilsControl {
   @stateful def lookahead(a: Sym[_]): Sym[_] = {
     if (a.consumers.nonEmpty) {
       val p = a.consumers.filterNot{x => a.ancestors.collect{case y if (y.s.isDefined) => y.s.get}.contains(x)} // Remove consumers who are in the ancestry of this node
-                         .map{ y => y match {case Op(x: CounterNew[_]) => y.getOwner.get; case _ => y}} // Convert counters to their owner ctrl
+                         .map{ case y @ Op(x: CounterNew[_]) => y.getOwner.get; case y => y } // Convert counters to their owner ctrl
       if (p.toList.length >= 1) p.head else a
     } 
     else a

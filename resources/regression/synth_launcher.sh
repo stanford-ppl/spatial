@@ -29,8 +29,8 @@ export REGRESSION_HOME="/home/mattfel/regression/synth/$inputarg"
 
 export SPATIAL_HOME=${REGRESSION_HOME}/current-spatial/
 
-if [[ ! -f ${REGRESSION_HOME}/protocol/lock ]]; then
-	touch ${REGRESSION_HOME}/protocol/lock
+if [[ ! -f ${REGRESSION_HOME}/lock ]]; then
+	touch ${REGRESSION_HOME}/lock
 	rm ${REGRESSION_HOME}/protocol/done
 	rm -rf ${REGRESSION_HOME}/next-spatial/
 	mkdir ${REGRESSION_HOME}/next-spatial
@@ -50,6 +50,6 @@ if [[ ! -f ${REGRESSION_HOME}/protocol/lock ]]; then
 	echo "Running synth_regression with $inputarg"
 	bash resources/regression/synth_regression.sh $inputarg
 
-	rm ${REGRESSION_HOME}/protocol/lock
+	rm ${REGRESSION_HOME}/lock
 	touch ${REGRESSION_HOME}/protocol/done
 fi

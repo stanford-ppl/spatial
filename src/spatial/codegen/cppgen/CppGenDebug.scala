@@ -25,7 +25,7 @@ trait CppGenDebug extends CppGenCommon {
     	else emit(src"""if ( ${cond.toList.mkString(" & ")} ) std::cout << $x;""")
     case BitToText(x) => emit(src"""${lhs.tp} $lhs = $x ? string("true") : string("false");""")
     case DelayLine(_, data) => emit(src"""${lhs.tp} $lhs = $data;""")
-    case op@VarNew(init) => emit(src"${lhs.tp} $lhs = $init;")
+    case op@VarNew(init) => emit(src"${lhs.tp.typeArgs.head} $lhs = ${init.getOrElse(0)};")
     case VarRead(v)      => emit(src"${lhs.tp} $lhs = $v;")
     case VarAssign(v, x) => emit(src"$v = $x;")
     case _ => super.gen(lhs, rhs)

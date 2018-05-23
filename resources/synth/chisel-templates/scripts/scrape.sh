@@ -17,7 +17,14 @@ hash=`cat ${REGRESSION_HOME}/current-spatial/spatial/hash`
 ahash=`cat ${REGRESSION_HOME}/current-spatial/spatial/ahash`
 
 #appname=`basename \`pwd\``
-appname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`
+fullname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`
+aws_dir_name=`basename \`pwd\``
+testdirs=`find ${REGRESSION_HOME}/current-spatial/spatial/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
+testdirsarray=($testdirs)
+for t in "${testdirsarray[@]}"; do
+	fullname=`echo $fullname | sed "s/${t}_//g"`
+done
+appname=$fullname
 if [[ $1 = "Zynq" ]]; then
 	par_util=`pwd`/verilog-zynq/par_utilization.rpt
 	if [[ ! -f ${par_util} ]]; then par_util=`pwd`/verilog-zynq/synth_utilization.rpt; fi
@@ -41,8 +48,8 @@ elif [[ $1 = "Arria10" ]]; then
     f1=3                                                # TODO: Tian     
     f2=6                                                # TODO: Tian    
 elif [[ $1 = "AWS" ]]; then
-	par_util=/home/mattfel/aws-fpga/hdk/cl/examples/$appname/build/reports/utilization_route_design.rpt
-	par_tmg=/home/mattfel/aws-fpga/hdk/cl/examples/$appname/build/reports/timing_summary_route_design.rpt
+	par_util=/home/mattfel/aws-fpga/hdk/cl/examples/${aws_dir_name}/build/reports/utilization_route_design.rpt
+	par_tmg=/home/mattfel/aws-fpga/hdk/cl/examples/${aws_dir_name}/build/reports/timing_summary_route_design.rpt
 	word="CLB"
 	f1=5
 	f2=8

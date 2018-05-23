@@ -1,5 +1,6 @@
 # This is called by regression_run.sh / scrape.sh / regression_functions.sh / receive.sh / synth_launcher.sh / synth_regression.sh
 
+import re
 import gspread
 import pygsheets
 import sys
@@ -38,16 +39,13 @@ def getColOrAppend(wksh, appname):
 		print("ERROR: pygsheets failed getColOrAppend... -_-")	
 		exit()
 
-def getCol(wksh, appname):
+def getCols(wksh, appname):
 	try: 
 		lol = readAllVals(wksh)
-		if (appname in lol[0]):
-			col=lol[0].index(appname)+1
-		else:
-			col=-1
-		return col
+		cols = [i+1 for i,x in enumerate(lol[0]) if (re.match(appname,x))]
+		return cols
 	except:
-		print("ERROR: pygsheets failed getColOrAppend... -_-")	
+		print("ERROR: pygsheets failed getCols... -_-")	
 		exit()
 
 def getRuntimeCol(wksh, appname):
@@ -409,6 +407,7 @@ def delete_n_rows(n, ofs, backend):
 		# worksheet = sh.get_worksheet(x)
 		worksheet = sh.worksheet('index', x)
 		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+			print("Scrubbing page %s" % worksheet.title)
 			for i in range(0,int(n)):
 				deleteRows(worksheet, 3 + int(ofs))
 
@@ -418,17 +417,18 @@ def delete_app_column(appname, backend):
 
 	numsheets = len(sh.worksheets())
 	for x in range(0,numsheets):
-		# worksheet = sh.get_worksheet(x)
 		worksheet = sh.worksheet('index', x)
-		col = getCol(worksheet, appname)
-		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
-			if (col >= 0):
-				deleteCols(worksheet, col)
-				if (perf and worksheet.title == "Runtime"):
-					# Delete the bit column also
+		cols = sorted(getCols(worksheet, appname), reverse=True)
+		for col in cols: 			
+			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+				if (col == max(cols)): print("Scrubbing page %s" % worksheet.title)
+				if (col >= 0):
 					deleteCols(worksheet, col)
-			else:
-				print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
+					if (perf and worksheet.title == "Runtime"):
+						# Delete the bit column also
+						deleteCols(worksheet, col)
+				else:
+					print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
 
 
 
@@ -455,14 +455,12 @@ elif (sys.argv[1] == "delete_app_column"):
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3])
-elif (len(sys.argv) == 1 or sys.argv[1] == "-h"):
+else:
 	print("Commands:")
 	print(" - report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args)")
 	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - delete_n_rows(n, ofs (0=row 3, 1=row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
-	print(" - delete_app_column(appname, backend (vcs, vcs-noretime, Zynq, etc...))")
-else:
-	print("ERROR: Not a valid spreadsheet interaction! %s" % sys.argv[1])
+	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
 	exit()

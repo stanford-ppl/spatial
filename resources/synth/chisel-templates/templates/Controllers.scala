@@ -92,10 +92,11 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
+        val extension = if (latency == 0) (synchronize & iterDone(i-1).io.output.data).D(1) else false.B // Hack for when retiming is turned off, in case mask turns on at the same time as the next iter should begin
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
-        active(i).io.input.set := ((synchronize & iterDone(i-1).io.output.data) | ~io.maskIn(i-1)) & io.enable
+        active(i).io.input.set := ((synchronize & iterDone(i-1).io.output.data) | (~io.maskIn(i-1) & active(i-1).io.output.data)) & io.enable
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i)) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)
+        iterDone(i).io.input.set := (io.doneIn(i)) | (iterDone(i-1).io.output.data.D(1) & ~io.maskIn(i) & io.enable)
         done(i).io.input.set := done(i-1).io.output.data & synchronize & ~io.rst
       }
     
@@ -265,7 +266,8 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
 
     stateFSM.io.input(0).data := io.nextState.asUInt
     stateFSM.io.input(0).init := io.initState.asUInt
-    stateFSM.io.input(0).en := io.enable & ~depulser
+    if (latency == 0) stateFSM.io.input(0).en := io.enable & ~depulser
+    else stateFSM.io.input(0).en := io.enable
     stateFSM.io.input(0).reset := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data.asSInt
 

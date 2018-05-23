@@ -390,7 +390,12 @@ trait UtilsControl {
   }
 
   @stateful def lookahead(a: Sym[_]): Sym[_] = {
-    if (a.consumers.nonEmpty && a.consumers.head.isCtrl()) a.consumers.head else a
+    if (a.consumers.nonEmpty) {
+      val p = a.consumers.filterNot{x => a.ancestors.collect{case y if (y.s.isDefined) => y.s.get}.contains(x)} // Remove consumers who are in the ancestry of this node
+                         .map{ case y @ Op(x: CounterNew[_]) => y.getOwner.get; case y => y } // Convert counters to their owner ctrl
+      if (p.toList.length >= 1) p.head else a
+    } 
+    else a
   }
 
   /** Returns all metapipeline parents between all pairs of (w in writers, a in readers U writers). */

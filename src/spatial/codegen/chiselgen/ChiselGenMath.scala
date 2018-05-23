@@ -45,8 +45,8 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x >>> $shift).r")
     case BitRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}) === 1.U")
     case FixRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)})")
-    // case UnbSatMul(x,y) => emitt(src"val $lhs = $x <*&> $y")
-    // case UnbSatDiv(x,y) => emitt(src"val $lhs = $x </&> $y")
+    case UnbSatMul(x,y) => emitt(src"val $lhs = $x <*&> $y")
+    case UnbSatDiv(x,y) => emitt(src"val $lhs = $x </&> $y")
     // case FixRandom(x) =>
     //   val seed = (random*1000).toInt
     //   val size = x match{

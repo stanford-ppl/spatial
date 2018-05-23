@@ -34,7 +34,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
-    case node: Primitive[_] if inHw && node.isEphemeral && requiresDuplication(lhs, rhs) =>
+    case node: Primitive[_] if node.isEphemeral && requiresDuplication(lhs, rhs) =>
       dbgs("")
       dbgs(s"$lhs = $rhs")
       dbgs(s" - users: ${lhs.users} [stateless]")
@@ -55,8 +55,13 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         }
       }
 
-      if (lhs.users.isEmpty) dbgs(s"REMOVING stateless $lhs")
-      Invalid // Must know context to use this symbol
+      if (lhs.users.isEmpty && inHw) {
+        dbgs(s"REMOVING stateless $lhs") // Nodes in host, used only in host won't have users
+        Invalid // Must know context to use this symbol
+      }
+      else {
+        updateWithContext(lhs, rhs)
+      }
 
     case node: Primitive[_] if inHw && node.isEphemeral =>
       dbgs("")

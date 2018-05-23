@@ -276,6 +276,20 @@ trait ChiselGenCommon extends ChiselCodegen {
       } else {""}
   }
 
+  def getStreamAdvancement(c: Sym[_]): String = { 
+    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
+      case x @ Op(StreamInNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
+      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
+    }.mkString(" & ")
+  }
+
+  def getStreamHalfAdvancement(c: Sym[_]): String = {  // Only valid for streamins and ready for streamouts
+    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
+      case x @ Op(StreamInNew(bus)) => src"${swap(x, Valid)}"
+      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)}"
+    }.mkString(" & ")
+  }
+
   def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
       // If we are inside a stream pipe, the following may be set
       val readiers = getReadStreams(c.toCtrl).map {

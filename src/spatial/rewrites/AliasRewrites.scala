@@ -5,6 +5,7 @@ import forge.tags._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
+import spatial.data._
 
 import utils.implicits.collections._
 

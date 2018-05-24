@@ -85,7 +85,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       synchronize := active.zip(iterDone).map{case (a, id) => a.io.output.data === id.io.output.data}.reduce{_&&_} // TODO: Retime tree
 
       // Define logic for first stage
-      active(0).io.input.set := Mux(!done(0).io.output.data & ~io.ctrDone & io.enable, true.B, false.B)
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable
       active(0).io.input.reset := io.ctrDone | io.parentAck
       iterDone(0).io.input.set := (io.doneIn(0)) | (~io.maskIn(0) & io.enable)
       done(0).io.input.set := io.ctrDone & ~io.rst
@@ -108,7 +108,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       synchronize := io.doneIn.last.D(1)
       
       // Define logic for first stage
-      active(0).io.input.set := Mux(!done(0).io.output.data & ~io.ctrDone & io.enable & ~io.doneIn(0), true.B, false.B)
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
       iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
       done(0).io.input.set := io.ctrDone & ~io.rst
@@ -130,7 +130,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := Mux(~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable, true.B, false.B)
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i) & io.enable)
         done(i).io.input.set := io.ctrDone & ~io.rst
@@ -145,7 +145,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := Mux(~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable, true.B, false.B)
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
         iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
@@ -162,8 +162,8 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := io.selectsIn(i)
-        active(i).io.input.reset := synchronize
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.selectsIn(i)
+        active(i).io.input.reset := io.doneIn(i) | io.rst
         iterDone(i).io.input.set := io.doneIn(i)
         iterDone(i).io.input.reset := done(i).io.output.data
         done(i).io.input.set := synchronize
@@ -188,9 +188,10 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     stateFSM.io.input(0).reset := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data.asSInt
 
-    doneReg.io.input.set := io.doneCondition & io.enable & iterDone.last.io.output.data
+    doneReg.io.input.set := io.doneCondition & io.enable & iterDone.last.io.output.data.D(1)
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
+    active.zip(io.doneIn).foreach{case (a,di) => a.io.input.reset := di | io.rst | io.parentAck | doneReg.io.output.data}
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
     io.done := doneReg.io.output.data & io.enable
   }

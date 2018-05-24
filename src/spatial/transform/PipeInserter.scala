@@ -45,10 +45,10 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
     case switch @ Switch(F(selects), _) if lhs.isOuterControl && inHw =>
       val res: Option[Either[Reg[A],Var[A]]] = if (Type[A].isVoid) None else Some(resFrom(lhs))
 
-      val cases = switch.cases.zip(selects).map { case (SwitchCase(body), sel) =>
-        val controllers = lhs.children
+      val cases = (switch.cases,selects,lhs.children).zipped.map { case (SwitchCase(body), sel, swcase) =>
+        val controllers = swcase.children
         val primitives = body.stms.collect{case Primitive(s) => s }
-        val requiresWrap = controllers.length > 1 || (primitives.nonEmpty && controllers.nonEmpty)
+        val requiresWrap = primitives.nonEmpty && controllers.nonEmpty
 
         () => withEnable(sel) {
           val body2: Block[Void] = {
@@ -59,6 +59,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
         }
       }
       val switch2: Void = transferDataToAllNew(lhs){ op_switch(selects, cases) }
+
       res match {
         case Some(r) => resRead(r)                    // non-void
         case None    => switch2.asInstanceOf[Sym[A]]  // Void case

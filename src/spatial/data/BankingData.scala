@@ -273,7 +273,7 @@ trait BankingData {
 
     def addDispatch(uid: Seq[Int], d: Int): Unit = getDispatch(uid) match {
       case Some(set) => s.dispatches += (uid -> (set + d))
-      case None => s.dispatches += (uid -> Set(d))
+      case None      => s.dispatches += (uid -> Set(d))
     }
 
     def getPorts: Option[Map[Seq[Int],Port]] = metadata[Ports](s).map(_.m)

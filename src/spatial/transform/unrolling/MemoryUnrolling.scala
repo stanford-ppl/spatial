@@ -7,6 +7,9 @@ import spatial.node._
 import spatial.util._
 import spatial.internal.spatialConfig
 import utils.tags.instrument
+import utils.implicits.collections._
+
+import scala.collection.mutable.ArrayBuffer
 
 trait MemoryUnrolling extends UnrollingBase {
 
@@ -186,7 +189,8 @@ trait MemoryUnrolling extends UnrollingBase {
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens)
 
         banked.s.foreach{s =>
-          s.ports += (Seq(0) -> port)
+          s.ports += (Nil -> port)
+          s.addDispatch(Nil, 0)
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
 
@@ -236,7 +240,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * len: width of vector access for vectorized accesses, e.g. linebuffer(0, c::c+3)
     */
   def getInstances(access: Sym[_], mem: Sym[_], isLoad: Boolean, len: Option[Int]): List[UnrollInstance] = {
-    // First, group by the instance each unrolled access is being dispatched to
+    // First, find all instances each unrolled access is being dispatched to
     val is = accessIterators(access, mem)
     dbgs(s"Access: $access")
     dbgs(s"Memory: $mem")
@@ -269,21 +273,37 @@ trait MemoryUnrolling extends UnrollingBase {
       }
     }.flatten
 
-    // Then, group by each time multiplex port each access is being dispatched to
+    // Then group by which logical duplicate each access is connected to
+    val duplicateGroups = mems.groupBy(_.memory).toList
 
-    mems.groupBy(_.memory).toList
-        .flatMap{case (mem2, vs) =>
-          vs.groupBy(_.port).toSeq
-            .map{case (port, muxVs) =>
-              UnrollInstance(
-                memory  = mem2,
-                dispIds = muxVs.flatMap(_.dispIds),
-                laneIds = muxVs.flatMap(_.laneIds),
-                port    = port,
-                vecOfs  = muxVs.flatMap(_.vecOfs)
-              )
-            }
+    duplicateGroups.flatMap{case (mem2, vs) =>
+      // Then gruop by which physical port (buffer + mux) these accesses are connected to
+      val portGroups = vs.groupBy{v => (v.port.bufferPort, v.port.muxPort) }.toSeq
+
+      portGroups.flatMap{case ((bufferPort,muxPort), muxVs) =>
+        // Finally, merge contiguous vector sections together into single vector accesses
+        val muxSize = muxVs.map(_.port.muxSize).maxOrElse(0)
+        val accesses = muxVs.sortBy(_.port.muxOfs)
+        val vectors: ArrayBuffer[ArrayBuffer[UnrollInstance]] = ArrayBuffer.empty
+        accesses.foreach{access =>
+          if (vectors.nonEmpty && vectors.last.last.port.muxOfs == access.port.muxOfs - 1) {
+            vectors.last += access
+          }
+          else vectors += ArrayBuffer(access)
         }
+        vectors.map{vec =>
+          val muxOfs = vec.head.port.muxOfs
+          val broadcast = vec.head.port.broadcast
+          UnrollInstance(
+            memory  = mem2,
+            dispIds = vec.flatMap(_.dispIds),
+            laneIds = vec.flatMap(_.laneIds),
+            port    = Port(bufferPort,muxPort,muxSize,muxOfs,broadcast),
+            vecOfs  = vec.flatMap(_.vecOfs)
+          )
+        }
+      }
+    }
   }
 
   /** Helper classes for unrolling */

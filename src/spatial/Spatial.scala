@@ -106,11 +106,11 @@ trait Spatial extends Compiler {
         accessAnalyzer ==> printer ==>
         memoryAnalyzer ==> printer ==>
         memoryAllocator ==>
-        memoryReporter  ==>
         unrollTransformer ==> printer ==>
         (cfg.enableRetiming ? retiming) ==> printer ==>
         (cfg.enableRetiming ? retimeReporter) ==>
         initiationAnalyzer ==>
+        memoryReporter  ==>
         printer ==>
         (cfg.enableSim ? scalaCodegen) ==>
         // (cfg.enableTree ? irTreeCodegen) ==>

@@ -576,10 +576,30 @@ object ops {
 
 object Utils {
 
+
+/** Info that comes from the compiler:
+  *
+  *            |--------------|--------------|
+  *            |   Buffer 0   |   Buffer 1   |
+  *            |--------------|--------------|
+  * bufferPort         0              1           The buffer port (None for access outside pipeline)
+  * muxSize            3              3           Width of a single time multiplexed vector
+  *                 |x x x|        |x x x|
+  *
+  *                /       \      /       \
+  *
+  *              |x x x|x x|     |x x x|x x x|
+  * muxPort         0    1          0     1       The ID for the given time multiplexed vector
+  *
+  *              |( ) O|O O|    |(   )|( ) O|
+  * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
+  *
+  */
+
   /* List of bank addresses, for direct accesses */
   type Banks = List[Int]
   def Banks(xs: Int*) = List(xs:_*)
-  /* Map from muxPort to (parallelization of access, isShift) */
+  /* Map from muxPort to (width of muxPort, isShift) */
   type XMap = HashMap[Int, (Int, Option[Int])]
   implicit class XMapOps(x: XMap) {
     def muxPorts: Seq[Int] = x.keys.toSeq

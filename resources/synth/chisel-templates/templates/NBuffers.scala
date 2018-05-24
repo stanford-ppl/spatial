@@ -64,7 +64,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 }
 
 
-class NBufMem(val mem: MemPrimitive, 
+class NBufMem(val mem: MemType, 
            val logicalDims: List[Int], val numBufs: Int, val bitWidth: Int, 
            val banks: List[Int], val strides: List[Int], 
            val xBarWMux: NBufXMap, val xBarRMux: NBufXMap, // bufferPort -> (muxPort -> accessPar)
@@ -74,7 +74,7 @@ class NBufMem(val mem: MemPrimitive,
 
   // Overloaded constructers
   // Tuple unpacker
-  def this(tuple: (MemPrimitive, List[Int], Int, Int, List[Int], List[Int], NBufXMap, NBufXMap, 
+  def this(tuple: (MemType, List[Int], Int, Int, List[Int], List[Int], NBufXMap, NBufXMap, 
     NBufDMap, NBufDMap, XMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, None, false, 0)
 
   val depth = logicalDims.product // Size of memory
@@ -226,8 +226,8 @@ class NBufMem(val mem: MemPrimitive,
           val sramXBarWPorts = portMapping.accessPars.sum
           val wMask = Utils.getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramXBarWPorts).foreach {k => 
-            f.io.input(bufferBase + k).en := io.xBarW(bufferBase + k).en & wMask
-            f.io.input(bufferBase + k).data := io.xBarW(bufferBase + k).data
+            f.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en & wMask
+            f.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
           }
         }
 
@@ -236,8 +236,8 @@ class NBufMem(val mem: MemPrimitive,
           val sramXBarWBase = xBarWMux.accessPars.sum
           val sramBroadcastWPorts = broadcastWMux.accessPars.sum
           (0 until sramBroadcastWPorts).foreach {k => 
-            f.io.input(sramXBarWBase + k).en := io.broadcast(k).en
-            f.io.input(sramXBarWBase + k).data := io.broadcast(k).data
+            f.io.xBarW(sramXBarWBase + k).en := io.broadcast(k).en
+            f.io.xBarW(sramXBarWBase + k).data := io.broadcast(k).data
           }
         }
       }
@@ -246,7 +246,7 @@ class NBufMem(val mem: MemPrimitive,
       xBarRMux.foreach { case (bufferPort, portMapping) => 
         val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
         val sel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
-        io.output.data(bufferBase) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data})        
+        io.output.data(bufferBase) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data(0)})        
       }
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head*depth), bitWidth, 

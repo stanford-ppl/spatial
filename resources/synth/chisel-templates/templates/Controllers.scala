@@ -182,11 +182,11 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     val stateFSM = Module(new FF(stateWidth))
     val doneReg = Module(new SRFF())
 
-    stateFSM.io.input(0).data := io.nextState.asUInt
-    stateFSM.io.input(0).init := io.initState.asUInt
-    stateFSM.io.input(0).en := io.enable & iterDone.last.io.output.data
-    stateFSM.io.input(0).reset := reset.toBool | ~io.enable
-    io.state := stateFSM.io.output.data.asSInt
+    stateFSM.io.xBarW(0).data := io.nextState.asUInt
+    stateFSM.io.xBarW(0).init := io.initState.asUInt
+    stateFSM.io.xBarW(0).en := io.enable & iterDone.last.io.output.data
+    stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable
+    io.state := stateFSM.io.output.data(0).asSInt
 
     doneReg.io.input.set := io.doneCondition & io.enable & iterDone.last.io.output.data.D(1)
     doneReg.io.input.reset := ~io.enable
@@ -265,12 +265,12 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
     else depulser := true.B
 
-    stateFSM.io.input(0).data := io.nextState.asUInt
-    stateFSM.io.input(0).init := io.initState.asUInt
-    if (latency == 0) stateFSM.io.input(0).en := io.enable & ~depulser
-    else stateFSM.io.input(0).en := io.enable
-    stateFSM.io.input(0).reset := reset.toBool | ~io.enable
-    io.state := stateFSM.io.output.data.asSInt
+    stateFSM.io.xBarW(0).data := io.nextState.asUInt
+    stateFSM.io.xBarW(0).init := io.initState.asUInt
+    if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
+    else stateFSM.io.xBarW(0).en := io.enable
+    stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable
+    io.state := stateFSM.io.output.data(0).asSInt
 
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable

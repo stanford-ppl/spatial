@@ -174,147 +174,147 @@ import fringe._
 // }
 
 
-class GeneralFIFO(val pR: List[Int], val pW: List[Int], val depth: Int, val bitWidth: Int = 32) extends Module {
-  def this(tuple: (List[Int], List[Int], Int, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4)
+// class GeneralFIFO(val pR: List[Int], val pW: List[Int], val depth: Int, val bitWidth: Int = 32) extends Module {
+//   def this(tuple: (List[Int], List[Int], Int, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4)
 
-  val io = IO( new Bundle {
-    val in = Vec(pW.reduce{_+_}, Input(new enqPort(bitWidth)))
-    val out = Vec(pR.max, Output(UInt(bitWidth.W)))
-    val deq = Vec(pR.reduce{_+_}, Input(Bool()))
-    val numel = Output(UInt(32.W))
-    val almostEmpty = Output(Bool())
-    val almostFull = Output(Bool())
-    val empty = Output(Bool())
-    val full = Output(Bool())
-    val debug = new Bundle {
-      val overwrite = Output(Bool())
-      val overread = Output(Bool())
-      val error = Output(Bool())
-    }
-  })
+//   val io = IO( new Bundle {
+//     val in = Vec(pW.reduce{_+_}, Input(new enqPort(bitWidth)))
+//     val out = Vec(pR.max, Output(UInt(bitWidth.W)))
+//     val deq = Vec(pR.reduce{_+_}, Input(Bool()))
+//     val numel = Output(UInt(32.W))
+//     val almostEmpty = Output(Bool())
+//     val almostFull = Output(Bool())
+//     val empty = Output(Bool())
+//     val full = Output(Bool())
+//     val debug = new Bundle {
+//       val overwrite = Output(Bool())
+//       val overread = Output(Bool())
+//       val error = Output(Bool())
+//     }
+//   })
 
-  // Create counters
-  val width = 2 + Utils.log2Up(depth)
+//   // Create counters
+//   val width = 2 + Utils.log2Up(depth)
 
-  val headCtr = Module(new CompactingCounter(pW.reduce{_+_}, depth, width))
-  val tailCtr = Module(new CompactingCounter(pR.reduce{_+_}, depth, width))
-  (0 until pW.reduce{_+_}).foreach{i => headCtr.io.input.enables(i) := io.in(i).en}
-  (0 until pR.reduce{_+_}).foreach{i => tailCtr.io.input.enables(i) := io.deq(i)}
-  headCtr.io.input.reset := reset
-  tailCtr.io.input.reset := reset
-  headCtr.io.input.dir := true.B
-  tailCtr.io.input.dir := true.B
+//   val headCtr = Module(new CompactingCounter(pW.reduce{_+_}, depth, width))
+//   val tailCtr = Module(new CompactingCounter(pR.reduce{_+_}, depth, width))
+//   (0 until pW.reduce{_+_}).foreach{i => headCtr.io.input.enables(i) := io.in(i).en}
+//   (0 until pR.reduce{_+_}).foreach{i => tailCtr.io.input.enables(i) := io.deq(i)}
+//   headCtr.io.input.reset := reset
+//   tailCtr.io.input.reset := reset
+//   headCtr.io.input.dir := true.B
+//   tailCtr.io.input.dir := true.B
 
-  // Register for tracking number of elements in FIFO
-  val elements = Module(new CompactingIncDincCtr(pW.reduce{_+_}, pR.reduce{_+_}, depth, width))
-  (0 until pW.reduce{_+_}).foreach{i => elements.io.input.inc_en(i) := io.in(i).en}
-  (0 until pR.reduce{_+_}).foreach{i => elements.io.input.dinc_en(i) := io.deq(i)}
+//   // Register for tracking number of elements in FIFO
+//   val elements = Module(new CompactingIncDincCtr(pW.reduce{_+_}, pR.reduce{_+_}, depth, width))
+//   (0 until pW.reduce{_+_}).foreach{i => elements.io.input.inc_en(i) := io.in(i).en}
+//   (0 until pR.reduce{_+_}).foreach{i => elements.io.input.dinc_en(i) := io.deq(i)}
 
-    //Mux(headCtr.io.output.count < tailCtr.io.output.count, headCtr.io.output.count + depth.S(width.W), headCtr.io.output.count - tailCtr.io.output.count)
+//     //Mux(headCtr.io.output.count < tailCtr.io.output.count, headCtr.io.output.count + depth.S(width.W), headCtr.io.output.count - tailCtr.io.output.count)
 
-  // Create physical mems
-  val banks = max(pW.max, pR.max)
-  val m = (0 until banks).map{ i => Module(new Mem1D(depth/banks, bitWidth))}
+//   // Create physical mems
+//   val banks = max(pW.max, pR.max)
+//   val m = (0 until banks).map{ i => Module(new Mem1D(depth/banks, bitWidth))}
 
-  // Create compacting network
-  val enqCompactor = Module(new CompactingEnqNetwork(pW, banks, width, bitWidth))
-  enqCompactor.io.headCnt := headCtr.io.output.count
-  (0 until pW.reduce{_+_}).foreach{i => enqCompactor.io.in(i) := io.in(i)}
+//   // Create compacting network
+//   val enqCompactor = Module(new CompactingEnqNetwork(pW, banks, width, bitWidth))
+//   enqCompactor.io.headCnt := headCtr.io.output.count
+//   (0 until pW.reduce{_+_}).foreach{i => enqCompactor.io.in(i) := io.in(i)}
 
-  // Connect compacting network to banks
-  val active_w_bank = Utils.singleCycleModulo(headCtr.io.output.count, banks.S(width.W))
-  val active_w_addr = Utils.singleCycleDivide(headCtr.io.output.count, banks.S(width.W))
-  (0 until banks).foreach{i => 
-    val addr = Mux(i.S(width.W) < active_w_bank, active_w_addr + 1.S(width.W), active_w_addr)
-    m(i).io.w.ofs := addr.asUInt
-    m(i).io.w.data := enqCompactor.io.out(i).data
-    m(i).io.w.en   := enqCompactor.io.out(i).en
-    m(i).io.wMask  := enqCompactor.io.out(i).en
-  }
+//   // Connect compacting network to banks
+//   val active_w_bank = Utils.singleCycleModulo(headCtr.io.output.count, banks.S(width.W))
+//   val active_w_addr = Utils.singleCycleDivide(headCtr.io.output.count, banks.S(width.W))
+//   (0 until banks).foreach{i => 
+//     val addr = Mux(i.S(width.W) < active_w_bank, active_w_addr + 1.S(width.W), active_w_addr)
+//     m(i).io.w.ofs := addr.asUInt
+//     m(i).io.w.data := enqCompactor.io.out(i).data
+//     m(i).io.w.en   := enqCompactor.io.out(i).en
+//     m(i).io.wMask  := enqCompactor.io.out(i).en
+//   }
 
-  // Create dequeue compacting network
-  val deqCompactor = Module(new CompactingDeqNetwork(pR, banks, width, bitWidth))
-  deqCompactor.io.tailCnt := tailCtr.io.output.count
-  val active_r_bank = Utils.singleCycleModulo(tailCtr.io.output.count, banks.S(width.W))
-  val active_r_addr = Utils.singleCycleDivide(tailCtr.io.output.count, banks.S(width.W))
-  (0 until banks).foreach{i => 
-    val addr = Mux(i.S(width.W) < active_r_bank, active_r_addr + 1.S(width.W), active_r_addr)
-    m(i).io.r.ofs := addr.asUInt
-    deqCompactor.io.input.data(i) := m(i).io.output.data
-  }
-  (0 until pR.reduce{_+_}).foreach{i =>
-    deqCompactor.io.input.deq(i) := io.deq(i)
-  }
-  (0 until pR.max).foreach{i =>
-    io.out(i) := deqCompactor.io.output.data(i)
-  }
+//   // Create dequeue compacting network
+//   val deqCompactor = Module(new CompactingDeqNetwork(pR, banks, width, bitWidth))
+//   deqCompactor.io.tailCnt := tailCtr.io.output.count
+//   val active_r_bank = Utils.singleCycleModulo(tailCtr.io.output.count, banks.S(width.W))
+//   val active_r_addr = Utils.singleCycleDivide(tailCtr.io.output.count, banks.S(width.W))
+//   (0 until banks).foreach{i => 
+//     val addr = Mux(i.S(width.W) < active_r_bank, active_r_addr + 1.S(width.W), active_r_addr)
+//     m(i).io.r.ofs := addr.asUInt
+//     deqCompactor.io.input.data(i) := m(i).io.output.data
+//   }
+//   (0 until pR.reduce{_+_}).foreach{i =>
+//     deqCompactor.io.input.deq(i) := io.deq(i)
+//   }
+//   (0 until pR.max).foreach{i =>
+//     io.out(i) := deqCompactor.io.output.data(i)
+//   }
 
-  // Check if there is data
-  io.empty := elements.io.output.empty
-  io.full := elements.io.output.full
-  io.almostEmpty := elements.io.output.almostEmpty
-  io.almostFull := elements.io.output.almostFull
-  io.numel := elements.io.output.numel.asUInt
+//   // Check if there is data
+//   io.empty := elements.io.output.empty
+//   io.full := elements.io.output.full
+//   io.almostEmpty := elements.io.output.almostEmpty
+//   io.almostFull := elements.io.output.almostFull
+//   io.numel := elements.io.output.numel.asUInt
 
-  // Debug signals
-  io.debug.overread := elements.io.output.overread
-  io.debug.overwrite := elements.io.output.overwrite
-  io.debug.error := elements.io.output.overwrite | elements.io.output.overread
+//   // Debug signals
+//   io.debug.overread := elements.io.output.overread
+//   io.debug.overwrite := elements.io.output.overwrite
+//   io.debug.error := elements.io.output.overwrite | elements.io.output.overread
 
-  val wPort_mask = scala.collection.mutable.MutableList((0 until pW.length).map{i => 0}:_*)
-  def connectEnqPort(data: Vec[UInt], en: Vec[Bool]): Unit = {
-    // Figure out which bundle this port can go with
-    val bundle_id = wPort_mask.zip(pW).indexWhere{a => a._2 == data.length && a._1 == 0}
-    wPort_mask(bundle_id) = 1
-    val base = pW.take(bundle_id).sum
+//   val wPort_mask = scala.collection.mutable.MutableList((0 until pW.length).map{i => 0}:_*)
+//   def connectEnqPort(data: Vec[UInt], en: Vec[Bool]): Unit = {
+//     // Figure out which bundle this port can go with
+//     val bundle_id = wPort_mask.zip(pW).indexWhere{a => a._2 == data.length && a._1 == 0}
+//     wPort_mask(bundle_id) = 1
+//     val base = pW.take(bundle_id).sum
 
-    (0 until data.length).foreach{ i => 
-      io.in(base + i).data := data(i)
-      io.in(base + i).en := en(i)
-    }
-  }
+//     (0 until data.length).foreach{ i => 
+//       io.in(base + i).data := data(i)
+//       io.in(base + i).en := en(i)
+//     }
+//   }
 
-  val rPort_mask = scala.collection.mutable.MutableList((0 until pR.length).map{i => 0}:_*)
-  def connectDeqPort(en: Vec[Bool]): Vec[UInt] = {
-    // Figure out which bundle this port can go with
-    val bundle_id = rPort_mask.zip(pR).indexWhere{a => a._2 == en.length && a._1 == 0}
-    rPort_mask(bundle_id) = 1
-    val base = pR.take(bundle_id).sum
+//   val rPort_mask = scala.collection.mutable.MutableList((0 until pR.length).map{i => 0}:_*)
+//   def connectDeqPort(en: Vec[Bool]): Vec[UInt] = {
+//     // Figure out which bundle this port can go with
+//     val bundle_id = rPort_mask.zip(pR).indexWhere{a => a._2 == en.length && a._1 == 0}
+//     rPort_mask(bundle_id) = 1
+//     val base = pR.take(bundle_id).sum
 
-    Vec((0 until en.length).map{ i =>
-      io.deq(base + i) := Utils.getRetimed(en(i), {if (Utils.retime) 1 else 0})
-      io.out(i) // TODO: probably wrong output
-    })
-  }
+//     Vec((0 until en.length).map{ i =>
+//       io.deq(base + i) := Utils.getRetimed(en(i), {if (Utils.retime) 1 else 0})
+//       io.out(i) // TODO: probably wrong output
+//     })
+//   }
 
-  // // Old empty and error tracking
-  // val ovW = Module(new SRFF())
-  // val ovR = Module(new SRFF())
-  // val www_c = writer.io.output.countWithoutWrap(0)*-*(p/pW).U + subWriter.io.output.count(0)
-  // val w_c = writer.io.output.count(0)*-*(p/pW).U + subWriter.io.output.count(0)
-  // val rww_c = reader.io.output.countWithoutWrap(0)*-*(p/pR).U + subReader.io.output.count(0)
-  // val r_c = reader.io.output.count(0)*-*(p/pR).U + subReader.io.output.count(0)
-  // val hasData = Module(new SRFF())
-  // hasData.io.input.set := (w_c === r_c) & io.enq & !(ovR.io.output.data | ovW.io.output.data)
-  // hasData.io.input.reset := (r_c + 1.U === www_c) & io.deq & !(ovR.io.output.data | ovW.io.output.data)
-  // io.empty := !hasData.io.output.data
+//   // // Old empty and error tracking
+//   // val ovW = Module(new SRFF())
+//   // val ovR = Module(new SRFF())
+//   // val www_c = writer.io.output.countWithoutWrap(0)*-*(p/pW).U + subWriter.io.output.count(0)
+//   // val w_c = writer.io.output.count(0)*-*(p/pW).U + subWriter.io.output.count(0)
+//   // val rww_c = reader.io.output.countWithoutWrap(0)*-*(p/pR).U + subReader.io.output.count(0)
+//   // val r_c = reader.io.output.count(0)*-*(p/pR).U + subReader.io.output.count(0)
+//   // val hasData = Module(new SRFF())
+//   // hasData.io.input.set := (w_c === r_c) & io.enq & !(ovR.io.output.data | ovW.io.output.data)
+//   // hasData.io.input.reset := (r_c + 1.U === www_c) & io.deq & !(ovR.io.output.data | ovW.io.output.data)
+//   // io.empty := !hasData.io.output.data
 
-  // // Debugger
-  // val overwrite = hasData.io.output.data & (w_c === r_c) & io.enq // TODO: Need to handle sub-counters
-  // val fixed_overwrite = (www_c === r_c + 1.U) & io.deq
-  // ovW.io.input.set := overwrite
-  // ovW.io.input.reset := fixed_overwrite
-  // io.debug.overwrite := ovW.io.output.data
-  // val overread = !hasData.io.output.data & (w_c === r_c) & io.deq // TODO: Need to handle sub-counters
-  // val fixed_overread = (w_c + 1.U === rww_c) & io.enq
-  // ovR.io.input.set := overread
-  // ovR.io.input.reset := fixed_overread
-  // io.debug.overread := ovR.io.output.data
+//   // // Debugger
+//   // val overwrite = hasData.io.output.data & (w_c === r_c) & io.enq // TODO: Need to handle sub-counters
+//   // val fixed_overwrite = (www_c === r_c + 1.U) & io.deq
+//   // ovW.io.input.set := overwrite
+//   // ovW.io.input.reset := fixed_overwrite
+//   // io.debug.overwrite := ovW.io.output.data
+//   // val overread = !hasData.io.output.data & (w_c === r_c) & io.deq // TODO: Need to handle sub-counters
+//   // val fixed_overread = (w_c + 1.U === rww_c) & io.enq
+//   // ovR.io.input.set := overread
+//   // ovR.io.input.reset := fixed_overread
+//   // io.debug.overread := ovR.io.output.data
 
-  // io.debug.error := ovR.io.output.data | ovW.io.output.data
+//   // io.debug.error := ovR.io.output.data | ovW.io.output.data
 
 
-}
+// }
 
 // class FILO(val pR: Int, val pW: Int, val depth: Int, val numWriters: Int, val numReaders: Int, val bitWidth: Int = 32) extends Module {
 //   def this(tuple: (Int, Int, Int, Int, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)

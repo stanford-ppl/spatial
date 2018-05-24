@@ -50,15 +50,6 @@ object Arguments {
     (32, XMap(0 -> 1)),
     (64, XMap(0 -> 1))
   )
-  val FFNoInit = List(
-    32
-  )
-  val FFNoInitNoReset = List(
-    32
-  )
-  val FFNoReset = List(
-    32
-  )
   val TFF = List(
     "null"
   )
@@ -73,15 +64,6 @@ object Arguments {
     (List(80), 16, List(5), XMap(0 -> 5),XMap(0 -> 1)),
     (List(80), 16, List(6), XMap(0 -> 6),XMap(0 -> 3)),
     (List(80), 16, List(2), XMap(0 -> 1),XMap(0 -> 2))
-  )
-  val FILO = List(
-    (1,1,10,1,1),
-    (2,2,30,1,1),
-    (4,4,52,1,1),
-    (4,1,56,1,1),
-    (1,4,56,1,1),
-    (3,6,48,1,1),
-    (6,3,48,1,1)
   )
   val SingleCounter = List(
     (1,None, None, None, None, 8),(3,None, None, None, None, 9)
@@ -99,14 +81,14 @@ object Arguments {
     (List(4,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8))
   )
   val OuterControl = List(
-    (Sequential, 1, false),
-    (Sequential, 2, false),
-    (Sequential, 5, false),
-    (Sequential, 8, false),
-    (Pipeline, 1, false),
-    (Pipeline, 2, false),
-    (Pipeline, 5, false),
-    (Pipeline, 8, false),
+    (Sequenced, 1, false),
+    (Sequenced, 2, false),
+    (Sequenced, 5, false),
+    (Sequenced, 8, false),
+    (Pipelined, 1, false),
+    (Pipelined, 2, false),
+    (Pipelined, 5, false),
+    (Pipelined, 8, false),
     (ForkJoin, 1, false),
     (ForkJoin, 2, false),
     (ForkJoin, 5, false),
@@ -117,7 +99,7 @@ object Arguments {
     // (8, Stream, false),
   )
   val InnerControl = List(
-    (Sequential, false, 32)
+    (Sequenced, false, 32)
   )
   val PRNG = List(
     1,
@@ -242,30 +224,6 @@ object Launcher {
       }) 
   }.toMap
 
-  templates = templates ++ Arguments.FFNoInit.zipWithIndex.map{ case(arg,i) => 
-    (s"FFNoInit$i" -> { (backendName: String) =>
-    	Driver(() => new FFNoInit(arg), "verilator") {
-          (c) => new FFNoInitTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.FFNoInitNoReset.zipWithIndex.map{ case(arg,i) => 
-    (s"FFNoInitNoReset$i" -> { (backendName: String) =>
-    	Driver(() => new FFNoInitNoReset(arg), "verilator") {
-          (c) => new FFNoInitNoResetTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.FFNoReset.zipWithIndex.map{ case(arg,i) => 
-    (s"FFNoReset$i" -> { (backendName: String) =>
-    	Driver(() => new FFNoReset(arg), "verilator") {
-          (c) => new FFNoResetTests(c)
-        }
-      }) 
-  }.toMap
-
   templates = templates ++ Arguments.TFF.zipWithIndex.map{ case(arg,i) => 
     (s"TFF$i" -> { (backendName: String) =>
     	Driver(() => new TFF(arg), "verilator") {
@@ -286,14 +244,6 @@ object Launcher {
     (s"FIFO$i" -> { (backendName: String) =>
     	Driver(() => new FIFO(arg), "verilator") {
           (c) => new FIFOTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.FILO.zipWithIndex.map{ case(arg,i) => 
-    (s"FILO$i" -> { (backendName: String) =>
-    	Driver(() => new FILO(arg), "verilator") {
-          (c) => new FILOTests(c)
         }
       }) 
   }.toMap

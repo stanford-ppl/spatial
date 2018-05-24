@@ -81,6 +81,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
     case _: ParallelPipe         => s.rawSchedule = ForkJoin
     case _: Switch[_]            => s.rawSchedule = Fork
+    case _: SwitchCase[_]        => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
     case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
     case _: Control[_] =>
@@ -105,6 +106,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
       if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
+      if (s.isUnitPipe && s.rawSchedule == Fork) s.rawSchedule = Sequenced // Undo transfer of metadata copied from Switch in PipeInserter
 
       logs(s"  Final Schedule:   ${s.rawSchedule}")
 

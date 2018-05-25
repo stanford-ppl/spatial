@@ -199,7 +199,10 @@ trait ReduceUnrolling extends UnrollingBase {
     inReduce(redType,isInner){
       dbgs(s"Store: $result to $accum")
 
-      store.reapply(accum, result)
+      val res = store.reapply(accum, result)
+
+      dbgs(s"Completed store (symbol $res)")
+      res
     }
   }
 

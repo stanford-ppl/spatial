@@ -94,8 +94,9 @@ abstract class SubstTransformer extends Transformer {
     {(a: A, b: B) => isolate() {
       register(lambda2.inputA -> a)
       register(lambda2.inputB -> b)
+      dbgs(s"Creating Function0 with subst: {${lambda2.inputA} -> $a, ${lambda2.inputB} -> $b}")
       val block = blockToFunction0(lambda2)
-      dbgs(s"BLOCK IS $a $b ${lambda2.inputA} ${lambda2.inputB} and ${block()}")
+      dbgs(s"Executing Function0")
       block()
     }}
   }

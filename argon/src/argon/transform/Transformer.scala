@@ -200,7 +200,12 @@ abstract class Transformer extends Pass {
   }
   implicit class Lambda2Ops[A,B,R](lambda2: Lambda2[A,B,R]) {
     /** Inline all statements in the block into the current scope with the given inputs. */
-    def reapply(a: A, b: B): R = { val func = lambda2ToFunction2(lambda2); func(a,b) }
+    def reapply(a: A, b: B): R = {
+      dbgs(s"Making Function2")
+      val func = lambda2ToFunction2(lambda2)
+      dbgs(s"Executing Function2 with inputs: $a and $b")
+      func(a,b)
+    }
     def toFunction2: (A, B) => R = lambda2ToFunction2(lambda2)
   }
   implicit class Lambda3Ops[A,B,C,R](lambda3: Lambda3[A,B,C,R]) {

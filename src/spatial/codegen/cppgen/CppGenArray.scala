@@ -216,6 +216,17 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case op @ IfThenElse(cond, thenp, elsep) =>
+      if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
+      open(src"if ($cond) { ")
+        visitBlock(thenp)
+        if (op.R.isBits) emit(src"${lhs} = ${thenp.result};")
+      close("}")
+      open("else {")
+        visitBlock(elsep)
+        if (op.R.isBits) emit(src"${lhs} = ${elsep.result};")
+      close("}")
+
     case ArrayFilter(array, apply, cond) =>
       emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
       open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")

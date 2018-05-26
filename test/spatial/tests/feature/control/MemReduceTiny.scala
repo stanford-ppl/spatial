@@ -21,8 +21,10 @@ import spatial.dsl._
       dram store accum
     }
 
-    val result = getMem(dram)
-    val golden = Matrix.tabulate(32,32){(j,k) => j + k }.map{e => e * 32 }
+    val result = getMatrix(dram)
+    val golden = Matrix.tabulate(32,32){(j,k) => (j + k)*32 }
+    printMatrix(golden, "Wanted:")
+    printMatrix(result, "Got:")
     assert(result == golden)
   }
 }

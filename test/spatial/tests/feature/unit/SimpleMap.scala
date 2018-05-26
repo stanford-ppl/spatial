@@ -22,7 +22,7 @@ import spatial.dsl._
       val xx = SRAM[Q32](N)
       val yy = SRAM[Q32](N)
       xx load x(0::N par 16)
-      Foreach(0 until N by 16){i =>
+      Foreach(0 until N par 16){i =>
         yy(i) = xx(i) * q
       }
       y(0::N par 16) store yy
@@ -30,6 +30,8 @@ import spatial.dsl._
 
     val result = getMem(y)
     val gold = data.map{e => e * a }
+    printArray(result, "Result:")
+    printArray(gold, "Wanted:")
     assert(result == gold)
   }
 

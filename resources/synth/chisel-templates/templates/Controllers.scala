@@ -138,19 +138,19 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
     case Streaming => 
       // Define rule for when ctr increments
-      io.ctrInc := synchronize // Don't care, each child has its own copy
+      io.ctrInc := false.B // Don't care, each child has its own copy
 
       // Configure synchronization
-      synchronize := iterDone.map(_.io.output.data).reduce{_&_}
+      synchronize := false.B // iterDone.map(_.io.output.data).reduce{_&_}
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & ~io.ctrCopyDone(i)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
         iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
         done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i) & io.enable)
-        done(i).io.input.reset := synchronize.D(1) | io.parentAck // Override done reset
+        done(i).io.input.reset := io.parentAck // Override done reset
       }
 
     case Fork => 

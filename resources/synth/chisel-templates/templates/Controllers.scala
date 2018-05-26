@@ -205,11 +205,11 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
 
 
-class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
+class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isInnerSwitch: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
-  def this(tuple: (Sched, Boolean, Int)) = this(tuple._1,tuple._2,tuple._3)
+  def this(tuple: (Sched, Boolean, Int)) = this(tuple._1,tuple._2,stateWidth = tuple._3)
 
   // Module IO
   val io = IO(new Bundle {
@@ -251,8 +251,14 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
-    io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
-    io.ctrInc := active.io.output.data & io.enable
+    if (isInnerSwitch) { // pass through signals
+      io.datapathEn := io.enable 
+      io.ctrInc := io.enable
+    }
+    else {
+      io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
+      io.ctrInc := active.io.output.data & io.enable
+    }
     io.done := Utils.getRetimed(Utils.risingEdge(done.io.output.data), latency)
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1)}
 
@@ -260,22 +266,26 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     val stateFSM = Module(new FF(stateWidth))
     val doneReg = Module(new SRFF())
 
-    // With retime turned off (i.e latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
-    val depulser = RegInit(true.B) 
-    if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
-    else depulser := true.B
+    // // With retime turned off (i.e latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
+    // val depulser = RegInit(true.B) 
+    // if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
+    // else depulser := true.B
 
     stateFSM.io.xBarW(0).data := io.nextState.asUInt
     stateFSM.io.xBarW(0).init := io.initState.asUInt
-    if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
-    else stateFSM.io.xBarW(0).en := io.enable
+    stateFSM.io.xBarW(0).en := io.enable & io.ctrDone.D(latency)
+    // if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
+    // else stateFSM.io.xBarW(0).en := io.enable
     stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data(0).asSInt
+
+    // Screwiness with "switch" signals until we have better fsm test cases
+    io.childAck.last := io.doneIn.last
 
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
-    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & depulser
+    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
     io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, io.enable)
 
   }

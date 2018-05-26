@@ -9,8 +9,6 @@ trait ScalaGenSwitch extends ScalaGenBits with ScalaGenMemories with ScalaGenSRA
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@Switch(selects,_) =>
-      val isBits = op.R.isBits
-
       emit(src"/** BEGIN SWITCH $lhs **/")
       open(src"val $lhs = {")
         selects.indices.foreach { i =>
@@ -18,7 +16,10 @@ trait ScalaGenSwitch extends ScalaGenBits with ScalaGenMemories with ScalaGenSRA
             ret(op.cases(i).body)
           close("}")
         }
-        if (isBits) emit(src"else { ${invalid(op.R)} }") else emit(src"()")
+        if (op.R.isBits)      emit(src"else { ${invalid(op.R)} }")
+        else if (op.R.isVoid) emit(src"else ()")
+        else                  emit(src"else { null.asInstanceOf[${op.R}]")
+
         emitControlDone(lhs)
       close("}")
       emit(src"/** END SWITCH $lhs **/")

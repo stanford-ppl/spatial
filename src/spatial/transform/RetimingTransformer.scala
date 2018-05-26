@@ -6,11 +6,14 @@ import spatial.data._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
+import spatial.internal.spatialConfig
 import spatial.traversal.AccelTraversal
 
 import scala.collection.immutable.SortedSet
 
 case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTraversal {
+  override def shouldRun: Boolean = spatialConfig.enableRetiming
+
   var retimeBlocks: List[Boolean] = Nil
   var ctx: Option[SrcCtx] = None
 

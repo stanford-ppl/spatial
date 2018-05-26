@@ -28,7 +28,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
   def requiresDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
     case _:RegRead[_] => true
     case _ =>
-      // Duplicate stateless nodes when they have users across control or
+      // Duplicate stateless nodes when they have users across control or not the current block
       val blocks = lhs.users.map(_.blk)
       blocks.size > 1 || blocks.exists(_ != blk)
   }
@@ -55,11 +55,12 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         }
       }
 
-      if (lhs.users.isEmpty && inHw) {
-        dbgs(s"REMOVING stateless $lhs") // Nodes in host, used only in host won't have users
-        Invalid // Must know context to use this symbol
+      if (inHw) {
+        if (lhs.users.isEmpty) dbgs(s"REMOVING stateless $lhs")
+        Invalid // In hardware, must know context to use this symbol
       }
       else {
+        // Nodes in host, used only in host won't have users
         updateWithContext(lhs, rhs)
       }
 

@@ -33,44 +33,57 @@ trait Printing {
   }
 
   /** Compiler Warnings */
-  @stateful def warn(x: => Any): Unit = if (config.enWarn) state.out.warn(x)
+  @stateful def warn(x: => Any): Unit = {
+    lazy val msg = x
+    if (config.enDbg) state.log.log(s"[warn] $msg")
+    if (config.enWarn) state.out.warn(msg)
+  }
   @stateful def warn(ctx: SrcCtx): Unit = warn(ctx, showCaret = true)
-  @stateful def warn(ctx: SrcCtx, showCaret: Boolean): Unit = if (config.enWarn) state.out.warn(ctx,showCaret)
+  @stateful def warn(ctx: SrcCtx, showCaret: Boolean): Unit = {
+    if (config.enDbg) { state.log.print("[warn] " ); state.log.log(ctx, showCaret) }
+    if (config.enWarn) state.out.warn(ctx,showCaret)
+  }
   @stateful def warn(ctx: SrcCtx, x: => Any, noWarning: Boolean = false): Unit = {
-    if (config.enWarn) state.out.warn(ctx, x)
+    lazy val msg = x
+    if (config.enDbg) { state.log.print("[warn] "); state.log.log(ctx, msg) }
+    if (config.enWarn) state.out.warn(ctx, msg)
     if (!noWarning) state.logWarning()
   }
 
   /** Compiler Errors */
   @stateful def error(x: => Any): Unit = {
-    if (config.enDbg) state.log.log(s"[error] $x")
-    if (config.enError) state.out.error(x)
+    lazy val msg = x
+    if (config.enDbg) state.log.log(s"[error] $msg")
+    if (config.enError) state.out.error(msg)
   }
   @stateful def error(ctx: SrcCtx): Unit = error(ctx, showCaret = true)
   @stateful def error(ctx: SrcCtx, showCaret: Boolean): Unit = {
     if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, showCaret) }
     if (config.enError) state.out.error(ctx,showCaret)
   }
-  @stateful def   error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
+  @stateful def error(ctx: SrcCtx, x: => String): Unit = error(ctx, x, noError = false)
   @stateful def error(ctx: SrcCtx, x: => String, noError: Boolean): Unit = {
-    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, x) }
-    if (config.enError) state.out.error(ctx, x)
+    lazy val msg = x
+    if (config.enDbg) { state.log.print("[error] "); state.log.log(ctx, msg) }
+    if (config.enError) state.out.error(ctx, msg)
     if (!noError) state.logError()
   }
 
   /** Compiler Bugs */
   @stateful def bug(x: => Any): Unit = {
-    dbg("[bug] " + x)
+    lazy val msg = x
+    if (config.enDbg) state.log.log(s"[bug] $msg")
     state.out.bug(x)
   }
   @stateful def bug(ctx: SrcCtx): Unit = bug(ctx, showCaret = true)
   @stateful def bug(ctx: SrcCtx, showCaret: Boolean): Unit = {
-    dbg("[bug] " + ctx.content.getOrElse(""))
+    if (config.enDbg) { state.log.print("[bug] "); state.log.log(ctx, showCaret) }
     state.out.bug(ctx, showCaret)
   }
   @stateful def bug(ctx: SrcCtx, x: => Any, noBug: Boolean = false): Unit = {
-    state.out.bug(ctx, x)
-    dbg(s"[bug] $ctx: $x")
+    lazy val msg = x
+    if (config.enDbg) { state.log.print("[bug] "); state.log.log(ctx, msg) }
+    state.out.bug(ctx, msg)
     if (!noBug) state.logBug()
   }
 

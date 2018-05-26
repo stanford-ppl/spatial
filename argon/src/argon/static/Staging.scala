@@ -141,14 +141,8 @@ trait Staging { this: Printing =>
             runFlows(sym,op)
 
             if (config.enLog) {
-              val writes = effects.writes.map{s => s"$s [${s.allAliases.mkString(",")}]" }.mkString(", ")
               logs(s"$lhs = $op")
-              logs(s"  Effects:   $effects")
-              logs(s"  Writes:    $writes")
-              logs(s"  AliasSyms: ${op.aliasSyms}")
-              logs(s"  Deep:      ${op.deepAliases}")
-              logs(s"  Shallow:   ${op.shallowAliases}")
-              logs(s"  Aliases:   ${sym.allAliases}")
+              strMeta(sym)
             }
 
             // 9. Check for mutable aliases, mutation of immutable values

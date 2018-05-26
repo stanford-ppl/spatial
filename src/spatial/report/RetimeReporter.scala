@@ -5,9 +5,10 @@ import spatial.data._
 import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.util._
+import spatial.internal.spatialConfig
 
 case class RetimeReporter(IR: State) extends AccelTraversal {
-  override def shouldRun: Boolean = config.enInfo
+  override def shouldRun: Boolean = config.enInfo && spatialConfig.enableRetiming
 
   override def process[R](block: Block[R]): Block[R] = {
     inGen(config.repDir, "Retime.report"){ super.process(block) }

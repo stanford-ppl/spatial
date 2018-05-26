@@ -17,7 +17,8 @@ abstract class Op[R:Type] extends Serializable with Product {
 
   def expInputs: Seq[Sym[_]] = exps(productIterator).toSeq
   def blockInputs: Seq[Sym[_]] = exps(blocks).toSeq
-  def nonBlockInputs: Seq[Sym[_]] = expInputs diff blockInputs
+  def nonBlockExpInputs: Seq[Sym[_]] = expInputs diff blockInputs
+  def nonBlockSymInputs: Seq[Sym[_]] = inputs diff blockInputs
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies */
   // Inputs: symbol dataflow dependencies for this Def.

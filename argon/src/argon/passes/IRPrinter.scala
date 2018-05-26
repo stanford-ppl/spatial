@@ -2,8 +2,9 @@ package argon.passes
 
 import argon._
 
-case class IRPrinter(IR: State) extends Traversal {
+case class IRPrinter(IR: State, enable: Boolean) extends Traversal {
   override val name = "IR"
+  override def shouldRun: Boolean = enable
 
   override protected def postprocess[R](block: Block[R]): Block[R] = {
     dbgs("")

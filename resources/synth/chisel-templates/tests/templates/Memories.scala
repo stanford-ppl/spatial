@@ -40,9 +40,11 @@ class Mem1DTests(c: Mem1D) extends PeekPokeTester(c) {
 class FFTests(c: FF) extends PeekPokeTester(c) {
   val initval = 10
   poke(c.io.xBarW(0).init, initval)
+  poke(c.io.xBarW(0).reset, 1)
   step(1)
-  reset(1)
   expect(c.io.output.data(0), initval)
+  poke(c.io.xBarW(0).reset, 0)
+  step(1)
 
   // overwrite init
   poke(c.io.xBarW(0).data, 0)
@@ -444,10 +446,11 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
   }
 
   // fill FIFO halfway
+  var x = 0
   var things_pushed = 0
   for (i <- 0 until c.p.depth/c.p.xBarWMux.values.head._1/2) {
     val ens = (0 until c.p.xBarWMux.values.head._1).map{i => rnd.nextInt(2)}
-    val datas = (0 until c.p.xBarWMux.values.head._1).map{i => rnd.nextInt(5)}
+    val datas = (0 until c.p.xBarWMux.values.head._1).map{i => x = x + 1; x /*rnd.nextInt(5)*/}
     things_pushed = things_pushed + ens.reduce{_+_}
     enq(datas, ens)
   }

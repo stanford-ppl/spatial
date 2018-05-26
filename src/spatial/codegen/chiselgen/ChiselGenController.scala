@@ -615,6 +615,7 @@ trait ChiselGenController extends ChiselGenCommon {
     case op@SwitchCase(body) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
+      emitIICounter(lhs)
       emitChildrenCxns(lhs, false)
       // emitInhibitor(lhs, None, Some(lhs.parent.s.get))
       emit(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")

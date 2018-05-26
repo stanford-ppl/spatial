@@ -46,9 +46,9 @@ object Arguments {
     // (18,"max","FloatingPoint",List(24,8))
   )
   val FF = List(
-    (16, XMap(0 -> 1)),
-    (32, XMap(0 -> 1)),
-    (64, XMap(0 -> 1))
+    (16, XMap((0,0) -> 1)),
+    (32, XMap((0,0) -> 1)),
+    (64, XMap((0,0) -> 1))
   )
   val TFF = List(
     "null"
@@ -57,13 +57,13 @@ object Arguments {
     "null"
   )
   val FIFO = List(
-    (List(80), 16, List(1), XMap(0 -> 1),XMap(0 -> 1)),
-    (List(80), 16, List(5), XMap(0 -> 1),XMap(0 -> 5)),
-    (List(80), 16, List(8), XMap(0 -> 1),XMap(0 -> 8)),
-    (List(80), 16, List(2), XMap(0 -> 2),XMap(0 -> 1)),
-    (List(80), 16, List(5), XMap(0 -> 5),XMap(0 -> 1)),
-    (List(80), 16, List(6), XMap(0 -> 6),XMap(0 -> 3)),
-    (List(80), 16, List(2), XMap(0 -> 1),XMap(0 -> 2))
+    (List(80), 16, List(1), XMap((0,0) -> 1),XMap((0,0) -> 1)),
+    (List(80), 16, List(5), XMap((0,0) -> 1),XMap((0,0) -> 5)),
+    (List(80), 16, List(8), XMap((0,0) -> 1),XMap((0,0) -> 8)),
+    (List(80), 16, List(2), XMap((0,0) -> 2),XMap((0,0) -> 1)),
+    (List(80), 16, List(5), XMap((0,0) -> 5),XMap((0,0) -> 1)),
+    (List(80), 16, List(6), XMap((0,0) -> 6),XMap((0,0) -> 3)),
+    (List(80), 16, List(2), XMap((0,0) -> 1),XMap((0,0) -> 2))
   )
   val SingleCounter = List(
     (1,None, None, None, None, 8),(3,None, None, None, None, 9)
@@ -112,11 +112,11 @@ object Arguments {
   )
   val ShiftRegFile = List(
            ( List(16,16), 32, 
-             XMap(0 -> 1), XMap(0 -> 1),
+             XMap((0,0) -> 1), XMap((0,0) -> 1),
              DMap(),  DMap()
            ),
            ( List(6,10), 32, 
-             ShiftXMap(1, 0 -> 1), ShiftXMap(1, 0 -> 1),
+             ShiftXMap(1, (0,0) -> 1), ShiftXMap(1, (0,0) -> 1),
              DMap(),  DMap()
            )
         )
@@ -124,43 +124,43 @@ object Arguments {
            ( List(1,16), 32, 
              List(1,1), List(1,1),
              XMap(), XMap(),
-             DMap(0 -> List(Banks(0,0))),  DMap(0 -> List(Banks(0,0))),
+             DMap((0,0) -> List(Banks(0,0))),  DMap((0,0) -> List(Banks(0,0))),
              BankedMemory ),
            ( List(1,32), 32, 
              List(1,2), List(1,1),
              XMap(), XMap(),
-             DMap(0 -> List(Banks(0,0), Banks(0,1))),  DMap(0 -> List(Banks(0,0),Banks(0,1))),
+             DMap((0,0) -> List(Banks(0,0), Banks(0,1))),  DMap((0,0) -> List(Banks(0,0),Banks(0,1))),
              BankedMemory ),
            ( List(32,32), 32, 
              List(2,2), List(1,1),
              XMap(), XMap(),
-             DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1))),  DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1))),
+             DMap((0,0) -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1))),  DMap((0,0) -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1))),
              BankedMemory )
         )
   val NBufMem = List( 
            ( SRAMType, List(8,12), 2, 32, 
              List(1,2), List(1,1),
              NBufXMap(), NBufXMap(),
-             NBufDMap(0 -> DMap(0 -> List(Banks(0,0), Banks(0,1)))),  NBufDMap(1 -> DMap(0 -> List(Banks(0,0),Banks(0,1)))),
-             XMap(0 -> 1),
+             NBufDMap(0 -> DMap((0,0) -> List(Banks(0,0), Banks(0,1)))),  NBufDMap(1 -> DMap((0,0) -> List(Banks(0,0),Banks(0,1)))),
+             XMap((0,0) -> 1),
              BankedMemory),
            ( SRAMType, List(8,12), 5, 32, 
              List(2,2), List(1,1),
              NBufXMap(), NBufXMap(),
-             NBufDMap(0 -> DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)))),  NBufDMap(4 -> DMap(0 -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)))),
-             XMap(0 -> 1),
+             NBufDMap(0 -> DMap((0,0) -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)))),  NBufDMap(4 -> DMap((0,0) -> List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)))),
+             XMap((0,0) -> 1),
              BankedMemory),
            ( FFType, List(1), 2, 32, 
              List(1), List(1),
-             NBufXMap(0 -> XMap(0 -> 1)), NBufXMap(1 -> XMap(0 -> 1)),
+             NBufXMap(0 -> XMap((0,0) -> 1)), NBufXMap(1 -> XMap((0,0) -> 1)),
              NBufDMap(), NBufDMap(),
-             XMap(0 -> 1),
+             XMap((0,0) -> 1),
              BankedMemory),
            ( ShiftRegFileType, List(16,16), 4, 32, 
              List(16,16), List(1),
-             NBufXMap(0 -> XMap(0 -> 1)), NBufXMap(3 -> XMap(0 -> 1)),
+             NBufXMap(0 -> XMap((0,0) -> 1)), NBufXMap(3 -> XMap((0,0) -> 1)),
              NBufDMap(), NBufDMap(),
-             XMap(0 -> 1),
+             XMap((0,0) -> 1),
              BankedMemory)
         )
   val SystolicArray2D = List(

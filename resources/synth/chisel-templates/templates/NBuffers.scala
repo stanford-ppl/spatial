@@ -348,53 +348,61 @@ class NBufMem(val mem: MemType,
   }
 
 
-
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int) {connectXBarWPort(wBundle, bufferPort, muxPort, 0)}
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+  var usedMuxPorts = List[(String,(Int,Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)) {connectXBarWPort(wBundle, bufferPort, muxAddr, 0)}
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(hasXBarW)
+    assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = xBarWMux.accessParsBelowBufferPort(bufferPort).sum
-    val muxBase = xBarWMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = xBarWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.xBarW(bufferBase + muxBase) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, 0, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int)): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, 0, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(hasXBarR)
+    assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum
-    val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.xBarR(bufferBase + muxBase) := rBundle    
     io.flow(bufferBase + muxBase) := flow
     io.output.data(bufferBase + muxBase)
   }
 
-  def connectBroadcastPort(wBundle: W_XBar, muxPort: Int) {connectBroadcastPort(wBundle, muxPort, 0)}
-  def connectBroadcastPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
-    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxPort).sum + vecId
+  def connectBroadcastPort(wBundle: W_XBar, muxAddr: (Int, Int)) {connectBroadcastPort(wBundle, muxAddr, 0)}
+  def connectBroadcastPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int) {
+    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.broadcast(muxBase) := wBundle
   }
 
-  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(hasDirectW)
+    assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to directW port ($bufferPort,$muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = directWMux.accessParsBelowBufferPort(bufferPort).sum 
-    val muxBase = directWMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = directWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.directW(bufferBase + muxBase) := wBundle
   }
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(hasDirectR)
+    assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to directR port ($bufferPort,$muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = directRMux.accessParsBelowBufferPort(bufferPort).sum
     val xBarRBase = xBarRMux.accessPars.sum
-    val muxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.directR(bufferBase + muxBase) := rBundle    
     io.flow(xBarRBase + bufferBase + muxBase) := flow
     io.output.data(xBarRBase + bufferBase + muxBase)
   }
 
-  def connectBroadcastWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
-    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxPort).sum + vecId
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int) {
+    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.broadcast(muxBase) := wBundle
   }
 
@@ -444,9 +452,9 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     }
   })
 
-  val wMap = NBufXMap(0 -> XMap(0 -> 1))
+  val wMap = NBufXMap(0 -> XMap((0,0) -> 1))
   val rMap = NBufXMap((0 until numBufs).map{i => 
-    (i -> XMap(0 -> 1))
+    (i -> XMap((0,0) -> 1))
   }.toArray:_*)
 
   val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), 

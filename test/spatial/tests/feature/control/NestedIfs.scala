@@ -5,7 +5,7 @@ import spatial.dsl._
 
 
 @test class NestedIfs extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+  override def runtimeArgs: Args = "43" and "2"
 
 
   def nestedIfTest(x: Int): Int = {
@@ -16,12 +16,12 @@ import spatial.dsl._
       val sram = SRAM[Int](3)
       if (in >= 42.to[Int]) {     // if (43 >= 42)
         if (in <= 43.to[Int]) {   // if (43 <= 43)
-          sram(in - 41.to[Int]) = 10.to[Int] // sram(2) = 10
+          sram(in - 41.to[Int]) = 10.to[T] // sram(2) = 10
         }
       }
       else {
         if (in <= 2.to[Int]){
-          sram(in) = 20.to[Int]
+          sram(2) = 20.to[Int]
         }
       }
       Pipe{out := sram(2)}
@@ -31,9 +31,11 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    val result = nestedIfTest(43)
+    val x = args(0).to[Int]
+    val result = nestedIfTest(x)
     println("result:   " + result)
-    assert(result == 10.to[Int])
+    if (x == 43) assert(result == 10.to[Int])
+    else if (x <= 2) assert(result == 20.to[Int])
   }
 }
 

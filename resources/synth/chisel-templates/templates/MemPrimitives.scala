@@ -97,8 +97,8 @@ class W_Direct(val ofs_width:Int, val banks:List[Int], val data_width:Int) exten
 class MemInterface(p: MemParams) extends Bundle {
   var xBarW = Vec(1 max p.numXBarW, Input(new W_XBar(p.ofsWidth, p.banksWidths, p.bitWidth)))
   var xBarR = Vec(1 max p.numXBarR, Input(new R_XBar(p.ofsWidth, p.banksWidths))) 
-  var directW = HVec(Array.tabulate(1 max p.numDirectW){i => Input(new W_Direct(p.ofsWidth, if (p.hasDirectW) p.directWMux.sortByMuxPort.values.map(_._1).flatten.toList(i) else p.defaultDirect, p.bitWidth))})
-  var directR = HVec(Array.tabulate(1 max p.numDirectR){i => Input(new R_Direct(p.ofsWidth, if (p.hasDirectR) p.directRMux.sortByMuxPort.values.map(_._1).flatten.toList(i) else p.defaultDirect))})
+  var directW = HVec(Array.tabulate(1 max p.numDirectW){i => Input(new W_Direct(p.ofsWidth, if (p.hasDirectW) p.directWMux.sortByMuxPortAndOfs.values.map(_._1).flatten.toList(i) else p.defaultDirect, p.bitWidth))})
+  var directR = HVec(Array.tabulate(1 max p.numDirectR){i => Input(new R_Direct(p.ofsWidth, if (p.hasDirectR) p.directRMux.sortByMuxPortAndOfs.values.map(_._1).flatten.toList(i) else p.defaultDirect))})
   var flow = Vec(1 max p.totalOutputs, Input(Bool()))
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
@@ -120,42 +120,46 @@ class MemInterface(p: MemParams) extends Bundle {
 abstract class MemPrimitive(val p: MemParams) extends Module {
   val io = IO(new MemInterface(p))
 
-  var usedMuxPorts = List[(String,(Int,Int))]()
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+  var usedMuxPorts = List[(String,(Int,Int,Int))]() // Check if the muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(p.hasXBarW)
-    assert(!usedMuxPorts.contains(("XBarW", (muxPort,vecId))), s"Attempted to connect to XBarW port ($muxPort,$vecId) twice!")
-    usedMuxPorts ::= ("XBarW", (muxPort, vecId))
-    val base = p.xBarWMux.accessParsBelowMuxPort(muxPort).sum + vecId
+    assert(p.xBarWMux.contains(muxAddr))
+    assert(!usedMuxPorts.contains(("XBarW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("XBarW", (muxAddr._1,muxAddr._2, vecId))
+    val base = p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.xBarW(base) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(p.hasXBarR)
-    assert(!usedMuxPorts.contains(("XBarR", (muxPort,vecId))), s"Attempted to connect to XBarR port ($muxPort,$vecId) twice!")
-    usedMuxPorts ::= ("XBarR", (muxPort, vecId))
-    val base = p.xBarRMux.accessParsBelowMuxPort(muxPort).sum + vecId
+    assert(p.xBarRMux.contains(muxAddr))
+    assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarR port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("XBarR", (muxAddr._1,muxAddr._2, vecId))
+    val base = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
     io.output.data(vecId)
   }
 
-  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(p.hasDirectW)
-    assert(!usedMuxPorts.contains(("DirectW", (muxPort,vecId))), s"Attempted to connect to DirectW port ($muxPort,$vecId) twice!")
-    usedMuxPorts ::= ("DirectW", (muxPort, vecId))
-    val base = p.directWMux.accessParsBelowMuxPort(muxPort).sum + vecId
+    assert(p.directWMux.contains(muxAddr))
+    assert(!usedMuxPorts.contains(("DirectW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectW port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("DirectW", (muxAddr._1,muxAddr._2, vecId))
+    val base = p.directWMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.directW(base) := wBundle
   }
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(p.hasDirectR)
-    assert(!usedMuxPorts.contains(("DirectR", (muxPort,vecId))), s"Attempted to connect to DirectR port ($muxPort,$vecId) twice!")
-    usedMuxPorts ::= ("DirectR", (muxPort, vecId))
-    val base = p.directRMux.accessParsBelowMuxPort(muxPort).sum + vecId
+    assert(p.directRMux.contains(muxAddr))
+    assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectR port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    usedMuxPorts ::= ("DirectR", (muxAddr._1,muxAddr._2, vecId))
+    val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.directR(base) := rBundle    
     io.flow(base) := flow
     io.output.data(vecId)
@@ -202,20 +206,24 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
     // Unmask write port if any of the above match
     mem._1.io.wMask := xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B}
+
     // Connect matching W port to memory
-    
     if (directSelect.length > 0 & p.hasXBarW) {           // Has direct and x
-      mem._1.io.w.ofs  := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs, chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs)
-      mem._1.io.w.data := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data, chisel3.util.PriorityMux(xBarSelect, io.xBarW).data)
-      mem._1.io.w.en   := Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarW).en)
+      val directChoice = chisel3.util.PriorityMux(directSelect.map(_.en), directSelect)
+      val xBarChoice = chisel3.util.PriorityMux(xBarSelect, io.xBarW)
+      mem._1.io.w.ofs  := Mux(directSelect.map(_.en).reduce(_|_), directChoice.ofs, xBarChoice.ofs)
+      mem._1.io.w.data := Mux(directSelect.map(_.en).reduce(_|_), directChoice.data, xBarChoice.data)
+      mem._1.io.w.en   := Mux(directSelect.map(_.en).reduce(_|_), directChoice.en, xBarChoice.en)
     } else if (p.hasXBarW && directSelect.length == 0) {  // Has x only
-      mem._1.io.w.ofs  := chisel3.util.PriorityMux(xBarSelect, io.xBarW).ofs
-      mem._1.io.w.data := chisel3.util.PriorityMux(xBarSelect, io.xBarW).data
-      mem._1.io.w.en   := chisel3.util.PriorityMux(xBarSelect, io.xBarW).en 
+      val xBarChoice = chisel3.util.PriorityMux(xBarSelect, io.xBarW)
+      mem._1.io.w.ofs  := xBarChoice.ofs
+      mem._1.io.w.data := xBarChoice.data
+      mem._1.io.w.en   := xBarChoice.en 
     } else if (directSelect.length > 0) {               // Has direct only
-      mem._1.io.w.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
-      mem._1.io.w.data := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data
-      mem._1.io.w.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
+      val directChoice = chisel3.util.PriorityMux(directSelect.map(_.en), directSelect)
+      mem._1.io.w.ofs  := directChoice.ofs
+      mem._1.io.w.data := directChoice.data
+      mem._1.io.w.en   := directChoice.en 
     }
   }
 
@@ -248,10 +256,10 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
   // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
     // Figure out which read port was active in xBar
-    val xBarIds = p.xBarRMux.accessPars.zipWithIndex.collect{case(x,ii) if (i < x) => p.xBarRMux.accessParsBelowMuxPort(ii).sum + i }
+    val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val xBarCandidates = xBarIds.map(io.xBarR(_))
     // Figure out which read port was active in direct
-    val directIds = p.directRMux.sortByMuxPort.values.map(_._1).zipWithIndex.collect{case(x,ii) if (i < x.length) => p.directRMux.accessParsBelowMuxPort(ii).sum + i }
+    val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val directCandidates = directIds.map(io.directR(_))
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ mem => 
@@ -273,27 +281,27 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
 
 class FF(p: MemParams) extends MemPrimitive(p) {
-  def this(bitWidth: Int, xBarWMux: XMap = XMap(0 -> 1),
-         init: Option[List[Double]] = None, fracBits: Int = 0) = this(MemParams(List(1), bitWidth, List(1), List(1), xBarWMux, XMap(), DMap(), DMap(), BankedMemory, init, false, fracBits))
-  def this(tuple: (Int, XMap)) = this(tuple._1,tuple._2,None,0)
   // Compatibility with standard mem codegen
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
-  def this(logicalDims: List[Int], bitWidth: Int, 
-           banks: List[Int], strides: List[Int], 
-           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
-           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(bitWidth, xBarWMux, if (init.isDefined) Some(init.get.map(_.toDouble)) else None, fracBits)
+  // def this(logicalDims: List[Int], bitWidth: Int, 
+  //          banks: List[Int], strides: List[Int], 
+  //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+  //          directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+  //          bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, {if (init.isDefined) Some(init.get.map(_.toDouble)) else None}, syncMem, fracBits))
+  def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, None, false, 0)
+  def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0) -> 1), XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, None, false, 0)
+  def this(bitWidth: Int, xBarWMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
   val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W)) else RegInit(io.xBarW(0).init)
   val anyReset = io.xBarW.map{_.reset}.reduce{_|_}
   val anyEnable = io.xBarW.map{_.en}.reduce{_|_}
   val wr_data = chisel3.util.Mux1H(io.xBarW.map{_.en}, io.xBarW.map{_.data})
   ff := Mux(anyReset, io.xBarW(0).init, Mux(anyEnable, wr_data, ff))
-  io.output.data(0) := Mux(anyReset, io.xBarW(0).init, ff)
+  io.output.data.foreach(_ := ff)
 
 }
 
@@ -329,7 +337,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create compacting network
 
-  val enqCompactor = Module(new CompactingEnqNetwork(p.xBarWMux.sortByMuxPort.values.map(_._1).toList, p.numBanks, p.banksWidths.head + 2, p.bitWidth))
+  val enqCompactor = Module(new CompactingEnqNetwork(p.xBarWMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
   enqCompactor.io.headCnt := headCtr.io.output.count
   (0 until p.numXBarW).foreach{i => enqCompactor.io.in(i).data := io.xBarW(i).data; enqCompactor.io.in(i).en := io.xBarW(i).en}
 
@@ -345,7 +353,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Create dequeue compacting network
-  val deqCompactor = Module(new CompactingDeqNetwork(p.xBarRMux.sortByMuxPort.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  val deqCompactor = Module(new CompactingDeqNetwork(p.xBarRMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
   deqCompactor.io.tailCnt := tailCtr.io.output.count
   val active_r_bank = Utils.singleCycleModulo(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
   val active_r_addr = Utils.singleCycleDivide(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
@@ -418,7 +426,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   if (pW == pR) {
     m.zipWithIndex.foreach { case (mem, i) => 
       // Figure out which write port was active in xBar
-      val xBarIds = p.xBarWMux.accessPars.zipWithIndex.collect{case(x,ii) if (i < x) => p.xBarRMux.accessParsBelowMuxPort(ii).sum + i }
+      val xBarIds = p.xBarWMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }.toList
       val xBarCandidates = xBarIds.map{case n => io.xBarW(n+i)}
       // Make connections to memory
       mem.io.w.ofs := accessor.io.output.count(0).asUInt
@@ -430,7 +438,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
     (0 until pW).foreach { w_i => 
       (0 until (par /-/ pW)).foreach { i => 
         // Figure out which write port was active in xBar
-        val xBarIds = p.xBarWMux.accessPars.zipWithIndex.collect{case(x,ii) if (i < x) => p.xBarRMux.accessParsBelowMuxPort(ii).sum + i }
+        val xBarIds = p.xBarWMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }.toList
         val xBarCandidates = xBarIds.map{case n => io.xBarW(n+(i*pW+w_i))}
         // Make connections to memory
         m(w_i + i*-*pW).io.w.ofs := accessor.io.output.count(0).asUInt
@@ -556,10 +564,10 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
     // Figure out which read port was active in xBar
-    val xBarIds = p.xBarRMux.sortByMuxPort.values.map(_._1).zipWithIndex.collect{case(x,ii) if (i < x) => p.xBarRMux.accessParsBelowMuxPort(ii).sum + i }
+    val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val xBarCandidates = xBarIds.map(io.xBarR(_))
     // Figure out which read port was active in direct
-    val directIds = p.directRMux.sortByMuxPort.values.map(_._1).zipWithIndex.collect{case(x,ii) if (i < x.length) => p.directRMux.accessParsBelowMuxPort(ii).sum + i }
+    val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val directCandidates = directIds.map(io.directR(_))
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ case(mem,coords,flatCoord) => 
@@ -608,7 +616,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
   // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
     // Figure out which read port was active in xBar
-    val xBarIds = p.xBarRMux.sortByMuxPort.values.map(_._1).zipWithIndex.collect{case(x,ii) if (i < x) => p.xBarRMux.sortByMuxPort.values.take(ii).map(_._1).sum + i }
+    val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val xBarCandidates = xBarIds.map(io.xBarR(_))
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ case(mem,coords,flatCoord) => 
@@ -1062,7 +1070,7 @@ class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWid
   val num_compactors = ports.max
   val io = IO( new Bundle {
       val numEnabled =Input(UInt(width.W))
-      val in = Vec(ports.reduce{_+_}, Input(new enqPort(bitWidth)))
+      val in = Vec(ports.sum, Input(new enqPort(bitWidth)))
       val out = Vec(num_compactors, Output(new enqPort(bitWidth)))
     })
 
@@ -1100,7 +1108,7 @@ class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWid
 class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
   val io = IO( new Bundle {
       val headCnt = Input(SInt(width.W))
-      val in = Vec(ports.reduce{_+_}, Input(new enqPort(bitWidth)))
+      val in = Vec(ports.sum, Input(new enqPort(bitWidth)))
       val out = Vec(banks, Output(new enqPort(bitWidth)))
       val debug1 = Output(Bool())
       val debug2 = Output(Bool())
@@ -1140,7 +1148,7 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
       val tailCnt = Input(SInt(width.W))
       val input = new Bundle{
         val data = Vec(banks, Input(UInt(bitWidth.W)))
-        val deq = Vec(ports.reduce{_+_}, Input(Bool()))
+        val deq = Vec(ports.sum, Input(Bool()))
       }
       val output = new Bundle{
         val data = Vec(ports.max, Output(UInt(bitWidth.W)))

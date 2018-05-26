@@ -597,40 +597,45 @@ object Utils {
   */
 
   /* List of bank addresses, for direct accesses */
+  import scala.collection.immutable.HashMap
   type Banks = List[Int]
   def Banks(xs: Int*) = List(xs:_*)
-  /* Map from muxPort to (width of muxPort, isShift) */
-  type XMap = HashMap[Int, (Int, Option[Int])]
+  /* Map from (muxPort, muxOfs) to (width of muxPort, isShift) */
+  type XMap = HashMap[(Int, Int), (Int, Option[Int])]
   implicit class XMapOps(x: XMap) {
-    def muxPorts: Seq[Int] = x.keys.toSeq
-    def accessPars: Seq[Int] = x.sortByMuxPort.values.map(_._1).toSeq
+    def muxAddrs: Seq[(Int,Int)] = x.keys.toSeq
+    def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
-    def sortByMuxPort: XMap = XMap(x.toSeq.sortBy(_._1))
-    def accessParsBelowMuxPort(f: Int): Seq[Int] = x.sortByMuxPort.filter(_._1 < f).accessPars
+    def sortByMuxPortAndOfs: XMap = XMap(x.toSeq.sortBy(r => (r._1._1, r._1._2))) // Order the map by (muxPort, muxOfs)
+    def sortByMuxPortAndCombine: XMap = XMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).sum, entries.head._2._2)}.toSeq) // Combine entries so that every muxOfs = 0, then sort
+    def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
     def merge(y: XMap): XMap = {
       if (y.nonEmpty) {
         HashMap( (x ++ HashMap(y.map{case (k,v) => 
                                 val base = x.toList.length
-                                ({base + k} -> v)
+                                (({base + k._1}, 0) -> v)
                               }.toArray:_*)).toArray:_*)
       } else x
     }
   }
-  def XMap(xs:(Int, Int)*) = HashMap[Int,(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
-  def XMap(xs: => Seq[(Int, (Int,Option[Int]))]) = HashMap[Int,(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftXMap(axis: Int, xs:(Int,Int)*) = HashMap[Int, (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
+  def XMap(xs:((Int, Int), Int)*) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
+  def XMap(xs: => Seq[((Int,Int), (Int,Option[Int]))]) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  def ShiftXMap(axis: Int, xs:((Int,Int),Int)*) = HashMap[(Int,Int), (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   /* Map from muxPort to (Banks, isShift) */
-  type DMap = HashMap[Int, (List[Banks],Option[Int])]
+  type DMap = HashMap[(Int,Int), (List[Banks],Option[Int])]
   implicit class DMapOps(x: DMap) {
-    def muxPorts: Seq[Int] = x.keys.toSeq
-    def accessPars: Seq[Int] = x.sortByMuxPort.values.map(_._1.length).toSeq
+    def muxAddrs: Seq[(Int,Int)] = x.keys.toSeq
+    def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1.length).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
-    def sortByMuxPort: DMap = DMap(x.toSeq.sortBy(_._1))
-    def accessParsBelowMuxPort(f: Int): Seq[Int] = x.sortByMuxPort.filter(_._1 < f).accessPars
+    def sortByMuxPortAndOfs: DMap = DMap(x.toSeq.sortBy(r => (r._1._1, r._1._2)))
+    def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq) // Combine entries so that every muxOfs = 0, then sort
+    def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
   }
-  def DMap(xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
-  def DMap(xs: => Seq[(Int, (List[Banks],Option[Int]))]) = HashMap[Int,(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftDMap(axis: Int, xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
+  def DMap(xs:((Int,Int),List[Banks])*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  // Example: val b = DMap((0,0) -> List(Banks(0,0), Banks(0,1)), (0,2) -> List(Banks(0,2),Banks(0,3)), (1,0) -> List(Banks(0,0),Banks(1,0)))
+  def DMap(xs: => Seq[((Int,Int), (List[Banks],Option[Int]))]) = HashMap[(Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  def ShiftDMap(axis: Int, xs:((Int,Int),List[Banks])*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   type NBufXMap = HashMap[Int, XMap]
   def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
   def NBufXMap(xs: => Seq[(Int, XMap)]) = HashMap[Int,XMap](xs:_*)
@@ -638,7 +643,7 @@ object Utils {
     def mergeXMaps: XMap = {
       HashMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, par) => ({muxport + base} -> par)} 
+        map.map{case (muxport, par) => (({muxport._1 + base}, 0) -> par)} 
       }.flatten.toArray:_*) 
     }
     def accessPars: Seq[Int] = x.mergeXMaps.accessPars
@@ -652,7 +657,7 @@ object Utils {
     def mergeDMaps: DMap = {
       HashMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, banks) => ({muxport + base} -> banks)} 
+        map.map{case (muxport, banks) => (({muxport._1 + base}, 0) -> banks)} 
       }.flatten.toArray:_*)
     }
     def accessPars: Seq[Int] = x.mergeDMaps.accessPars

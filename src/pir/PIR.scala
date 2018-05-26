@@ -14,7 +14,7 @@ trait PIR extends Compiler {
   final def stageApp(args: Array[String]): Block[_] = stageBlock{ entry() }
 
   def runPasses[R](block: Block[R]): Block[R] = {
-    lazy val printer = IRPrinter(state)
+    lazy val printer = IRPrinter(state, enable = config.enDbg)
     lazy val irDotCodegen = IRDotCodegen(state)
     lazy val puDotCodegen = PUDotCodegen(state)
 

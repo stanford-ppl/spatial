@@ -14,6 +14,19 @@ import scala.util.Try
 
 trait UtilsControl {
 
+  /** True if the given symbol is allowed to be defined on the Host and used in Accel
+    * This is true for the following types:
+    *   - Global (shared) memories (e.g. DRAM, ArgIn, ArgOut, HostIO, StreamIn, StreamOut)
+    *   - Bit-based types (if ArgIn inference is allowed)
+    *   - Text (staged strings) (TODO: only allowed in debug mode?)
+    */
+  def allowSharingBetweenHostAndAccel(s: Sym[_], allowArgInference: Boolean): Boolean = {
+    s.isRemoteMem ||
+    (s.isBits && allowArgInference) ||
+    s.isInstanceOf[Text]
+  }
+
+
   implicit class ControlOpOps(op: Op[_]) {
     /** True if this Op is a loop which has a body which is run multiple times at runtime. */
     def isLoop: Boolean = op match {

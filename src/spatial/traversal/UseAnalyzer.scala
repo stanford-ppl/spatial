@@ -74,8 +74,8 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
   private def checkUses(lhs: Sym[_], rhs: Op[_]): Unit = {
     dbgs(s"  pending: ${pendingUses.all.mkString(", ")}")
-    dbgs(s"  inputs: ${rhs.nonBlockInputs.mkString(", ")}")
-    val pending = rhs.nonBlockInputs.flatMap{sym => pendingUses(sym) }
+    dbgs(s"  inputs: ${rhs.nonBlockExpInputs.mkString(", ")}")
+    val pending = rhs.nonBlockExpInputs.flatMap{sym => pendingUses(sym) }
     dbgs(s"  uses: ${pending.mkString(", ")}")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
@@ -94,13 +94,12 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     dbgs(s"  Uses [Block: $block]:")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
-    used.foreach{use =>
+    // Bound symbols should always be the result of a block if they are defined elsewhere
+    (used diff boundSyms).foreach{use =>
       use.users += User(user, block)
 
       // Also add stateless nodes that this node uses
-      if (!boundSyms.contains(use)) {
-        (pendingUses(use) - use).foreach{pend => pend.users += User(use, block) }
-      }
+      (pendingUses(use) - use).foreach{pend => pend.users += User(use, block) }
     }
   }
 

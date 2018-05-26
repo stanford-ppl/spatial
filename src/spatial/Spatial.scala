@@ -51,10 +51,13 @@ trait Spatial extends Compiler {
     isl.startup()
 
     // --- Debug
-    lazy val printer = IRPrinter(state)
+    lazy val printer = IRPrinter(state, enable = config.enDbg)
+    lazy val finalIRPrinter = IRPrinter(state, enable = true)
 
     // --- Checking
-    lazy val sanityChecks = SanityChecks(state)
+    lazy val userSanityChecks  = UserSanityChecks(state)
+    lazy val transformerChecks = CompilerSanityChecks(state, enable = cfg.enLog)
+    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = true)
 
     // --- Analysis
     lazy val cliNaming          = CLINaming(state)
@@ -79,43 +82,49 @@ trait Spatial extends Compiler {
     lazy val unrollTransformer = UnrollingTransformer(state)
     lazy val retiming          = RetimingTransformer(state)
 
-    lazy val globalAllocation = GlobalAllocation(state)
-
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
-    lazy val cppCodegen = CppGen(state)
-    lazy val irDotCodegen = IRDotCodegen(state)
+    lazy val cppCodegen    = CppGen(state)
+    lazy val irDotCodegen  = IRDotCodegen(state)
     // lazy val treeCodegen = TreeCodegen(state)
-    lazy val scalaCodegen = ScalaGenSpatial(state)
-    lazy val puDotCodegen = PUDotCodegen(state)
+    lazy val scalaCodegen  = ScalaGenSpatial(state)
 
     val result = {
-      block ==> printer ==>
-        cliNaming ==>
-        friendlyTransformer ==>
-        sanityChecks ==>
-        switchTransformer ==>
-        switchOptimizer ==> printer ==>
-        blackboxLowering ==> printer ==>
-        switchTransformer ==>                  // Re-run switch lowering after black box lowering
-        switchOptimizer ==> printer ==>
-        memoryDealiasing ==> printer ==>
-        pipeInserter ==> printer ==>
-        useAnalyzer ==> printer ==>
-        registerCleanup ==> printer ==>
-        accessAnalyzer ==> printer ==>
-        memoryAnalyzer ==> printer ==>
-        memoryAllocator ==>
-        unrollTransformer ==> printer ==>
-        (cfg.enableRetiming ? retiming) ==> printer ==>
-        (cfg.enableRetiming ? retimeReporter) ==>
-        initiationAnalyzer ==>
-        memoryReporter  ==>
-        printer ==>
-        (cfg.enableSim ? scalaCodegen) ==>
-        // (cfg.enableTree ? irTreeCodegen) ==>
+      block ==> printer     ==>
+        cliNaming           ==>
+        friendlyTransformer ==> printer ==> transformerChecks ==>
+        userSanityChecks    ==>
+        /** Black box lowering */
+        switchTransformer   ==> printer ==> transformerChecks ==>
+        switchOptimizer     ==> printer ==> transformerChecks ==>
+        blackboxLowering    ==> printer ==> transformerChecks ==>
+        switchTransformer   ==> printer ==> transformerChecks ==>
+        switchOptimizer     ==> printer ==> transformerChecks ==>
+        memoryDealiasing    ==> printer ==> transformerChecks ==>
+        /** Control insertion */
+        pipeInserter        ==> printer ==> transformerChecks ==>
+        /** Dead code cleanup */
+        useAnalyzer         ==>
+        registerCleanup     ==> printer ==> transformerChecks ==>
+        /** Memory analysis */
+        accessAnalyzer      ==>
+        memoryAnalyzer      ==>
+        memoryAllocator     ==>
+        /** Unrolling */
+        unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** Retiming */
+        retiming            ==> printer ==> transformerChecks ==>
+        retimeReporter      ==>
+        /** Schedule finalization */
+        initiationAnalyzer  ==>
+        /** Reports */
+        memoryReporter      ==>
+        finalIRPrinter      ==>
+        finalSanityChecks   ==>
+        /** Code generation */
+        (cfg.enableSim   ? scalaCodegen)  ==>
         (cfg.enableSynth ? chiselCodegen) ==>
-        (cfg.enableSynth ? cppCodegen) ==>
+        (cfg.enableSynth ? cppCodegen)    ==>
         (cfg.enableDot ? irDotCodegen)
     }
 

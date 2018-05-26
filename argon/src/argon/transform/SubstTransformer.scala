@@ -21,13 +21,13 @@ abstract class SubstTransformer extends Transformer {
   }
 
   /** Defines the substitution rule for a symbol s, i.e. the result of f(s). */
-  override protected def substituteSym[T](s: Sym[T]): Sym[T] = subst.get(s) match {
+  final override protected def substituteSym[T](s: Sym[T]): Sym[T] = subst.get(s) match {
     case Some(s2) => s2.asInstanceOf[Sym[T]]
     case None     => s
   }
 
   /** Defines the substitution rule for a block b, i.e. the result of f(b). */
-  override protected def substituteBlock[T](b: Block[T]): Block[T] = blockSubst.get(b) match {
+  final override protected def substituteBlock[T](b: Block[T]): Block[T] = blockSubst.get(b) match {
     case Some(b2) => b2.asInstanceOf[Block[T]]
     case None     =>
       isolate(b.result) {

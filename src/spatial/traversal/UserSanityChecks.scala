@@ -1,7 +1,6 @@
 package spatial.traversal
 
 import argon._
-import argon.passes.Traversal
 import emul.Number
 
 import spatial.data._
@@ -9,15 +8,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 
-case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
-  override val recurse: Recurse = Recurse.Always
-
-  def disallowedInputs(stms: Set[Sym[_]], ins: Iterator[Sym[_]]): Iterator[(Sym[_],Sym[_])] = {
-    ins.filterNot(_.isRemoteMem)                // Remote memories are assumed to be shared
-       .filterNot{_.tp.isInstanceOf[Bits[_]]}   // We can infer ArgIns (see FriendlyTransformer)
-       .filterNot{_.tp.isInstanceOf[Text]}      // TODO[3]: Debug only?
-       .flatMap{in => stms.find(_.inputs.contains(in)).map{use => (in,use) }}
-  }
+case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
 
   def busWidthCheck(tp: Bits[_], bus: Bus, mem: String): Unit = {
     if (tp.nbits < bus.nbits) {
@@ -72,11 +63,11 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
           sym
       }
       val inputs = rawInputs.filterNot{
-        case _:Var[_] => false    // Don't two errors for Vars
+        case _:Var[_] => false    // Don't give two errors for Vars
         case _ => true
       }
 
-      val illegalUsed = disallowedInputs(stms diff specialized, inputs.iterator)
+      val illegalUsed = disallowedInputs(stms diff specialized, inputs.iterator, allowArgInference = true)
 
       if (illegalUsed.nonEmpty) {
         error("One or more values were defined on the host but used in Accel without explicit transfer.")
@@ -89,6 +80,8 @@ case class SanityChecks(IR: State) extends Traversal with AccelTraversal {
         }
         if (illegalUsed.size > 5) error(s"(${illegalUsed.size - 5} values elided)")
       }
+
+      super.visit(lhs,rhs)
     }
 
 

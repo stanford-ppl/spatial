@@ -14,12 +14,12 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
   @flow def accesses(s: Sym[_], op: Op[_]): Unit = op match {
     case Accessor(wr,rd) =>
-      wr.foreach{w => w.mem.writers += s }
-      rd.foreach{r => r.mem.readers += s }
+      wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
+      rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
 
     case BankedAccessor(wr,rd) =>
-      wr.foreach{w => w.mem.writers += s }
-      rd.foreach{r => r.mem.readers += s }
+      wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
+      rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
 
     case Resetter(mem,ens) => mem.resetters += s
 

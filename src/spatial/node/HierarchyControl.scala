@@ -53,7 +53,8 @@ abstract class UnrolledLoop[R:Type] extends Loop[R] {
   def bodiess: Seq[(Seq[Seq[I32]], Seq[Block[_]])]
   final override def iters: Seq[I32] = iterss.flatten
   final def valids: Seq[Bit] = validss.flatten
-  override def binds: Set[Sym[_]] = super.binds ++ validss.flatten
+  override def inputs: Seq[Sym[_]] = super.inputs diff (iters ++ valids)
+  override def binds: Set[Sym[_]] = super.binds ++ (iters ++ valids).toSet
   final override def cchains = cchainss.map{case (ctr,itrss) => ctr -> itrss.flatten }
   final override def bodies = bodiess.map{case (itrss, blocks) => itrss.flatten -> blocks }
 }

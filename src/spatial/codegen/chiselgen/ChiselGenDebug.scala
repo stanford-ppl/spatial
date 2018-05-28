@@ -19,6 +19,7 @@ trait ChiselGenDebug extends ChiselGenCommon {
     case BitToText(_) => 
     case GenericToText(_) =>
     case VarNew(_) => 
+    case VarAssign(_,_) => 
 
     case ExitIf(en) => 
     	val ens = if (en.isEmpty) "true.B" else en.mkString("&")

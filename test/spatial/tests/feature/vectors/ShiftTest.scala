@@ -13,8 +13,10 @@ import spatial.dsl._
     val t1 = ArgOut[Int]
     val t3 = ArgOut[Int]
     val t4 = ArgOut[Int]
-    setArg(x, args(0).to[Int])
-    setArg(m, args(1).to[Int])
+    val neg14 = args(0).to[Int]
+    val two = args(1).to[Int]
+    setArg(x, neg14)
+    setArg(m, two)
     Accel {
       val lsh = x << m
       val rsh = x >> m

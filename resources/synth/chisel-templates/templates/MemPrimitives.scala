@@ -124,7 +124,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(p.hasXBarW)
     assert(p.xBarWMux.contains(muxAddr))
-    assert(!usedMuxPorts.contains(("XBarW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    assert(!usedMuxPorts.contains(("XBarW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("XBarW", (muxAddr._1,muxAddr._2, vecId))
     val base = p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.xBarW(base) := wBundle
@@ -135,7 +135,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(p.hasXBarR)
     assert(p.xBarRMux.contains(muxAddr))
-    assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarR port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarR port ($muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("XBarR", (muxAddr._1,muxAddr._2, vecId))
     val base = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.xBarR(base) := rBundle    
@@ -146,7 +146,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(p.hasDirectW)
     assert(p.directWMux.contains(muxAddr))
-    assert(!usedMuxPorts.contains(("DirectW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectW port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    assert(!usedMuxPorts.contains(("DirectW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectW port ($muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("DirectW", (muxAddr._1,muxAddr._2, vecId))
     val base = p.directWMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.directW(base) := wBundle
@@ -157,7 +157,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(p.hasDirectR)
     assert(p.directRMux.contains(muxAddr))
-    assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectR port ($muxAddr._1,muxAddr._2,$vecId) twice!")
+    assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectR port ($muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("DirectR", (muxAddr._1,muxAddr._2, vecId))
     val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.directR(base) := rBundle    
@@ -294,7 +294,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   //          bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, {if (init.isDefined) Some(init.get.map(_.toDouble)) else None}, syncMem, fracBits))
   def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0) -> 1), XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, None, false, 0)
-  def this(bitWidth: Int, xBarWMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, inits, false, fracBits)
+  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
   val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W)) else RegInit(io.xBarW(0).init)
   val anyReset = io.xBarW.map{_.reset}.reduce{_|_}

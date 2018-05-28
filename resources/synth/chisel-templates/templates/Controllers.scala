@@ -252,7 +252,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isInnerSwit
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
     if (isInnerSwitch) { // pass through signals
-      io.datapathEn := io.enable 
+      io.datapathEn := io.enable & ~io.done & ~io.parentAck
       io.ctrInc := io.enable
     }
     else {
@@ -260,7 +260,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isInnerSwit
       io.ctrInc := active.io.output.data & io.enable
     }
     io.done := Utils.getRetimed(Utils.risingEdge(done.io.output.data), latency)
-    io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1)}
+    io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner
     val stateFSM = Module(new FF(stateWidth))
@@ -285,6 +285,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isInnerSwit
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
+    io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
     io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, io.enable)
 

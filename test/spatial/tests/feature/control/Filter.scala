@@ -4,7 +4,7 @@ import spatial.dsl._
 import spatial.lib._
 
 @test class Scan_fifofull extends SpatialTest {
-  override def runtimeArgs: Args = "128"
+  override def runtimeArgs: Args = "256"
 
   def main(args: Array[String]): Unit = {
 
@@ -44,10 +44,11 @@ import spatial.lib._
         }
 
         Pipe.Foreach (0 until tileSize) { j=>
-
-          if (fifo.isFull) {
-            outram(stores.value::stores.value+tileSize) store fifo
-            stores := stores.value + tileSize
+          Sequential{
+            if (fifo.isFull) {
+              outram(stores.value::stores.value+tileSize) store fifo
+              stores := stores.value + tileSize
+            }
           }
 
           val fromsram1 = sram1(j)
@@ -78,6 +79,7 @@ import spatial.lib._
     }
 
     printArray(result, "Result : ")
+    printArray(golden, "Gold : ")
     println("fifofull:"  + getArg(out_fifofull))
     println("fifoempty:"  + getArg(out_fifoempty))
     println("store_loc:"  + getArg(out_store_loc))

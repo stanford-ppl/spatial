@@ -337,7 +337,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
     val isInnerSwitch = sym match{case Op(_: Switch[_]) if (isInner) => ",isInnerSwitch = true"; case Op(_:SwitchCase[_]) if (isInner) => ",isInnerSwitch = true"; case _ => ""}
     val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
-    val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case Op(_: StateMachine[_]) if (isInner & sym.children.length > 0) => s", cases=${sym.children.length}"; case _ => ""}
+    val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case Op(x: SwitchCase[_]) if (isInner & sym.children.length > 0) => s",cases = ${sym.children.length}"; case Op(_: StateMachine[_]) if (isInner & sym.children.length > 0) => s", cases=${sym.children.length}"; case _ => ""}
 
     // Generate standard control signals for all types
     emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
@@ -398,6 +398,8 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.length > 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.head.s.get, Done)}""")
+      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.length == 0) => true; case _ => false }) {
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc).D(1) // Used to be delayed by 1 & validNow""")
       } else {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc) // Used to be delayed by 1 & validNow""")
       }

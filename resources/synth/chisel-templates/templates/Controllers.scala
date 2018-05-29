@@ -205,7 +205,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
 
 
-class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isInnerSwitch: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
+class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrough: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
@@ -251,8 +251,8 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isInnerSwit
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
-    if (isInnerSwitch) { // pass through signals
-      io.datapathEn := io.enable & ~io.done & ~io.parentAck
+    if (isPassthrough) { // pass through signals
+      io.datapathEn := io.enable // & ~io.done & ~io.parentAck
       io.ctrInc := io.enable
     }
     else {

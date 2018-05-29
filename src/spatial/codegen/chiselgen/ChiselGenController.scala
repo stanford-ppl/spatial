@@ -335,7 +335,7 @@ trait ChiselGenController extends ChiselGenCommon {
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
     val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
-    val isInnerSwitch = sym match{case Op(_: Switch[_]) if (isInner) => ",isInnerSwitch = true"; case Op(_:SwitchCase[_]) if (isInner) => ",isInnerSwitch = true"; case _ => ""}
+    val isPassthrough = sym match{case Op(_: Switch[_]) if (isInner && sym.parent.s.isDefined && sym.parent.s.get.isInnerControl) => ",isPassthrough = true"; case Op(_:SwitchCase[_]) if (isInner && sym.parent.s.get.parent.s.isDefined && sym.parent.s.get.parent.s.get.isInnerControl) => ",isPassthrough = true"; case _ => ""}
     val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
     val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case Op(x: SwitchCase[_]) if (isInner & sym.children.length > 0) => s",cases = ${sym.children.length}"; case Op(_: StateMachine[_]) if (isInner & sym.children.length > 0) => s", cases=${sym.children.length}"; case _ => ""}
 
@@ -346,7 +346,7 @@ trait ChiselGenController extends ChiselGenCommon {
     createInstrumentation(sym)
 
     // Create controller
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $isInnerSwitch $ncases, latency = ${swap(sym, Latency)}))")
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = ${swap(sym, Latency)}))")
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getStreamReadyLogic(sym)}""")

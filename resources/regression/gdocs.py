@@ -338,7 +338,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		lastapphash=lol[2][acol]
 		lasttime=lol[2][ttcol]
 
-	if (lol[74][5] == "KEEP"):
+	if (len(lol) >= 75 and len(lol[74]) >= 6 and lol[74][5] == "KEEP"):
 		keep_row_75 = True
 	else:
 		keep_row_75 = False

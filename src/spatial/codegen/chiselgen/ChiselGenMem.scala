@@ -227,11 +227,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     // if (readCtrls.isEmpty) throw new Exception(u"Memory $mem, instance $i had no readers?")
 
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
-
-    if (!specialLB) {
-      val lca = LCA(accesses.toList)
-      val (basePort, numPorts) = LCAPortMatchup(accesses.toList, lca)
-      val info = (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
+    if (!specialLB && accesses.toList.length > 0) {
+      val lca = if (accesses.toList.length == 1) accesses.head.parent else LCA(accesses.toList)
+      val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
+      val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
       info.toList
     } else {
       throw new Exception("Implement LB with transient buffering")

@@ -233,7 +233,7 @@ class NBufMem(val mem: MemType,
         val xBarRBase = xBarRMux.accessPars.sum
         val directRBase = directRMux.accessPars.sum
         val sramXBarRPorts = broadcastRMux.accessPars.sum
-        val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.last === a.U, {if (Utils.retime) 1 else 0}) }
+        val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.head === a.U, {if (Utils.retime) 1 else 0}) }
         (0 until sramXBarRPorts).foreach {k => 
           io.output.data(xBarRBase + directRBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
           f.io.xBarR(xBarRBase + k).en := io.broadcastR( k).en
@@ -281,6 +281,11 @@ class NBufMem(val mem: MemType,
       }
 
       // TODO: BroadcastR connections?
+      val xBarRBase = xBarRMux.accessPars.sum
+      val sramBroadcastRPorts = broadcastRMux.accessPars.sum
+      val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.head === a.U, {if (Utils.retime) 1 else 0})}
+      (0 until sramBroadcastRPorts).foreach {k => io.output.data(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output.data(0)}) }
+      
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
                                   banks, combinedXBarWMux, combinedXBarRMux))

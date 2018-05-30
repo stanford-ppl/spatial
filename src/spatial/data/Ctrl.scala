@@ -11,8 +11,6 @@ sealed abstract class Ctrl {
   def id: Int
 
   def master: Ctrl
-  def parent: Ctrl
-  @stateful def children: Seq[Controller]
 
   def isOuterBlock: Boolean
 }
@@ -20,17 +18,9 @@ sealed abstract class Ctrl {
 case class Controller(sym: Sym[_], id: Int) extends Ctrl {
   override def s: Option[Sym[_]] = Some(sym)
   def master: Ctrl = Controller(sym, -1)
-  def parent: Ctrl = if (id != -1) Controller(sym,-1) else sym.parent
-  @stateful def children: Seq[Controller] = {
-    if (id == -1) sym match {
-      case Op(ctrl: Control[_]) => ctrl.bodies.indices.map{i => Controller(sym,i) }
-      case _ => Seq(Controller(sym, 0))
-    }
-    else sym.children.filter(_.parent == this)
-  }
 
   def isOuterBlock: Boolean = id == -1 || (sym match {
-    case Op(ctrl: Control[_]) => ctrl.mayBeOuterBlock(id)
+    case Op(ctrl: Control[_]) => ctrl.bodies(id).mayBeOuterStage
     case _ => true
   })
 }
@@ -38,8 +28,6 @@ case class Controller(sym: Sym[_], id: Int) extends Ctrl {
 case object Host extends Ctrl {
   def id: Int = 0
   def master: Ctrl = Host
-  def parent: Ctrl = Host
-  @stateful def children: Seq[Controller] = hwScopes.all
 
   def isOuterBlock: Boolean = true
 }

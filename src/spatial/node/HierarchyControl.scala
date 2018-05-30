@@ -19,14 +19,31 @@ object FringeNode {
   }
 }
 
+sealed abstract class ControlBody {
+  /** The iterators over this stage. */
+  def iters: Seq[I32]
+  /** All blocks that are part of this stage. */
+  def blocks: Seq[Block[_]]
+  /** True if this body does not represent a true or future stage. */
+  def isPseudoStage: Boolean
+  /** True if this stage may represent an outer controller. */
+  def mayBeOuterStage: Boolean
+}
+case class PseudoStage(iters: Seq[I32], blocks: Seq[Block[_]]) extends ControlBody {
+  override def isPseudoStage: Boolean = true
+  override def mayBeOuterStage: Boolean = true
+}
+case class FutureStage(iters: Seq[I32], blocks: Seq[Block[_]], mayBeOuterStage: Boolean) extends ControlBody {
+  override def isPseudoStage: Boolean = false
+}
+
 /** Nodes with implicit control signals/logic with internal state */
 abstract class Control[R:Type] extends AccelOp[R] {
   override def inputs: Seq[Sym[_]] = super.inputs diff iters
   override def binds: Set[Sym[_]] = super.binds ++ iters.toSet
   def iters: Seq[I32]
   def cchains: Seq[(CounterChain, Seq[I32])]
-  def bodies: Seq[(Seq[I32],Seq[Block[_]])]
-  def mayBeOuterBlock(i: Int): Boolean
+  def bodies: Seq[ControlBody]
 }
 object Control {
   def unapply[R](x: Sym[R]): Option[Sym[R]] = x match {
@@ -56,5 +73,7 @@ abstract class UnrolledLoop[R:Type] extends Loop[R] {
   override def inputs: Seq[Sym[_]] = super.inputs diff (iters ++ valids)
   override def binds: Set[Sym[_]] = super.binds ++ (iters ++ valids).toSet
   final override def cchains = cchainss.map{case (ctr,itrss) => ctr -> itrss.flatten }
-  final override def bodies = bodiess.map{case (itrss, blocks) => itrss.flatten -> blocks }
+  final override def bodies = {
+    bodiess.map{case (itrss, blocks) => PseudoStage(itrss.flatten, blocks) }
+  }
 }

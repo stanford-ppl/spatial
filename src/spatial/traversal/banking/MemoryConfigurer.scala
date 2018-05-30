@@ -224,7 +224,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     * Also calculates whether the associated memory should be considered a "buffer accumulator";
     * this occurs if at least one read and write occur in the same controller within a buffer.
     */
-  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Option[Instance] = {
+  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
     val reads = rdGroups.flatten
     val writes = wrGroups.flatten
     val ctrls = reads.map(_.parent)
@@ -232,29 +232,35 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val reachingWrGroups = wrGroups.map{grp => grp intersect reaching }.filterNot(_.isEmpty)
     val bankings = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, dimGrps)
     if (bankings.nonEmpty) {
-      val (metapipe, bufPorts) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
-      val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
-      val bankingCosts = bankings.map{b => b -> cost(b,depth) }
-      val (banking, bankCost) = bankingCosts.minBy(_._2)
-      // TODO[5]: Assumption: All memories are at least simple dual port
-      val ports = computePorts(rdGroups,bufPorts) ++ computePorts(wrGroups,bufPorts)
-      val isBuffAccum = metapipe.isDefined &&
-                        writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
-      val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
-      val accTyp = mem.accumType | accum
+      val (metapipe, bufPorts, issue) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
 
-      val instance = Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp)
+      if (issue.isEmpty) {
+        val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
+        val bankingCosts = bankings.map{b => b -> cost(b,depth) }
+        val (banking, bankCost) = bankingCosts.minBy(_._2)
+        // TODO[5]: Assumption: All memories are at least simple dual port
+        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(wrGroups,bufPorts)
+        val isBuffAccum = metapipe.isDefined &&
+          writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+        val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
+        val accTyp = mem.accumType | accum
 
-      dbgs(s"  Reads:")
-      rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
-      dbgs(s"  Writes:")
-      wrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
-      dbgs(s"  Instance: ")
-      dbgss("  ", instance)
+        val instance = Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp)
 
-      Some(instance)
+        dbgs(s"  Reads:")
+        rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+        dbgs(s"  Writes:")
+        wrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+        dbgs(s"  Instance: ")
+        dbgss("  ", instance)
+
+        Right(instance)
+      }
+      else Left(issue.get)
     }
-    else None
+    else {
+      Left(UnbankableGroup(mem, reads, reaching))
+    }
   }
 
   /** Should not attempt to merge instances if any of the following conditions hold:
@@ -278,10 +284,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   2. The merge results in a multi-ported N-buffer (if this is disabled)
     *   3. The merged instance costs more than the total cost of the two separate instances
     */
-  protected def getMergeError(i1: Instance, i2: Instance, i3: Option[Instance]): Option[String] = {
-    if (i3.isEmpty) Some("Banking conflict")
-    else if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing) Some("Buffer conflict")
-    else if (i3.get.cost > (i1.cost + i2.cost)) Some("Expensive")
+  protected def getMergeError(i1: Instance, i2: Instance, i3: Instance): Option[String] = {
+    if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing) Some("Buffer conflict")
+    else if (i3.cost > (i1.cost + i2.cost)) Some("Expensive")
     else None
   }
 
@@ -291,7 +296,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
     rdGroups.zipWithIndex.foreach{case (grp,grpId) =>
       bankGroups(Set(grp),wrGroups) match {
-        case Some(i1) =>
+        case Right(i1) =>
           var instIdx = 0
           var merged = false
           while (instIdx < instances.length && !merged) {
@@ -299,24 +304,25 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
             val err = getMergeAttemptError(i1, i2)
             if (err.isEmpty) {
-              val i3 = bankGroups(i1.reads ++ i2.reads, wrGroups)
-              val err = getMergeError(i1, i2, i3)
-              if (err.isEmpty) {
-                instances(instIdx) = i3.get
-                merged = true
-                dbg(s"Merged $grpId into instance $instIdx")
-              }
-              else dbg(s"Did not merge $grpId into instance $instIdx: ${err.get}")
-            }
-            else dbg(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+              bankGroups(i1.reads ++ i2.reads, wrGroups) match {
+                case Right(i3) =>
+                  val err = getMergeError(i1, i2, i3)
+                  if (err.isEmpty) {
+                    instances(instIdx) = i3
+                    merged = true
+                    dbg(s"Merged $grpId into instance $instIdx")
+                  }
+                  else dbg(s"Did not merge $grpId into instance $instIdx: ${err.get}")
 
+                case Left(issue) =>
+                  dbg(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
+              }
+            }
             instIdx += 1
           }
           if (!merged) instances += i1
 
-        case None =>
-          val writeGroups = reachingWrites(grp, wrGroups.flatten, isGlobal)
-          raiseIssue(UnbankableGroup(mem, grp, writeGroups))
+        case Left(issue) => raiseIssue(issue)
       }
     }
     instances
@@ -327,11 +333,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
     // Assumes that all writers reach some unknown reader external to Accel.
-    val instance = bankGroups(Set.empty, wrGroups)
-    if (instance.isEmpty) {
-      raiseIssue(UnbankableGroup(mem,Set.empty,wrGroups.flatten))
-      Nil
+    bankGroups(Set.empty, wrGroups) match {
+      case Right(instance) => Seq(instance)
+      case Left(issue)     => raiseIssue(issue); Nil
     }
-    else Seq(instance.get)
   }
 }

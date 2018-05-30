@@ -194,11 +194,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       step.accessPattern  = Seq(getValueAddressPattern(step.asInstanceOf[Idx]))
 
     case Op(loop: Loop[_]) =>
-      loop.bodies.foreach{case (is,blocks) =>
+      loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
-        dbgs(s"  Blocks: $blocks")
-        dbgs(s"  Iterators: $is")
-        inLoop(lhs, is, blocks)
+        dbgs(s"  Blocks: ${scope.blocks}")
+        dbgs(s"  Iterators: ${scope.iters}")
+        inLoop(lhs, scope.iters, scope.blocks)
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)

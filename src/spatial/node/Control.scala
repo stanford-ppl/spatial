@@ -19,8 +19,7 @@ import spatial.util._
 
 @op case class AccelScope(block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
-  override def bodies = Seq(Nil -> Seq(block))
-  override def mayBeOuterBlock(i: Int) = true
+  override def bodies = Seq(PseudoStage(Nil, Seq(block)))
   override def cchains = Nil
   override var ens: Set[Bit] = Set.empty
   override def updateEn(f: Tx, addEns: Set[Bit]) = update(f)
@@ -32,16 +31,14 @@ import spatial.util._
 
 @op case class UnitPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
-  override def bodies = Seq(Nil -> Seq(block))
+  override def bodies = Seq(PseudoStage(Nil, Seq(block)))
   override def cchains = Nil
-  override def mayBeOuterBlock(i: Int) = true
 }
 
 @op case class ParallelPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
-  override def bodies = Seq(Nil -> Seq(block))
+  override def bodies = Seq(PseudoStage(Nil, Seq(block)))
   override def cchains = Nil
-  override def mayBeOuterBlock(i: Int): Boolean = true
 }
 
 @op case class OpForeach(
@@ -51,8 +48,7 @@ import spatial.util._
   iters:  Seq[I32]
 ) extends Loop[Void] {
   def cchains = Seq(cchain -> iters)
-  def bodies = Seq(iters -> Seq(block))
-  override def mayBeOuterBlock(i: Int) = true
+  def bodies = Seq(PseudoStage(iters, Seq(block)))
 }
 
 
@@ -70,8 +66,10 @@ import spatial.util._
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def cchains = Seq(cchain -> iters)
-  override def bodies  = Seq(iters -> Seq(map,reduce), Nil -> Seq(load,store))
-  override def mayBeOuterBlock(i: Int) = i == 0
+  override def bodies  = Seq(
+    PseudoStage(iters, Seq(map,reduce)),
+    FutureStage(Nil, Seq(load,store), mayBeOuterStage = false)
+  )
 }
 
 @op case class OpMemReduce[A,C[T]](
@@ -93,11 +91,10 @@ import spatial.util._
   override def iters: Seq[I32] = itersMap ++ itersRed
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
-    itersMap -> Seq(map),
-    (itersMap ++ itersRed) -> Seq(loadRes, reduce),
-    itersRed -> Seq(loadAcc, storeAcc)
+    PseudoStage(itersMap, Seq(map)),
+    FutureStage(itersMap ++ itersRed, Seq(loadRes, reduce), mayBeOuterStage = false),
+    FutureStage(itersRed, Seq(loadAcc, storeAcc), mayBeOuterStage = false)
   )
-  override def mayBeOuterBlock(i: Int): Boolean = i == 0
 }
 
 @op case class StateMachine[A](
@@ -110,8 +107,11 @@ import spatial.util._
   override def binds = super.binds ++ notDone.inputs
   override def iters: Seq[I32] = Nil
   override def cchains = Nil
-  override def bodies = Seq(Nil -> Seq(notDone, action, nextState))
-  override def mayBeOuterBlock(i: Int): Boolean = i == 1
+  override def bodies = Seq(
+    FutureStage(Nil, Seq(notDone), mayBeOuterStage = false),
+    PseudoStage(Nil, Seq(action)),
+    FutureStage(Nil, Seq(nextState), mayBeOuterStage = false)
+  )
 }
 
 
@@ -124,7 +124,6 @@ import spatial.util._
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
   override def bodiess = Seq(iterss -> Seq(func))
-  override def mayBeOuterBlock(i: Int): Boolean = true
 }
 
 @op case class UnrolledReduce(
@@ -136,5 +135,4 @@ import spatial.util._
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
   override def bodiess = Seq(iterss -> Seq(func))
-  override def mayBeOuterBlock(i: Int): Boolean = true
 }

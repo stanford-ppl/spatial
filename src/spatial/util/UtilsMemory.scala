@@ -196,17 +196,38 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     // memory are in different sub-controllers.
     // This is to account for memories defined, e.g. in the map (block 0) of a MemReduce
     // with the access defined in the second block.
-    val accessAncestors = access.ancestors
-    val memParent = accessAncestors.indexOf(mem.parent)
-    val allAncestors = {
-      if (memParent > -1) accessAncestors.drop(memParent+1)
-      else access.ancestors(stop = mem.parent.master)
-    }
-    val ancestors = allAncestors.filterNot(_.id == -1)
+    //
+    // CASE 1: Direct hierarchy
+    // Foreach(-1)
+    //   Foreach(0)
+    //     *Alloc
+    //     Reduce(-1)
+    //       Reduce(0)
+    //         *Access
+    // Want: Reduce(0) Reduce(-1)
+    // access.scopes(stop = mem.scope) = Reduce(-1) Reduce(0)
+    // access.scopes(stop = mem.scope.master) = Foreach(0) Reduce(-1) Reduce(0)
+    //
+    // CASE 2: Access across subcontrollers
+    // Foreach(-1)
+    //   Foreach(0)
+    //     MemReduce(-1)
+    //       MemReduce (0)
+    //         *Alloc
+    //       MemReduce(1)
+    //         *Access
+    // Want: MemReduce(1) [STOP]
+    // access.scopes(stop = mem.scope) = Accel Foreach(-1) Foreach(0) MemReduce(-1) MemReduce(1)
+    // access.scopes(stop = mem.scope.master) = MemReduce(1)
+    val accessScopes = access.scopes(stop = mem.scope)
+    val memScopeIdx  = accessScopes.indexOf(mem.scope)
+    val memMasterIdx = accessScopes.indexOf(mem.scope.master)
+    val allScopes = if (memScopeIdx > -1) accessScopes else accessScopes.drop(memMasterIdx + 1)
+    val scopes = allScopes.filterNot(_.id == -1)
 
-    logs(s"Ancestors ($access -> $mem): ${allAncestors.mkString(",")}")
-    logs(s"Iterators: ${ancestors.flatMap(ctrlIters)}")
-    ancestors.flatMap(ctrlIters)
+    logs(s"Scopes ($access -> $mem): ${allScopes.mkString(",")}")
+    logs(s"Iters: ${scopes.flatMap(ctrlIters)}")
+    scopes.flatMap(ctrlIters)
   }
 
   /** Returns two sets of writers which may be visible to the given reader.

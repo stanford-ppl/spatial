@@ -11,6 +11,5 @@ import spatial.lang._
 
   override def iters = Nil
   override def cchains = Nil
-  override def bodies = Seq(Nil -> Seq(thenBlk,elseBlk))
-  def mayBeOuterBlock(i: Int): Boolean = true
+  override def bodies = Seq(PseudoStage(Nil, Seq(thenBlk,elseBlk)))
 }

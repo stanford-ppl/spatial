@@ -1,9 +1,8 @@
 package pir.node
 
 import pir.lang._
-import spatial.node.{Alloc, Control, Primitive}
+import spatial.node.{Alloc, Control, Primitive, PseudoStage}
 import spatial.lang._
-
 import argon._
 import forge.tags._
 import spatial.util.getCChains
@@ -30,8 +29,7 @@ abstract class PU extends Control[Void] {
   def ccs: Seq[CounterChain] = this.blocks.flatMap(getCChains)
   override def iters   = iterss.flatten
   override def cchains = ccs.zip(iterss)
-  override def bodies  = Seq(iters -> this.blocks)
-  def mayBeOuterBlock(i: Int): Boolean = true
+  override def bodies  = Seq(PseudoStage(iters, this.blocks))
 
   override def binds = super.binds ++ ins.values ++ outs.values ++ iters
 }
@@ -80,8 +78,10 @@ abstract class PU extends Control[Void] {
   override def cchains = rdPath.toSeq.flatMap{getCChains}.zip(rdIters) ++
                          wrPath.toSeq.flatMap{getCChains}.zip(wrIters)
 
-  override def bodies = rdPath.map{blk => rdIters.flatten -> Seq(blk) }.toSeq ++
-                        wrPath.map{blk => wrIters.flatten -> Seq(blk) }
+  override def bodies = {
+    rdPath.map{blk => PseudoStage(rdIters.flatten, Seq(blk)) }.toSeq ++
+      wrPath.map{blk => PseudoStage(wrIters.flatten, Seq(blk)) }
+  }
 
   override def inputs = syms(rdPath, wrPath, memories).toSeq
 

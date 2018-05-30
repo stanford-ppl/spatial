@@ -32,7 +32,7 @@ case object Looped extends CtrlLooping
   */
 case class ControlLevel(level: CtrlLevel) extends Data[ControlLevel](SetBy.Flow.Self)
 
-/** A counter or counterchain's owning controller.
+/** A controller, counter, or counterchain's owning controller.
   *
   * Getter:  sym.owner
   * Setter:  sym.owner = (Sym[_])
@@ -64,23 +64,36 @@ case class UserScheduleDirective(sched: CtrlSchedule) extends Data[UserScheduleD
 /** Metadata holding a list of children within a controller.
   * Note that the type of a child is Controller, not Ctrl, since a child cannot be the Host.
   *
-  * Getter:  sym.children
-  * Setter:  sym.children = (Seq[Controller])
+  * Getter:  sym.rawChildren
+  * Setter:  sym.rawChildren = (Seq[Controller])
   * Default: Nil
   */
 case class Children(children: Seq[Controller]) extends Data[Children](SetBy.Flow.Self)
 
 /** The controller (Ctrl) parent of a symbol within the controller hierarchy.
   * Operations defined outside Accel always have the Host as their parent.
-  * If the parent is not the Host, the id corresponds to the logical stage index of the parent controller.
+  * If the parent is not the Host, the id corresponds to the direct parent controller.
   * MemReduce, for example, has several isolated blocks which represent the logical accumulation
-  * into the accumulator. The id in Ctrl will give the index into the logical stage.
+  * into the accumulator. The id in Ctrl will give the index into the logical stage for every
+  * true future stage (e.g. the accumulation stage) and will be -1 for pseudo-stages.
   *
   * Getter:  sym.parent
   * Setter:  sym.parent = (Ctrl)
   * Default: Host
   */
 case class ParentCtrl(parent: Ctrl) extends Data[ParentCtrl](SetBy.Flow.Consumer)
+
+/** The scope (Ctrl) parent of a symbol within the controller hierarchy.
+  * The controller id corresponds to the logical stage index of the parent controller.
+  * MemReduce, for example, has several isolated blocks which represent the logical accumulation
+  * into the accumulator. The id in Controller will always give the index into the logical stage.
+  *
+  * Getter:  sym.scope
+  * Setter:  sym.scope = (Ctrl)
+  * Default: Host
+  */
+case class ScopeCtrl(scope: Ctrl) extends Data[ScopeCtrl](SetBy.Flow.Consumer)
+
 
 
 /** The block a symbol is defined in within the controller hierarchy.
@@ -136,7 +149,9 @@ case class UserII(interval: Double) extends Data[UserII](SetBy.User)
 
 trait ControlData {
   implicit class ControlDataOps(s: Sym[_]) {
+    /** Returns an Option of the control level (Inner or Outer) metadata. None if undefined. */
     def getRawLevel: Option[CtrlLevel] = metadata[ControlLevel](s).map(_.level)
+    /** Returns the control level (Inner or Outer) metadata. Use .level for most purposes. */
     def rawLevel: CtrlLevel = getRawLevel.getOrElse{throw new Exception(s"No control level defined for $s") }
     def rawLevel_=(level: CtrlLevel): Unit = metadata.add(s, ControlLevel(level))
 
@@ -161,15 +176,17 @@ trait ControlData {
     def owner: Sym[_] = getOwner.getOrElse{throw new Exception(s"Undefined counter owner for $s") }
     def owner_=(own: Sym[_]): Unit = metadata.add(s, CounterOwner(own))
 
-    def parent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Host)
-    def parent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
+    def rawParent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Host)
+    def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
 
+    def rawScope: Ctrl = metadata[ScopeCtrl](s).map(_.scope).getOrElse(Host)
+    def rawScope_=(ctrl: Ctrl): Unit = metadata.add(s, ScopeCtrl(ctrl))
 
-    def children: Seq[Controller] = {
+    def rawChildren: Seq[Controller] = {
       if (!s.isControl) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](s).map(_.children).getOrElse(Nil)
     }
-    def children_=(cs: Seq[Controller]): Unit = metadata.add(s, Children(cs))
+    def rawChildren_=(cs: Seq[Controller]): Unit = metadata.add(s, Children(cs))
 
 
     def blk: Ctrl = metadata[ParentBlk](s).map(_.blk).getOrElse{Host}

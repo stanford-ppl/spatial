@@ -44,21 +44,41 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
   @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = op match {
     case ctrl: Control[_] =>
+      // Find all children controllers within this controller
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
+      s.rawChildren = children.map{c => Controller(c,-1) }
+
       // Branches (Switch, SwitchCase) only count as controllers here if they are outer controllers
       // MemReduce is always an outer controller
       val isOuter = children.exists{c => !c.isBranch || c.isOuterControl } || op.isMemReduce
       s.rawLevel = if (isOuter) Outer else Inner
-      s.cchains.foreach{cchain => cchain.owner = s; cchain.counters.foreach{ctr => ctr.owner = s }}
-      s.children = children.map{c => Controller(c,-1) }
-      val bodies = ctrl.bodies
-      op.blocks.foreach{blk =>
-        val id = bodies.zipWithIndex.collectFirst{case (grp,i) if grp._2.contains(blk) => i }
-                       .getOrElse{throw new Exception(s"Block $blk is not associated with an ID in control $ctrl")}
-        blk.stms.foreach{lhs => lhs.parent = Controller(s,id) }
+
+      // Set metadata for counter owners
+      s.cchains.foreach{cchain =>
+        cchain.owner = s
+        cchain.counters.foreach{ctr => ctr.owner = s }
       }
-      op.blocks.zipWithIndex.foreach{case (blk,bId) =>
-        blk.stms.foreach{lhs => lhs.blk = Controller(s, bId) }
+
+      // Set scope and parent metadata for children controllers
+      val master = Controller(s, -1)
+      val bodies = ctrl.bodies
+
+      op.blocks.foreach{block =>
+        val (body,id) = bodies.zipWithIndex.collectFirst{case (stg,i) if stg.blocks.contains(block) => (stg,i) }
+                       .getOrElse{throw new Exception(s"Block $block is not associated with an ID in control $ctrl")}
+
+        val scope = Controller(s,id)
+        val scopeChildren = children intersect block.stms
+        // Don't track pseudoscopes in the control hierarchy (use master controller instead)
+        val parent = if (body.isPseudoStage) master else scope
+        block.stms.foreach{lhs => lhs.rawParent = parent }
+        // Always track all scopes in the scope hierarchy
+        scopeChildren.foreach{lhs => lhs.rawScope = scope }
+      }
+
+      // Set the blk of each symbol defined in this controller
+      op.blocks.zipWithIndex.foreach{case (block,bId) =>
+        block.stms.foreach{lhs => lhs.blk = Controller(s, bId) }
       }
 
     case _ => // Nothin'

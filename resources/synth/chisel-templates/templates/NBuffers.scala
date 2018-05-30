@@ -69,13 +69,13 @@ class NBufMem(val mem: MemType,
            val banks: List[Int], val strides: List[Int], 
            val xBarWMux: NBufXMap, val xBarRMux: NBufXMap, // bufferPort -> (muxPort -> accessPar)
            val directWMux: NBufDMap, val directRMux: NBufDMap,  // bufferPort -> (muxPort -> List(banks, banks, ...))
-           val broadcastWMux: XMap, // Assume broadcasts are XBar
+           val broadcastWMux: XMap, val broadcastRMux: XMap,  // Assume broadcasts are XBar
            val bankingMode: BankingMode, val inits: Option[List[Double]] = None, val syncMem: Boolean = false, val fracBits: Int = 0) extends Module { 
 
   // Overloaded constructers
   // Tuple unpacker
   def this(tuple: (MemType, List[Int], Int, Int, List[Int], List[Int], NBufXMap, NBufXMap, 
-    NBufDMap, NBufDMap, XMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, None, false, 0)
+    NBufDMap, NBufDMap, XMap, XMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, tuple._13, None, false, 0)
 
   val depth = logicalDims.product // Size of memory
   val N = logicalDims.length // Number of dimensions
@@ -85,15 +85,17 @@ class NBufMem(val mem: MemType,
   // Compute info required to set up IO interface
   val hasXBarW = xBarWMux.accessPars.sum > 0
   val hasXBarR = xBarRMux.accessPars.sum > 0
-  val numXBarW = if (hasXBarW) xBarWMux.accessPars.sum else 0
-  val numXBarR = if (hasXBarR) xBarRMux.accessPars.sum else 0
+  val numXBarW = xBarWMux.accessPars.sum
+  val numXBarR = xBarRMux.accessPars.sum
   val hasDirectW = directWMux.mergeDMaps.accessPars.sum > 0
   val hasDirectR = directRMux.mergeDMaps.accessPars.sum > 0
-  val numDirectW = if (hasDirectW) directWMux.mergeDMaps.accessPars.sum else 0
-  val numDirectR = if (hasDirectR) directRMux.mergeDMaps.accessPars.sum else 0
-  val totalOutputs = numXBarR + numDirectR
+  val numDirectW = directWMux.mergeDMaps.accessPars.sum
+  val numDirectR = directRMux.mergeDMaps.accessPars.sum
   val hasBroadcastW = broadcastWMux.accessPars.toList.sum > 0
-  val numBroadcastW = if (hasBroadcastW) broadcastWMux.accessPars.toList.sum else 0
+  val numBroadcastW = broadcastWMux.accessPars.toList.sum
+  val hasBroadcastR = broadcastRMux.accessPars.toList.sum > 0
+  val numBroadcastR = broadcastRMux.accessPars.toList.sum
+  val totalOutputs = numXBarR + numDirectR + numBroadcastR
   val defaultDirect = List.fill(banks.length)(99)
   val portsWithWriter = (directWMux.keys ++ xBarWMux.keys).toList.sorted
 
@@ -104,8 +106,9 @@ class NBufMem(val mem: MemType,
     val xBarR = Vec(1 max numXBarR, Input(new R_XBar(ofsWidth, banksWidths))) 
     val directW = HVec(Array.tabulate(1 max numDirectW){i => Input(new W_Direct(ofsWidth, if (hasDirectW) directWMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values.map(_._1)).flatten.flatten.toList(i) else defaultDirect, bitWidth))})
     val directR = HVec(Array.tabulate(1 max numDirectR){i => Input(new R_Direct(ofsWidth, if (hasDirectR) directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values.map(_._1)).flatten.flatten.toList(i) else defaultDirect))})
-    val broadcast = Vec(1 max numBroadcastW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
-    val flow = Vec(numXBarR + numDirectR, Input(Bool()))
+    val broadcastW = Vec(1 max numBroadcastW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
+    val broadcastR = Vec(1 max numBroadcastR, Input(new R_XBar(ofsWidth, banksWidths)))
+    val flow = Vec(totalOutputs, Input(Bool()))
 
     // FIFO Specific
     val full = Output(Bool())
@@ -132,6 +135,7 @@ class NBufMem(val mem: MemType,
   val flatDirectWMux = directWMux.mergeDMaps 
   val flatDirectRMux = directRMux.mergeDMaps 
   val combinedXBarWMux = flatXBarWMux.merge(broadcastWMux)
+  val combinedXBarRMux = flatXBarRMux.merge(broadcastRMux)
 
   // Create physical mems
   mem match {
@@ -139,7 +143,7 @@ class NBufMem(val mem: MemType,
       val srams = (0 until numBufs).map{ i => 
         Module(new SRAM(logicalDims, bitWidth, 
                         banks, strides, 
-                        combinedXBarWMux, flatXBarRMux,
+                        combinedXBarWMux, combinedXBarRMux,
                         flatDirectWMux, flatDirectRMux,
                         bankingMode, inits, syncMem, fracBits))
       }
@@ -175,10 +179,20 @@ class NBufMem(val mem: MemType,
           val sramXBarWBase = xBarWMux.accessPars.sum
           val sramBroadcastWPorts = broadcastWMux.accessPars.sum
           (0 until sramBroadcastWPorts).foreach {k => 
-            f.io.xBarW(sramXBarWBase + k).en := io.broadcast(k).en
-            f.io.xBarW(sramXBarWBase + k).data := io.broadcast(k).data
-            f.io.xBarW(sramXBarWBase + k).ofs := io.broadcast(k).ofs
-            f.io.xBarW(sramXBarWBase + k).banks.zip(io.broadcast(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+            f.io.xBarW(sramXBarWBase + k).en := io.broadcastW(k).en
+            f.io.xBarW(sramXBarWBase + k).data := io.broadcastW(k).data
+            f.io.xBarW(sramXBarWBase + k).ofs := io.broadcastW(k).ofs
+            f.io.xBarW(sramXBarWBase + k).banks.zip(io.broadcastW(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+          }
+        }
+        if (hasBroadcastR) {
+          val sramXBarRBase = xBarRMux.accessPars.sum
+          val sramBroadcastRPorts = broadcastRMux.accessPars.sum
+          (0 until sramBroadcastRPorts).foreach {k => 
+            f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
+            f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
+            f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
+            f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
           }
         }
 
@@ -210,13 +224,29 @@ class NBufMem(val mem: MemType,
             f.io.directR(bufferBase + k).en := io.directR(k).en & rMask
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(k).ofs
-            f.io.flow(k + {if (hasXBarR) numXBarR else 0}) := io.flow(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
+            f.io.flow(k + numXBarR) := io.flow(k + numXBarR) // Dangerous move here
           }
         }
+
+        // Connect BroadcastR ports and the associated outputs
+        // TODO: Broadcasting sram reads are untested and expected behavior is unclear, currently getting last buffer all the time just because
+        val xBarRBase = xBarRMux.accessPars.sum
+        val directRBase = directRMux.accessPars.sum
+        val sramXBarRPorts = broadcastRMux.accessPars.sum
+        val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.head === a.U, {if (Utils.retime) 1 else 0}) }
+        (0 until sramXBarRPorts).foreach {k => 
+          io.output.data(xBarRBase + directRBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+          f.io.xBarR(xBarRBase + k).en := io.broadcastR( k).en
+          // f.io.xBarR(xBarRBase + k).data := io.xBarR(xBarRBase + k).data
+          f.io.xBarR(xBarRBase + k).ofs := io.broadcastR( k).ofs
+          f.io.xBarR(xBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+          f.io.flow(xBarRBase + k) := io.flow(xBarRBase + directRBase + k) // Dangerous move here
+        }
+
       }
     case FFType => 
       val ffs = (0 until numBufs).map{ i => 
-        Module(new FF(bitWidth, combinedXBarWMux, inits, fracBits))
+        Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits)) 
       }
       // Route NBuf IO to FF IOs
       ffs.zipWithIndex.foreach{ case (f,i) => 
@@ -236,8 +266,8 @@ class NBufMem(val mem: MemType,
           val sramXBarWBase = xBarWMux.accessPars.sum
           val sramBroadcastWPorts = broadcastWMux.accessPars.sum
           (0 until sramBroadcastWPorts).foreach {k => 
-            f.io.xBarW(sramXBarWBase + k).en := io.broadcast(k).en
-            f.io.xBarW(sramXBarWBase + k).data := io.broadcast(k).data
+            f.io.xBarW(sramXBarWBase + k).en := io.broadcastW(k).en
+            f.io.xBarW(sramXBarWBase + k).data := io.broadcastW(k).data
           }
         }
       }
@@ -245,17 +275,28 @@ class NBufMem(val mem: MemType,
       // Connect buffers to output data ports
       xBarRMux.foreach { case (bufferPort, portMapping) => 
         val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
+        val sramXBarRPorts = portMapping.accessPars.sum
         val sel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
-        io.output.data(bufferBase) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data(0)})        
+        (0 until sramXBarRPorts).foreach {k => io.output.data(bufferBase+k) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data(0)})}
       }
-    case FIFOType => 
-      val fifo = Module(new FIFO(List(logicalDims.head*depth), bitWidth, 
-                                  banks, combinedXBarWMux, flatXBarRMux))
 
-      fifo.io.xBarW := io.xBarW
-      fifo.io.xBarR := io.xBarR
+      // TODO: BroadcastR connections?
+      val xBarRBase = xBarRMux.accessPars.sum
+      val sramBroadcastRPorts = broadcastRMux.accessPars.sum
+      val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.head === a.U, {if (Utils.retime) 1 else 0})}
+      (0 until sramBroadcastRPorts).foreach {k => io.output.data(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output.data(0)}) }
+      
+    case FIFOType => 
+      val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
+                                  banks, combinedXBarWMux, combinedXBarRMux))
+
+      fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
+      fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
       fifo.io.flow := io.flow
-      io.output.data := fifo.io.output.data
+      combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
+        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
+        (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
+      }
       io.full := fifo.io.full
       io.almostFull := fifo.io.almostFull
       io.empty := fifo.io.empty
@@ -265,8 +306,9 @@ class NBufMem(val mem: MemType,
     case ShiftRegFileType => 
       val rfs = (0 until numBufs).map{ i => 
         val combinedXBarWMux = xBarWMux.getOrElse(i,XMap()).merge(broadcastWMux)
+        val combinedXBarRMux = xBarRMux.getOrElse(i,XMap()).merge(broadcastRMux)
         Module(new ShiftRegFile(logicalDims, bitWidth, 
-                        combinedXBarWMux, xBarRMux.getOrElse(i, XMap()),
+                        combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
                         inits, syncMem, fracBits, isBuf = {i != 0}))
       }
@@ -301,16 +343,29 @@ class NBufMem(val mem: MemType,
           }
         }
 
-        // Connect Broadcast ports
+        // Connect BroadcastW ports
         if (hasBroadcastW) {
           val sramXBarWBase = if (xBarWMux.contains(i)) xBarWMux(i).values.map(_._1).sum else 0
           val sramBroadcastWPorts = broadcastWMux.accessPars.sum
           (0 until sramBroadcastWPorts).foreach {k => 
-            f.io.xBarW(sramXBarWBase + k).en := io.broadcast(k).en
-            f.io.xBarW(sramXBarWBase + k).shiftEn := io.broadcast(k).shiftEn
-            f.io.xBarW(sramXBarWBase + k).data := io.broadcast(k).data
-            f.io.xBarW(sramXBarWBase + k).ofs := io.broadcast(k).ofs
-            f.io.xBarW(sramXBarWBase + k).banks.zip(io.broadcast(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+            f.io.xBarW(sramXBarWBase + k).en := io.broadcastW(k).en
+            f.io.xBarW(sramXBarWBase + k).shiftEn := io.broadcastW(k).shiftEn
+            f.io.xBarW(sramXBarWBase + k).data := io.broadcastW(k).data
+            f.io.xBarW(sramXBarWBase + k).ofs := io.broadcastW(k).ofs
+            f.io.xBarW(sramXBarWBase + k).banks.zip(io.broadcastW(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+          }
+        }
+
+        // Connect BroadcastR ports
+        if (hasBroadcastR) {
+          val sramXBarRBase = if (xBarRMux.contains(i)) xBarRMux(i).values.map(_._1).sum else 0
+          val sramBroadcastRPorts = broadcastRMux.accessPars.sum
+          (0 until sramBroadcastRPorts).foreach {k => 
+            f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
+            // f.io.xBarR(sramXBarRBase + k).shiftEn := io.broadcastR(k).shiftEn
+            f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
+            f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
+            f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
           }
         }
 
@@ -343,59 +398,99 @@ class NBufMem(val mem: MemType,
             // f.io.flow(k + {if (hasXBarR) numXBarR else 0}) := io.flow(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
           }
         }
+
+        // Connect XBarR ports and the associated outputs
+        if (xBarRMux.contains(i)) {
+          val xBarRMuxPortMapping = xBarRMux(i)
+          val xBarRMuxBufferBase = xBarRMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
+          val sramXBarRPorts = xBarRMuxPortMapping.accessPars.sum
+          (0 until sramXBarRPorts).foreach {k => 
+            io.output.data(xBarRMuxBufferBase + k) := f.io.output.data(k)
+            f.io.xBarR(k).en := io.xBarR(xBarRMuxBufferBase + k).en
+            // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
+            f.io.xBarR(k).ofs := io.xBarR(xBarRMuxBufferBase + k).ofs
+            f.io.xBarR(k).banks.zip(io.xBarR(xBarRMuxBufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+              // f.io.flow(k) := io.flow(k) // Dangerous move here
+          }
+        }
+
+        // Connect BroadcastR ports and the associated outputs
+        // TODO: Broadcasting sram reads are untested and expected behavior is unclear, currently getting last buffer all the time just because
+        val xBarRMuxPortMapping = broadcastRMux
+        val xBarRMuxBufferBase = xBarRMux.accessPars.sum
+        val sramXBarRPorts = xBarRMuxPortMapping.accessPars.sum
+        (0 until sramXBarRPorts).foreach {k => 
+          io.output.data(xBarRMuxBufferBase + k) := f.io.output.data(k)
+          f.io.xBarR(xBarRMuxBufferBase + k).en := io.broadcastR(k).en
+          f.io.xBarR(xBarRMuxBufferBase + k).ofs := io.broadcastR(k).ofs
+          f.io.xBarR(xBarRMuxBufferBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
+        }
+
       }
 
   }
 
 
-
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int) {connectXBarWPort(wBundle, bufferPort, muxPort, 0)}
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxPort: Int, vecId: Int) {
+  var usedMuxPorts = List[(String,(Int,Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)) {connectXBarWPort(wBundle, bufferPort, muxAddr, 0)}
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(hasXBarW)
+    assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr,$vecId) twice!")
+    usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = xBarWMux.accessParsBelowBufferPort(bufferPort).sum
-    val muxBase = xBarWMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = xBarWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.xBarW(bufferBase + muxBase) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxPort, 0, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int)): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, 0, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(hasXBarR)
+    assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr,$vecId) twice!")
+    usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum
-    val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.xBarR(bufferBase + muxBase) := rBundle    
     io.flow(bufferBase + muxBase) := flow
     io.output.data(bufferBase + muxBase)
   }
 
-  def connectBroadcastPort(wBundle: W_XBar, muxPort: Int) {connectBroadcastPort(wBundle, muxPort, 0)}
-  def connectBroadcastPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
-    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxPort).sum + vecId
-    io.broadcast(muxBase) := wBundle
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int)) {connectBroadcastWPort(wBundle, muxAddr, 0)}
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int) {
+    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
+    io.broadcastW(muxBase) := wBundle
   }
 
-  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxPort: Int, vecId: Int) {
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int)): UInt = {connectBroadcastRPort(rBundle, muxAddr, 0)}
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), vecId: Int): UInt = {
+    val muxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
+    val xBarRBase = xBarRMux.accessPars.sum
+    val directRBase = directRMux.accessPars.sum
+    io.broadcastR(muxBase) := rBundle
+    io.output.data(xBarRBase + directRBase + muxBase)
+  }
+
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
     assert(hasDirectW)
+    assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to directW port ($bufferPort,$muxAddr,$vecId) twice!")
+    usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = directWMux.accessParsBelowBufferPort(bufferPort).sum 
-    val muxBase = directWMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = directWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.directW(bufferBase + muxBase) := wBundle
   }
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxPort, vecId, true.B)}
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectDirectRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxPort: Int, vecId: Int, flow: Bool): UInt = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     assert(hasDirectR)
+    assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to directR port ($bufferPort,$muxAddr,$vecId) twice!")
+    usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,muxAddr._2, vecId))
     val bufferBase = directRMux.accessParsBelowBufferPort(bufferPort).sum
     val xBarRBase = xBarRMux.accessPars.sum
-    val muxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxPort).sum + vecId
+    val muxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.directR(bufferBase + muxBase) := rBundle    
     io.flow(xBarRBase + bufferBase + muxBase) := flow
     io.output.data(xBarRBase + bufferBase + muxBase)
-  }
-
-  def connectBroadcastWPort(wBundle: W_XBar, muxPort: Int, vecId: Int) {
-    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxPort).sum + vecId
-    io.broadcast(muxBase) := wBundle
   }
 
   def connectStageCtrl(done: Bool, en: Bool, port: Int) {
@@ -429,7 +524,8 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     val xBarR = Vec(numBufs, Input(new R_XBar(1, List(1)))) 
     val directW = HVec(Array.tabulate(1){i => Input(new W_Direct(1, List(1), bitWidth))})
     val directR = HVec(Array.tabulate(1){i => Input(new R_Direct(1, List(1)))})
-    val broadcast = Vec(1, Input(new W_XBar(1, List(1), bitWidth)))
+    val broadcastW = Vec(1, Input(new W_XBar(1, List(1), bitWidth)))
+    val broadcastR = Vec(1, Input(new R_XBar(1, List(1))))
     val flow = Vec(numBufs, Input(Bool()))
 
     // FIFO Specific
@@ -444,14 +540,14 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     }
   })
 
-  val wMap = NBufXMap(0 -> XMap(0 -> 1))
+  val wMap = NBufXMap(0 -> XMap((0,0) -> 1))
   val rMap = NBufXMap((0 until numBufs).map{i => 
-    (i -> XMap(0 -> 1))
+    (i -> XMap((0,0) -> 1))
   }.toArray:_*)
 
   val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), 
                                     wMap, rMap, NBufDMap(), NBufDMap(),
-                                    XMap(), BankedMemory
+                                    XMap(), XMap(), BankedMemory
                                   ))
   io <> nbufFF.io
 

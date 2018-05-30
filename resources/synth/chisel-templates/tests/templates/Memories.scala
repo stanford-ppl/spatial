@@ -40,9 +40,12 @@ class Mem1DTests(c: Mem1D) extends PeekPokeTester(c) {
 class FFTests(c: FF) extends PeekPokeTester(c) {
   val initval = 10
   poke(c.io.xBarW(0).init, initval)
-  step(1)
+  poke(c.io.xBarW(0).reset, 1)
   reset(1)
+  step(1)
   expect(c.io.output.data(0), initval)
+  poke(c.io.xBarW(0).reset, 0)
+  step(1)
 
   // overwrite init
   poke(c.io.xBarW(0).data, 0)
@@ -60,27 +63,28 @@ class FFTests(c: FF) extends PeekPokeTester(c) {
     step(1)
     if (newenable == 1) {
       // val a = peek(c.io.output.data(0))
-      // println(s"expect $a to be $i")
+      // println(s"expect $a to be $i ? ${a == i} branch a")
       expect(c.io.output.data(0), i)
     } else {
       // val a = peek(c.io.output.data(0))
-      // println(s"expect $a to be $oldout")
+      // println(s"expect $a to be $oldout ? ${a == oldout} branch b")
       expect(c.io.output.data(0), oldout)
     }
   }
   poke(c.io.xBarW(0).reset, 1)
   poke(c.io.xBarW(0).en, 0)
   // val b = peek(c.io.output.data(0))
-  // println(s"expect $b to be $initval")
+  // println(s"expect $b to be $initval ? ${b == initval}")
+  step(1)
   expect(c.io.output.data(0), initval)
   step(1)
   // val cc = peek(c.io.output.data(0))
-  // println(s"expect $cc to be $initval")
+  // println(s"expect $cc to be $initval ? ${cc == initval}")
   expect(c.io.output.data(0), initval)
   poke(c.io.xBarW(0).reset, 0)
   step(1)
   // val d = peek(c.io.output.data(0))
-  // println(s"expect $d to be $initval")
+  // println(s"expect $d to be $initval ? ${d == initval}")
   expect(c.io.output.data(0), initval)
 }
 
@@ -228,31 +232,31 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
       for (i <- 0 until c.logicalDims(0) by c.banks(0)) {
         for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
           (0 until c.banks(0)).foreach{ ii => (0 until c.banks(1)).foreach{ jj =>
-            poke(c.io.broadcast(0).banks(0), ii)
-            poke(c.io.broadcast(0).banks(1), jj)
-            poke(c.io.broadcast(0).ofs, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
-            poke(c.io.broadcast(0).data, 999)
-            poke(c.io.broadcast(0).en, true)
+            poke(c.io.broadcastW(0).banks(0), ii)
+            poke(c.io.broadcastW(0).banks(1), jj)
+            poke(c.io.broadcastW(0).ofs, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
+            poke(c.io.broadcastW(0).data, 999)
+            poke(c.io.broadcastW(0).en, true)
             step(1)      
           }}
         }
       }
     case FFType => 
-      poke(c.io.broadcast(0).data, 999)
-      poke(c.io.broadcast(0).en, true)
+      poke(c.io.broadcastW(0).data, 999)
+      poke(c.io.broadcastW(0).en, true)
       step(1)
     case ShiftRegFileType => 
       for (i <- 0 until c.logicalDims(0)) {
         for (j <- 0 until c.logicalDims(1)) {
-          poke(c.io.broadcast(0).banks(0), i)
-          poke(c.io.broadcast(0).banks(1), j)
-          poke(c.io.broadcast(0).data, 999)
-          poke(c.io.broadcast(0).en, true)
+          poke(c.io.broadcastW(0).banks(0), i)
+          poke(c.io.broadcastW(0).banks(1), j)
+          poke(c.io.broadcastW(0).data, 999)
+          poke(c.io.broadcastW(0).en, true)
           step(1)      
         }
       }
   }
-  c.io.broadcast.foreach{p => poke(p.en, false)}
+  c.io.broadcastW.foreach{p => poke(p.en, false)}
   step(1)
 
   // Read all bufs
@@ -444,10 +448,11 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
   }
 
   // fill FIFO halfway
+  var x = 0
   var things_pushed = 0
   for (i <- 0 until c.p.depth/c.p.xBarWMux.values.head._1/2) {
     val ens = (0 until c.p.xBarWMux.values.head._1).map{i => rnd.nextInt(2)}
-    val datas = (0 until c.p.xBarWMux.values.head._1).map{i => rnd.nextInt(5)}
+    val datas = (0 until c.p.xBarWMux.values.head._1).map{i => x = x + 1; x /*rnd.nextInt(5)*/}
     things_pushed = things_pushed + ens.reduce{_+_}
     enq(datas, ens)
   }

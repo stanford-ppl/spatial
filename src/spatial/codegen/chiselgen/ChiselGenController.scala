@@ -279,6 +279,9 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""${swap(sym, SM)}.io.doneIn($idx) := ${swap(c, Done)}""")
         case Op(op@SwitchCase(_)) => 
           emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")
+        case _ if (isInner) => // Happens when a controller (FSM, Foreach, etc) contains a switch with inner style cases
+          emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")  
+          emitt(src"""${swap(sym, SM)}.io.doneIn($idx) := ${swap(c,Done)}""")  
         case _ => 
       }
       if (!isInner) emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := !${swap(c, CtrTrivial)}""")
@@ -300,13 +303,6 @@ trait ChiselGenController extends ChiselGenCommon {
         if (sym.isOuterStreamLoop) {
           emitt(src"""// ${swap(sym, SM)}.io.parentAck := ${swap(src"${sym.cchains.head}", Done)} // Not sure why this used to be connected, since it can cause an extra command issued""")
           emitGlobalWireMap(src"""${swap(src"${sym.cchains.head}", En)}""", """Wire(Bool())""") 
-          // val unitKid = c.isUnitPipe
-          // val snooping = getNowValidLogic(c).replace(" ", "") != ""
-          // val innerKid = c.isInnerControl
-          // val signalHandle = if (unitKid & innerKid & snooping) { // If this is a unit pipe that listens, we just need to snoop the now_valid & _ready overlap
-          //   src"true.B ${getStreamReadyLogic(c)} ${getNowValidLogic(c)}"
-          // } else src"${swap(c, Done)}"
-
           emitt(src"""${swap(src"${sym.cchains.head}", En)} := ${swap(c,Done)}//${if (getStreamAdvancement(c) != "") getStreamAdvancement(c) else swap(c, Done)}""")
           emitt(src"""${swap(src"${sym.cchains.head}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
           emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(src"${sym.cchains.head}",Done)}""")
@@ -332,8 +328,9 @@ trait ChiselGenController extends ChiselGenCommon {
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
     val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
+    val isPassthrough = sym match{case Op(_: Switch[_]) if (isInner && sym.parent.s.isDefined && sym.parent.s.get.isInnerControl) => ",isPassthrough = true"; case Op(_:SwitchCase[_]) if (isInner && sym.parent.s.get.parent.s.isDefined && sym.parent.s.get.parent.s.get.isInnerControl) => ",isPassthrough = true"; case _ => ""}
     val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
-    val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case _ => ""}
+    val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case Op(x: SwitchCase[_]) if (isInner & sym.children.length > 0) => s",cases = ${sym.children.length}"; case Op(_: StateMachine[_]) if (isInner & sym.children.length > 0) => s", cases=${sym.children.length}"; case _ => ""}
 
     // Generate standard control signals for all types
     emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
@@ -342,7 +339,7 @@ trait ChiselGenController extends ChiselGenCommon {
     createInstrumentation(sym)
 
     // Create controller
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $ncases, latency = ${swap(sym, Latency)}))")
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = ${swap(sym, Latency)}))")
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getStreamReadyLogic(sym)}""")
@@ -392,6 +389,10 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym.isInnerControl & (sym.children.length > 0) & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.head.s.get}", Done)}""")
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
+      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.length > 0) => true; case _ => false }) {
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.head.s.get, Done)}""")
+      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.length == 0) => true; case _ => false }) {
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc).D(1) // Used to be delayed by 1 & validNow""")
       } else {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc) // Used to be delayed by 1 & validNow""")
       }
@@ -580,11 +581,12 @@ trait ChiselGenController extends ChiselGenCommon {
     case op@Switch(selects, body) => 
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
+      emitIICounter(lhs)
       emitChildrenCxns(lhs, false)
       val cases = lhs.children.map(_.s.get)
       
       // Route through signals
-      emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
+      // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
       emit(src"""${swap(lhs, DatapathEn)} := ${swap(parent_kernel, DatapathEn)} // Not really used probably""")
       emit(src"""${swap(lhs, CtrTrivial)} := ${swap(parent_kernel, CtrTrivial)} | false.B""")
       // emit(src"""${swap(lhs, Mask)} := true.B // No enable associated with switch, never mask it""")
@@ -615,6 +617,7 @@ trait ChiselGenController extends ChiselGenCommon {
     case op@SwitchCase(body) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
+      emitIICounter(lhs)
       emitChildrenCxns(lhs, false)
       // emitInhibitor(lhs, None, Some(lhs.parent.s.get))
       emit(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")

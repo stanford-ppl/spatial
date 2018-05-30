@@ -184,10 +184,6 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     case _ => -1
   }
 
-  def wPortMuxWidth(mem: Sym[_], port: Int): Int = mem.writers.map{_.ports.values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
-
-  def rPortMuxWidth(mem: Sym[_], port: Int): Int = mem.readers.map{_.ports.values.head}.filter(_.bufferPort.getOrElse(-1) == port).map(_.muxPort).max
-
   /** Returns iterators between controller containing access (inclusive) and controller
     * containing mem (exclusive). Iterators are ordered outermost to innermost.
     */

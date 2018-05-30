@@ -257,7 +257,8 @@ trait ChiselGenCommon extends ChiselCodegen {
           case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
             fifo.readers.head match {
               // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-              case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+              // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+              case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
               case Op(FIFOPeek(_,_)) => src""
             }
           case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
@@ -266,7 +267,8 @@ trait ChiselGenCommon extends ChiselCodegen {
         val writesTo = getWriteStreams(c.toCtrl).map{
           case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
             fifo.writers.head match {
-              case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+              // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+              case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
             }
           case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
           // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        

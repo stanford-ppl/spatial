@@ -108,16 +108,16 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       synchronize := io.doneIn.last.D(1)
       
       // Define logic for first stage
-      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~io.doneIn(0)
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
       iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
-        active(i).io.input.set := io.doneIn(i-1) | (~io.maskIn(i-1) & ~io.doneIn(i) & io.enable)
+        active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable)) & ~synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) & ~synchronize) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)
+        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)) & ~synchronize
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
@@ -138,19 +138,19 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
     case Streaming => 
       // Define rule for when ctr increments
-      io.ctrInc := synchronize // Don't care, each child has its own copy
+      io.ctrInc := false.B // Don't care, each child has its own copy
 
       // Configure synchronization
-      synchronize := iterDone.map(_.io.output.data).reduce{_&_}
+      synchronize := false.B // iterDone.map(_.io.output.data).reduce{_&_}
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & ~io.ctrCopyDone(i)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
         iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
         done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i) & io.enable)
-        done(i).io.input.reset := synchronize.D(1) | io.parentAck // Override done reset
+        done(i).io.input.reset := io.parentAck // Override done reset
       }
 
     case Fork => 
@@ -205,11 +205,11 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
 
 
-class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
+class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrough: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
 
   // Overloaded construters
   // Tuple unpacker
-  def this(tuple: (Sched, Boolean, Int)) = this(tuple._1,tuple._2,tuple._3)
+  def this(tuple: (Sched, Boolean, Int)) = this(tuple._1,tuple._2,stateWidth = tuple._3)
 
   // Module IO
   val io = IO(new Bundle {
@@ -251,31 +251,42 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val stateWidth:
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
-    io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
-    io.ctrInc := active.io.output.data & io.enable
+    if (isPassthrough) { // pass through signals
+      io.datapathEn := io.enable // & ~io.done & ~io.parentAck
+      io.ctrInc := io.enable
+    }
+    else {
+      io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
+      io.ctrInc := active.io.output.data & io.enable
+    }
     io.done := Utils.getRetimed(Utils.risingEdge(done.io.output.data), latency)
-    io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1)}
+    io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner
     val stateFSM = Module(new FF(stateWidth))
     val doneReg = Module(new SRFF())
 
-    // With retime turned off (i.e latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
-    val depulser = RegInit(true.B) 
-    if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
-    else depulser := true.B
+    // // With retime turned off (i.e latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
+    // val depulser = RegInit(true.B) 
+    // if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
+    // else depulser := true.B
 
     stateFSM.io.xBarW(0).data := io.nextState.asUInt
     stateFSM.io.xBarW(0).init := io.initState.asUInt
-    if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
-    else stateFSM.io.xBarW(0).en := io.enable
+    stateFSM.io.xBarW(0).en := io.enable & io.ctrDone.D(latency)
+    // if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
+    // else stateFSM.io.xBarW(0).en := io.enable
     stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data(0).asSInt
+
+    // Screwiness with "switch" signals until we have better fsm test cases
+    io.childAck.last := io.doneIn.last
 
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
-    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & depulser
+    io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
+    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
     io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, io.enable)
 
   }

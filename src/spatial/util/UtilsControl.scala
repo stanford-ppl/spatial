@@ -432,6 +432,7 @@ trait UtilsControl {
       else if (anchor.ancestors.map(_.master).contains(x)) x else LCA(anchor, x)
     }
     if (candidates.distinct.length == 1) candidates.head 
+    else if (n.distinct.length == 1) n.distinct.head
     else LCA(candidates)
   }
   @stateful def LCAPortMatchup(n: List[Sym[_]], lca: Ctrl): (Int,Int) = {

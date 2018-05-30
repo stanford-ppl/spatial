@@ -428,7 +428,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     val init = start.asSInt
     base.io.xBarW(0).init := init.asUInt
     base.io.xBarW(0).reset := io.input.reset
-    base.io.xBarW(0).en := io.input.reset | io.input.enable
+    base.io.xBarW(0).en := io.input.enable
 
     val count = base.io.output.data(0).asSInt
     val newval_up = count + ((strideUp * par + gap).S((width).W))

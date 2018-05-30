@@ -338,6 +338,11 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		lastapphash=lol[2][acol]
 		lasttime=lol[2][ttcol]
 
+	if (len(lol) >= 75 and len(lol[74]) >= 6 and lol[74][5] == "KEEP"):
+		keep_row_75 = True
+	else:
+		keep_row_75 = False
+
 	if (perf):
 		new_entry=True
 	else:
@@ -351,7 +356,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			worksheet = sh.worksheet('index', x)
 			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
-				deleteRows(worksheet, 75)
+				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
 				# worksheet.update_cell(id,2, alink)
 				# worksheet.update_cell(id,3, t)
@@ -374,7 +379,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 				worksheet = sh.worksheet('index', x)
 				if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
-					deleteRows(worksheet, 75)
+					if (not keep_row_75): deleteRows(worksheet, 75)
 					# worksheet.update_cell(id,1, link)
 					# worksheet.update_cell(id,2, alink)
 					# worksheet.update_cell(id,3, t)

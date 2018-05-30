@@ -35,9 +35,10 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       dbgs(s"New body for $lhs will contain:")
       regular_primitives.foreach{x => dbgs(s" $x - ${x.op}")}
       flattened_primitives.foreach{x => dbgs(s" * $x - ${x.op} (from switch)")}
-      val lhs2 = stageWithFlow(UnitPipe(body,en)){lhs2 => transferData(lhs,lhs2) }
+      // val lhs2 = stageWithFlow(UnitPipe(body,en)){lhs2 => transferData(lhs,lhs2) }
 
-      lhs2
+      // lhs2
+      super.transform(lhs,rhs)
 
     case UnrolledForeach(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
       dbgs(s"Transforming $lhs")
@@ -54,9 +55,10 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       dbgs(s"New body for $lhs will contain:")
       regular_primitives.foreach{x => dbgs(s" $x - ${x.op}")}
       flattened_primitives.foreach{x => dbgs(s" * $x - ${x.op} (from switch)")}
-      val lhs2 = stageWithFlow(UnrolledForeach(ens, cchain, body, iters, valids)){lhs2 => transferData(lhs,lhs2) }
+      // val lhs2 = stageWithFlow(UnrolledForeach(ens, cchain, body, iters, valids)){lhs2 => transferData(lhs,lhs2) }
 
-      lhs2
+      // lhs2
+      super.transform(lhs,rhs)
 
     case UnrolledReduce(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
       dbgs(s"Transforming $lhs")
@@ -73,9 +75,10 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       dbgs(s"New body for $lhs will contain:")
       regular_primitives.foreach{x => dbgs(s" $x - ${x.op}")}
       flattened_primitives.foreach{x => dbgs(s" * $x - ${x.op} (from switch)")}
-      val lhs2 = stageWithFlow(UnrolledReduce(ens, cchain, body, iters, valids)){lhs2 => transferData(lhs,lhs2) }
+      // val lhs2 = stageWithFlow(UnrolledReduce(ens, cchain, body, iters, valids)){lhs2 => transferData(lhs,lhs2) }
 
-      lhs2
+      // lhs2
+      super.transform(lhs,rhs)
 
     case _ => super.transform(lhs,rhs)
   }

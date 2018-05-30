@@ -82,7 +82,8 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       io.ctrInc := iterDone(0).io.output.data & synchronize
 
       // Configure synchronization
-      synchronize := active.zip(iterDone).map{case (a, id) => a.io.output.data === id.io.output.data}.reduce{_&&_} // TODO: Retime tree
+      val anydone = iterDone.map(_.io.output.data).reduce(_|_)
+      synchronize := (active,iterDone,io.maskIn).zipped.map{case (a, id, mask) => a.io.output.data === id.io.output.data | (anydone & (a.io.output.data === ~mask))}.reduce{_&&_} // TODO: Retime tree
 
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable
@@ -94,9 +95,9 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       for (i <- 1 until depth) {
         val extension = if (latency == 0) (synchronize & iterDone(i-1).io.output.data).D(1) else false.B // Hack for when retiming is turned off, in case mask turns on at the same time as the next iter should begin
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
-        active(i).io.input.set := ((synchronize & iterDone(i-1).io.output.data) | (~io.maskIn(i-1) & active(i-1).io.output.data)) & io.enable
+        active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i)) | (iterDone(i-1).io.output.data.D(1) & ~io.maskIn(i) & io.enable)
+        iterDone(i).io.input.set := (io.doneIn(i))
         done(i).io.input.set := done(i-1).io.output.data & synchronize & ~io.rst
       }
     

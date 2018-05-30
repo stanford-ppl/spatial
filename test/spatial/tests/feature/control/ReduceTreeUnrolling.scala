@@ -18,7 +18,7 @@ import spatial.dsl._
       out1 := sum
     }
 
-    val gold = data.reduce{_*_}
+    val gold = data.reduce{_+_}
     assert(getArg(out1) == gold, r"$out1 != $gold")
   }
 }

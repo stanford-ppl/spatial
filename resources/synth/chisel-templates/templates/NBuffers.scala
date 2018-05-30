@@ -467,6 +467,7 @@ class NBufMem(val mem: MemType,
     val xBarRBase = xBarRMux.accessPars.sum
     val directRBase = directRMux.accessPars.sum
     io.broadcastR(muxBase) := rBundle
+    io.flow(xBarRBase + directRBase + muxBase) := true.B
     io.output.data(xBarRBase + directRBase + muxBase)
   }
 

@@ -121,6 +121,15 @@ trait Printing {
     case Def.TypeRef     => lhs.tp.typeName
   }
 
+  def shortStm(lhs: Sym[_]): String = lhs.rhs match {
+    case Def.Bound(id)   => s"b$id"
+    case Def.Const(c)    => s"${escapeConst(c)}"
+    case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
+    case Def.Node(id,op) => s"x$id: ${op.productPrefix}"
+    case Def.Error(id,_) => s"e$id <error>"
+    case Def.TypeRef     => lhs.tp.typeName
+  }
+
   @stateful def setupStream(dir: String, filename: String): String = {
     getOrCreateStream(dir, filename)
     dir + files.sep + filename

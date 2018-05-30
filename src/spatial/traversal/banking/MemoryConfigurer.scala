@@ -78,6 +78,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Added port ${inst.ports(a)} to ${a.access} {${a.unroll.mkString(",")}}")
         dbgs(s"  Added dispatch $id to ${a.access} {${a.unroll.mkString(",")}}")
       }
+
+      if (inst.writes.flatten.isEmpty && mem.name.isDefined) {
+        inst.reads.iterator.flatten.foreach{read =>
+          warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
+          warn(read.access.ctx)
+        }
+      }
     }
 
     val used = instances.flatMap(_.accesses).toSet
@@ -226,22 +233,23 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
     val reads = rdGroups.flatten
-    val writes = wrGroups.flatten
     val ctrls = reads.map(_.parent)
-    val reaching = reachingWrites(reads,writes,isGlobal)
-    val reachingWrGroups = wrGroups.map{grp => grp intersect reaching }.filterNot(_.isEmpty)
+    val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
+    val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     val bankings = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, dimGrps)
     if (bankings.nonEmpty) {
       val (metapipe, bufPorts, issue) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
 
       if (issue.isEmpty) {
+        printCtrlTree((reads ++ writes).map(_.access))
+
         val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val bankingCosts = bankings.map{b => b -> cost(b,depth) }
         val (banking, bankCost) = bankingCosts.minBy(_._2)
         // TODO[5]: Assumption: All memories are at least simple dual port
-        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(wrGroups,bufPorts)
+        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
         val isBuffAccum = metapipe.isDefined &&
-          writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+                          writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
@@ -250,7 +258,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Reads:")
         rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
         dbgs(s"  Writes:")
-        wrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+        reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
         dbgs(s"  Instance: ")
         dbgss("  ", instance)
 
@@ -259,7 +267,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       else Left(issue.get)
     }
     else {
-      Left(UnbankableGroup(mem, reads, reaching))
+      Left(UnbankableGroup(mem, reads, writes))
     }
   }
 
@@ -310,14 +318,15 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                   if (err.isEmpty) {
                     instances(instIdx) = i3
                     merged = true
-                    dbg(s"Merged $grpId into instance $instIdx")
+                    dbgs(s"Merged $grpId into instance $instIdx")
                   }
-                  else dbg(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+                  else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
 
                 case Left(issue) =>
-                  dbg(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
+                  dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
               }
             }
+            else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
             instIdx += 1
           }
           if (!merged) instances += i1

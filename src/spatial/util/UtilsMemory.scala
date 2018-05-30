@@ -240,6 +240,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
       intersects && mayPrecede
     }
+    dbgs(s"  Preceding writes for ${read.access} {${read.unroll.mkString(",")}}: ")
     preceding.foreach{write => dbgs(s"    ${write.access} {${write.unroll.mkString(",")}}")}
     preceding.partition{write => !write.access.mayFollow(read.access) }
   }

@@ -122,6 +122,32 @@ trait UtilsControl {
       */
     def looping: CtrlLooping = if (op.exists(_.isLoop)) Looped else Single
 
+    def schedule: CtrlSchedule = {
+      val ctrlLoop  = this.looping
+      val ctrlLevel = this.level
+      s.map(_.rawSchedule) match {
+        case None => Sequenced
+        case Some(actualSchedule) => (ctrlLoop, ctrlLevel) match {
+          case (Looped, Inner) => actualSchedule
+          case (Looped, Outer) => actualSchedule
+          case (Single, Inner) => actualSchedule match {
+            case Sequenced => Sequenced
+            case Pipelined => Sequenced
+            case Streaming => Streaming
+            case ForkJoin  =>  ForkJoin
+            case Fork => Fork
+          }
+          case (Single, Outer) => actualSchedule match {
+            case Sequenced => Sequenced
+            case Pipelined => Sequenced
+            case Streaming => Streaming
+            case ForkJoin  => ForkJoin
+            case Fork => Fork
+          }
+        }
+      }
+    }
+
     def isCtrl(
       loop:  CtrlLooping = null,
       level: CtrlLevel = null,
@@ -135,33 +161,11 @@ trait UtilsControl {
         val _sched = Option(sched)
         val ctrlLoop  = this.looping
         val ctrlLevel = this.level
-        val ctrlSched = s.map(_.rawSchedule)
+        val ctrlSched = this.schedule
 
         val hasLoop = _loop.isEmpty || _loop.contains(ctrlLoop)
         val hasLevel = _level.isEmpty || _level.contains(ctrlLevel)
-        val hasSched = (_sched, ctrlSched) match {
-          case (None, _) => true
-          case (_, None) => false
-          case (Some(expectedSchedule), Some(actualSchedule)) => (ctrlLoop, ctrlLevel) match {
-            case (Looped, Inner) => expectedSchedule == actualSchedule
-            case (Looped, Outer) => expectedSchedule == actualSchedule
-            case (Single, Inner) => expectedSchedule match {
-              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
-              case Pipelined => false
-              case Streaming => actualSchedule == Streaming
-              case ForkJoin  => actualSchedule == ForkJoin  // Shouldn't occur in practice
-              case Fork      => actualSchedule == Fork
-            }
-            case (Single, Outer) => expectedSchedule match {
-              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
-              case Pipelined => false
-              case Streaming => actualSchedule == Streaming
-              case ForkJoin  => actualSchedule == ForkJoin
-              case Fork      => actualSchedule == Fork
-            }
-          }
-
-        }
+        val hasSched = _sched.isEmpty || _sched.contains(ctrlSched)
 
         isCtrl && hasLoop && hasLevel && hasSched
       }
@@ -516,7 +520,7 @@ trait UtilsControl {
       val ctrlGrps: Set[(Ctrl,(Sym[_],Sym[_]))] = writers.flatMap{w =>
         (readers ++ writers).flatMap{a =>
           val (lca, dist) = LCAWithCoarseDistance(lookahead(w),lookahead(a))
-          dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
+          //dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
           if (dist != 0) Some(lca.master, (w,a)) else None
         }
       }
@@ -524,6 +528,30 @@ trait UtilsControl {
     }
   }
 
+  @stateful def printCtrlTree(accesses: Set[Sym[_]], top: Option[Ctrl] = None): Unit = if (accesses.nonEmpty) {
+    val lca_init = LCA(accesses.toList)
+    val lca = top match {
+      case Some(ctrl) if lca_init.ancestors.contains(ctrl) => ctrl
+      case None => lca_init
+    }
+
+    lca match {
+      case Controller(s,id) => dbgs(s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]")
+      case Host => dbgs("Host")
+    }
+    if (lca.isInnerControl) {
+      accesses.foreach{a => dbgs(s"  ${shortStm(a)}") }
+    }
+    else {
+      val children = lca.children
+      children.foreach { child =>
+        val accs = accesses.filter(_.ancestors.contains(child))
+        state.logTab += 1
+        printCtrlTree(accs, Some(child))
+        state.logTab -= 1
+      }
+    }
+  }
 
   @stateful def findMetaPipe(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {
     val accesses = readers ++ writers

@@ -517,48 +517,50 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def decrementAxisCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ List(l(x) - 1) ++ l.drop(x+1)}
   // Handle Writes
   m.foreach{ case(mem, coords, flatCoord) => 
-    // Check all xBar w ports against this bank's coords
-    val xBarSelect = io.xBarW.map(_.banks).zip(io.xBarW.map(_.en)).map{ case(bids, en) => 
-      bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
-    }
-    // Check all direct W ports against this bank's coords
-    val directSelect = io.directW.filter(_.banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_))
-
-    // Unmask write port if any of the above match
-    val wMask = xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B}
-
-    // Check if shiftEn is turned on for this line
-    val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
-      // XBarW requests shift
-      val axisShiftXBar = io.xBarW.map(_.banks).zip(io.xBarW.map(_.shiftEn)).map{ case(bids, en) => 
-        bids.zip(coords).zipWithIndex.map{case ((b, coord),id) => if (id == p.axis) true.B else b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
+    if (p.isBuf) mem := Mux(io.dump_en, io.dump_in(flatCoord), mem)
+    else {
+      // Check all xBar w ports against this bank's coords
+      val xBarSelect = io.xBarW.map(_.banks).zip(io.xBarW.map(_.en)).map{ case(bids, en) => 
+        bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
       }
-      // DirectW requests shift
-      val axisShiftDirect = io.directW.filter{case x => stripCoord(x.banks, p.axis).zip(stripCoord(coords, p.axis)).map{case (b,coord) => b == coord}.reduce(_&_)}
+      // Check all direct W ports against this bank's coords
+      val directSelect = io.directW.filter(_.banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_))
 
-      // Unmask shift if any of the above match
-      axisShiftXBar.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.shiftEn).reduce(_|_) else false.B}
-    } else false.B
+      // Unmask write port if any of the above match
+      val wMask = xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B}
 
-    // Connect matching W port to memory
-    val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
-    val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
-    val (data, enable) = 
-      if (directSelect.length > 0 & p.hasXBarW) {           // Has direct and x
-        val enable = Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarW).en) & wMask
-        val data = Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data, chisel3.util.PriorityMux(xBarSelect, io.xBarW).data)
-        (data, enable)
-      } else if (p.hasXBarW && directSelect.length == 0) {  // Has x only
-        val enable = chisel3.util.PriorityMux(xBarSelect, io.xBarW).en & wMask
-        val data = chisel3.util.PriorityMux(xBarSelect, io.xBarW).data
-        (data, enable)
-      } else {                                            // Has direct only
-        val enable = chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en & wMask
-        val data = chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data
-        (data, enable)
-      }
-    if (p.isBuf) mem := Mux(io.dump_en, io.dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
-    else mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
+      // Check if shiftEn is turned on for this line
+      val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
+        // XBarW requests shift
+        val axisShiftXBar = io.xBarW.map(_.banks).zip(io.xBarW.map(_.shiftEn)).map{ case(bids, en) => 
+          bids.zip(coords).zipWithIndex.map{case ((b, coord),id) => if (id == p.axis) true.B else b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
+        }
+        // DirectW requests shift
+        val axisShiftDirect = io.directW.filter{case x => stripCoord(x.banks, p.axis).zip(stripCoord(coords, p.axis)).map{case (b,coord) => b == coord}.reduce(_&_)}
+
+        // Unmask shift if any of the above match
+        axisShiftXBar.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.shiftEn).reduce(_|_) else false.B}
+      } else false.B
+
+      // Connect matching W port to memory
+      val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
+      val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
+      val (data, enable) = 
+        if (directSelect.length > 0 & p.hasXBarW) {           // Has direct and x
+          val enable = Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en, chisel3.util.PriorityMux(xBarSelect, io.xBarW).en) & wMask
+          val data = Mux(directSelect.map(_.en).reduce(_|_), chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data, chisel3.util.PriorityMux(xBarSelect, io.xBarW).data)
+          (data, enable)
+        } else if (p.hasXBarW && directSelect.length == 0) {  // Has x only
+          val enable = chisel3.util.PriorityMux(xBarSelect, io.xBarW).en & wMask
+          val data = chisel3.util.PriorityMux(xBarSelect, io.xBarW).data
+          (data, enable)
+        } else if (directSelect.length > 0) {                                            // Has direct only
+          val enable = chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en & wMask
+          val data = chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).data
+          (data, enable)
+        } else (0.U, false.B)
+      mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
+  }
   }
 
   // Connect read data to output

@@ -12,10 +12,18 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
 
-  def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
+  private def switchCaseLookaheadHack(parent: Sym[_]): Sym[_] = {
+    parent match {
+      case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get match {case s @ Op(_: SwitchCase[_]) => true; case _ => false}) => switchCaseLookaheadHack(parent.parent.s.get.parent.s.get)
+      case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get.isInnerControl) => parent.parent.s.get.parent.s.get
+      case _ => parent
+    }
+  }
+
+  private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get //mem.readers.find{_.node == lhs}.get.ctrlNode
+    val parent = switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -57,10 +65,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     
   }
 
-  def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
+  private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get
+    val parent = switchCaseLookaheadHack(lhs.parent.s.get)
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -89,7 +97,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
   }
 
-  def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
+  private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else constDimsOf(mem)
     val broadcastWrites = mem.writers.filter{w => w.ports.values.head.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> ${accessWidth(a)}"}.toList

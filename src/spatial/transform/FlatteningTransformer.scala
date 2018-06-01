@@ -18,77 +18,74 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
   private var enables: Set[Bit] = Set.empty
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
+    case AccelScope(body) => inAccel{
+      if (inHw && lhs.isInnerControl && lhs.children.length >= 1) {
+        dbgs(s"Transforming $lhs = $rhs")
+        val body2 = wrapPrimitives(rhs, body)
+        val lhs2 = stageWithFlow(AccelScope(body2)){lhs2 => transferData(lhs,lhs2) }
+        lhs2      
+      } else super.transform(lhs,rhs)
+    }
 
-    case UnitPipe(body, en) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs")
-      val regular_primitives = rhs.blocks.head.stms.collect{case Primitive(s) => s}
-      val switches = rhs.blocks.head.stms.collect{case s @ Op(_: Switch[_]) => s}
-      val flattened_primitives = switches.map{x => 
-        // if (x.R.isBits) {
-        //   dbgs(s" - Squashing $x (returns bits)")
-        // }
-        // else dbgs(s" - Squashing $x")
-        squash(x)
-      }.flatten
-      val new_primitives = regular_primitives ++ flattened_primitives
-      dbgs(s"New body for $lhs will contain:")
-      regular_primitives.foreach{x => dbgs(s" $x - ${x.op}")}
-      flattened_primitives.foreach{x => dbgs(s" * $x - ${x.op} (from switch)")}
-      val lhs2 = stageWithFlow(UnitPipe(body,en)){lhs2 => transferData(lhs,lhs2) }
-
+    case UnitPipe(en, body) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
+      dbgs(s"Transforming $lhs = $rhs")
+      val body2 = wrapPrimitives(rhs, body)
+      val lhs2 = stageWithFlow(UnitPipe(en, body2)){lhs2 => transferData(lhs,lhs2) }
       lhs2
 
-    case UnrolledForeach(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs")
-      val regular_primitives = rhs.blocks.head.stms.collect{case Primitive(s) => s}
-      val switches = rhs.blocks.head.stms.collect{case s @ Op(_: Switch[_]) => s}
-      val flattened_primitives = switches.map{x => 
-        // if (x.R.isBits) {
-        //   dbgs(s" - Squashing $x (returns bits)")
-        // }
-        // else dbgs(s" - Squashing $x")
-        squash(x)
-      }.flatten
-      val new_primitives = regular_primitives ++ flattened_primitives
-      dbgs(s"New body for $lhs will contain:")
-      regular_primitives.foreach{x => dbgs(s" $x - ${x.op}")}
-      flattened_primitives.foreach{x => dbgs(s" * $x - ${x.op} (from switch)")}
-      val lhs2 = stageWithFlow(UnrolledForeach(ens, cchain, body, iters, valids)){lhs2 => transferData(lhs,lhs2) }
 
+    case UnrolledForeach(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
+      dbgs(s"Transforming $lhs = $rhs")
+      val body2 = wrapPrimitives(rhs, body)
+      val lhs2 = stageWithFlow(UnrolledForeach(ens, cchain, body2, iters, valids)){lhs2 => transferData(lhs,lhs2) }
       lhs2
 
     case UnrolledReduce(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs")
-      val regular_primitives = rhs.blocks.head.stms.collect{case Primitive(s) => s}
-      val switches = rhs.blocks.head.stms.collect{case s @ Op(_: Switch[_]) => s}
-      val flattened_primitives = switches.map{x => 
-        // if (x.R.isBits) {
-        //   dbgs(s" - Squashing $x (returns bits)")
-        // }
-        // else dbgs(s" - Squashing $x")
-        squash(x)
-      }.flatten
-      val new_primitives = regular_primitives ++ flattened_primitives
-      dbgs(s"New body for $lhs will contain:")
-      regular_primitives.foreach{x => dbgs(s" $x - ${x.op}")}
-      flattened_primitives.foreach{x => dbgs(s" * $x - ${x.op} (from switch)")}
-      val lhs2 = stageWithFlow(UnrolledReduce(ens, cchain, body, iters, valids)){lhs2 => transferData(lhs,lhs2) }
-
+      dbgs(s"Transforming $lhs = $rhs")
+      val body2 = wrapPrimitives(rhs, body)
+      val lhs2 = stageWithFlow(UnrolledReduce(ens, cchain, body2, iters, valids)){lhs2 => transferData(lhs,lhs2) }
       lhs2
 
     case _ => super.transform(lhs,rhs)
   }
 
-  private def squash(s: Sym[_]): List[Sym[_]] = {
-    s match {
-      case Op(Switch(selects, body)) => 
-        selects.zip(s.children.map(_.s.get)).map{case (sel, sc) => 
-          if (sc.children.length >= 1) sc.children.map{x => squash(x.s.get)}.flatten
-          else sc.blocks.head.stms.toList
-        }.toList.flatten
-      case _ => throw new Exception()
+
+  private def extractPrimitives[A:Type](rhs: Op[A], body: Block[_])(implicit ctx: SrcCtx): Unit = {
+    rhs.blocks.head.stms.map{
+      case Primitive(s) => dbgs(s"visiting $s - ${s.op}");visit(s)
+      case sym @ Op(op: Switch[_]) => 
+        sym.children.map(_.s.get).map{sc => val Op(op) = sc; implicit val typeInfo = sc.tp; extractPrimitives(op,sc.blocks.head)}
+        implicit val typeInfo = sym.tp
+        val Op(rhs) = sym
+        if (op.R.isBits) createOneHotMux(sym)
+        ()
     }
+  }
+
+  private def wrapPrimitives[A:Type](rhs: Op[A], body: Block[Void])(implicit ctx: SrcCtx): Block[Void] = {
+    val body2 = stageScope(f(body.inputs),body.options){
+      extractPrimitives(rhs, body)
+      assert(body.result.isVoid)
+      void
+    }
+    body2
+  }
+
+  private def createOneHotMux[A:Type](lhs: Sym[A])(implicit ctx: SrcCtx): Unit = {
+    Type[A] match {
+      case Bits(b) =>
+        implicit val bA: Bits[A] = b
+        val Op(Switch(selects,body)) = lhs
+        val stms = body.stms.map(_.asInstanceOf[A])
+        val cases = stms.collect{case Op(op:SwitchCase[_]) => op.asInstanceOf[SwitchCase[A]]  }
+        val vals = cases.map{cas => substituteSym(cas.body.result).unbox }
+        val sels = selects.map(sel => substituteSym(sel).unbox)
+        val ohmux = oneHotMux[A](sels, vals)
+        dbgs(s"staging $ohmux (<- $lhs) - ${ohmux.op}")
+        register(lhs -> ohmux)
+      case _ =>
+    }
+
   }
 
 }

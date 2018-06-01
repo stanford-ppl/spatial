@@ -10,13 +10,14 @@ import spatial.dsl._
 
   def fifopushpop(N: Int): Int = {
     val tileSize = 96 (96 -> 96)
+    val doubleTileSize = 192
 
     val size = ArgIn[Int]
     setArg(size, N)
     val acc = ArgOut[Int]
 
     Accel {
-      val f1 = FIFO[Int](tileSize)
+      val f1 = FIFO[Int](doubleTileSize)
       val accum = Reg[Int](0)
       Reduce(accum)(size by tileSize){ iter =>
         Foreach(tileSize by 1){i => f1.enq(iter + i) }
@@ -50,13 +51,14 @@ import spatial.dsl._
 
   def fifopushpop(N: Int): Int = {
     val tileSize = 16 (16 -> 16)
+    val doubleTileSize = 32
 
     val size = ArgIn[Int]
     setArg(size, N)
     val acc = ArgOut[Int]
 
     Accel {
-      val f1 = FIFO[Int](tileSize)
+      val f1 = FIFO[Int](doubleTileSize)
       val accum = Reg[Int](0)
       Sequential.Reduce(accum)(size by tileSize){ iter =>
         Foreach(tileSize/2 by 1 par 2){i => f1.enq(iter + i) }

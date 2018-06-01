@@ -187,14 +187,12 @@ trait ChiselGenMath extends ChiselGenCommon {
     // case FltAcos(x) => throw new spatial.TrigInAccelException(lhs)
     // case FltAtan(x) => throw new spatial.TrigInAccelException(lhs)
 
+    case OneHotMux(sels, opts) => 
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"${lhs}.r := Mux1H(List($sels), List(${opts.map{x => src"${x}.r"}}))")
+
     case Mux(sel, a, b) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      // lhs.tp match { 
-      //   case FixPtType(s,d,f) => 
-      //     emitGlobalWire(s"""val ${quote(lhs)} = Wire(new FixedPoint($s,$d,$f))""")
-      //   case _ =>
-      //     emitGlobalWire(s"""val ${quote(lhs)} = Wire(UInt(${bitWidth(lhs.tp)}.W))""")
-      // }
       emitt(src"${lhs}.r := Mux(($sel), ${a}.r, ${b}.r)")
 
     // // Assumes < and > are defined on runtime type...

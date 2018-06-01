@@ -42,7 +42,7 @@ def getColOrAppend(wksh, appname):
 def getCols(wksh, appname):
 	try: 
 		lol = readAllVals(wksh)
-		cols = [i+1 for i,x in enumerate(lol[0]) if (re.match(appname,x))]
+		cols = [i+1 for i,x in enumerate(lol[0]) if (re.match("^"+appname+"$",x))]
 		return cols
 	except:
 		print("ERROR: pygsheets failed getCols... -_-")	
@@ -403,6 +403,53 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
+
+def report_changes(backend):
+	sh = getDoc(backend)
+
+	worksheet = sh.worksheet_by_title("Runtime")
+	lol = worksheet.get_all_values()
+	start = getCols(worksheet, "Test:")[0]
+	tests = list(filter(None, lol[0][start:]))
+	pass_list = []
+	fail_list = []
+	nocompile_list = []
+	improved_list = []
+	worsened_list = []
+	for t in tests:
+		col = lol[0].index(t) + 1
+		now_pass = lol[2][col] == '1'
+		now_fail = lol[2][col] == '0'
+		now_nocompile = lol[2][col] == ''
+		b4_pass = lol[3][col] == '1'
+		b4_fail = lol[3][col] == '0'
+		b4_nocompile = lol[3][col] == ''
+		if (now_pass): pass_list.append(t)
+		if (now_fail): fail_list.append(t)
+		if (now_nocompile): nocompile_list.append(t)
+		if (now_pass and (not b4_pass)): improved_list.append(t)
+		if ((not now_pass) and b4_pass): worsened_list.append(t)
+	print("SUMMARY")
+	print("-------")
+	print("Improved: %d" % len(improved_list))
+	print("Worsened: %d" % len(worsened_list))
+	print("Total # Passing: %d" % len(pass_list))
+	print("Total # Failing: %d" % len(fail_list))
+	print("Total # Not Compiling: %d" % len(nocompile_list))
+	print("BREAKDOWN")
+	print("---------")
+	print("Passing:")
+	print(sorted(pass_list))
+	print("Failing:")
+	print(sorted(fail_list))
+	print("Not Compiling:")
+	print(sorted(nocompile_list))
+	print("Improved:")
+	print(sorted(improved_list))
+	print("Worsened:")
+	print(sorted(worsened_list))
+
+
 # ofs = 0 means start deleting from spreadsheet "row 3" and down
 def delete_n_rows(n, ofs, backend):
 	sh = getDoc(backend)
@@ -435,6 +482,44 @@ def delete_app_column(appname, backend):
 				else:
 					print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
 
+# This will take rows from new_appname column 0 until the last row with data and paste it into old_appname column
+def merge_apps_columns(old_appname, new_appname, backend):
+	sh = getDoc(backend)
+	perf = isPerf(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		worksheet = sh.worksheet('index', x)
+		lol = readAllVals(worksheet)
+		old_col_in_sheet = getCols(worksheet, old_appname)
+		new_col_in_sheet = getCols(worksheet, new_appname)
+		if (len(old_col_in_sheet) != 1):
+			print("ERROR: %s not found on sheet %s" % (old_appname, worksheet.title))
+		elif (len(new_col_in_sheet) != 1):
+			print("ERROR: %s not found on sheet %s" % (new_appname, worksheet.title))
+		else:
+			new_col = lol[0].index(new_appname)
+
+			if (perf and worksheet.title == "Runtime"):
+				data = [x[new_col] for x in lol]
+				passes = [x[new_col+1] for x in lol]
+				for i in range(0,len(data)):
+					if (data[i] != ''):
+						write(worksheet, i+1, old_col_in_sheet[0], data[i])
+						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
+					if (passes[i] != ''):
+						write(worksheet, i+1, old_col_in_sheet[0]+1, passes[i])
+						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0]+1, passes[i]))
+			else:
+				data = [x[new_col] for x in lol]
+				for i in range(0,len(data)):
+					if (data[i] != ''):
+						write(worksheet, i+1, old_col_in_sheet[0], data[i])
+						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
+
+			deleteCols(worksheet, new_col_in_sheet[0])
+			# print("delete app column")
+
 
 
 
@@ -451,12 +536,18 @@ elif (sys.argv[1] == "report_synth_results"):
 elif (sys.argv[1] == "prepare_sheet"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
 	prepare_sheet(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+elif (sys.argv[1] == "report_changes"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s')" % (sys.argv[2]))
+	report_changes(sys.argv[2])
 elif (sys.argv[1] == "delete_n_rows"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "delete_app_column"):
-	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_app_column('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_app_column(sys.argv[2], sys.argv[3])
+elif (sys.argv[1] == "merge_apps_columns"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! merge_apps_columns('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	merge_apps_columns(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3])
@@ -466,6 +557,8 @@ else:
 	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
+	print(" - report_changes(backend)")
 	print(" - delete_n_rows(n, ofs (0=row 3, 1=row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - merge_app_columns(old appname, new appname, backend)")
 	exit()

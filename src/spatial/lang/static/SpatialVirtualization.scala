@@ -11,7 +11,13 @@ import spatial.node.IfThenElse
 import language.experimental.macros
 import scala.reflect.macros.whitebox
 
-trait SpatialVirtualization {
+trait LowPriorityVirtualization {
+
+  def __newVar[T](init: T): VarLike[T] = new Ptr[T](init)
+
+}
+
+trait SpatialVirtualization extends LowPriorityVirtualization {
   import SpatialVirtualization._
 
   // Generally unused/unsupported methods
@@ -33,13 +39,14 @@ trait SpatialVirtualization {
     case _ => ()
   }
 
-  @rig def __newVar[T](init: T): VarLike[T] = init match {
-    case t: Top[_] =>
-      implicit val T: Type[T] = t.selfType.asInstanceOf[Type[T]]
-      Var.alloc(Some(init))
+  @rig def __newVar[A<:Top[A]:Type](init: A): VarLike[A] = Var.alloc(Some(init))
 
-    case _ => new Ptr[T](init)
+  @rig def __newVar[A,B](init: A)(implicit lift: Lifting[A,B]): VarLike[B] = {
+    implicit val A: Type[B] = lift.rightType
+    Var.alloc(Some(lift(init)))
   }
+
+
 
   // TODO[4]: Implicit staged conversions when assigning to vars
   @rig def __assign[T](v: VarLike[T], rhs: Any): Unit = v match {

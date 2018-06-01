@@ -189,7 +189,7 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case OneHotMux(sels, opts) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := Mux1H($sels, ${opts}).r")
+      emitt(src"${lhs}.r := Mux1H(List($sels), List(${opts.map{x => src"${x}.r"}}))")
 
     case Mux(sel, a, b) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")

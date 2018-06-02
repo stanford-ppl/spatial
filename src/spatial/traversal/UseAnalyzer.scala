@@ -23,13 +23,13 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       if (mem.isReg && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead))) {
         mem.isUnusedMemory = true
         if (mem.name.isDefined) {
-          warn(mem.ctx, s"${mem.name.get} is defined but never used.")
+          warn(mem.ctx, s"${mem.name.get} is defined here but never read. Unused writes will be dropped.")
           warn(mem.ctx)
         }
       }
       else if (mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) {
         if (mem.name.isDefined) {
-          warn(mem.ctx, s"${mem.name.get} is defined but never used.")
+          warn(mem.ctx, s"${mem.name.get} is defined here but never read.")
           warn(mem.ctx)
         }
       }

@@ -255,8 +255,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val (banking, bankCost) = bankingCosts.minBy(_._2)
         // TODO[5]: Assumption: All memories are at least simple dual port
         val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
-        val isBuffAccum = metapipe.isDefined &&
-                          writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+        val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 

@@ -494,11 +494,6 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
-  def this(logicalDims: List[Int], bitWidth: Int, 
-           banks: List[Int], strides: List[Int], 
-           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
-           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, if (init.isDefined) Some(init.get.map(_.toDouble)) else None, syncMem, fracBits)
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)

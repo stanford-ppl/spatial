@@ -298,18 +298,30 @@ def dev(arg1, arg2, backend):
 	t=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 	worksheet = sh.worksheet_by_title("Timestamps")
-	
-	# Some nonsense to write
-	numsheets = len(sh.worksheets())
-	for x in range(0,numsheets):
-		# worksheet = sh.get_worksheet(x)
-		worksheet = sh.worksheet('index', x)
-		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
-			worksheet.insert_rows(row = 2, values = [arg1, arg2, t])
-			deleteRows(worksheet, 75)
-		if (worksheet.title == "Properties" and perf):
-			worksheet.update_cells('B3:DQ3', [[' ']*120]) # Clear old pass bitmask
-	sys.stdout.write(str(3))
+	lol = worksheet.get_all_values()
+	lolhash = [x[0] for x in lol if x[0] != '']
+	# id = len(lolhash) + 1
+	freq = os.environ['CLOCK_FREQ_MHZ']
+	if ("hash" in lol[1]):
+		hcol=lol[1].index("hash")
+	if ("app hash" in lol[1]):
+		acol=lol[1].index("app hash")
+	if ("test timestamp" in lol[1]):
+		ttcol=lol[1].index("test timestamp")
+
+	if (len(lol) < 3): 
+		lasthash="NA"
+		lastapphash="NA"
+		lasttime="2000-01-08 21:15:36"
+	else:
+		lasthash=lol[2][hcol]
+		lastapphash=lol[2][acol]
+		lasttime=lol[2][ttcol]
+
+	if (len(lol) >= 74 and len(lol[73]) >= 6 and lol[73][5] == "KEEP"):
+		keep_row_75 = True
+	else:
+		keep_row_75 = False
 
 def prepare_sheet(hash, apphash, timestamp, backend):
 	sh = getDoc(backend)
@@ -338,7 +350,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		lastapphash=lol[2][acol]
 		lasttime=lol[2][ttcol]
 
-	if (len(lol) >= 75 and len(lol[74]) >= 6 and lol[74][5] == "KEEP"):
+	if (len(lol) >= 74 and len(lol[73]) >= 6 and lol[73][5] == "KEEP"):
 		keep_row_75 = True
 	else:
 		keep_row_75 = False
@@ -550,7 +562,7 @@ elif (sys.argv[1] == "merge_apps_columns"):
 	merge_apps_columns(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
-	dev(sys.argv[2], sys.argv[3])
+	dev(sys.argv[2], sys.argv[3], sys.argv[4])
 else:
 	print("Commands:")
 	print(" - report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args)")

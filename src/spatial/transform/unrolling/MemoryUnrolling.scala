@@ -221,6 +221,8 @@ trait MemoryUnrolling extends UnrollingBase {
     // The unrolled version of register file shifting currently doesn't take a banked address
     //case _:RegFileVectorShiftIn[_] => addr
     case _:RegFileShiftIn[_,_]     => addr
+    case _:RegFileRead[_,_]     => addr
+    case _:RegFileWrite[_,_]     => addr
     case _ => addr.map{laneAddr => inst.bankSelects(laneAddr) }
   }
 
@@ -353,6 +355,8 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))
     case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
     case _:GetReg[_]         => URead(stage(GetReg(mem.asInstanceOf[Reg[A]])))
+
+    // case op:RegFileShiftIn[_,_] => UWrite[A](stage(RegFileShiftInVector(mem.asInstanceOf[RegFilex[A]], data, bank, enss, op.axis, enss.length)))
 
     case op:RegFileShiftIn[_,_] =>
       UMultiWrite(data.zipWithIndex.map{case (d,i) =>

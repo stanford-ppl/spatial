@@ -63,11 +63,12 @@ trait ChiselGenController extends ChiselGenCommon {
   val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
 
   var html_tab = 0
-  def print_stage_prefix(lhs: Sym[_], title: String, ctr: String, node: String, ctx: String, inner: Boolean = false): Unit = {
+  def print_stage_prefix(lhs: Sym[_], title: String, level: String, ctr: String, node: String, ctx: String, inner: Boolean = false): Unit = {
     inGen(out, "controller_tree.html") {
       emit(s"""${" "*html_tab}<!--Begin $node -->""")
       html_tab = html_tab + 1
-      emit(s"""${" "*html_tab}<TD><font size = "6">$title<br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
+      val isFSM = lhs match {case Op(_: StateMachine[_]) => " FSM"; case _ => ""}
+      emit(s"""${" "*html_tab}<TD><font size = "6">${title}$isFSM<font size = "4"> ($level)</font><br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
       // if (!inner & !collapsible) {emit(s"""${" "*html_tab}<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}
       emit("")
       if (!inner) {
@@ -130,7 +131,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
-    print_stage_prefix(lhs, s"${lhs.rawSchedule}", s"$cchain", s"$lhs", s"${lhs.ctx}", lhs.isInnerControl & lhs.children.isEmpty)
+    print_stage_prefix(lhs, s"${lhs.rawSchedule}", s"${lhs.level}", s"$cchain", s"$lhs", s"${lhs.ctx}", lhs.isInnerControl & lhs.children.isEmpty)
     if (lhs.isOuterControl)      { widthStats += lhs.children.toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
 

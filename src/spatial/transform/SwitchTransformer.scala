@@ -74,6 +74,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
     case IfThenElse(cond,thenBlk,elseBlk) if inHw =>
+      dbgs(s"Transforming $lhs ($cond ? $thenBlk : $elseBlk")
       val cond2 = f(cond)
       val elseCond = !cond2
       val thenCase = createCase(cond2, thenBlk)

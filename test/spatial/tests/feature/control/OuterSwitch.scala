@@ -15,6 +15,7 @@ import spatial.dsl._
 
     Accel {
       val data = SRAM[Int](32)
+      Sequential.Foreach(32 by 1){i => data(i) = 0}
       if (in.value <= 28) {
         Sequential.Foreach((in.value+4) by 1){ i => data(i) = i }
       }

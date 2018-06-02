@@ -174,6 +174,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   }
 
   def accessWidth(access: Sym[_]): Int = access match {
+    case Op(RegFileShiftIn(_,data,_,_,_)) => 1
+    case Op(RegFileShiftInVector(_,_,_,_,_,len)) => len
     case Op(FIFOBankedDeq(_, ens)) => ens.length
     case Op(FIFOBankedEnq(_, _, ens)) => ens.length
     case Op(LIFOBankedPop(_, ens)) => ens.length

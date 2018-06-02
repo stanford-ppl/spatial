@@ -108,7 +108,7 @@ class NBufMem(val mem: MemType,
     val directR = HVec(Array.tabulate(1 max numDirectR){i => Input(new R_Direct(ofsWidth, if (hasDirectR) directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values.map(_._1)).flatten.flatten.toList(i) else defaultDirect))})
     val broadcastW = Vec(1 max numBroadcastW, Input(new W_XBar(ofsWidth, banksWidths, bitWidth)))
     val broadcastR = Vec(1 max numBroadcastR, Input(new R_XBar(ofsWidth, banksWidths)))
-    val flow = Vec(totalOutputs, Input(Bool()))
+    val flow = Vec(1 max totalOutputs, Input(Bool()))
 
     // FIFO Specific
     val full = Output(Bool())
@@ -467,6 +467,7 @@ class NBufMem(val mem: MemType,
     val xBarRBase = xBarRMux.accessPars.sum
     val directRBase = directRMux.accessPars.sum
     io.broadcastR(muxBase) := rBundle
+    io.flow(xBarRBase + directRBase + muxBase) := true.B
     io.output.data(xBarRBase + directRBase + muxBase)
   }
 

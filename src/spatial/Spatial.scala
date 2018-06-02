@@ -80,6 +80,7 @@ trait Spatial extends Compiler {
     lazy val pipeInserter      = PipeInserter(state)
     lazy val registerCleanup   = RegisterCleanup(state)
     lazy val unrollTransformer = UnrollingTransformer(state)
+    lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val retiming          = RetimingTransformer(state)
 
     // --- Codegen
@@ -112,6 +113,8 @@ trait Spatial extends Compiler {
         memoryAllocator     ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** Pipe Flattening */
+        flatteningTransformer   ==> printer ==> transformerChecks ==>
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>

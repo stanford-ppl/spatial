@@ -90,6 +90,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         inst.reads.iterator.flatten.foreach{read =>
           warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
           warn(read.access.ctx)
+          warn(mem.ctx, s"For memory ${mem.name.get} originally defined here.", noWarning = true)
+          warn(mem.ctx)
         }
       }
     }

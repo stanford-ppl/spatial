@@ -84,6 +84,16 @@ case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
       super.visit(lhs,rhs)
     }
 
+    case op: OpMemReduce[_,_] =>
+      if (op.map.result == op.accum) {
+        warn(op.map.result.ctx, s"${op.map.result.nameOr("Memory")} is used both as a MemReduce map result and accumulator.")
+        warn(op.map.result.ctx)
+        warn(lhs.ctx, "In the MemReduce defined here.", noWarning = true)
+        warn(lhs.ctx)
+        warn("This will update both the result and accumulator on every iteraton.")
+        warn("It is extremely unlikely this is the behavior you want.\n")
+      }
+      super.visit(lhs,rhs)
 
 
     case CounterNew(_,_,Literal(step: Number),_) if step === 0 =>

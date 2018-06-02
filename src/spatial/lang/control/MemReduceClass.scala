@@ -37,7 +37,7 @@ protected class MemReduceAccum[A,C[T]](
     val ends    = acc.ends()
     val pars    = acc.pars()
     val ctrsRed = (0 to acc.rank.length-1).map{i =>
-        Counter[I32](start = starts(acc.rank(i)), step = strides(acc.rank(i)), end = ends(acc.rank(i)), par = pars(acc.rank(i)))
+        Counter[I32](start = 0, step = strides(acc.rank(i)), end = ends(acc.rank(i)) - starts(acc.rank(i)), par = pars(acc.rank(i)))
       }
     val cchainRed = CounterChain(ctrsRed)
 

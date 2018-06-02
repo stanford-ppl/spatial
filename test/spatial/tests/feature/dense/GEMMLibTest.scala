@@ -51,7 +51,11 @@ import spatial.lib._
         transY = true,
         sumY = true,
         alpha = 1.0.to[T],
-        beta = 1.0.to[T])
+        beta = 1.0.to[T],
+        mp = 1,
+        np = 1,
+        kp = 1
+      )
 
       dramY store sramY
     }

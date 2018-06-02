@@ -11,9 +11,9 @@ import scala.collection.mutable.HashMap
   * Getter: hwScopes.all
   * Default: Nil
   */
-case class AccelScopes(scopes: Seq[Controller]) extends Data[AccelScopes](GlobalData.Flow)
+case class AccelScopes(scopes: Seq[Ctrl.Node]) extends Data[AccelScopes](GlobalData.Flow)
 @data object hwScopes {
-  def all: Seq[Controller] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)
+  def all: Seq[Ctrl.Node] = globals[AccelScopes].map(_.scopes).getOrElse(Nil)
 }
 
 /** Global set of all local memories.

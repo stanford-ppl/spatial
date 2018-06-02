@@ -94,6 +94,7 @@ trait ImplicitsPriority3 {
   @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
   @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
   @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
+  @rig implicit def liftString(b: String): Lift[Text] = new Lift[Text](b, Text(b))
 }
 
 trait ImplicitsPriority2 extends ImplicitsPriority3 {
@@ -117,6 +118,7 @@ trait ImplicitsPriority2 extends ImplicitsPriority3 {
   @rig implicit def litLong(b: Long): Literal = new Literal(b)
   @rig implicit def litFloat(b: Float): Literal = new Literal(b)
   @rig implicit def litDouble(b: Double): Literal = new Literal(b)
+  @rig implicit def litString(b: String): Literal = new Literal(b)
 }
 
 trait ImplicitsPriority1 extends ImplicitsPriority2 {
@@ -393,4 +395,7 @@ trait Implicits extends ImplicitsPriority1 { this: SpatialStatics =>
   @api implicit def NumFromDouble[A:Num](c: Double): A = c.to[A]
   @api implicit def doubleWrapper(c: Double): DoubleWrapper = new DoubleWrapper(c)
 
+
+  // --- String
+  implicit lazy val castStringToText: Lifting[String,Text] = Lifting[String,Text]
 }

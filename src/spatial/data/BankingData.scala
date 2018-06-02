@@ -94,7 +94,13 @@ case class Instance(
         accesses.groupBy{a => ports(a).muxPort }.toSeq.sortBy(_._1).flatMap{case (muxPort, matrices) =>
           Seq(s" - Mux Port #$muxPort: ") ++
           matrices.groupBy(_.access).iterator.flatMap(_._2.sortBy(_.unroll))
-                .map{ a => s"  [Ofs: ${ports(a).muxOfs}] ${a.access.ctx.content.getOrElse(stm(a.access))} {${a.unroll.mkString(",")}} (${a.access.ctx})" }
+                .flatMap{ a =>
+                  Seq(
+                    s"  [Ofs: ${ports(a).muxOfs}] ${stm(a.access)} {${a.unroll.mkString(",")}}",
+                    s"      - ${a.access.ctx}: ${a.access.ctx.content.getOrElse("").trim}",
+                    s"      - Scope: ${a.access.scope}"
+                  )
+                }
         }
       }
       lines.mkString("\n")

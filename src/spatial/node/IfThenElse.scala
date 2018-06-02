@@ -11,5 +11,5 @@ import spatial.lang._
 
   override def iters = Nil
   override def cchains = Nil
-  override def bodies = Seq(PseudoStage(Nil, Seq(thenBlk,elseBlk)))
+  override def bodies = Seq(PseudoStage(Nil -> thenBlk, Nil -> elseBlk))
 }

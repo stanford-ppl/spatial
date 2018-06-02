@@ -17,10 +17,10 @@ trait Printing {
   @stateful def raiseIssue(issue: Issue): Unit = state.issues += issue
 
   /** Compiler Generated Files (reports, codegen, etc.) */
-  @stateful def open(): Unit = { state.incGenTab }
+  @stateful def open(): Unit = { state.incGenTab() }
   @stateful def open(x: => Any): Unit = { emit(x); open() }
   @stateful def emit(x: => Any): Unit = if (config.enGen) state.gen.println("  "*state.getGenTab + x)
-  @stateful def close(): Unit = { state.decGenTab }
+  @stateful def close(): Unit = { state.decGenTab() }
   @stateful def close(x: => Any): Unit = { close(); emit(x) }
   @stateful def closeopen(x: => Any): Unit = { close(); emit(x); open() }
 
@@ -117,6 +117,15 @@ trait Printing {
     case Def.Const(c)    => s"${escapeConst(c)}"
     case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
     case Def.Node(id,op) => s"x$id = $op"
+    case Def.Error(id,_) => s"e$id <error>"
+    case Def.TypeRef     => lhs.tp.typeName
+  }
+
+  def shortStm(lhs: Sym[_]): String = lhs.rhs match {
+    case Def.Bound(id)   => s"b$id"
+    case Def.Const(c)    => s"${escapeConst(c)}"
+    case Def.Param(id,c) => s"p$id = <${escapeConst(c)}>"
+    case Def.Node(id,op) => s"x$id: ${op.productPrefix}"
     case Def.Error(id,_) => s"e$id <error>"
     case Def.TypeRef     => lhs.tp.typeName
   }

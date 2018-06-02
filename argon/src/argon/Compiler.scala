@@ -6,8 +6,14 @@ import utils._
 import utils.implicits.terminal._
 
 trait Compiler { self =>
-  protected[argon] var IR: State = new State
-  final protected implicit def __IR: State = IR
+  // TODO[2]: Support multiple compile runs? How to preserve global declarations across compilations?
+  final protected[argon] implicit lazy val IR: State = {
+    val ir = new State
+    ir.config = initConfig()
+    ir.config.name = name
+    ir.newScope(motion = false)
+    ir
+  }
   private val instrument = new Instrument()
   private val memWatch = new MemoryLogger()
 
@@ -161,7 +167,6 @@ trait Compiler { self =>
   def rewrites(): Unit = { }
 
   final def init(args: Array[String]): Unit = instrument("init"){
-    IR = new State                 // Create a new, empty state
     IR.config = initConfig()
     IR.config.name = name          // Set the default program name
     directives = Map.empty

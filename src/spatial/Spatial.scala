@@ -11,7 +11,7 @@ import spatial.data._
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.dse.DSEMode
 import spatial.flows.SpatialFlowRules
-import spatial.targets.{HardwareTarget, Targets}
+import spatial.targets.HardwareTarget
 import spatial.transform._
 import spatial.traversal._
 import spatial.internal.{spatialConfig => cfg}
@@ -228,19 +228,19 @@ trait Spatial extends Compiler {
           warn("override val target = <device>")
           warn("Defaulting to 'Default' device.")
           IR.logWarning()
-          cfg.target = Targets.Default
+          cfg.target = targets.Default
         }
       }
       else {
-        val target = Targets.targets.find{_.name.toLowerCase == cfg.targetName.toLowerCase }
+        val target = targets.fpgas.find{_.name.toLowerCase == cfg.targetName.toLowerCase }
         if (target.isDefined) {
           cfg.target = target.get
         }
         else {
           if (cfg.enableRetiming) {
             error(s"No target found with the name '${cfg.targetName}'.")
-            error(s"Available targets: ")
-            Targets.targets.foreach{t => error(s"  ${t.name}") }
+            error(s"Available FPGA targets: ")
+            targets.fpgas.foreach{t => error(s"  ${t.name}") }
             IR.logError()
             return
           }
@@ -249,7 +249,7 @@ trait Spatial extends Compiler {
             warn("Defaulting to 'Default' device.")
             IR.logWarning()
           }
-          cfg.target = Targets.Default
+          cfg.target = targets.Default
           cfg.targetName = cfg.target.name
         }
       }

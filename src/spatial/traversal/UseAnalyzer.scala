@@ -23,13 +23,13 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       if (mem.isReg && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead))) {
         mem.isUnusedMemory = true
         if (mem.name.isDefined) {
-          warn(mem.ctx, s"${mem.name.get} is defined but never used.")
+          warn(mem.ctx, s"${mem.name.get} is defined here but never read. Unused writes will be dropped.")
           warn(mem.ctx)
         }
       }
       else if (mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) {
         if (mem.name.isDefined) {
-          warn(mem.ctx, s"${mem.name.get} is defined but never used.")
+          warn(mem.ctx, s"${mem.name.get} is defined here but never read.")
           warn(mem.ctx)
         }
       }
@@ -48,23 +48,23 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       super.visit(lhs, rhs)
     }
 
-    if (lhs.isControl) withCtrl(lhs){ inspect() } else inspect()
+    if (lhs.isControl) inCtrl(lhs){ inspect() } else inspect()
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
     val saveBounds = boundSyms
     boundSyms ++= block.inputs
 
-    advanceBlock()
+    advanceBlk()
     block.result.blk match {
-      case Host =>
-      case Controller(ctrl,_) => addUse(ctrl, block.inputs.toSet, blk)
+      case Blk.Host =>
+      case Blk.Node(ctrl,_) => addUse(ctrl, block.inputs.toSet, blk)
     }
 
     val result = super.visitBlock(block)
     block.result.blk match {
-      case Host =>
-      case Controller(ctrl,_) => addUse(ctrl, pendingUses(block.result), blk)
+      case Blk.Host =>
+      case Blk.Node(ctrl,_) => addUse(ctrl, pendingUses(block.result), blk)
     }
 
     boundSyms = saveBounds
@@ -90,7 +90,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     * @param used Consumed symbol(s)
     * @param block The control block this use occurs in
     */
-  private def addUse(user: Sym[_], used: Set[Sym[_]], block: Ctrl): Unit = {
+  private def addUse(user: Sym[_], used: Set[Sym[_]], block: Blk): Unit = {
     dbgs(s"  Uses [Block: $block]:")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 

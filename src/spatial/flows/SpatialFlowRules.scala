@@ -46,7 +46,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case ctrl: Control[_] =>
       // Find all children controllers within this controller
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
-      s.rawChildren = children.map{c => Controller(c,-1) }
+      s.rawChildren = children.map{c => Ctrl.Node(c,-1) }
 
       // Branches (Switch, SwitchCase) only count as controllers here if they are outer controllers
       // MemReduce is always an outer controller
@@ -60,25 +60,30 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
 
       // Set scope and parent metadata for children controllers
-      val master = Controller(s, -1)
       val bodies = ctrl.bodies
 
       op.blocks.foreach{block =>
-        val (body,id) = bodies.zipWithIndex.collectFirst{case (stg,i) if stg.blocks.contains(block) => (stg,i) }
-                       .getOrElse{throw new Exception(s"Block $block is not associated with an ID in control $ctrl")}
+        val (body,stageId) = bodies.zipWithIndex.collectFirst{case (stg,i) if stg.blocks.exists(_._2 == block) => (stg,i) }
+                                    .getOrElse{throw new Exception(s"Block $block is not associated with an ID in control $ctrl")}
 
-        val scope = Controller(s,id)
-        val scopeChildren = children intersect block.stms
+        // --- Ctrl Hierarchy --- //
         // Don't track pseudoscopes in the control hierarchy (use master controller instead)
-        val parent = if (body.isPseudoStage) master else scope
+        val master: Ctrl  = Ctrl.Node(s, -1)
+        val control: Ctrl = Ctrl.Node(s, stageId)
+        val parent: Ctrl  = if (body.isPseudoStage) master else control
         block.stms.foreach{lhs => lhs.rawParent = parent }
+
+        // --- Scope Hierarchy --- //
         // Always track all scopes in the scope hierarchy
-        scopeChildren.foreach{lhs => lhs.rawScope = scope }
+        val blockId = body.blocks.indexWhere(_._2 == block)
+        val scope: Scope = Scope.Node(s, stageId, blockId)
+        block.stms.foreach{lhs => lhs.rawScope = scope }
       }
 
+      // --- Blk Hierarchy --- //
       // Set the blk of each symbol defined in this controller
       op.blocks.zipWithIndex.foreach{case (block,bId) =>
-        block.stms.foreach{lhs => lhs.blk = Controller(s, bId) }
+        block.stms.foreach{lhs => lhs.blk = Blk.Node(s, bId) }
       }
 
     case _ => // Nothin'

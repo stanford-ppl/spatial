@@ -23,9 +23,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   val dimGrps: Seq[Seq[Seq[Int]]] = if (rank > 1) Seq(FLAT_BANKS, NEST_BANKS) else Seq(FLAT_BANKS)
 
   def configure(): Unit = {
-    dbg("\n\n--------------------------------")
-    dbg(s"${mem.ctx}: Inferring instances for memory ${mem.fullname}")
-    dbg(mem.ctx.content.getOrElse(""))
+    dbg(s"---------------------------------------------------------------------")
+    dbg(s"INFERRING...")
+    dbg(s"Name: ${mem.fullname}")
+    dbg(s"Type: ${mem.tp}")
+    dbg(s"Src:  ${mem.ctx}")
+    dbg(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
+    dbg(s"Symbol:     ${stm(mem)}")
+    dbg(s"---------------------------------------------------------------------")
     val readers = mem.readers
     val writers = mem.writers
     resetData(readers, writers)
@@ -34,6 +39,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val writeMatrices = writers.flatMap{wr => wr.affineMatrices }
 
     val instances = bank(readMatrices, writeMatrices)
+
     summarize(instances)
     finalize(instances)
   }
@@ -48,12 +54,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   protected def summarize(instances: Seq[Instance]): Unit = {
     dbg(s"---------------------------------------------------------------------")
+    dbg(s"SUMMARY: ")
     dbg(s"Name: ${mem.fullname}")
     dbg(s"Type: ${mem.tp}")
     dbg(s"Src:  ${mem.ctx}")
     dbg(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
-    dbg(s"---------------------------------------------------------------------")
     dbg(s"Symbol:     ${stm(mem)}")
+    dbg(s"---------------------------------------------------------------------")
     dbg(s"Instances: ${instances.length}")
     instances.zipWithIndex.foreach{case (inst,i) =>
       dbg(s"Instance #$i")
@@ -77,6 +84,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         a.access.addDispatch(a.unroll, id)
         dbgs(s"  Added port ${inst.ports(a)} to ${a.access} {${a.unroll.mkString(",")}}")
         dbgs(s"  Added dispatch $id to ${a.access} {${a.unroll.mkString(",")}}")
+      }
+
+      if (inst.writes.flatten.isEmpty && mem.name.isDefined) {
+        inst.reads.iterator.flatten.foreach{read =>
+          warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
+          warn(read.access.ctx)
+        }
       }
     }
 
@@ -108,7 +122,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     accesses.foreach{a =>
       dbg(s"    Access: ${a.access} [${a.parent}]")
       val grpId = {
-        if (a.parent == Host) { if (groups.isEmpty) -1 else 0 }
+        if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
           val pairs = grp.filter{b => requireConcurrentPortAccess(a, b) && !a.overlapsAddress(b) }
           if (pairs.nonEmpty) dbg(s"      Group #$i: ")
@@ -226,22 +240,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
     val reads = rdGroups.flatten
-    val writes = wrGroups.flatten
     val ctrls = reads.map(_.parent)
-    val reaching = reachingWrites(reads,writes,isGlobal)
-    val reachingWrGroups = wrGroups.map{grp => grp intersect reaching }.filterNot(_.isEmpty)
+    val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
+    val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     val bankings = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, dimGrps)
     if (bankings.nonEmpty) {
       val (metapipe, bufPorts, issue) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
 
       if (issue.isEmpty) {
+        printCtrlTree((reads ++ writes).map(_.access))
+
         val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val bankingCosts = bankings.map{b => b -> cost(b,depth) }
         val (banking, bankCost) = bankingCosts.minBy(_._2)
         // TODO[5]: Assumption: All memories are at least simple dual port
-        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(wrGroups,bufPorts)
-        val isBuffAccum = metapipe.isDefined &&
-          writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
+        val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
@@ -250,7 +264,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Reads:")
         rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
         dbgs(s"  Writes:")
-        wrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+        reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
         dbgs(s"  Instance: ")
         dbgss("  ", instance)
 
@@ -259,24 +273,29 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       else Left(issue.get)
     }
     else {
-      Left(UnbankableGroup(mem, reads, reaching))
+      Left(UnbankableGroup(mem, reads, writes))
     }
   }
 
   /** Should not attempt to merge instances if any of the following conditions hold:
-    *   1. The two instances have a common LCA controller
+    *   1. The two instances have a common LCA controller (means they require separate banking)
     *   2. The two instances result in hierarchical buffers (for now)
-    *   3. Either instance is a Fold or Buffer "accumulator"
+    *   3. Either instance is an accumulator and there is at least one pipelined ancestor controller.
     */
   protected def getMergeAttemptError(a: Instance, b: Instance): Option[String] = {
     lazy val reads = a.reads.flatten ++ b.reads.flatten
     lazy val writes = a.writes.flatten ++ b.writes.flatten
     lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
+    val commonCtrl = a.ctrls intersect b.ctrls
 
-    if ((a.ctrls intersect b.ctrls).nonEmpty && !isGlobal) Some("Control conflict")
-    else if ((a.accType | b.accType) >= AccumType.Buff)    Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
-    else if (metapipes.size > 1)                           Some("Ambiguous metapipes")
-    else None
+    if (commonCtrl.nonEmpty && !isGlobal)
+      Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
+    else if (metapipes.size > 1)
+      Some("Ambiguous metapipes")
+    else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce)
+      Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
+    else
+      None
   }
 
   /** Should not complete merging instances if any of the following hold:
@@ -285,21 +304,30 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   3. The merged instance costs more than the total cost of the two separate instances
     */
   protected def getMergeError(i1: Instance, i2: Instance, i3: Instance): Option[String] = {
-    if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing) Some("Buffer conflict")
-    else if (i3.cost > (i1.cost + i2.cost)) Some("Expensive")
-    else None
+    if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
+      Some("Buffer conflict")
+    else if (i3.cost > (i1.cost + i2.cost))
+      Some(s"Too expensive: ${i3.cost} > ${i1.cost + i2.cost}")
+    else
+      None
   }
 
   /** Greedily banks and merges groups of readers into memory instances. */
   protected def mergeReadGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
+    dbgs("\n\n")
+    dbgs(s"Merging memory instance groups:")
     val instances = ArrayBuffer[Instance]()
 
     rdGroups.zipWithIndex.foreach{case (grp,grpId) =>
+      dbgs(s"Group #$grpId: ")
+      state.logTab += 1
       bankGroups(Set(grp),wrGroups) match {
         case Right(i1) =>
           var instIdx = 0
           var merged = false
           while (instIdx < instances.length && !merged) {
+            dbgs(s"Attempting to merge group #$grpId with instance #$instIdx: ")
+            state.logTab += 1
             val i2 = instances(instIdx)
 
             val err = getMergeAttemptError(i1, i2)
@@ -310,20 +338,28 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                   if (err.isEmpty) {
                     instances(instIdx) = i3
                     merged = true
-                    dbg(s"Merged $grpId into instance $instIdx")
                   }
-                  else dbg(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+                  else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
 
                 case Left(issue) =>
-                  dbg(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
+                  dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
               }
             }
+            else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+            state.logTab -= 1
             instIdx += 1
           }
-          if (!merged) instances += i1
+          if (!merged) {
+            instances += i1
+            dbgs(s"Result: Created instance #${instances.length-1}")
+          }
+          else {
+            dbgs(s"Result: Merged $grpId into instance ${instIdx-1}")
+          }
 
         case Left(issue) => raiseIssue(issue)
       }
+      state.logTab -= 1
     }
     instances
   }

@@ -29,7 +29,7 @@ abstract class PU extends Control[Void] {
   def ccs: Seq[CounterChain] = this.blocks.flatMap(getCChains)
   override def iters   = iterss.flatten
   override def cchains = ccs.zip(iterss)
-  override def bodies  = Seq(PseudoStage(iters, this.blocks))
+  override def bodies  = Seq(PseudoStage(this.blocks.map{blk => iters -> blk}:_*))
 
   override def binds = super.binds ++ ins.values ++ outs.values ++ iters
 }
@@ -79,8 +79,8 @@ abstract class PU extends Control[Void] {
                          wrPath.toSeq.flatMap{getCChains}.zip(wrIters)
 
   override def bodies = {
-    rdPath.map{blk => PseudoStage(rdIters.flatten, Seq(blk)) }.toSeq ++
-      wrPath.map{blk => PseudoStage(wrIters.flatten, Seq(blk)) }
+    rdPath.map{blk => PseudoStage(rdIters.flatten -> blk) }.toSeq ++
+      wrPath.map{blk => PseudoStage(wrIters.flatten -> blk) }
   }
 
   override def inputs = syms(rdPath, wrPath, memories).toSeq

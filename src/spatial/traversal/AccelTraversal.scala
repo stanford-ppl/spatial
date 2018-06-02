@@ -34,22 +34,23 @@ trait AccelTraversal extends argon.passes.Traversal {
 }
 
 trait BlkTraversal extends AccelTraversal {
-  protected var blk: Ctrl = Host       // Used to track which duplicates should be made in which blocks
-  protected def withCtrl[A](c: Sym[_])(func: => A): A = withCtrl(c.toCtrl)(func)
-  protected def withCtrl[A](b: Ctrl)(func: => A): A = {
+  // The current block (raw index)
+  protected var blk: Blk = Blk.Host
+  protected def inCtrl[A](c: Sym[_])(func: => A): A = inBlk(Blk.Node(c,-1)){ func }
+  protected def inBlk[A](b: Blk)(func: => A): A = {
     val prevBlk = blk
     val saveHW  = inHw
     blk = b
-    inHw = inHw || b.isAccel
+    inHw = inHw || b.s.exists(_.isAccel)
     val result = func
     blk = prevBlk
     inHw = saveHW
     result
   }
 
-  def advanceBlock(): Unit = blk = blk match {
-    case Host => Host
-    case Controller(s,id) => Controller(s,id+1)
+  def advanceBlk(): Unit = blk = blk match {
+    case Blk.Host => Blk.Host
+    case Blk.Node(s,id) => Blk.Node(s,id+1)
   }
 
 }

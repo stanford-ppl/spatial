@@ -13,7 +13,7 @@ import scala.collection.mutable.HashMap
 case class UnusedAccess(flag: Boolean) extends Data[UnusedAccess](SetBy.Analysis.Consumer)
 
 /** Tuple class for holding a user symbol and usage location. */
-case class User(sym: Sym[_], blk: Ctrl)
+case class User(sym: Sym[_], blk: Blk)
 
 /** Set of location-annotated consumers of a given node (for ephemeral node removal).
   *

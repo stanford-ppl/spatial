@@ -39,88 +39,54 @@ trait UtilsControl {
     }
   }
 
-  /** Operations implicitly defined on both Sym[_] and Ctrl.
-    *
-    * We maintain two related trees in metadata:
-    *   The control hierarchy gives the direct relationships between all controllers.
-    *
-    *   The scope hierarchy includes intermediate nodes with info about logical iteration scopes.
-    */
-  abstract class ControlOps(s: Option[Sym[_]]) {
+  abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
     private def op: Option[Op[_]] = s.flatMap{sym => sym.op : Option[Op[_]] }
+
+    /** True if this is a controller or the Host control. */
+    def isControllerOrHost: Boolean
 
     /** Returns the nearest controller at or above the current symbol or controller.
       * Identity for Ctrl instances.
       */
     def toCtrl: Ctrl
 
-    /** True if this is a controller or the Host control. */
-    def isControllerOrHost: Boolean
-
-
-    // --- Control hierarchy --- //
-
-    /** Returns the controller or Host which is the direct controller parent of this controller. */
-    def parent: Ctrl
-
-    /** Returns a sequence of all controllers and subcontrollers which are direct children in the
-      * control hierarchy of this symbol or controller.
-      */
-    @stateful def children: Seq[Controller]
-
-    /** Returns all ancestors of the controller or symbol.
-      * Ancestors are ordered outermost to innermost
-      */
-    def ancestors: Seq[Ctrl] = Tree.ancestors(this.toCtrl){_.parent}
-
-    /** Returns all ancestors of the controller or symbol, stopping when stop is true (exclusive).
-      * Ancestors are ordered outermost to innermost
-      */
-    def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(toCtrl, stop){_.parent}
-
-    /** Returns all ancestors of the controller or symbol, stopping at `stop` (exclusive).
-      * Ancestors are ordered outermost to innermost
-      */
-    def ancestors(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](toCtrl, {c => c == stop}){_.parent}
-
-    /** True if this control or symbol has the given ancestor controller. */
-    def hasAncestor(ctrl: Ctrl): Boolean = ancestors.contains(ctrl)
-
-
-    // --- Scope hierarchy --- //
-
-    /** Returns the control scope in which this symbol or controller is defined. */
-    def scope: Ctrl
-
-    /** Returns all scope ancestors of the controller or symbol.
-      * Ancestors are ordered outermost to innermost
-      */
-    def scopes: Seq[Ctrl] = Tree.ancestors(this.toCtrl){_.scope}
-
-    /** Returns all scope ancestors of the controller or symbol, stopping when stop is true (exclusive).
-      * Ancestors are ordered outermost to innermost
-      */
-    def scopes(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(toCtrl, stop){_.scope}
-
-    /** Returns all scope ancestors of the controller or symbol, stopping at `stop` (exclusive).
-      * Scopes are ordered outermost to innermost.
-      */
-    def scopes(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](toCtrl, {c => c == stop})(_.scope)
-
-
-    // --- Control Scheme and Level Info --- //
-
     /** Returns the level of this controller (Outer or Inner). */
     def level: CtrlLevel = toCtrl match {
-      case ctrl @ Controller(sym,_) if sym.isRawOuter && ctrl.isOuterBlock => Outer
-      case Host => Outer
-      case _    => Inner
+      case ctrl @ Ctrl.Node(sym,_) if sym.isRawOuter && ctrl.mayBeOuterBlock => Outer
+      case Ctrl.Host => Outer
+      case _         => Inner
     }
 
     /** Returns whether this control node is a Looped control or Single iteration control.
       * Nodes which will be fully unrolled are considered Single control.
       */
     def looping: CtrlLooping = if (op.exists(_.isLoop)) Looped else Single
+
+    def schedule: CtrlSchedule = {
+      val ctrlLoop  = this.looping
+      val ctrlLevel = this.level
+      s.map(_.rawSchedule) match {
+        case None => Sequenced
+        case Some(actualSchedule) => (ctrlLoop, ctrlLevel) match {
+          case (Looped, Inner) => actualSchedule
+          case (Looped, Outer) => actualSchedule
+          case (Single, Inner) => actualSchedule match {
+            case Sequenced => Sequenced
+            case Pipelined => Sequenced
+            case Streaming => Streaming
+            case ForkJoin  =>  ForkJoin
+            case Fork => Fork
+          }
+          case (Single, Outer) => actualSchedule match {
+            case Sequenced => Sequenced
+            case Pipelined => Sequenced
+            case Streaming => Streaming
+            case ForkJoin  => ForkJoin
+            case Fork => Fork
+          }
+        }
+      }
+    }
 
     def isCtrl(
       loop:  CtrlLooping = null,
@@ -135,33 +101,11 @@ trait UtilsControl {
         val _sched = Option(sched)
         val ctrlLoop  = this.looping
         val ctrlLevel = this.level
-        val ctrlSched = s.map(_.rawSchedule)
+        val ctrlSched = this.schedule
 
         val hasLoop = _loop.isEmpty || _loop.contains(ctrlLoop)
         val hasLevel = _level.isEmpty || _level.contains(ctrlLevel)
-        val hasSched = (_sched, ctrlSched) match {
-          case (None, _) => true
-          case (_, None) => false
-          case (Some(expectedSchedule), Some(actualSchedule)) => (ctrlLoop, ctrlLevel) match {
-            case (Looped, Inner) => expectedSchedule == actualSchedule
-            case (Looped, Outer) => expectedSchedule == actualSchedule
-            case (Single, Inner) => expectedSchedule match {
-              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
-              case Pipelined => false
-              case Streaming => actualSchedule == Streaming
-              case ForkJoin  => actualSchedule == ForkJoin  // Shouldn't occur in practice
-              case Fork      => actualSchedule == Fork
-            }
-            case (Single, Outer) => expectedSchedule match {
-              case Sequenced => actualSchedule == Sequenced || actualSchedule == Pipelined
-              case Pipelined => false
-              case Streaming => actualSchedule == Streaming
-              case ForkJoin  => actualSchedule == ForkJoin
-              case Fork      => actualSchedule == Fork
-            }
-          }
-
-        }
+        val hasSched = _sched.isEmpty || _sched.contains(ctrlSched)
 
         isCtrl && hasLoop && hasLevel && hasSched
       }
@@ -249,6 +193,35 @@ trait UtilsControl {
       case _ => false
     }
 
+    // --- Control hierarchy --- //
+
+    /** Returns the controller or Host which is the direct controller parent of this controller. */
+    def parent: Ctrl
+
+    /** Returns a sequence of all controllers and subcontrollers which are direct children in the
+      * control hierarchy of this symbol or controller.
+      */
+    @stateful def children: Seq[Ctrl.Node]
+
+    /** Returns all ancestors of the controller or symbol.
+      * Ancestors are ordered outermost to innermost
+      */
+    def ancestors: Seq[Ctrl] = Tree.ancestors(this.toCtrl){_.parent}
+
+    /** Returns all ancestors of the controller or symbol, stopping when stop is true (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
+    def ancestors(stop: Ctrl => Boolean): Seq[Ctrl] = Tree.ancestors(toCtrl, stop){_.parent}
+
+    /** Returns all ancestors of the controller or symbol, stopping at `stop` (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
+    def ancestors(stop: Ctrl): Seq[Ctrl] = Tree.ancestors[Ctrl](toCtrl, {c => c == stop}){_.parent}
+
+    /** True if this control or symbol has the given ancestor controller. */
+    def hasAncestor(ctrl: Ctrl): Boolean = ancestors.contains(ctrl)
+
+
     /** True if this control or symbol occurs within a loop. */
     def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
 
@@ -274,67 +247,102 @@ trait UtilsControl {
     })
 
 
-
     /** Returns a list of all counterhains in this controller. */
     def cchains: Seq[CounterChain] = op match {
       case Some(op: Control[_]) => op.cchains.map(_._1).distinct
       case _ => Nil
     }
-
-
   }
 
 
-  implicit class SymControl(s: Sym[_]) extends ControlOps(Some(s)) {
-    def toCtrl: Ctrl = if (s.isControl) Controller(s,-1) else s.parent
+  abstract class ScopeHierarchyOps(s: Option[Sym[_]]) extends CtrlHierarchyOps(s) {
+    // --- Scope hierarchy --- //
+    def toScope: Scope
+
+    /** Returns the control scope in which this symbol or controller is defined. */
+    def scope: Scope
+
+    /** Returns all scope ancestors of the controller or symbol.
+      * Ancestors are ordered outermost to innermost
+      */
+    def scopes: Seq[Scope] = Tree.ancestors[Scope](this.toScope){_.scope}
+
+    /** Returns all scope ancestors of the controller or symbol, stopping when stop is true (exclusive).
+      * Ancestors are ordered outermost to innermost
+      */
+    def scopes(stop: Scope => Boolean): Seq[Scope] = Tree.ancestors[Scope](toScope, stop){_.scope}
+
+    /** Returns all scope ancestors of the controller or symbol, stopping at `stop` (exclusive).
+      * Scopes are ordered outermost to innermost.
+      */
+    def scopes(stop: Scope): Seq[Scope] = Tree.ancestors[Scope](toScope, {c => c == stop})(_.scope)
+  }
+
+
+  implicit class SymControl(s: Sym[_]) extends ScopeHierarchyOps(Some(s)) {
+    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else s.parent
+    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else s.scope
     def isControllerOrHost: Boolean = s.isControl
 
-    @stateful def children: Seq[Controller] = {
+    @stateful def children: Seq[Ctrl.Node] = {
       if (s.isControl) toCtrl.children
       else throw new Exception(s"Cannot get children of non-controller.")
     }
 
     def parent: Ctrl = s.rawParent
+    def scope: Scope = s.rawScope
+  }
 
-    def scope: Ctrl = s.rawScope
+  implicit class ScopeOperations(scp: Scope) {
+    def toCtrl: Ctrl = scp match {
+      case Scope.Node(sym,id,_) => Ctrl.Node(sym,id)
+      case Scope.Host           => Ctrl.Host
+    }
+    def toScope: Scope = scp
+    def isControllerOrHost: Boolean = true
+
+    @stateful def children: Seq[Ctrl.Node] = toCtrl.children
+    def parent: Ctrl = toCtrl.parent
+    def scope: Scope = scp
   }
 
 
-  implicit class CtrlControl(ctrl: Ctrl) extends ControlOps(ctrl.s) {
+  implicit class CtrlControl(ctrl: Ctrl) extends CtrlHierarchyOps(ctrl.s) {
     def toCtrl: Ctrl = ctrl
     def isControllerOrHost: Boolean = true
 
-    @stateful def children: Seq[Controller] = ctrl match {
+    @stateful def children: Seq[Ctrl.Node] = ctrl match {
       // "Master" controller case
-      case Controller(sym, -1) => sym match {
+      case Ctrl.Node(sym, -1) => sym match {
         case Op(ctrl: Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body,id) =>
-          val stage = Controller(sym,id)
+          val stage = Ctrl.Node(sym,id)
           // If this is a pseudostage, transparently return all controllers under this pseudostage
-          if (body.isPseudoStage) sym.rawChildren.filter(_.scope == stage)
+          if (body.isPseudoStage) sym.rawChildren.filter(_.scope.toCtrl == stage)
           // Otherwise return the subcontroller for this "future" stage
-          else Seq(Controller(sym, id))
+          else Seq(Ctrl.Node(sym, id))
         }
         case _ => throw new Exception(s"Cannot get children of non-controller.")
       }
       // Subcontroller case - return all children which have this subcontroller as an owner
-      case Controller(sym,_) => sym.rawChildren.filter(_.scope == ctrl)
+      case Ctrl.Node(sym,_) => sym.rawChildren.filter(_.scope.toCtrl == ctrl)
 
       // The children of the host controller is all Accel scopes in the program
-      case Host => hwScopes.all
+      case Ctrl.Host => hwScopes.all
     }
 
     def parent: Ctrl = ctrl match {
-      case Controller(sym,-1) => sym.parent
-      case Controller(sym, _) => Controller(sym, -1)
-      case Host => Host
+      case Ctrl.Node(sym,-1) => sym.parent
+      case Ctrl.Node(sym, _) => Ctrl.Node(sym, -1)
+      case Ctrl.Host => Ctrl.Host
     }
 
-    def scope: Ctrl = ctrl match {
-      case Controller(sym,-1) => sym.scope
-      case Controller(sym, _) => Controller(sym, -1)
-      case Host => Host
+    def scope: Scope = ctrl match {
+      case Ctrl.Node(sym,-1) => sym.scope
+      case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
+      case Ctrl.Host         => Scope.Host
     }
   }
+
 
   implicit class CounterChainHelperOps(x: CounterChain) {
     def node: CounterChainNew = x match {
@@ -396,20 +404,20 @@ trait UtilsControl {
   def getCChains(stms: Seq[Sym[_]]): Seq[CounterChain] = stms.collect{case s: CounterChain => s}
 
 
-  def ctrlIters(ctrl: Ctrl): Seq[I32] = Try(ctrl match {
-    case Host => Nil
-    case Controller(Op(loop: Loop[_]), -1) => loop.iters
-    case Controller(Op(loop: Loop[_]), i)  => loop.bodies(i).iters
-    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.iters
-    case Controller(Op(loop: UnrolledLoop[_]), i)  => loop.bodiess.apply(i)._1.flatten
+  def scopeIters(scope: Scope): Seq[I32] = Try(scope match {
+    case Scope.Host => Nil
+    case Scope.Node(Op(loop: Loop[_]), -1, -1)         => loop.iters
+    case Scope.Node(Op(loop: Loop[_]), stage, block)   => loop.bodies(stage).blocks.apply(block)._1
+    case Scope.Node(Op(loop: UnrolledLoop[_]), -1, -1) => loop.iters
+    case Scope.Node(Op(loop: UnrolledLoop[_]), i ,_)   => loop.bodiess.apply(i)._1.flatten
     case _ => Nil
-  }).getOrElse(throw new Exception(s"$ctrl had invalid iterators"))
+  }).getOrElse(throw new Exception(s"$scope had no iterators defined"))
 
-  def ctrlValids(ctrl: Ctrl): Seq[Bit] = Try(ctrl match {
-    case Host => Nil
-    case Controller(Op(loop: UnrolledLoop[_]), -1) => loop.valids
+  def scopeValids(scope: Scope): Seq[Bit] = Try(scope match {
+    case Scope.Host => Nil
+    case Scope.Node(Op(loop: UnrolledLoop[_]), _, _) => loop.valids
     case _ => Nil
-  }).getOrElse(throw new Exception(s"$ctrl had invalid valids"))
+  }).getOrElse(throw new Exception(s"$scope had valids defined"))
 
 
 
@@ -516,7 +524,7 @@ trait UtilsControl {
       val ctrlGrps: Set[(Ctrl,(Sym[_],Sym[_]))] = writers.flatMap{w =>
         (readers ++ writers).flatMap{a =>
           val (lca, dist) = LCAWithCoarseDistance(lookahead(w),lookahead(a))
-          dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
+          //dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
           if (dist != 0) Some(lca.master, (w,a)) else None
         }
       }
@@ -524,6 +532,30 @@ trait UtilsControl {
     }
   }
 
+  @stateful def printCtrlTree(accesses: Set[Sym[_]], top: Option[Ctrl] = None): Unit = if (accesses.nonEmpty) {
+    val lca_init = LCA(accesses.toList)
+    val lca = top match {
+      case Some(ctrl) if lca_init.ancestors.contains(ctrl) => ctrl
+      case None => lca_init
+    }
+
+    lca match {
+      case Ctrl.Node(s,id) => dbgs(s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]")
+      case Ctrl.Host       => dbgs("Host")
+    }
+    if (lca.isInnerControl) {
+      accesses.foreach{a => dbgs(s"  ${shortStm(a)}") }
+    }
+    else {
+      val children = lca.children
+      children.foreach { child =>
+        val accs = accesses.filter(_.ancestors.contains(child))
+        state.logTab += 1
+        printCtrlTree(accs, Some(child))
+        state.logTab -= 1
+      }
+    }
+  }
 
   @stateful def findMetaPipe(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {
     val accesses = readers ++ writers

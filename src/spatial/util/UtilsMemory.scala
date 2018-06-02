@@ -196,36 +196,31 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     // with the access defined in the second block.
     //
     // CASE 1: Direct hierarchy
-    // Foreach(-1)
-    //   Foreach(0)
+    // Foreach(-1,-1)
+    //   Foreach(0,0)
     //     *Alloc
-    //     Reduce(-1)
-    //       Reduce(0)
+    //     Reduce(-1,-1)
+    //       Reduce(0,0)
     //         *Access
-    // Want: Reduce(0) Reduce(-1)
-    // access.scopes(stop = mem.scope) = Reduce(-1) Reduce(0)
-    // access.scopes(stop = mem.scope.master) = Foreach(0) Reduce(-1) Reduce(0)
+    // Want: Reduce(-1,-1) Reduce(0,0)
+    // access.scopes(stop = mem.scope) = Reduce(-1,-1) Reduce(0,0)
+    // access.scopes(stop = mem.scope.master) = Foreach(0,0) Reduce(-1,-1) Reduce(0,0)
     //
     // CASE 2: Access across subcontrollers
-    // Foreach(-1)
-    //   Foreach(0)
-    //     MemReduce(-1)
-    //       MemReduce (0)
+    // Foreach(-1,-1)
+    //   Foreach(0,0)
+    //     MemReduce(-1,-1)
+    //       MemReduce(0,0)  -- MemReduce(0)
     //         *Alloc
-    //       MemReduce(1)
+    //       MemReduce(1,0)  -- MemReduce(1)
     //         *Access
-    // Want: MemReduce(1) [STOP]
-    // access.scopes(stop = mem.scope) = Accel Foreach(-1) Foreach(0) MemReduce(-1) MemReduce(1)
+    // Want: MemReduce(1,0) [STOP]
+    // access.scopes(stop = mem.scope) = Accel Foreach(-1,-1) Foreach(0,0) MemReduce(-1) MemReduce(1)
     // access.scopes(stop = mem.scope.master) = MemReduce(1)
-    val accessScopes = access.scopes(stop = mem.scope)
-    val memScopeIdx  = accessScopes.indexOf(mem.scope)
-    val memMasterIdx = accessScopes.indexOf(mem.scope.master)
-    val allScopes = if (memScopeIdx > -1) accessScopes else accessScopes.drop(memMasterIdx + 1)
-    val scopes = allScopes.filterNot(_.stage == -1)
+    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(scopeIters)
+    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(scopeIters)
 
-    logs(s"Scopes ($access -> $mem): ${allScopes.mkString(",")}")
-    logs(s"Iters: ${scopes.flatMap(scopeIters)}")
-    scopes.flatMap(scopeIters)
+    accessIters diff memoryIters
   }
 
   /** Returns two sets of writers which may be visible to the given reader.

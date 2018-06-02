@@ -410,7 +410,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   final protected def getCtrSuffix(ctrl: Sym[_]): String = {
-    if (ctrl.parent != Host) {
+    if (ctrl.parent != Ctrl.Host) {
       if (ctrl.parent.isStreamControl) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}
     } else {
       throw new Exception(s"Could not find LCA stream schedule for a bound sym that is definitely in a stream controller.  This error should be impossibru!")

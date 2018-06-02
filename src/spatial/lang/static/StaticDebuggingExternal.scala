@@ -110,14 +110,16 @@ trait StaticDebuggingExternal {
 
   /** Prints the given SRAM1 to the console, preceded by an optional heading. **/
   @virtualize
-  @api def printSRAM[T:Type](array: SRAM1[T]): Void = {
+  @api def printSRAM1[T:Type](array: SRAM1[T], header: Text = Text("")): Void = {
+    println(header)
     Foreach(0 until array.length) { i => print(array(i).toString + " ") }
     println("")
   }
 
   /** Prints the given SRAM2 to the console, preceded by an optional heading. **/
   @virtualize
-  @api def printSRAM[T:Type](matrix: SRAM2[T]): Void = {
+  @api def printSRAM2[T:Type](matrix: SRAM2[T], header: Text = Text("")): Void = {
+    println(header)
     Foreach(0 until matrix.rows){ i =>
       Foreach(0 until matrix.cols){ j =>
         print(matrix(i, j).toString + "\t")
@@ -128,7 +130,8 @@ trait StaticDebuggingExternal {
 
   /** Prints the given SRAM3 to the console, preceded by an optional heading. **/
   @virtualize
-  @api def printSRAM[T:Type](tensor: SRAM3[T]): Void = {
+  @api def printSRAM3[T:Type](tensor: SRAM3[T], header: Text = Text("")): Void = {
+    println(header)
     Foreach(0 until tensor.dim0) { i =>
       Foreach(0 until tensor.dim1) { j =>
         Foreach(0 until tensor.dim2) { k =>

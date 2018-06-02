@@ -19,7 +19,7 @@ import spatial.util._
 
 @op case class AccelScope(block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
-  override def bodies = Seq(PseudoStage(Nil, Seq(block)))
+  override def bodies = Seq(PseudoStage(Nil -> block))
   override def cchains = Nil
   override var ens: Set[Bit] = Set.empty
   override def updateEn(f: Tx, addEns: Set[Bit]) = update(f)
@@ -31,13 +31,13 @@ import spatial.util._
 
 @op case class UnitPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
-  override def bodies = Seq(PseudoStage(Nil, Seq(block)))
+  override def bodies = Seq(PseudoStage(Nil -> block))
   override def cchains = Nil
 }
 
 @op case class ParallelPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
   override def iters = Nil
-  override def bodies = Seq(PseudoStage(Nil, Seq(block)))
+  override def bodies = Seq(PseudoStage(Nil -> block))
   override def cchains = Nil
 }
 
@@ -48,7 +48,7 @@ import spatial.util._
   iters:  Seq[I32]
 ) extends Loop[Void] {
   def cchains = Seq(cchain -> iters)
-  def bodies = Seq(PseudoStage(iters, Seq(block)))
+  def bodies = Seq(PseudoStage(iters -> block))
 }
 
 
@@ -67,8 +67,8 @@ import spatial.util._
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def cchains = Seq(cchain -> iters)
   override def bodies  = Seq(
-    PseudoStage(iters, Seq(map,reduce)),
-    FutureStage(Nil, Seq(load,store), mayBeOuterStage = false)
+    PseudoStage(iters -> map, iters -> reduce),
+    InnerStage(Nil -> load, Nil -> store)
   )
 }
 
@@ -91,9 +91,8 @@ import spatial.util._
   override def iters: Seq[I32] = itersMap ++ itersRed
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
-    PseudoStage(itersMap, Seq(map)),
-    FutureStage(itersMap ++ itersRed, Seq(loadRes, reduce), mayBeOuterStage = false),
-    FutureStage(itersRed, Seq(loadAcc, storeAcc), mayBeOuterStage = false)
+    PseudoStage(itersMap -> map),
+    InnerStage(itersMap ++ itersRed -> loadRes, itersRed -> loadAcc, itersMap ++ itersRed -> reduce, itersRed -> storeAcc)
   )
 }
 
@@ -108,9 +107,9 @@ import spatial.util._
   override def iters: Seq[I32] = Nil
   override def cchains = Nil
   override def bodies = Seq(
-    FutureStage(Nil, Seq(notDone), mayBeOuterStage = false),
-    PseudoStage(Nil, Seq(action)),
-    FutureStage(Nil, Seq(nextState), mayBeOuterStage = false)
+    InnerStage(Nil -> notDone),
+    PseudoStage(Nil -> action),
+    InnerStage(Nil -> nextState)
   )
 }
 

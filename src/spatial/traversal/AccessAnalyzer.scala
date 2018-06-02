@@ -14,16 +14,16 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
   private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of looop iterators to all symbols defined in that scope
 
-  private def inLoop(loop: Sym[_], is: Seq[Idx], blocks: Seq[Block[_]]): Unit = {
+  private def inLoop(loop: Sym[_], is: Seq[Idx], block: Block[_]): Unit = {
     val saveIters = iters
     val saveLoops = loops
     val saveScopes = scopes
 
-    val scope = blocks.flatMap(_.nestedStms).toSet
+    val scope = block.nestedStms.toSet
     iters ++= is
     loops ++= is.map{_ -> loop}
     scopes ++= is.map{_ -> scope}
-    blocks.foreach{b => visitBlock(b) }
+    visitBlock(block)
 
     iters = saveIters
     loops = saveLoops
@@ -196,9 +196,12 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Op(loop: Loop[_]) =>
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
-        dbgs(s"  Blocks: ${scope.blocks}")
-        dbgs(s"  Iterators: ${scope.iters}")
-        inLoop(lhs, scope.iters, scope.blocks)
+        scope.blocks.foreach{case (iters, block) =>
+          dbgs(s"  Iters:  $iters")
+          dbgs(s"  Blocks: $block")
+          inLoop(lhs, iters, block)
+        }
+
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)

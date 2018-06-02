@@ -178,7 +178,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val Op(CounterChainNew(counters)) = lhs.cchains.head
       val par = lhs.cchains.head.pars
       val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
-      ctrlIters(lhs.toCtrl).toList.zipWithIndex.foreach { case (idx,index) =>
+      scopeIters(lhs.toScope).toList.zipWithIndex.foreach { case (idx,index) =>
         val ctr = ctrMapping.count(_ <= index) - 1
         val w = bitWidth(counters(ctr).typeArgs.head)
         inGenn(out, "BufferControlCxns", ext) {
@@ -364,7 +364,7 @@ trait ChiselGenController extends ChiselGenCommon {
     else emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} & ~${swap(sym, SM)}.io.ctrDone // Used to have many variations""")
 
     // Update bound sym watchlists
-    (ctrlIters(sym.toCtrl) ++ ctrlValids(sym.toCtrl)).foreach{ item => 
+    (scopeIters(sym.toScope) ++ scopeValids(sym.toScope)).foreach{ item =>
       if (sym.isPipeControl) pipeChainPassMap += (item -> sym.children.toList.map(_.s.get))
       else if (sym.isStreamControl) {streamCopyWatchlist = streamCopyWatchlist :+ item}
     }

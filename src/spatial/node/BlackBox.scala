@@ -30,7 +30,7 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
   iters: Seq[I32]
 ) extends BlackBox[Void] {
   override def cchains = Seq(cchain -> iters)
-  override def bodies = Seq(FutureStage(iters, Nil, mayBeOuterStage = false))
+  override def bodies = Nil
   override def effects: Effects = Effects.Writes(y)
 }
 

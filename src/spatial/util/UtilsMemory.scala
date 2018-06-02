@@ -54,7 +54,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
     def isStreamIn: Boolean = a.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = a.isInstanceOf[StreamOut[_]]
-    def isInternalStream: Boolean = (a.isStreamIn || a.isStreamOut) && a.parent != Host
+    def isInternalStream: Boolean = (a.isStreamIn || a.isStreamOut) && a.parent != Ctrl.Host
 
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
     def isReader: Boolean = Reader.unapply(a).isDefined
@@ -221,11 +221,11 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     val memScopeIdx  = accessScopes.indexOf(mem.scope)
     val memMasterIdx = accessScopes.indexOf(mem.scope.master)
     val allScopes = if (memScopeIdx > -1) accessScopes else accessScopes.drop(memMasterIdx + 1)
-    val scopes = allScopes.filterNot(_.id == -1)
+    val scopes = allScopes.filterNot(_.stage == -1)
 
     logs(s"Scopes ($access -> $mem): ${allScopes.mkString(",")}")
-    logs(s"Iters: ${scopes.flatMap(ctrlIters)}")
-    scopes.flatMap(ctrlIters)
+    logs(s"Iters: ${scopes.flatMap(scopeIters)}")
+    scopes.flatMap(scopeIters)
   }
 
   /** Returns two sets of writers which may be visible to the given reader.

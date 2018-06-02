@@ -14,14 +14,14 @@ import scala.collection.mutable
 
 case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversal {
   // Substitutions per use location
-  private var statelessSubstRules = Map[(Sym[_],Ctrl), Seq[(Sym[_], () => Sym[_])]]()
+  private var statelessSubstRules = Map[(Sym[_],Blk), Seq[(Sym[_], () => Sym[_])]]()
 
-  private val completedMirrors = mutable.HashMap[(Sym[_],Ctrl), Sym[_]]()
+  private val completedMirrors = mutable.HashMap[(Sym[_],Blk), Sym[_]]()
 
-  private def delayedMirror[T](lhs: Sym[T], rhs: Op[T], ctrl: Ctrl)(implicit ctx: SrcCtx): () => Sym[_] = () => {
-    val key = (lhs, ctrl)
+  private def delayedMirror[T](lhs: Sym[T], rhs: Op[T], blk: Blk)(implicit ctx: SrcCtx): () => Sym[_] = () => {
+    val key = (lhs, blk)
     completedMirrors.getOrElseAdd(key, () => {
-      withCtrl(ctrl){ inCopyMode(copy = true){ updateWithContext(lhs, rhs) } }
+      inBlk(blk){ inCopyMode(copy = true){ updateWithContext(lhs, rhs) } }
     })
   }
 
@@ -99,7 +99,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
       }
       else updateWithContext(lhs, rhs)
 
-    case _ if lhs.isControl => withCtrl(lhs){ updateWithContext(lhs, rhs) }
+    case _ if lhs.isControl => inCtrl(lhs){ updateWithContext(lhs, rhs) }
     case _ => updateWithContext(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 
@@ -121,10 +121,10 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
 
   def withBlockSubsts[A](escape: Sym[_]*)(block: => A): A = {
     val rules = blk match {
-      case Host            => Nil
-      case Controller(s,_) =>
+      case Blk.Host      => Nil
+      case Blk.Node(s,_) =>
         // Add substitutions for this node (ctrl.node, -1) and for the current block (ctrl)
-        val node  = (s, Controller(s,-1))
+        val node  = (s, Blk.Node(s,-1))
         val block = (s, blk)
         dbgs(s"node: $node, block: $block")
         statelessSubstRules.getOrElse(node, Nil).map{case (s1, s2) => s1 -> s2() } ++
@@ -136,7 +136,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
 
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
-    advanceBlock() // Advance block counter before transforming inputs
+    advanceBlk() // Advance block counter before transforming inputs
 
     withBlockSubsts(b.result) {
       inlineWith(b){stms =>

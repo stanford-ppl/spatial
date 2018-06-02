@@ -62,15 +62,17 @@ case class UserScheduleDirective(sched: CtrlSchedule) extends Data[UserScheduleD
 
 
 /** Metadata holding a list of children within a controller.
-  * Note that the type of a child is Controller, not Ctrl, since a child cannot be the Host.
+  *
+  * Note that the type of a child is Ctrl.Node, not Ctrl, since a child cannot be the Host.
   *
   * Getter:  sym.rawChildren
-  * Setter:  sym.rawChildren = (Seq[Controller])
+  * Setter:  sym.rawChildren = (Seq[Ctrl.Node])
   * Default: Nil
   */
-case class Children(children: Seq[Controller]) extends Data[Children](SetBy.Flow.Self)
+case class Children(children: Seq[Ctrl.Node]) extends Data[Children](SetBy.Flow.Self)
 
 /** The controller (Ctrl) parent of a symbol within the controller hierarchy.
+  *
   * Operations defined outside Accel always have the Host as their parent.
   * If the parent is not the Host, the id corresponds to the direct parent controller.
   * MemReduce, for example, has several isolated blocks which represent the logical accumulation
@@ -84,6 +86,7 @@ case class Children(children: Seq[Controller]) extends Data[Children](SetBy.Flow
 case class ParentCtrl(parent: Ctrl) extends Data[ParentCtrl](SetBy.Flow.Consumer)
 
 /** The scope (Ctrl) parent of a symbol within the controller hierarchy.
+  *
   * The controller id corresponds to the logical stage index of the parent controller.
   * MemReduce, for example, has several isolated blocks which represent the logical accumulation
   * into the accumulator. The id in Controller will always give the index into the logical stage.
@@ -92,13 +95,14 @@ case class ParentCtrl(parent: Ctrl) extends Data[ParentCtrl](SetBy.Flow.Consumer
   * Setter:  sym.scope = (Ctrl)
   * Default: Host
   */
-case class ScopeCtrl(scope: Ctrl) extends Data[ScopeCtrl](SetBy.Flow.Consumer)
+case class ScopeCtrl(scope: Scope) extends Data[ScopeCtrl](SetBy.Flow.Consumer)
 
 
 
-/** The block a symbol is defined in within the controller hierarchy.
-  * If the parent is not the Host, the id is the index within the parent controller's
-  * list of blocks where this symbol is defined.
+/** The block ID (Blk) a symbol is defined within the IR.
+  *
+  * If the parent is not the Host, the id is the raw index into the parent controller's
+  * list of .blocks where this symbol is defined.
   * MemReduce, for example, has several isolated blocks which represent the logical accumulation
   * into the accumulator. Blk will give the index into the specific block.
   *
@@ -106,11 +110,10 @@ case class ScopeCtrl(scope: Ctrl) extends Data[ScopeCtrl](SetBy.Flow.Consumer)
   * Setter:  sym.blk = (Ctrl)
   * Default: Host
   */
-case class ParentBlk(blk: Ctrl) extends Data[ParentBlk](SetBy.Flow.Consumer)
+case class ParentBlk(blk: Blk) extends Data[ParentBlk](SetBy.Flow.Consumer)
 
 
-/** The counter associated with a loop iterator.
-  * Only defined for loop iterators.
+/** The counter associated with a loop iterator. Only defined for loop iterators.
   *
   * Option:  sym.getCounter
   * Getter:  sym.counter
@@ -172,25 +175,30 @@ trait ControlData {
     def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
     def userSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, UserScheduleDirective(sched))
 
+    // --- Control Hierarchy --- //
+
     def getOwner: Option[Sym[_]] = metadata[CounterOwner](s).map(_.owner)
     def owner: Sym[_] = getOwner.getOrElse{throw new Exception(s"Undefined counter owner for $s") }
     def owner_=(own: Sym[_]): Unit = metadata.add(s, CounterOwner(own))
 
-    def rawParent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Host)
+    def rawParent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Ctrl.Host)
     def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
 
-    def rawScope: Ctrl = metadata[ScopeCtrl](s).map(_.scope).getOrElse(Host)
-    def rawScope_=(ctrl: Ctrl): Unit = metadata.add(s, ScopeCtrl(ctrl))
-
-    def rawChildren: Seq[Controller] = {
+    def rawChildren: Seq[Ctrl.Node] = {
       if (!s.isControl) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](s).map(_.children).getOrElse(Nil)
     }
-    def rawChildren_=(cs: Seq[Controller]): Unit = metadata.add(s, Children(cs))
+    def rawChildren_=(cs: Seq[Ctrl.Node]): Unit = metadata.add(s, Children(cs))
 
+    // --- Scope Hierarchy --- //
 
-    def blk: Ctrl = metadata[ParentBlk](s).map(_.blk).getOrElse{Host}
-    def blk_=(b: Ctrl): Unit = metadata.add(s, ParentBlk(b))
+    def rawScope: Scope = metadata[ScopeCtrl](s).map(_.scope).getOrElse(Scope.Host)
+    def rawScope_=(scope: Scope): Unit = metadata.add(s, ScopeCtrl(scope))
+
+    // --- IR Hierarchy --- //
+
+    def blk: Blk = metadata[ParentBlk](s).map(_.blk).getOrElse(Blk.Host)
+    def blk_=(b: Blk): Unit = metadata.add(s, ParentBlk(b))
 
     def bodyLatency: Seq[Double] = metadata[BodyLatency](s).map(_.latency).getOrElse(Nil)
     def bodyLatency_=(latencies: Seq[Double]): Unit = metadata.add(s, BodyLatency(latencies))

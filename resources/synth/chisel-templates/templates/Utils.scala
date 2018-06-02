@@ -643,7 +643,7 @@ object Utils {
     def mergeXMaps: XMap = {
       HashMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, par) => (({muxport._1 + base}, 0) -> par)} 
+        map.map{case (muxport, par) => (({muxport._1 + base}, muxport._2) -> par)} 
       }.flatten.toArray:_*) 
     }
     def accessPars: Seq[Int] = x.mergeXMaps.accessPars
@@ -657,7 +657,7 @@ object Utils {
     def mergeDMaps: DMap = {
       HashMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, banks) => (({muxport._1 + base}, 0) -> banks)} 
+        map.map{case (muxport, banks) => (({muxport._1 + base}, muxport._2) -> banks)} 
       }.flatten.toArray:_*)
     }
     def accessPars: Seq[Int] = x.mergeDMaps.accessPars

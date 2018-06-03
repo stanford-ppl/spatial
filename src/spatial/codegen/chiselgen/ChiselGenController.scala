@@ -574,7 +574,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
       emit(src"${lhs}_doneCondition := ~${notDone.result}")
       emit(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
-      val extraEn = if (ens.toList.length > 0) {src"""List($ens).map(en=>en).reduce{_&&_}"""} else {"true.B"}
+      val extraEn = if (ens.toList.length > 0) {src"""List(${ens.toList.map(quote)}).map(en=>en).reduce{_&&_}"""} else {"true.B"}
       emit(src"${swap(lhs, Mask)} := ${extraEn}")
       emitChildrenCxns(lhs, true)
       exitCtrl(lhs)

@@ -170,9 +170,9 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // Registers
     case RegNew(init) => emitMem(lhs, "FF", Some(List(init)))
-    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn) => 
+    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn) => 
+    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set())) 
 
     // RegFiles

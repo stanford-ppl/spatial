@@ -396,16 +396,17 @@ public:
   }
 
   virtual uint64_t getArg(uint32_t arg, bool isIO) {
-    if (isIO) {
-      return readReg(2+arg);
-    } else {
-      if (numArgIns == 0) {
-        return readReg(1-numArgIOs+2+arg);
-      } else {
-        return readReg(numArgIns-numArgIOs+2+arg);
-      }
+    readReg(2+arg);
+    // if (isIO) {
+    //   return readReg(2+arg);
+    // } else {
+    //   if (numArgIns == 0) {
+    //     return readReg(1-numArgIOs+2+arg);
+    //   } else {
+    //     return readReg(numArgIns-numArgIOs+2+arg);
+    //   }
 
-    }
+    // }
   }
 
   virtual uint64_t getArgIn(uint32_t arg, bool isIO) {

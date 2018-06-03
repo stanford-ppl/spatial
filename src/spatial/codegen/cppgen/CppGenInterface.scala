@@ -4,6 +4,8 @@ import argon._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
+import spatial.data._
+import spatial.util._
 
 
 trait CppGenInterface extends CppGenCommon {
@@ -51,27 +53,27 @@ trait CppGenInterface extends CppGenCommon {
       reg.tp.typeArgs.head match {
         case FixPtType(s,d,f) => 
           if (f != 0) {
-            emit(src"c1->setArg(${argHandle(reg)}_arg, (int64_t)($v * ((int64_t)1 << $f)), ${isHostIO(reg)}); // $reg")
+            emit(src"c1->setArg(${argHandle(reg)}_arg, (int64_t)($v * ((int64_t)1 << $f)), ${reg.isHostIO}); // $reg")
             emit(src"$reg = $v;")
           } else {
-            emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)});")
+            emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${reg.isHostIO});")
             emit(src"$reg = $v;")
           }
         case FltPtType(g,e) =>         
           emit(src"int64_t ${v}_raw;")
           emit(src"memcpy(&${v}_raw, &${v}, sizeof(${v}));")
           emit(src"${v}_raw = ${v}_raw & ((int64_t) 0 | (int64_t) pow(2,${g+e}) - 1);")
-          emit(src"c1->setArg(${argHandle(reg)}_arg, ${v}_raw, ${isHostIO(reg)}); // $reg")
+          emit(src"c1->setArg(${argHandle(reg)}_arg, ${v}_raw, ${reg.isHostIO}); // $reg")
           emit(src"$reg = $v;")
         case _ => 
-            emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${isHostIO(reg)}); // $reg")
+            emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${reg.isHostIO}); // $reg")
             emit(src"$reg = $v;")
       }
     case _: CounterNew[_] => 
     case _: CounterChainNew => 
     case GetReg(reg)    =>
       val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
-      val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${isHostIO(reg)})"
+      val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${reg.isHostIO})"
     
       lhs.tp match {
         case FixPtType(s,d,f) => 
@@ -129,12 +131,12 @@ trait CppGenInterface extends CppGenCommon {
     inGen(out,"ArgAPI.hpp") {
       emit("\n// ArgIns")
       argIns.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
-      emit("\n// ArgIOs")
-      argIOs.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.toList.length}")}
-      emit("\n// ArgOuts")
-      argOuts.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
       emit("\n// DRAM Ptrs:")
-      drams.foreach {case (d, id) => emit(src"#define ${argHandle(d)}_ptr ${id+argIns.toList.length+argIOs.toList.length}")}
+      drams.foreach {case (d, id) => emit(src"#define ${argHandle(d)}_ptr ${id+argIns.toList.length}")}
+      emit("\n// ArgIOs")
+      argIOs.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.toList.length+drams.toList.length}")}
+      emit("\n// ArgOuts")
+      argOuts.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.toList.length+drams.toList.length+argIOs.toList.length}")}
 
     }
     super.emitFooter()

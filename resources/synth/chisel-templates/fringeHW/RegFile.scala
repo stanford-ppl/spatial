@@ -16,7 +16,7 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
   val pureArgIns = numArgIns-numArgIOs
   val pureArgOuts = numArgOuts-numArgIOs
   val argInRange = List(0, 1) ++ (2 until numArgIns).toList
-  val argOutRange = List(1) ++ (2 until (2+numArgIOs)).toList ++ ((numArgIns) until (numArgIns + pureArgOuts - 1)).toList
+  val argOutRange = List(1) ++ (pureArgIns until (numArgIns + pureArgOuts - 1)).toList
   val argOutLoopbacksMap = argOutLoopbacksMapRaw.map{case (k,v) => (k + 1 -> v)}
   // Console.println("argin: " + argInRange + ", argout: " + argOutRange)
 
@@ -57,6 +57,8 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
   Predef.assert(numArgOuts >= 0, s"Invalid numArgOuts ($numArgOuts): must be >= 0.")
   Predef.assert(numArgIns <= d, s"numArgIns ($numArgIns) must be less than number of registers ($d)!")
   Predef.assert(numArgOuts <= d, s"numArgOuts ($numArgOuts) must be less than number of registers ($d)!")
+  
+  Console.println(s"$numArgIns $numArgIOs $numArgOuts $argOutRange and $argInRange and $argOutLoopbacksMap")
 
   val regs = List.tabulate(d) { i =>
     val id = if (FringeGlobals.target == "zcu") i*2 else i

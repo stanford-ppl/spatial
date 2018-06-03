@@ -522,14 +522,16 @@ def merge_apps_columns(old_appname, new_appname, backend):
 					if (passes[i] != ''):
 						write(worksheet, i+1, old_col_in_sheet[0]+1, passes[i])
 						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0]+1, passes[i]))
+				deleteCols(worksheet, new_col_in_sheet[0]+1)
+				deleteCols(worksheet, new_col_in_sheet[0])
 			else:
 				data = [x[new_col] for x in lol]
 				for i in range(0,len(data)):
 					if (data[i] != ''):
 						write(worksheet, i+1, old_col_in_sheet[0], data[i])
 						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
+				deleteCols(worksheet, new_col_in_sheet[0])
 
-			deleteCols(worksheet, new_col_in_sheet[0])
 			# print("delete app column")
 
 
@@ -572,5 +574,5 @@ else:
 	print(" - report_changes(backend)")
 	print(" - delete_n_rows(n, ofs (0=row 3, 1=row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
-	print(" - merge_app_columns(old appname, new appname, backend)")
+	print(" - merge_apps_columns(old appname, new appname, backend)")
 	exit()

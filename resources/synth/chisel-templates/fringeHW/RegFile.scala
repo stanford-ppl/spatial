@@ -58,8 +58,6 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
   Predef.assert(numArgIns <= d, s"numArgIns ($numArgIns) must be less than number of registers ($d)!")
   Predef.assert(numArgOuts <= d, s"numArgOuts ($numArgOuts) must be less than number of registers ($d)!")
   
-  Console.println(s"$numArgIns $numArgIOs $numArgOuts $argOutRange and $argInRange and $argOutLoopbacksMap")
-
   val regs = List.tabulate(d) { i =>
     val id = if (FringeGlobals.target == "zcu") i*2 else i
     val ff = Module(new FF(UInt(w.W)))

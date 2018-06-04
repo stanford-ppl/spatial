@@ -307,7 +307,8 @@ public:
   }
 
   virtual uint32_t getArg(uint32_t arg, bool isIO) {
-    return readReg(2+arg);
+    if (numArgIns == 0) return readReg(3+arg);
+    else return readReg(2+arg);
     // if (isIO) {
     //   return readReg(2+arg);
     // } else {

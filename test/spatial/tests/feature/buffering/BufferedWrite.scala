@@ -30,6 +30,7 @@ import spatial.dsl._
         val niter = Reg[Int]
         Pipe{niter.reset}
         Pipe{niter.reset} // Testing codegen for multiple resetters
+        Pipe{niter := 0}
         Foreach(I by 1){x =>
           // niter := niter + 1
           niter :+= 1
@@ -69,7 +70,7 @@ import spatial.dsl._
     printArray(result, "result: ")
 
     val cksum = gold.zip(result){_==_}.reduce{_&&_}
-    println("PASS: " + cksum  + " (BubbledWriteTest)")
+    println("PASS: " + cksum  + " (BufferedWrite)")
     assert(cksum)
 
   }

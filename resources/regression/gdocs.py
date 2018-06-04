@@ -572,7 +572,7 @@ else:
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - report_changes(backend)")
-	print(" - delete_n_rows(n, ofs (0=row 3, 1=row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
 	print(" - merge_apps_columns(old appname, new appname, backend)")
 	exit()

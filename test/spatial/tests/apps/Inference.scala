@@ -15,12 +15,12 @@ import spatial.dsl._
     val debug:scala.Boolean = false
 
     val PX = 1 //1
-    val P1 = 2 //2 // Unsafe parallelization if OC < 1 burst (16)
-    val P2 = 2 //2 // Unsafe parallelization if OC < 1 burst (16)
+    val P1 = 1 //2 // Unsafe parallelization if OC < 1 burst (16)
+    val P2 = 1 //2 // Unsafe parallelization if OC < 1 burst (16)
     val P3 = 1 //2
     val P4 = 1 //2
-    val P5 = 2 //4
-    val P6 = 4 //16
+    val P5 = 1 //4
+    val P6 = 1 //16
     val loadPar = 4 (1 -> 16)
     val storePar = 4 (1 -> 16)
     // Scalar params

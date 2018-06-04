@@ -219,4 +219,11 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
     Var.assign(x,data.unbox)
   }
 
+
+  override def postprocess[R](block: Block[R]): Block[R] = {
+    // Not allowed to have mixed control and primitives after unit pipe insertion
+    spatialConfig.allowPrimitivesInOuterControl = false
+    super.postprocess(block)
+  }
+
 }

@@ -1,12 +1,12 @@
 package spatial.traversal
 
 import argon._
-
 import spatial.data._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
-
+import spatial.internal.spatialConfig
+import spatial.issues.ControlPrimitiveMix
 
 /** Used to automatically detect invalid changes that occurred during transformations. */
 case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSanityChecks {
@@ -63,6 +63,20 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         }
 
       case _ => // Nothing
+    }
+
+    if (!spatialConfig.allowPrimitivesInOuterControl) rhs match {
+      case ctrl:Control[_] if lhs.isOuterControl =>
+        val blocks = ctrl.blocks
+        blocks.foreach{block =>
+          val stms = block.stms
+          val ctrl = stms.filter{s => s.isControl && !(s.isBranch && s.isInnerControl) }
+          val prim = stms.filter{s => s.isPrimitive && !s.isEphemeral }
+          if (ctrl.nonEmpty && prim.nonEmpty) {
+            raiseIssue(ControlPrimitiveMix(lhs,ctrl,prim))
+          }
+        }
+      case _ =>
     }
   }
 

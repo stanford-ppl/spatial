@@ -38,6 +38,8 @@ class SpatialConfig extends Config {
   var enableAsyncMem = false
   var enableRetiming = true
 
+  // Internal flag used to mark whether unit pipe transformer has been run or not
+  var allowPrimitivesInOuterControl = true
 
   def ignoreParEdgeCases: Boolean = false
   def noInnerLoopUnroll: Boolean = false

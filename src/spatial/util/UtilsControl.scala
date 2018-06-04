@@ -532,29 +532,32 @@ trait UtilsControl {
     }
   }
 
-  @stateful def printCtrlTree(accesses: Set[Sym[_]], top: Option[Ctrl] = None): Unit = if (accesses.nonEmpty) {
-    val lca_init = LCA(accesses.toList)
-    val lca = top match {
-      case Some(ctrl) if lca_init.ancestors.contains(ctrl) => ctrl
-      case None => lca_init
-    }
+  @stateful def ctrlTree(accesses: Set[Sym[_]], top: Option[Ctrl] = None, tab: Int = 0): Iterator[String] = {
+    if (accesses.nonEmpty) {
+      val lca_init = LCA(accesses.toList)
+      val lca = top match {
+        case Some(ctrl) if lca_init.ancestors.contains(ctrl) => ctrl
+        case None => lca_init
+      }
 
-    lca match {
-      case Ctrl.Node(s,id) => dbgs(s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]")
-      case Ctrl.Host       => dbgs("Host")
-    }
-    if (lca.isInnerControl) {
-      accesses.foreach{a => dbgs(s"  ${shortStm(a)}") }
-    }
-    else {
-      val children = lca.children
-      children.foreach { child =>
-        val accs = accesses.filter(_.ancestors.contains(child))
-        state.logTab += 1
-        printCtrlTree(accs, Some(child))
-        state.logTab -= 1
+      val head: Iterator[String] = Seq(lca match {
+        case Ctrl.Node(s,id) => "  "*tab + s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]"
+        case Ctrl.Host       => "  "*tab + "Host"
+      }).iterator
+      if (lca.isInnerControl) {
+        val inner: Iterator[String] = head ++ accesses.iterator.map{a => "  "*tab + s"  ${shortStm(a)}" }
+        inner
+      }
+      else {
+        val children = lca.children.iterator
+        val childStrs: Iterator[String] = children.flatMap{ child =>
+          val accs = accesses.filter(_.ancestors.contains(child))
+          ctrlTree(accs, Some(child), tab + 1)
+        }
+        head ++ childStrs
       }
     }
+    else Nil.iterator
   }
 
   @stateful def findMetaPipe(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {

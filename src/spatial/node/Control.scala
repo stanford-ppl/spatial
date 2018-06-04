@@ -67,8 +67,8 @@ import spatial.util._
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def cchains = Seq(cchain -> iters)
   override def bodies  = Seq(
-    PseudoStage(iters -> map, iters -> reduce),
-    InnerStage(Nil -> load, Nil -> store)
+    PseudoStage(iters -> map),
+    InnerStage(Nil -> load, iters -> reduce, Nil -> store)
   )
 }
 

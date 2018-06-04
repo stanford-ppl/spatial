@@ -250,7 +250,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val (metapipe, bufPorts, issue) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
 
       if (issue.isEmpty) {
-        printCtrlTree((reads ++ writes).map(_.access))
+        ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
 
         val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val bankingCosts = bankings.map{b => b -> cost(b,depth) }

@@ -88,7 +88,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   /** Duplicate the given controller based on the global Unroller helper instance lanes. */
-  final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A]): List[Sym[_]] = {
+  final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     dbgs(s"Duplicating controller $lhs = $rhs")
     def duplicate(): Sym[A] = unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]]
     if (lanes.size > 1) {

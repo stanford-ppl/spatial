@@ -90,6 +90,10 @@ case class MemoryReporter(IR: State) extends Pass {
           }
         }
 
+        emit("\n\n")
+        emit(s"Control Tree: ")
+        ctrlTree(readers ++ writers, None).foreach{x => emit(x) }
+
         emit(s"---------------------------------------------------------------------")
         emit("\n\n\n")
       }

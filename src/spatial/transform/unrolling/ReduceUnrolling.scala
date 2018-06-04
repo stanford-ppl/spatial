@@ -44,7 +44,7 @@ trait ReduceUnrolling extends UnrollingBase {
     val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
     val rfunc = reduce.toFunction2
 
-    val pipe = stageWithFlow(UnitPipe(enables ++ ens, stageLambda1(accum){
+    val pipe = stageWithFlow(UnitPipe(enables ++ ens, stageBlock{
       val foldValid: Option[Bit] = fold.map(_ => Bit(true))
       val valids: () => Seq[Bit] = () => foldValid.toSeq ++ lanes.valids.map{vs => vs.andTree }
       val values: Seq[A] = unroll(func, lanes)
@@ -52,10 +52,10 @@ trait ReduceUnrolling extends UnrollingBase {
 
       if (lhs.isOuterControl) {
         dbgs("Fully unrolling outer reduce")
-        stage(UnitPipe(Set.empty, stageBlock{
+        Pipe {
           val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
           store.reapply(accum, result)
-        }))
+        }
       }
       else {
         dbgs("Fully unrolling inner reduce")

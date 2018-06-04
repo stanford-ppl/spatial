@@ -71,12 +71,15 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
           dbgs(s"$lhs = $rhs")
           ctrl.bodies.zipWithIndex.foreach { case (body, id) =>
             val stage = Ctrl.Node(lhs, id)
-            body.blocks.foreach{case (_,block) =>
-              dbgs(s"  block #$id [" + (if (stage.mayBeOuterBlock) "Outer]" else "Inner]"))
+            dbgs(s"  $lhs Body #$id: ")
+            body.blocks.zipWithIndex.foreach{case ((_,block),bid) =>
+              dbgs(s"    $lhs body #$id block #$bid [" + (if (stage.mayBeOuterBlock) "Outer]" else "Inner]"))
+              state.logTab += 1
               // Register substitutions for outer control blocks
               if (stage.mayBeOuterBlock) {
                 register(block -> insertPipes(block).left.get)
               }
+              state.logTab -= 1
             }
           }
         }

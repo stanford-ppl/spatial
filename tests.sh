@@ -32,10 +32,13 @@ if [[ $numthreads == "" ]]; then
   threads=4
 else
   threads=$numthreads
+  echo "Using $threads thread(s) for testing."
 fi
 
 if [[ $TEST_DATA_HOME == "" ]]; then
   echo "TEST_DATA_HOME is not set. Set TEST_DATA_HOME for data-dependent tests to pass."
+else 
+  echo "Test Data Directory: $TEST_DATA_HOME"
 fi
 
 fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"

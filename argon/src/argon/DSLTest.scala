@@ -118,7 +118,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
         lines.foreach{ll => val l = ll.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(l); cmdLog.println(l) } // replaceAll to prevent JUnit crash
         errs.foreach{ee => val e = ee.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(e); cmdLog.println(e) } // replaceAll to prevent JUnit crash
         if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code during backend $pass: $code.\n${errs.take(4).mkString("\n")}"))
-        if (code == 0) cause = Unknown
+        if (pass == "make" && code == 0) cause = Unknown // Don't report an error for zero exit codes in make phase
       }
       catch {
         case e: Throwable =>

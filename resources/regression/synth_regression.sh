@@ -1,6 +1,6 @@
 #!/bin/bash
 
-maxthreads=3
+maxthreads=2
 
 jobs=`ps aux | grep "mattfel.*sbt" | wc -l`
 if [[ $jobs -gt 40 ]]; then
@@ -16,7 +16,7 @@ if [[ $1 = "zynq" ]]; then
 	tid=`python3 ${REGRESSION_HOME}/next-spatial/spatial/resources/regression/gdocs.py "prepare_sheet" "$hash" "$apphash" "$timestamp" "Zynq"`
 elif [[ $1 = "zcu" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
-	export CLOCK_FREQ_MHZ=125
+	export CLOCK_FREQ_MHZ=100
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}
 	tid=`python3 ${REGRESSION_HOME}/next-spatial/spatial/resources/regression/gdocs.py "prepare_sheet" "$hash" "$apphash" "$timestamp" "ZCU"`

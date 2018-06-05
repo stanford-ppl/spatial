@@ -58,101 +58,108 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 
 	def msb():Bool = number(d+f-1)
 
-	def cast(dst: FixedPoint, rounding: LSBCasting = Truncate, saturating: MSBCasting = Lazy, sign_extend: scala.Boolean = true, expect_neg: Bool = false.B, expect_pos: Bool = false.B): Unit = {
-		val has_frac = dst.f > 0
-		val has_dec = dst.d > 0
-		val up_frac = dst.f max 1
-		val up_dec = dst.d max 1
-		val tmp_frac = Wire(UInt(up_frac.W))
-		val new_frac = Wire(UInt(up_frac.W))
-		val new_dec = Wire(UInt(up_dec.W))
-		if (!has_frac) { tmp_frac := 0.U(1.W) }
-		if (!has_frac) { new_frac := 0.U(1.W) }
-		if (!has_dec) { new_dec := 0.U(1.W) }
 
-		// Compute new frac part
-		// val new_frac = Wire(UInt(dst.f.W))
-		val shave_f = f - dst.f
-		val shave_d = d - dst.d
-		if (has_frac) {
-			if (dst.f < f) { // shrink decimals
-				rounding match {
-					case Truncate => 
-						tmp_frac := number(shave_f + dst.f - 1, shave_f)
-						// (0 until dst.f).map{ i => number(shave_f + i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-					case Unbiased => 
-						val prng = Module(new PRNG(scala.math.abs(scala.util.Random.nextInt)))
-						prng.io.en := true.B
-						val salted = number + prng.io.output(shave_f-1,0)
-						tmp_frac := salted(shave_f + dst.f -1, shave_f)
-					// case "biased" =>
-					// 	Mux(number(shave_f-1), number + 1.U(shave_f.W) << (shave_f-1), number(shave_f + dst.f - 1, shave_f)) // NOT TESTED!!
-					case _ =>
-						tmp_frac := 0.U(dst.f.W)
-						// TODO: throw error
+	def cast[T](dest: T, rounding: LSBCasting = Truncate, saturating: MSBCasting = Lazy, sign_extend: scala.Boolean = true, expect_neg: Bool = false.B, expect_pos: Bool = false.B): Unit = {
+		dest match { 
+			case dst: FixedPoint => 
+				val has_frac = dst.f > 0
+				val has_dec = dst.d > 0
+				val up_frac = dst.f max 1
+				val up_dec = dst.d max 1
+				val tmp_frac = Wire(UInt(up_frac.W))
+				val new_frac = Wire(UInt(up_frac.W))
+				val new_dec = Wire(UInt(up_dec.W))
+				if (!has_frac) { tmp_frac := 0.U(1.W) }
+				if (!has_frac) { new_frac := 0.U(1.W) }
+				if (!has_dec) { new_dec := 0.U(1.W) }
+
+				// Compute new frac part
+				// val new_frac = Wire(UInt(dst.f.W))
+				val shave_f = f - dst.f
+				val shave_d = d - dst.d
+				if (has_frac) {
+					if (dst.f < f) { // shrink decimals
+						rounding match {
+							case Truncate => 
+								tmp_frac := number(shave_f + dst.f - 1, shave_f)
+								// (0 until dst.f).map{ i => number(shave_f + i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
+							case Unbiased => 
+								val prng = Module(new PRNG(scala.math.abs(scala.util.Random.nextInt)))
+								prng.io.en := true.B
+								val salted = number + prng.io.output(shave_f-1,0)
+								tmp_frac := salted(shave_f + dst.f -1, shave_f)
+							// case "biased" =>
+							// 	Mux(number(shave_f-1), number + 1.U(shave_f.W) << (shave_f-1), number(shave_f + dst.f - 1, shave_f)) // NOT TESTED!!
+							case _ =>
+								tmp_frac := 0.U(dst.f.W)
+								// TODO: throw error
+						}
+					} else if (dst.f > f) { // expand decimals
+						val expand = dst.f - f
+						if (f > 0) { tmp_frac := util.Cat(number(f-1,0), 0.U(expand.W))} else {tmp_frac := 0.U(expand.W)}
+						// (0 until dst.f).map{ i => if (i < expand) {0.U} else {number(i - expand)*scala.math.pow(2,i).toInt.U}}.reduce{_+_}
+					} else { // keep same
+						tmp_frac := number(dst.f-1,0)
+						// (0 until dst.f).map{ i => number(i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
+					}
 				}
-			} else if (dst.f > f) { // expand decimals
-				val expand = dst.f - f
-				if (f > 0) { tmp_frac := util.Cat(number(f-1,0), 0.U(expand.W))} else {tmp_frac := 0.U(expand.W)}
-				// (0 until dst.f).map{ i => if (i < expand) {0.U} else {number(i - expand)*scala.math.pow(2,i).toInt.U}}.reduce{_+_}
-			} else { // keep same
-				tmp_frac := number(dst.f-1,0)
-				// (0 until dst.f).map{ i => number(i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-			}
-		}
 
-		// Compute new dec part (concatenated with frac part from before)
-		if (has_dec) {
-			if (dst.d < d) { // shrink decimals
-				saturating match { 
-					case Lazy =>
-						dst.debug_overflow := (0 until shave_d).map{i => number(d + f - 1 - i)}.reduce{_||_}
+				// Compute new dec part (concatenated with frac part from before)
+				if (has_dec) {
+					if (dst.d < d) { // shrink decimals
+						saturating match { 
+							case Lazy =>
+								dst.debug_overflow := (0 until shave_d).map{i => number(d + f - 1 - i)}.reduce{_||_}
+								new_frac := tmp_frac
+								new_dec := number(dst.d + f - 1, f)
+								// (0 until dst.d).map{i => number(f + i) * scala.math.pow(2,i).toInt.U}.reduce{_+_}
+							case Saturation =>
+								val sign = number.msb
+								val overflow = ((sign & expect_pos) | (~sign & expect_neg)) 
+							  	val not_saturated = ( number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) ) | ( ~number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) )
+
+							  	val saturated_frac = Mux(expect_pos, 
+							  			util.Cat(util.Fill(up_frac, true.B)), 
+							  			Mux(expect_neg, 0.U(up_frac.W), 0.U(up_frac.W)))
+							  	val saturated_dec = Mux(expect_pos, 
+							  			util.Cat(~(dst.s | s).B, util.Fill(up_dec-1, true.B)), 
+							  			Mux(expect_neg, 1.U((dst.d).W) << (dst.d-1), 1.U((dst.d).W) << (dst.d-1))) 
+
+							  	new_frac := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, tmp_frac, saturated_frac))
+							  	new_dec := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, number(dst.d + f - 1, f), saturated_dec))
+							case _ =>
+								new_frac := tmp_frac
+								new_dec := 0.U(dst.d.W)
+						}
+					} else if (dst.d > d) { // expand decimals
+						val expand = dst.d - d
+						val sgn_extend = if (s & sign_extend) { number(d+f-1) } else {0.U(1.W)}
 						new_frac := tmp_frac
-						new_dec := number(dst.d + f - 1, f)
-						// (0 until dst.d).map{i => number(f + i) * scala.math.pow(2,i).toInt.U}.reduce{_+_}
-					case Saturation =>
-						val sign = number.msb
-						val overflow = ((sign & expect_pos) | (~sign & expect_neg)) 
-					  	val not_saturated = ( number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) ) | ( ~number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) )
-
-					  	val saturated_frac = Mux(expect_pos, 
-					  			util.Cat(util.Fill(up_frac, true.B)), 
-					  			Mux(expect_neg, 0.U(up_frac.W), 0.U(up_frac.W)))
-					  	val saturated_dec = Mux(expect_pos, 
-					  			util.Cat(~(dst.s | s).B, util.Fill(up_dec-1, true.B)), 
-					  			Mux(expect_neg, 1.U((dst.d).W) << (dst.d-1), 1.U((dst.d).W) << (dst.d-1))) 
-
-					  	new_frac := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, tmp_frac, saturated_frac))
-					  	new_dec := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, number(dst.d + f - 1, f), saturated_dec))
-					case _ =>
+						new_dec := util.Cat(util.Fill(expand, sgn_extend), number(f+d-1, f))
+						// (0 until dst.d).map{ i => if (i >= dst.d - expand) {sgn_extend*scala.math.pow(2,i).toInt.U} else {number(i+f)*scala.math.pow(2,i).toInt.U }}.reduce{_+_}
+					} else { // keep same
 						new_frac := tmp_frac
-						new_dec := 0.U(dst.d.W)
+						new_dec := number(f+d-1, f)
+						// (0 until dst.d).map{ i => number(i + f)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
+					}
+
 				}
-			} else if (dst.d > d) { // expand decimals
-				val expand = dst.d - d
-				val sgn_extend = if (s & sign_extend) { number(d+f-1) } else {0.U(1.W)}
-				new_frac := tmp_frac
-				new_dec := util.Cat(util.Fill(expand, sgn_extend), number(f+d-1, f))
-				// (0 until dst.d).map{ i => if (i >= dst.d - expand) {sgn_extend*scala.math.pow(2,i).toInt.U} else {number(i+f)*scala.math.pow(2,i).toInt.U }}.reduce{_+_}
-			} else { // keep same
-				new_frac := tmp_frac
-				new_dec := number(f+d-1, f)
-				// (0 until dst.d).map{ i => number(i + f)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-			}
 
+				if (has_dec & has_frac) {
+					dst.number := chisel3.util.Cat(new_dec, new_frac)	
+				} else if (has_dec & !has_frac) {
+					dst.number := new_dec		
+				} else if (!has_dec & has_frac) {
+					dst.number := tmp_frac
+				}
+				
+				
+				// dst.number := util.Cat(new_dec, new_frac) //new_frac + new_dec*(scala.math.pow(2,dst.f).toInt.U)
+			case dst: UInt => 
+				val result = Wire(new FixedPoint(true, dst.getWidth, 0))
+				this.cast(result, rounding, saturating, sign_extend, expect_neg, expect_pos)
+				dst := result.r
 		}
-
-		if (has_dec & has_frac) {
-			dst.number := chisel3.util.Cat(new_dec, new_frac)	
-		} else if (has_dec & !has_frac) {
-			dst.number := new_dec		
-		} else if (!has_dec & has_frac) {
-			dst.number := tmp_frac
-		}
-		
-		
-		// dst.number := util.Cat(new_dec, new_frac) //new_frac + new_dec*(scala.math.pow(2,dst.f).toInt.U)
-
 	}
 	
 

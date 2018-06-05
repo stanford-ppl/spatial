@@ -75,7 +75,7 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   final protected def quoteAsScala(x: Sym[_]): String = {
     x.rhs match {
-      case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("false.B","0").replaceAll("true.B","1")
+      case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("\\.U(.*)","").replaceAll("\\.S(.*)","").replaceAll("false.B","0").replaceAll("true.B","1")
       case Def.Node(id,_) => x match {
         case Op(SimpleStruct(fields)) => 
           var shift = 0
@@ -110,14 +110,14 @@ trait ChiselGenCommon extends ChiselCodegen {
           val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
           val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
           val (stride_wire, stride_constr) = step match {case Final(st) => (src"${st}.FP(true, $w, 0)", src"Some($st)"); case _ => (quote(step), "None")}
-          val par_wire = {src"$par"}.split('.').take(1)(0) // TODO: What is this doing?
+          val par_wire = {src"$par"}.split('.').take(1)(0).replaceAll("L","") // TODO: What is this doing?
           (start_wire, end_wire, stride_wire, par_wire, start_constr, end_constr, stride_constr, "Some(0)")
         case Op(ForeverNew()) => 
           isForever = true
           ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
       }}
       emitGlobalWireMap(src"""${cchain}_done""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""") // Dangerous but whatever
+      emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${cchain}_resetter""", """Wire(Bool())""")
       emitGlobalModule(src"""val ${cchain}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
       emitGlobalModule(src"""val ${cchain}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")

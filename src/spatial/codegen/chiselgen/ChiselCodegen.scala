@@ -52,7 +52,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
-    case (FixPtType(s,d,f), _) => c.toString + {if (f == 0 && !s) s".U($d.W)" else s".FP($s, $d, $f)"}
+    case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + {if (f == 0 && !s) s".U($d.W)" else s".FP($s, $d, $f)"}
     case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
     case (_:Bit, c:Bool) => s"${c.value}.B"
     case _ => super.quoteConst(tp,c)

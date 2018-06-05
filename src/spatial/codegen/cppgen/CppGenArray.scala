@@ -26,6 +26,12 @@ trait CppGenArray extends CppGenCommon {
     case _ => 0
   }
 
+  private def zeroElement(tp: Type[_]): String = tp match {
+    case tp: Tup2[_,_] => src"*(new $tp(${zeroElement(tp.A)},${zeroElement(tp.B)}));"
+    case tp: Struct[_] => src"*(new $tp(${tp.fields.map{field => zeroElement(field._2)}.mkString(",")}));"
+    case _ => "0"
+  }
+
   protected def ptr(tp: Type[_]): String = if (isArrayType(tp)) "*" else ""
   protected def amp(tp: Type[_]): String = if (isArrayType(tp)) "&" else ""
   protected def isArrayType(tp: Type[_]): Boolean = tp match {
@@ -303,7 +309,7 @@ trait CppGenArray extends CppGenCommon {
         emitApply(lhs, array, "0", false)
       close("}")
       open("else {")
-        emit(src"$lhs = 0;")
+        emit(src"$lhs = ${zeroElement(lhs.tp)};")
       close("}")
 
       open(src"for (int ${apply.inputB} = 1; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")

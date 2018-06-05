@@ -41,26 +41,29 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32]
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     dbgs(s"Fully unrolling reduce $lhs")
-    val lanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
+    val mapLanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
+    val redLanes = UnitUnroller(s"${lhs}_reduce", isInnerLoop=true)
     val rfunc = reduce.toFunction2
 
     val pipe = stageWithFlow(UnitPipe(enables ++ ens, stageBlock{
-      val foldValid: Option[Bit] = fold.map(_ => Bit(true))
-      val valids: () => Seq[Bit] = () => foldValid.toSeq ++ lanes.valids.map{vs => vs.andTree }
-      val values: Seq[A] = unroll(func, lanes)
-      val inputs: Seq[A] = fold.toSeq ++ values
+      inLanes(redLanes) {
+        val foldValid: Option[Bit] = fold.map(_ => Bit(true))
+        val valids: () => Seq[Bit] = () => foldValid.toSeq ++ mapLanes.valids.map { vs => vs.andTree }
+        val values: Seq[A] = unroll(func, mapLanes)
+        val inputs: Seq[A] = fold.toSeq ++ values
 
-      if (lhs.isOuterControl) {
-        dbgs("Fully unrolling outer reduce")
-        Pipe {
+        if (lhs.isOuterControl) {
+          dbgs("Fully unrolling outer reduce")
+          Pipe {
+            val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
+            store.reapply(accum, result)
+          }
+        }
+        else {
+          dbgs("Fully unrolling inner reduce")
           val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
           store.reapply(accum, result)
         }
-      }
-      else {
-        dbgs("Fully unrolling inner reduce")
-        val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
-        store.reapply(accum, result)
       }
     })){lhs2 => transferData(lhs,lhs2) }
     dbgs(s"Created unit pipe ${stm(pipe)}")
@@ -81,15 +84,15 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32]                // Bound iterators for map loop
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     dbgs(s"Unrolling reduce $lhs -> $accum")
-    val lanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
-    val inds2 = lanes.indices
-    val vs = lanes.indexValids
+    val mapLanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
+    val inds2 = mapLanes.indices
+    val vs = mapLanes.indexValids
     val start = cchain.counters.map(_.start.asInstanceOf[I32])
 
     val blk = stageLambda1(accum) {
       dbgs(s"Unrolling reduce map $lhs -> $accum")
-      val valids: () => Seq[Bit] = () => lanes.valids.map{_.andTree}
-      val values: Seq[A] = unroll(func, lanes)
+      val valids: () => Seq[Bit] = () => mapLanes.valids.map{_.andTree}
+      val values: Seq[A] = unroll(func, mapLanes)
 
       if (lhs.isOuterControl) {
         dbgs("Unrolling unit pipe reduce")
@@ -163,46 +166,52 @@ trait ReduceUnrolling extends UnrollingBase {
     start:  Seq[I32],             // Start for each iterator
     isInner: Boolean
   )(implicit ctx: SrcCtx): Void = {
-    val redType = reduce.result.reduceType
-    val treeResult = inReduce(redType,isInner){ unrollReduceTree[A](inputs, valids, ident, reduce.toFunction2) }
+    val redLanes = UnitUnroller(s"${accum}_accum", isInnerLoop = true)
 
-    val result: A = inReduce(redType,isInner){
-      dbgs(s"Inlining load function in reduce")
-      val accValue = load.reapply(accum)
-      val isFirst = iters.zip(start).map{case (i,st) => i === st }.andTree
-
-      if (spatialConfig.ignoreParEdgeCases) {
-        reduce.reapply(treeResult, accValue)
+    inLanes(redLanes) {
+      val redType = reduce.result.reduceType
+      val treeResult = inReduce(redType, isInner) {
+        unrollReduceTree[A](inputs, valids, ident, reduce.toFunction2)
       }
-      else fold match {
-        // FOLD: On first iteration, use init value rather than zero
-        case Some(init) =>
-          val accumOrFirst: A = mux(isFirst, init, accValue)
-          box(accumOrFirst).reduceType = redType
-          reduce.reapply(treeResult, accumOrFirst)
 
-        // REDUCE: On first iteration, store result of tree, do not include value from accum
-        // TODO: Could also have third case where we use ident instead of loaded value. Is one better?
-        case None =>
-          val res2   = reduce.reapply(treeResult, accValue)
-          val select = mux(isFirst, treeResult, res2)
-          box(select).reduceType = redType
+      val result: A = inReduce(redType, isInner) {
+        dbgs(s"Inlining load function in reduce")
+        val accValue = load.reapply(accum)
+        val isFirst = iters.zip(start).map { case (i, st) => i === st }.andTree
 
-          dbgs(s"isFirst: ${stm(isFirst)}")
-          dbgs(s"res2:    ${stm(res2)}")
-          dbgs(s"select:  ${stm(select)}")
+        if (spatialConfig.ignoreParEdgeCases) {
+          reduce.reapply(treeResult, accValue)
+        }
+        else fold match {
+          // FOLD: On first iteration, use init value rather than zero
+          case Some(init) =>
+            val accumOrFirst: A = mux(isFirst, init, accValue)
+            box(accumOrFirst).reduceType = redType
+            reduce.reapply(treeResult, accumOrFirst)
 
-          select
+          // REDUCE: On first iteration, store result of tree, do not include value from accum
+          // TODO: Could also have third case where we use ident instead of loaded value. Is one better?
+          case None =>
+            val res2 = reduce.reapply(treeResult, accValue)
+            val select = mux(isFirst, treeResult, res2)
+            box(select).reduceType = redType
+
+            dbgs(s"isFirst: ${stm(isFirst)}")
+            dbgs(s"res2:    ${stm(res2)}")
+            dbgs(s"select:  ${stm(select)}")
+
+            select
+        }
       }
-    }
 
-    inReduce(redType,isInner){
-      dbgs(s"Store: $result to $accum")
+      inReduce(redType, isInner) {
+        dbgs(s"Store: $result to $accum")
 
-      val res = store.reapply(accum, result)
+        val res = store.reapply(accum, result)
 
-      dbgs(s"Completed store (symbol $res)")
-      res
+        dbgs(s"Completed store (symbol $res)")
+        res
+      }
     }
   }
 

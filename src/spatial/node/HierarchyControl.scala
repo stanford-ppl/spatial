@@ -26,21 +26,26 @@ sealed abstract class ControlBody {
   def isPseudoStage: Boolean
   /** True if this stage may represent an outer controller. */
   def mayBeOuterStage: Boolean
+  /** True if this is an inner stage regardless of outer controller. */
+  def isInnerStage: Boolean
 }
 case class PseudoStage(blks: (Seq[I32], Block[_])*) extends ControlBody {
   override def blocks: Seq[(Seq[I32], Block[_])] = blks.toSeq
   override def isPseudoStage: Boolean = true
   override def mayBeOuterStage: Boolean = true
+  override def isInnerStage: Boolean = false
 }
 case class OuterStage(blks: (Seq[I32], Block[_])*) extends ControlBody {
   override def blocks: Seq[(Seq[I32], Block[_])] = blks.toSeq
   override def mayBeOuterStage: Boolean = true
   override def isPseudoStage: Boolean = false
+  override def isInnerStage: Boolean = false
 }
 case class InnerStage(blks: (Seq[I32], Block[_])*) extends ControlBody {
   override def blocks: Seq[(Seq[I32], Block[_])] = blks.toSeq
   override def mayBeOuterStage: Boolean = false
   override def isPseudoStage: Boolean = false
+  override def isInnerStage: Boolean = true
 }
 
 /** Nodes with implicit control signals/logic with internal state */

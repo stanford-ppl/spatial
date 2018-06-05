@@ -15,84 +15,47 @@ import spatial.util._
   */
 case class FlatteningTransformer(IR: State) extends MutateTransformer with AccelTraversal {
 
-  private var enables: Set[Bit] = Set.empty
+  private var flattenSwitch: Boolean = false
 
-  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case AccelScope(body) => inAccel{
-      if (inHw && lhs.isInnerControl && lhs.children.length >= 1) {
-        dbgs(s"Transforming $lhs = $rhs")
-        val body2 = wrapPrimitives(body)
-        val lhs2 = stageWithFlow(AccelScope(body2)){lhs2 => transferData(lhs,lhs2) }
-        lhs2      
-      } else super.transform(lhs,rhs)
-    }
-
-    case UnitPipe(en, body) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs = $rhs")
-      val body2 = wrapPrimitives(body)
-      val lhs2 = stageWithFlow(UnitPipe(en, body2)){lhs2 => transferData(lhs,lhs2) }
-      lhs2
-
-    case StateMachine(ens,start,notDone,action,nextState)  if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs = $rhs")
-      val action2 = wrapPrimitives(action)
-      implicit val D = nextState.result.tp match {case Bits(bA) => bA}
-      val lhs2 = stageWithFlow(StateMachine(ens, start, notDone, action2.asLambda1, nextState)(D)){lhs2 => transferData(lhs,lhs2) }
-      lhs2
-
-    case UnrolledForeach(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs = $rhs")
-      val body2 = wrapPrimitives(body)
-      val lhs2 = stageWithFlow(UnrolledForeach(ens, cchain, body2, iters, valids)){lhs2 => transferData(lhs,lhs2) }
-      lhs2
-
-    case UnrolledReduce(ens,cchain,body,iters,valids) if (inHw && lhs.isInnerControl && lhs.children.length >= 1) =>
-      dbgs(s"Transforming $lhs = $rhs")
-      val body2 = wrapPrimitives(body)
-      val lhs2 = stageWithFlow(UnrolledReduce(ens, cchain, body2, iters, valids)){lhs2 => transferData(lhs,lhs2) }
-      lhs2
-
+  private def transformCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+    case ctrl: Control[_] =>
+      ctrl.bodies.foreach{body =>
+        // Pre-transform all blocks which correspond to inner stages in this controller
+        if (lhs.isInnerControl || body.isInnerStage) {
+          body.blocks.foreach{case (_,block) =>
+            // Transform the block and register the block substitution
+            val saveFlatten = flattenSwitch
+            flattenSwitch = true
+            val block2 = f(block)
+            register(block -> block2)
+            flattenSwitch = saveFlatten
+          }
+        }
+      }
+      // Mirror the controller symbol (with any block substitutions in place)
+      super.transform(lhs,rhs)
     case _ => super.transform(lhs,rhs)
   }
 
+  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+    case op@Switch(F(sels),_) if flattenSwitch =>
+      val vals = op.cases.map{cas => inlineBlock(cas.body).unbox }
 
-  private def extractPrimitives(body: Block[_])(implicit ctx: SrcCtx): Unit = {
-    body.stms.map{
-      case Primitive(s) => dbgs(s"visiting $s - ${s.op}");visit(s)
-      case sym @ Op(op: Switch[_]) => 
-        sym.children.map(_.s.get).map{sc => val Op(op) = sc; implicit val typeInfo = sc.tp; extractPrimitives(sc.blocks.head)}
-        implicit val typeInfo = sym.tp
-        val Op(rhs) = sym
-        if (op.R.isBits) createOneHotMux(sym)
-        ()
-    }
-  }
+      Type[A] match {
+        case Bits(b) =>
+          implicit val bA: Bits[A] = b
+          if (sels.length == 2) mux[A](sels.head, vals.head, vals.last)
+          else oneHotMux[A](sels, vals)
 
-  private def wrapPrimitives(body: Block[Void])(implicit ctx: SrcCtx): Block[Void] = {
-    val body2 = stageScope(f(body.inputs),body.options){
-      extractPrimitives(body)
-      assert(body.result.isVoid)
-      // substituteSym(body.result)
-      void
-    }
-    body2
-  }
+        case _:Void => void.asInstanceOf[Sym[A]]
+        case _      => op_switch[A](sels,vals.map{v => () => v })
+      }
 
-  private def createOneHotMux[A:Type](lhs: Sym[A])(implicit ctx: SrcCtx): Unit = {
-    Type[A] match {
-      case Bits(b) =>
-        implicit val bA: Bits[A] = b
-        val Op(Switch(selects,body)) = lhs
-        val stms = body.stms.map(_.asInstanceOf[A])
-        val cases = stms.collect{case Op(op:SwitchCase[_]) => op.asInstanceOf[SwitchCase[A]]  }
-        val vals = cases.map{cas => substituteSym(cas.body.result).unbox }
-        val sels = selects.map(sel => substituteSym(sel).unbox)
-        val ohmux = oneHotMux[A](sels, vals)
-        dbgs(s"staging $ohmux (<- $lhs) - ${ohmux.op}")
-        register(lhs -> ohmux)
-      case _ =>
-    }
+    case _:Switch[_]  => super.transform(lhs,rhs)
+    case _:AccelScope => inAccel{ transformCtrl(lhs,rhs) }
+    case _:Control[_] => transformCtrl(lhs,rhs)
 
+    case _ => super.transform(lhs,rhs)
   }
 
 }

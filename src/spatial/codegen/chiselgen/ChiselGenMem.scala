@@ -12,18 +12,18 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
 
-  private def switchCaseLookaheadHack(parent: Sym[_]): Sym[_] = {
-    parent match {
-      case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get match {case s @ Op(_: SwitchCase[_]) => true; case _ => false}) => switchCaseLookaheadHack(parent.parent.s.get.parent.s.get)
-      case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get.isInnerControl) => parent.parent.s.get.parent.s.get
-      case _ => parent
-    }
-  }
+  // private def switchCaseLookaheadHack(parent: Sym[_]): Sym[_] = {
+  //   parent match {
+  //     case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get match {case s @ Op(_: SwitchCase[_]) => true; case _ => false}) => switchCaseLookaheadHack(parent.parent.s.get.parent.s.get)
+  //     case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get.isInnerControl) => parent.parent.s.get.parent.s.get
+  //     case _ => parent
+  //   }
+  // }
 
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val rPar = accessWidth(lhs)
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
+    val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) constDimsOf(mem).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -69,7 +69,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = switchCaseLookaheadHack(lhs.parent.s.get)
+    val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get)
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) constDimsOf(mem).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}

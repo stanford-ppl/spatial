@@ -35,29 +35,29 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   def createInstrumentation(lhs: Sym[_]): Unit = {
-    // if (cfg.enableInstrumentation) {
-    //   val ctx = s"${lhs.ctx}"
-    //   emitInstrumentation(src"""// Instrumenting $lhs, context: ${ctx}, depth: ${controllerStack.length}""")
-    //   val id = instrumentCounters.length
-    //   if (config.multifile == 5 || config.multifile == 6) {
-    //     emitInstrumentation(src"ic(${id*2}).io.enable := ${swap(lhs,En)}; ic(${id*2}).reset := accelReset")
-    //     emitInstrumentation(src"ic(${id*2+1}).io.enable := Utils.risingEdge(${swap(lhs, Done)}); ic(${id*2+1}).reset := accelReset")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ic(${id*2}).io.count""")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock_sym.head, En)}//${swap(hwblock_sym.head, Done)}""")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ic(${id*2+1}).io.count""")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).valid := ${swap(hwblock_sym.head, En)}//${swap(hwblock_sym.head, Done)}""")        
-    //   } else {
-    //     emitInstrumentation(src"""val ${lhs}_cycles = Module(new InstrumentationCounter())""")
-    //     emitInstrumentation(src"${lhs}_cycles.io.enable := ${swap(lhs,En)}; ${lhs}_cycles.reset := accelReset")
-    //     emitInstrumentation(src"""val ${lhs}_iters = Module(new InstrumentationCounter())""")
-    //     emitInstrumentation(src"${lhs}_iters.io.enable := Utils.risingEdge(${swap(lhs, Done)}); ${lhs}_iters.reset := accelReset")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ${lhs}_cycles.io.count""")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock_sym.head, En)}//${swap(hwblock_sym.head, Done)}""")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ${lhs}_iters.io.count""")
-    //     emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).valid := ${swap(hwblock_sym.head, En)}//${swap(hwblock_sym.head, Done)}""")        
-    //   }
-    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    // }
+    if (cfg.enableInstrumentation) {
+      val ctx = s"${lhs.ctx}"
+      emitInstrumentation(src"""// Instrumenting $lhs, context: ${ctx}, depth: ${controllerStack.length}""")
+      val id = instrumentCounters.length
+      if (cfg.compressWires == 1 || cfg.compressWires == 2) {
+        emitInstrumentation(src"ic(${id*2}).io.enable := ${swap(lhs,En)}; ic(${id*2}).reset := accelReset")
+        emitInstrumentation(src"ic(${id*2+1}).io.enable := Utils.risingEdge(${swap(lhs, Done)}); ic(${id*2+1}).reset := accelReset")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ic(${id*2}).io.count""")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ic(${id*2+1}).io.count""")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")        
+      } else {
+        emitInstrumentation(src"""val ${lhs}_cycles = Module(new InstrumentationCounter())""")
+        emitInstrumentation(src"${lhs}_cycles.io.enable := ${swap(lhs,En)}; ${lhs}_cycles.reset := accelReset")
+        emitInstrumentation(src"""val ${lhs}_iters = Module(new InstrumentationCounter())""")
+        emitInstrumentation(src"${lhs}_iters.io.enable := Utils.risingEdge(${swap(lhs, Done)}); ${lhs}_iters.reset := accelReset")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ${lhs}_cycles.io.count""")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ${lhs}_iters.io.count""")
+        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")        
+      }
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+    }
   }
 
   val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
@@ -131,7 +131,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
-    print_stage_prefix(lhs, s"${lhs.rawSchedule}", s"${lhs.level}", s"$cchain", s"$lhs", s"${lhs.ctx}", lhs.isInnerControl & lhs.children.isEmpty)
+    print_stage_prefix(lhs, s"${lhs.rawSchedule}", s"${lhs.level}", s"$cchain", s"$lhs", s"${lhs.ctx}", lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).isEmpty)
     if (lhs.isOuterControl)      { widthStats += lhs.children.toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
 
@@ -140,7 +140,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   final private def exitCtrl(lhs: Sym[_]): Unit = {
     // Tree stuff
-    print_stage_suffix(s"$lhs", lhs.isInnerControl & lhs.children.isEmpty)
+    print_stage_suffix(s"$lhs", lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).isEmpty)
     controllerStack.pop()
   }
 
@@ -390,9 +390,9 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym.isInnerControl & (sym.children.length > 0) & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.head.s.get}", Done)}""")
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
-      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.length > 0) => true; case _ => false }) {
+      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.head.s.get, Done)}""")
-      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.length == 0) => true; case _ => false }) {
+      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc).D(1) // Used to be delayed by 1 & validNow""")
       } else {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc) // Used to be delayed by 1 & validNow""")

@@ -252,35 +252,40 @@ trait UtilsModeling {
       WARCycle(reader, writer, mem, symbols, cycleLength)
     }
 
-    def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.map{case (mem,accesses) =>
+    def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       dbgs(s"Multiplexed accesses for memory $mem: ")
       accesses.foreach{access => dbgs(s"  ${stm(access)}") }
 
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
-      val muxPairs = accesses.map{access =>
-        val muxes = access.ports.values.map(_.muxPort)
-        (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
-      }.toSeq
+      val instances = mem.duplicates.length
+      (0 until instances).map{id =>
+        val accs = accesses.filter(_.dispatches.values.exists(_.contains(id)))
 
-      val length = muxPairs.map(_._3).maxOrElse(0) + 1
+        val muxPairs = accs.map{access =>
+          val muxes = access.ports(0).values.map(_.muxPort)
+          (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
+        }.toSeq
 
-      // Keep accesses with the same mux index together, even if they have different delays
-      // TODO[1]: This isn't quite right - should order by common parent instead?
-      val groupedMuxPairs = muxPairs.groupBy(_._3)  // Group by maximum mux port
-      val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
-      var writeStage = 0.0
-      orderedMuxPairs.foreach{pairs =>
-        val dlys = pairs.map(_._2) :+ writeStage
-        val writeDelay = dlys.max
-        writeStage = writeDelay + 1
-        pairs.foreach{case (access, dly, _) =>
-          dbgs(s"Pushing ${stm(access)} to $writeDelay due to muxing")
-          paths(access) = writeDelay
+        val length = muxPairs.map(_._3).maxOrElse(0) + 1
+
+        // Keep accesses with the same mux index together, even if they have different delays
+        // TODO[1]: This isn't quite right - should order by common parent instead?
+        val groupedMuxPairs = muxPairs.groupBy(_._3)  // Group by maximum mux port
+        val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
+        var writeStage = 0.0
+        orderedMuxPairs.foreach{pairs =>
+          val dlys = pairs.map(_._2) :+ writeStage
+          val writeDelay = dlys.max
+          writeStage = writeDelay + 1
+          pairs.foreach{case (access, dly, _) =>
+            dbgs(s"Pushing ${stm(access)} to $writeDelay due to muxing")
+            paths(access) = writeDelay
+          }
         }
-      }
 
-      AAACycle(accesses, mem, length)
+        AAACycle(accesses, mem, length)
+      }
     }
 
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)

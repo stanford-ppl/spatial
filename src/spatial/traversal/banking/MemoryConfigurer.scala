@@ -78,12 +78,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val duplicates = instances.map{_.toMemory}
     mem.duplicates = duplicates
 
-    instances.zipWithIndex.foreach{case (inst, id) =>
+    instances.zipWithIndex.foreach{case (inst, dispatch) =>
       (inst.reads.iterator.flatten ++ inst.writes.iterator.flatten).foreach{a =>
-        a.access.ports += (a.unroll -> inst.ports(a))
-        a.access.addDispatch(a.unroll, id)
+        a.access.addPort(dispatch, a.unroll, inst.ports(a))
+        a.access.addDispatch(a.unroll, dispatch)
         dbgs(s"  Added port ${inst.ports(a)} to ${a.access} {${a.unroll.mkString(",")}}")
-        dbgs(s"  Added dispatch $id to ${a.access} {${a.unroll.mkString(",")}}")
+        dbgs(s"  Added dispatch $dispatch to ${a.access} {${a.unroll.mkString(",")}}")
       }
 
       if (inst.writes.flatten.isEmpty && mem.name.isDefined) {

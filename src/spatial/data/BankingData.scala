@@ -229,15 +229,15 @@ case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends Data[Dispatch](Transfer.M
 /** Map of buffer ports for each unrolled instance of an access node.
   * Unrolled instances are tracked by the unrolled IDs (duplicate number) of all surrounding iterators.
   *
-  * Option:  sym.getPorts     --- for the entire map
-  * Option:  sym.getPort(uid) --- for a single unrolled instance id
-  * Getter:  sym.ports        --- for the entire map
-  * Getter:  sym.port(uid)    --- for a single unrolled instance id
-  * Setter:  sym.ports = (Map[Seq[Int],Port])
-  * Default: empty map        --- for the entire map
-  * Default: undefined        --- for a single unrolled instance id
+  * Option:  sym.getPorts        --- for the entire map
+  * Option:  sym.getPort(uid)    --- for a single unrolled instance id
+  * Getter:  sym.ports(disp)     --- for the entire map
+  * Getter:  sym.port(disp,uid)  --- for a single unrolled instance id
+  * Setter:  sym.addPort(Int, Seq[Int, Port)
+  * Default: empty map           --- for the entire map
+  * Default: undefined           --- for a single unrolled instance id
   */
-case class Ports(m: Map[Seq[Int],Port]) extends Data[Ports](Transfer.Mirror)
+case class Ports(m: Map[Int, Map[Seq[Int],Port]]) extends Data[Ports](Transfer.Mirror)
 
 
 /** Flag set by the user to allow buffered writes across metapipeline stages.
@@ -282,12 +282,19 @@ trait BankingData {
       case None      => s.dispatches += (uid -> Set(d))
     }
 
-    def getPorts: Option[Map[Seq[Int],Port]] = metadata[Ports](s).map(_.m)
-    def ports: Map[Seq[Int],Port] = getPorts.getOrElse{ Map.empty }
-    def ports_=(ps: Map[Seq[Int],Port]): Unit = metadata.add(s, Ports(ps))
+    def getPorts: Option[Map[Int, Map[Seq[Int],Port]]] = metadata[Ports](s).map(_.m)
+    def getPorts(dispatch: Int): Option[Map[Seq[Int],Port]] = getPorts.flatMap(_.get(dispatch))
+    def ports(dispatch: Int): Map[Seq[Int],Port] = getPorts(dispatch).getOrElse{ throw new Exception(s"No ports defined for $s on dispatch #$dispatch") }
+    def addPort(dispatch: Int, uid: Seq[Int], port: Port): Unit = getPorts match {
+      case Some(map) => map.get(dispatch) match {
+        case Some(ports) => metadata.add(s, Ports(map + (dispatch -> (ports + (uid -> port)))))
+        case None        => metadata.add(s, Ports(map + (dispatch -> Map(uid -> port))))
+      }
+      case None      => metadata.add(s, Ports(Map(dispatch -> Map(uid -> port))))
+    }
 
-    def getPort(uid: Seq[Int]): Option[Port] = getPorts.flatMap(_.get(uid))
-    def port(uid: Seq[Int]): Port = getPort(uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }
+    def getPort(dispatch: Int, uid: Seq[Int]): Option[Port] = getPorts(dispatch).flatMap(_.get(uid))
+    def port(dispatch: Int, uid: Seq[Int]): Port = getPort(dispatch, uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }
   }
 
 }

@@ -92,8 +92,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
-      val muxPort = lhs.ports.values.head.muxPort
-      val base = stream.writers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val muxPort = lhs.ports(0).values.head.muxPort
+      val base = stream.writers.filter(_.ports(0).values.head.muxPort < muxPort).map(accessWidth(_)).sum
       val parent = lhs.parent.s.get
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
@@ -107,8 +107,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 
 
     case StreamInBankedRead(strm, ens) =>
-      val muxPort = lhs.ports.values.head.muxPort
-      val base = strm.readers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val muxPort = lhs.ports(0).values.head.muxPort
+      val base = strm.readers.filter(_.ports(0).values.head.muxPort < muxPort).map(accessWidth(_)).sum
       val parent = lhs.parent.s.get
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)}

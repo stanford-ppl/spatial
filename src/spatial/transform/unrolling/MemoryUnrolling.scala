@@ -189,7 +189,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens)
 
         banked.s.foreach{s =>
-          s.ports += (Nil -> port)
+          s.addPort(dispatch=0, Nil, port)
           s.addDispatch(Nil, 0)
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
@@ -268,7 +268,7 @@ trait MemoryUnrolling extends UnrollingBase {
             memory  = memories((mem, dispatchId)),
             dispIds = Seq(dispatchId),
             laneIds = Seq(laneId),
-            port    = access.ports(vid),
+            port    = access.port(dispatchId, vid),
             vecOfs  = wid
           )
         }

@@ -46,11 +46,11 @@ case class MemoryReporter(IR: State) extends Pass {
         val writers = mem.writers
         emit("\n")
         emit(s"Instance Summary: ")
-        duplicates.zipWithIndex.foreach{case (inst,i) =>
+        duplicates.zipWithIndex.foreach{case (inst,id) =>
           val Memory(banking,depth,isAccum) = inst
           val banks  = banking.map(_.nBanks).mkString(", ")
           val format = if (banks.length == 1) "Flat" else "Hierarchical"
-          emit(s"  #$i: Banked")
+          emit(s"  #$id: Banked")
           emit(s"     Resource: ${inst.resource.name}")
           emit(s"     Depth:    $depth")
           emit(s"     Accum:    $isAccum")
@@ -63,8 +63,8 @@ case class MemoryReporter(IR: State) extends Pass {
 
             // Find all accesses connected to this buffer port
             val accesses: Iterable[(Sym[_],Seq[Int],Port)] = {
-              as.filter{a => a.dispatches.values.exists(_.contains(i)) }
-                .flatMap{a => a.ports.filter(_._2.bufferPort == port).map{case (unroll,pt) => (a,unroll,pt) }}
+              as.filter{a => a.dispatches.values.exists(_.contains(id)) }
+                .flatMap{a => a.ports(id).filter(_._2.bufferPort == port).map{case (unroll,pt) => (a,unroll,pt) }}
             }
 
             // Find the maximum width of this buffer port

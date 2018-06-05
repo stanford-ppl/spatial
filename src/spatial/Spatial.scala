@@ -110,7 +110,7 @@ trait Spatial extends Compiler {
         /** Memory analysis */
         accessAnalyzer      ==>
         memoryAnalyzer      ==>
-        memoryAllocator     ==>
+        memoryAllocator     ==> printer ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */

@@ -10,7 +10,7 @@ import spatial.dsl._
     type T = FixPt[TRUE,_16,_16]
     val rowtile = 16
     val coltile = 64
-    val data = loadCSV2D[T]("/remote/regression/data/slacsample2d.csv", ",", "\n")
+    val data = loadCSV2D[T](s"$DATA/slac/slacsample2d.csv", ",", "\n")
     val memrows = ArgIn[Int]
     val memcols = ArgIn[Int]
     setArg(memrows, data.rows.to[Int])
@@ -53,7 +53,7 @@ import spatial.dsl._
 
     // Extract results from accelerator
     val results = getMem(risingEdges)
-    val gold = loadCSV1D[Int]("/remote/regression/data/edge_gold.csv", ",")
+    val gold = loadCSV1D[Int](s"$DATA/slac/edge_gold.csv", ",")
     val margin = 2.to[Int]
 
     // Create validation checks and debug code

@@ -12,7 +12,7 @@ import spatial.dsl._
     type T = FixPt[TRUE, _16, _16]
     val rowtile = 2
     val coltile = 16
-    val data = loadCSV2D[T]("/remote/regression/data/2d.ssv", " ", "\n")
+    val data = loadCSV2D[T](s"$DATA/ssv/2d.ssv", " ", "\n")
     val memrows = ArgIn[Int]
     val memcols = ArgIn[Int]
     setArg(memrows, data.rows.to[Int])

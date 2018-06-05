@@ -14,6 +14,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
   def compileArgs: Args = NoArgs
   def runtimeArgs: Args
+  lazy val DATA = sys.env("TEST_DATA_HOME")
 
   //-------------------//
   //      Backends     //

@@ -16,7 +16,7 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    val sparse_data = loadCSV2D[Int]("/remote/regression/data/machsuite/pagerank_chesapeake.csv", " ", "\n").t
+    val sparse_data = loadCSV2D[Int](s"$DATA/machsuite/pagerank_chesapeake.csv", " ", "\n").t
     val rows = sparse_data(0, 0)
     val node1_list = Array.tabulate(sparse_data.cols - 1) { i => sparse_data(0, i + 1) - 1 } // Every page is 1-indexed...
     val node2_list = Array.tabulate(sparse_data.cols - 1) { i => sparse_data(1, i + 1) - 1 } // Every page is 1-indexed...

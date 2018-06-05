@@ -4,8 +4,8 @@
 # export TEST_DATA_HOME="$PWD/../data/"
 
 type=$1
-numthreads=$2
-file_or_tests=$3
+numthreads=$NUM_THREADS
+file_or_tests=$2
 
 if [[ $file_or_tests == "" ]]; then
    tests="spatial.tests.*" 
@@ -28,7 +28,8 @@ else
 fi
 
 if [[ $numthreads == "" ]]; then
-  threads=1
+  echo "Defaulting to 4 threads. Set NUM_THREADS variable to change."
+  threads=4
 else
   threads=$numthreads
 fi

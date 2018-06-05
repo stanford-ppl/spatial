@@ -18,7 +18,7 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
     // Setup off-chip data
 
-    val raw_text = args(0)  // loadCSV1D[String]("/remote/regression/data/machsuite/sha_txt.csv", "\n").apply(0)
+    val raw_text = args(0)
     val data_text_int = raw_text.map[U8]{c => c}
     val data_text = Array.tabulate(data_text_int.length){i => data_text_int(i).to[UInt8]}
     val len = HostIO[Int]

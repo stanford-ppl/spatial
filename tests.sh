@@ -28,10 +28,14 @@ else
 fi
 
 if [[ $numthreads == "" ]]; then
-  echo "Defaulting to 4 threads. Set NUM_THREADS variable to change."
+  echo "Defaulting to 4 threads. Set NUM_THREADS environment variable to change."
   threads=4
 else
   threads=$numthreads
+fi
+
+if [[ $TEST_DATA_HOME == "" ]]; then
+  echo "TEST_DATA_HOME is not set. Set TEST_DATA_HOME for data-dependent tests to pass."
 fi
 
 fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"

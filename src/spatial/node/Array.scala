@@ -20,6 +20,7 @@ import spatial.lang.host._
 }
 
 @op case class ArrayUpdate[A:Type](array: Array[A], i: I32, data: Sym[A]) extends Op[Void] {
+  override def effects: Effects = Effects.Writes(array)
   override def contains = syms(data)
 }
 

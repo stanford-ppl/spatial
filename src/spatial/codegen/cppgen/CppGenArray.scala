@@ -198,8 +198,9 @@ trait CppGenArray extends CppGenCommon {
         case _ => emit(src"${lhs}.push_back($e);")
       }}
 
-    case MapIndices(size, func)   =>
-      emitNewArray(lhs, lhs.tp, src"$size")
+    case op @ MapIndices(size, func)   =>
+      val isVoid = op.A.isVoid
+      if (!isVoid) emitNewArray(lhs, lhs.tp, src"$size")
       open(src"for (int ${func.input} = 0; ${func.input} < $size; ${func.input}++) {")
       visitBlock(func)
       if (isArrayType(func.result.tp)) {
@@ -209,7 +210,7 @@ trait CppGenArray extends CppGenCommon {
           emit(src"(*$lhs)[${func.input}][${func.result}_copier] = (*${func.result})[${func.result}_copier];")
         close("}")
       } else {
-        emit(src"(*$lhs)[${func.input}] = ${func.result};")  
+        if (!isVoid) emit(src"(*$lhs)[${func.input}] = ${func.result};")
       }
       close("}")
 

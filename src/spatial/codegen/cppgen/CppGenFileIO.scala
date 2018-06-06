@@ -104,10 +104,30 @@ trait CppGenFileIO extends CppGenCommon {
         close("}")
       close("}")
 
-    // case OpenBinaryFile(filename: Exp[MString], write: Boolean)
-    // case CloseBinaryFile(file: Exp[MBinaryFile])
-    // case ReadBinaryFile[T:Type:Num](file: Exp[MBinaryFile])
-    // case WriteBinaryFile[T:Type:Num](file:  Exp[MBinaryFile],len:   Exp[Index],value: Lambda1[Index, T],index: Bound[Index])
+    case OpenBinaryFile(filename, isWr) =>
+      val dir = if (isWr) "o" else "i"
+      emit(src"""std::${dir}fstream ${lhs}_file (${filename}.c_str(), std::ios::binary);""")
+      emit(src"""assert(${lhs}_file.good() && "File ${s"filename".replace("\"","")} does not exist"); """)
+
+    case CloseBinaryFile(file) =>
+      emit(src"${file}_file.close();")
+
+    case WriteBinaryFile(file, len ,value) =>
+      val i = value.input
+      open(src"for (int ${i} = 0; ${i} < $len; ${i}++) {")
+        open(src"if (${file}_file.is_open()) {")
+          visitBlock(value)
+          emit(src"${file}_file.write((char *)&${value.result}, sizeof(${value.result}));")
+        close("}")
+      close("}")
+
+    case ReadBinaryFile(file) =>
+      emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}; ")
+      open(src"while (!${file}_file.eof()) {")
+        emit(src"${lhs.tp.typeArgs.head} t;")
+        emit(src"${file}_file.read((char *)&t, sizeof(t));")
+        emit(src"(*${lhs}).push_back(t);")
+      close("}")
 
     case _ => super.gen(lhs, rhs)
   }

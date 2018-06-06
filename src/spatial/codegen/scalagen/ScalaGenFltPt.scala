@@ -13,7 +13,12 @@ trait ScalaGenFltPt extends ScalaGenBits {
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp, c) match {
-    case (FltPtType(g,e), c: FloatPoint) => s"""FloatPoint(BigDecimal("$c"), FltFormat(${g-1},$e))"""
+    case (FltPtType(g,e), c: FloatPoint) =>
+      if (c.isNaN) s"""FloatPoint("NaN", FltFormat(${g-1},$e))"""
+      else if (c.isPositiveInfinity) s"""FloatPoint("Inf", FltFormat(${g-1},$e))"""
+      else if (c.isNegativeInfinity) s"""FloatPoint("-Inf", FltFormat(${g-1},$e))"""
+      else if (c.isNegZero) s"""FloatPoint("-0.0", FltFormat(${g-1},$e))"""
+      else s"""FloatPoint(BigDecimal("$c"), FltFormat(${g-1},$e))"""
     case _ => super.quoteConst(tp,c)
   }
 
@@ -32,7 +37,7 @@ trait ScalaGenFltPt extends ScalaGenBits {
     case FltSub(x,y) => emit(src"val $lhs = $x - $y")
     case FltMul(x,y) => emit(src"val $lhs = $x * $y")
     case FltDiv(x,y) => emit(src"val $lhs = $x / $y")
-    case FltMod(x,y) => emit(src"val $lhs = $x / $y")
+    case FltMod(x,y) => emit(src"val $lhs = $x % $y")
     case FltRecip(x) => emit(src"val $lhs = Number.recip($x)")
     case FltLst(x,y) => emit(src"val $lhs = $x < $y")
     case FltLeq(x,y) => emit(src"val $lhs = $x <= $y")

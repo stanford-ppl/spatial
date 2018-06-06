@@ -432,8 +432,8 @@ trait UtilsControl {
     * and the pipeline distance between the first access and the first stage.
     * If the controllers have no ancestors in common, returns None.
     */
-  @stateful def LCA(n: => List[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
-  @stateful def LCA(n: List[Ctrl]): Ctrl = { 
+  @stateful def LCA(n: => Seq[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
+  @stateful def LCA(n: Seq[Ctrl]): Ctrl = {
     val anchor = n.distinct.head
     val candidates = n.distinct.drop(1).map{x =>
       if (x.ancestors.map(_.master).contains(anchor.master)) anchor

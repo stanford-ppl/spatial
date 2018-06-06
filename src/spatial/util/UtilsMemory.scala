@@ -52,6 +52,11 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     def isFIFO: Boolean = a.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = a.isInstanceOf[LIFO[_]]
 
+    def isLUT: Boolean = a match {
+      case _: LUT[_,_] => true
+      case _ => false
+    }
+
     def isStreamIn: Boolean = a.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = a.isInstanceOf[StreamOut[_]]
     def isInternalStream: Boolean = (a.isStreamIn || a.isStreamOut) && a.parent != Ctrl.Host

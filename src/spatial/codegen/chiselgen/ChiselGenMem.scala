@@ -25,10 +25,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-    val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
-    val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) constDimsOf(mem).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+    val ofsWidth = Math.max(1, Math.ceil(scala.math.log(constDimsOf(mem).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
+    val banksWidths = if (mem.isRegFile || mem.isLUT) constDimsOf(mem).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-    val isBroadcast = !lhs.ports(0).values.head.bufferPort.isDefined & mem.instance.depth > 1
+    val isBroadcast = lhs.ports(0).values.head.bufferPort.isEmpty & mem.instance.depth > 1
     val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
     val muxPort = lhs.ports(0).values.head.muxPort
     val muxOfs = lhs.ports(0).values.head.muxOfs
@@ -41,7 +41,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     ens.zipWithIndex.foreach{case (e, i) => 
       if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
       else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
-      if (!ofs.isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
       if (lhs.isDirectlyBanked & !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.toInt)}))") 
         emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
@@ -239,8 +239,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     // if (readCtrls.isEmpty) throw new Exception(u"Memory $mem, instance $i had no readers?")
 
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
-    if (!specialLB && accesses.toList.length > 0) {
-      val lca = if (accesses.toList.length == 1) accesses.head.parent else LCA(accesses.toList)
+    if (!specialLB && accesses.nonEmpty) {
+      val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses.toList)
       val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
       val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
       info.toList

@@ -313,18 +313,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def getFifoReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).map{ pt => pt match {
-        case fifo @ Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
-        case _ => ""
-    }}.toList.filter(_ != "")
+    getWriteStreams(sym).collect{
+      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
+    }.toList
   }
 
   def getAllReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).map{ pt => pt match {
-        case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-        case fifo @ Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
-        case _ => ""
-    }}.toList.filter(_ != "")
+    getWriteStreams(sym).collect{
+      case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
+      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
+    }.toList
   }
 
   def DLTrace(lhs: Sym[_]): Option[String] = {
@@ -335,10 +333,10 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val streamOuts = if (!controllerStack.isEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
+    val streamOuts = if (controllerStack.nonEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
     latency match {
       case lat: Int => 
-        if (!controllerStack.isEmpty) {
+        if (controllerStack.nonEmpty) {
           if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
@@ -351,7 +349,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           else src"Utils.getRetimed($name, $latency)"                    
         }
       case lat: Double => 
-        if (!controllerStack.isEmpty) {
+        if (controllerStack.nonEmpty) {
           if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
@@ -364,7 +362,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           else src"Utils.getRetimed($name, ${lat.toInt})"
         }
       case lat: String => 
-        if (!controllerStack.isEmpty) {
+        if (controllerStack.nonEmpty) {
           if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
@@ -381,14 +379,13 @@ trait ChiselGenCommon extends ChiselCodegen {
 
 
   protected def bitWidth(tp: Type[_]): Int = tp match {
-    case FixPtType(s,d,f) => d+f; 
-    case FltPtType(g,e) => g+e; 
-    case BitType() => 1
-    case t: Vec[_] => t.width * bitWidth(t.typeArgs.head)
-    case st: Struct[_] => st.fields.map{case (name, typ) => bitWidth(typ)}.sum
+    case Bits(bT) => bT.nbits
     case _ => -1
   }
-  protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
+  protected def fracBits(tp: Type[_]) = tp match {
+    case FixPtType(s,d,f) => f
+    case _ => 0
+  }
 
   final protected def appendChainPass(s: Sym[_], rawname: String): (String, Boolean) = {
     var result = rawname

@@ -83,7 +83,20 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       // --- Blk Hierarchy --- //
       // Set the blk of each symbol defined in this controller
       op.blocks.zipWithIndex.foreach{case (block,bId) =>
-        block.stms.foreach{lhs => lhs.blk = Blk.Node(s, bId) }
+        block.stms.foreach{lhs =>
+          lhs.blk = Blk.Node(s, bId)
+          lhs match {
+            case Accessor(wr,rd) =>
+              wr.foreach{w => s.writtenMems += w.mem }
+              rd.foreach{r => s.readMems += r.mem }
+
+            case BankedAccessor(wr,rd) =>
+              wr.foreach{w => s.writtenMems += w.mem }
+              rd.foreach{r => s.readMems += r.mem }
+
+            case _ =>
+          }
+        }
       }
 
     case _ => // Nothin'

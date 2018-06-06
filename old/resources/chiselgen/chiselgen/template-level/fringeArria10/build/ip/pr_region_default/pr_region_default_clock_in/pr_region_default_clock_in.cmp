@@ -1,7 +1,0 @@
-	component pr_region_default_clock_in is
-		port (
-			in_clk  : in  std_logic := 'X'; -- clk
-			out_clk : out std_logic         -- clk
-		);
-	end component pr_region_default_clock_in;
-

@@ -78,7 +78,7 @@ case class MemoryAllocator(IR: State) extends Pass {
         while (capacity(resource.name) > 0 && sortedInsts.hasNext) {
           val ProfiledInstance(inst, _, area) = sortedInsts.next()
           val Instance(mem, dup, idx) = inst
-          val depth = areaModel.memoryBankDepth(mem, dup) //constDimsOf(mem).product
+          val depth = areaModel.memoryBankDepth(mem, dup)
 
           if (area <= capacity && depth >= resource.minDepth) {
             dbg(s"  Assigned $mem#$idx to ${resource.name} (area: $area (<= $capacity), depth: $depth (>= ${resource.minDepth}))")

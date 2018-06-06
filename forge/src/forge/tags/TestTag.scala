@@ -19,11 +19,16 @@ class TestTag(dsl: String, dslTest: String, dslApp: String, verbose: Boolean = f
                    .renameMethod("main", "entry")
 
         val cls = virt(mod).head.asClass
-        val obj = q"object ${cls.name.toTermName} extends ${cls.name} with $appType".asObject
 
         if (verbose) info(showCode(cls))
 
-        List(cls,obj) ::: as
+        if (a.isTrait || a.isAbstract) {
+          List(cls) ::: as
+        }
+        else {
+          val obj = q"object ${cls.name.toTermName} extends ${cls.name} with $appType".asObject
+          List(cls,obj) ::: as
+        }
 
       case _ => invalidAnnotationUse("test", "classes", "traits")
     }

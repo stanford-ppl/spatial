@@ -3,16 +3,14 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 import spatial.lib._
 
-@test class GEMMLibTest extends SpatialTest {
+@test trait GEMMLibBase extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
-  type T = Float
-
-  def main(args: Array[String]): Unit = {
+  def common[T:Num](KP: scala.Int): Unit = {
 
     // Populate input matrices
-    val inputA = Matrix.tabulate[T](3, 2){(i, j) => i.to[T]+j.to[T]}
-    val inputB = Matrix.tabulate[T](3, 1){(i, j) => i.to[T]+j.to[T]}
+    val inputA = Matrix.tabulate[T](16, 8){(i, j) => i.to[T]}
+    val inputB = Matrix.tabulate[T](16, 8){(i, j) => j.to[T]}
 
     // Print input matrices
     print("\n*** Input A ***\n")
@@ -21,9 +19,9 @@ import spatial.lib._
     printMatrix(inputB)
 
     // Allocate DRAM
-    val dramA = DRAM[T](3, 2)
-    val dramB = DRAM[T](3, 1)
-    val dramY = DRAM[T](1,2)
+    val dramA = DRAM[T](16, 8)
+    val dramB = DRAM[T](16, 8)
+    val dramY = DRAM[T](8,8)
 
     // Transfer input matrices to DRAM
     setMem(dramA, inputA)
@@ -31,9 +29,9 @@ import spatial.lib._
 
 
     Accel {
-      val sramA = SRAM[T](3, 2)
-      val sramB = SRAM[T](3, 1)
-      val sramY = SRAM[T](1, 2)
+      val sramA = SRAM[T](16, 8)
+      val sramB = SRAM[T](16, 8)
+      val sramY = SRAM[T](8, 8)
 
       sramA load dramA
       sramB load dramB
@@ -52,10 +50,8 @@ import spatial.lib._
         sumY = true,
         alpha = 1.0.to[T],
         beta = 1.0.to[T],
-        mp = 1,
-        np = 1,
-        kp = 1
-      )
+        mp = 1, np = 1,
+        kp = KP)
 
       dramY store sramY
     }
@@ -64,14 +60,38 @@ import spatial.lib._
     print("\n*** Output Y ***\n")
     printMatrix(outputY)
 
-    val goldY = Matrix.tabulate[T](2, 1) { (i,j) =>
-      Array.tabulate(3){ k => inputA.t.apply(i,k)*inputB(k,j)}.reduce{_+_}
+    val goldY = Matrix.tabulate[T](8, 8) { (i,j) =>
+      Array.tabulate(16){ k => inputA.t.apply(i,k)*inputB(k,j)}.reduce{_+_}
     }.t
 
     print("\n*** Golden Y ***\n")
     printMatrix(goldY)
 
-    val cksum = goldY.zip(outputY){(a,b) => abs(a-b) < .001.to[T]}.reduce{_&&_}
+    val cksum = goldY.zip(outputY){(a,b) => abs(a-b) <= .001.to[T]}.reduce{_&&_}
     assert(cksum)
   }
+}
+
+@test class GEMMLibFloatTest extends GEMMLibBase {
+  def main(args: Array[String]): Unit = common[Float](1)
+}
+
+@test class GEMMLibIntTest extends GEMMLibBase {
+  def main(args: Array[String]): Unit = common[Int](1)
+}
+
+@test class GEMMLibHalfTest extends GEMMLibBase {
+  def main(args: Array[String]): Unit = common[Half](1)
+}
+
+@test class GEMMLibFloatParTest extends GEMMLibBase {
+  def main(args: Array[String]): Unit = common[Float](2)
+}
+
+@test class GEMMLibIntParTest extends GEMMLibBase {
+  def main(args: Array[String]): Unit = common[Int](2)
+}
+
+@test class GEMMLibHalfParTest extends GEMMLibBase {
+  def main(args: Array[String]): Unit = common[Half](2)
 }

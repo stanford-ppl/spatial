@@ -38,7 +38,7 @@ import spatial.dsl._
       }
 
       setArg(outA, omm.value.min)
-      setArg(outB, omm.value.min)
+      setArg(outB, omm.value.max)
     }
 
     val a = getArg(outA)

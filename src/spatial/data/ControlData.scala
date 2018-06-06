@@ -150,6 +150,23 @@ case class InitiationInterval(interval: Double) extends Data[InitiationInterval]
 case class UserII(interval: Double) extends Data[UserII](SetBy.User)
 
 
+/** Memories which are written in a given controller.
+  *
+  * Getter: sym.writtenMems
+  * Setter: sym.writtenMems = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Self)
+
+/** Memories which are read in a given controller.
+  *
+  * Getter: sym.readMems
+  * Setter: sym.readMems = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Self)
+
+
 trait ControlData {
   implicit class ControlDataOps(s: Sym[_]) {
     /** Returns an Option of the control level (Inner or Outer) metadata. None if undefined. */
@@ -174,6 +191,12 @@ trait ControlData {
     def getUserSchedule: Option[CtrlSchedule] = metadata[UserScheduleDirective](s).map(_.sched)
     def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
     def userSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, UserScheduleDirective(sched))
+
+    def writtenMems: Set[Sym[_]] = metadata[WrittenMems](s).map(_.mems).getOrElse(Set.empty)
+    def writtenMems_=(mems: Set[Sym[_]]): Unit = metadata.add(s, WrittenMems(mems))
+
+    def readMems: Set[Sym[_]] = metadata[ReadMems](s).map(_.mems).getOrElse(Set.empty)
+    def readMems_=(mems: Set[Sym[_]]): Unit = metadata.add(s, ReadMems(mems))
 
     // --- Control Hierarchy --- //
 

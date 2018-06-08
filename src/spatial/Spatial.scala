@@ -4,9 +4,10 @@ import argon._
 import argon.passes.IRPrinter
 import pir.codegen.dot._
 import poly.{ConstraintMatrix, ISL}
-import spatial.codegen.scalagen._
-import spatial.codegen.cppgen._
 import spatial.codegen.chiselgen._
+import spatial.codegen.cppgen._
+import spatial.codegen.scalagen._
+import spatial.codegen.treegen._
 import spatial.data._
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.dse.DSEMode
@@ -90,7 +91,7 @@ trait Spatial extends Compiler {
     lazy val chiselCodegen = ChiselGen(state)
     lazy val cppCodegen    = CppGen(state)
     lazy val irDotCodegen  = IRDotCodegen(state)
-    // lazy val treeCodegen = TreeCodegen(state)
+    lazy val treeCodegen   = TreeGen(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
 
     val result = {
@@ -131,6 +132,7 @@ trait Spatial extends Compiler {
         finalIRPrinter      ==>
         finalSanityChecks   ==>
         /** Code generation */
+        treeCodegen         ==>
         (cfg.enableSim   ? scalaCodegen)  ==>
         (cfg.enableSynth ? chiselCodegen) ==>
         (cfg.enableSynth ? cppCodegen)    ==>

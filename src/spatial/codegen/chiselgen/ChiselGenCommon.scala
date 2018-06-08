@@ -6,9 +6,6 @@ import spatial.lang._
 import spatial.node._
 import spatial.data._
 import spatial.util._
-import emul.FloatPoint
-import emul.FixedPoint
-import utils.escapeString
 import spatial.internal.{spatialConfig => cfg}
 
 trait ChiselGenCommon extends ChiselCodegen { 
@@ -101,11 +98,11 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def emitCounterChain(lhs: Sym[_]): Unit = {
-    if (!lhs.cchains.isEmpty) {
+    if (lhs.cchains.nonEmpty) {
       val cchain = lhs.cchains.head
       var isForever = cchain.isForever
       val w = bitWidth(cchain.counters.head.typeArgs.head)
-      val counter_data = cchain.counters.map{ ctr => ctr match {
+      val counter_data = cchain.counters.map{
         case Op(CounterNew(start, end, step, par)) => 
           val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
           val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
@@ -115,7 +112,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         case Op(ForeverNew()) => 
           isForever = true
           ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
-      }}
+      }
       emitGlobalWireMap(src"""${cchain}_done""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${cchain}_resetter""", """Wire(Bool())""")
@@ -210,10 +207,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
-  override protected def remap(tp: Type[_]): String = tp match {
-    case s: Struct[_] => s"UInt(${bitWidth(tp)}.W)"
-    case _ => super.remap(tp)
-  }
+
 
   def remappedEns(node: Sym[_], ens: List[Sym[_]]): String = {
     var previousLevel: Sym[_] = node
@@ -247,35 +241,35 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def getStreamEnablers(c: Sym[_]): String = {
-      // If we are inside a stream pipe, the following may be set
-      // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
+    // If we are inside a stream pipe, the following may be set
+    // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
 
-      if (c.hasStreamAncestor) {
-        // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
-        val lat = c.bodyLatency.sum
-        val readsFrom = getReadStreams(c.toCtrl).map{
-          case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-            fifo.readers.head match {
-              // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-              // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-              case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-              case Op(FIFOPeek(_,_)) => src""
-            }
-          case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-        }
+    if (c.hasStreamAncestor) {
+      // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
+      val lat = c.bodyLatency.sum
+      val readsFrom = getReadStreams(c.toCtrl).map{
+        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+          fifo.readers.head match {
+            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            case Op(FIFOPeek(_,_)) => src""
+          }
+        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+      }
 
-        val writesTo = getWriteStreams(c.toCtrl).map{
-          case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-            fifo.writers.head match {
-              // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-              case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-            }
-          case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-          // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
-        }
+      val writesTo = getWriteStreams(c.toCtrl).map{
+        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+          fifo.writers.head match {
+            // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+            case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+          }
+        case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
+        // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
+      }
 
-        {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
-      } else {""}
+      {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
+    } else {""}
   }
 
   def getStreamAdvancement(c: Sym[_]): String = { 
@@ -293,23 +287,23 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-      // If we are inside a stream pipe, the following may be set
-      val readiers = getReadStreams(c.toCtrl).map {
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
-        case _ => ""
-      }.mkString(" & ")
-      val hasReadiers = if (readiers != "") "&" else ""
-      if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    // If we are inside a stream pipe, the following may be set
+    val readiers = getReadStreams(c.toCtrl).map {
+      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
+      case _ => ""
+    }.mkString(" & ")
+    val hasReadiers = if (readiers != "") "&" else ""
+    if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
   def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-      // If we are inside a stream pipe, the following may be set
-      val readiers = getWriteStreams(c.toCtrl).map {
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Ready)}"
-        case _ => ""
-      }.mkString(" & ")
-      val hasReadiers = if (readiers != "") "&" else ""
-      if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    // If we are inside a stream pipe, the following may be set
+    val readiers = getWriteStreams(c.toCtrl).map {
+      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Ready)}"
+      case _ => ""
+    }.mkString(" & ")
+    val hasReadiers = if (readiers != "") "&" else ""
+    if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
   def getFifoReadyLogic(sym: Ctrl): List[String] = {
@@ -325,11 +319,11 @@ trait ChiselGenCommon extends ChiselCodegen {
     }.toList
   }
 
-  def DLTrace(lhs: Sym[_]): Option[String] = {
-    lhs match {
-      case Op(DelayLine(_, data)) => DLTrace(data)
-      case _ => lhs.rhs match {case Def.Const(c) => Some(quote(lhs)); case Def.Param(_,c) => Some(quote(lhs)); case _ => None}
-    }
+  def DLTrace(lhs: Sym[_]): Option[String] = lhs match {
+    case Op(DelayLine(_, data)) => DLTrace(data)
+    case Const(_) => Some(quote(lhs))
+    case Param(_) => Some(quote(lhs))
+    case _ => None
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
@@ -382,7 +376,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     case Bits(bT) => bT.nbits
     case _ => -1
   }
-  protected def fracBits(tp: Type[_]) = tp match {
+  protected def fracBits(tp: Type[_]): Int = tp match {
     case FixPtType(s,d,f) => f
     case _ => 0
   }
@@ -437,93 +431,42 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
 
-  def swap(tup: (Sym[_], RemapSignal)): String = { swap(tup._1, tup._2) }
+  def swap(tup: (Sym[_], RemapSignal)): String = swap(tup._1, tup._2)
+  def swap(lhs: Sym[_], s: RemapSignal): String = swap(src"$lhs", s)
+  def swap(lhs: Ctrl, s: RemapSignal): String = swap(src"${lhs.s.get}", s)
 
-  def swap(lhs: Sym[_], s: RemapSignal): String = { swap(src"$lhs", s) }
-  def swap(lhs: Ctrl, s: RemapSignal): String = { swap(src"${lhs.s.get}", s) }
-
-  def swap(lhs: => String, s: RemapSignal): String = {
-    s match {
-      case En => wireMap(src"${lhs}_en")
-      case Done => wireMap(src"${lhs}_done")
-      case BaseEn => wireMap(src"${lhs}_base_en")
-      case Mask => wireMap(src"${lhs}_mask")
-      case Resetter => wireMap(src"${lhs}_resetter")
-      case DatapathEn => wireMap(src"${lhs}_datapath_en")
-      case CtrTrivial => wireMap(src"${lhs}_ctr_trivial")
-      case IIDone => wireMap(src"${lhs}_II_done")
-      case RstEn => wireMap(src"${lhs}_rst_en")
-      case CtrEn => wireMap(src"${lhs}_ctr_en")
-      case Ready => wireMap(src"${lhs}_ready")
-      case Valid => wireMap(src"${lhs}_valid")
-      case NowValid => wireMap(src"${lhs}_now_valid")
-      case Inhibitor => wireMap(src"${lhs}_inhibitor")
-      case Wren => wireMap(src"${lhs}_wren")
-      case Chain => wireMap(src"${lhs}_chain")
-      case Blank => wireMap(src"${lhs}")
-      case DataOptions => wireMap(src"${lhs}_data_options")
-      case ValidOptions => wireMap(src"${lhs}_valid_options")
-      case ReadyOptions => wireMap(src"${lhs}_ready_options")
-      case EnOptions => wireMap(src"${lhs}_en_options")
-      case RVec => wireMap(src"${lhs}_rVec")
-      case WVec => wireMap(src"${lhs}_wVec")
-      case Latency => wireMap(src"${lhs}_latency")
-      case II => wireMap(src"${lhs}_ii")
-      case SM => wireMap(src"${lhs}_sm")
-      case Inhibit => wireMap(src"${lhs}_inhibit")
-    }
+  def swap(lhs: => String, s: RemapSignal): String = s match {
+    case En           => wireMap(src"${lhs}_en")
+    case Done         => wireMap(src"${lhs}_done")
+    case BaseEn       => wireMap(src"${lhs}_base_en")
+    case Mask         => wireMap(src"${lhs}_mask")
+    case Resetter     => wireMap(src"${lhs}_resetter")
+    case DatapathEn   => wireMap(src"${lhs}_datapath_en")
+    case CtrTrivial   => wireMap(src"${lhs}_ctr_trivial")
+    case IIDone       => wireMap(src"${lhs}_II_done")
+    case RstEn        => wireMap(src"${lhs}_rst_en")
+    case CtrEn        => wireMap(src"${lhs}_ctr_en")
+    case Ready        => wireMap(src"${lhs}_ready")
+    case Valid        => wireMap(src"${lhs}_valid")
+    case NowValid     => wireMap(src"${lhs}_now_valid")
+    case Inhibitor    => wireMap(src"${lhs}_inhibitor")
+    case Wren         => wireMap(src"${lhs}_wren")
+    case Chain        => wireMap(src"${lhs}_chain")
+    case Blank        => wireMap(src"$lhs")
+    case DataOptions  => wireMap(src"${lhs}_data_options")
+    case ValidOptions => wireMap(src"${lhs}_valid_options")
+    case ReadyOptions => wireMap(src"${lhs}_ready_options")
+    case EnOptions    => wireMap(src"${lhs}_en_options")
+    case RVec         => wireMap(src"${lhs}_rVec")
+    case WVec         => wireMap(src"${lhs}_wVec")
+    case Latency      => wireMap(src"${lhs}_latency")
+    case II           => wireMap(src"${lhs}_ii")
+    case SM           => wireMap(src"${lhs}_sm")
+    case Inhibit      => wireMap(src"${lhs}_inhibit")
   }
 
 }
 
-sealed trait RemapSignal
-// "Standard" Signals
-object En extends RemapSignal
-object Done extends RemapSignal
-object BaseEn extends RemapSignal
-object Mask extends RemapSignal
-object Resetter extends RemapSignal
-object DatapathEn extends RemapSignal
-object CtrTrivial extends RemapSignal
-// A few non-canonical signals
-object IIDone extends RemapSignal
-object RstEn extends RemapSignal
-object CtrEn extends RemapSignal
-object Ready extends RemapSignal
-object Valid extends RemapSignal
-object NowValid extends RemapSignal
-object Inhibitor extends RemapSignal
-object Wren extends RemapSignal
-object Chain extends RemapSignal
-object Blank extends RemapSignal
-object DataOptions extends RemapSignal
-object ValidOptions extends RemapSignal
-object ReadyOptions extends RemapSignal
-object EnOptions extends RemapSignal
-object RVec extends RemapSignal
-object WVec extends RemapSignal
-object Latency extends RemapSignal
-object II extends RemapSignal
-object SM extends RemapSignal
-object Inhibit extends RemapSignal
 
-sealed trait AppProperties
-object HasLineBuffer extends AppProperties
-object HasNBufSRAM extends AppProperties
-object HasNBufRegFile extends AppProperties
-object HasGeneralFifo extends AppProperties
-object HasTileStore extends AppProperties
-object HasTileLoad extends AppProperties
-object HasGather extends AppProperties
-object HasScatter extends AppProperties
-object HasLUT extends AppProperties
-object HasBreakpoint extends AppProperties
-object HasAlignedLoad extends AppProperties
-object HasAlignedStore extends AppProperties
-object HasUnalignedLoad extends AppProperties
-object HasUnalignedStore extends AppProperties
-object HasStaticCtr extends AppProperties
-object HasVariableCtrBounds extends AppProperties
-object HasVariableCtrStride extends AppProperties
-object HasFloats extends AppProperties
-object HasVariableCtrSyms extends AppProperties
+
+

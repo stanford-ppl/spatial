@@ -16,8 +16,8 @@ case class RewriteAnalyzer(IR: State) extends AccelTraversal {
     case FixAdd(_, mul @ Op(FixMul(_,_))) => lhs.canFuseAsFMA = inHw && mul.consumers.size == 1
     case FixAdd(mul @ Op(FixMul(_,_)), _) => lhs.canFuseAsFMA = inHw && mul.consumers.size == 1
 
-    case FltAdd(_, mul @ Op(FixMul(_,_))) => lhs.canFuseAsFMA = inHw && mul.consumers.size == 1
-    case FltAdd(mul @ Op(FixMul(_,_)), _) => lhs.canFuseAsFMA = inHw && mul.consumers.size == 1
+    case FltAdd(_, mul @ Op(FltMul(_,_))) => lhs.canFuseAsFMA = inHw && mul.consumers.size == 1
+    case FltAdd(mul @ Op(FltMul(_,_)), _) => lhs.canFuseAsFMA = inHw && mul.consumers.size == 1
 
     case _ => super.visit(lhs,rhs)
   }

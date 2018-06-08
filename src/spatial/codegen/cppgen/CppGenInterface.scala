@@ -89,38 +89,35 @@ trait CppGenInterface extends CppGenCommon {
           emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${get_string};")
       }
 
-      
-    // case SetMem(dram, data) => 
-    //   val rawtp = remapIntType(dram.tp.typeArguments.head)
-    //   if (spatialNeedsFPType(dram.tp.typeArguments.head)) {
-    //     dram.tp.typeArguments.head match { 
-    //       case FixPtType(s,d,f) => 
-    //         emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
-    //         open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
-    //           emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
-    //         close("}")
-    //         emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
-    //       case _ => emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
-    //     }
-    //   } else {
-    //     emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
-    //   }
-    // case GetMem(dram, data) => 
-    //   val rawtp = remapIntType(dram.tp.typeArguments.head)
-    //   if (spatialNeedsFPType(dram.tp.typeArguments.head)) {
-    //     dram.tp.typeArguments.head match { 
-    //       case FixPtType(s,d,f) => 
-    //         emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
-    //         emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
-    //         open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
-    //           emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
-    //           emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
-    //         close("}")
-    //       case _ => emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
-    //     }
-    //   } else {
-    //     emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
-    //   }
+
+    case SetMem(dram, data) =>
+      val rawtp = asIntType(dram.tp.typeArgs.head)
+      val f = fracBits(dram.tp.typeArgs.head)
+      if (f > 0) {
+        emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
+        open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
+        emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
+        close("}")
+        emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
+      }
+      else {
+        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
+      }
+
+    case GetMem(dram, data) =>
+      val rawtp = asIntType(dram.tp.typeArgs.head)
+      val f = fracBits(dram.tp.typeArgs.head)
+      if (f > 0) {
+        emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
+        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
+        open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
+        emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
+        emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
+        close("}")
+      }
+      else {
+        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
+      }
 
     case _ => super.gen(lhs, rhs)
   }

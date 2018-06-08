@@ -11,7 +11,7 @@ import spatial.util._
 trait CppGenFileIO extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-      case OpenBinaryFile(filename, isWr) =>
+    case OpenBinaryFile(filename, isWr) =>
       val dir = if (isWr) "o" else "i"
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")
       emit(src"""assert(${lhs}.good() && "File ${s"$filename".replace("\"","")} does not exist"); """)
@@ -56,8 +56,8 @@ trait CppGenFileIO extends CppGenCommon {
 
       close("}")
       
-    case CloseBinaryFile(file) => // Anything for this?
-      emit(src"${file}.close();")
+    case CloseBinaryFile(file) =>
+      emit(src"$file.close();")
 
 
     case OpenCSVFile(filename, isWr) => 
@@ -102,31 +102,6 @@ trait CppGenFileIO extends CppGenCommon {
           val chardelim = src"$delim".replace("\"","'").replace("string(","").dropRight(1)
           emit(src"""${file}_file << ${chardelim};""")
         close("}")
-      close("}")
-
-    case OpenBinaryFile(filename, isWr) =>
-      val dir = if (isWr) "o" else "i"
-      emit(src"""std::${dir}fstream ${lhs}_file (${filename}.c_str(), std::ios::binary);""")
-      emit(src"""assert(${lhs}_file.good() && "File ${s"filename".replace("\"","")} does not exist"); """)
-
-    case CloseBinaryFile(file) =>
-      emit(src"${file}_file.close();")
-
-    case WriteBinaryFile(file, len ,value) =>
-      val i = value.input
-      open(src"for (int ${i} = 0; ${i} < $len; ${i}++) {")
-        open(src"if (${file}_file.is_open()) {")
-          visitBlock(value)
-          emit(src"${file}_file.write((char *)&${value.result}, sizeof(${value.result}));")
-        close("}")
-      close("}")
-
-    case ReadBinaryFile(file) =>
-      emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}; ")
-      open(src"while (!${file}_file.eof()) {")
-        emit(src"${lhs.tp.typeArgs.head} t;")
-        emit(src"${file}_file.read((char *)&t, sizeof(t));")
-        emit(src"(*${lhs}).push_back(t);")
       close("}")
 
     case _ => super.gen(lhs, rhs)

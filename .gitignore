@@ -37,6 +37,7 @@ resources/synth/chisel-templates/fringeXSIM/
 *.pdf
 *.swp
 *.swo
+*.swn
 *.log
 *.aux
 *.out

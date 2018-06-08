@@ -102,6 +102,16 @@ case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
       error("(If this is what you wanted, use the forever counter '*' notation instead.)")
       error(lhs)
 
+    case CounterNew(Expect(start),Expect(end),Expect(step),Expect(par)) =>
+      val len = Math.ceil((end.toDouble - start.toDouble)/step.toDouble).toInt
+      dbg(s"${stm(lhs)}")
+      dbg(s"length: $len, par: $par")
+      if (par > len) {
+        warn(lhs.ctx, s"Counter parallelization ($par) is greater than total number of iterations ($len)")
+        warn(lhs.ctx)
+      }
+
+
     case RegNew(init) if !init.isFixedBits =>
       error(lhs.ctx, s"Reset value of register ${lhs.fullname} was not a constant.")
       error(lhs.ctx)

@@ -587,4 +587,18 @@ trait UtilsControl {
     }
   }
 
+  @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
+    // ctrl.children.flatMap(getReadStreams).toSet ++
+    localMems.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
+      .filter{mem => mem.isStreamIn || mem.isFIFO }
+    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+  }
+
+  @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
+    // ctrl.children.flatMap(getWriteStreams).toSet ++
+    localMems.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
+      .filter{mem => mem.isStreamOut || mem.isFIFO }
+    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+  }
+
 }

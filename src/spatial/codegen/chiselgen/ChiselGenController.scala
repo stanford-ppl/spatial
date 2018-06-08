@@ -60,51 +60,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-  val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
 
-  var html_tab = 0
-  def print_stage_prefix(lhs: Sym[_], title: String, level: String, ctr: String, node: String, ctx: String, inner: Boolean = false): Unit = {
-    inGen(out, "controller_tree.html") {
-      emit(s"""${" "*html_tab}<!--Begin $node -->""")
-      html_tab = html_tab + 1
-      val isFSM = lhs match {case Op(_: StateMachine[_]) => " FSM"; case _ => ""}
-      emit(s"""${" "*html_tab}<TD><font size = "6">${title}$isFSM<font size = "4"> ($level)</font><br><font size = "2">$ctx</font><br><b>$node</b></font><br><font size = "1">Counter: $ctr</font>""")
-      // if (!inner & !collapsible) {emit(s"""${" "*html_tab}<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}
-      emit("")
-      if (!inner) {
-        val coll = "data-role=\"collapsible\""
-        emit(s"""${" "*html_tab}<div $coll>""")
-        emit(s"""${" "*html_tab}<h4> </h4>${table_init}""")
-      }
-
-      print_stream_info(lhs)
-
-    }
-  }
-
-  def print_stream_info(sym: Sym[_]): Unit = {
-    inGen(out, "controller_tree.html") {
-      if (getReadStreams(sym.toCtrl).toList.length + getWriteStreams(sym.toCtrl).toList.length > 0){
-        emit(s"""<div style="border:1px solid black">Stream Info<br>""")
-        val listens = getReadStreams(sym.toCtrl).map{a => s"${a}"}.mkString(",")
-        val pushes = getWriteStreams(sym.toCtrl).map{a => s"${a}"}.mkString(",")
-        if (listens != "") emit(s"""${" "*html_tab}<p align="left">----->$listens""")
-        if (listens != "" & pushes != "") emit(s"${" "*html_tab}<br>")
-        if (pushes != "") emit(s"""${" "*html_tab}<p align="right">$pushes----->""")
-        emit(s"""${" "*html_tab}</div>""")
-      }
-    }
-  }
-
-  def print_stage_suffix(name: String, inner: Boolean = false): Unit = {
-    inGen(out, "controller_tree.html") {
-      if (!inner) {
-        emit(s"""${" "*html_tab}</TABLE></div>""")
-      }
-      html_tab = html_tab - 1
-      emit(s"""${" "*html_tab}</TD><!-- Close $name -->""")
-    }
-  }
 
   protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
     lhs.children.zipWithIndex.foreach { case (cc, idx) =>
@@ -131,7 +87,6 @@ trait ChiselGenController extends ChiselGenCommon {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
-    print_stage_prefix(lhs, s"${lhs.rawSchedule}", s"${lhs.level}", s"$cchain", s"$lhs", s"${lhs.ctx}", lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).isEmpty)
     if (lhs.isOuterControl)      { widthStats += lhs.children.toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
 
@@ -140,7 +95,6 @@ trait ChiselGenController extends ChiselGenCommon {
 
   final private def exitCtrl(lhs: Sym[_]): Unit = {
     // Tree stuff
-    print_stage_suffix(s"$lhs", lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).isEmpty)
     controllerStack.pop()
   }
 
@@ -329,9 +283,18 @@ trait ChiselGenController extends ChiselGenCommon {
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
     val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
-    val isPassthrough = sym match{case Op(_: Switch[_]) if (isInner && sym.parent.s.isDefined && sym.parent.s.get.isInnerControl) => ",isPassthrough = true"; case Op(_:SwitchCase[_]) if (isInner && sym.parent.s.get.parent.s.isDefined && sym.parent.s.get.parent.s.get.isInnerControl) => ",isPassthrough = true"; case _ => ""}
+    val isPassthrough = sym match{
+      case Op(_: Switch[_]) if isInner && sym.parent.s.isDefined && sym.parent.s.get.isInnerControl => ",isPassthrough = true";
+      case Op(_:SwitchCase[_]) if isInner && sym.parent.s.get.parent.s.isDefined && sym.parent.s.get.parent.s.get.isInnerControl => ",isPassthrough = true";
+      case _ => ""
+    }
     val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
-    val ncases = sym match{case Op(x: Switch[_]) => s",cases = ${x.cases.length}"; case Op(x: SwitchCase[_]) if (isInner & sym.children.length > 0) => s",cases = ${sym.children.length}"; case Op(_: StateMachine[_]) if (isInner & sym.children.length > 0) => s", cases=${sym.children.length}"; case _ => ""}
+    val ncases = sym match{
+      case Op(x: Switch[_]) => s",cases = ${x.cases.length}"
+      case Op(x: SwitchCase[_]) if isInner & sym.children.nonEmpty => s",cases = ${sym.children.length}"
+      case Op(_: StateMachine[_]) if isInner & sym.children.nonEmpty => s", cases=${sym.children.length}"
+      case _ => ""
+    }
 
     // Generate standard control signals for all types
     emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
@@ -387,7 +350,7 @@ trait ChiselGenController extends ChiselGenCommon {
         if (getReadStreams(sym.toCtrl).nonEmpty) emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, Done), 1, true)} // Do not use rst_en for stream kiddo""")
         emitt(src"""${swap(ctr, Resetter)} := ${swap(sym, RstEn)}""")
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(swap(ctr, Done), 1, true)}""")
-      } else if (sym.isInnerControl & (sym.children.length > 0) & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
+      } else if (sym.isInnerControl & sym.children.nonEmpty & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.head.s.get}", Done)}""")
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
@@ -402,7 +365,6 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-
     case AccelScope(func) =>
       inAccel{
         hwblock = Some(enterCtrl(lhs))

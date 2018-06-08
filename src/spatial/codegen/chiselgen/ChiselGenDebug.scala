@@ -13,7 +13,7 @@ import spatial.util._
 trait ChiselGenDebug extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-	case FixToText(_)  => 
+	  case FixToText(_)  =>
     case TextConcat(_) => 
     case PrintIf(_,_) => 
     case BitToText(_) => 

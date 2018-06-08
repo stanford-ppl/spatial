@@ -17,7 +17,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
   var storeParMapping = List[String]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case InputArguments()       => 
+    case InputArguments() =>
     case ArgInNew(init)  => 
       argIns += (lhs -> argIns.toList.length)
     case HostIONew(init)  => 
@@ -42,28 +42,28 @@ trait ChiselGenInterface extends ChiselGenCommon {
     //   // emitGlobalWireMap(src"""${lhs}""",src"Wire(${newWire(reg.tp.typeArguments.head)})")
     //   emitt(src"""${lhs}.r := io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
 
-    case GetReg(reg) if (reg.isHostIO) =>
+    case GetReg(reg) if reg.isHostIO =>
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
       val id = argHandle(reg)
       emitGlobalWire(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
 
-    case RegRead(reg)  if (reg.isArgIn) => 
+    case RegRead(reg)  if reg.isArgIn =>
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
       val id = argHandle(reg)
       emitGlobalWire(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
 
-    case RegRead(reg)  if (reg.isHostIO) => 
+    case RegRead(reg)  if reg.isHostIO =>
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
       val id = argHandle(reg)
       emitGlobalWire(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
 
-    case RegRead(reg)  if (reg.isArgOut) => 
+    case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${reg.tp.typeArgs.head})")
       emitt(src"""${lhs}.r := io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
 
 
-    case RegWrite(reg, v, en) if (reg.isHostIO) => 
+    case RegWrite(reg, v, en) if reg.isHostIO =>
       val id = lhs.ports(0).values.head.muxPort
       emitt(src"val $id = $id")
       v.tp match {
@@ -84,24 +84,16 @@ trait ChiselGenInterface extends ChiselGenCommon {
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
       emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), lhs.fullDelay)}""")
 
-    case RegWrite(reg, v, en) if (reg.isArgOut) => 
+    case RegWrite(reg, v, en) if reg.isArgOut =>
       val id = lhs.ports(0).values.head.muxPort
       emitt(src"val $id = $id")
-      v.tp match {
-        case FixPtType(s,d,f) =>
-          if (s) {
-            val pad = 64 - d - f
-            if (pad > 0) {
-              emitt(src"""${swap(reg, DataOptions)}($id) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
-            } else {
-              emitt(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
-            }
-          } else {
-            emitt(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
-          }
-        case _ =>
-          emitt(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
+      val padded = v.tp match {
+        case FixPtType(s,d,f) if s && (64 > d + f) =>
+          src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
+        case _ => src"$v.r"
       }
+      emitt(src"""${swap(reg, DataOptions)}($id) := $padded""")
+
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
       emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), lhs.fullDelay)}""")
 

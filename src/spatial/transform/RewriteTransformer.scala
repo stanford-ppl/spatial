@@ -10,6 +10,7 @@ import spatial.internal.spatialConfig
 
 import utils.math.{isPow2,log2}
 
+/** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
 
   def selectMod[S:BOOL,I:INT,F:INT](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
@@ -41,13 +42,13 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     // Change a write from a mux with the register or some other value to an enabled register write
     case RegWrite(F(reg), F(data), F(en)) => data match {
-      case Op( Mux(sel, Op(e@RegRead(`reg`)), b) ) =>
+      case Op( Mux(sel, Op(RegRead(`reg`)), b) ) =>
         val lhs2 = writeReg(lhs, reg, b, en + !sel)
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]
 
-      case Op( Mux(sel, a, Op(e @ RegRead(`reg`))) ) =>
+      case Op( Mux(sel, a, Op(RegRead(`reg`))) ) =>
         val lhs2 = writeReg(lhs, reg, a, en + sel)
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
@@ -56,7 +57,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       case _ => super.transform(lhs, rhs)
     }
 
-    case op @ FixMod(F(x), F(Final(y))) if isPow2(y) =>
+    case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw =>
       import x.fmt._
       selectMod(x, y).asInstanceOf[Sym[A]]
 
@@ -71,19 +72,18 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
 
     // m1*m2 + add --> fma(m1,m2,add)
-    // TODO[1]: Consumers check is wrong here now that this is a mutate transformer!
-    case FixAdd(mul@F(Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if mul.consumers.size == 1 =>
+    case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA =>
       import add.fmt._
       stage(FixFMA[s,i,f](m1,m2,add)).asInstanceOf[Sym[A]]
 
-    case FixAdd(F(add: Fix[s,i,f]), mul@F(Op(FixMul(m1,m2)))) if mul.consumers.size == 1 =>
+    case FixAdd(F(add: Fix[s,i,f]), F(Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA =>
       import add.fmt._
       stage(FixFMA[s,i,f](m1,m2,add)).asInstanceOf[Sym[A]]
 
-    case FltAdd(mul@F(Op(FltMul(m1,m2))), F(add: Flt[m,e])) if mul.consumers.size == 1 =>
+    case FltAdd(F(Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA =>
       fltFMA(m1,m2,add).asInstanceOf[Sym[A]]
 
-    case FltAdd(F(add: Flt[m,e]), mul@F(Op(FltMul(m1,m2)))) if mul.consumers.size == 1 =>
+    case FltAdd(F(add: Flt[m,e]), F(Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA =>
       fltFMA(m1,m2,add).asInstanceOf[Sym[A]]
 
     case _ => super.transform(lhs,rhs)

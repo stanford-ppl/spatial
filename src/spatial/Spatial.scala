@@ -65,23 +65,26 @@ trait Spatial extends Compiler {
     lazy val accessAnalyzer     = AccessAnalyzer(state)
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
     lazy val memoryAllocator    = MemoryAllocator(state)
+    lazy val rewriteAnalyzer    = RewriteAnalyzer(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
+
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
     lazy val retimeReporter = RetimeReporter(state)
 
     // --- Transformer
-    lazy val friendlyTransformer = FriendlyTransformer(state)
-    lazy val switchTransformer = SwitchTransformer(state)
-    lazy val switchOptimizer   = SwitchOptimizer(state)
-    lazy val blackboxLowering  = BlackboxLowering(state)
-    lazy val memoryDealiasing  = MemoryDealiasing(state)
-    lazy val pipeInserter      = PipeInserter(state)
-    lazy val registerCleanup   = RegisterCleanup(state)
-    lazy val unrollTransformer = UnrollingTransformer(state)
+    lazy val friendlyTransformer   = FriendlyTransformer(state)
+    lazy val switchTransformer     = SwitchTransformer(state)
+    lazy val switchOptimizer       = SwitchOptimizer(state)
+    lazy val blackboxLowering      = BlackboxLowering(state)
+    lazy val memoryDealiasing      = MemoryDealiasing(state)
+    lazy val pipeInserter          = PipeInserter(state)
+    lazy val registerCleanup       = RegisterCleanup(state)
+    lazy val unrollTransformer     = UnrollingTransformer(state)
+    lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
-    lazy val retiming          = RetimingTransformer(state)
+    lazy val retiming              = RetimingTransformer(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -113,8 +116,11 @@ trait Spatial extends Compiler {
         memoryAllocator     ==> printer ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** Hardware Rewrites **/
+        rewriteAnalyzer     ==>
+        rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
-        flatteningTransformer   ==> printer ==> transformerChecks ==>
+        flatteningTransformer ==> printer ==> transformerChecks ==>
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>

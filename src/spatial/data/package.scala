@@ -12,3 +12,4 @@ package object data extends Object
   with MemoryData
   with ParameterData
   with RetimingData
+  with RewriteData

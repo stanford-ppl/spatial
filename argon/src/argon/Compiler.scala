@@ -194,11 +194,11 @@ trait Compiler { self =>
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
     flows()
     rewrites()
+    if (config.enMemLog) memWatch.start(config.logDir)
   }
 
   def execute(args: Array[String]): Unit = instrument("compiler"){
     init(args)
-    if (config.enMemLog) memWatch.start(config.logDir)
     compileProgram(args)
   }
 
@@ -226,17 +226,7 @@ trait Compiler { self =>
       Some(except)
   }
 
-  /**
-    * The "real" entry point for the application
-    */
-  def compile(args: Array[String]): Unit = {
-    instrument.reset()
-    var failure: Option[Throwable] = None
-    try {
-      execute(args)
-    }
-    catch {case t: Throwable => failure = handleException(t) }
-
+  protected def complete(failure: Option[Throwable]): Unit = {
     checkWarnings()
     val tag = {
       if (IR.hadBugs || IR.hadErrors || failure.nonEmpty) s"[${Console.RED}failed${Console.RESET}]"
@@ -281,8 +271,24 @@ trait Compiler { self =>
     msg(s"$tag Total time: " + "%.4f".format(time/1000.0f) + " seconds")
 
     IR.streams.values.foreach{stream => stream.close() }
+    IR.streams.clear()
 
     if (config.test && failure.nonEmpty) throw failure.get
     else if (failure.nonEmpty || IR.hadBugs || IR.hadErrors) sys.exit(1)
+  }
+
+
+  /**
+    * The "real" entry point for the application
+    */
+  def compile(args: Array[String]): Unit = {
+    instrument.reset()
+    var failure: Option[Throwable] = None
+    try {
+      execute(args)
+    }
+    catch {case t: Throwable => failure = handleException(t) }
+
+    complete(failure)
   }
 }

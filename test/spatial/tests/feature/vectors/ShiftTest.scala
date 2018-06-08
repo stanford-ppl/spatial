@@ -24,13 +24,13 @@ import spatial.dsl._
       t1 := lsh
       t3 := rsh
       t4 := ursh
-      assert(lsh == -48, "lsh: " + lsh + ", expected: -48")
-      assert(rsh == -3, "rsh: " + rsh + ", expected: -3")
-      assert(ursh == 1073741821, "ursh: " + ursh + ", expected: 1073741821")
+      assert(lsh == -56, "lsh: " + lsh + ", expected: -48")
+      assert(rsh == -4, "rsh: " + rsh + ", expected: -4")
+      assert(ursh == 1073741820, "ursh: " + ursh + ", expected: 1073741820")
     }
 
-    println(r"test1: ${getArg(t1)} =?= -48")
-    println(r"test3: ${getArg(t3)} =?= -3")
-    println(r"test4: ${getArg(t4)} =?= 1073741821")
+    println(r"test1: ${getArg(t1)} =?= -56")
+    println(r"test3: ${getArg(t3)} =?= -4")
+    println(r"test4: ${getArg(t4)} =?= 1073741820")
   }
 }

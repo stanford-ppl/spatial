@@ -84,11 +84,13 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
             compileProgram(args)
           }}
           Await.result(f, duration.Duration(backend.makeTimeout, "sec"))
+          complete(None)
           Unknown
         }
         catch {
           case t: Throwable =>
-            handleException(t)
+            val failure = handleException(t)
+            complete(failure)
             Error(t)
         }
       }}

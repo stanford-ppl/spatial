@@ -115,5 +115,6 @@ import spatial.dsl._
     println("cksum4: " + cksum4)
     val cksum = cksum1 && cksum2 && cksum3 && cksum4
     println("PASS: " + cksum + " (UnalignedTileLoadStore)")
+    assert(cksum)
   }
 }

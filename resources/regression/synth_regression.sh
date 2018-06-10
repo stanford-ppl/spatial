@@ -70,5 +70,5 @@ else
 	echo "Moving to ${REGRESSION_HOME}/spatial"
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
-	bin/tests $1 $maxthreads ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/${1}_tests
+	./tests.sh $1 $maxthreads ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/${1}_tests
 fi

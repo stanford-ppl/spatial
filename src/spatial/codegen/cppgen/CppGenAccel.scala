@@ -41,7 +41,7 @@ trait CppGenAccel extends CppGenCommon {
          emit("bool early_exit = false;")
          val numInstrs = if (cfg.enableInstrumentation) {2*instrumentCounters.length} else 0
          earlyExits.zipWithIndex.foreach{ case (b, i) =>
-           emit(src"long ${b}_act = c1->getArg(${argIOs.toList.length + argOuts.toList.length + numInstrs + i}, false);")
+           emit(src"long ${b}_act = c1->getArg(${argIOs.toList.length + argOuts.toList.length + drams.toList.length + argIns.toList.length + numInstrs + i}, false);")
            val msg = b match {
              case Def(AssertIf(_,_,m)) => 
                val mm = m match {
@@ -60,8 +60,7 @@ trait CppGenAccel extends CppGenCommon {
          emit(src"""std::ofstream instrumentation ("./instrumentation.txt");""")
  
          emit(s"// Need to instrument ${instrumentCounters}")
-         val instrumentStart = argIOs.toList.length + argOuts.toList.length // These "invisible" instrumentation argOuts start after the full range of IR interface args
-         emit(s"// Detected ${argOuts.toList.length} argOuts and ${argIOs.toList.length} argIOs, start instrument indexing at ${instrumentStart}")
+         val instrumentStart = argIOs.toList.length + argOuts.toList.length + drams.toList.length + argIns.toList.length // These "invisible" instrumentation argOuts start after the full range of IR interface args
          // In order to get niter / parent execution, we need to know the immediate parent of each controller and divide out that guy's niter
          val immediate_parent_niter_hashmap = scala.collection.mutable.HashMap[Int, Sym[_]]()
          instrumentCounters.zipWithIndex.foreach{case (c, i) => 
@@ -88,33 +87,45 @@ trait CppGenAccel extends CppGenCommon {
       visitBlock(func)
       controllerStack.pop()
 
+    case UnrolledForeach(ens,cchain,func,iters,valids) if (inHw) =>
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+      visitBlock(func)
+      controllerStack.pop()
+
+    case UnrolledReduce(ens,cchain,func,iters,valids) =>
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+      visitBlock(func)
+      controllerStack.pop()
+
     case ParallelPipe(ens,func) =>
       controllerStack.push(lhs)
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)
       controllerStack.pop()      
 
-    // case op@Switch(body,selects,cases) =>
-    //   controllerStack.push(lhs)
-    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    //   cases.collect{case s: Sym[_] => stmOf(s)}.foreach{ stm => 
-    //     visitStm(stm)
-    //   }
-    //   controllerStack.pop()      
+    case op@Switch(selects, body) => 
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+      selects.indices.foreach{i => 
+        visitBlock(op.cases(i).body)
+      }
+      controllerStack.pop()      
 
-    // case op@SwitchCase(body) =>
-    //   controllerStack.push(lhs)
-    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    //   visitBlock(body)
-    //   controllerStack.pop()      
+    case op@SwitchCase(body) =>
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+      visitBlock(body)
+      controllerStack.pop()      
 
-    // case StateMachine(ens,start,notDone,action,nextState,state) =>
-    //   controllerStack.push(lhs)
-    //   instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)    
-    //   visitBlock(notDone)
-    //   visitBlock(action)
-    //   visitBlock(nextState)
-    //   controllerStack.pop()
+    case StateMachine(ens,start,notDone,action,nextState) =>
+      controllerStack.push(lhs)
+      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)    
+      visitBlock(notDone)
+      visitBlock(action)
+      visitBlock(nextState)
+      controllerStack.pop()
 
     case ExitIf(en) => 
       // Emits will only happen if outside the accel

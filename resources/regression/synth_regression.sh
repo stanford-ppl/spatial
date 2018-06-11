@@ -66,9 +66,10 @@ else
 	rm -rf ${REGRESSION_HOME}/last-spatial
 	mv ${REGRESSION_HOME}/current-spatial ${REGRESSION_HOME}/last-spatial
 	mv ${REGRESSION_HOME}/next-spatial ${REGRESSION_HOME}/current-spatial
+	export TEST_DATA_HOME=${REGRESSION_HOME}/current-spatial/spatial/resources/testdata
 
 	echo "Moving to ${REGRESSION_HOME}/spatial"
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
-	./tests.sh $1 $maxthreads ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/${1}_tests
+	./tests.sh $1 $maxthreads ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
 fi

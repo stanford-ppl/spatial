@@ -1,0 +1,11 @@
+SVRG,       0
+epochs,     4
+len_epoch,  16
+points,     256
+alpha1,     0.00006
+alpha2,     0.00009
+bump_epoch, 5
+track,      1
+threshold,  20
+variance,   3
+warmup,     2

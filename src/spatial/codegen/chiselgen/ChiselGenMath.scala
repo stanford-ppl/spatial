@@ -124,7 +124,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixFMA(x,y,z) => 
       alphaconv_register(src"$lhs")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := Utils.getRetimed((($x*-*$y)+$z),${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0).toInt).r")
+      emitt(src"${lhs}.r := Utils.getRetimed((($x.*-*($y,Some(0.0)))+$z),${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
 
     case FltFMA(x,y,z) => 
       alphaconv_register(src"$lhs")

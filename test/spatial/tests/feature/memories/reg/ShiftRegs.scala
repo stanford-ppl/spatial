@@ -1,8 +1,6 @@
 package spatial.tests.feature.memories.reg
 
-
 import spatial.dsl._
-
 
 @test class ShiftRegs extends SpatialTest {
   override def runtimeArgs: Args = "32"
@@ -16,6 +14,9 @@ import spatial.dsl._
     Accel {
       val init_reg = RegFile[I32](3,3,List.tabulate[I32](9){i => i})
       init_dram store init_reg
+
+      Foreach(3 by 1, 3 by 1){(i,j) => print(init_reg(i,j) + " ") }
+      println("\n")
 
       val regfile = RegFile[I32](3,3)
       Foreach(3 by 1, 3 by 1 par 3){(i,j) => regfile(i,j) = i+j}
@@ -35,7 +36,10 @@ import spatial.dsl._
 
     }
 
-    assert(getMem(init_dram) == Array.tabulate(9){i => i})
+    val init = getMem(init_dram)
+    printArray(init)
+
+    assert(init == Array.tabulate(9){i => i})
     val regfile_result = getMatrix(regfile_dram)
     val parshiftregfile_result = getMatrix(parshiftregfile_dram)
     val shiftregfile_result = getMatrix(shiftregfile_dram)

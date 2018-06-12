@@ -65,12 +65,15 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     def isReader: Boolean = Reader.unapply(a).isDefined
     def isWriter: Boolean = Writer.unapply(a).isDefined
 
-    def banks: Seq[Seq[Idx]] = {
-      a match {
-        case Op(SRAMBankedRead(_,bank,_,_)) => bank
-        case Op(SRAMBankedWrite(_,_,bank,_,_)) => bank
-        case _ => Seq(Seq())
-      }
+    def hasInitialValue: Boolean = a match {
+      case Op(RegFileNew(_,inits)) => inits.isDefined
+      case _ => a.isReg
+    }
+
+    def banks: Seq[Seq[Idx]] = a match {
+      case Op(SRAMBankedRead(_,bank,_,_)) => bank
+      case Op(SRAMBankedWrite(_,_,bank,_,_)) => bank
+      case _ => Seq(Seq())
     }
 
     def isDirectlyBanked: Boolean = {
@@ -169,25 +172,21 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   }
 
   def readWidths(mem: Sym[_]): Set[Int] = mem.readers.map{
-    case Op(read: BankedAccessor[_,_]) => read.width
+    case Op(read: UnrolledAccessor[_,_]) => read.width
     case _ => 1
   }
 
   def writeWidths(mem: Sym[_]): Set[Int] = mem.writers.map{
-    case Op(write: BankedAccessor[_,_]) => write.width
+    case Op(write: UnrolledAccessor[_,_]) => write.width
     case _ => 1
   }
 
   def accessWidth(access: Sym[_]): Int = access match {
-    case Op(RegFileShiftIn(_,data,_,_,_)) => 1
-    case Op(RegFileShiftInVector(_,_,_,_,_,len)) => len
-    case Op(FIFOBankedDeq(_, ens)) => ens.length
-    case Op(FIFOBankedEnq(_, _, ens)) => ens.length
-    case Op(LIFOBankedPop(_, ens)) => ens.length
-    case Op(LIFOBankedPush(_, _, ens)) => ens.length
-    case Op(ba: BankedAccessor[_,_]) => ba.width
+    case Op(_:RegFileShiftIn[_,_])        => 1
+    case Op(op:RegFileShiftInVector[_,_]) => op.data.width
+    case Op(ua: UnrolledAccessor[_,_])    => ua.width
     case Op(RegWrite(_,_,_)) => 1
-    case Op(RegRead(_)) => 1
+    case Op(RegRead(_))      => 1
     case _ => -1
   }
 

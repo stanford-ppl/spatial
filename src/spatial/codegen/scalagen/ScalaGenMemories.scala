@@ -69,67 +69,69 @@ trait ScalaGenMemories extends ScalaGenBits {
   def emitBankedInitMem(mem: Sym[_], init: Option[Seq[Sym[_]]], tp: ExpType[_,_]): Unit = {
     val inst = mem.instance
     val dims = constDimsOf(mem)
+    val size = dims.product
     implicit val ctx: SrcCtx = mem.ctx
 
-    val data = init match {
-      case Some(elems) =>
-        val nBanks = inst.nBanks.product
-        val bankDepth = Math.ceil(dims.product.toDouble / nBanks).toInt
-
-        dbg(s"Generating initialized memory: ${stm(mem)}")
-        dbg(s"# Banks: $nBanks")
-        dbg(s"Bank Depth: $bankDepth")
-
-        // Import an implicit lexicographic ordering for the bank addresses (allows us to group and sort by bank addr)
-        import scala.math.Ordering.Implicits._
-
-        val banks = multiLoopWithIndex(dims).map { case (is, i) =>
-          val bankAddr = inst.bankSelects(is)
-          val ofs = inst.bankOffset(mem, is)
-          dbg("  " + is.mkString(", ") + s" ($i): elem:${elems(i)}, bankAddr:$bankAddr, ofs:$ofs" )
-
-          (elems(i), bankAddr, ofs)
-        }.toArray.groupBy(_._2).toList.sortBy(_._1).map{case (_, vals) =>
-          val elems = (0 until bankDepth).meta.map{i => vals.find(_._3 == i).map(_._1).getOrElse(invalid(tp)) }
-          src"Array[$tp]($elems)"
-        }
-        src"""Array[Array[$tp]](${banks.mkString(",\n")})"""
-      case None =>
-        val banks = inst.totalBanks
-        val bankDepth = Math.ceil(dims.product.toDouble / banks).toInt
-        src"""Array.fill($banks){ Array.fill($bankDepth)(${invalid(tp)}) }"""
-    }
     val dimensions = dims.map(_.toString).mkString("Seq(", ",", ")")
     val numBanks = inst.nBanks.map(_.toString).mkString("Seq(", ",", ")")
 
     if (mem.isRegFile) {
-      // HACK: Stage, then generate, the banking and offset addresses for the regfile on the fly
-      val addr = Seq.fill(rankOf(mem).length){ boundVar[I32] }
-      val bankAddrFunc = stageBlock{
-        val bank = inst.bankSelects(addr)
-        implicit val vT: Type[Vec[I32]] = Vec.bits[I32](bank.length)
-        Vec.fromSeq(bank)
-      }
-      val offsetFunc = stageBlock{ inst.bankOffset(mem,addr) }
-
       val name = s""""${mem.fullname}""""
+      val data = init match {
+        case Some(elems) if elems.length >= size => src"Array[$tp](${elems.take(size)})"
+        case Some(elems) if elems.length < size  => src"Array[$tp]($elems) ++ Array.fill(${elems.size - size}){ ${invalid(tp)} }"
+        case None        => src"Array.fill($size){ ${invalid(tp)} }"
+      }
       emitMemObject(mem) {
-        open(src"object $mem extends ShiftableMemory($name, $dimensions, $numBanks, $data, ${invalid(tp)}, saveInit = ${init.isDefined}, {")
-        emit(src"""case Seq(${addr.mkString(",")}) => """)
-        bankAddrFunc.stms.foreach(visit)
-        emit(src"${bankAddrFunc.result}")
-        close("},")
-        open("{")
-        emit(src"""case Seq(${addr.mkString(",")}) => """)
-        offsetFunc.stms.foreach(visit)
-        emit(src"${offsetFunc.result}")
-        close("})")
+        open(src"object $mem extends ShiftableMemory[$tp](")
+          emit(src"name = $name,")
+          emit(src"dims = $dimensions,")
+          emit(src"data = $data,")
+          emit(src"invalid = ${invalid(tp)},")
+          emit(src"saveInit = ${init.isDefined}")
+        close(")")
       }
     }
     else {
+      val data = init match {
+        case Some(elems) =>
+          val nBanks = inst.nBanks.product
+          val bankDepth = Math.ceil(dims.product.toDouble / nBanks).toInt
+
+          dbg(s"Generating initialized memory: ${stm(mem)}")
+          dbg(s"# Banks: $nBanks")
+          dbg(s"Bank Depth: $bankDepth")
+
+          // Import an implicit lexicographic ordering for the bank addresses (allows us to group and sort by bank addr)
+          import scala.math.Ordering.Implicits._
+
+          val banks = multiLoopWithIndex(dims).map { case (is, i) =>
+            val bankAddr = inst.bankSelects(is)
+            val ofs = inst.bankOffset(mem, is)
+            dbg("  " + is.mkString(", ") + s" ($i): elem:${elems(i)}, bankAddr:$bankAddr, ofs:$ofs" )
+
+            (elems(i), bankAddr, ofs)
+          }.toArray.groupBy(_._2).toList.sortBy(_._1).map{case (_, vals) =>
+            val elems = (0 until bankDepth).meta.map{i => vals.find(_._3 == i).map(_._1).getOrElse(invalid(tp)) }
+            src"Array[$tp]($elems)"
+          }
+          src"""Array[Array[$tp]](${banks.mkString(",\n")})"""
+        case None =>
+          val banks = inst.totalBanks
+          val bankDepth = Math.ceil(dims.product.toDouble / banks).toInt
+          src"""Array.fill($banks){ Array.fill($bankDepth)(${invalid(tp)}) }"""
+      }
+
       emitMemObject(mem){
         val name = s""""${mem.fullname}""""
-        emit(src"object $mem extends BankedMemory($name, $dimensions, $numBanks, $data, ${invalid(tp)}, saveInit = ${init.isDefined})")
+        open(src"object $mem extends BankedMemory(")
+          emit(src"name  = $name,")
+          emit(src"dims  = $dimensions,")
+          emit(src"banks = $numBanks,")
+          emit(src"data  = $data,")
+          emit(src"invalid = ${invalid(tp)},")
+          emit(src"saveInit = ${init.isDefined}")
+        close(")")
       }
     }
   }
@@ -142,6 +144,13 @@ trait ScalaGenMemories extends ScalaGenBits {
     emit(src"val $lhs = $mem.apply($ctx, $bankAddr, $ofsAddr, $enables)")
   }
 
+  def emitVectorLoad[T:Type](lhs: Sym[_], mem: Sym[_], addr: Seq[Seq[Idx]], ens: Seq[Set[Bit]]): Unit = {
+    val fullAddr = addr.map(_.map(quote).mkString("Seq(", ",", ")")).mkString("Seq(", ",", ")")
+    val enables  = ens.map(en => and(en)).mkString("Seq(", ",", ")")
+    val ctx = s""""${lhs.ctx}""""
+    emit(src"val $lhs = $mem.apply($ctx, $fullAddr, $enables)")
+  }
+
   def emitBankedStore[T:Type](lhs: Sym[_], mem: Sym[_], data: Seq[Sym[T]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]): Unit = {
     val bankAddr = bank.map(_.map(quote).mkString("Seq(", ",", ")")).mkString("Seq(", ",", ")")
     val ofsAddr  = ofs.map(quote).mkString("Seq(", ",", ")")
@@ -149,6 +158,14 @@ trait ScalaGenMemories extends ScalaGenBits {
     val datas    = data.map(quote).mkString("Seq(", ",", ")")
     val ctx = s""""${lhs.ctx}""""
     emit(src"val $lhs = $mem.update($ctx, $bankAddr, $ofsAddr, $enables, $datas)")
+  }
+
+  def emitVectorStore[T:Type](lhs: Sym[_], mem: Sym[_], data: Seq[Sym[T]], addr: Seq[Seq[Idx]], ens: Seq[Set[Bit]]): Unit = {
+    val fullAddr = addr.map(_.map(quote).mkString("Seq(", ",", ")")).mkString("Seq(", ",", ")")
+    val enables  = ens.map(en => and(en)).mkString("Seq(", ",", ")")
+    val datas    = data.map(quote).mkString("Seq(", ",", ")")
+    val ctx = s""""${lhs.ctx}""""
+    emit(src"val $lhs = $mem.update($ctx, $fullAddr, $enables, $datas)")
   }
 
 }

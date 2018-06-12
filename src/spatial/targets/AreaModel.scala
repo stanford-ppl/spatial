@@ -180,8 +180,8 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
     case lut @ LUTNew(dims,_) => model("LUT")("s" -> dims.map(_.toInt).product, "b" -> lut.A.nbits)
 
     case _:MemAlloc[_,_] if lhs.isLocalMem => areaOfMem(lhs)
-    case op:Accessor[_,_]       => areaOfAccess(lhs, op.mem)
-    case op:BankedAccessor[_,_] => areaOfAccess(lhs, op.mem)
+    case op:Accessor[_,_]         => areaOfAccess(lhs, op.mem)
+    case op:UnrolledAccessor[_,_] => areaOfAccess(lhs, op.mem)
     case op:StatusReader[_]       => NoArea
 
     case DelayLine(size,data) => areaOfDelayLine(size,nbits(data),1)

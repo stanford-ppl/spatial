@@ -96,7 +96,7 @@ object RegFile {
   /** Shifts in `data` into the first N registers, where N is the size of the given Vector.
     * All other elements are shifted by N positions.
     */
-  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(this,data,Seq(I32(0)),Set.empty,0,data.width))
+  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(this,data,Seq(I32(0)),Set.empty,0))
 
 
   /** Returns the value at `pos`. */
@@ -164,6 +164,6 @@ object RegFile {
 
 case class RegFileView[A:Bits,C[T]](s: RegFile[A,C], addr: Seq[I32], axis: Int) {
   @api def <<=(data: A): Void = stage(RegFileShiftIn(s, data, addr, Set.empty, axis))
-  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(s, data, addr, Set.empty, axis, data.width))
+  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(s, data, addr, Set.empty, axis))
 }
 

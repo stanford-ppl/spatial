@@ -86,7 +86,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Added dispatch $dispatch to ${a.access} {${a.unroll.mkString(",")}}")
       }
 
-      if (inst.writes.flatten.isEmpty && mem.name.isDefined) {
+      if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValue) {
         inst.reads.iterator.flatten.foreach{read =>
           warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
           warn(read.access.ctx)

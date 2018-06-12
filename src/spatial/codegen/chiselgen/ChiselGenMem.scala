@@ -71,7 +71,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get)
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-    val ofsWidth = 1 max (Math.ceil(scala.math.log((constDimsOf(mem).product/mem.instance.nBanks.product))/scala.math.log(2))).toInt
+    val ofsWidth = 1 max Math.ceil(scala.math.log(constDimsOf(mem).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) constDimsOf(mem).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val isBroadcast = lhs.ports(0).values.head.bufferPort.isEmpty & mem.instance.depth > 1
@@ -182,9 +182,11 @@ trait ChiselGenMem extends ChiselGenCommon {
       // val parent = lhs.parent.s.get
       // val id = resettersOf(rf).map{_._1}.indexOf(lhs)
       // duplicatesOf(rf).indices.foreach{i => emitt(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
-    // case RegFileShiftInVector(rf,data,addr,en,axis,len) => emitWrite(lhs,rf,data,addr,Seq(),en, Some(axis))
-    case op@RegFileBankedRead(rf,bank,ofs,ens)       => emitRead(lhs,rf,bank,ofs,ens)
-    case op@RegFileBankedWrite(rf,data,bank,ofs,ens) => emitWrite(lhs,rf,data,bank,ofs,ens)
+    // case RegFileShiftInVector(rf,data,addr,en,axis) => emitWrite(lhs,rf,data,addr,Seq(),en, Some(axis))
+
+    // TODO: Update for N-D change
+    //case op@RegFileVectorRead(rf,addr,ens)       => emitRead(lhs,rf,addr,ens)
+    //case op@RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,ens)
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)

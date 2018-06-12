@@ -97,17 +97,17 @@ trait ChiselGenMath extends ChiselGenCommon {
      case FixMul(x,y) =>
       alphaconv_register(src"$lhs")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"($x.*-*($y, ${latencyOptionString("FixMul", Some(bitWidth(lhs.tp)))})).cast(${lhs})")
+      emitt(src"${lhs}.r := ($x.*-*($y, ${latencyOptionString("FixMul", Some(bitWidth(lhs.tp)))}).r)")
 
     case FixDiv(x,y) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"($x./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))})).cast(${lhs})")
+      emitt(src"${lhs}.r := ($x./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))}).r)")
 
     case FixRecip(y) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
       emit(src"1.U.cast(${lhs}_one)")
-      emitt(src"(${lhs}_one./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))})).cast(${lhs})")
+      emitt(src"${lhs}.r := (${lhs}_one./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))}).r)")
 
     case FixMod(x,y) =>
       emitGlobalWireMap(src"$lhs",src"Wire(${lhs.tp})")
@@ -115,11 +115,11 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixAbs(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"Mux(${x} < 0.U, -$x, $x).cast(${lhs})")
+      emitt(src"${lhs}.r := Mux(${x} < 0.U, -$x, $x).r")
 
     case FixSqrt(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"sqrt(${x}).cast(${lhs})")
+      emitt(src"${lhs}.r := sqrt(${x}).r")
 
     case FixFMA(x,y,z) => 
       alphaconv_register(src"$lhs")

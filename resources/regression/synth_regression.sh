@@ -1,6 +1,6 @@
 #!/bin/bash
 
-maxthreads=2
+export NUM_THREADS=2
 
 jobs=`ps aux | grep "mattfel.*sbt" | wc -l`
 if [[ $jobs -gt 40 ]]; then
@@ -66,10 +66,10 @@ else
 	rm -rf ${REGRESSION_HOME}/last-spatial
 	mv ${REGRESSION_HOME}/current-spatial ${REGRESSION_HOME}/last-spatial
 	mv ${REGRESSION_HOME}/next-spatial ${REGRESSION_HOME}/current-spatial
-	export TEST_DATA_HOME=${REGRESSION_HOME}/current-spatial/spatial/resources/testdata
+	export TEST_DATA_HOME=${REGRESSION_HOME}/current-spatial/test-data
 
 	echo "Moving to ${REGRESSION_HOME}/spatial"
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
-	./tests.sh $1 $maxthreads ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
+	./tests.sh $1 ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
 fi

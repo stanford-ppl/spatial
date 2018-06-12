@@ -57,11 +57,11 @@ case class TreeGen(IR: State) extends NamedCodegen {
     val listens = getReadStreams(sym.toCtrl).map{a => s"$a" }
     val pushes  = getWriteStreams(sym.toCtrl).map{a => s"$a" }
     if (listens.nonEmpty || pushes.nonEmpty) {
-      emit(s"""<div style="border:1px solid black">Stream Info<br>""")
+      emit(s"""<div style="border:1px solid black"><font size = "2">Stream Info</font><br><font size = "1"> """)
       if (listens.nonEmpty) emit(s"""<p align="left">----->$listens""")
       if (listens.nonEmpty && pushes.nonEmpty) emit(s"<br>")
       if (pushes.nonEmpty) emit(s"""<p align="right">$pushes----->""")
-      emit(s"""</div>""")
+      emit(s"""</font></div>""")
     }
   }
 

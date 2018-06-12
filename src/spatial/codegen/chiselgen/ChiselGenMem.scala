@@ -41,13 +41,13 @@ trait ChiselGenMem extends ChiselGenCommon {
     ens.zipWithIndex.foreach{case (e, i) => 
       if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
       else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
       if (lhs.isDirectlyBanked & !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.toInt)}))") 
         emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
       } else if (isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         lhs.tp match {
           case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i)""")
           case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i)""")
@@ -56,7 +56,7 @@ trait ChiselGenMem extends ChiselGenCommon {
         
       } else {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         lhs.tp match {
           case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
           case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
@@ -84,18 +84,18 @@ trait ChiselGenMem extends ChiselGenCommon {
       val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
       if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable}""")
       else emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable} & ${ens(i).map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.r""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
       emitt(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
       if (lhs.isDirectlyBanked && !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_Direct($ofsWidth, ${bank(i).map(_.toInt)}, $width))") 
         emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, (${muxPort}, $muxOfs), $i)""")
       } else if (isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         emitt(src"""${mem}.connectBroadcastWPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i)""")        
       } else {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.r""")}
+        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, (${muxPort}, $muxOfs), $i)""")
       }
     }

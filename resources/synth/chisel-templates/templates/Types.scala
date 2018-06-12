@@ -163,12 +163,10 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	}
 	
 
-	def raw_dec[T]: UInt = {
-		this.number(d+f-1, f)
-	}
-	def raw_frac[T]: UInt = {
-		this.number(f, 0)
-	}
+	def raw_dec[T]: UInt = this.number(d+f-1, f)
+	def rd[T]: UInt = this.number(d+f-1, f)
+	def raw_frac[T]: UInt = this.number(f, 0)
+	def rf[T]: UInt = this.number(f, 0)
 
 	// Arithmetic
 	override def connect (rawop: Data)(implicit sourceInfo: SourceInfo, connectionCompileOptions: chisel3.core.CompileOptions): Unit = {
@@ -258,8 +256,11 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				val full_result = Wire(new FixedPoint(upcasted_type))
 				// Do upcasted operation
 				if (rounding == Truncate && saturating == Lazy) {
-					val expanded_self = if (op.f != 0) util.Cat(util.Fill(op.f, this.msb), this.number) else this.number
-					val expanded_op = if (f != 0) util.Cat(util.Fill(f, op.msb), op.number) else op.number
+					// val expanded_self = if (op.f != 0) util.Cat(util.Fill(op.f, this.msb), this.number) else this.number
+					// val expanded_op = if (f != 0) util.Cat(util.Fill(f, op.msb), op.number) else op.number
+					val rhs_bits = op.f - f
+					val expanded_self = if (rhs_bits > 0) util.Cat(this.number, util.Fill(rhs_bits, false.B)) else this.number
+					val expanded_op = if (rhs_bits < 0) util.Cat(op.number, util.Fill(-rhs_bits, false.B)) else op.number
 					full_result.number := (expanded_self.*-*(expanded_op, Some(op_latency))) >> scala.math.max(op.f, f)
 				} else {
 					val expanded_self = util.Cat(util.Fill(op.d+op.f, this.msb), this.number)

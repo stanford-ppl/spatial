@@ -97,17 +97,17 @@ trait ChiselGenMath extends ChiselGenCommon {
      case FixMul(x,y) =>
       alphaconv_register(src"$lhs")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := ($x.*-*($y, ${latencyOptionString("FixMul", Some(bitWidth(lhs.tp)))}).r)")
+      emitt(src"($x.*-*($y, ${latencyOptionString("FixMul", Some(bitWidth(lhs.tp)))})).cast(${lhs})")
 
     case FixDiv(x,y) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := ($x./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))}).r)")
+      emitt(src"($x./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))})).cast(${lhs})")
 
     case FixRecip(y) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
       emit(src"1.U.cast(${lhs}_one)")
-      emitt(src"${lhs}.r := (${lhs}_one./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))}).r)")
+      emitt(src"(${lhs}_one./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))})).cast(${lhs})")
 
     case FixMod(x,y) =>
       emitGlobalWireMap(src"$lhs",src"Wire(${lhs.tp})")
@@ -115,16 +115,16 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixAbs(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := Mux(${x} < 0.U, -$x, $x).r")
+      emitt(src"Mux(${x} < 0.U, -$x, $x).cast(${lhs})")
 
     case FixSqrt(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := sqrt(${x}).r")
+      emitt(src"sqrt(${x}).cast(${lhs})")
 
     case FixFMA(x,y,z) => 
       alphaconv_register(src"$lhs")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := Utils.getRetimed((($x.*-*($y,Some(0.0)))+$z),${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
+      emitt(src"Utils.getRetimed((($x.*-*($y,Some(0.0)))+$z),${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).cast($lhs)")
 
     case FltFMA(x,y,z) => 
       alphaconv_register(src"$lhs")

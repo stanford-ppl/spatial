@@ -21,35 +21,27 @@ object ops {
 
 
   implicit class ArrayOps[T](val b:Array[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
   implicit class ArrayBoolOps[T](val b:Array[Bool]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
 
   implicit class IndexedSeqOps[T](val b:scala.collection.immutable.IndexedSeq[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
 
   implicit class VecOps[T](val b:chisel3.core.Vec[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
@@ -87,15 +79,11 @@ object ops {
   }
   
   // implicit class DspRealOps(val b:DspReal) {
-  //   def raw = {
-  //     b.node
-  //   }
+  //   def raw = //     b.node/   }
   //   def number = {
   //     b.node
   //   }
-  //   def r = {
-  //     b.node
-  //   }
+  //   def r = //     b.node
   // }
 
   implicit class UIntOps(val b:UInt) {
@@ -103,12 +91,9 @@ object ops {
     def number = {
       b
     }
-    def raw = {
-      b
-    }
-    def r = {
-      b
-    }
+    def raw = b
+    def rd = b
+    def r = b
     def msb = {
       b(b.getWidth-1)
     }
@@ -317,12 +302,9 @@ object ops {
     def number = {
       b.asUInt
     }
-    def raw = {
-      b.asUInt
-    }
-    def r = {
-      b.asUInt
-    }
+    def raw = b.asUInt
+    def rd = b.asUInt
+    def r = b.asUInt
     def msb = {
       b(b.getWidth-1)
     }

@@ -296,7 +296,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0) -> 1), XMap((0,0) -> 1), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
-  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W)) else RegInit(io.xBarW(0).init)
+  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init)
   val anyReset = io.xBarW.map{_.reset}.reduce{_|_}
   val anyEnable = io.xBarW.map{_.en}.reduce{_|_}
   val wr_data = chisel3.util.Mux1H(io.xBarW.map{_.en}, io.xBarW.map{_.data})

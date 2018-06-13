@@ -39,7 +39,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
     // case GetReg(reg) if (reg.isArgOut) =>
     //   argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
-    //   // emitGlobalWireMap(src"""${lhs}""",src"Wire(${newWire(reg.tp.typeArguments.head)})")
+    //   // emitGlobalWireMap(src"""${lhs}""",src"Wire(${newWire(reg.tp.typeArgs.head)})")
     //   emitt(src"""${lhs}.r := io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
 
     case GetReg(reg) if reg.isHostIO =>
@@ -105,40 +105,15 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"""val $lhs = io.argIns(api.${id}_ptr)""")
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
-      // // Find stages that pushes to cmdstream and dataStream
-      // var cmdStage: Option[Sym[_]] = None
-      // childrenOf(parentOf(lhs).get).map{c =>
-      //   if (childrenOf(c).length > 0) {
-      //     childrenOf(c).map{ cc => 
-      //       pushesTo(cc).distinct.map{ pt => pt.memory match {
-      //         case fifo @ Def(StreamOutNew(bus)) => 
-      //           if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(cc)
-      //         case _ => 
-      //       }}                      
-      //     }
-      //   } else {
-      //     pushesTo(c).distinct.map{ pt => pt.memory match {
-      //       case fifo @ Def(StreamOutNew(bus)) => 
-      //         if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(c)
-      //       case _ => 
-      //     }}          
-      //   }
-      // }
-
       appPropertyStats += HasTileLoad
       if (cmdStream.isAligned) appPropertyStats += HasAlignedLoad
       else appPropertyStats += HasUnalignedLoad
-      // Get parallelization of datastream
-      // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
       val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
 
       val id = loadsList.length
-      // loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
       loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, false)"""
       loadsList = loadsList :+ dram
 
-      // controllerStack.push(cmdStage.get) // Push so that DLI does the right thing
-      // Connect the IO interface signals to their streams
       emit(src"${swap(cmdStream, Ready)} := io.memStreams.loads($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
       val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "offset")
       val (sizeMSB, sizeLSB)  = getField(cmdStream.tp.typeArgs.head, "size")
@@ -148,8 +123,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
       emit(src"io.memStreams.loads($id).cmd.bits.isWr := ~${cmdStream}(0)($isLdMSB,$isLdLSB)")
       emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 0.U")
-      // controllerStack.pop()
-      
+
       // Connect the streams to their IO interface signals
       emit(src"io.memStreams.loads($id).rdata.ready := ${swap(dataStream, Ready)}")
       emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
@@ -157,71 +131,38 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
 
 
-    // case FringeSparseLoad(dram,addrStream,dataStream) =>
-    //   appPropertyStats += HasGather
-    //   // Get parallelization of datastream
-    //   emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-    //   val par = readersOf(dataStream).head.node match {
-    //     case Def(e@ParStreamRead(strm, ens)) => ens.length
-    //     case _ => 1
-    //   }
-    //   assert(par == 1, s"Unsupported par '$par' for sparse loads! Must be 1 currently")
+    case FringeSparseLoad(dram,cmdStream,dataStream) =>
+      appPropertyStats += HasGather
+      val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+      assert(par == 1, s"Unsupported par '$par' for sparse loads! Must be 1 currently")
 
-    //   val id = loadsList.length
-    //   // loadParMapping = loadParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
-    //   loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
-    //   loadsList = loadsList :+ dram
-    //   val turnstiling_stage = getLastChild(parentOf(lhs).get)
-    //   emitGlobalWire(src"""val ${turnstiling_stage}_enq = io.memStreams.loads(${id}).rdata.valid""")
+      val id = loadsList.length
+      // loadParMapping = loadParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArgs.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
+      loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, true)"""
+      loadsList = loadsList :+ dram
 
-    //   emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${symDelay(readersOf(dataStream).head.node)}.toInt")}}""")
-    //   emit(src"""${swap(dataStream, NowValid)} := io.memStreams.loads($id).rdata.valid""")
-    //   emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${symDelay(readersOf(dataStream).head.node)}.toInt", true)}""")
-    //   // emit(src"${swap(addrStream, Ready)} := ${DL(src"io.memStreams.loads($id).cmd.ready", src"${symDelay(writersOf(addrStream).head.node)}.toInt", true)}")
-    //   emit(src"${swap(addrStream, Ready)} := ${DL(src"io.memStreams.loads($id).cmd.ready", src"0", true)} // Not sure why the cmdStream ready used to be delayed")
-    //   emit(src"io.memStreams.loads($id).rdata.ready := ${swap(dataStream, Ready)}")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.addr := ${addrStream}(0).r // TODO: Is sparse addr stream always a vec?")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.size := 1.U")
-    //   emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(addrStream, Valid)}")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.isWr := false.B")
-    //   emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 1.U")
+      emit(src"${swap(cmdStream, Ready)} := io.memStreams.loads($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
+      emit(src"io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}(0).r")
+      emit(src"io.memStreams.loads($id).cmd.bits.size := 1.U")
+      emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.loads($id).cmd.bits.isWr := false.B")
+      emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 1.U")
+
+      // Connect the streams to their IO interface signals
+      emit(src"io.memStreams.loads($id).rdata.ready := ${swap(dataStream, Ready)}")
+      emit(src"""${dataStream}.zip(io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
+      emit(src"""${swap(dataStream, NowValid)} := io.memStreams.loads($id).rdata.valid""")
+      emit(src"""${swap(dataStream, Valid)} := ${DL(swap(dataStream, NowValid), src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
 
     case FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
       appPropertyStats += HasTileStore
-
-      // // Find stages that pushes to cmdstream and dataStream
-      // var cmdStage: Option[Sym[_]] = None
-      // var dataStage: Option[Sym[_]] = None
-      // childrenOf(parentOf(lhs).get).map{c =>
-      //   if (childrenOf(c).length > 0) {
-      //     childrenOf(c).map{ cc => 
-      //       pushesTo(cc).distinct.map{ pt => pt.memory match {
-      //         case fifo @ Def(StreamOutNew(bus)) => 
-      //           if (s"$bus".contains("BurstFullDataBus")) dataStage = Some(cc)
-      //           if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(cc)
-      //         case _ => 
-      //       }}                      
-      //     }
-      //   } else {
-      //     pushesTo(c).distinct.map{ pt => pt.memory match {
-      //       case fifo @ Def(StreamOutNew(bus)) => 
-      //         if (s"$bus".contains("BurstFullDataBus")) dataStage = Some(c)
-      //         if (s"$bus".contains("BurstCmdBus")) cmdStage = Some(c)
-      //       case _ => 
-      //     }}          
-      //   }
-      // }
-
       if (cmdStream.isAligned) appPropertyStats += HasAlignedStore
       else appPropertyStats += HasUnalignedStore
 
       // Get parallelization of datastream
-      // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
       val par = dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
       val id = storesList.length
-      // storeParMapping = storeParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
-      // storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, false)"""
       storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, false)"""
       storesList = storesList :+ dram
 
@@ -250,34 +191,34 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
       emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
 
-    // case FringeSparseStore(dram,cmdStream,ackStream) =>
-    //   appPropertyStats += HasScatter
-    //   // Get parallelization of datastream
-    //   emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-    //   val par = writersOf(cmdStream).head.node match {
-    //     case Def(e@ParStreamWrite(_, _, ens)) => ens.length
-    //     case _ => 1
-    //   }
-    //   Predef.assert(par == 1, s"Unsupported par '$par', only par=1 currently supported")
+    case FringeSparseStore(dram,cmdStream,ackStream) =>
+      appPropertyStats += HasScatter
+      // Get parallelization of datastream
+      // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
+      val par = 1//dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
-    //   val id = storesList.length
-    //   // storeParMapping = storeParMapping :+ s"""StreamParInfo({if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArguments.head)}}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
-    //   storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArguments.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
-    //   storesList = storesList :+ dram
+      Predef.assert(par == 1, s"Unsupported par '$par', only par=1 currently supported")
 
-    //   val (addrMSB, addrLSB) = tupCoordinates(cmdStream.tp.typeArguments.head, "_2")
-    //   val (dataMSB, dataLSB) = tupCoordinates(cmdStream.tp.typeArguments.head, "_1")
-    //   emit(src"io.memStreams.stores($id).wdata.bits.zip(${cmdStream}).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
-    //   emit(src"io.memStreams.stores($id).wdata.valid := ${swap(cmdStream, Valid)}")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.size := 1.U")
-    //   emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.isWr := 1.U")
-    //   emit(src"io.memStreams.stores($id).cmd.bits.isSparse := 1.U")
-    //   emit(src"${swap(cmdStream, Ready)} := ${DL(src"io.memStreams.stores($id).wdata.ready", src"${symDelay(writersOf(cmdStream).head.node)}.toInt", true)}")
-    //   emit(src"""${swap(ackStream, NowValid)} := io.memStreams.stores($id).wresp.valid""")
-    //   emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${symDelay(readersOf(ackStream).head.node)}.toInt", true)}""")
-    //   emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
+      val id = storesList.length
+      // storeParMapping = storeParMapping :+ s"""StreamParInfo({if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArgs.head)}}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
+      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, true)"""
+      storesList = storesList :+ dram
+
+      // Connect IO interface signals to their streams
+      val (dataMSB, dataLSB)  = getField(cmdStream.tp.typeArgs.head, "_1")
+      val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "_2")
+
+      emit(src"io.memStreams.stores($id).wdata.bits.zip(${cmdStream}).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
+      emit(src"io.memStreams.stores($id).wdata.valid := ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
+      emit(src"io.memStreams.stores($id).cmd.bits.size := 1.U")
+      emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.stores($id).cmd.bits.isWr := 1.U")
+      emit(src"io.memStreams.stores($id).cmd.bits.isSparse := 1.U")
+      emit(src"${swap(cmdStream, Ready)} := io.memStreams.stores($id).cmd.ready")
+      emit(src"""${swap(ackStream, NowValid)} := io.memStreams.stores($id).wresp.valid""")
+      emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
+      emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")
 
     case _ => super.gen(lhs, rhs)
   }

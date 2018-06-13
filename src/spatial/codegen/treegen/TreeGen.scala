@@ -9,15 +9,18 @@ import spatial.node._
 import spatial.util._
 import spatial.internal.{spatialConfig => cfg}
 import spatial.codegen.naming.NamedCodegen
+import spatial.traversal.AccelTraversal
 
-case class TreeGen(IR: State) extends NamedCodegen {
+case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
   override val ext: String = "html"
+  backend = "tree"
   override val lang: String = "html"
   override val entryFile: String = "controller_tree.html"
   val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case _:Control[_] => printControl(lhs, rhs)
+    case AccelScope(func) => inAccel{printControl(lhs,rhs)}
+    case _:Control[_] if (inHw) => printControl(lhs, rhs)
     case _ => rhs.blocks.foreach{blk => gen(blk) }
   }
 

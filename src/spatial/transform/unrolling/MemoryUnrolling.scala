@@ -153,7 +153,6 @@ trait MemoryUnrolling extends UnrollingBase {
         dbgs(s"  Lane IDs: $laneIds")
         dbgs(s"  Port:     $port")
 
-        val ens   = lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => (f(a),p) }               // lanes of ND addresses
@@ -182,11 +181,12 @@ trait MemoryUnrolling extends UnrollingBase {
           val d2 = lanes.inLanes(laneIds){_ => f(d).asInstanceOf[Bits[A]] }  // Chunk of data
           masters.map{t => d2(laneIdToChunkId(t)) }                          // Vector of data
         }
+        val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
         val bank   = addr2.map{a => bankSelects(rhs,a,inst) }
         val ofs    = addr2.map{a => bankOffset(mem,lhs,a,inst) }
-        val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens)
+        val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
 
         banked.s.foreach{s =>
           s.addPort(dispatch=0, Nil, port)

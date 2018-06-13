@@ -15,6 +15,7 @@ trait CppGenDebug extends CppGenCommon {
     case TextToFlt(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
     case TextLength(x) => emit(src"${lhs.tp} $lhs = ${x}.length();")
     case TextApply(x,el) => emit(src"${lhs.tp} $lhs = $x.at($el);")
+    case TextSlice(x,start,end) => emit(src"${lhs.tp} $lhs = $x.substr($start,${end}-${start});")
     case TextToBit(x) => emit(src"""${lhs.tp} $lhs = $x != "false" & $x != "False" | $x != "0";""")
     case TextEql(a,b) => emit(src"""${lhs.tp} $lhs = $a == $b;""")
     case GenericToText(x) => emit(src"""${lhs.tp} $lhs = $x.toString();""")

@@ -63,7 +63,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
 
   protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
-    lhs.children.zipWithIndex.foreach { case (cc, idx) =>
+    lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach { case (cc, idx) =>
       val c = cc.s.get
       controllerStack.push(c)
       body(c,idx)
@@ -87,7 +87,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
-    if (lhs.isOuterControl)      { widthStats += lhs.children.toList.length }
+    if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
 
     parent
@@ -105,7 +105,7 @@ trait ChiselGenController extends ChiselGenCommon {
         // emitGlobalWire(s"//${validPassMap}")
         emitGlobalModuleMap(src"${v}","Wire(Bool())")  
         if (lhs.isOuterPipeControl) {
-          lhs.children.indices.drop(1).foreach{i => emitGlobalModuleMap(src"""${v}_chain_read_$i""", "Wire(Bool())")}
+          lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModuleMap(src"""${v}_chain_read_$i""", "Wire(Bool())")}
         }
       }
     }
@@ -113,7 +113,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   final private def allocateRegChains(lhs: Sym[_], inds:Seq[Sym[_]], cchain:Sym[CounterChain]): Unit = {
     if (lhs.isOuterPipeControl) {
-      val stages = lhs.children.map(_.s.get)
+      val stages = lhs.children.filter(_.s.get != lhs).map(_.s.get)
       val Op(CounterChainNew(counters)) = cchain
       val par = counters.map(_.ctrPar)
       val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
@@ -128,7 +128,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   private final def emitRegChains(lhs: Sym[_]) = {
     if (lhs.isOuterPipeControl) {
-      val stages = lhs.children.toList.map(_.s.get)
+      val stages = lhs.children.filter(_.s.get != lhs).toList.map(_.s.get)
       val Op(CounterChainNew(counters)) = lhs.cchains.head
       val par = lhs.cchains.head.pars
       val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
@@ -166,10 +166,10 @@ trait ChiselGenController extends ChiselGenCommon {
       layer.zip(count).foreach{ case (v, c) =>
         emitt(src"${swap(src"${v}", Blank)} := Mux(${counter_data(i)._3} >= 0.S, ${swap(src"${c}", Blank)} < ${counter_data(i)._2}, ${swap(src"${c}", Blank)} > ${counter_data(i)._2}) // TODO: Generate these inside counter")
         if (lhs.isOuterPipeControl) {
-          emitGlobalModuleMap(src"""${swap(src"${swap(src"${v}", Blank)}", Chain)}""",src"""Module(new RegChainPass(${lhs.children.size}, 1))""")
-          lhs.children.indices.drop(1).foreach{i => emitGlobalModule(src"""${swap(src"${swap(src"${v}", Blank)}_chain_read_$i", Blank)} := ${swap(src"${swap(src"${v}", Blank)}", Chain)}.read(${i}) === 1.U(1.W)""")}
+          emitGlobalModuleMap(src"""${swap(src"${swap(src"${v}", Blank)}", Chain)}""",src"""Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1))""")
+          lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModule(src"""${swap(src"${swap(src"${v}", Blank)}_chain_read_$i", Blank)} := ${swap(src"${swap(src"${v}", Blank)}", Chain)}.read(${i}) === 1.U(1.W)""")}
           inGenn(out, "BufferControlCxns", ext) {
-            lhs.children.zipWithIndex.foreach{ case (ss, i) =>
+            lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach{ case (ss, i) =>
               val s = ss.s.get
               emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
               emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
@@ -282,7 +282,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
-    val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.length}, isFSM = ${isFSM}"}
+    val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.filter(_.s.get != sym).length}, isFSM = ${isFSM}"}
     val isPassthrough = sym match{
       case Op(_: Switch[_]) if isInner && sym.parent.s.isDefined && sym.parent.s.get.isInnerControl => ",isPassthrough = true";
       case Op(_:SwitchCase[_]) if isInner && sym.parent.s.get.parent.s.isDefined && sym.parent.s.get.parent.s.get.isInnerControl => ",isPassthrough = true";
@@ -291,8 +291,8 @@ trait ChiselGenController extends ChiselGenCommon {
     val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
     val ncases = sym match{
       case Op(x: Switch[_]) => s",cases = ${x.cases.length}"
-      case Op(x: SwitchCase[_]) if isInner & sym.children.nonEmpty => s",cases = ${sym.children.length}"
-      case Op(_: StateMachine[_]) if isInner & sym.children.nonEmpty => s", cases=${sym.children.length}"
+      case Op(x: SwitchCase[_]) if isInner & sym.children.filter(_.s.get != sym).nonEmpty => s",cases = ${sym.children.filter(_.s.get != sym).length}"
+      case Op(_: StateMachine[_]) if isInner & sym.children.filter(_.s.get != sym).nonEmpty => s", cases=${sym.children.filter(_.s.get != sym).length}"
       case _ => ""
     }
 
@@ -328,7 +328,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Update bound sym watchlists
     (scopeIters(sym.toScope) ++ scopeValids(sym.toScope)).foreach{ item =>
-      if (sym.isPipeControl) pipeChainPassMap += (item -> sym.children.toList.map(_.s.get))
+      if (sym.isPipeControl) pipeChainPassMap += (item -> sym.children.filter(_.s.get != sym).toList.map(_.s.get))
       else if (sym.isStreamControl) {streamCopyWatchlist = streamCopyWatchlist :+ item}
     }
 
@@ -350,11 +350,11 @@ trait ChiselGenController extends ChiselGenCommon {
         if (getReadStreams(sym.toCtrl).nonEmpty) emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, Done), 1, true)} // Do not use rst_en for stream kiddo""")
         emitt(src"""${swap(ctr, Resetter)} := ${swap(sym, RstEn)}""")
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(swap(ctr, Done), 1, true)}""")
-      } else if (sym.isInnerControl & sym.children.nonEmpty & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.head.s.get}", Done)}""")
+      } else if (sym.isInnerControl & sym.children.filter(_.s.get != sym).nonEmpty & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.filter(_.s.get != sym).head.s.get}", Done)}""")
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.head.s.get, Done)}""")
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.filter(_.s.get != sym).head.s.get, Done)}""")
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc).D(1) // Used to be delayed by 1 & validNow""")
       } else {
@@ -546,7 +546,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       emitIICounter(lhs)
       emitChildrenCxns(lhs, false)
-      val cases = lhs.children.map(_.s.get)
+      val cases = lhs.children.filter(_.s.get != lhs).map(_.s.get)
       
       // Route through signals
       // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")

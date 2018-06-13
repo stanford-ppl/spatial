@@ -3,7 +3,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 @test class PageBoundaryStraddle extends SpatialTest { // Regression (Unit) // Args: none
-  override def runtimeArgs: Args = NoArgs
+  override def runtimeArgs: Args = "864"
 
 
   def main(args: Array[String]): Void = {

@@ -30,6 +30,7 @@ trait CppGenMath extends CppGenCommon {
     case FixDiv(x,y) => emit(src"${lhs.tp} $lhs = $x / $y;")
     case FixRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
     case FixFMA(a,b,c) => emit(src"${lhs.tp} $lhs = $a * $b + $c;")
+    case FltFMA(a,b,c) => emit(src"${lhs.tp} $lhs = $a * $b + $c;")
     case FltRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
     case FltAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
     case FltSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")

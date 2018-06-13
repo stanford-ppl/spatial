@@ -45,7 +45,7 @@ case class MemParams(
   def hasDirectR: Boolean = directRMux.accessPars.sum > 0
   def numDirectW: Int = directWMux.accessPars.sum
   def numDirectR: Int = directRMux.accessPars.sum
-  def totalOutputs: Int = numXBarR + numDirectR
+  def totalOutputs: Int = {if (xBarRMux.toList.length > 0) xBarRMux.sortByMuxPortAndCombine.accessPars.max else 0} + {if (directRMux.toList.length > 0) directRMux.sortByMuxPortAndCombine.accessPars.max else 0}
   def numBanks: Int = banks.product
   def defaultDirect: List[Int] = List.fill(banks.length)(99) // Dummy bank address when ~hasDirectR
   def ofsWidth: Int = Utils.log2Up(depth/banks.product)
@@ -99,7 +99,7 @@ class MemInterface(p: MemParams) extends Bundle {
   var xBarR = Vec(1 max p.numXBarR, Input(new R_XBar(p.ofsWidth, p.banksWidths))) 
   var directW = HVec(Array.tabulate(1 max p.numDirectW){i => Input(new W_Direct(p.ofsWidth, if (p.hasDirectW) p.directWMux.sortByMuxPortAndOfs.values.map(_._1).flatten.toList(i) else p.defaultDirect, p.bitWidth))})
   var directR = HVec(Array.tabulate(1 max p.numDirectR){i => Input(new R_Direct(p.ofsWidth, if (p.hasDirectR) p.directRMux.sortByMuxPortAndOfs.values.map(_._1).flatten.toList(i) else p.defaultDirect))})
-  var flow = Vec(1 max p.totalOutputs, Input(Bool()))
+  var flow = Vec(1 max (p.numXBarR + p.numDirectR), Input(Bool()))
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
   
@@ -615,6 +615,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
     // Figure out which read port was active in xBar
     val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val xBarCandidates = xBarIds.map(io.xBarR(_))
+
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ case(mem,coords,flatCoord) => 
       xBarCandidates.map {x => 

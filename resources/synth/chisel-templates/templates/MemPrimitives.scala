@@ -586,7 +586,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
 class LUT(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, 
             xBarRMux: XMap, // muxPort -> accessPar
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(logicalDims, bitWidth, List(1), List(1), XMap(), xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
+            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(logicalDims, bitWidth, logicalDims, List(1), XMap(), xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
 
   def this(tuple: (List[Int], Int, XMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
   def this(logicalDims: List[Int], bitWidth: Int, 
@@ -618,7 +618,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
 
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ case(mem,coords,flatCoord) => 
-      xBarCandidates.map {x => 
+      xBarCandidates.map {x =>
         x.banks.zip(coords).map{case (b, coord) => b === coord.U}.reduce{_&&_} && x.en
       }.reduce{_||_}
     }

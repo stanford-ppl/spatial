@@ -220,6 +220,7 @@ trait MemoryUnrolling extends UnrollingBase {
     //case _:LineBufferRotateEnq[_]  => addr
     // The unrolled version of register file shifting currently doesn't take a banked address
     //case _:RegFileVectorShiftIn[_] => addr
+    case _:LUTRead[_,_]     => addr
     case _:RegFileShiftIn[_,_]     => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]     => addr

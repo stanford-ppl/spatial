@@ -151,7 +151,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val BXBarR = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastReads.mkString(",") + ")," else ""
 
     val dimensions = dims.map(_.toString).mkString("List[Int](", ",", ")")
-    val numBanks = inst.nBanks.map(_.toString).mkString("List[Int](", ",", ")")
+    val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
     val strides = numBanks // TODO: What to do with strides
     val bankingMode = "BankedMemory" // TODO: Find correct one
 

@@ -252,7 +252,8 @@ trait CppGenArray extends CppGenCommon {
       emitUpdate(lhs, func.result, src"${applyA.inputB}", func.result.tp)
       close("}")
 
-    case ArrayUpdate(arr, id, data) => emit(src"${arr}[$id] = $data;")
+    case ArrayUpdate(arr, id, data) => emitUpdate(arr, data, src"${id}", data.tp)
+
     case UnrolledForeach(ens,cchain,func,iters,valids) if (!inHw) => 
       val starts = cchain.counters.map(_.start)
       val ends = cchain.counters.map(_.end)

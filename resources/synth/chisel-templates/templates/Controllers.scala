@@ -163,7 +163,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.selectsIn(i)
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.selectsIn(i) & ~io.done
         active(i).io.input.reset := io.doneIn(i) | io.rst
         iterDone(i).io.input.set := io.doneIn(i)
         iterDone(i).io.input.reset := done(i).io.output.data

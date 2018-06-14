@@ -2967,10 +2967,12 @@ import spatial.targets._
       Foreach(16 by 1) {i => widths_sram(i) = if ( i == 0) 1 else 0}
       val level_width = Reg[Int](0)
       FSM(0)(horizon => horizon < N_LEVELS) { horizon =>
-        level_width.reset
+        // level_width.reset
+        level_width := 0
         Sequential.Reduce(level_width)(N_NODES by 1) { n => 
           val node_width = Reg[Int](0)
-          node_width.reset
+          // node_width.reset
+          node_width := 0
           if (levels_sram(n) == horizon) {
             Pipe{
               val start = node_starts_sram(n)

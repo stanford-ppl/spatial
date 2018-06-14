@@ -50,7 +50,7 @@ object SparseTransfer {
   ): Void = {
     val addrs = dram.addrs()
     val p = addrs.pars().head
-    val requestLength = addrs.lens().head
+    val requestLength = dram.lens().head
 
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 

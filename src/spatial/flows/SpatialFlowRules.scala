@@ -72,6 +72,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
         val control: Ctrl = Ctrl.Node(s, stageId)
         val parent: Ctrl  = if (body.isPseudoStage) master else control
         block.stms.foreach{lhs => lhs.rawParent = parent }
+        op.binds.foreach{b => b.rawParent = parent}
 
         // --- Scope Hierarchy --- //
         // Always track all scopes in the scope hierarchy

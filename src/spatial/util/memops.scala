@@ -31,7 +31,6 @@ object memops {
       Seq.tabulate(rank.length){i => stage(MemPar(x, rank(i))) }
     }
     @rig def lens(): Seq[I32] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get lens of sparse alias")
       Seq.tabulate(rank.length){i => stage(MemLen(x, rank(i))) }
     }
 

@@ -110,13 +110,22 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
     case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank.length)
     case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank.length)
 
+    case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
+    case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes))), _) => oneHotMux(conds,sizes)
+
+    case MemPar(Op(MemDenseAlias(_,_,F(ranges))), d)          => fieldsRanges(ranges, d)(_.par).head
+    case MemPar(Op(MemSparseAlias(F(conds),_,F(addrs),_)), _) =>
+      val pars = addrs.map(_.asInstanceOf[Sym[_]]).map{
+        case Def(MemPar(Op(MemDenseAlias(_,_,F(ranges))), d)) => fieldsRanges(ranges, d)(_.par).head
+        case _ => I32(1)
+      }
+      oneHotMux(conds,pars)
+
     // --- The remaining operations are currently disallowed for SparseAlias:
 
     case MemStart(Op(MemDenseAlias(F(conds),_,F(ranges))), d) => dealiasRanges(conds, ranges, d)(_.start)
     case MemEnd(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.end)
     case MemStep(Op(MemDenseAlias(F(conds),_,F(ranges))), d)  => dealiasRanges(conds, ranges, d)(_.step)
-    case MemPar(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => fieldsRanges(ranges, d)(_.par).head
-    case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
 
     case op: Reader[_,_] if op.mem.isDenseAlias =>
       val Reader(Op(MemDenseAlias(F(conds),F(mems),F(ranges))), addr, F(ens)) = op

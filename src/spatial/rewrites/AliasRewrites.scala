@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 import spatial.data._
+import spatial.util.memops._
 
 import utils.implicits.collections._
 
@@ -82,10 +83,12 @@ trait AliasRewrites extends RewriteRules {
   }
   @rewrite def mem_par(op: MemPar): Sym[_] = {
     case MemPar(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).par
+    case MemPar(Op(MemSparseAlias(cond,mem,addr,_)), _) if addr.lengthIs(1) => addr.head.asInstanceOf[Sym[_]].pars().head
     case MemPar(Op(alloc: MemAlloc[_,_]), d) => I32(1)
   }
   @rewrite def mem_len(op: MemLen): Sym[_] = {
     case MemLen(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).length
+    case MemLen(Op(MemSparseAlias(cond,mem,addr,size)), _) if size.lengthIs(1) => size.head
     case MemLen(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
   }
 

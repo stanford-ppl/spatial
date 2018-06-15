@@ -143,6 +143,10 @@ trait CppGenArray extends CppGenCommon {
               }
               emit(src"return result;")
             close("}")
+            position = 0
+            open(src"${struct}(int128_t bits){ /* Constructor from raw bits */")
+              st.foreach{f => emit(src"set${f._1}((${f._2.tp}) (bits >> $position));"); position = position + bitWidth(f._2.tp)}
+            close("}")
             close(" ")
           } catch { case _:Throwable => }
 

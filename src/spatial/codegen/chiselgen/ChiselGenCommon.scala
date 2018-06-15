@@ -62,7 +62,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case Def.Node(id,_) => x match {
         case Op(SimpleStruct(fields)) => 
           var shift = 0
-          fields.reverse.map{f => 
+          fields.map{f => // Used to be .reversed but not sure now
             val x = src"(${quoteAsScala(f._2)} << $shift).toDouble"
             shift = shift + bitWidth(f._2.tp)
             x

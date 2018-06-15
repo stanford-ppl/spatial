@@ -86,7 +86,7 @@ trait CppGenInterface extends CppGenCommon {
           emit(src"${lhs.tp} ${lhs};")
           emit(src"memcpy(&${lhs}, &${lhs}_tmp, sizeof(${lhs}));")
         case _ => 
-          emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${get_string};")
+          emit(src"${lhs.tp} $lhs = (${lhs.tp}(${get_string}));")
       }
 
 

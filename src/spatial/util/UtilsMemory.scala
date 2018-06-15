@@ -191,6 +191,12 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
     case _ => -1
   }
 
+  def shiftAxis(access: Sym[_]): Option[Int] = access match {
+    case Op(RegFileShiftIn(_,_,_,_,axis)) => Some(axis)
+    case Op(RegFileShiftInVector(_,_,_,_,axis,_)) => Some(axis)
+    case _ => None
+  }
+
   /** Returns iterators between controller containing access (inclusive) and controller
     * containing mem (exclusive). Iterators are ordered outermost to innermost.
     */

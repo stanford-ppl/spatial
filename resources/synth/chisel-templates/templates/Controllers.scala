@@ -103,10 +103,10 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     
     case Sequenced => 
       // Define rule for when ctr increments
-      io.ctrInc := io.doneIn.last
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
 
       // Configure synchronization
-      synchronize := io.doneIn.last.D(1)
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
       
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)

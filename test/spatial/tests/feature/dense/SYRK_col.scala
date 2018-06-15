@@ -98,7 +98,7 @@ import spatial.dsl._
 
     val C_computed = Array.tabulate(N * N) { i => result(i) }
     val cksum = C_computed.zip(C_check) { (a, b) => a > b - margin && a < b + margin }.reduce{_&&_}
-
+    println("PASS: " + cksum)
     assert(cksum)
   }
 }

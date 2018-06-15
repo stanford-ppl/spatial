@@ -541,9 +541,9 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     }
   })
 
-  val wMap = NBufXMap(0 -> XMap((0,0) -> 1))
+  val wMap = NBufXMap(0 -> XMap((0,0) -> (1, None)))
   val rMap = NBufXMap((0 until numBufs).map{i => 
-    (i -> XMap((0,0) -> 1))
+    (i -> XMap((0,0) -> (1, None)))
   }.toArray:_*)
 
   val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), 

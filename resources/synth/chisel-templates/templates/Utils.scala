@@ -600,10 +600,9 @@ object Utils {
       } else x
     }
   }
-  def XMap(xs:((Int, Int), Int)*) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def XMap(xs:((Int, Int), (Int, Option[Int]))*) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
   // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
   def XMap(xs: => Seq[((Int,Int), (Int,Option[Int]))]) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftXMap(axis: Int, xs:((Int,Int),Int)*) = HashMap[(Int,Int), (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   /* Map from muxPort to (Banks, isShift) */
   type DMap = HashMap[(Int,Int), (List[Banks],Option[Int])]
   implicit class DMapOps(x: DMap) {
@@ -614,10 +613,9 @@ object Utils {
     def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq) // Combine entries so that every muxOfs = 0, then sort
     def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
   }
-  def DMap(xs:((Int,Int),List[Banks])*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def DMap(xs:((Int,Int),(List[Banks], Option[Int]))*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
   // Example: val b = DMap((0,0) -> List(Banks(0,0), Banks(0,1)), (0,2) -> List(Banks(0,2),Banks(0,3)), (1,0) -> List(Banks(0,0),Banks(1,0)))
   def DMap(xs: => Seq[((Int,Int), (List[Banks],Option[Int]))]) = HashMap[(Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftDMap(axis: Int, xs:((Int,Int),List[Banks])*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   type NBufXMap = HashMap[Int, XMap]
   def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
   def NBufXMap(xs: => Seq[(Int, XMap)]) = HashMap[Int,XMap](xs:_*)

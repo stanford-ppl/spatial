@@ -22,7 +22,7 @@ import spatial.targets._
     val CONST3 = 0x8f1bbcdcL
     val CONST4 = 0xca62c1d6L
 
-    val raw_text = loadCSV1D[String](s"$DATA/machsuite/sha_txt.csv", "\n").apply(0)
+    val raw_text = loadCSV1D[String](s"$DATA/sha/sha_txt.csv", "\n").apply(0)
     val data_text = raw_text.map{c => c.to[Int8] }
     val len = ArgIn[Int]
     setArg(len, data_text.length)

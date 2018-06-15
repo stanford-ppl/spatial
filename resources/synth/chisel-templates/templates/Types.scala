@@ -249,13 +249,13 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				} else 0
 
 				// Compute upcasted type and return type
-				val upcasted_type = if (rounding == Truncate && saturating == Lazy) (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
+				val upcasted_type = if (rounding == Truncate && saturating == Lazy && (op.f == 0 | f == 0)) (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
 									else (op.s | s, op.d + d, op.f + f)
 				val return_type = (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
 				// Get upcasted operators
 				val full_result = Wire(new FixedPoint(upcasted_type))
 				// Do upcasted operation
-				if (rounding == Truncate && saturating == Lazy) {
+				if (rounding == Truncate && saturating == Lazy && (op.f == 0 | f == 0)) {
 					// val expanded_self = if (op.f != 0) util.Cat(util.Fill(op.f, this.msb), this.number) else this.number
 					// val expanded_op = if (f != 0) util.Cat(util.Fill(f, op.msb), op.number) else op.number
 					val rhs_bits = op.f - f

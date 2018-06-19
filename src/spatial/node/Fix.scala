@@ -273,6 +273,8 @@ object Shifting {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (_, Literal(0))    => R.from(1)
     case (Literal(1), _)    => a
+    case (_, Literal(1))    => a
+    case (_, Literal(2))    => a * a
     case (_, Literal(0.5))  => sqrt(a)
     case (_, Literal(-0.5)) => stage(FixRecipSqrt(a))
     case (_, Literal(-1))   => stage(FixInv(a))

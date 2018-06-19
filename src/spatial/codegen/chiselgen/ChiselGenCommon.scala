@@ -382,6 +382,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           nextLevel = nextLevel.get.parent.s
         }
       }
+      if (modified == false) throw new Exception(s"Ambiguous usage of bound sym $s")
     }
     (result, modified)
   }

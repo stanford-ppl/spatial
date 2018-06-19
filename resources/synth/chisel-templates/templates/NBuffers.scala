@@ -203,7 +203,8 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramXBarRPorts).foreach {k => 
-            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+            val sram_index = k - portMapping.accessPars.indices.map{i => portMapping.accessPars.take(i+1).sum}.filter(k >= _).lastOption.getOrElse(0)
+            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en & rMask
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
@@ -220,7 +221,8 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramDirectRPorts).foreach {k => 
-            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+            val sram_index = k - portMapping.accessPars.indices.map{i => portMapping.accessPars.take(i+1).sum}.filter(k >= _).lastOption.getOrElse(0)
+            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             f.io.directR(bufferBase + k).en := io.directR(k).en & rMask
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(k).ofs

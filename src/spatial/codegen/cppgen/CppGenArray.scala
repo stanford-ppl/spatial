@@ -199,15 +199,23 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case ArrayMkString(array,start,delim,end) =>
+      emit(src"""${lhs.tp} $lhs = $start;""")
+      open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i++){ ")
+        emit(src"${lhs} = string_plus(string_plus(${lhs}, ${delim}), std::to_string((*${array})[${lhs}_i]));")
+      close("}")
+      emit(src"""$lhs = string_plus($lhs, $end);""")
+
     case op @ IfThenElse(cond, thenp, elsep) =>
-      if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
+      val star = lhs.tp match {case _: host.Array[_] => "*"; case _ => ""}
+      if (!op.R.isVoid) emit(src"${lhs.tp}${star} $lhs;")
       open(src"if ($cond) { ")
         visitBlock(thenp)
-        if (op.R.isBits) emit(src"${lhs} = ${thenp.result};")
+        if (!op.R.isVoid) emit(src"${lhs} = ${thenp.result};")
       close("}")
       open("else {")
         visitBlock(elsep)
-        if (op.R.isBits) emit(src"${lhs} = ${elsep.result};")
+        if (!op.R.isVoid) emit(src"${lhs} = ${elsep.result};")
       close("}")
 
     case ArrayFilter(array, apply, cond) =>

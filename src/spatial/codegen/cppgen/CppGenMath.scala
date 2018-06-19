@@ -23,6 +23,7 @@ trait CppGenMath extends CppGenCommon {
     // case FixURsh(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
     case FixInv(x)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"~(${toTrueFix(quote(x), x.tp)})", x.tp)};")
     case FixNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
+    case FixPow(x,y)   => emit(src"${lhs.tp} $lhs = pow($x,$y);")
     case FltNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
     case FixAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
     case FixSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")

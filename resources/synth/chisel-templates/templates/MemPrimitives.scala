@@ -188,7 +188,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until numMems).map{ i => 
-    val mem = Module(new Mem1D(bankDim, p.bitWidth, p.syncMem))
+    val mem = Module(new Mem1D(bankDim + 1, p.bitWidth, p.syncMem))
     val coords = p.banks.zipWithIndex.map{ case (b,j) => 
       i % (p.banks.drop(j).product) / p.banks.drop(j+1).product
     }
@@ -660,8 +660,8 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
 
   // We can do better than MaxJ by forcing mems to be single-ported since
   //   we know how to properly schedule reads and writes
-  val wInBound = io.w.ofs < (size).U
-  val rInBound = io.r.ofs < (size).U
+  val wInBound = io.w.ofs <= (size).U
+  val rInBound = io.r.ofs <= (size).U
 
   if (syncMem) {
     if (size <= Utils.SramThreshold) {

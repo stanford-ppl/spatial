@@ -1077,7 +1077,7 @@ object Utils {
     }
     else {
       // TODO: Use IP 
-      mul1.*-*(mul2, Some(delay)) + Utils.getRetimed(add)
+      mul1.*-*(mul2, Some(delay)) + Utils.getRetimed(add, delay)
       // sig.cloneType.fromBits(sr.io.out)
     }
   }

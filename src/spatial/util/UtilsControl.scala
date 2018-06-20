@@ -265,17 +265,17 @@ trait UtilsControl {
     /** Returns all scope ancestors of the controller or symbol.
       * Ancestors are ordered outermost to innermost
       */
-    def scopes: Seq[Scope] = Tree.ancestors[Scope](this.toScope){_.scope}
+    def scopes: Seq[Scope] = Tree.ancestors[Scope](this.toScope){_.parent.scope}
 
     /** Returns all scope ancestors of the controller or symbol, stopping when stop is true (exclusive).
       * Ancestors are ordered outermost to innermost
       */
-    def scopes(stop: Scope => Boolean): Seq[Scope] = Tree.ancestors[Scope](toScope, stop){_.scope}
+    def scopes(stop: Scope => Boolean): Seq[Scope] = Tree.ancestors[Scope](toScope, stop){_.parent.scope}
 
     /** Returns all scope ancestors of the controller or symbol, stopping at `stop` (exclusive).
       * Scopes are ordered outermost to innermost.
       */
-    def scopes(stop: Scope): Seq[Scope] = Tree.ancestors[Scope](toScope, {c => c == stop})(_.scope)
+    def scopes(stop: Scope): Seq[Scope] = Tree.ancestors[Scope](toScope, {c => c == stop})(_.parent.scope)
   }
 
 
@@ -507,7 +507,7 @@ trait UtilsControl {
     (lca, coarseDist)
   }
 
-  // FIXME: Should have metadata for control owner for inputs to counters, shouldn't need this method
+  // FIXME: Should have metadata for control owner for inputs to counters, shouldn't need this method.  Bug #
   @stateful def lookahead(a: Sym[_]): Sym[_] = {
     if (a.consumers.nonEmpty) {
       val p = a.consumers.filterNot{x => a.ancestors.collect{case y if (y.s.isDefined) => y.s.get}.contains(x)} // Remove consumers who are in the ancestry of this node
@@ -571,7 +571,24 @@ trait UtilsControl {
         val group  = metapipeLCAs(metapipe)
         val anchor = group.head._1
         val dists = accesses.map{a =>
-          val (lca,dist) = LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
+          val (lca,dist) = 
+            if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpReduce[_]) => true; case _ => false})) { // Hack for bug # 
+              val Op(OpReduce(_,_,_,map,load,_,_,_,_,_)) = a.parent.s.get
+              if (map.result == a) {
+                (a.parent, a.parent.children.filter(_.s.get != a.parent.s.get).length)
+              }
+              else LCAWithCoarseDistance(lookahead(anchor), lookahead(a))
+            }
+            else if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpMemReduce[_]) => true; case _ => false})) { // Hack for bug # 
+              val Op(OpReduce(_,_,_,_,map,load,_,_,_,_,_,_)) = a.parent.s.get
+              if (map.result == a) {
+                (a.parent, a.parent.children.filter(_.s.get != a.parent.s.get).length)
+              }
+              else LCAWithCoarseDistance(lookahead(anchor), lookahead(a))
+            }
+            else LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
+
+          // val (lca,dist) = LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
 
           dbgs(s"$a <-> $anchor # LCA: $lca, Dist: $dist")
 

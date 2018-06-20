@@ -1071,6 +1071,17 @@ object Utils {
     }
   }
 
+  def FixFMA(mul1: FixedPoint, mul2: FixedPoint, add: FixedPoint, delay: Int, en: Bool = true.B): FixedPoint = {
+    if (delay == 0) {
+      mul1 *-* mul2 + add
+    }
+    else {
+      // TODO: Use IP 
+      mul1.*-*(mul2, Some(delay)) + Utils.getRetimed(add)
+      // sig.cloneType.fromBits(sr.io.out)
+    }
+  }
+
   def vecWidthConvert[T<:chisel3.core.Data](vec: Vec[T], newW: Int) = {
     assert(vec.getWidth % newW == 0)
     val newV = vec.getWidth / newW

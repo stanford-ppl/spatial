@@ -19,6 +19,12 @@ trait ScalaGenRegFile extends ScalaGenMemories {
       val ctx = s""""${lhs.ctx}""""
       emit(src"val $lhs = if (${and(en)}) $rf.shiftIn($ctx, Seq($addr), $axis, $data)")
 
+    case RegFileBankedShiftIn(rf,data,addr,en,axis) =>
+      val ctx = s""""${lhs.ctx}""""
+      (data,addr,en).zipped.foreach{(d,a,e) => 
+        emit(src"val $lhs = if (${and(e)}) $rf.shiftIn($ctx, Seq($a), $axis, $d)")
+      }
+
 //    case RegFileVectorShiftIn(rf,data,addr,en,axis,len) =>
 //      val ctx = s""""${lhs.ctx}""""
 //      emit(src"val $lhs = if ($en) $rf.shiftInVec($ctx, Seq($addr), $axis, $data)")

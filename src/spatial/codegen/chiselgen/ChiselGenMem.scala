@@ -183,7 +183,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       // val id = resettersOf(rf).map{_._1}.indexOf(lhs)
       // duplicatesOf(rf).indices.foreach{i => emitt(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
     case RegFileShiftInVector(rf,data,addr,en,axis,len) => emitWrite(lhs,rf,data.elems.map(_.asInstanceOf[Sym[_]]).toSeq,Seq(addr),Seq(),Seq(en), Some(axis))
-    case RegFileShiftIn(rf,data,addr,en,axis) => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en), Some(axis))
+    case RegFileBankedShiftIn(rf,data,addr,en,axis) => emitWrite(lhs,rf,data,addr,Seq(),en, Some(axis))
     case op@RegFileBankedRead(rf,bank,ofs,ens)       => emitRead(lhs,rf,bank,ofs,ens)
     case op@RegFileBankedWrite(rf,data,bank,ofs,ens) => emitWrite(lhs,rf,data,bank,ofs,ens)
 

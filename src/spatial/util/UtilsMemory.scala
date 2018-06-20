@@ -180,6 +180,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
   def accessWidth(access: Sym[_]): Int = access match {
     case Op(RegFileShiftIn(_,data,_,_,_)) => 1
+    case Op(RegFileBankedShiftIn(_,data,_,_,_)) => data.length
     case Op(RegFileShiftInVector(_,_,_,_,_,len)) => len
     case Op(FIFOBankedDeq(_, ens)) => ens.length
     case Op(FIFOBankedEnq(_, _, ens)) => ens.length
@@ -193,6 +194,7 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
   def shiftAxis(access: Sym[_]): Option[Int] = access match {
     case Op(RegFileShiftIn(_,_,_,_,axis)) => Some(axis)
+    case Op(RegFileBankedShiftIn(_,_,_,_,axis)) => Some(axis)
     case Op(RegFileShiftInVector(_,_,_,_,axis,_)) => Some(axis)
     case _ => None
   }

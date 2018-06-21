@@ -4,7 +4,7 @@ package spatial.tests.apps
 import spatial.dsl._
 
 
-@test class SW extends SpatialTest {
+@test class SW_alg extends SpatialTest { // Name SW conflicts with something in spade
   override def runtimeArgs: Args = {
     "tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
   }

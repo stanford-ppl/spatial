@@ -771,7 +771,7 @@ import spatial.targets._
 // }
 
 
-@test class NW extends SpatialTest {
+@test class NW_alg extends SpatialTest { // NW conflicts with something in spade
   override def runtimeArgs: Args = {
     "tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
   }

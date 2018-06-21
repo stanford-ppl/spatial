@@ -12,6 +12,7 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   // Statistics counters
   var pipeChainPassMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
+  var pipeChainPassMapBug41Hack = new scala.collection.mutable.HashMap[Sym[_], Sym[_]]
   var streamCopyWatchlist = List[Sym[_]]()
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var validPassMap = new scala.collection.mutable.HashMap[Sym[_], Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
@@ -376,6 +377,11 @@ trait ChiselGenCommon extends ChiselCodegen {
       while (nextLevel.isDefined) {
         if (siblings.contains(nextLevel.get)) {
           if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
+          modified = true
+          nextLevel = None
+        }
+        else if (pipeChainPassMapBug41Hack.contains(s) && pipeChainPassMapBug41Hack(s) == nextLevel.get) {
+          result = result + s"_chain_read_${siblings.length-1}"
           modified = true
           nextLevel = None
         } else {

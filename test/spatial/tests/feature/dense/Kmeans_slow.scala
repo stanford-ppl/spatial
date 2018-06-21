@@ -198,6 +198,7 @@ import spatial.dsl._
     val cksum = result.flatten.zip(gold){ case (o, g) => (g < (o + margin)) && g > (o - margin)}.reduce{_&&_}
 
     println("PASS: " + cksum + " (Kmeans)")
+    assert(cksum)
   }
 }
 

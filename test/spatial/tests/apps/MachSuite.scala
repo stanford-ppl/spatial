@@ -1630,7 +1630,7 @@ import spatial.targets._
       Foreach(dim by i_tileSize par loop_ii) { ii => // this loop defenitilely cant be parallelized right now
         Foreach(dim by tileSize par loop_jj) { jj => 
           val c_col = SRAM[T](i_tileSize,tileSize)
-          MemReduce(c_col par reduce_col)(dim by tileSize par loop_kk) { kk => 
+          MemReduce(c_col(0::i_tileSize, 0::tileSize par reduce_col))(dim by tileSize par loop_kk) { kk => 
             val c_col_partial = SRAM[T](i_tileSize,tileSize)
             val b_sram = SRAM[T](tileSize,tileSize)
             b_sram load b_dram(kk::kk.to[I32]+tileSize, jj::jj.to[I32]+tileSize par par_load)

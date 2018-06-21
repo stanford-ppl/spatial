@@ -572,14 +572,14 @@ trait UtilsControl {
         val anchor = group.head._1
         val dists = accesses.map{a =>
           val (lca,dist) = 
-            if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpReduce[_]) => true; case _ => false})) { // Hack for bug # 
+            if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpReduce[_]) => true; case _ => false}) && a.parent.s.get.isOuterControl) { // Hack for bug # 
               val Op(OpReduce(_,_,_,map,load,_,_,_,_,_)) = a.parent.s.get
               if (map.result == a) {
                 (a.parent, a.parent.children.filter(_.s.get != a.parent.s.get).length)
               }
               else LCAWithCoarseDistance(lookahead(anchor), lookahead(a))
             }
-            else if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpMemReduce[_,_]) => true; case _ => false})) { // Hack for bug # 
+            else if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpMemReduce[_,_]) => true; case _ => false}) && a.parent.s.get.isOuterControl) { // Hack for bug # 
               val Op(OpMemReduce(_,_,_,_,map,_,_,_,_,_,_,_,_)) = a.parent.s.get
               if (map.result == a) {
                 (a.parent, a.parent.children.filter(_.s.get != a.parent.s.get).length)

@@ -184,7 +184,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   protected def connectCtrTrivial(lhs: Sym[_]): Unit = {
     val ctrl = lhs.owner
-    emit(src"""${swap(ctrl, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | ${lhs}_stops.zip(${lhs}_starts).map{case (stop,start) => (stop === start)}.reduce{_||_}""")
+    emitt(src"""${swap(ctrl, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | ${lhs}_stops.zip(${lhs}_starts).map{case (stop,start) => (stop === start)}.reduce{_||_}""")
   }
 
 
@@ -433,15 +433,15 @@ trait ChiselGenController extends ChiselGenCommon {
     case ParallelPipe(ens,func) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs)
-      emit(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
+      emitt(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
       emitGlobalWire(src"""${swap(lhs, IIDone)} := true.B""")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emit(s"// Controller Stack: ${controllerStack.tail}")
+        emitt(s"// Controller Stack: ${controllerStack.tail}")
         emitChildrenCxns(lhs)
         visitBlock(func)
       } 
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
-      emit(src"${swap(lhs, Mask)} := $en")
+      emitt(src"${swap(lhs, Mask)} := $en")
 
       exitCtrl(lhs)
 
@@ -526,33 +526,33 @@ trait ChiselGenController extends ChiselGenCommon {
       emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
 
-      emit("// Emitting notDone")
+      emitt("// Emitting notDone")
       visitBlock(notDone)
       // emitInhibitor(lhs, Some(notDone.result), None)
 
-      emit(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
+      emitt(src"${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B")
       emitIICounter(lhs)
       // emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B // Maybe this should handled differently""")
 
-      emit("// Emitting action")
+      emitt("// Emitting action")
       // emitGlobalWire(src"val ${notDone.result}_doneCondition = Wire(Bool())")
-      // emit(src"${notDone.result}_doneCondition := ~${notDone.result} // Seems unused")
+      // emitt(src"${notDone.result}_doneCondition := ~${notDone.result} // Seems unused")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emit(s"// Controller Stack: ${controllerStack.tail}")
+        emitt(s"// Controller Stack: ${controllerStack.tail}")
         visitBlock(action)
       }
-      emit("// Emitting nextState")
+      emitt("// Emitting nextState")
       visitBlock(nextState)
-      emit(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
-      emit(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Latency)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
-      emit(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
+      emitt(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
+      emitt(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Latency)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
+      emitt(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
-      emit(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
+      emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
       emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
-      emit(src"${lhs}_doneCondition := ~${notDone.result}")
-      emit(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
+      emitt(src"${lhs}_doneCondition := ~${notDone.result}")
+      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
       val extraEn = if (ens.toList.length > 0) {src"""List(${ens.toList.map(quote)}).map(en=>en).reduce{_&&_}"""} else {"true.B"}
-      emit(src"${swap(lhs, Mask)} := ${extraEn}")
+      emitt(src"${swap(lhs, Mask)} := ${extraEn}")
       emitChildrenCxns(lhs, true)
       exitCtrl(lhs)
 
@@ -564,28 +564,28 @@ trait ChiselGenController extends ChiselGenCommon {
       val cases = lhs.children.filter(_.s.get != lhs).map(_.s.get)
       
       // Route through signals
-      // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emit(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
-      emit(src"""${swap(lhs, DatapathEn)} := ${swap(parent_kernel, DatapathEn)} // Not really used probably""")
-      emit(src"""${swap(lhs, CtrTrivial)} := ${swap(parent_kernel, CtrTrivial)} | false.B""")
-      // emit(src"""${swap(lhs, Mask)} := true.B // No enable associated with switch, never mask it""")
+      // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emitt(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
+      emitt(src"""${swap(lhs, DatapathEn)} := ${swap(parent_kernel, DatapathEn)} // Not really used probably""")
+      emitt(src"""${swap(lhs, CtrTrivial)} := ${swap(parent_kernel, CtrTrivial)} | false.B""")
+      // emitt(src"""${swap(lhs, Mask)} := true.B // No enable associated with switch, never mask it""")
 
 
       if (lhs.isInnerControl) { // If inner, don't worry about condition mutation
-        selects.zipWithIndex.foreach{case (s,i) => emit(src"""${swap(lhs, SM)}.io.selectsIn($i) := $s""")}
+        selects.zipWithIndex.foreach{case (s,i) => emitt(src"""${swap(lhs, SM)}.io.selectsIn($i) := $s""")}
       } else { // If outer, latch in selects in case the body mutates the condition
         selects.indices.foreach{i => 
           emitGlobalWire(src"""val ${cases(i)}_switch_sel_reg = RegInit(false.B)""")
-          emit(src"""${cases(i)}_switch_sel_reg := Mux(Utils.risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
-          emit(src"""${swap(lhs, SM)}.io.selectsIn($i) := ${selects(i)}""")
+          emitt(src"""${cases(i)}_switch_sel_reg := Mux(Utils.risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
+          emitt(src"""${swap(lhs, SM)}.io.selectsIn($i) := ${selects(i)}""")
         }
       }
 
       inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emit(s"// Controller Stack: ${controllerStack.tail}")
+        emitt(s"// Controller Stack: ${controllerStack.tail}")
         if (op.R.isBits) {
-          emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
-          selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
-          emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emit(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
+          emitt(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emitt(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
+          selects.indices.foreach { i => emitt(src"${lhs}_onehot_selects($i) := ${selects(i)}");emitt(src"${lhs}_data_options($i) := ${cases(i)}") }
+          emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emitt(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
         }
         visitBlock(body)
       }
@@ -598,15 +598,15 @@ trait ChiselGenController extends ChiselGenCommon {
       emitIICounter(lhs)
       emitChildrenCxns(lhs, false)
       // emitInhibitor(lhs, None, Some(lhs.parent.s.get))
-      emit(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
+      emitt(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emit(s"// Controller Stack: ${controllerStack.tail}")
+        emitt(s"// Controller Stack: ${controllerStack.tail}")
         // if (blockContents(body).length > 0) {
         // if (childrenOf(lhs).count(isControlNode) == 1) { // This is an outer pipe
         visitBlock(body)
         if (op.R.isBits) {
           emitGlobalWire(src"val $lhs = Wire(${lhs.tp})")
-          emit(src"$lhs.r := ${body.result}.r")
+          emitt(src"$lhs.r := ${body.result}.r")
         }
       }
       exitCtrl(lhs)
@@ -660,44 +660,44 @@ trait ChiselGenController extends ChiselGenCommon {
         emit (s"val io_numArgOuts_instr = ${instrumentCounters.length*2}")
         emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
 
-        // emit("""// Set Build Info""")
+        // emit ("""// Set Build Info""")
         // val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
         // if (config.multifile == 5 || config.multifile == 6) {
         //   pipeRtMap.groupBy(_._1._1).map{x => 
         //     val listBuilder = x._2.toList.sortBy(_._1._2).map(_._2)
-        //     emit(src"val ${listHandle(x._1)}_rtmap = List(${listBuilder.mkString(",")})")
+        //     emit (src"val ${listHandle(x._1)}_rtmap = List(${listBuilder.mkString(",")})")
         //   }
         //   // TODO: Make the things below more efficient
         //   compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
         //     if (wire == "_retime") {
-        //       emit(src"val ${listHandle(wire)} = List[Int](${retimeList.mkString(",")})")  
+        //       emit (src"val ${listHandle(wire)} = List[Int](${retimeList.mkString(",")})")  
         //     }
         //   }
         //   compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
         //     if (wire == "_retime") {
         //     } else if (wire.contains("pipe(") || wire.contains("inner(")) {
         //       val numel = compressorMap.filter(_._2._1 == wire).size
-        //       emit(src"val ${listHandle(wire)} = List.tabulate(${numel}){i => ${wire.replace("))", src",retime=${listHandle("_retime")}(${listHandle(wire)}_rtmap(i))))")}}")
+        //       emit (src"val ${listHandle(wire)} = List.tabulate(${numel}){i => ${wire.replace("))", src",retime=${listHandle("_retime")}(${listHandle(wire)}_rtmap(i))))")}}")
         //     } else {
         //       val numel = compressorMap.filter(_._2._1 == wire).size
-        //       emit(src"val ${listHandle(wire)} = List.fill(${numel}){${wire}}")            
+        //       emit (src"val ${listHandle(wire)} = List.fill(${numel}){${wire}}")            
         //     }
         //   }
         // }
 
-        emit(s"Utils.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
-        emit(s"Utils.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
-        emit(s"Utils.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
-        emit(s"Utils.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
-        emit(s"Utils.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
-        emit(s"Utils.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
-        // emit(s"Utils.tight_control   = ${spatialConfig.enableTightControl}")
-        emit(s"Utils.mux_latency    = ${latencyOption("Mux", None)}.toInt")
-        emit(s"Utils.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
-        emit(s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
-        emit(s"Utils.SramThreshold = 4")
-        // emit(s"""Utils.target = ${trgt}""")
-        emit(s"""Utils.retime = ${cfg.enableRetiming}""")
+        emit (s"Utils.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
+        emit (s"Utils.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
+        emit (s"Utils.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
+        emit (s"Utils.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
+        emit (s"Utils.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
+        emit (s"Utils.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
+        // emit (s"Utils.tight_control   = ${spatialConfig.enableTightControl}")
+        emit (s"Utils.mux_latency    = ${latencyOption("Mux", None)}.toInt")
+        emit (s"Utils.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
+        emit (s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
+        emit (s"Utils.SramThreshold = 4")
+        // emit (s"""Utils.target = ${trgt}""")
+        emit (s"""Utils.retime = ${cfg.enableRetiming}""")
 
       }
 

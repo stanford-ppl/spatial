@@ -34,7 +34,7 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
     open(s"""<!--Begin $lhs -->""")
     val isFSM = lhs match {case Op(_: StateMachine[_]) => " FSM"; case _ => ""}
     emit(s"""<TD><font size = "6">${lhs.schedule} $isFSM<font size = "4"> (${lhs.level})</font>""")
-    emit(s"""<br><font size = "2">$ctx</font>""")
+    emit(s"""<br><font size = "2">${lhs.ctx}</font>""")
     emit(s"""<br><font size = "2">$line</font>""")
     emit(s"""<br><font size = "1"><b>$lhs = $rhs</b></font>""")
     if (cchain.isDefined) emit(s"""<br><font size = "1">Counter: ${cchain.get}</font>""")

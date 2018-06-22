@@ -1,6 +1,7 @@
 package spatial.tests.feature.banking
 
 import spatial.dsl._
+import argon.Block
 
 @test class ReadBroadcast extends SpatialTest {
 
@@ -23,7 +24,7 @@ import spatial.dsl._
 
   }
   override def checkIR(block: Block[_]): Result = {
-    val srams = block.nestedStms.collect{case p:spatial.node.SRAMNew => p }
+    val srams = block.nestedStms.collect{case p:spatial.node.SRAMNew[_,_] => p }
 
     require(srams.length == 3, r"There should (probably) only be 3 SRAMNews in this app, found ${srams.length}")
 

@@ -110,22 +110,22 @@ trait ChiselGenCommon extends ChiselCodegen {
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
                        src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
-      emit(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
-      emit(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
-      emit(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
-      emit(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
-      emit(src"""${cchain}.io.input.saturate := true.B""")
-      emit(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
-      emit(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
-      emit(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
-      if (streamCopyWatchlist.contains(cchain)) emit(src"""${cchain}.io.input.isStream := true.B""")
-      else emit(src"""${cchain}.io.input.isStream := false.B""")      
-      emit(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
+      emitt(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
+      emitt(src"""${cchain}.io.input.saturate := true.B""")
+      emitt(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
+      emitt(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
+      emitt(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
+      if (streamCopyWatchlist.contains(cchain)) emitt(src"""${cchain}.io.input.isStream := true.B""")
+      else emitt(src"""${cchain}.io.input.isStream := false.B""")      
+      emitt(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
       cchain.counters.zipWithIndex.foreach { case (c, i) =>
         val x = c.ctrPar.toInt
         if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
         else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
-        emit(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
+        emitt(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
       }
 
     }
@@ -159,41 +159,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
     if (cfg.enableRetiming) lhs.fullDelay else 0.0
   }
-
-
-  protected def emitInhibitor(lhs: Sym[_], fsm: Option[Sym[_]] = None, switch: Option[Sym[_]]): Unit = {
-    if (cfg.enableRetiming) {
-      emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())") // Used to be global module?
-      if (fsm.isDefined) {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(~${fsm.get})")  
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${DL(swap(lhs, Done), src"1 + ${swap(lhs, Latency)}", true)}")
-          /* or'ed  back in because of BasicCondFSM!! */
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${fsm.get}*/ // Really want inhibit to turn on at last enabled cycle")        
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-      } else if (switch.isDefined) {
-        emit(src"${swap(lhs, Inhibitor)} := ${swap(switch.get, Inhibitor)}")
-      } else {
-        if (lhs.cchains.nonEmpty) {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := ${lhs.cchains.head}.io.output.done")  
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${lhs.cchains.head}.io.output.done*/ // Correction not needed because _done should mask dp anyway")
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${swap(lhs, Done)}")
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-        } else {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(${swap(lhs, Done)} /*${lhs}_sm.io.output.ctr_inc*/)")
-          val rster = if (lhs.isInnerControl & getReadStreams(lhs.toCtrl).nonEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Latency)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := $rster")
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data")
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-        }        
-      }
-    } else {
-      emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())");emit(src"${swap(lhs, Inhibitor)} := false.B // Maybe connect to ${swap(lhs, Done)}?  ")
-    }
-  }
-
 
 
   def remappedEns(node: Sym[_], ens: List[Sym[_]]): String = {

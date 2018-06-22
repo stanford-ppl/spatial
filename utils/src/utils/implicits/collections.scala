@@ -76,9 +76,13 @@ object collections {
       * Returns an iterator over all combinations of 2 from this iterable collection.
       * Assumes that either the collection has (functionally) distinct elements.
       */
-    def pairs: Iterator[(A,A)] = x match {
-      case m0 :: y => y.iterator.map{m1 => (m0,m1) } ++ y.pairs
-      case _ => Iterator.empty
+    // abstract type pattern Coll is unchecked since it is eliminated by erasure?
+    // def pairs: Iterator[(A,A)] = x match {
+    //   case m0 +: y => y.iterator.map{m1 => (m0,m1) } ++ y.pairs
+    //   case _ => Iterator.empty
+    // }
+    def pairs: Iterator[(A,A)] = {
+      if (x.size >= 2) (x.tail.iterator.map{m1 => (x.head,m1) } ++ x.tail.pairs) else Iterator.empty
     }
   }
 

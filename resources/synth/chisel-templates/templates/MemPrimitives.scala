@@ -622,9 +622,10 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
 
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ case(mem,coords,flatCoord) => 
-      xBarCandidates.map {x =>
+      if (xBarCandidates.toList.length > 0) xBarCandidates.map {x =>
         x.banks.zip(coords).map{case (b, coord) => b === coord.U}.reduce{_&&_} && x.en
       }.reduce{_||_}
+      else false.B
     }
     val datas = m.map{ _._1 }
     val d = chisel3.util.PriorityMux(sel, datas)

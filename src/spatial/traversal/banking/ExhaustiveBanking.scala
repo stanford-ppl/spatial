@@ -24,7 +24,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     dimGrps: Seq[Seq[Seq[Int]]]
   ): Seq[Seq[Banking]] = {
 
-    val grps = (reads ++ writes).map(_.toSeq.map(_.matrix))
+    val grps = (reads ++ writes).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix))
     if (grps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
     else {
       dimGrps.flatMap{strategy: Seq[Seq[Int]] =>
@@ -76,13 +76,16 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val Ns = (n2Head ++ n2 ++ nx).iterator
 
     var banking: Option[ModBanking] = None
+    dbgs(s"Finding banking for $grps:")
 
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
       val As = Alphas(rank, N)
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
-        if (checkCyclic(N,alpha,grps)) banking = Some(ModBanking(N,1,alpha,dims))
+        val cyclic = checkCyclic(N,alpha,grps)
+        dbgs(s"checkCyclic on $N, $alpha = $cyclic")
+        if (cyclic) banking = Some(ModBanking(N,1,alpha,dims))
         else {
           val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b => ModBanking(N, b, alpha, dims) }

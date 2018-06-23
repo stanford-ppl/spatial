@@ -14,6 +14,7 @@ sealed abstract class Banking {
   def nBanks: Int
   def stride: Int
   def dims: Seq[Int]
+  def alphas: Seq[Int]
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
@@ -21,6 +22,7 @@ sealed abstract class Banking {
 case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int]) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
+  override def alphas: Seq[Int] = alpha
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
@@ -161,11 +163,23 @@ case class Memory(
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride
+      val alpha = banking.head.alphas
 
+      // If alpha.last == 0 and alpha.secondToLast == 0, then this offset calculation won't work.  This case should be disable in ExhaustiveBanking.scala for now
       (0 until D).map{t =>
         val xt = addr(t)
-        if (t < D - 1) { xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b) }
-        else           { (xt / (n*b)) * b + xt % b }
+        if (t < D - 2) { 
+          if (alpha(D-1) == 0) {xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b)}
+          else {xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b)}
+        }
+        else if (t == D - 2) {
+          if (alpha(D-1) == 0) {(xt / (n*b)) * w(D-1) * b}
+          else {xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b)}          
+        }
+        else           { 
+          if (alpha(D-1) == 0) {xt}
+          else {(xt / (n*b)) * b + xt % b}
+        }
       }.sumTree
     }
     else if (banking.lengthIs(D)) {

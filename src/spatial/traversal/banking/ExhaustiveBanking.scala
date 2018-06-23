@@ -76,16 +76,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val Ns = (n2Head ++ n2 ++ nx).iterator
 
     var banking: Option[ModBanking] = None
-    dbgs(s"Finding banking for $grps:")
 
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
       val As = Alphas(rank, N)
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
-        val cyclic = checkCyclic(N,alpha,grps)
-        dbgs(s"checkCyclic on $N, $alpha = $cyclic")
-        if (cyclic) banking = Some(ModBanking(N,1,alpha,dims))
+        if (alpha.last == 0 && alpha.length >= 2 && alpha.takeRight(2).head == 0) {} // Invalid, for now offset correction will only work if either alpha.last != 0 or (alpha.last == 0 and alpha.takeRight(2).head != 0)
+        else if (checkCyclic(N,alpha,grps)) banking = Some(ModBanking(N,1,alpha,dims))
         else {
           val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b => ModBanking(N, b, alpha, dims) }

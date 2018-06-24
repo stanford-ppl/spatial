@@ -12,7 +12,7 @@ import spatial.dsl._
     val d = DRAM[Int](16,16)
     Accel {
       val s = SRAM[Int](16,16)
-      Foreach(16 by 1 par 2, 16 by 1 par 4){(i,j) => s(i,j) = i+j}
+      Foreach(16 by 1 par 2, 16 by 1 par 3){(i,j) => s(i,j) = i+j}
       d store s
     }
 
@@ -22,6 +22,6 @@ import spatial.dsl._
     printMatrix(gold, "Wanted:")
     println(r"Pass? ${result == gold}")
     assert(result == gold)
-  }
+  } 
 
 }

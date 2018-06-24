@@ -163,24 +163,65 @@ case class Memory(
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride
-      val alpha = banking.head.alphas
 
-      // If alpha.last == 0 and alpha.secondToLast == 0, then this offset calculation won't work.  This case should be disable in ExhaustiveBanking.scala for now
-      (0 until D).map{t =>
+      /* Offset correction not mentioned in p199-wang
+         0. Equations in paper must be wrong.  Example 
+             ex-     alpha = 1,2    N = 4     B = 1
+                          
+                 banks:   0 2 0 2    ofs (bank0):   0 * 0 *
+                          1 3 1 3                   * * * *
+                          2 0 2 0                   * 2 * 2 
+                          1 3 1 3                   * * * *
+
+            These offsets conflict!  They went wrong by assuming NB periodicity of 1 in leading dimension
+
+         1. Proposed correction: Divide memory into "offset chunks" by finding the 
+            periodicity of the banking pattern and fencing off a portion that contains each bank exactly once
+             P_i = NB / gcd(NB,alpha_i)
+                 ** if alpha_i = 0, then P_i = w_i **
+
+             ex-     alpha = 3,4    N = 6     B = 1
+                          _____
+                 banks:  |0 4 2|0 4 2 0 4 2
+                         |3_1_5|3 1 5 3 1 5
+                          0 4 2 0 4 2 0 4 2
+                          3 1 5 3 1 5 3 1 5
+                 banking pattern: 0 4 2
+                                  3 1 5
+                 P = 2,3
+         2. If any dimesion has period = NB, then set all other periods to 1 as this sliver contains all banks.  Otherwise, do not change P
+         3. Compute offset chunk
+            ofsdim_i = floor(x_i/P_i)
+         4. Flatten these ofsdims
+            ofschunk = ... + (ofsdim_0 * ceil(w_1 / P_1)) + ofsdim_1
+         5. If B != 1, do extra math to compute index within the block
+            intrablockdim_i = x_i mod B
+         6. Flatten intrablockdims
+            intrablockofs = ... + intrablockdim_0 * B + intrablockdim_1
+         7. Combine ofschunk and intrablockofs
+            ofs = ofschunk * exp(B,D) + intrablockofs
+
+      */
+      val alpha = banking.head.alphas
+      def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) w(i) else n*b/gcd(n*b,alpha(i))}
+      val P = if (P_raw.contains(n*b)) { 
+        val i = P_raw.indexOf(n*b)
+        (0 until D).map{id => if (id == i) n*b else 1}
+      } else P_raw
+     
+      val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
-        if (t < D - 2) { 
-          if (alpha(D-1) == 0) {xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b)}
-          else {xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b)}
-        }
-        else if (t == D - 2) {
-          if (alpha(D-1) == 0) {(xt / (n*b)) * w(D-1) * b}
-          else {xt * (w.slice(t+1,D-1).product * math.ceil(w(D-1).toDouble / (n*b)).toInt * b)}          
-        }
-        else           { 
-          if (alpha(D-1) == 0) {xt}
-          else {(xt / (n*b)) * b + xt % b}
-        }
+        val p = P(t)
+        val ofsdim_t = xt / p
+        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
+      val intrablockofs = (0 until D).map{t => 
+        val xt = addr(t)
+        val ofsdim_t = xt % b
+        ofsdim_t * List.fill(D-t-1)(b).product.toInt
+      }.sumTree
+      ofschunk * math.pow(b,D).toInt + intrablockofs
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)

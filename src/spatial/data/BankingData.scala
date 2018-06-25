@@ -178,7 +178,7 @@ case class Memory(
          1. Proposed correction: Divide memory into "offset chunks" by finding the 
             periodicity of the banking pattern and fencing off a portion that contains each bank exactly once
              P_i = NB / gcd(NB,alpha_i)
-                 ** if alpha_i = 0, then P_i = w_i **
+                 ** if alpha_i = 0, then P_i = infinity **
 
              ex-     alpha = 3,4    N = 6     B = 1
                           _____
@@ -204,7 +204,7 @@ case class Memory(
       */
       val alpha = banking.head.alphas
       def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
-      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) w(i) else n*b/gcd(n*b,alpha(i))}
+      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 65535 else n*b/gcd(n*b,alpha(i))}
       val P = if (P_raw.contains(n*b)) { 
         val i = P_raw.indexOf(n*b)
         (0 until D).map{id => if (id == i) n*b else 1}

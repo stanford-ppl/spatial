@@ -445,7 +445,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
       exitCtrl(lhs)
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids) if (inHw) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
@@ -481,7 +481,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
       exitCtrl(lhs)
 
-    case UnrolledReduce(ens,cchain,func,iters,valids) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids) if (inHw) =>
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)

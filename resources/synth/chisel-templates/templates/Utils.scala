@@ -841,9 +841,10 @@ object Utils {
       result
   }
 
-  def fixrand(seed: Int, bits: Int): FixedPoint = {
+  def fixrand(seed: Int, bits: Int, en: Bool): FixedPoint = {
     val prng = Module(new PRNG(seed, bits))
     val result = Wire(new FixedPoint(false, bits, 0))
+    prng.io.en := en
     result := prng.io.output
     result
   }

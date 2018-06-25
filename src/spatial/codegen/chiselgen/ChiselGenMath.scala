@@ -5,6 +5,8 @@ import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.internal.{spatialConfig => cfg}
+import spatial.data._
+import spatial.util._
 
 
 trait ChiselGenMath extends ChiselGenCommon {
@@ -44,8 +46,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSRU(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x >>> $shift).r")
-    case BitRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}) === 1.U")
-    case FixRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)})")
+    case BitRandom(None) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
+    case FixRandom(None) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case UnbSatMul(x,y) => emitt(src"val $lhs = $x <*&> $y")
     case UnbSatDiv(x,y) => emitt(src"val $lhs = $x </&> $y")
     case FixRandom(x) =>

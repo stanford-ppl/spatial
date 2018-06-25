@@ -5,14 +5,14 @@ import spatial.dsl._
 @test class MultilevelPar extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
   val rowpar = 2
-  val colpar = 1
+  val colpar = 3
 
 
   def main(args: Array[String]): Unit = {
     val d = DRAM[Int](16,16)
     Accel {
       val s = SRAM[Int](16,16)
-      Foreach(16 by 1 par 2, 16 by 1 par 3){(i,j) => s(i,j) = i+j}
+      Foreach(16 by 1 par rowpar, 16 by 1 par colpar){(i,j) => s(i,j) = i+j}
       d store s
     }
 
@@ -25,3 +25,4 @@ import spatial.dsl._
   } 
 
 }
+

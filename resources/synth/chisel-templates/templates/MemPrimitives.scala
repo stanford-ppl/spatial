@@ -140,7 +140,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     val base = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.xBarR(base) := rBundle    
     io.flow(base) := flow
-    io.output.data(vecId)
+    io.output.data(muxAddr._2 + vecId)
   }
 
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
@@ -162,7 +162,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.directR(base) := rBundle    
     io.flow(base) := flow
-    io.output.data(vecId)
+    io.output.data(muxAddr._2 + vecId)
   }
 
 }

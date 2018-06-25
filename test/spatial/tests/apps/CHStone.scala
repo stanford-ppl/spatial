@@ -27,7 +27,7 @@ import spatial.targets._
     val len = ArgIn[Int]
     setArg(len, data_text.length)
     val text_dram = DRAM[Int8](len)
-    val hash_dram = DRAM[ULong](16)//(5)
+    val hash_dram = DRAM[ULong](5)
 
     // println("Hashing: " + charArrayToString(data_text) + " (len: " + data_text.length + ")")
     println("Hashing: " + raw_text + " (len: " + data_text.length + ")")
@@ -147,7 +147,7 @@ import spatial.targets._
     }
 
     val hashed_result = getMem(hash_dram)
-    val hashed_gold = Array[ULong](1754467640L,1633762310L,3755791939L,3062269980L,2187536409L,0,0,0,0,0,0,0,0,0,0,0)
+    val hashed_gold = Array[ULong](1754467640L,1633762310L,3755791939L,3062269980L,2187536409L)
     printArray(hashed_gold, "Expected: ")
     printArray(hashed_result, "Got: ")
 

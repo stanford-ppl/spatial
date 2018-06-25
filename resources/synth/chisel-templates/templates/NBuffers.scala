@@ -309,7 +309,6 @@ class NBufMem(val mem: MemType,
       val rfs = (0 until numBufs).map{ i => 
         val combinedXBarWMux = xBarWMux.getOrElse(i,XMap()).merge(broadcastWMux)
         val combinedXBarRMux = xBarRMux.getOrElse(i,XMap()).merge(broadcastRMux)
-        Console.println(s"cmobined write is $combinedXBarWMux")
         Module(new ShiftRegFile(logicalDims, bitWidth, 
                         combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),

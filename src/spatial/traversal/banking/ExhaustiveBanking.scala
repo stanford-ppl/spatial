@@ -24,7 +24,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     dimGrps: Seq[Seq[Seq[Int]]]
   ): Seq[Seq[Banking]] = {
 
-    val grps = (reads ++ writes).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix))
+    val grps = (reads ++ writes).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
     if (grps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
     else {
       dimGrps.flatMap{strategy: Seq[Seq[Int]] =>

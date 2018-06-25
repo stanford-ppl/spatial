@@ -26,7 +26,7 @@ import argon.Block
   override def checkIR(block: Block[_]): Result = {
     val srams = block.nestedStms.collect{case p:spatial.node.SRAMNew[_,_] => p }
 
-    require(srams.length == 3, r"There should (probably) only be 3 SRAMNews in this app, found ${srams.length}")
+    assert(srams.length == 3, r"There should (probably) only be 3 SRAMNews in this app, found ${srams.length}")
 
     super.checkIR(block)
   }

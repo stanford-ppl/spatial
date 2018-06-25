@@ -492,6 +492,43 @@ trait UtilsControl {
     }
   }
 
+
+  /** Returns the coarse distance between two symbols a and b from the given LCA
+    *
+    * Pipeline distance between a and b:
+    *   If a and b have a least common control ancestor which is neither a nor b,
+    *   this is defined as the dataflow distance between the LCA's children which contain a and b
+    *   If a and b are equal, the distance is defined as zero.
+    *
+    *   The distance is undefined when the LCA is a xor b, or if a and b occur in parallel
+    *   The distance is positive if a comes before b, negative otherwise
+    */
+  @stateful def coarseDistance(lca: Ctrl, a: Sym[_], b: Sym[_]): Int = coarseDistance(lca,a.toCtrl,b.toCtrl)
+
+
+  @stateful def coarseDistance(lca: Ctrl, a: Ctrl, b: Ctrl): Int = {
+    if (a == b) 0
+    else {
+      val (_, pathA, pathB) = LCAWithPaths(a, b)
+      if (lca.isOuterControl && lca != a && lca != b) {
+        logs(s"PathA: " + pathA.mkString(", "))
+        logs(s"PathB: " + pathB.mkString(", "))
+        logs(s"LCA: $lca")
+
+        val topA = pathA.find{c => c != lca }.get
+        val topB = pathB.find{c => c != lca }.get
+        // TODO[2]: Update with arbitrary children graph once defined
+        val idxA = lca.children.indexOf(topA)
+        val idxB = lca.children.indexOf(topB)
+        val dist = idxB - idxA
+        if (lca.isOuterPipeLoop || lca.isOuterStreamLoop) dist else 0
+      }
+      else {
+        0
+      }
+    }
+  }  
+
   /** Returns the LCA and coarse-grained pipeline distance between accesses a and b.
     *
     * Coarse-grained pipeline distance:
@@ -571,28 +608,28 @@ trait UtilsControl {
         val group  = metapipeLCAs(metapipe)
         val anchor = group.head._1
         val dists = accesses.map{a =>
-          val (lca,dist) = 
+          val dist = 
             if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpReduce[_]) => true; case _ => false}) && a.parent.s.get.isOuterControl) { // Hack for bug # 
               val Op(OpReduce(_,_,_,map,load,_,_,_,_,_)) = a.parent.s.get
               if (map.result == a) {
-                (a.parent, a.parent.children.filter(_.s.get != a.parent.s.get).length)
+                a.parent.children.filter(_.s.get != a.parent.s.get).length
               }
-              else LCAWithCoarseDistance(lookahead(anchor), lookahead(a))
+              else coarseDistance(metapipe, lookahead(anchor), lookahead(a))
             }
             else if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpMemReduce[_,_]) => true; case _ => false}) && a.parent.s.get.isOuterControl) { // Hack for bug # 
               val Op(OpMemReduce(_,_,_,_,map,_,_,_,_,_,_,_,_)) = a.parent.s.get
               if (map.result == a) {
-                (a.parent, a.parent.children.filter(_.s.get != a.parent.s.get).length)
+                a.parent.children.filter(_.s.get != a.parent.s.get).length
               }
-              else LCAWithCoarseDistance(lookahead(anchor), lookahead(a))
+              else coarseDistance(metapipe, lookahead(anchor), lookahead(a))
             }
-            else LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
+            else coarseDistance(metapipe, lookahead(anchor),lookahead(a))
 
-          // val (lca,dist) = LCAWithCoarseDistance(lookahead(anchor),lookahead(a))
+          // val (lca,dist) = coarseDistance(metapipe, lookahead(anchor),lookahead(a))
 
-          dbgs(s"$a <-> $anchor # LCA: $lca, Dist: $dist")
+          dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
 
-          if (lca == metapipe || anchor == a) a -> Some(dist) else a -> None
+          if (group.map{x => List(x._1, x._2)}.flatten.contains(a)) a -> Some(dist) else a -> None
         }
         val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
         val minDist = buffers.minOrElse(0)

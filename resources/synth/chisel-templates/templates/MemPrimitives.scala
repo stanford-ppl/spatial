@@ -512,54 +512,52 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def decrementAxisCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ List(l(x) - 1) ++ l.drop(x+1)}
   // Handle Writes
   m.foreach{ case(mem, coords, flatCoord) => 
-    if (p.isBuf) mem := Mux(io.dump_en, io.dump_in(flatCoord), mem)
-    else {
-      // Check all xBar w ports against this bank's coords
-      val xBarSelect = (io.xBarW.map(_.banks), io.xBarW.map(_.en), io.xBarW.map(_.shiftEn)).zipped.map{ case(bids, en, shiftEn) => 
-        bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en | shiftEn else false.B}
+    // Check all xBar w ports against this bank's coords
+    val xBarSelect = (io.xBarW.map(_.banks), io.xBarW.map(_.en), io.xBarW.map(_.shiftEn)).zipped.map{ case(bids, en, shiftEn) => 
+      bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en | shiftEn else false.B}
+    }
+    // Check all direct W ports against this bank's coords
+    val directSelect = io.directW.filter(_.banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_))
+
+    // Unmask write port if any of the above match
+    val wMask = xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map{x => x.en | x.shiftEn}.reduce(_|_) else false.B}
+
+    // Check if shiftEn is turned on for this line, guaranteed false on entry plane
+    val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
+      // XBarW requests shift
+      val axisShiftXBar = io.xBarW.map(_.banks).zip(io.xBarW.map(_.shiftEn)).map{ case(bids, en) => 
+        bids.zip(coords).zipWithIndex.map{case ((b, coord),id) => if (id == p.axis) true.B else b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
       }
-      // Check all direct W ports against this bank's coords
-      val directSelect = io.directW.filter(_.banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_))
+      // DirectW requests shift
+      val axisShiftDirect = io.directW.filter{case x => stripCoord(x.banks, p.axis).zip(stripCoord(coords, p.axis)).map{case (b,coord) => b == coord}.reduce(_&_)}
 
-      // Unmask write port if any of the above match
-      val wMask = xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map{x => x.en | x.shiftEn}.reduce(_|_) else false.B}
+      // Unmask shift if any of the above match
+      axisShiftXBar.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.shiftEn).reduce(_|_) else false.B}
+    } else false.B
 
-      // Check if shiftEn is turned on for this line, guaranteed false on entry plane
-      val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
-        // XBarW requests shift
-        val axisShiftXBar = io.xBarW.map(_.banks).zip(io.xBarW.map(_.shiftEn)).map{ case(bids, en) => 
-          bids.zip(coords).zipWithIndex.map{case ((b, coord),id) => if (id == p.axis) true.B else b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
-        }
-        // DirectW requests shift
-        val axisShiftDirect = io.directW.filter{case x => stripCoord(x.banks, p.axis).zip(stripCoord(coords, p.axis)).map{case (b,coord) => b == coord}.reduce(_&_)}
-
-        // Unmask shift if any of the above match
-        axisShiftXBar.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.shiftEn).reduce(_|_) else false.B}
-      } else false.B
-
-      // Connect matching W port to memory
-      val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
-      val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
-      val (data, enable) = 
-        if (directSelect.length > 0 & p.hasXBarW) {           // Has direct and x
-          val liveDirectWire = chisel3.util.PriorityMux(directSelect.map{x => x.en | x.shiftEn}, directSelect)
-          val liveXBarWire = chisel3.util.PriorityMux(xBarSelect, io.xBarW)
-          val enable = Mux(directSelect.map{x => x.en | x.shiftEn}.reduce(_|_), (liveDirectWire.en | liveDirectWire.shiftEn), (liveXBarWire.en | liveXBarWire.shiftEn)) & wMask
-          val data = Mux(directSelect.map{x => x.en | x.shiftEn}.reduce(_|_), liveDirectWire.data, liveXBarWire.data)
-          (data, enable)
-        } else if (p.hasXBarW && directSelect.length == 0) {  // Has x only
-          val liveXBarWire = chisel3.util.PriorityMux(xBarSelect, io.xBarW)
-          val enable = (liveXBarWire.en | liveXBarWire.shiftEn) & wMask
-          val data = liveXBarWire.data
-          (data, enable)
-        } else if (directSelect.length > 0) {                                            // Has direct only
-          val liveDirectWire = chisel3.util.PriorityMux(directSelect.map{x => x.en | x.shiftEn}, directSelect)
-          val enable = (liveDirectWire.en | liveDirectWire.shiftEn)& wMask
-          val data = liveDirectWire.data
-          (data, enable)
-        } else (0.U, false.B)
-      mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
-  }
+    // Connect matching W port to memory
+    val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
+    val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
+    val (data, enable) = 
+      if (directSelect.length > 0 & p.hasXBarW) {           // Has direct and x
+        val liveDirectWire = chisel3.util.PriorityMux(directSelect.map{x => x.en | x.shiftEn}, directSelect)
+        val liveXBarWire = chisel3.util.PriorityMux(xBarSelect, io.xBarW)
+        val enable = Mux(directSelect.map{x => x.en | x.shiftEn}.reduce(_|_), (liveDirectWire.en | liveDirectWire.shiftEn), (liveXBarWire.en | liveXBarWire.shiftEn)) & wMask
+        val data = Mux(directSelect.map{x => x.en | x.shiftEn}.reduce(_|_), liveDirectWire.data, liveXBarWire.data)
+        (data, enable)
+      } else if (p.hasXBarW && directSelect.length == 0) {  // Has x only
+        val liveXBarWire = chisel3.util.PriorityMux(xBarSelect, io.xBarW)
+        val enable = (liveXBarWire.en | liveXBarWire.shiftEn) & wMask
+        val data = liveXBarWire.data
+        (data, enable)
+      } else if (directSelect.length > 0) {                                            // Has direct only
+        val liveDirectWire = chisel3.util.PriorityMux(directSelect.map{x => x.en | x.shiftEn}, directSelect)
+        val enable = (liveDirectWire.en | liveDirectWire.shiftEn)& wMask
+        val data = liveDirectWire.data
+        (data, enable)
+      } else (0.U, false.B)
+    if (p.isBuf) mem := Mux(io.dump_en, io.dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
+    else mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
   }
 
   // Connect read data to output

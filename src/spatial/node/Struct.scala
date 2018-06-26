@@ -11,7 +11,9 @@ abstract class StructAlloc[S:Struct] extends Primitive[S] {
   override def reads  = Nil
   override def aliases = Nul
   override def contains = syms(elems.map(_._2))
-  override val isEphemeral: Boolean = true
+
+  // Emphemeral is false for simple struct to avoid issues across stages, e.g. reductions (#41)
+  override val isEphemeral: Boolean = false
 }
 
 @op case class SimpleStruct[S:Struct](elems: Seq[(String,Sym[_])]) extends StructAlloc[S]

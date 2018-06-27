@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class ParLaneMask extends SpatialTest {
+@spatial class ParLaneMask extends SpatialTest {
   override def runtimeArgs: Args = "13"
   /*
     This app is for testing the valids that get passed to each child of a metapipe,

@@ -2,7 +2,7 @@ package spatial.tests.feature.banking
 
 import spatial.dsl._
 
-@test class SequentialWrites extends SpatialTest {
+@spatial class SequentialWrites extends SpatialTest {
   override def runtimeArgs: Args = "32"
 
   val tileSize = 96

@@ -4,7 +4,7 @@ import spatial.dsl._
 
 
 
-@test class FIFOLoad extends SpatialTest {
+@spatial class FIFOLoad extends SpatialTest {
   override def runtimeArgs: Args = "960"
 
 

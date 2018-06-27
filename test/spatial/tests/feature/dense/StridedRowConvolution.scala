@@ -2,9 +2,7 @@
 
 // import spatial.dsl._
 
-// @test class StridedRowConvolution extends SpatialTest { // ReviveMe (LineBuffer.strided)
-//   override def runtimeArgs: Args = NoArgs
-
+// @spatial class StridedRowConvolution extends SpatialTest { // ReviveMe (LineBuffer.strided)
 //   def main(args: Array[String]): Unit = {
 //     val R = 20
 //     val C = 16

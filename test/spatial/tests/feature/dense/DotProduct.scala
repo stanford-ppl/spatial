@@ -4,7 +4,7 @@ import spatial.dsl._
 
 
 
-@test class DotProduct extends SpatialTest {
+@spatial class DotProduct extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 
@@ -67,7 +67,7 @@ import spatial.dsl._
   }
 }
 
-@test class DotProductFlt extends SpatialTest {
+@spatial class DotProductFlt extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = Float //FixPt[TRUE,_32,_0]
 

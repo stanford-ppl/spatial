@@ -4,7 +4,7 @@ import argon._
 import spatial.data._
 import spatial.dsl._
 
-@test class CLITest extends SpatialTest {
+@spatial class CLITest extends SpatialTest {
   override def runtimeArgs: Args = "10 2 0.1 15"
 
   def main(args: Array[String]): Unit = {

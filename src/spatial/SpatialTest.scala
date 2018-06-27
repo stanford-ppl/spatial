@@ -6,6 +6,7 @@ import spatial.lang.{Bit, Text, Void}
 
 trait SpatialTest extends Spatial with DSLTest {
   private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
+  override def runtimeArgs: Args = NoArgs
 
   def assert(cond: Bit)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond)
   def assert(cond: Bit, msg: Text)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond, msg)

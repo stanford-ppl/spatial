@@ -5,8 +5,7 @@ import argon._
 import spatial.dsl._
 import spatial.node.DelayLine
 
-@test class SimpleRetimePipe extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class SimpleRetimePipe extends SpatialTest {
   override def backends = super.backends.filterNot{be => (be == Scala) | (be == VCS_noretime)}
 
   def main(args: Array[String]): Unit = {
@@ -28,9 +27,7 @@ import spatial.node.DelayLine
   }
 }
 
-@test class SimplePipeRetime2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SimplePipeRetime2 extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     // add one to avoid dividing by zero
@@ -56,8 +53,7 @@ import spatial.node.DelayLine
 }
 
 
-@test class RetimeLoop extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RetimeLoop extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](16,16)
@@ -80,9 +76,8 @@ import spatial.node.DelayLine
   }
 }
 
-@test class RetimeNestedPipe extends SpatialTest {
+@spatial class RetimeNestedPipe extends SpatialTest {
   override def runtimeArgs: Args = "6"
-
 
   def main(args: Array[String]): Unit = {
     val x = ArgIn[Int]
@@ -108,8 +103,7 @@ import spatial.node.DelayLine
 }
 
 
-@test class RetimeRandomTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RetimeRandomTest extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     val x = ArgOut[Bit]
@@ -124,8 +118,7 @@ import spatial.node.DelayLine
   }
 }
 
-@test class RetimeOffsetTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RetimeOffsetTest extends SpatialTest {
   override def backends = DISABLED // TODO: Rewrite
 
   def main(args: Array[String]): Void = {

@@ -4,7 +4,7 @@ package spatial.tests.feature.memories.sram
 import spatial.dsl._
 
 
-@test class SRAM2D extends SpatialTest {
+@spatial class SRAM2D extends SpatialTest {
   override def runtimeArgs: Args = "7"
 
 

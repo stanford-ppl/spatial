@@ -4,7 +4,7 @@ import spatial.libview._
 import pir.dsl._
 import _root_.pir.PIRTest
 
-@test class PIR_LSTM extends PIRTest {
+@pir class PIR_LSTM extends PIRTest {
   val STAGES = 6
   val LANES  = 16
 
@@ -175,7 +175,7 @@ import _root_.pir.PIRTest
   }
 }
 
-@test class PIR_GEMM extends PIRTest {
+@pir class PIR_GEMM extends PIRTest {
   val STAGES = 6
   val LANES  = 16
 

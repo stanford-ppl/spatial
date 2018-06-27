@@ -2,7 +2,7 @@
 
  import spatial.dsl._
 
- @test class PageRank extends SpatialTest {
+ @spatial class PageRank extends SpatialTest {
    override def runtimeArgs: Args = "50 0.125"
 
    type Elem = FixPt[TRUE, _16, _16] // Float

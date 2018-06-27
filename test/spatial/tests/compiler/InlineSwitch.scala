@@ -2,7 +2,7 @@ package spatial.tests.compiler
 
 import spatial.dsl._
 
-@test class InlineSwitch extends SpatialTest {
+@spatial class InlineSwitch extends SpatialTest {
   override def runtimeArgs: Args = "3" and "7" and "5" and "32"
 
 

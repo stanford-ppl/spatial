@@ -1,11 +1,8 @@
 package spatial.tests.feature.host
 
-
 import spatial.dsl._
 
-
-@test class BinaryFileIO extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class BinaryFileIO extends SpatialTest {
   type Nibble = FixPt[TRUE,_4,_0]
   type UByte = FixPt[FALSE,_8,_0]
   type UShort = FixPt[FALSE,_16,_0]

@@ -3,9 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 import spatial.targets._
 
-@test class SHA1 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SHA1 extends SpatialTest {
   type ULong = FixPt[FALSE, _32, _0]
   @struct case class byte_pack(a: Int8, b: Int8, c: Int8, d: Int8)
 
@@ -158,9 +156,7 @@ import spatial.targets._
 }
 
 
-@test class JPEG_Markers extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class JPEG_Markers extends SpatialTest {
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
   type UInt16 = FixPt[FALSE, _16, _0]
@@ -557,9 +553,7 @@ import spatial.targets._
   }
 }
 
-@test class JPEG_Decompress extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class JPEG_Decompress extends SpatialTest {
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
   type UInt16 = FixPt[FALSE, _16, _0]
@@ -846,8 +840,7 @@ import spatial.targets._
   }
 }
 
-@test class JPEG_Decode extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class JPEG_Decode extends SpatialTest {
   override def backends = DISABLED
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
@@ -1270,8 +1263,7 @@ import spatial.targets._
 }
 
 
-@test class MPEG2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MPEG2 extends SpatialTest {
   override def backends = DISABLED
 
   type UInt8 = FixPt[FALSE, _8, _0]

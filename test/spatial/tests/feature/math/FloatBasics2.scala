@@ -2,8 +2,7 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-@test class FloatBasics2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class FloatBasics2 extends SpatialTest {
   type T = Float
 
   def main(args: Array[String]): Unit = {

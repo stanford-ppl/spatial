@@ -2,8 +2,8 @@ package spatial.tests.syntax
 
 import spatial.dsl._
 
-@test class LiteralMath extends SpatialTest {
-  def runtimeArgs: Args = "32 16"
+@spatial class LiteralMath extends SpatialTest {
+  override def runtimeArgs: Args = "32 16"
 
   def main(args: Array[String]): Unit = {
     Accel { /* No hardware lol */ }

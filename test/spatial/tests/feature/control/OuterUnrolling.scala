@@ -2,8 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class OuterForeachUnrolling extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class OuterForeachUnrolling extends SpatialTest {
   override def backends: Seq[Backend] = Seq(Scala)
 
   def main(args: Array[String]): Unit = {
@@ -24,8 +23,7 @@ import spatial.dsl._
   }
 }
 
-@test class OuterReduceUnrolling extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class OuterReduceUnrolling extends SpatialTest {
   override def backends: Seq[Backend] = Seq(Scala)
 
   def main(args: Array[String]): Unit = {
@@ -47,8 +45,7 @@ import spatial.dsl._
   }
 }
 
-@test class OuterReduceUnrolling2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class OuterReduceUnrolling2 extends SpatialTest {
   override def backends: Seq[Backend] = Seq(Scala)
 
   def main(args: Array[String]): Unit = {

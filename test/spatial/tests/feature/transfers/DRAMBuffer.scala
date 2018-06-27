@@ -1,11 +1,8 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class DRAMBuffer extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class DRAMBuffer extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     type T = Int32

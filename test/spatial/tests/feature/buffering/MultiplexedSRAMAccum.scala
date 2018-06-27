@@ -2,8 +2,7 @@ package spatial.tests.feature.buffering
 
 import spatial.dsl._
 
-@test class MultiplexedSRAMAccum extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MultiplexedSRAMAccum extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val data = Array.fill(32){ random[Int](max = 10) }

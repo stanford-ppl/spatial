@@ -117,7 +117,7 @@ def getFullyQualifiedSourceName(app):
   return path
 
 
-def getFullyQualifiedClassName(app):
+def getFullyQualifiedClassName(app, errorIfNone):
   path_cmd = "find ./ -name '" + app + ".class'"
   p = subprocess.Popen(path_cmd, stdout=subprocess.PIPE, shell=True)
   p.wait()
@@ -130,17 +130,21 @@ def getFullyQualifiedClassName(app):
       paths.append(path)
 
   path = ""
+  found = false
 
   if len(paths) == 1:
     path = paths[0].decode("utf-8")
-  elif len(paths) == 0:
+    found = true
+  elif len(paths) == 0 and errorIfNone:
     print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] No class found for application with name " + app + ".\n")
     exit(1)
-  else:
+  elif len(paths) > 1:
     print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] Ambiguous classes found for " + app + ".\n")
     for path in paths:
       print(path + "\n")
     exit(1)
+
+
 
   name = path.replace("/", ".")
   isTest = path.find("test-classes") > 0
@@ -151,7 +155,7 @@ def getFullyQualifiedClassName(app):
     name = name[(classPos+8):]
   name = name[:(len(name)-6)]
 
-  return name, isTest
+  return name, isTest, found
 
 
 def main():
@@ -167,12 +171,11 @@ def main():
   ecode = os.system("sbt test:compile")
   if ecode != 0: exit(1)
 
-  name, isTest = getFullyQualifiedClassName(opts.app)
+  name, isTest, found = getFullyQualifiedClassName(app=opts.app, errorIfNone=True)
 
   java_cmd = ""
   if isTest:
-    java_cmd = "sbt -batch \"; test:runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
-
+    java_cmd = "sbt -batch \"; testOnly " + name + " -- --name " + opts.app + " " + ' '.join(args) + "\""
   else:
     java_cmd = "sbt -batch \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
 

@@ -36,11 +36,11 @@ trait Spatial extends Compiler {
   }
 
   var args: Tensor1[Text] = _
-  def entry(args: Tensor1[Text]): Void
+  def main(args: Tensor1[Text]): Void
 
   final def stageApp(sargs: Array[String]): Block[_] = stageBlock{
     args = stage(InputArguments())
-    entry(args)
+    main(args)
   }
 
   override def initConfig(): Config = new SpatialConfig

@@ -3,7 +3,7 @@ package spatial.tests.feature.transfers
 
 import spatial.dsl._
 
-@test class AXICommandSplit extends SpatialTest { 
+@spatial class AXICommandSplit extends SpatialTest {
   override def runtimeArgs: Args = "12288"
 
   val rows = 4

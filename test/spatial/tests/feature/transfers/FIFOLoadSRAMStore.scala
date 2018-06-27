@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class FIFOLoadSRAMStore extends SpatialTest {
+@spatial class FIFOLoadSRAMStore extends SpatialTest {
   override def runtimeArgs: Args = "192"
 
 

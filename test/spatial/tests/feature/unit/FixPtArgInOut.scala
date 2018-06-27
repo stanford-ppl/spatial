@@ -2,7 +2,7 @@ package spatial.tests.feature.unit
 
 import spatial.dsl._
 
-@test class FixPtArgInOut extends SpatialTest {
+@spatial class FixPtArgInOut extends SpatialTest {
   override def runtimeArgs: Args = "-1.5"
   type T = FixPt[TRUE,_28,_4]
 

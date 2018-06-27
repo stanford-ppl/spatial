@@ -2,11 +2,9 @@ package spatial.tests.feature.unit
 
 import spatial.dsl._
 
-@test class MultilevelPar extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MultilevelPar extends SpatialTest {
   val rowpar = 2
   val colpar = 3
-
 
   def main(args: Array[String]): Unit = {
     val d = DRAM[Int](16,16)

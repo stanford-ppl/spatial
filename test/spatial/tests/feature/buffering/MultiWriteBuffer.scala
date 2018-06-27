@@ -2,9 +2,7 @@ package spatial.tests.feature.buffering
 
 import spatial.dsl._
 
-@test class MultiWriteBuffer extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MultiWriteBuffer extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val R = 16

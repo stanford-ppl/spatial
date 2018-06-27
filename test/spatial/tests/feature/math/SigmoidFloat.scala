@@ -1,14 +1,9 @@
 package spatial.tests.feature.math
 
-
 import spatial.dsl._
 
-
-@test class SigmoidFloat extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SigmoidFloat extends SpatialTest {
   type T = Float//FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
     val data = 

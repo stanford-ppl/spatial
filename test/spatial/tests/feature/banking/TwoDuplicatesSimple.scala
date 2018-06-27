@@ -1,12 +1,8 @@
 package spatial.tests.feature.banking
 
-
 import spatial.dsl._
 
-
-@test class TwoDuplicatesSimple extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class TwoDuplicatesSimple extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)

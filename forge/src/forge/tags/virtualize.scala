@@ -32,7 +32,7 @@ private object virtualize {
         c.warning(c.enclosingPosition, "@virtualize cannot be used on type aliases.")
         inputs
 
-      case a :: as => virt(a) ::: as
+      case a :: as => runVirtualizer(a) ::: as
       case Nil     => Nil
     }
 

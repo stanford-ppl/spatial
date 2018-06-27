@@ -4,7 +4,7 @@ package spatial.tests.feature.memories.reg
 import spatial.dsl._
 
 
-@test class StructReg extends SpatialTest {
+@spatial class StructReg extends SpatialTest {
   override def runtimeArgs: Args = "32, 8"
 
   def main(args: Array[String]): Unit = {

@@ -2,7 +2,7 @@ package spatial.tests.apps
 
 import spatial.dsl._
 
-@test class LP_SVRG extends SpatialTest {
+@spatial class LP_SVRG extends SpatialTest {
   override def runtimeArgs: Args = "25 30 256 0.0001 0.0009 10"
 
   val margin = 2 // Maximum distance between gold weights and computed weights to consider the app "passing"

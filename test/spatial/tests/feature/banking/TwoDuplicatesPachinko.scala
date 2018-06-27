@@ -3,8 +3,7 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 // Nonsensical app, just to get structure there.
-@test class TwoDuplicatesPachinko extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class TwoDuplicatesPachinko extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](512)

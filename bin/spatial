@@ -130,11 +130,11 @@ def getFullyQualifiedClassName(app, errorIfNone):
       paths.append(path)
 
   path = ""
-  found = false
+  found = False
 
   if len(paths) == 1:
     path = paths[0].decode("utf-8")
-    found = true
+    found = True
   elif len(paths) == 0 and errorIfNone:
     print("[" + bcolors.FAIL + "error" + bcolors.ENDC + "] No class found for application with name " + app + ".\n")
     exit(1)
@@ -175,7 +175,8 @@ def main():
 
   java_cmd = ""
   if isTest:
-    java_cmd = "sbt -batch \"; testOnly " + name + " -- --name " + opts.app + " " + ' '.join(args) + "\""
+    ciArgs = "export TEST_ARGS=\"--name " + opts.app + " " + ' '.join(args) + "\""
+    java_cmd = ciArgs + "; sbt -batch -Dci=true \"; testOnly " + name + "\""
   else:
     java_cmd = "sbt -batch \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
 

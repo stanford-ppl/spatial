@@ -6,6 +6,7 @@ import utils.process.Subprocess
 import utils.{Args, Testbench}
 
 import scala.concurrent.{Await, Future, duration}
+import scala.util.Try
 
 trait DSLTest extends Testbench with Compiler with Args { test =>
   //-------------------//
@@ -21,8 +22,11 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
   //-------------------//
 
   def backends: Seq[Backend]
-  def enable(str: String): Boolean = sys.props.get(str).exists(v => v.trim.toLowerCase == "true")
+  def property(str: String): Option[String] = sys.props.get(str)
+  def checkFlag(str: String): Boolean = property(str).exists(v => v.trim.toLowerCase == "true")
   lazy val DISABLED: Seq[Backend] = Seq(IGNORE_TEST)
+
+  def commandLine: Boolean = checkFlag("ci")
 
   /** A backend which can compile and run a given application.
     *
@@ -180,10 +184,17 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
 
   private val tests = backends.filter(_.shouldRun)
-  if (tests.isEmpty) {
+  if (commandLine) {
+    // If running from a non-testing script, run the standard compiler flow
+    val args = sys.env.get("TEST_ARGS").map(_.split(" ")).getOrElse(Array.empty)
+    System.out.println(s"Running standard compilation flow for test with args: ${args.mkString(" ")}")
+    name should "compile" in { compile(args) }
+  }
+  else if (tests.isEmpty) {
     ignore should "...nothing? (No backends enabled. Enable using -D<backend>=true)" in { () }
   }
   else {
+    // Otherwise run all the backend tests (if there are any enabled)
     tests.foreach{backend => backend.runBackend() }
   }
 

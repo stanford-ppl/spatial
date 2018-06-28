@@ -136,7 +136,7 @@ import spatial.node.DelayLine
 
 
 
-@test class SystolishArray extends SpatialTest {
+@spatial class SystolishArray extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
   def main(args: Array[String]): Void = {

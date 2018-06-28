@@ -1070,7 +1070,7 @@ object Utils {
         val sr = Module(new RetimeWrapper(sig.getWidth, delay))
         sr.io.in := sig.asUInt
         sr.io.flow := en
-        sig.cloneType.fromBits(sr.io.out)
+        sr.io.out.asTypeOf(sig)
       }
     }
   }

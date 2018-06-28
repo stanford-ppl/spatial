@@ -255,6 +255,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
           step(1)      
         }
       }
+    case FIFOType =>
+    case LineBufferType => 
   }
   c.io.broadcastW.foreach{p => poke(p.en, false)}
   step(1)
@@ -299,6 +301,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
           }
           println("")
         }
+      case FIFOType =>
+      case LineBufferType => 
 
     }
     c.io.directR.foreach{p => poke(p.en, false)}
@@ -348,6 +352,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
             step(1)      
           }
         }
+      case FIFOType =>
+      case LineBufferType => 
 
     }
 
@@ -405,6 +411,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
           }
           println("")
         }
+      case FIFOType =>
+      case LineBufferType => 
     }
     println("")
     
@@ -425,7 +433,7 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
   step(5)
 
   var fifo = scala.collection.mutable.Queue[Int]()
-  def enq(datas: Seq[Int], ens: Seq[Int]) {
+  def enq(datas: Seq[Int], ens: Seq[Int]): Unit = {
     (0 until datas.length).foreach { i => poke(c.io.xBarW(i).data, datas(i)) }
     (0 until datas.length).foreach { i => poke(c.io.xBarW(i).en, ens(i)) }
     step(1)
@@ -433,7 +441,7 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
     step(1)
     (0 until datas.length).foreach{i => if (ens(i) != 0) fifo.enqueue(datas(i))}
   }
-  def deq(ens: Seq[Int]) {
+  def deq(ens: Seq[Int]): Unit = {
     (0 until ens.length).foreach { i => poke(c.io.xBarR(i).en, ens(i)) }
     val num_popping = ens.reduce{_+_}
     (0 until ens.length).foreach{i => 

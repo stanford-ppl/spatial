@@ -36,7 +36,7 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
     emit(s"""<TD><font size = "6">${lhs.schedule} $isFSM<font size = "4"> (${lhs.level})</font>""")
     emit(s"""<br><font size = "2">${lhs.ctx}</font>""")
     emit(s"""<br><font size = "2">$line</font>""")
-    emit(s"""<br><font size = "1"><b>$lhs = $rhs</b></font>""")
+    emit(s"""<br><font size = "1"><b>${lhs}${lhs._name} = $rhs</b></font>""")
     if (cchain.isDefined) emit(s"""<br><font size = "1">Counter: ${cchain.get}</font>""")
 
     // if (!inner & !collapsible) {emit(s"""${" "*html_tab}<br><font size = "1"><b>**Stages below are route-through (think of cycle counts as duty-cycles)**</b></font>""")}

@@ -225,7 +225,7 @@ class LineBuffer(val num_lines: Int, val line_size: Int, val empty_stages_to_buf
 
   val availablePorts = (0 until num_lines).map{p => p}
   var usedPorts = List[Int]()
-  def connectStageCtrl(done: Bool, en: Bool, ports: List[Int]) {
+  def connectStageCtrl(done: Bool, en: Bool, ports: List[Int]): Unit = {
     ports.foreach{ port => 
       io.sEn(port) := en
       io.sDone(port) := done
@@ -235,7 +235,7 @@ class LineBuffer(val num_lines: Int, val line_size: Int, val empty_stages_to_buf
 
   var dPort = 0
   var ePort = 0
-  def connectWPort(data: List[UInt], en: List[Bool]) {
+  def connectWPort(data: List[UInt], en: List[Bool]): Unit = {
     data.foreach{ d => 
       io.data_in(dPort) := d
       dPort = dPort + 1
@@ -248,7 +248,7 @@ class LineBuffer(val num_lines: Int, val line_size: Int, val empty_stages_to_buf
 
   }
 
-  def lockUnusedCtrl() {
+  def lockUnusedCtrl(): Unit = {
     availablePorts.foreach { p =>
       if (!usedPorts.contains(p)) {
         io.sEn(p) := false.B

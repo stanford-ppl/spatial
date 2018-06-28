@@ -427,15 +427,15 @@ class NBufMem(val mem: MemType,
           f.io.xBarR(xBarRMuxBufferBase + k).ofs := io.broadcastR(k).ofs
           f.io.xBarR(xBarRMuxBufferBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
         }
-
       }
+    case LineBufferType => 
 
   }
 
 
   var usedMuxPorts = List[(String,(Int,Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)) {connectXBarWPort(wBundle, bufferPort, muxAddr, 0)}
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)): Unit = {connectXBarWPort(wBundle, bufferPort, muxAddr, 0)}
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
     assert(hasXBarW)
     assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
@@ -457,8 +457,8 @@ class NBufMem(val mem: MemType,
     io.output.data(bufferBase + muxBase)
   }
 
-  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int)) {connectBroadcastWPort(wBundle, muxAddr, 0)}
-  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int) {
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int)): Unit = {connectBroadcastWPort(wBundle, muxAddr, 0)}
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int): Unit = {
     val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.broadcastW(muxBase) := wBundle
   }
@@ -473,7 +473,7 @@ class NBufMem(val mem: MemType,
     io.output.data(xBarRBase + directRBase + muxBase)
   }
 
-  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
     assert(hasDirectW)
     assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to directW port ($bufferPort,$muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
@@ -496,7 +496,7 @@ class NBufMem(val mem: MemType,
     io.output.data(xBarRBase + bufferBase + muxBase)
   }
 
-  def connectStageCtrl(done: Bool, en: Bool, port: Int) {
+  def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {
     io.sEn(port) := en
     io.sDone(port) := done
   }
@@ -554,12 +554,12 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
                                   ))
   io <> nbufFF.io
 
-  def connectStageCtrl(done: Bool, en: Bool, port: Int) {
+  def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {
     io.sEn(port) := en
     io.sDone(port) := done
   }
 
-  def chain_pass[T](dat: T, en: Bool) { // Method specifically for handling reg chains that pass counter values between metapipe stages
+  def chain_pass[T](dat: T, en: Bool): Unit = { // Method specifically for handling reg chains that pass counter values between metapipe stages
     dat match {
       case data: UInt => 
         io.xBarW(0).data := data

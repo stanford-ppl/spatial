@@ -107,7 +107,7 @@ class MAGCore(
 
   var dbgCount = 0
   val signalLabels = ListBuffer[String]()
-  def connectDbgSig(sig: UInt, label: String) {
+  def connectDbgSig(sig: UInt, label: String): Unit = {
     if (FringeGlobals.enableDebugRegs) {
       if (isDebugChannel) {
         io.debugSignals(dbgCount) := sig

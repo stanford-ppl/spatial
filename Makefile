@@ -7,6 +7,8 @@ all: apps
 install: 
 	bash bin/make_poly.sh
 	sbt "; project emul; publishLocal"
+#	sbt "; project resources/synth/chisel-templates/templates; publishLocal"
+#	sbt "; project resources/synth/chisel-templates/fringeHW; publishLocal"
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##

@@ -4,7 +4,6 @@ import spatial.dsl._
 import argon.Block
 
 @spatial class PipeMergerTest extends SpatialTest {
-  override def backends = DISABLED // TODO: Add IR check
 
   def main(args: Array[String]): Unit = {
     val N = ArgIn[Int]

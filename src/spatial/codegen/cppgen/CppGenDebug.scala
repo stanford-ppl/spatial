@@ -17,6 +17,19 @@ trait CppGenDebug extends CppGenCommon {
             emit(src"""${lhs} += ${array}[${lhs}_i];""")
         close("}")
     case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
+      // lhs.tp match {
+      //   case IntType()  => emit(src"int32_t $lhs = atoi(${x}.c_str());")
+      //   case LongType() => emit(src"long $lhs = std::stol($x);")
+      //   // case FixPtType(s,d,f) => emit(src"float $lhs = std::stof($x);")
+      //   case FixPtType(s,d,f) => 
+      //     if (f > 0 || f+d <= 8) emit(src"float $lhs = std::stof($x);") 
+      //     else {
+      //       emit(src"${lhs.tp} $lhs;")
+      //       emit(src"std::istringstream iss$lhs($x);")
+      //       emit(src"iss$lhs >> $lhs;")
+      //     }
+      // }
+
     case TextToFlt(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
     case TextLength(x) => emit(src"${lhs.tp} $lhs = ${x}.length();")
     case TextApply(x,el) => emit(src"${lhs.tp} $lhs = $x.at($el);")

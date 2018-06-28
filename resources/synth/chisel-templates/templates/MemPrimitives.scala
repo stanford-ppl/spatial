@@ -121,7 +121,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
   val io = IO(new MemInterface(p))
 
   var usedMuxPorts = List[(String,(Int,Int,Int))]() // Check if the muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
     assert(p.hasXBarW)
     assert(p.xBarWMux.contains(muxAddr))
     assert(!usedMuxPorts.contains(("XBarW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($muxAddr,$vecId) twice!")
@@ -145,7 +145,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     io.output.data(outBase + vecId)
   }
 
-  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
     assert(p.hasDirectW)
     assert(p.directWMux.contains(muxAddr))
     assert(!usedMuxPorts.contains(("DirectW", (muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to DirectW port ($muxAddr,$vecId) twice!")
@@ -182,7 +182,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
   // Get info on physical dims
   // TODO: Upcast dims to evenly bank
   val bankDim = p.bankingMode match {
-    // case DiagonalMemory => logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
+    case DiagonalMemory => math.ceil(p.depth / p.banks.product).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
     case BankedMemory => math.ceil(p.depth / p.banks.product).toInt
   }
   val numMems = p.bankingMode match {
@@ -845,7 +845,8 @@ class SRAM_Old(val logicalDims: List[Int], val bitWidth: Int,
   }
 
   var wInUse = Array.fill(wPar.length) {false} // Array for tracking which wPar sections are in use
-  def connectWPort(wBundle: Vec[multidimW], ports: List[Int]) {
+
+  def connectWPort(wBundle: Vec[multidimW], ports: List[Int]): Unit = {
     // Figure out which wPar section this wBundle fits in by finding first false index with same wPar
     val potentialFits = wPar.zipWithIndex.filter(_._1 == wBundle.length).map(_._2)
     val wId = potentialFits(potentialFits.map(wInUse(_)).indexWhere(_ == false))

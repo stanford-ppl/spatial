@@ -5,6 +5,7 @@ import argon.codegen._
 
 import spatial.lang._
 import spatial.node._
+import spatial.util._
 
 import scala.collection.mutable
 
@@ -12,13 +13,13 @@ trait NamedCodegen extends Codegen {
 
   override def named(s: Sym[_], id: Int): String = s.op match {
     case Some(rhs) => rhs match {
-      case _: AccelScope       => s"${s}_RootController${s._name}"
-      case _: UnitPipe         => s"${s}_UnitPipe${s._name}"
-      case _: UnrolledForeach  => s"${s}_Foreach${s._name}"
-      case _: UnrolledReduce   => s"${s}_Reduce${s._name}"
-      case _: Switch[_]        => s"${s}_Switch${s._name}"
-      case _: SwitchCase[_]    => s"${s}_SwitchCase${s._name}"
-      case _: StateMachine[_]  => s"${s}_FSM${s._name}"
+      case _: AccelScope       => if (s.isInnerControl) s"${s}_inr_RootController${s._name}" else s"${s}_outr_RootController${s._name}"
+      case _: UnitPipe         => if (s.isInnerControl) s"${s}_inr_UnitPipe${s._name}" else s"${s}_outr_UnitPipe${s._name}"
+      case _: UnrolledForeach  => if (s.isInnerControl) s"${s}_inr_Foreach${s._name}" else s"${s}_outr_Foreach${s._name}"
+      case _: UnrolledReduce   => if (s.isInnerControl) s"${s}_inr_Reduce${s._name}" else s"${s}_outr_Reduce${s._name}"
+      case _: Switch[_]        => if (s.isInnerControl) s"${s}_inr_Switch${s._name}" else s"${s}_outr_Switch${s._name}"
+      case _: SwitchCase[_]    => if (s.isInnerControl) s"${s}_inr_SwitchCase${s._name}" else s"${s}_outr_SwitchCase${s._name}"
+      case _: StateMachine[_]  => if (s.isInnerControl) s"${s}_inr_FSM${s._name}" else s"${s}_outr_FSM${s._name}"
       case _: CounterNew[_]    => s"${s}_ctr"
       case _: CounterChainNew  => s"${s}_ctrchain"
 

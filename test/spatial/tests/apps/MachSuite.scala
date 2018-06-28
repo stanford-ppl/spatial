@@ -2854,7 +2854,7 @@ import spatial.targets._
       // Loop 11
       Sequential.Foreach(THREADS by 1) { tid => 
         FFT8(tid)
-        // Do the indirect "reversing"
+        // Do the indirect "reversing" (LUT = 0,4,2,6,1,5,3,7)
         val tmem_x = SRAM[T](8)
         val tmem_y = SRAM[T](8)
         Foreach(8 by 1) { i => 

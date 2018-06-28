@@ -611,7 +611,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
     val coords = p.logicalDims.zipWithIndex.map{ case (b,j) => 
       i % (p.logicalDims.drop(j).product) / p.logicalDims.drop(j+1).product
     }
-    val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt else 0.S(p.bitWidth.W).asUInt
+    val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.S((p.bitWidth+1).W).asUInt.apply(p.bitWidth,0) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
     (mem,coords,i)
   }

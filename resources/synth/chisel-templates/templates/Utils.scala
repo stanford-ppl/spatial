@@ -294,6 +294,9 @@ object ops {
     def cast(c: FixedPoint, sign_extend: scala.Boolean = false): Unit = {
       c.r := Utils.FixedPoint(c.s,c.d,c.f,b, sign_extend).r
     }
+    def cast(c: => UInt): Unit = {
+      c.r := b.r
+    }
 
   }
 

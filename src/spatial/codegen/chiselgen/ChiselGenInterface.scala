@@ -82,7 +82,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
           emitt(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
       }
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), lhs.fullDelay)}""")
+      emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(src"${swap(controllerStack.head, DatapathEn)} & ${swap(controllerStack.head, IIDone)}", lhs.fullDelay)}""")
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
       val id = lhs.ports(0).values.head.muxPort
@@ -95,7 +95,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emitt(src"""${swap(reg, DataOptions)}($id) := $padded""")
 
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(swap(controllerStack.head, DatapathEn), lhs.fullDelay)}""")
+      emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(src"${swap(controllerStack.head, DatapathEn)} & ${swap(controllerStack.head, IIDone)}", lhs.fullDelay)}""")
 
     case DRAMNew(dims, _) => 
       drams += (lhs -> drams.toList.length)

@@ -455,104 +455,103 @@ trait UtilsControl {
     Tree.LCAWithPaths(a,b){_.parent}
   }
 
-  /** Returns the LCA between two symbols a and b along with their pipeline distance.
+  /** Returns the stage distance between a and b with respect to the common controller ctrl.
     *
-    * Pipeline distance between a and b:
-    *   If a and b have a least common control ancestor which is neither a nor b,
-    *   this is defined as the dataflow distance between the LCA's children which contain a and b
-    *   If a and b are equal, the distance is defined as zero.
+    * The stage distance between a and b is defined as:
+    *   If a and b are equal: 0
+    *   If ctrl is an inner controller: 0
+    *   If ctrl is not a common ancestor of both a and b: <undefined>
+    *   If ctrl == a XOR ctrl == b: <undefined> (ctrl == a == b: 0)
+    *   Otherwise: dataflow distance between the immediate child(ren) of ctrl containing a and b.
     *
-    *   The distance is undefined when the LCA is a xor b, or if a and b occur in parallel
-    *   The distance is positive if a comes before b, negative otherwise
+    * The distance is positive if a comes before b (dataflow order), negative otherwise.
     */
-  @stateful def LCAWithDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = LCAWithDistance(a.toCtrl,b.toCtrl)
-
-
-  @stateful def LCAWithDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
-    if (a == b) (a,0)
+  @stateful def getStageDistance(ctrl: Ctrl, a: Ctrl, b: Ctrl): Option[Int] = {
+    if (a == b) Some(0)
+    else if (ctrl.isInnerControl) Some(0)
     else {
-      val (lca, pathA, pathB) = LCAWithPaths(a, b)
-      if (lca.isOuterControl && lca != a && lca != b) {
+      val pathA = a.ancestors
+      val pathB = b.ancestors
+      val ctrlIdxA = pathA.indexOf(ctrl)
+      val ctrlIdxB = pathB.indexOf(ctrl)
+
+      if (ctrlIdxA < 0 || ctrlIdxB < 0) None        // ctrl is not common to a and b
+      else if (ctrlIdxA >= pathA.length - 1) None   // implies ctrl == a
+      else if (ctrlIdxB >= pathB.length - 1) None   // implies ctrl == b
+      else {
+        // TODO[2]: Revise to account for arbitrary dataflow graphs for children controllers
+        val topA = pathA(ctrlIdxA + 1)
+        val topB = pathA(ctrlIdxA + 1)
+        val idxA = ctrl.children.indexOf(topA)
+        val idxB = ctrl.children.indexOf(topB)
         logs(s"PathA: " + pathA.mkString(", "))
         logs(s"PathB: " + pathB.mkString(", "))
-        logs(s"LCA: $lca")
-
-        val topA = pathA.find{c => c != lca }.get
-        val topB = pathB.find{c => c != lca }.get
-        // TODO[2]: Update with arbitrary children graph once defined
-        val idxA = lca.children.indexOf(topA)
-        val idxB = lca.children.indexOf(topB)
-        if (idxA < 0 || idxB < 0) throw new Exception(s"Undefined distance between $a and $b (idxA=$idxA,idxB=$idxB)")
-        val dist = idxB - idxA
-        (lca,dist)
-      }
-      else {
-        (lca, 0)
+        logs(s"Ctrl: $ctrl")
+        if (idxA < 0 || idxB < 0) None
+        Some(idxB - idxA)
       }
     }
   }
 
+  @stateful def getStageDistance(ctrl: Ctrl, a: Sym[_], b: Sym[_]): Option[Int] = {
+    getStageDistance(ctrl, a.toCtrl, b.toCtrl)
+  }
 
-  /** Returns the coarse distance between two symbols a and b from the given LCA
+  /** Returns the LCA between a and b along with their dataflow distance w.r.t. the LCA. */
+  @stateful def LCAWithDataflowDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
+    val lca = LCA(a, b)
+    // TODO[2]: This should return a non-zero distance for inner controllers
+    val dist = getStageDistance(lca, a, b).getOrElse(0)
+    (lca, dist)
+  }
+
+  @stateful def LCAWithDataflowDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = {
+    LCAWithDataflowDistance(a.toCtrl,b.toCtrl)
+  }
+
+  /** Returns the coarse distance between two symbols a and b from the given controller ctrl.
     *
-    * Pipeline distance between a and b:
-    *   If a and b have a least common control ancestor which is neither a nor b,
-    *   this is defined as the dataflow distance between the LCA's children which contain a and b
-    *   If a and b are equal, the distance is defined as zero.
-    *
-    *   The distance is undefined when the LCA is a xor b, or if a and b occur in parallel
-    *   The distance is positive if a comes before b, negative otherwise
+    * The coarse distance is defined as:
+    *   If ctrl is an outer pipeline or streaming controller: the stage distance between a and b
+    *   Otherwise: <undefined>
     */
-  @stateful def coarseDistance(lca: Ctrl, a: Sym[_], b: Sym[_]): Int = coarseDistance(lca,a.toCtrl,b.toCtrl)
-
-
-  @stateful def coarseDistance(lca: Ctrl, a: Ctrl, b: Ctrl): Int = {
-    if (a == b) 0
-    else {
-      val (_, pathA, pathB) = LCAWithPaths(a, b)
-      if (lca.isOuterControl && lca != a && lca != b) {
-        logs(s"PathA: " + pathA.mkString(", "))
-        logs(s"PathB: " + pathB.mkString(", "))
-        logs(s"LCA: $lca")
-
-        val topA = pathA.find{c => c != lca }.get
-        val topB = pathB.find{c => c != lca }.get
-        // TODO[2]: Update with arbitrary children graph once defined
-        val idxA = lca.children.indexOf(topA)
-        val idxB = lca.children.indexOf(topB)
-        val dist = idxB - idxA
-        if (lca.isOuterPipeLoop || lca.isOuterStreamLoop) dist else 0
-      }
-      else {
-        0
-      }
-    }
-  }  
-
-  /** Returns the LCA and coarse-grained pipeline distance between accesses a and b.
-    *
-    * Coarse-grained pipeline distance:
-    *   If the LCA controller of a and b is a metapipeline, the pipeline distance
-    *   is the distance between the respective controllers for a and b. Otherwise zero.
-    */
-  @stateful def LCAWithCoarseDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = {
-    LCAWithCoarseDistance(a.toCtrl, b.toCtrl)
-  }
-  @stateful def LCAWithCoarseDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
-    val (lca,dist) = LCAWithDistance(a,b)
-    val coarseDist = if (lca.isOuterPipeLoop || lca.isOuterStreamLoop) dist else 0
-    (lca, coarseDist)
+  @stateful def getCoarseDistance(ctrl: Ctrl, a: Ctrl, b: Ctrl): Option[Int] = {
+    val dist = getStageDistance(ctrl, a, b)
+    if (ctrl.isOuterPipeLoop || ctrl.isOuterStreamLoop) dist else None
   }
 
-  // FIXME: Should have metadata for control owner for inputs to counters, shouldn't need this method.  Bug #
-  @stateful def lookahead(a: Sym[_]): Sym[_] = {
-    if (a.consumers.nonEmpty) {
-      val p = a.consumers.filterNot{x => a.ancestors.collect{case y if (y.s.isDefined) => y.s.get}.contains(x)} // Remove consumers who are in the ancestry of this node
-                         .map{ case y @ Op(x: CounterNew[_]) => y.getOwner.get; case y => y } // Convert counters to their owner ctrl
-      if (p.toList.length >= 1) p.head else a
-    } 
-    else a
+  @stateful def getCoarseDistance(ctrl: Ctrl, a: Sym[_], b: Sym[_]): Option[Int] = {
+    getCoarseDistance(ctrl,a.toCtrl,b.toCtrl)
   }
+
+  /** Returns the LCA between a and b along with their stage distance w.r.t. the LCA. */
+  @stateful def getLCAWithStageDistance(a: Ctrl, b: Ctrl): Option[(Ctrl,Int)] = {
+    val lca = LCA(a, b)
+    getStageDistance(lca, a, b).map{dist => (lca,dist) }
+  }
+
+  /** Returns the LCA between a and b along with their stage distance w.r.t. the LCA. */
+  @stateful def LCAWithStageDistance(a: Ctrl, b: Ctrl): (Ctrl,Int) = {
+    val lca = LCA(a, b)
+    val dist = getStageDistance(lca, a, b)
+    if (dist.isEmpty) throw new Exception(s"Stage distance between $a and $b is undefined.")
+    (lca, dist.get)
+  }
+
+  @stateful def LCAWithStageDistance(a: Sym[_], b: Sym[_]): (Ctrl,Int) = {
+    LCAWithStageDistance(a.toCtrl,b.toCtrl)
+  }
+
+  /** Returns the LCA between a and b along with their coarse distance w.r.t. the LCA. */
+  @stateful def getLCAWithCoarseDistance(a: Ctrl, b: Ctrl): Option[(Ctrl,Int)] = {
+    val lca = LCA(a,b)
+    getCoarseDistance(lca, a, b).map{dist => (lca,dist) }
+  }
+
+  @stateful def getLCAWithCoarseDistance(a: Sym[_], b: Sym[_]): Option[(Ctrl,Int)] = {
+    getLCAWithCoarseDistance(a.toCtrl, b.toCtrl)
+  }
+
 
   /** Returns all metapipeline parents between all pairs of (w in writers, a in readers U writers). */
   @stateful def findAllMetaPipes(readers: Set[Sym[_]], writers: Set[Sym[_]]): Map[Ctrl,Set[(Sym[_],Sym[_])]] = {
@@ -560,15 +559,40 @@ trait UtilsControl {
     else {
       val ctrlGrps: Set[(Ctrl,(Sym[_],Sym[_]))] = writers.flatMap{w =>
         (readers ++ writers).flatMap{a =>
-          val (lca, dist) = LCAWithCoarseDistance(lookahead(w),lookahead(a))
-          //dbgs(s"lcawithdist for $w (${lookahead(w)} <-> $a (${lookahead(a)} = $lca $dist")
-          if (dist != 0) Some(lca.master, (w,a)) else None
+          getLCAWithCoarseDistance(w, a).filter(_._2 != 0).map{case (lca,_) => (lca.master, (w,a)) }
         }
       }
       ctrlGrps.groupBy(_._1).mapValues(_.map(_._2))
     }
   }
 
+  @stateful def findMetaPipe(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {
+    val accesses = readers ++ writers
+    val metapipeLCAs = findAllMetaPipes(readers, writers)
+    val hierarchicalBuffer = metapipeLCAs.keys.size > 1
+    val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
+
+    metapipeLCAs.keys.headOption match {
+      case Some(metapipe) =>
+        val group: Set[(Sym[_],Sym[_])] = metapipeLCAs(metapipe)
+        val anchor: Sym[_] = group.head._1
+        val dists = accesses.map{a =>
+          val dist = getCoarseDistance(metapipe, anchor, a)
+          dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
+
+          if (group.exists{x => a == x._1 || a == x._2 }) a -> dist else a -> None
+        }
+        val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
+        val minDist = buffers.minOrElse(0)
+        val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
+        (Some(metapipe), ports, issue)
+
+      case None =>
+        (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+    }
+  }
+
+  /** Creates a String representation of the controller tree over all of the given accesses. */
   @stateful def ctrlTree(accesses: Set[Sym[_]], top: Option[Ctrl] = None, tab: Int = 0): Iterator[String] = {
     if (accesses.nonEmpty) {
       val lca_init = LCA(accesses.toList)
@@ -595,50 +619,6 @@ trait UtilsControl {
       }
     }
     else Nil.iterator
-  }
-
-  @stateful def findMetaPipe(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {
-    val accesses = readers ++ writers
-    val metapipeLCAs = findAllMetaPipes(readers, writers)
-    val hierarchicalBuffer = metapipeLCAs.keys.size > 1
-    val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
-
-    metapipeLCAs.keys.headOption match {
-      case Some(metapipe) =>
-        val group  = metapipeLCAs(metapipe)
-        val anchor = group.head._1
-        val dists = accesses.map{a =>
-          val dist = 
-            if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpReduce[_]) => true; case _ => false}) && a.parent.s.get.isOuterControl) { // Hack for bug # 
-              val Op(OpReduce(_,_,_,map,load,_,_,_,_,_)) = a.parent.s.get
-              if (map.result == a) {
-                a.parent.children.filter(_.s.get != a.parent.s.get).length
-              }
-              else coarseDistance(metapipe, lookahead(anchor), lookahead(a))
-            }
-            else if (a.parent.s.isDefined && (a.parent.s.get match { case Op(_: OpMemReduce[_,_]) => true; case _ => false}) && a.parent.s.get.isOuterControl) { // Hack for bug # 
-              val Op(OpMemReduce(_,_,_,_,map,_,_,_,_,_,_,_,_)) = a.parent.s.get
-              if (map.result == a) {
-                a.parent.children.filter(_.s.get != a.parent.s.get).length
-              }
-              else coarseDistance(metapipe, lookahead(anchor), lookahead(a))
-            }
-            else coarseDistance(metapipe, lookahead(anchor),lookahead(a))
-
-          // val (lca,dist) = coarseDistance(metapipe, lookahead(anchor),lookahead(a))
-
-          dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
-
-          if (group.map{x => List(x._1, x._2)}.flatten.contains(a)) a -> Some(dist) else a -> None
-        }
-        val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
-        val minDist = buffers.minOrElse(0)
-        val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
-        (Some(metapipe), ports, issue)
-
-      case None =>
-        (None, accesses.map{a => a -> Some(0)}.toMap, issue)
-    }
   }
 
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {

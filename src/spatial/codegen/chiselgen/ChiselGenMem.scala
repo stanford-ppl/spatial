@@ -218,7 +218,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
-    val accesses = mem.accesses.filter(_.ports(0).values.head.bufferPort.isDefined).map(lookahead(_))
+    val accesses = mem.accesses.filter(_.ports(0).values.head.bufferPort.isDefined)
 
     var specialLB = false
     // val readCtrls = readPorts.map{case (port, readers) =>

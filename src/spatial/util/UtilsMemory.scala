@@ -87,13 +87,13 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
 
     /** Returns true if an execution of access a may occur before one of access b. */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
-      val (ctrl,dist) = LCAWithDistance(b.parent, a.parent)
+      val (ctrl,dist) = LCAWithDataflowDistance(b.parent, a.parent)
       dist <= 0 || (dist > 0 && ctrl.willRunMultiple)
     }
 
     /** Returns true if an execution of access a may occur after one of access b. */
     @stateful def mayFollow(b: Sym[_]): Boolean = {
-      val (ctrl,dist) = LCAWithDistance(b.parent, a.parent)
+      val (ctrl,dist) = LCAWithDataflowDistance(b.parent, a.parent)
       dist >= 0 || (dist < 0) && ctrl.willRunMultiple
     }
 
@@ -121,8 +121,8 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       *   5. p b a - true if b does not occur within a switch
       */
     @stateful def mustFollow(b: Sym[_], p: Sym[_]): Boolean = {
-      val (ctrlA,distA) = LCAWithDistance(a, p) // Positive if a * p, negative otherwise
-      val (ctrlB,distB) = LCAWithDistance(b, p) // Positive if b * p, negative otherwise
+      val (ctrlA,distA) = LCAWithDataflowDistance(a, p) // Positive for a * p, negative otherwise
+      val (ctrlB,distB) = LCAWithDataflowDistance(b, p) // Positive for b * p, negative otherwise
       val ctrlAB = LCA(a,b)
       if      (distA > 0 && distB > 0) { distA < distB && a.mustOccurWithin(ctrlAB) }   // b a p
       else if (distA > 0 && distB < 0) { ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // a p b
@@ -193,9 +193,9 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
   }
 
   def shiftAxis(access: Sym[_]): Option[Int] = access match {
-    case Op(RegFileShiftIn(_,_,_,_,axis)) => Some(axis)
-    case Op(RegFileBankedShiftIn(_,_,_,_,axis)) => Some(axis)
-    case Op(RegFileShiftInVector(_,_,_,_,axis,_)) => Some(axis)
+    case Op(op: RegFileShiftIn[_,_])       => Some(op.axis)
+    case Op(op: RegFileBankedShiftIn[_,_]) => Some(op.axis)
+    case Op(op: RegFileShiftInVector[_,_]) => Some(op.axis)
     case _ => None
   }
 

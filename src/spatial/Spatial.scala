@@ -81,7 +81,7 @@ trait Spatial extends Compiler {
     lazy val blackboxLowering      = BlackboxLowering(state)
     lazy val memoryDealiasing      = MemoryDealiasing(state)
     lazy val pipeInserter          = PipeInserter(state)
-    lazy val registerCleanup       = RegisterCleanup(state)
+    lazy val registerCleanup       = TransientCleanup(state)
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)

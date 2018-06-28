@@ -53,10 +53,19 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       val isOuter = children.exists{c => !c.isBranch || c.isOuterControl } || op.isMemReduce
       s.rawLevel = if (isOuter) Outer else Inner
 
+      val master: Ctrl  = Ctrl.Node(s, -1)
+      val masterScope: Scope = Scope.Node(s, -1, -1)
+
       // Set metadata for counter owners
       s.cchains.foreach{cchain =>
         cchain.owner = s
-        cchain.counters.foreach{ctr => ctr.owner = s }
+        cchain.rawParent = master
+        cchain.rawScope  = masterScope
+        cchain.counters.foreach{ctr =>
+          ctr.owner = s
+          ctr.rawParent = master
+          ctr.rawScope  = masterScope
+        }
       }
 
       // Set scope and parent metadata for children controllers
@@ -68,17 +77,33 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
         // --- Ctrl Hierarchy --- //
         // Don't track pseudoscopes in the control hierarchy (use master controller instead)
-        val master: Ctrl  = Ctrl.Node(s, -1)
         val control: Ctrl = Ctrl.Node(s, stageId)
         val parent: Ctrl  = if (body.isPseudoStage) master else control
-        block.stms.foreach{lhs => lhs.rawParent = parent }
         ctrl.iters.foreach{b => b.rawParent = parent}
 
         // --- Scope Hierarchy --- //
         // Always track all scopes in the scope hierarchy
         val blockId = body.blocks.indexWhere(_._2 == block)
         val scope: Scope = Scope.Node(s, stageId, blockId)
-        block.stms.foreach{lhs => lhs.rawScope = scope }
+
+        // Iterate from last to first
+        block.stms.reverse.foreach{lhs =>
+          if (lhs.isTransient) {
+            val consumerParents = lhs.consumers.map{c =>
+              if (c.isControl) Ctrl.Node(c, -1)
+              else             lhs.parent
+            }
+            val nodeMaster = consumerParents.find{c => c != parent && c != Ctrl.Host }
+            val nodeParent = nodeMaster.getOrElse(parent)
+            val nodeScope  = nodeMaster.map{c => Scope.Node(c.s.get,-1,-1) }.getOrElse(scope)
+            lhs.rawParent = nodeParent
+            lhs.rawScope  = nodeScope
+          }
+          else if (!lhs.isCounter && !lhs.isCounterChain) {
+            lhs.rawParent = parent
+            lhs.rawScope  = scope
+          }
+        }
       }
 
       // --- Blk Hierarchy --- //

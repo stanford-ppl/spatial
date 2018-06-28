@@ -15,7 +15,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
   override protected def postprocess[R](block: Block[R]): Block[R] = {
     def isUnusedRead(read: Sym[_]): Boolean = {
-      if (read.isEphemeral) read.users.isEmpty
+      if (read.isTransient) read.users.isEmpty
       else read.consumers.isEmpty
     }
 
@@ -44,7 +44,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
     def inspect(): Unit = {
       if (inHw) checkUses(lhs, rhs)
-      if (lhs.isEphemeral) addPendingUse(lhs)
+      if (lhs.isTransient) addPendingUse(lhs)
       super.visit(lhs, rhs)
     }
 
@@ -80,7 +80,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
-      if (lhs.isEphemeral && !lhs.toCtrl.isInnerControl) addPropagatingUse(lhs, pending.toSet)
+      if (lhs.isTransient && !lhs.toCtrl.isInnerControl) addPropagatingUse(lhs, pending.toSet)
       else addUse(lhs, pending.toSet, blk)
     }
   }

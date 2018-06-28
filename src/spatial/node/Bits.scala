@@ -37,7 +37,7 @@ import utils.implicits.collections._
 }
 
 @op case class DataAsBits[A](data: Bits[A])(implicit val tV: Vec[Bit]) extends Primitive[Vec[Bit]] {
-  override val isEphemeral: Boolean = true
+  override val isTransient: Boolean = true
 
   @rig override def rewrite: Vec[Bit] = data match {
     case Op(BitsAsData(vec,tp)) if data.tp =:= tp => vec
@@ -57,7 +57,7 @@ import utils.implicits.collections._
   }
 }
 @op case class BitsAsData[A:Bits](v: Vec[Bit], A: Bits[A]) extends Primitive[A] {
-  override val isEphemeral: Boolean = true
+  override val isTransient: Boolean = true
 
   @rig override def rewrite: A = (v, A) match {
     case (Op(DataAsBits(data)), _) if data.tp =:= A => data.asInstanceOf[A]

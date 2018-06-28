@@ -39,7 +39,7 @@ trait UtilsModeling {
     def dfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
-        else dfs(x.allDeps.toSet, nodes + x)
+        else dfs(x.inputs.toSet, nodes + x)
       }
       else Set.empty[Sym[_]]
     }
@@ -304,3 +304,4 @@ trait UtilsModeling {
   }
 
 }
+                                                                                                                                                                                                                                         

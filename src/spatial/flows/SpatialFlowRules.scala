@@ -70,7 +70,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
       // Special cases for blocks with return values - should correspond to their outer use
       ctrl match {
-        case node: OpReduce[_] if s.isOuterControl =>
+        case node: OpReduce[_] if isOuter =>
           val result = node.map.result
           result.rawParent = Ctrl.Node(s, 1)
           result.rawScope  = Scope.Node(s, 1, 1)

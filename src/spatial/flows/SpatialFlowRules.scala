@@ -69,11 +69,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
 
       // Special cases for blocks with return values - should correspond to their outer use
+      var specialCases: Set[Sym[_]] = Set.empty
       ctrl match {
         case node: OpReduce[_] if isOuter =>
           val result = node.map.result
           result.rawParent = Ctrl.Node(s, 1)
           result.rawScope  = Scope.Node(s, 1, 1)
+          specialCases += result
 
         case _ =>
       }
@@ -99,7 +101,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
         // Iterate from last to first
         block.stms.reverse.foreach{lhs =>
-          if (lhs.isTransient) {
+          if (lhs.isCounter || lhs.isCounterChain || specialCases.contains(lhs)) {
+            // Ignore
+          }
+          else if (lhs.isTransient) {
             val consumerParents = lhs.consumers.map{c =>
               if (c.isControl) Ctrl.Node(c, -1)
               else             lhs.parent
@@ -110,7 +115,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
             lhs.rawParent = nodeParent
             lhs.rawScope  = nodeScope
           }
-          else if (!lhs.isCounter && !lhs.isCounterChain) {
+          else {
             lhs.rawParent = parent
             lhs.rawScope  = scope
           }

@@ -474,6 +474,12 @@ trait UtilsControl {
       val pathB = b.ancestors
       val ctrlIdxA = pathA.indexOf(ctrl)
       val ctrlIdxB = pathB.indexOf(ctrl)
+      dbgs(s"getStageDistance: ")
+      dbgs(s"PathA: " + pathA.mkString(", "))
+      dbgs(s"PathB: " + pathB.mkString(", "))
+      dbgs(s"Ctrl: $ctrl")
+      dbgs(s"ctrlIdxA: $ctrlIdxA")
+      dbgs(s"ctrlIdxB: $ctrlIdxB")
 
       if (ctrlIdxA < 0 || ctrlIdxB < 0) None        // ctrl is not common to a and b
       else if (ctrlIdxA >= pathA.length - 1) None   // implies ctrl == a
@@ -484,9 +490,7 @@ trait UtilsControl {
         val topB = pathA(ctrlIdxA + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
-        logs(s"PathA: " + pathA.mkString(", "))
-        logs(s"PathB: " + pathB.mkString(", "))
-        logs(s"Ctrl: $ctrl")
+
         if (idxA < 0 || idxB < 0) None
         Some(idxB - idxA)
       }

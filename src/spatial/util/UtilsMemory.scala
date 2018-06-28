@@ -129,6 +129,13 @@ trait UtilsMemory { this: UtilsControl with UtilsHierarchy =>
       else if (distA < 0 && distB < 0) { distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // p b a
       else false
     }
+
+    def hasInitialValues: Boolean = a match {
+      case Op(RegNew(_)) => true
+      case Op(RegFileNew(_,inits)) => inits.isDefined
+      case Op(LUTNew(_,_)) => true
+      case _ => false
+    }
   }
 
 

@@ -81,7 +81,7 @@ trait Spatial extends Compiler {
     lazy val blackboxLowering      = BlackboxLowering(state)
     lazy val memoryDealiasing      = MemoryDealiasing(state)
     lazy val pipeInserter          = PipeInserter(state)
-    lazy val registerCleanup       = TransientCleanup(state)
+    lazy val transientCleanup      = TransientCleanup(state)
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
@@ -110,13 +110,15 @@ trait Spatial extends Compiler {
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** Dead code cleanup */
         useAnalyzer         ==>
-        registerCleanup     ==> printer ==> transformerChecks ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Memory analysis */
         accessAnalyzer      ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
+        useAnalyzer         ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>

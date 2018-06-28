@@ -432,20 +432,21 @@ trait UtilsControl {
     * and the pipeline distance between the first access and the first stage.
     * If the controllers have no ancestors in common, returns None.
     */
-  @stateful def LCA(n: => Seq[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
-  @stateful def LCA(n: Seq[Ctrl]): Ctrl = {
-    val anchor = n.distinct.head
-    val candidates = n.distinct.drop(1).map{x =>
-      if (x.ancestors.map(_.master).contains(anchor.master)) anchor
-      else if (anchor.ancestors.map(_.master).contains(x)) x else LCA(anchor, x)
-    }
-    if (candidates.distinct.length == 1) candidates.head 
-    else if (n.distinct.length == 1) n.distinct.head
-    else LCA(candidates)
+  @stateful def LCA(n: => Set[Sym[_]]): Ctrl = { LCA(n.map(_.toCtrl)) }
+  @stateful def LCA(n: Set[Ctrl]): Ctrl = {
+    if (n.isEmpty) throw new Exception(s"No LCA for empty set")
+    else n.reduce{(a,b) => LCA(a,b) }
   }
   @stateful def LCAPortMatchup(n: List[Sym[_]], lca: Ctrl): (Int,Int) = {
     val lcaChildren = lca.children.toList.map(_.master)
-    val portMatchup = n.map{a => lcaChildren.indexOf(lcaChildren.filter{ s => a.ancestors.map(_.master).contains(s) }.head)}
+    val portMatchup = n.map{a =>
+      val idx = lcaChildren.indexWhere{s => a.ancestors.map(_.master).contains(s) }
+      if (idx < 0) {
+        ctrlTree(n.toSet).foreach{line => dbgs(line) }
+        throw new Exception(s"Access $a doesn't seem to occur under LCA $lca? (accesses: $n)")
+      }
+      idx
+    }
     val basePort = portMatchup.min
     val numPorts = portMatchup.max - portMatchup.min
     (basePort, numPorts) 
@@ -605,7 +606,7 @@ trait UtilsControl {
   /** Creates a String representation of the controller tree over all of the given accesses. */
   @stateful def ctrlTree(accesses: Set[Sym[_]], top: Option[Ctrl] = None, tab: Int = 0): Iterator[String] = {
     if (accesses.nonEmpty) {
-      val lca_init = LCA(accesses.toList)
+      val lca_init = LCA(accesses)
       val lca = top match {
         case Some(ctrl) if lca_init.ancestors.contains(ctrl) => ctrl
         case None => lca_init

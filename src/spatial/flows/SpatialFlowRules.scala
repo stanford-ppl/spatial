@@ -105,11 +105,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
             // Ignore
           }
           else if (lhs.isTransient) {
-            val consumerParents = lhs.consumers.map{c =>
-              if (c.isControl) Ctrl.Node(c, -1)
-              else             lhs.parent
-            }
-            val nodeMaster = consumerParents.find{c => c != parent && c != Ctrl.Host }
+            val consumerParents = lhs.consumers.map{c => c.toCtrl }
+            val nodeMaster = consumerParents.find{c => c != master && c != parent && c != Ctrl.Host }
             val nodeParent = nodeMaster.getOrElse(parent)
             val nodeScope  = nodeMaster.map{c => Scope.Node(c.s.get,-1,-1) }.getOrElse(scope)
             lhs.rawParent = nodeParent

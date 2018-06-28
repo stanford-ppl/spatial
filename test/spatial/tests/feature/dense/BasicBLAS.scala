@@ -3,7 +3,7 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 import spatial.lib.BLAS
 
-@test class BasicBLAS extends SpatialTest {
+@spatial class BasicBLAS extends SpatialTest {
   override def runtimeArgs: Args = "0.2 0.8 64 128 96"
 
   // DSE Parameters

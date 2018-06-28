@@ -2,7 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class FIFOBranch extends SpatialTest { // Regression (Unit) // Args: 13 25
+@spatial class FIFOBranch extends SpatialTest { // Regression (Unit) // Args: 13 25
   override def runtimeArgs: Args = "13 25"
 
   def main(args: Array[String]): Void = {

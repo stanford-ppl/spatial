@@ -5,7 +5,7 @@ import spatial.dsl._
 
 
 // Formerly called FixPtMem
-@test class FunctionApproximations extends SpatialTest {  
+@spatial class FunctionApproximations extends SpatialTest {
   override def runtimeArgs: Args = "5.25 2.125"
 
   type T = FixPt[TRUE,_32,_32]

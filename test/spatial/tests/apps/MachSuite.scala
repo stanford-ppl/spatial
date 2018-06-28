@@ -3,7 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 import spatial.targets._
 
-@test class AES extends SpatialTest {
+@spatial class AES extends SpatialTest {
   override def runtimeArgs: Args = "50"
 
   /*
@@ -409,9 +409,7 @@ import spatial.targets._
 }
 
 
-@test class Viterbi extends SpatialTest { // Regression (Dense) // Args: none
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class Viterbi extends SpatialTest {
   /*
 
                     ←       N_OBS            →
@@ -568,10 +566,7 @@ import spatial.targets._
 }
 
 
-// @test class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
-
+// @spatial class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
 //   /*
 //            ←    COLS     →   
 //          ___________________             ___________________                         
@@ -650,10 +645,7 @@ import spatial.targets._
 // }
 
 
-// @test class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
-
+// @spatial class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
 //  /*
                                                                                                                              
 //  H   ↗        ___________________                  ___________________                                                                  
@@ -771,7 +763,7 @@ import spatial.targets._
 // }
 
 
-@test class NW_alg extends SpatialTest { // NW conflicts with something in spade
+@spatial class NW_alg extends SpatialTest { // NW conflicts with something in spade
   override def runtimeArgs: Args = {
     "tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
   }
@@ -939,8 +931,7 @@ import spatial.targets._
 }
 
 
-@test class MD_KNN extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MD_KNN extends SpatialTest {
 
  /*
   
@@ -1057,9 +1048,7 @@ import spatial.targets._
   }
 }      
 
-@test class MD_Grid extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MD_Grid extends SpatialTest {
  /*
   
   Moleckaler Dynamics via the grid, a digital frontier
@@ -1248,7 +1237,7 @@ import spatial.targets._
   }
 }      
 
-@test class KMP extends SpatialTest {
+@spatial class KMP extends SpatialTest {
   override def runtimeArgs: Args = "the"
 
  /*
@@ -1350,11 +1339,8 @@ import spatial.targets._
 }      
 
 
-@test class GEMM_NCubed extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class GEMM_NCubed extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
 
@@ -1402,7 +1388,7 @@ import spatial.targets._
   }
 }      
 
-@test class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+@spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
   override def runtimeArgs: Args = "128"
                                                                                                   
                                                                                                   
@@ -1671,10 +1657,7 @@ import spatial.targets._
   }
 }
 
-@test class Sort_Merge extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class Sort_Merge extends SpatialTest {
  /*                                                                                                  
                               |     |                                                                                                                                                                                        
                      |        |     |                                      |     |                                                                                                                                                                                     
@@ -1769,10 +1752,7 @@ import spatial.targets._
 }
 
 
-@test class Sort_Radix extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class Sort_Radix extends SpatialTest {
  /*                                                                                                  
     TODO: Cartoon of what this is doing                                                         
                                                                                                                                                                                                                        
@@ -1928,10 +1908,7 @@ import spatial.targets._
 }
 
 
-@test class SPMV_CRS extends SpatialTest { // Regression (Sparse) // Args: none
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class SPMV_CRS extends SpatialTest {
  /*                                                                                                  
    Sparse Matrix is the IEEE 494 bus interconnect matrix from UF Sparse Datasets   
 
@@ -2027,10 +2004,7 @@ import spatial.targets._
   }
 }
 
-@test class SPMV_ELL extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class SPMV_ELL extends SpatialTest {
  /*                                                                                                  
    Sparse Matrix is the IEEE 494 bus interconnect matrix from UF Sparse Datasets   
 
@@ -2110,7 +2084,7 @@ import spatial.targets._
 }
 
 
-@test class Backprop extends SpatialTest {
+@spatial class Backprop extends SpatialTest {
   override def runtimeArgs: Args = "5"
 
  /*                                                                                                  
@@ -2543,8 +2517,7 @@ import spatial.targets._
 }
 
 
-@test class FFT_Strided extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class FFT_Strided extends SpatialTest {
   override def backends: Seq[Backend] = DISABLED // TODO: Producing huge logs during run, disabling for now
 
  /*                                                                                                  
@@ -2639,9 +2612,7 @@ import spatial.targets._
   }
 }
 
-@test class FFT_Transpose extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FFT_Transpose extends SpatialTest {
  /*                                                                                                  
     Concerns: Not sure why machsuite makes a data_x and DATA_x when they only dump values from one row of DATA_x to data_x and back
               Also, is their algorithm even correct?!  It's very suspicion and I can even comment out some of their code and it still passes....
@@ -2900,10 +2871,7 @@ import spatial.targets._
 }
 
 
-@test class BFS_Bulk extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class BFS_Bulk extends SpatialTest {
  /*                                                                                                  
 
        * Scan levels straight through, and index into nodes if it matches current horizon
@@ -3009,9 +2977,7 @@ import spatial.targets._
 }
 
 
-@test class BFS_Queue extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class BFS_Queue extends SpatialTest {
  /*                                                                                                  
           ________________
     Q:   |          x x x |

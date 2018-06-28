@@ -2,7 +2,7 @@ package spatial.tests.feature.unit
 
 import spatial.dsl._
 
-@test class SimpleMap extends SpatialTest {
+@spatial class SimpleMap extends SpatialTest {
   override def runtimeArgs: Args = "5.25"
 
   type Q32 = FixPt[TRUE,_32,_32]

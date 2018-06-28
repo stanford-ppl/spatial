@@ -1,12 +1,8 @@
 package spatial.tests.feature.host
 
-
 import spatial.dsl._
 
-
-@test class ReadSSV1D extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class ReadSSV1D extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE, _16, _16]

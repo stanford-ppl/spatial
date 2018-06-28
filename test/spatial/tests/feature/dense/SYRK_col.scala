@@ -9,7 +9,7 @@ import spatial.dsl._
   * -------------------------
   * C := C + AA' with N*K matrix A, updating only lower triangular part of symmetric N*N matrix C.
   */
-@test class SYRK_col extends SpatialTest {
+@spatial class SYRK_col extends SpatialTest {
   override def runtimeArgs: Args = "64"
   type T = Int
 

@@ -72,9 +72,7 @@ import spatial.dsl._
 // */
 
 
-@test class TRSM extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class TRSM extends SpatialTest {
   type T = FixPt[TRUE, _16, _16]
 
   // def blockedGEMMH(id0: Exp[_], L: SRAM[T],

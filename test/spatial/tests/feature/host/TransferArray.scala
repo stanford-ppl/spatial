@@ -4,7 +4,7 @@ package spatial.tests.feature.host
 import spatial.dsl._
 
 
-@test class TransferArray extends SpatialTest {
+@spatial class TransferArray extends SpatialTest {
   override def runtimeArgs: Args = "50"
 
   val N = 192

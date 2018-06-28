@@ -116,6 +116,10 @@ case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
       error(lhs.ctx, s"Reset value of register ${lhs.fullname} was not a constant.")
       error(lhs.ctx)
 
+    case RegNew(init) if !inHw =>
+      error(lhs.ctx, s"Register was created outside Accel. Use an ArgIn, ArgOut, or HostIO instead.")
+      error(lhs.ctx)
+
     case op @ StreamInNew(bus)  => busWidthCheck(op.A,bus,"StreamIn")
     case op @ StreamOutNew(bus) => busWidthCheck(op.A,bus,"StreamOut")
 

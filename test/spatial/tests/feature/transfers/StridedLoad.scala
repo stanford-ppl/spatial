@@ -1,11 +1,8 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class StridedLoad extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class StridedLoad extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     val N = 192

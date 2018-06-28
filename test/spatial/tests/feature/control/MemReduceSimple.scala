@@ -1,13 +1,9 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
-@test class MemReduceSimple extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MemReduceSimple extends SpatialTest {
   lazy val N = 16.to[Int]
-
 
   def main(args: Array[String]): Unit = {
 

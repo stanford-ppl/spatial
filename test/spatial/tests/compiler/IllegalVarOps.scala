@@ -2,8 +2,7 @@ package spatial.tests.compiler
 
 import spatial.dsl._
 
-@test class IllegalVarAssignTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class IllegalVarAssignTest extends SpatialTest {
   override def backends = RequireErrors(1)
 
   def main(args: Array[String]): Unit = {
@@ -15,8 +14,7 @@ import spatial.dsl._
   }
 }
 
-@test class IllegalVarReadTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class IllegalVarReadTest extends SpatialTest {
   override def backends = RequireErrors(1)
 
   def main(args: Array[String]): Unit = {
@@ -28,8 +26,7 @@ import spatial.dsl._
   }
 }
 
-@test class IllegalVarNewTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class IllegalVarNewTest extends SpatialTest {
   override def backends = RequireErrors(1)
   def main(args: Array[String]): Unit = {
     Accel {

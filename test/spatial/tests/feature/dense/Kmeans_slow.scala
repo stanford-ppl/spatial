@@ -2,7 +2,7 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class Kmeans_fast extends SpatialTest { // Regression (Dense) // Args: 3 64
+@spatial class Kmeans_fast extends SpatialTest { // Regression (Dense) // Args: 3 64
   override val runtimeArgs = "3 64"
 
   type X = Int
@@ -202,7 +202,7 @@ import spatial.dsl._
   }
 }
 
-@test class Kmeans_slow extends SpatialTest { // ReviveMe (groupByReduce)
+@spatial class Kmeans_slow extends SpatialTest { // ReviveMe (groupByReduce)
   override def runtimeArgs: Args = "3 64"
 
   type X = Int

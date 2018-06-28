@@ -3,9 +3,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 // Example of user syntax for explicitly setting II of a pipeline
-@test class ExplicitII extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class ExplicitII extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val y = ArgIn[Int]

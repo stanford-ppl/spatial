@@ -136,10 +136,8 @@ import spatial.dsl._
 
 */
 
-@test class MatMult_hierarchy extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MatMult_hierarchy extends SpatialTest {
   type T = Int
-
 
   def main(args: Array[String]): Unit = {
     val m = 64

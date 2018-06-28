@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class ScatterGatherSRAM2 extends SpatialTest {
+@spatial class ScatterGatherSRAM2 extends SpatialTest {
   override def runtimeArgs: Args = "160"
 
   val tileSize = 32

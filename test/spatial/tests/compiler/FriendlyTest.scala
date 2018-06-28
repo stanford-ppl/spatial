@@ -1,12 +1,8 @@
 package spatial.tests.compiler
 
-
-
 import spatial.dsl._
 
-@test class FriendlyTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FriendlyTest extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val y = ArgIn[Int]

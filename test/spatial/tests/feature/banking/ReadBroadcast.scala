@@ -3,9 +3,7 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 import argon.Block
 
-@test class ReadBroadcast extends SpatialTest {
-
-  override def runtimeArgs: Args = NoArgs
+@spatial class ReadBroadcast extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     val d = DRAM[Int](16,16)

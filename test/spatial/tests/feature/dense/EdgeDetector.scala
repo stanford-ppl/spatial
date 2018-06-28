@@ -2,8 +2,7 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class EdgeDetector extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class EdgeDetector extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
 
   def main(args: Array[String]): Unit = {

@@ -2,10 +2,8 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-@test class FixBasics2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class FixBasics2 extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
 

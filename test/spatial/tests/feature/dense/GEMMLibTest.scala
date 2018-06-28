@@ -3,9 +3,7 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 import spatial.lib._
 
-@test trait GEMMLibBase extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial trait GEMMLibBase extends SpatialTest {
   def common[T:Num](KP: scala.Int): Unit = {
 
     // Populate input matrices
@@ -72,26 +70,26 @@ import spatial.lib._
   }
 }
 
-@test class GEMMLibFloatTest extends GEMMLibBase {
+@spatial class GEMMLibFloatTest extends GEMMLibBase {
   def main(args: Array[String]): Unit = common[Float](1)
 }
 
-@test class GEMMLibIntTest extends GEMMLibBase {
+@spatial class GEMMLibIntTest extends GEMMLibBase {
   def main(args: Array[String]): Unit = common[Int](1)
 }
 
-@test class GEMMLibHalfTest extends GEMMLibBase {
+@spatial class GEMMLibHalfTest extends GEMMLibBase {
   def main(args: Array[String]): Unit = common[Half](1)
 }
 
-@test class GEMMLibFloatParTest extends GEMMLibBase {
+@spatial class GEMMLibFloatParTest extends GEMMLibBase {
   def main(args: Array[String]): Unit = common[Float](2)
 }
 
-@test class GEMMLibIntParTest extends GEMMLibBase {
+@spatial class GEMMLibIntParTest extends GEMMLibBase {
   def main(args: Array[String]): Unit = common[Int](2)
 }
 
-@test class GEMMLibHalfParTest extends GEMMLibBase {
+@spatial class GEMMLibHalfParTest extends GEMMLibBase {
   def main(args: Array[String]): Unit = common[Half](2)
 }

@@ -7,7 +7,7 @@ object libview extends SpatialDSL {
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag
 
-  /** Annotation class for @test macro annotation. */
+  /** Annotation class for @spatial macro annotation. */
   final class spatial extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro spatial.impl
   }
@@ -21,24 +21,13 @@ object libview extends SpatialDSL {
 object dsl extends SpatialDSL with lang.static.ShadowingStatics {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
-  import forge.tags.{AppTag,TestTag}
+  import forge.tags.AppTag
 
-  /** Annotation class for @test macro annotation. */
+  /** Annotation class for @spatial macro annotation. */
   final class spatial extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro spatial.impl
   }
   private object spatial extends AppTag("spatial", "SpatialApp")
-
-  final class test extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro test.impl
-  }
-  private object test extends TestTag("spatial", "SpatialTest", "SpatialApp")
-
-  // Used for debugging virtualization macros
-  final class testv extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro testv.impl
-  }
-  private object testv extends TestTag("spatial", "SpatialTest", "SpatialApp", verbose = true)
 
   final class struct extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl

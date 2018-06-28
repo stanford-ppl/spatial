@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class MemCopySRAM1D extends SpatialTest {
+@spatial class MemCopySRAM1D extends SpatialTest {
   override def runtimeArgs: Args = "100"
 
   val N = 192

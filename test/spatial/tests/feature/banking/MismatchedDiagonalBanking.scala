@@ -2,9 +2,7 @@ package spatial.tests.feature.banking
 
 import spatial.dsl._
 
-@test class MismatchedDiagonalBanking extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MismatchedDiagonalBanking extends SpatialTest {
   type T = Int
 
   def main(args: Array[String]): Unit = {

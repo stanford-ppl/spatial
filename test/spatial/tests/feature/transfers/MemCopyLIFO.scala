@@ -2,8 +2,7 @@ package spatial.tests.feature.transfers
 
 import spatial.dsl._
 
-@test class MemCopyLIFO extends SpatialTest {
-  def runtimeArgs: Args = NoArgs
+@spatial class MemCopyLIFO extends SpatialTest {
   val N = 32
 
   def stackLoadStore[T:Bits](srcHost: Array[T]): Array[T] = {

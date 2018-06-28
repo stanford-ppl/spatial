@@ -2,9 +2,7 @@
 
 // import spatial.dsl._
 
-// @test class Convolution_FPGA extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
+// @spatial class Convolution_FPGA extends SpatialTest { // ReviveMe (LineBuffer)
 //   val Kh = 3
 //   val Kw = 3
 //   val Cmax = 16

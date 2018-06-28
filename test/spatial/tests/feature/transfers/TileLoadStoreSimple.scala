@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class TileLoadStoreSimple extends SpatialTest {
+@spatial class TileLoadStoreSimple extends SpatialTest {
   override def runtimeArgs: Args = "16"
 
   val N = 192
@@ -61,7 +61,7 @@ import spatial.dsl._
   }
 }
 
-@test class PartialTileLoadStore extends SpatialTest {
+@spatial class PartialTileLoadStore extends SpatialTest {
   override def runtimeArgs: Args = "2"
 
 

@@ -4,7 +4,7 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 
-@test class ParFIFOLoad extends SpatialTest {
+@spatial class ParFIFOLoad extends SpatialTest {
   override def runtimeArgs: Args = "192"
 
   def parFifoLoad[T:Num](src1: Array[T], src2: Array[T], in: Int) = {

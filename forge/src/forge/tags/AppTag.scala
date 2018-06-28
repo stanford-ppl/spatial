@@ -10,20 +10,19 @@ class AppTag(dsl: String, dslApp: String) {
     import c.universe._
 
     val appType = Ident(TypeName(dslApp))
-    // Bit strange here. Virtualization requires at least EmbeddedControls to have
-    // an implementation default. However, we also can't mix EmbeddedControls in directly
-    // because we need a view of the DSL's overrides
     val inputs = annottees.toList
-    val outputs = inputs match {
+    val outputs: List[Tree] = inputs match {
+      case (a:ValDef) :: as if !a.mods.hasFlag(Flag.PARAM) =>
+        runVirtualizer(a) ::: as
+      case (a:DefDef) :: as =>
+        runVirtualizer(a) ::: as
       case (a:ClassDef) :: as =>
-        val mod = a.mixIn(appType) //.injectStm(q"import ${TermName(dsl)}.dsl._")
-                   .renameMethod("main", "entry")
-        virt(mod) ::: as
+        val mod = a.mixIn(appType)
+        runVirtualizer(mod) ::: as
       case (a:ModuleDef) :: as =>
-        val mod = a.mixIn(appType) //.injectStm(q"import ${TermName(dsl)}.dsl._")
-                   .renameMethod("main", "entry")
-        virt(mod) ::: as
-      case _ => invalidAnnotationUse(dsl, "classes", "objects", "traits")
+        val mod = a.mixIn(appType)
+        runVirtualizer(mod) ::: as
+      case _ => invalidAnnotationUse(dsl, "classes", "objects", "traits", "defs")
     }
 
     //info(showCode(outputs.head))

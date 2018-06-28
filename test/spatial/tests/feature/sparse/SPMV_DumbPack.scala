@@ -4,7 +4,7 @@ import spatial.dsl._
 
 
 
-@test class SPMV_DumbPack extends SpatialTest {
+@spatial class SPMV_DumbPack extends SpatialTest {
   override def runtimeArgs: Args = "1536"
 
   type T = Int //FixPt[Signed,B16,B16]

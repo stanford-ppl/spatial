@@ -4,7 +4,7 @@ package spatial.tests.feature.sparse
 import spatial.dsl._
 
 
-@test class BFS extends SpatialTest {
+@spatial class BFS extends SpatialTest {
   override def runtimeArgs: Args = "6 10"
 
   val tileSize = 8000

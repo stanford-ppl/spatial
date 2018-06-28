@@ -5,8 +5,7 @@ import spatial.dsl._
 import spatial.data._
 import spatial.node._
 
-@test class RegCoalescing extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RegCoalescing extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val out1 = ArgOut[Int]

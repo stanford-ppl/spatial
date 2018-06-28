@@ -1,18 +1,13 @@
-package spatial.tests.feature.memories.lut
-
-
+package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class Breakpoint extends SpatialTest { // Regression (Unit) // Args: 7
-  override def runtimeArgs: Args = NoArgs
-  def main(args: Array[String]): Void = {
+@spatial class Breakpoint extends SpatialTest {
 
-    // Declare SW-HW interface vals
+  def main(args: Array[String]): Void = {
     val y = ArgOut[Int]
     val z = HostIO[Int]
 
-    // Create HW accelerator
     Accel {
       Sequential.Foreach(16 by 1) {i =>
         sleep(100)
@@ -25,8 +20,6 @@ import spatial.dsl._
       }
     }
 
-
-    // Extract results from accelerator
     val Y = getArg(y)
     val Z = getArg(z)
 

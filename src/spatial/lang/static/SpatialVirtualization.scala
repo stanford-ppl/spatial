@@ -81,13 +81,13 @@ trait SpatialVirtualization extends LowPriorityVirtualization {
   @rig def __ifThenElse[A](cond: Bit, thenBr: => Sym[A], elseBr: => Sym[A])(implicit ov3: Overload3): A = {
     ifThenElse(cond, () => thenBr, () => elseBr)
   }
-  @rig def __ifThenElse(cond: Bit, thenBr: => Void, elseBr: => Any)(implicit ov3: Overload4): Void = {
+  @rig def __ifThenElse(cond: Bit, thenBr: => Void, elseBr: => Any)(implicit ov4: Overload4): Void = {
     ifThenElse(cond, () => thenBr, () => { elseBr; void })
   }
-  @rig def __ifThenElse(cond: Bit, thenBr: => Any, elseBr: => Void)(implicit ov3: Overload5): Void = {
+  @rig def __ifThenElse(cond: Bit, thenBr: => Any, elseBr: => Void)(implicit ov5: Overload5): Void = {
     ifThenElse(cond, () => { thenBr; void }, () => { elseBr })
   }
-  @rig def __ifThenElse(cond: Bit, thenBr: => Void, elseBr: => Void)(implicit ov3: Overload6): Void = {
+  @rig def __ifThenElse(cond: Bit, thenBr: => Void, elseBr: => Void)(implicit ov6: Overload6): Void = {
     ifThenElse(cond, () => { thenBr }, () => { elseBr })
   }
 

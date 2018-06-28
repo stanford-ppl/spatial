@@ -4,7 +4,7 @@ import spatial.dsl._
 
 
 
-@test class MatMult_outer extends SpatialTest {
+@spatial class MatMult_outer extends SpatialTest {
   override def runtimeArgs: Args = "32 128 128"
   type X = FixPt[TRUE,_16,_16]
 

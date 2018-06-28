@@ -30,7 +30,7 @@ x_par=4  |       --->       X                XX    |
          |_________________________________________|
 
 */
-@test class Gibbs_Ising2D extends SpatialTest { 
+@spatial class Gibbs_Ising2D extends SpatialTest {
   override def runtimeArgs: Args = "25 0.3 1"
 
 

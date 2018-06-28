@@ -474,12 +474,11 @@ trait UtilsControl {
       val pathB = b.ancestors
       val ctrlIdxA = pathA.indexOf(ctrl)
       val ctrlIdxB = pathB.indexOf(ctrl)
-      dbgs(s"getStageDistance: ")
-      dbgs(s"PathA: " + pathA.mkString(", "))
-      dbgs(s"PathB: " + pathB.mkString(", "))
-      dbgs(s"Ctrl: $ctrl")
-      dbgs(s"ctrlIdxA: $ctrlIdxA")
-      dbgs(s"ctrlIdxB: $ctrlIdxB")
+      logs(s"PathA: " + pathA.mkString(", "))
+      logs(s"PathB: " + pathB.mkString(", "))
+      logs(s"Ctrl: $ctrl")
+      logs(s"ctrlIdxA: $ctrlIdxA")
+      logs(s"ctrlIdxB: $ctrlIdxB")
 
       if (ctrlIdxA < 0 || ctrlIdxB < 0) None        // ctrl is not common to a and b
       else if (ctrlIdxA >= pathA.length - 1) None   // implies ctrl == a
@@ -487,7 +486,7 @@ trait UtilsControl {
       else {
         // TODO[2]: Revise to account for arbitrary dataflow graphs for children controllers
         val topA = pathA(ctrlIdxA + 1)
-        val topB = pathA(ctrlIdxA + 1)
+        val topB = pathB(ctrlIdxB + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
 
@@ -563,7 +562,14 @@ trait UtilsControl {
     else {
       val ctrlGrps: Set[(Ctrl,(Sym[_],Sym[_]))] = writers.flatMap{w =>
         (readers ++ writers).flatMap{a =>
-          getLCAWithCoarseDistance(w, a).filter(_._2 != 0).map{case (lca,_) => (lca.master, (w,a)) }
+          getLCAWithCoarseDistance(w, a) match {
+            case Some((lca, dist)) =>
+              dbgs(s"  $a <-> $w: LCA: $lca, coarse-dist: $dist")
+              if (dist != 0) Some((lca.master, (w,a))) else None
+            case _ =>
+              dbgs(s"  $a <-> $w: LCA: ${LCA(a,w)}, coarse-dist: <None>")
+              None
+          }
         }
       }
       ctrlGrps.groupBy(_._1).mapValues(_.map(_._2))

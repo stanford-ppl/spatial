@@ -10,7 +10,6 @@ import spatial.dsl._
     based on the current counter value for stage 0
   */
 
-
   def main(args: Array[String]): Unit = {
 
     val x = ArgIn[Int] // Should NOT be multiple of 2

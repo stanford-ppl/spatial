@@ -71,7 +71,7 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         blocks.foreach{block =>
           val stms = block.stms
           val ctrl = stms.filter{s => s.isControl && !(s.isBranch && s.isInnerControl) }
-          val prim = stms.filter{s => s.isPrimitive && !s.isEphemeral }
+          val prim = stms.filter{s => s.isPrimitive && !s.isTransient }
           if (ctrl.nonEmpty && prim.nonEmpty) {
             raiseIssue(ControlPrimitiveMix(lhs,ctrl,prim))
           }

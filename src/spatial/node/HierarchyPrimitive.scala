@@ -13,7 +13,7 @@ abstract class Primitive[R:Type] extends AccelOp[R] {
     *
     * e.g. DataAsBits, BitsAsData
     */
-  val isEphemeral: Boolean = false
+  val isTransient: Boolean = false
 }
 object Primitive {
   def unapply(x: Sym[_]): Option[Sym[_]] = x match {
@@ -23,11 +23,11 @@ object Primitive {
 }
 
 abstract class Transient[R:Type] extends Primitive[R] {
-  override val isEphemeral: Boolean = true
+  override val isTransient: Boolean = true
 }
 object Transient {
   @stateful def unapply(x: Sym[_]): Option[Sym[_]] = x match {
-    case Op(p:Primitive[_]) if p.isEphemeral => Some(x)
+    case Op(p:Primitive[_]) if p.isTransient => Some(x)
     case Expect(_) => Some(x)
     case _ => None
   }

@@ -327,7 +327,7 @@ object Shifting {
     a:  Fix[S1,I1,F1],
     f2: FixFmt[S2,I2,F2])
   extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
-  override val isEphemeral = true
+  override val isTransient = true
   @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
     case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
     case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]

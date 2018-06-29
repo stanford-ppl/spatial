@@ -275,17 +275,6 @@ trait ChiselGenController extends ChiselGenCommon {
 
   }
 
-  def applyBug41Hack(lhs: Sym[_], iters: Seq[Sym[_]], valids: Seq[Sym[_]]): Unit = {
-    (iters ++ valids).foreach{item => 
-      pipeChainPassMapBug41Hack += (item -> lhs)
-    }
-  }
-  def unapplyBug41Hack(lhs: Sym[_], iters: Seq[Sym[_]], valids: Seq[Sym[_]]): Unit = {
-    (iters ++ valids).foreach{item => 
-      pipeChainPassMapBug41Hack -= item
-    }
-  }
-
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
     val lat = if (cfg.enableRetiming & sym.isInnerControl) sym.bodyLatency.sum else 0.0
@@ -493,9 +482,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emitIters(iters, cchain)
           allocateValids(lhs, cchain, iters, valids)
           emitChildrenCxns(lhs)
-          if (lhs.isOuterControl) applyBug41Hack(lhs,iters.toList.flatten,valids.toList.flatten)
           visitBlock(func)
-          if (lhs.isOuterControl) unapplyBug41Hack(lhs,iters.toList.flatten,valids.toList.flatten)
         }
         emitValids(lhs, cchain, iters, valids)
       }
@@ -507,9 +494,7 @@ trait ChiselGenController extends ChiselGenCommon {
             allocateValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
           }
           emitChildrenCxns(lhs)
-          if (lhs.isOuterControl) applyBug41Hack(lhs,iters.toList.flatten,valids.toList.flatten)
           visitBlock(func)
-          if (lhs.isOuterControl) unapplyBug41Hack(lhs,iters.toList.flatten,valids.toList.flatten)
         }
         forEachChild(lhs){case (_,_) =>
           emitValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method

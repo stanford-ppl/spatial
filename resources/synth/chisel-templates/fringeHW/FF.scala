@@ -3,7 +3,7 @@ package fringe
 import chisel3._
 import templates._
 
-class FF[T<:Data](val t: T) extends Module {
+class FringeFF[T<:Data](val t: T) extends Module {
   val io = IO(new Bundle {
     val in   = Input(t.cloneType)
     val init = Input(t.cloneType)

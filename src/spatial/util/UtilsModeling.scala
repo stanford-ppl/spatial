@@ -114,10 +114,12 @@ trait UtilsModeling {
     val readers = scope.collect{
       case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
       case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
+      case reader @ BankedReader(mem,_,_,_) => AccessPair(mem, reader)
     }
     val writers = scope.collect{
       case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
-      case reader @ DequeuerLike(mem,_,_) => AccessPair(mem, reader)
+      case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
+      case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
     }
     val readersByMem = readers.groupBy(_.mem).mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).mapValues(_.map(_.access))

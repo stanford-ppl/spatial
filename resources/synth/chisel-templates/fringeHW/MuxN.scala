@@ -77,13 +77,13 @@ class MuxNReg(val numInputs: Int, w: Int) extends Module {
 
   // Register the inputs
   val ffins = List.tabulate(numInputs) { i =>
-    val ff = Module(new FF(UInt(w.W)))
+    val ff = Module(new FringeFF(UInt(w.W)))
     ff.io.enable := true.B
     ff.io.in := io.ins(i)
     ff
   }
 
-  val ffsel = Module(new FF(UInt(numSelectBits.W)))
+  val ffsel = Module(new FringeFF(UInt(numSelectBits.W)))
   ffsel.io.enable := true.B
   ffsel.io.in := io.sel
   val sel = ffsel.io.out
@@ -93,7 +93,7 @@ class MuxNReg(val numInputs: Int, w: Int) extends Module {
   mux.io.sel := sel
 
   // Register the output
-  val ff = Module(new FF(UInt(w.W)))
+  val ff = Module(new FringeFF(UInt(w.W)))
   ff.io.enable := true.B
   ff.io.in := mux.io.out
   io.out := ff.io.out

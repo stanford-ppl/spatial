@@ -116,11 +116,11 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
         tpt match {
           case TypeTree() =>
             __c.info(tree.pos, "Type annotation recommended for var declaration.", force = true)
-            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), Nil)).asVal
+            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), Nil)).asVar
             val regv = methodCall(None, "__valName", List(List(Ident(term), Literal(Constant(name)))),Nil)
             List(vdef, regv)
           case _ =>
-            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), List(tpt))).asVal
+            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), List(tpt))).asVar
             val regv = methodCall(None, "__valName", List(List(Ident(term), Literal(Constant(name)))),Nil)
             List(vdef, regv)
         }

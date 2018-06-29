@@ -58,8 +58,8 @@ import spatial.lang._
 /** Shift of single elements into a RegFile
   * @param mem The memory instance being written
   * @param data The elements being written
-  * @param addr The N-dimensional address identifying the entry plane
-  * @param ens Associated write enable(s)
+  * @param adr The N-dimensional address identifying the entry plane
+  * @param enss Associated write enable(s)
   * @param axis The axis of the 1-dimensional slice
   *             e.g. for a 2D RegFile:
   *             axis=0: shift into the specified row
@@ -68,8 +68,8 @@ import spatial.lang._
 @op case class RegFileBankedShiftIn[A:Bits,C[T]](
     mem:  RegFile[A,C],
     data: Seq[Sym[A]],
-    adr: Seq[Seq[Idx]],
-    enss:  Seq[Set[Bit]],
+    adr:  Seq[Seq[Idx]],
+    enss: Seq[Set[Bit]],
     axis: Int
 ) extends BankedEnqueue[A] {
     override def bank: Seq[Seq[Idx]] = adr
@@ -88,9 +88,9 @@ import spatial.lang._
 @op case class RegFileShiftInVector[A:Bits,C[T]](
   mem:  RegFile[A,C],
   data: Vec[A],
-  adr: Seq[Idx],
+  adr:  Seq[Idx],
   ens:  Set[Bit],
-  ax:   Int,
+  axis: Int,
   len:  Int
 ) extends VectorEnqueuer[A] {
     override def addr: Seq[Idx] = adr

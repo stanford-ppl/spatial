@@ -6,7 +6,11 @@ import spatial.lang._
 import spatial.node._
 import spatial.util._
 
-/** IR hierarchy: References a linearized block from some parent controller. Raw scoping rules. */
+/** IR hierarchy: References a linearized block from some parent controller. Raw scoping rules.
+  *
+  * A Blk defines the exact location in the IR in which a symbol is defined. This is independent
+  * of the control hierarchy, which may or may not match the structure of blocks in the IR.
+  */
 sealed abstract class Blk(val s: Option[Sym[_]], val block: Int)
 object Blk {
   case class Node(sym: Sym[_], blk: Int) extends Blk(Some(sym), blk) {
@@ -15,7 +19,12 @@ object Blk {
   case object Host extends Blk(None, 0)
 }
 
-/** Scope hierarchy: References the exact stage and block for a statement in a controller in Accel. */
+/** Scope hierarchy: References the exact stage and block for a statement in a controller in Accel.
+  *
+  * This tracks the exact stage (pseudo or otherwise) and block within that stage for each statement.
+  *
+  * This is most useful for determining which iterators are defined over a given scope.
+  */
 sealed abstract class Scope(val s: Option[Sym[_]], val stage: Int, val block: Int) {
   def master: Scope
 }
@@ -29,7 +38,13 @@ object Scope {
   }
 }
 
-/** Control hierarchy: References the stage for a statement in a controller in Accel. */
+/** Control hierarchy: References the stage for a statement in a controller in Accel.
+  *
+  * This keeps details about how the graph will look after unrolling, in terms of actual control
+  * stages that will be implemented in hardware.
+  *
+  * Most useful for determining concurrency and buffer depths.
+  */
 sealed abstract class Ctrl(val s: Option[Sym[_]], val stage: Int) {
   def master: Ctrl
   def mayBeOuterBlock: Boolean

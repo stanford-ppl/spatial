@@ -36,14 +36,14 @@ trait UtilsModeling {
     * If there are no such paths, returns an empty set.
     */
   def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
-    def dfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+    def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
-        else dfs(x.inputs.toSet, nodes + x)
+        else inputsDfs(x.inputs.toSet, nodes + x)
       }
       else Set.empty[Sym[_]]
     }
-    dfs(Set(end),Set(end))
+    inputsDfs(Set(end),Set(end))
   }
 
   @stateful def target: HardwareTarget = spatialConfig.target
@@ -133,7 +133,7 @@ trait UtilsModeling {
         val path = getAllNodesBetween(rd, wr, scope)
         path.foreach{sym => addCycle(sym, triple) }
 
-        if (verbose && path.nonEmpty) {
+        if (true && path.nonEmpty) {
           dbgs("Found cycle between: ")
           dbgs(s"  ${stm(wr)}")
           dbgs(s"  ${stm(rd)}")
@@ -170,7 +170,7 @@ trait UtilsModeling {
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
-    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+    accumReads.foreach{reader => dbgs(s"$reader is part of an accum cycle");cycles(reader) = Set(reader) }
 
     def fullDFS(cur: Sym[_]): Double = cur match {
       case Op(d) if scope.contains(cur) =>
@@ -196,13 +196,13 @@ trait UtilsModeling {
           // TODO[3]: + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
           val delay = critical + latencyOf(cur, inReduce)
 
-          if (verbose) dbgs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+          if (true) dbgs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
         }
         else {
           val inReduce = knownCycles.contains(cur)
           val delay = latencyOf(cur, inReduce)
-          if (verbose) dbgs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+          if (true) dbgs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
         }
 
@@ -215,17 +215,17 @@ trait UtilsModeling {
       case s: Sym[_] if cycle contains cur =>
         val forward = s.consumers intersect scope
         if (forward.nonEmpty) {
-          if (verbose) dbgs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
+          if (true) dbgs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
 
           val earliestConsumer = forward.map{e =>
             val in = paths.getOrElse(e, 0.0) - latencyOf(e, inReduce=cycle.contains(e))
-            if (verbose) dbgs(s"  [$in = ${paths.getOrElse(e, 0L)} - ${latencyOf(e,inReduce = cycle.contains(e))}] ${stm(e)}")
+            if (true) dbgs(s"  [$in = ${paths.getOrElse(e, 0L)} - ${latencyOf(e,inReduce = cycle.contains(e))}] ${stm(e)}")
             in
           }.min
 
           val push = Math.max(earliestConsumer, paths.getOrElse(cur, 0.0))
 
-          if (verbose) dbgs(s"  [$push]")
+          if (true) dbgs(s"  [$push]")
 
           paths(cur) = push
         }
@@ -241,7 +241,7 @@ trait UtilsModeling {
       // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
-        if (verbose) dbgs(s"Cycle #$i: ")
+        if (true) dbgs(s"Cycle #$i: ")
         reverseDFS(writer, cycle)
       }
     }
@@ -252,6 +252,13 @@ trait UtilsModeling {
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?
       val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
       WARCycle(reader, writer, mem, symbols, cycleLength)
+    }
+
+    def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+      if (scope.contains(x) && !nodes.contains(x)) {
+        consumersDfs(x.consumers.toSet, nodes + x)
+      }
+      else nodes
     }
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
@@ -281,8 +288,18 @@ trait UtilsModeling {
           val writeDelay = dlys.max
           writeStage = writeDelay + 1
           pairs.foreach{case (access, dly, _) =>
-            dbgs(s"Pushing ${stm(access)} to $writeDelay due to muxing")
+            val oldPath = paths(access)
             paths(access) = writeDelay
+            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
+            if (writeDelay-oldPath > 0) {
+              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              // Attempted fix for issue #54. Not sure how this interacts with cycles
+              val affectedNodes = consumersDfs(access.consumers.toSet, Set()) intersect scope
+              affectedNodes.foreach{x => 
+                dbgs(s"  $x")
+                paths(x) = paths(x) + (writeDelay-oldPath)
+              }
+            }
           }
         }
 
@@ -294,7 +311,7 @@ trait UtilsModeling {
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
 
-    if (verbose) {
+    if (true) {
       def dly(x: Sym[_]) = paths.getOrElse(x, 0.0)
       dbgs(s"  Schedule after pipeLatencies calculation:")
       schedule.sortWith{(a,b) => dly(a) < dly(b)}.foreach{node =>

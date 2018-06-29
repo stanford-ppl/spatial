@@ -343,6 +343,21 @@ trait UtilsControl {
     }
   }
 
+  implicit class BlkOps(blk: Blk) {
+    def toScope: Scope = blk match {
+      case Blk.Host      => Scope.Host
+      case Blk.Node(s,i) => s match {
+        case Op(op:Control[_]) =>
+          val block = op.blocks(i)
+          val stage = op.bodies.indexWhere(_.blocks.exists(_._2 == block))
+          val blk   = op.bodies(stage).blocks.indexWhere(_._2 == block)
+          Scope.Node(s, stage, blk)
+
+        case _ => Scope.Node(s, -1, -1)
+      }
+    }
+  }
+
 
   implicit class CounterChainHelperOps(x: CounterChain) {
     def node: CounterChainNew = x match {

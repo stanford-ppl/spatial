@@ -73,14 +73,18 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
 
   private def checkUses(lhs: Sym[_], rhs: Op[_]): Unit = {
-    dbgs(s"  pending: ${pendingUses.all.mkString(", ")}")
-    dbgs(s"  inputs: ${rhs.nonBlockExpInputs.mkString(", ")}")
+    dbgs(s"  Pending: ${pendingUses.all.mkString(", ")}")
+    dbgs(s"  Inputs:  ${rhs.nonBlockExpInputs.mkString(", ")}")
     val pending = rhs.nonBlockExpInputs.flatMap{sym => pendingUses(sym) }
-    dbgs(s"  uses: ${pending.mkString(", ")}")
+    dbgs(s"  Uses:    ${pending.mkString(", ")}")
+    dbgs(s"  Transient: ${lhs.isTransient}")
+    // We care about whether the IR scope is outer, not whether the owning controller is outer
+    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl
+    dbgs(s"  Outer: $isOuter")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
-      if (lhs.isTransient && !lhs.toCtrl.isInnerControl) addPropagatingUse(lhs, pending.toSet)
+      if (lhs.isTransient && isOuter) addPropagatingUse(lhs, pending.toSet)
       else addUse(lhs, pending.toSet, blk)
     }
   }
@@ -99,7 +103,10 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       use.users += User(user, block)
 
       // Also add stateless nodes that this node uses
-      (pendingUses(use) - use).foreach{pend => pend.users += User(use, block) }
+      (pendingUses(use) - use).foreach{pend =>
+        dbgs(s"  Adding ($use, $block) to uses for $pend")
+        pend.users += User(use, block)
+      }
     }
   }
 

@@ -1,8 +1,6 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
-
 
 @spatial class ParLaneMask extends SpatialTest {
   override def runtimeArgs: Args = "13"
@@ -11,7 +9,6 @@ import spatial.dsl._
     and before this bug was caught in MD_Grid, the enable for all stages was computed
     based on the current counter value for stage 0
   */
-
 
   def main(args: Array[String]): Unit = {
 

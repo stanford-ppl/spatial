@@ -19,10 +19,12 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
   val table_init = """<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">"""
 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case AccelScope(func) => inAccel{printControl(lhs,rhs)}
-    case _:Control[_] if (inHw) => printControl(lhs, rhs)
+    case AccelScope(func)     => inAccel{ printControl(lhs,rhs) }
+    case _:Control[_] if inHw => printControl(lhs, rhs)
     case _ => rhs.blocks.foreach{blk => gen(blk) }
   }
+
+  override def quoteConst(tp: Type[_], c: Any): String = c.toString
 
   override protected def emitEntry(block: Block[_]): Unit = gen(block)
 

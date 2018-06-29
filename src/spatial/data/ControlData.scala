@@ -107,10 +107,10 @@ case class ScopeCtrl(scope: Scope) extends Data[ScopeCtrl](SetBy.Flow.Consumer)
   * into the accumulator. Blk will give the index into the specific block.
   *
   * Getter:  sym.blk
-  * Setter:  sym.blk = (Ctrl)
+  * Setter:  sym.blk = (Blk)
   * Default: Host
   */
-case class ParentBlk(blk: Blk) extends Data[ParentBlk](SetBy.Flow.Consumer)
+case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
 
 
 /** The counter associated with a loop iterator. Only defined for loop iterators.
@@ -220,8 +220,8 @@ trait ControlData {
 
     // --- IR Hierarchy --- //
 
-    def blk: Blk = metadata[ParentBlk](s).map(_.blk).getOrElse(Blk.Host)
-    def blk_=(b: Blk): Unit = metadata.add(s, ParentBlk(b))
+    def blk: Blk = metadata[DefiningBlk](s).map(_.blk).getOrElse(Blk.Host)
+    def blk_=(b: Blk): Unit = metadata.add(s, DefiningBlk(b))
 
     def bodyLatency: Seq[Double] = metadata[BodyLatency](s).map(_.latency).getOrElse(Nil)
     def bodyLatency_=(latencies: Seq[Double]): Unit = metadata.add(s, BodyLatency(latencies))

@@ -113,9 +113,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
       block.stms.foreach{
         case Transient(s) =>
-          val i = stages.lastIndexWhere{stage =>
-            (stage.nodes intersect s.inputs).nonEmpty
-          }
+          val i = stages.lastIndexWhere{stage => (stage.nodes intersect s.inputs).nonEmpty }
           val stage = if (i >= 0) stages(i) else stages.head
           stage.nodes += s
 

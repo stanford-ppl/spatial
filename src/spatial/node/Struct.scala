@@ -12,14 +12,13 @@ abstract class StructAlloc[S:Struct] extends Primitive[S] {
   override def aliases = Nul
   override def contains = syms(elems.map(_._2))
 
-  // Emphemeral is false for simple struct to avoid issues across stages, e.g. reductions (#41)
-  override val isEphemeral: Boolean = false
+  override val isTransient: Boolean = true
 }
 
 @op case class SimpleStruct[S:Struct](elems: Seq[(String,Sym[_])]) extends StructAlloc[S]
 
 @op case class FieldApply[S,A:Type](struct: Struct[S], field: String) extends Primitive[A] {
-  override val isEphemeral: Boolean = true
+  override val isTransient: Boolean = true
 
   @rig override def rewrite: A = struct match {
     case Op(SimpleStruct(fields)) if !struct.isMutable =>

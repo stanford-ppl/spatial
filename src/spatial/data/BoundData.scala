@@ -41,6 +41,7 @@ case class Global(flag: Boolean) extends Data[Global](SetBy.Flow.Self)
   */
 case class FixedBits(flag: Boolean) extends Data[FixedBits](SetBy.Flow.Self)
 
+
 object Final {
   def unapply(x: Bound): Option[Int] = x match {
     case f: Final => Some(f.x)

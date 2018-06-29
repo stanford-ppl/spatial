@@ -2,6 +2,7 @@ package spatial.util
 
 import argon._
 import spatial.data._
+import spatial.lang._
 import spatial.node._
 
 trait UtilsHierarchy {
@@ -9,8 +10,8 @@ trait UtilsHierarchy {
   implicit class OpHierarchy(op: Op[_]) {
     def isControl: Boolean = op.isInstanceOf[Control[_]]
     def isPrimitive: Boolean = op.isInstanceOf[Primitive[_]]
-    def isEphemeral: Boolean = op match {
-      case p: Primitive[_] => p.isEphemeral
+    def isTransient: Boolean = op match {
+      case p: Primitive[_] => p.isTransient
       case _ => false
     }
 
@@ -82,7 +83,7 @@ trait UtilsHierarchy {
 
     def isControl: Boolean = op.exists(_.isControl)
     def isPrimitive: Boolean = op.exists(_.isPrimitive)
-    def isEphemeral: Boolean = op.exists(_.isEphemeral)
+    def isTransient: Boolean = op.exists(_.isTransient)
 
     def isAccel: Boolean = op.exists(_.isAccel)
     def isSwitch: Boolean = op.exists(_.isSwitch)
@@ -94,6 +95,9 @@ trait UtilsHierarchy {
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
+
+    def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
+    def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
 
     def isParEnq: Boolean = op.exists(_.isParEnq)
 

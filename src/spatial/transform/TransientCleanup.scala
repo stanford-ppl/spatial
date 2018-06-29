@@ -12,7 +12,7 @@ import utils.implicits.collections._
 
 import scala.collection.mutable
 
-case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversal {
+case class TransientCleanup(IR: State) extends MutateTransformer with BlkTraversal {
   // Substitutions per use location
   private var statelessSubstRules = Map[(Sym[_],Blk), Seq[(Sym[_], () => Sym[_])]]()
 
@@ -25,16 +25,17 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
     })
   }
 
-  def requiresDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
-    case _:RegRead[_] => true
-    case _ =>
+  def requiresMoveOrDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
+    case node:Primitive[_] =>
       // Duplicate stateless nodes when they have users across control or not the current block
       val blocks = lhs.users.map(_.blk)
-      blocks.size > 1 || blocks.exists(_ != blk)
+      node.isTransient && (blocks.size > 1 || blocks.exists(_ != blk))
+
+    case _ => false
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
-    case node: Primitive[_] if node.isEphemeral && requiresDuplication(lhs, rhs) =>
+    case node: Primitive[_] if requiresMoveOrDuplication(lhs, rhs) =>
       dbgs("")
       dbgs(s"$lhs = $rhs")
       dbgs(s" - users: ${lhs.users} [stateless]")
@@ -64,7 +65,7 @@ case class RegisterCleanup(IR: State) extends MutateTransformer with BlkTraversa
         updateWithContext(lhs, rhs)
       }
 
-    case node: Primitive[_] if inHw && node.isEphemeral =>
+    case node: Primitive[_] if inHw && node.isTransient =>
       dbgs("")
       dbgs(s"$lhs = $rhs [stateless]")
       dbgs(s" - users: ${lhs.users}")

@@ -17,7 +17,7 @@ import spatial.lang._
   override def aliases = Nul
   override def contains = Nul
   override def extracts = syms(v)
-  override val isEphemeral: Boolean = true
+  override val isTransient: Boolean = true
   override val debugOnly: Boolean = true
 
   @rig override def rewrite: A = {

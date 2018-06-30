@@ -133,7 +133,7 @@ trait UtilsModeling {
         val path = getAllNodesBetween(rd, wr, scope)
         path.foreach{sym => addCycle(sym, triple) }
 
-        if (true && path.nonEmpty) {
+        if (verbose && path.nonEmpty) {
           dbgs("Found cycle between: ")
           dbgs(s"  ${stm(wr)}")
           dbgs(s"  ${stm(rd)}")
@@ -196,13 +196,13 @@ trait UtilsModeling {
           // TODO[3]: + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
           val delay = critical + latencyOf(cur, inReduce)
 
-          if (true) dbgs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+          if (verbose) dbgs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
         }
         else {
           val inReduce = knownCycles.contains(cur)
           val delay = latencyOf(cur, inReduce)
-          if (true) dbgs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+          if (verbose) dbgs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
         }
 
@@ -215,17 +215,17 @@ trait UtilsModeling {
       case s: Sym[_] if cycle contains cur =>
         val forward = s.consumers intersect scope
         if (forward.nonEmpty) {
-          if (true) dbgs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
+          if (verbose) dbgs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
 
           val earliestConsumer = forward.map{e =>
             val in = paths.getOrElse(e, 0.0) - latencyOf(e, inReduce=cycle.contains(e))
-            if (true) dbgs(s"  [$in = ${paths.getOrElse(e, 0L)} - ${latencyOf(e,inReduce = cycle.contains(e))}] ${stm(e)}")
+            if (verbose) dbgs(s"  [$in = ${paths.getOrElse(e, 0L)} - ${latencyOf(e,inReduce = cycle.contains(e))}] ${stm(e)}")
             in
           }.min
 
           val push = Math.max(earliestConsumer, paths.getOrElse(cur, 0.0))
 
-          if (true) dbgs(s"  [$push]")
+          if (verbose) dbgs(s"  [$push]")
 
           paths(cur) = push
         }
@@ -241,7 +241,7 @@ trait UtilsModeling {
       // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
-        if (true) dbgs(s"Cycle #$i: ")
+        if (verbose) dbgs(s"Cycle #$i: ")
         reverseDFS(writer, cycle)
       }
     }
@@ -311,7 +311,7 @@ trait UtilsModeling {
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
 
-    if (true) {
+    if (verbose) {
       def dly(x: Sym[_]) = paths.getOrElse(x, 0.0)
       dbgs(s"  Schedule after pipeLatencies calculation:")
       schedule.sortWith{(a,b) => dly(a) < dly(b)}.foreach{node =>

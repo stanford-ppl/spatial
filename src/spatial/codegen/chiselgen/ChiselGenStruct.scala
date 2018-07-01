@@ -1,8 +1,8 @@
 package spatial.codegen.chiselgen
 
 import argon._
+import argon.node._
 import spatial.lang._
-import spatial.node._
 
 trait ChiselGenStruct extends ChiselGenCommon {
 

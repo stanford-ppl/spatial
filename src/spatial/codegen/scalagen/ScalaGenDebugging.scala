@@ -1,8 +1,7 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.lang._
-import spatial.node._
+import argon.node._
 
 trait ScalaGenDebugging extends ScalaCodegen {
 

@@ -5,7 +5,6 @@ import utils.implicits.collections._
 import argon._
 
 import spatial.lang.LocalMem
-import spatial.internal.spatialConfig
 import spatial.targets.MemoryResource
 import spatial.util._
 

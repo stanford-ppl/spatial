@@ -15,7 +15,7 @@ import spatial.flows.SpatialFlowRules
 import spatial.targets.HardwareTarget
 import spatial.transform._
 import spatial.traversal._
-import spatial.internal.{spatialConfig => cfg}
+import spatial.util.{spatialConfig => cfg}
 import spatial.node.InputArguments
 import spatial.report._
 import spatial.rewrites.SpatialRewriteRules

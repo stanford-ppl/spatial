@@ -4,7 +4,6 @@ import argon._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
 import spatial.data._
 import spatial.util._
 
@@ -35,11 +34,11 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   def createInstrumentation(lhs: Sym[_]): Unit = {
-    if (cfg.enableInstrumentation) {
+    if (spatialConfig.enableInstrumentation) {
       val ctx = s"${lhs.ctx}"
       emitInstrumentation(src"""// Instrumenting $lhs, context: ${ctx}, depth: ${controllerStack.length}""")
       val id = instrumentCounters.length
-      if (cfg.compressWires == 1 || cfg.compressWires == 2) {
+      if (spatialConfig.compressWires == 1 || spatialConfig.compressWires == 2) {
         emitInstrumentation(src"ic(${id*2}).io.enable := ${swap(lhs,En)}; ic(${id*2}).reset := accelReset")
         emitInstrumentation(src"ic(${id*2+1}).io.enable := Utils.risingEdge(${swap(lhs, Done)}); ic(${id*2+1}).reset := accelReset")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ic(${id*2}).io.count""")
@@ -197,7 +196,7 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   final private def emitIICounter(lhs: Sym[_]): Unit = {
-    if (lhs.II <= 1 | !cfg.enableRetiming | lhs.isOuterControl) {
+    if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) {
       emitt(src"""${swap(lhs, IIDone)} := true.B""")
     } else {
       emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
@@ -250,7 +249,7 @@ trait ChiselGenController extends ChiselGenCommon {
       forEachChild(sym) { case (c, idx) =>
         val streamAddition = getStreamEnablers(c)
 
-        val base_delay = if (cfg.enableTightControl) 0 else 1
+        val base_delay = if (spatialConfig.enableTightControl) 0 else 1
         emitt(src"""${swap(c, BaseEn)} := ${DL(src"${swap(sym, SM)}.io.enableOut(${idx})", base_delay, true)} & ${DL(src"~${swap(c, Done)}", 1, true)}""")  
         emitt(src"""${swap(c, En)} := ${swap(c, BaseEn)} ${streamAddition}""")  
 
@@ -288,7 +287,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = if (cfg.enableRetiming & sym.isInnerControl) sym.bodyLatency.sum else 0.0
+    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) sym.bodyLatency.sum else 0.0
     val ii = sym.II
 
     // Construct controller args
@@ -617,7 +616,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   override def emitFooter(): Unit = {
     inAccel{
-      if (cfg.compressWires >= 1) {
+      if (spatialConfig.compressWires >= 1) {
         inGenn(out, "GlobalModules", ext) {
           emitt(src"val ic = List.fill(${instrumentCounters.length*2}){Module(new InstrumentationCounter())}")
         }
@@ -649,7 +648,7 @@ trait ChiselGenController extends ChiselGenCommon {
       inGenn(out, "IOModule", ext) {
         emit (src"// Root controller for app: ${config.name}")
         // emit (src"// Complete config: ${config.printer()}")
-        // emit (src"// Complete cfg: ${cfg.printer()}")
+        // emit (src"// Complete cfg: ${spatialConfig.printer()}")
         emit ("")
         emit (src"// Widths: ${widthStats.sorted}")
         emit (src"//   Widest Outer Controller: ${if (widthStats.length == 0) 0 else widthStats.max}")
@@ -697,7 +696,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit (s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
         emit (s"Utils.SramThreshold = 4")
         // emit (s"""Utils.target = ${trgt}""")
-        emit (s"""Utils.retime = ${cfg.enableRetiming}""")
+        emit (s"""Utils.retime = ${spatialConfig.enableRetiming}""")
 
       }
 

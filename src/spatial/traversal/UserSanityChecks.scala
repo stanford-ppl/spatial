@@ -1,6 +1,7 @@
 package spatial.traversal
 
 import argon._
+import argon.node._
 import emul.Number
 
 import spatial.data._

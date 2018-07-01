@@ -1,6 +1,7 @@
 package spatial.flows
 
 import argon._
+import argon.node._
 import forge.tags._
 import spatial.data._
 import spatial.node._

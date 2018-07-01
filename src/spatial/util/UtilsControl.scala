@@ -1,10 +1,10 @@
 package spatial.util
 
 import argon._
+import argon.node._
 import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.internal.spatialConfig
 import spatial.issues.AmbiguousMetaPipes
 import forge.tags._
 import utils.implicits.collections._

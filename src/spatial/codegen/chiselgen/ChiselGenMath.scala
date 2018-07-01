@@ -1,16 +1,14 @@
 package spatial.codegen.chiselgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
 import spatial.data._
 import spatial.util._
 
-
 trait ChiselGenMath extends ChiselGenCommon {
-
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixInv(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (~$x).r")

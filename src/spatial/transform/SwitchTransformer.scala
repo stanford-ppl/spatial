@@ -1,10 +1,10 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.internal._
 import spatial.util.shouldMotion
 import spatial.traversal.AccelTraversal
 
@@ -43,7 +43,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
 
   private def createCase[T:Type](cond: Bit, body: Block[T])(implicit ctx: SrcCtx) = () => {
     dbgs(s"Creating SwitchCase from cond $cond and body $body")
-    val c = withEn(cond){ op_case(f(body) )}
+    val c = withEn(cond){ Switch.op_case(f(body) )}
     dbgs(s"  ${stm(c)}")
     c
   }
@@ -80,7 +80,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
       val thenCase = createCase(cond2, thenBlk)
       val (selects, cases) = extractSwitches(elseBlk, elseCond, Seq(cond2), Seq(thenCase))
 
-      val switch = op_switch(selects, cases)
+      val switch = Switch.op_switch(selects, cases)
       switch
 
     case _ => super.transform(lhs,rhs)

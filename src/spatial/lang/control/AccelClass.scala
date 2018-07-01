@@ -1,8 +1,8 @@
 package spatial.lang
 package control
 
-import forge.tags._
 import argon._
+import forge.tags._
 import spatial.node._
 
 protected class AccelClass(name: Option[String]) {

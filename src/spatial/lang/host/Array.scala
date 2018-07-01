@@ -4,8 +4,6 @@ package host
 import argon._
 import forge.tags._
 import spatial.node._
-import spatial.internal._
-import utils.Overloads._
 import utils.implicits.Readable._
 
 /** A one-dimensional array on the host. */
@@ -61,10 +59,8 @@ import utils.implicits.Readable._
 
   @api def sum(implicit aA: Num[A]): A = this.fold(aA.zero){(a,b) => a + b }
   @api def product(implicit aA: Num[A]): A = this.fold(aA.one){(a,b) => a * b }
-  @virtualize
-  @api def min(implicit aA: Num[A]): A = this.reduce{(a,b) => if(a < b) a else b }
-  @virtualize
-  @api def max(implicit aA: Num[A]): A = this.reduce{(a,b) => if(a < b) b else a }
+  @api def min(implicit aA: Num[A]): A = this.reduce{(a,b) => aA.min(a,b) }
+  @api def max(implicit aA: Num[A]): A = this.reduce{(a,b) => aA.max(a,b) }
 
   /**
     * Reduces the elements in this Array and the given initial value into a single element

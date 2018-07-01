@@ -1,6 +1,7 @@
 package spatial.node
 
 import argon._
+import argon.node.EnPrimitive
 import spatial.lang._
 
 abstract class BankedAccess {

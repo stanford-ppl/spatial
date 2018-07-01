@@ -1,6 +1,6 @@
 package spatial
 
-trait SpatialDSL extends lang.static.FrontendStatics
+trait SpatialDSL extends lang.api.StaticAPI_Frontend
 
 object libview extends SpatialDSL {
   import language.experimental.macros
@@ -18,7 +18,7 @@ object libview extends SpatialDSL {
   }
 }
 
-object dsl extends SpatialDSL with lang.static.ShadowingStatics {
+object dsl extends SpatialDSL with lang.api.StaticAPI_Shadowing {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag

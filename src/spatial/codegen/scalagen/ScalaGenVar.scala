@@ -1,7 +1,7 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.node._
+import argon.node._
 import spatial.lang._
 
 trait ScalaGenVar extends ScalaCodegen {

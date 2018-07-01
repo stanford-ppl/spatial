@@ -1,12 +1,12 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
 import spatial.data._
 import spatial.util._
 import spatial.lang._
 import spatial.node._
-import spatial.internal._
 import spatial.traversal.BlkTraversal
 
 import scala.collection.mutable.ArrayBuffer
@@ -55,10 +55,10 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
             if (requiresWrap) wrapSwitchCase(body, res)
             else stageScope(f(body.inputs),body.options){ insertPipes(body, res, scoped = false).right.get }
           }
-          op_case(body2)
+          Switch.op_case(body2)
         }
       }
-      val switch2: Void = transferDataToAllNew(lhs){ op_switch(selects, cases) }
+      val switch2: Void = transferDataToAllNew(lhs){ Switch.op_switch(selects, cases) }
 
       res match {
         case Some(r) => resRead(r)                    // non-void

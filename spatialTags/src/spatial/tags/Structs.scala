@@ -80,8 +80,8 @@ object StagedStructsMacro {
                 }""".asDef)
           .injectField(q"""override val box = implicitly[${cls.fullName} <:< (
                              spatial.lang.Struct[${cls.fullName}]
-                        with spatial.lang.types.Bits[${cls.fullName}]
-                        with spatial.lang.types.Arith[${cls.fullName}]) ]""".asVal)
+                        with argon.lang.types.Bits[${cls.fullName}]
+                        with argon.lang.types.Arith[${cls.fullName}]) ]""".asVal)
     }
 
     obj2 = {

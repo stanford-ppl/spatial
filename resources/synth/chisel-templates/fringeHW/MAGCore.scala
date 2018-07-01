@@ -98,7 +98,7 @@ class MAGCore(
       case u: UInt => u
     }
 
-    val ff = Module(new FF(UInt(sig.getWidth.W)))
+    val ff = Module(new FringeFF(UInt(sig.getWidth.W)))
     ff.io.init := Cat("hBADF".U, dbgCount.U)
     ff.io.in := in
     ff.io.enable := en
@@ -174,9 +174,9 @@ class MAGCore(
   sizeCounter.io.max := Mux(isSparseMux.io.out, 1.U, cmdHead.size)
   sizeCounter.io.stride := maxBytesPerCmd.U
 
-  val cmdCooldown =  Module(new FF(Bool()))
-  val burstCounterDoneLatch = Module(new FF(Bool()))
-  val sizeCounterDoneLatch = Module(new FF(Bool()))
+  val cmdCooldown =  Module(new FringeFF(Bool()))
+  val burstCounterDoneLatch = Module(new FringeFF(Bool()))
+  val sizeCounterDoneLatch = Module(new FringeFF(Bool()))
   sizeCounterDoneLatch.io.init := false.B
   sizeCounterDoneLatch.io.in := true.B
   sizeCounterDoneLatch.io.enable := Mux(isSparseMux.io.out, false.B, sizeCounter.io.done)
@@ -186,7 +186,7 @@ class MAGCore(
   rrespReadyMux.io.sel := rrespTag.streamId
   io.dram.rresp.ready := rrespReadyMux.io.out
 
-  val burstCounterMaxLatch = Module(new FF(UInt(io.dram.cmd.bits.size.getWidth.W)))
+  val burstCounterMaxLatch = Module(new FringeFF(UInt(io.dram.cmd.bits.size.getWidth.W)))
   val wdataMux = Module(new MuxN(Valid(io.dram.wdata.bits), storeStreamInfo.size))
   wdataMux.io.sel := storeStreamIndex(cmdArbiter.io.tag)
   wdataMux.io.ins.zipWithIndex.foreach { case (in,i) =>
@@ -461,7 +461,7 @@ class MAGCore(
     // connectDbgSig(debugCounter(~m.io.full && stream.wdata.valid).io.out, s"store stream $i # handshakes")
 
     val wrespSizeCounter = Module(new Counter(sizeWidth))
-    val wrespSizeCounterMaxLatch = Module(new FF(UInt(sizeWidth.W)))
+    val wrespSizeCounterMaxLatch = Module(new FringeFF(UInt(sizeWidth.W)))
     wrespSizeCounterMaxLatch.io.reset := false.B
     wrespSizeCounterMaxLatch.io.init := 0.U
     wrespSizeCounterMaxLatch.io.in := cmdHead.size
@@ -517,7 +517,7 @@ class MAGCore(
   burstTagCounter.io.enable := dramValid  & dramReady
   burstTagCounter.io.saturate := false.B
 
-  val dramReadyFF = Module(new FF(Bool()))
+  val dramReadyFF = Module(new FringeFF(Bool()))
   dramReadyFF.io.init := 0.U
   val dramReadyFFEnabler = Mux(isSparseMux.io.out, burstCounter.io.done, burstCounterDoneLatch.io.out)
   dramReadyFF.io.enable := dramReadyFFEnabler | (dramValid  & io.dram.cmd.bits.isWr)

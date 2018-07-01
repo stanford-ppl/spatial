@@ -36,14 +36,14 @@ trait UtilsModeling {
     * If there are no such paths, returns an empty set.
     */
   def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
-    def dfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+    def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
-        else dfs(x.inputs.toSet, nodes + x)
+        else inputsDfs(x.inputs.toSet, nodes + x)
       }
       else Set.empty[Sym[_]]
     }
-    dfs(Set(end),Set(end))
+    inputsDfs(Set(end),Set(end))
   }
 
   @stateful def target: HardwareTarget = spatialConfig.target
@@ -114,10 +114,12 @@ trait UtilsModeling {
     val readers = scope.collect{
       case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
       case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
+      case reader @ BankedReader(mem,_,_,_) => AccessPair(mem, reader)
     }
     val writers = scope.collect{
       case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
-      case reader @ DequeuerLike(mem,_,_) => AccessPair(mem, reader)
+      case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
+      case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
     }
     val readersByMem = readers.groupBy(_.mem).mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).mapValues(_.map(_.access))
@@ -168,7 +170,7 @@ trait UtilsModeling {
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
-    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+    accumReads.foreach{reader => dbgs(s"$reader is part of an accum cycle");cycles(reader) = Set(reader) }
 
     def fullDFS(cur: Sym[_]): Double = cur match {
       case Op(d) if scope.contains(cur) =>
@@ -252,6 +254,13 @@ trait UtilsModeling {
       WARCycle(reader, writer, mem, symbols, cycleLength)
     }
 
+    def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+      if (scope.contains(x) && !nodes.contains(x)) {
+        consumersDfs(x.consumers.toSet, nodes + x)
+      }
+      else nodes
+    }
+
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       dbgs(s"Multiplexed accesses for memory $mem: ")
       accesses.foreach{access => dbgs(s"  ${stm(access)}") }
@@ -279,8 +288,18 @@ trait UtilsModeling {
           val writeDelay = dlys.max
           writeStage = writeDelay + 1
           pairs.foreach{case (access, dly, _) =>
-            dbgs(s"Pushing ${stm(access)} to $writeDelay due to muxing")
+            val oldPath = paths(access)
             paths(access) = writeDelay
+            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
+            if (writeDelay-oldPath > 0) {
+              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              // Attempted fix for issue #54. Not sure how this interacts with cycles
+              val affectedNodes = consumersDfs(access.consumers.toSet, Set()) intersect scope
+              affectedNodes.foreach{x => 
+                dbgs(s"  $x")
+                paths(x) = paths(x) + (writeDelay-oldPath)
+              }
+            }
           }
         }
 

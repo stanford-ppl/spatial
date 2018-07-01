@@ -1052,7 +1052,7 @@ object Utils {
   }
 
   def getFF[T<: chisel3.core.Data](sig: T, en: UInt) = {
-    val ff = Module(new fringe.FF(sig))
+    val ff = Module(new fringe.FringeFF(sig))
     ff.io.init := 0.U(sig.getWidth.W).asTypeOf(sig)
     ff.io.in := sig
     ff.io.enable := en

@@ -26,7 +26,8 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
     val muxSize = groups.map(_.size).maxOrElse(0)
 
     groups.zipWithIndex.flatMap{case (group,muxPort) =>
-      group.zipWithIndex.map{case (matrix,muxOfs) =>
+      import scala.math.Ordering.Implicits._
+      group.toSeq.sortBy(_.unroll).zipWithIndex.map{case (matrix,muxOfs) =>
         val port = Port(
           bufferPort = Some(0),
           muxPort    = muxPort,

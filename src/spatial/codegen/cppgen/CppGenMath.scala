@@ -1,12 +1,13 @@
 package spatial.codegen.cppgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
 import spatial.data._
 import spatial.util._
+import spatial.util.{spatialConfig => cfg}
 
 
 trait CppGenMath extends CppGenCommon {
@@ -125,8 +126,6 @@ trait CppGenMath extends CppGenCommon {
         case _ => emit(src"${lhs.tp} $lhs = $x >> $y;")
       }
     case FixSRU(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
-
-
       
     case _ => super.gen(lhs, rhs)
   }

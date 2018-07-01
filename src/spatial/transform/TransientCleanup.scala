@@ -1,6 +1,7 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
 import spatial.data._
 import spatial.lang._

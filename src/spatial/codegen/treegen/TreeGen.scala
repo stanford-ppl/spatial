@@ -1,13 +1,12 @@
 package spatial.codegen.treegen
 
 import argon._
-import argon.codegen.Codegen
 
 import spatial.data._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
-import spatial.internal.{spatialConfig => cfg}
+import spatial.util.{spatialConfig => cfg}
 import spatial.codegen.naming.NamedCodegen
 import spatial.traversal.AccelTraversal
 

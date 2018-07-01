@@ -5,7 +5,6 @@ import argon.transform.MutateTransformer
 import emul.{FALSE, TRUE}
 import spatial.node._
 import spatial.lang._
-import spatial.internal._
 import spatial.traversal.AccelTraversal
 import spatial.util.shouldMotion
 
@@ -55,7 +54,7 @@ case class SwitchOptimizer(IR: State) extends MutateTransformer with AccelTraver
             else oneHotMux[A](sels, vals)
 
           case _ =>
-            op_switch[A](sels, stms.map{s => () => { visit(s); f(s) } })
+            Switch.op_switch[A](sels, stms.map{s => () => { visit(s); f(s) } })
         }
       }
 

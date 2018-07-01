@@ -1,11 +1,11 @@
 package pir.node
 
-import pir.lang._
-import spatial.node.{Alloc, Primitive}
-import spatial.lang._
-
 import argon._
+import argon.node.{Alloc, Primitive}
 import forge.tags._
+
+import spatial.lang._
+import pir.lang._
 
 sealed abstract class ICBus[A:Bits] extends Alloc[A]
 object ICBus {

@@ -1,6 +1,7 @@
 package spatial.util
 
 import argon._
+import argon.node.Enabled
 import forge.tags._
 import utils.implicits.collections._
 import poly.ISL

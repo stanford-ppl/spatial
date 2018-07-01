@@ -1,10 +1,11 @@
 package spatial.codegen.cppgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
+import spatial.util.{spatialConfig => cfg}
 
 
 trait CppGenAccel extends CppGenCommon {

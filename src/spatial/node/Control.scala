@@ -1,7 +1,8 @@
 package spatial.node
 
-import forge.tags._
 import argon._
+import argon.node._
+import forge.tags._
 import spatial.lang._
 import spatial.util._
 

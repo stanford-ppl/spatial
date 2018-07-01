@@ -1,6 +1,7 @@
 package spatial.traversal
 
 import argon._
+import argon.node._
 import spatial.data._
 import spatial.node._
 

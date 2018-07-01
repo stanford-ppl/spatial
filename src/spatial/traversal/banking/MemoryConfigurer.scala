@@ -9,7 +9,6 @@ import spatial.issues.UnbankableGroup
 import spatial.data._
 import spatial.lang._
 import spatial.util._
-import spatial.internal.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 

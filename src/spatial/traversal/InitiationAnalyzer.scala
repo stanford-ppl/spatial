@@ -5,7 +5,6 @@ import spatial.data._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
-import spatial.internal.spatialConfig
 
 case class InitiationAnalyzer(IR: State) extends AccelTraversal {
 

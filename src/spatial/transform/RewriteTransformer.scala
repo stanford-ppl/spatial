@@ -1,12 +1,13 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
 import spatial.data._
 import spatial.lang._
 import spatial.node._
+import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
-import spatial.internal.spatialConfig
 
 import utils.math.{isPow2,log2}
 

@@ -1,13 +1,12 @@
 package spatial.codegen.naming
 
 import argon._
-import argon.codegen._
+import argon.node._
+import argon.codegen.Codegen
 
 import spatial.lang._
 import spatial.node._
 import spatial.util._
-
-import scala.collection.mutable
 
 trait NamedCodegen extends Codegen {
 

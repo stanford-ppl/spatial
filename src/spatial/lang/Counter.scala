@@ -1,8 +1,8 @@
 package spatial.lang
 
-import forge.tags._
 import argon._
 import emul.FixedPointRange
+import forge.tags._
 import spatial.node._
 
 /** Types */

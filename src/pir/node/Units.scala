@@ -1,11 +1,12 @@
 package pir.node
 
-import pir.lang._
-import spatial.node.{Alloc, Control, Primitive, PseudoStage}
-import spatial.lang._
 import argon._
+import argon.node.{Alloc, Primitive}
 import forge.tags._
+import spatial.lang._
+import spatial.node.{Control, PseudoStage}
 import spatial.util.getCChains
+import pir.lang._
 
 import scala.collection.mutable
 

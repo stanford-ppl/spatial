@@ -6,7 +6,6 @@ import spatial.data._
 import spatial.lang._
 import spatial.node._
 import spatial.util._
-import spatial.internal.spatialConfig
 import spatial.traversal.AccelTraversal
 
 import scala.collection.immutable.SortedSet

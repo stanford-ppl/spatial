@@ -102,7 +102,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   final override def postprocess(block: argon.Block[_]): Unit = {
     import argon._
-    import spatial.node.AssertIf
+    import argon.node.AssertIf
     super.postprocess(block)
 
     if (config.test) {

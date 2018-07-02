@@ -4,7 +4,7 @@ import argon._
 import models._
 import forge.tags._
 import spatial.data.Expect
-import spatial.internal.spatialConfig
+import spatial.util.spatialConfig
 
 import scala.io.Source
 import scala.util.Try

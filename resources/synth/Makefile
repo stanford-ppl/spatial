@@ -253,7 +253,7 @@ zynq-sw:
 	tar -czf $(APPNAME).tar.gz -C ${ZYNQ_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C fringeZynq/utils set_perms setClocks.sh run.sh
 
 zynq-hw:
-	sed -i "s/val bug239_hack = .*/val bug239_hack = true/g" chisel/template-level/fringeHW/Fringe.scala
+	# sed -i "s/val bug239_hack = .*/val bug239_hack = true/g" chisel/template-level/fringeHW/Fringe.scala
 	echo "$$(date +%s)" > start.log
 	sbt "runMain top.Instantiator --verilog --testArgs zynq"
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
@@ -314,7 +314,7 @@ zcu-sw:
 zcu-hw:
 	echo "$$(date +%s)" >> start.log
 	# Some hacks that really need to be fixed in a way better than sed
-	sed -i "s/val bug239_hack = .*/val bug239_hack = true/g" chisel/template-level/fringeHW/Fringe.scala
+	# sed -i "s/val bug239_hack = .*/val bug239_hack = true/g" chisel/template-level/fringeHW/Fringe.scala
 	# sed -i "s/#define FRINGE_MEM_BASEADDR.*/#define FRINGE_MEM_BASEADDR  0x40000000/g" cpp/fringeZynq/ZynqAddressMap.h
 	# sed -i "s/#define FRINGE_SCALAR_BASEADDR.*/#define FRINGE_SCALAR_BASEADDR  0x400000000/g" cpp/fringeZynq/ZynqAddressMap.h
 	# sed -i "s/#define MEM_SIZE.*/#define MEM_SIZE  0x40000000/g" cpp/fringeZynq/ZynqAddressMap.h
@@ -383,7 +383,7 @@ vcs-sw:
 
 vcs-hw:
 	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" chisel/template-level/fringeVCS/Top-harness.sv; fi 
-	sed -i "s/val bug239_hack = .*/val bug239_hack = false/g" chisel/template-level/fringeHW/Fringe.scala
+	# sed -i "s/val bug239_hack = .*/val bug239_hack = false/g" chisel/template-level/fringeHW/Fringe.scala
 	sbt "runMain top.Instantiator --verilog --testArgs vcs"
 	cp -r chisel/template-level/fringeVCS/* verilog-vcs
 	touch in.txt
@@ -403,7 +403,7 @@ asic: asic-hw asic-sw
 asic-sw: vcs-sw
 
 asic-hw:
-	sed -i "s/val bug239_hack = .*/val bug239_hack = false/g" chisel/template-level/fringeHW/Fringe.scala
+	# sed -i "s/val bug239_hack = .*/val bug239_hack = false/g" chisel/template-level/fringeHW/Fringe.scala
 	sbt "runMain top.Instantiator --verilog --testArgs asic"
 	cp -r chisel/template-level/fringeVCS/* verilog-asic
 	cp -r chisel/template-level/fringeASIC/build/* verilog-asic

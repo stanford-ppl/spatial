@@ -2,6 +2,7 @@ package spatial.codegen.cppgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
+import spatial.util.{spatialConfig => cfg}
 import spatial.traversal.AccelTraversal
 
 trait CppCodegen extends FileDependencies with AccelTraversal  {
@@ -36,7 +37,8 @@ trait CppCodegen extends FileDependencies with AccelTraversal  {
 
     dependencies ::= DirDep("synth", "scripts", "../", Some("scripts/"))
     dependencies ::= FileDep("synth", "Makefile", "../", Some("Makefile"))
-    dependencies ::= FileDep("synth", "build.sbt", "../", Some("build.sbt"))
+    if (cfg.enableDebugResources) dependencies ::= FileDep("synth", "buildDbgResources.sbt", "../", Some("build.sbt"))
+    else dependencies ::= FileDep("synth", "build.sbt", "../", Some("build.sbt"))
     dependencies ::= FileDep("synth", "run.sh", "../", Some("run.sh"))
 
     // dependencies ::= FileDep(cppResourcesPath, "cpptypes.h")

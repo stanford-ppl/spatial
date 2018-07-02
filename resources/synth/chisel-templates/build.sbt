@@ -83,9 +83,6 @@ val templateResources_common = Seq(
 //    baseDirectory.value / "emul"
 // )
 
-
-
-
 /** Projects **/
 lazy val templateResources = (project in file(".")).settings(templateResources_common)
 

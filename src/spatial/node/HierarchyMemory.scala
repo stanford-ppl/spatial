@@ -1,17 +1,9 @@
 package spatial.node
 
 import argon._
+import argon.node._
 import forge.tags._
 import spatial.lang._
-
-/** Allocation of any black box */
-abstract class Alloc[T:Type] extends AccelOp[T]
-object Alloc {
-  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
-    case Op(_: Alloc[_]) => Some(x)
-    case _ => None
-  }
-}
 
 /** Memory allocation */
 abstract class MemAlloc[A:Bits,C[T]](
@@ -60,7 +52,7 @@ abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) ext
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
 
-  def rank: Seq[Int] = ranges.head.zipWithIndex.collect{case(r,i) if (!r.isUnit) => i}
+  def rank: Seq[Int] = ranges.head.zipWithIndex.collect{case(r,i) if !r.isUnit => i}
   def rawRank: Seq[Int] = Seq.tabulate(ranges.head.length){i => i}
   val mutable = true
 

@@ -4,11 +4,9 @@ import argon._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.internal._
-import spatial.util.shouldMotion
-import spatial.traversal.AccelTraversal
 import spatial.data._
 import spatial.util._
+import spatial.traversal.AccelTraversal
 
 /** Converts inner pipes that contain switches into innerpipes with enabled accesses.
   * Also squashes outer unit pipes that contain only one child
@@ -48,7 +46,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
           else oneHotMux[A](sels, vals)
 
         case _:Void => void.asInstanceOf[Sym[A]]
-        case _      => op_switch[A](sels,vals.map{v => () => v })
+        case _      => Switch.op_switch[A](sels,vals.map{v => () => v })
       }
 
     case _:Switch[_]  => super.transform(lhs,rhs)

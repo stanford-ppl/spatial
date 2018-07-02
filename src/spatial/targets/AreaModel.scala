@@ -1,6 +1,7 @@
 package spatial.targets
 
 import argon._
+import argon.node._
 import forge.tags._
 import utils.math.{isPow2,log2}
 import utils.implicits.Readable._
@@ -168,7 +169,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
   @stateful def areaOfNode(lhs: Sym[_], rhs: Op[_]): Area = rhs match {
     /** Non-synthesizable nodes */
-    case op:Primitive[_] if op.debugOnly => NoArea
+    case op:Primitive[_] if !op.canAccel => NoArea
 
     /** Zero area cost */
     case Transient(_)       => NoArea

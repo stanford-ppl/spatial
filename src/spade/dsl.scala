@@ -1,6 +1,6 @@
 package spade
 
-import spade.lang.static.ExternalStatics
+import spade.lang.api.ExternalStatics
 
 object dsl extends ExternalStatics {
   import language.experimental.macros

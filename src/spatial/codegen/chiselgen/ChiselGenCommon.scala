@@ -1,12 +1,12 @@
 package spatial.codegen.chiselgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.data._
 import spatial.util._
-import spatial.internal.{spatialConfig => cfg}
 
 trait ChiselGenCommon extends ChiselCodegen { 
 
@@ -31,9 +31,9 @@ trait ChiselGenCommon extends ChiselCodegen {
   var earlyExits: List[Sym[_]] = List()
 
   def latencyOption(op: String, b: Option[Int]): Double = {
-    if (cfg.enableRetiming) {
-      if (b.isDefined) {cfg.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
-      else cfg.target.latencyModel.model(op)()("LatencyOf") 
+    if (spatialConfig.enableRetiming) {
+      if (b.isDefined) {spatialConfig.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
+      else spatialConfig.target.latencyModel.model(op)()("LatencyOf")
     } else {
       0.0
     }
@@ -133,7 +133,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def latencyOptionString(op: String, b: Option[Int]): String = {
-    if (cfg.enableRetiming) {
+    if (spatialConfig.enableRetiming) {
       val latency = latencyOption(op, b)
       if (b.isDefined) {
         s"""Some(${latency})"""
@@ -158,7 +158,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     //   case _ => throw new Exception(s"Node enable $en not yet handled in partial retiming")
     // }
     // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
-    if (cfg.enableRetiming) lhs.fullDelay else 0.0
+    if (spatialConfig.enableRetiming) lhs.fullDelay else 0.0
   }
 
 
@@ -246,7 +246,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case _ => ""
     }.mkString(" & ")
     val hasReadiers = if (readiers != "") "&" else ""
-    if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
   def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
@@ -256,7 +256,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case _ => ""
     }.mkString(" & ")
     val hasReadiers = if (readiers != "") "&" else ""
-    if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
   def getFifoReadyLogic(sym: Ctrl): List[String] = {

@@ -4,7 +4,6 @@ import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.util._
-import spatial.internal.spatialConfig
 
 /** Control node schedule */
 sealed abstract class CtrlSchedule

@@ -1,8 +1,7 @@
 package spatial.tests.compiler
 
-import spatial.node.{FixInv, FixRecip}
+import argon.node._
 import spatial.dsl._
-import _root_.spatial.SpatialTestbench
 
 class BasicRewriteChecks extends SpatialTestbench {
   val b = random[Bit]

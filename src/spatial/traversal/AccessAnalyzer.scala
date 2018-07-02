@@ -1,6 +1,7 @@
 package spatial.traversal
 
 import argon._
+import argon.node._
 import argon.passes.Traversal
 import utils.implicits.collections._
 

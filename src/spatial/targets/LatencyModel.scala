@@ -3,7 +3,7 @@ package spatial.targets
 import argon._
 import models._
 import forge.tags._
-import spatial.internal.spatialConfig
+import spatial.util.spatialConfig
 
 class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](target) {
   val FILE_NAME: String = target.name.replaceAll(" ", "_") + "_Latency.csv"

@@ -1,7 +1,7 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.node.SeriesForeach
+import argon.node._
 
 trait ScalaGenSeries extends ScalaCodegen {
 

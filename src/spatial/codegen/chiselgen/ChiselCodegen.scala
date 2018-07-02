@@ -3,12 +3,10 @@ package spatial.codegen.chiselgen
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
 import spatial.codegen.naming._
-import spatial.internal.{spatialConfig => cfg}
-import emul.FloatPoint
-import emul.FixedPoint
+import emul.{Bool, FloatPoint, FixedPoint}
 import spatial.lang._
 import spatial.node._
-import emul.Bool
+import spatial.util.{spatialConfig => cfg}
 import spatial.traversal.AccelTraversal
 
 trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTraversal {

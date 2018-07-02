@@ -216,6 +216,10 @@ trait Spatial extends Compiler {
       overrideRetime = true
     }.text("Enable tighter timing between controllers at the expense of potentially failing timing")
 
+    cli.opt[Unit]("debugResources").action { (_,_) => 
+      cfg.enableDebugResources = true
+    }.text("Copy chisel + fringe templates with DirDep and do not use the published jars for templates")
+
     cli.opt[Unit]("cheapFifos").action { (_,_) => // Must necessarily turn on retiming
       cfg.useCheapFifos = true
       cfg.enableRetiming = true

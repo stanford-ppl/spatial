@@ -413,19 +413,22 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override def copyDependencies(out: String): Unit = {
     val resourcesPath = "synth/chisel-templates"
 
-    dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
-    dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
+    if (cfg.enableDebugResources) {
+      dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
+      dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
+    }
 
+
+    dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
+    dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
     dependencies ::= FileDep(resourcesPath, "Top.scala", outputPath = Some("Top.scala"))
 
     super.copyDependencies(out)

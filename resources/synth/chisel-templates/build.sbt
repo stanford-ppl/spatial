@@ -1,6 +1,6 @@
 val scala_version = "2.11.7"
 
-name := "chisel-resources"
+name := "templateResources"
 organization := "edu.stanford.ppl"
 
 isSnapshot := true
@@ -14,7 +14,7 @@ val defaultVersions = Map(
   "chisel-iotesters" -> "1.1-SNAPSHOT"
   )
 
-val chisel_templates_common = Seq(
+val templateResources_common = Seq(
   scalaVersion := scala_version,
   version := "1.0",
 
@@ -87,5 +87,5 @@ val chisel_templates_common = Seq(
 
 
 /** Projects **/
-lazy val chisel_templates = (project in file(".")).settings(chisel_templates_common)
+lazy val templateResources = (project in file(".")).settings(templateResources_common)
 

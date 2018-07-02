@@ -121,10 +121,9 @@ trait UtilsModeling {
       case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
       case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
     }
-    val readersByMem = readers.groupBy(_.mem).mapValues(_.map(_.access))
-    val writersByMem = writers.groupBy(_.mem).mapValues(_.map(_.access))
+    val readersByMem = readers.groupBy(_.mem).filter{x => x._2.size > 1 | writers.map(_.mem).contains(x._1)}.mapValues(_.map(_.access))
+    val writersByMem = writers.groupBy(_.mem).filter{x => x._2.size > 1 | readers.map(_.mem).contains(x._1)}.mapValues(_.map(_.access))
     val memories = readersByMem.keySet intersect writersByMem.keySet
-
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
@@ -310,6 +309,8 @@ trait UtilsModeling {
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
+    dbgs(s"Found cycles: ")
+    allCycles.foreach{x => dbgs(s"$x")}
 
     if (verbose) {
       def dly(x: Sym[_]) = paths.getOrElse(x, 0.0)

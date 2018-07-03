@@ -40,7 +40,7 @@ trait EmbeddedControls {
   // macros (See [[https://issues.scala-lang.org/browse/SI-5778]]).
 
   /** Val definitions */
-  def __newVar[T](init: T): VarLike[T] = new forge.Ptr[T](init)
+  def __newVar[T](init: T): T = init
 
   def __valName(init: Any, name: String): Unit = ()
   def __use[T](v: T): T = macro useImpl[T]

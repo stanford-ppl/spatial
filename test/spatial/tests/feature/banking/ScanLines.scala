@@ -34,7 +34,7 @@ import spatial.dsl._
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
 
       Foreach(iters by 1) { iter =>
-        Foreach(ROWS by 1 par 2) { i =>
+        Foreach(ROWS by 1 par 4) { i =>
           val this_body = i % 1
           Sequential.Foreach(-this_body until COLS by 1) { j =>
             val N = grid_sram((i+1)%ROWS, j)

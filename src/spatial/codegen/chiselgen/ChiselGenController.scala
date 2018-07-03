@@ -297,7 +297,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Generate standard control signals for all types
     emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
-    emitGlobalRetimeMap(src"""${sym}_ii""", s"$lat.toInt")
+    emitGlobalRetimeMap(src"""${sym}_ii""", s"$ii.toInt")
     emitControlSignals(sym)
     createInstrumentation(sym)
 

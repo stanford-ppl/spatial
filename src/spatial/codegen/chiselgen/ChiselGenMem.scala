@@ -189,10 +189,10 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
-    case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.empty")
-    case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.full")
-    case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.almostFull")
+    case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].empty")
+    case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].full")
+    case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostFull")
     case op@FIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
     case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
@@ -200,10 +200,10 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, "LIFO", None)
-    case LIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.empty")
-    case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.full")
-    case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.almostEmpty")
-    case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.almostFull")
+    case LIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].empty")
+    case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].full")
+    case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostFull")
     case op@LIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
     case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)

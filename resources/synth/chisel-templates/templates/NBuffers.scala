@@ -299,11 +299,11 @@ class NBufMem(val mem: MemType,
         val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
         (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
       }
-      io.full := fifo.io.full
-      io.almostFull := fifo.io.almostFull
-      io.empty := fifo.io.empty
-      io.almostEmpty := fifo.io.almostEmpty
-      io.numel := fifo.io.numel
+      io.full := fifo.io.asInstanceOf[FIFOInterface].full
+      io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
+      io.empty := fifo.io.asInstanceOf[FIFOInterface].empty
+      io.almostEmpty := fifo.io.asInstanceOf[FIFOInterface].almostEmpty
+      io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
 
     case ShiftRegFileType => 
       val rfs = (0 until numBufs).map{ i => 
@@ -314,7 +314,7 @@ class NBufMem(val mem: MemType,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
                         inits, syncMem, fracBits, isBuf = {i != 0}))
       }
-      rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.dump_in.zip(rfs(i).io.output.dump_out).foreach{case(a,b) => a:=b}; rf.io.dump_en := ctrl.io.swap}
+      rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(i).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{case(a,b) => a:=b}; rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap}
 
       // Route NBuf IO to SRAM IOs
       rfs.zipWithIndex.foreach{ case (f,i) => 
@@ -429,7 +429,22 @@ class NBufMem(val mem: MemType,
         }
       }
     case LineBufferType => 
+    case LIFOType => 
+      val fifo = Module(new LIFO(List(logicalDims.head), bitWidth, 
+                                  banks, combinedXBarWMux, combinedXBarRMux))
 
+      fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
+      fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
+      fifo.io.flow := io.flow
+      combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
+        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
+        (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
+      }
+      io.full := fifo.io.asInstanceOf[FIFOInterface].full
+      io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
+      io.empty := fifo.io.asInstanceOf[FIFOInterface].empty
+      io.almostEmpty := fifo.io.asInstanceOf[FIFOInterface].almostEmpty
+      io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
   }
 
 

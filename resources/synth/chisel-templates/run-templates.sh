@@ -34,9 +34,9 @@ if [[ $hn = *"testing"* ]]; then # Do sudo because travis is being an asshole (i
 	echo "running on travis" # sudo /usr/local/bin/sbt "test:run-main templates.Launcher all"
 else
 	if [[ -n $1 ]]; then
-		sbt ";project chisel_templates;test:runMain templates.Launcher $1"
+		sbt ";project templateResources;test:runMain templates.Launcher $1"
 	else
-		sbt ";project chisel_templates;test:runMain templates.Launcher all"
+		sbt ";project templateResources;test:runMain templates.Launcher all"
 	fi
 fi
 

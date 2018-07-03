@@ -245,7 +245,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data
     active.io.input.reset := io.ctrDone | io.rst | io.parentAck
     active.io.input.asyn_reset := false.B
-    sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := io.ctrDone }
+    sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := Utils.risingEdge(io.ctrDone)}
     done.io.input.reset := io.rst | io.parentAck
     done.io.input.asyn_reset := false.B
 

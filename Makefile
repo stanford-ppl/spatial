@@ -37,6 +37,7 @@ test: tests
 ###-----------------------------------###
 resources:
 	bash bin/update_resources.sh
+	sbt "; project templateResources; publishLocal"
 
 ###-----------------------------------###
 ## Remove all generated files.	       ##

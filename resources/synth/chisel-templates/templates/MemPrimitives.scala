@@ -17,11 +17,18 @@ sealed trait MemType
 object SRAMType extends MemType
 object FFType extends MemType
 object FIFOType extends MemType
+object LIFOType extends MemType
 object ShiftRegFileType extends MemType
 object LineBufferType extends MemType
 
+sealed trait MemInterfaceType
+object StandardInterface extends MemInterfaceType
+object ShiftRegFileInterface extends MemInterfaceType
+object FIFOInterface extends MemInterfaceType
+
 
 case class MemParams(
+  val iface: MemInterfaceType, // Required so the abstract MemPrimitive class can instantiate correct interface
   val logicalDims: List[Int], 
   val bitWidth: Int, 
   val banks: List[Int], 
@@ -94,7 +101,7 @@ class W_Direct(val ofs_width:Int, val banks:List[Int], val data_width:Int) exten
   override def cloneType = (new W_Direct(ofs_width, banks, data_width)).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
-class MemInterface(p: MemParams) extends Bundle {
+abstract class MemInterface(p: MemParams) extends Bundle {
   var xBarW = Vec(1 max p.numXBarW, Input(new W_XBar(p.ofsWidth, p.banksWidths, p.bitWidth)))
   var xBarR = Vec(1 max p.numXBarR, Input(new R_XBar(p.ofsWidth, p.banksWidths))) 
   var directW = HVec(Array.tabulate(1 max p.numDirectW){i => Input(new W_Direct(p.ofsWidth, if (p.hasDirectW) p.directWMux.sortByMuxPortAndOfs.values.map(_._1).flatten.toList(i) else p.defaultDirect, p.bitWidth))})
@@ -102,14 +109,16 @@ class MemInterface(p: MemParams) extends Bundle {
   var flow = Vec(1 max (p.numXBarR + p.numDirectR), Input(Bool()))
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
-  
-    // ShiftRegFile
-    var dump_out = Vec(p.depth, Output(UInt(p.bitWidth.W)))
   }
+}
+
+class StandardInterface(p: MemParams) extends MemInterface(p) {}  
+class ShiftRegFileInterface(p: MemParams) extends MemInterface(p) {
+  var dump_out = Vec(p.depth, Output(UInt(p.bitWidth.W)))
   var dump_in = Vec(p.depth, Input(UInt(p.bitWidth.W)))
   var dump_en = Input(Bool())
-
-  // FIFO/LIFO
+}
+class FIFOInterface(p: MemParams) extends MemInterface(p) {
   var full = Output(Bool())
   var almostFull = Output(Bool())
   var empty = Output(Bool())
@@ -118,7 +127,11 @@ class MemInterface(p: MemParams) extends Bundle {
 }
 
 abstract class MemPrimitive(val p: MemParams) extends Module {
-  val io = IO(new MemInterface(p))
+  val io = p.iface match {
+    case StandardInterface => IO(new StandardInterface(p))
+    case ShiftRegFileInterface => IO(new ShiftRegFileInterface(p))
+    case FIFOInterface => IO(new FIFOInterface(p))
+  } 
 
   var usedMuxPorts = List[(String,(Int,Int,Int))]() // Check if the muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
@@ -175,15 +188,15 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 class SRAM(p: MemParams) extends MemPrimitive(p) { 
   def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, directWMux: DMap, directRMux: DMap,
-           bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits))
+           bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(StandardInterface, logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits))
   def this(tuple: (List[Int], Int, List[Int], List[Int], XMap, XMap, 
-    DMap, DMap, BankingMode)) = this(MemParams(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9))
+    DMap, DMap, BankingMode)) = this(MemParams(StandardInterface,tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9))
 
   // Get info on physical dims
   // TODO: Upcast dims to evenly bank
   val bankDim = p.bankingMode match {
-    case DiagonalMemory => math.ceil(p.depth / p.banks.product).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
-    case BankedMemory => math.ceil(p.depth / p.banks.product).toInt
+    case DiagonalMemory => math.ceil(p.depth.toDouble / p.banks.product.toDouble).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
+    case BankedMemory => math.ceil(p.depth.toDouble / p.banks.product.toDouble).toInt
   }
   val numMems = p.bankingMode match {
     case DiagonalMemory => p.banks.head
@@ -192,7 +205,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until numMems).map{ i => 
-    val mem = Module(new Mem1D(bankDim + 1, p.bitWidth, p.syncMem))
+    val mem = Module(new Mem1D(bankDim, p.bitWidth, p.syncMem))
     val coords = p.banks.zipWithIndex.map{ case (b,j) => 
       i % (p.banks.drop(j).product) / p.banks.drop(j+1).product
     }
@@ -290,7 +303,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(StandardInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
   // def this(logicalDims: List[Int], bitWidth: Int, 
   //          banks: List[Int], strides: List[Int], 
   //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
@@ -312,14 +325,14 @@ class FF(p: MemParams) extends MemPrimitive(p) {
 class FIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], xBarWMux: XMap, xBarRMux: XMap,
-           inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
+           inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
 
   def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
 
   // Create bank counters
   val headCtr = Module(new CompactingCounter(p.numXBarW, p.depth, p.elsWidth))
@@ -374,11 +387,11 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Check if there is data
-  io.empty := elements.io.output.empty
-  io.full := elements.io.output.full
-  io.almostEmpty := elements.io.output.almostEmpty
-  io.almostFull := elements.io.output.almostFull
-  io.numel := elements.io.output.numel.asUInt
+  io.asInstanceOf[FIFOInterface].empty := elements.io.output.empty
+  io.asInstanceOf[FIFOInterface].full := elements.io.output.full
+  io.asInstanceOf[FIFOInterface].almostEmpty := elements.io.output.almostEmpty
+  io.asInstanceOf[FIFOInterface].almostFull := elements.io.output.almostFull
+  io.asInstanceOf[FIFOInterface].numel := elements.io.output.numel.asUInt
 
 
 }
@@ -388,13 +401,13 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap,
-           inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
+           inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
   def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
 
   val pW = p.xBarWMux.accessPars.max
   val pR = p.xBarRMux.accessPars.max
@@ -477,11 +490,11 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Check if there is data
-  io.empty := elements.io.output.empty
-  io.full := elements.io.output.full
-  io.almostEmpty := elements.io.output.almostEmpty
-  io.almostFull := elements.io.output.almostFull
-  io.numel := elements.io.output.numel.asUInt
+  io.asInstanceOf[FIFOInterface].empty := elements.io.output.empty
+  io.asInstanceOf[FIFOInterface].full := elements.io.output.full
+  io.asInstanceOf[FIFOInterface].almostEmpty := elements.io.output.almostEmpty
+  io.asInstanceOf[FIFOInterface].almostFull := elements.io.output.almostFull
+  io.asInstanceOf[FIFOInterface].numel := elements.io.output.numel.asUInt
 
 }
 
@@ -489,7 +502,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, 
             xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
             directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, isBuf: Boolean = false) = this(MemParams(logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf))
+            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, isBuf: Boolean = false) = this(MemParams(ShiftRegFileInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf))
 
   def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
   def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
@@ -507,7 +520,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     }
     val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
-    io.output.dump_out(i) := mem
+    io.asInstanceOf[ShiftRegFileInterface].dump_out(i) := mem
     (mem,coords,i)
   }
 
@@ -560,7 +573,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
         val data = liveDirectWire.data
         (data, enable)
       } else (0.U, false.B)
-    if (p.isBuf) mem := Mux(io.dump_en, io.dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
+    if (p.isBuf) mem := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en, io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
     else mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
   }
 
@@ -592,7 +605,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
 class LUT(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, 
             xBarRMux: XMap, // muxPort -> accessPar
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(logicalDims, bitWidth, logicalDims, List(1), XMap(), xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
+            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), XMap(), xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
 
   def this(tuple: (List[Int], Int, XMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
   def this(logicalDims: List[Int], bitWidth: Int, 

@@ -2,7 +2,7 @@ package spatial.tests.apps
 
 import spatial.dsl._
 
-@test class SVRG extends SpatialTest {
+@spatial class SVRG extends SpatialTest {
   override def runtimeArgs: Args = "25 30 256 0.0001 0.0009 10"
 
   type TM = FixPt[TRUE, _8, _24]

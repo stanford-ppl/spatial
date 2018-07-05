@@ -1,8 +1,7 @@
 package spatial.traversal
 
 import argon._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.control._
 
 trait AccelTraversal extends argon.passes.Traversal {
   protected var inHw: Boolean = false
@@ -11,7 +10,7 @@ trait AccelTraversal extends argon.passes.Traversal {
     val saveHW = inHw
     val saveEnGen = config.enGen
     inHw = true
-    if (backend == "accel") config.enGen = true
+    if (backend == "accel" || backend == "tree") config.enGen = true
     else config.enGen = false
     val result = blk
     inHw = saveHW

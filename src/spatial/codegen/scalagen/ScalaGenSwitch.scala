@@ -3,7 +3,7 @@ package spatial.codegen.scalagen
 import argon._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.types._
 
 trait ScalaGenSwitch extends ScalaGenBits with ScalaGenMemories with ScalaGenSRAM with ScalaGenController {
 

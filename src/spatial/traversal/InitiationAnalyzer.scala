@@ -1,11 +1,11 @@
 package spatial.traversal
 
 import argon._
-import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.internal.spatialConfig
+import spatial.util.spatialConfig
+import spatial.util.modeling._
+import spatial.metadata.control._
 
 case class InitiationAnalyzer(IR: State) extends AccelTraversal {
 

@@ -1,12 +1,8 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
-@test class ChangingCtrMax extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class ChangingCtrMax extends SpatialTest {
   val tileSize = 16
   val N = 5
 

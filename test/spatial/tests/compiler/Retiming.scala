@@ -5,8 +5,7 @@ import argon._
 import spatial.dsl._
 import spatial.node.DelayLine
 
-@test class SimpleRetimePipe extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class SimpleRetimePipe extends SpatialTest {
   override def backends = super.backends.filterNot{be => (be == Scala) | (be == VCS_noretime)}
 
   def main(args: Array[String]): Unit = {
@@ -28,9 +27,7 @@ import spatial.node.DelayLine
   }
 }
 
-@test class SimplePipeRetime2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SimplePipeRetime2 extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     // add one to avoid dividing by zero
@@ -56,8 +53,7 @@ import spatial.node.DelayLine
 }
 
 
-@test class RetimeLoop extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RetimeLoop extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](16,16)
@@ -80,9 +76,8 @@ import spatial.node.DelayLine
   }
 }
 
-@test class RetimeNestedPipe extends SpatialTest {
+@spatial class RetimeNestedPipe extends SpatialTest {
   override def runtimeArgs: Args = "6"
-
 
   def main(args: Array[String]): Unit = {
     val x = ArgIn[Int]
@@ -108,8 +103,7 @@ import spatial.node.DelayLine
 }
 
 
-@test class RetimeRandomTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RetimeRandomTest extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     val x = ArgOut[Bit]
@@ -124,8 +118,7 @@ import spatial.node.DelayLine
   }
 }
 
-@test class RetimeOffsetTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class RetimeOffsetTest extends SpatialTest {
   override def backends = DISABLED // TODO: Rewrite
 
   def main(args: Array[String]): Void = {
@@ -142,3 +135,89 @@ import spatial.node.DelayLine
 }
 
 
+
+@spatial class SystolishArray extends SpatialTest {
+
+  def main(args: Array[String]): Void = {
+    val a = ArgOut[Int]
+    val b = ArgOut[Int]
+    val c = ArgOut[Int]
+    val d = ArgOut[Int]
+    val e = ArgOut[Int]
+
+    Accel {
+      val A = Reg[Int](0)
+      val B = Reg[Int](0)
+      val C = Reg[Int](0)
+      val D = Reg[Int](0)
+      val E = Reg[Int](0)
+
+      // Inspired by SHA1 with FullDelay of RegRead(E) being incorrect
+      Foreach(5 by 1){i => 
+        val temp = A + B + C + D + E + 1
+        E := D; D := C; C := B; B := A; A := temp
+      }
+
+      a := A
+      b := B
+      c := C
+      d := D
+      e := E
+    }
+
+    val A_result = getArg(a)
+    val B_result = getArg(b)
+    val C_result = getArg(c)
+    val D_result = getArg(d)
+    val E_result = getArg(e)
+
+    val A_gold = 16
+    val B_gold = 8
+    val C_gold = 4
+    val D_gold = 2
+    val E_gold = 1
+
+    println(r"Got:    ${E_result} ${D_result} ${C_result} ${B_result} ${A_result}")
+    println(r"Wanted: ${E_gold} ${D_gold} ${C_gold} ${B_gold} ${A_gold}")
+
+    assert(A_result == A_gold && B_result == B_gold && C_result == C_gold && D_result == D_gold && E_result == E_gold)
+
+
+  }
+}
+
+
+@spatial class UnrAccessCycleDetection extends SpatialTest {
+  override def runtimeArgs: Args = NoArgs
+
+  def main(args: Array[String]): Void = {
+    val x = ArgIn[Int]
+    setArg(x, 1)
+    val w = DRAM[Int](32)
+    Accel {
+      // Inspired by SHA1 the last instance of this loop (not nested in an if statement) has incorrect II
+      val W = SRAM[Int](32)
+      val data = SRAM[Int](16)
+      Foreach(16 by 1) { i => data(i) = i+1 } 
+
+      if (x.value == 1) {
+        'CORRECT.Foreach(32 by 1) { i =>
+          W(i) = if (i < 16) {data(i)} else {W(i-3) + W(i-8) + W(i-14) + W(i-16)}
+        }
+      }
+
+      Foreach(16 by 1) { i => data(i) = i } 
+
+      'WRONG.Foreach(32 by 1) { i =>
+        W(i) = if (i < 16) {data(i)} else {W(i-3) + W(i-8) + W(i-14) + W(i-16)}
+      }
+
+      w store W
+    }
+
+    printArray(getMem(w), "W: ")
+    val gold = Array[Int](0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,23,27,31,42,49,56,70,80,97,117,133,163,192,217,270,314)
+    printArray(gold, "G: ")
+    assert(getMem(w) == gold)
+  }
+}

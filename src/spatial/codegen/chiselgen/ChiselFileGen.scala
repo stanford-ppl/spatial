@@ -1,12 +1,9 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
-import spatial.internal.{spatialConfig => cfg}
-
+import spatial.util.spatialConfig
 
 trait ChiselFileGen extends ChiselCodegen {
-
   backend = "accel"
 
   override def emitHeader(): Unit = {
@@ -297,7 +294,7 @@ trait ChiselFileGen extends ChiselCodegen {
         emit(s"trait InstrumentationMixer extends ${traits.mkString("\n with ")}")
       }
 
-      if (cfg.compressWires == 2) {
+      if (spatialConfig.compressWires == 2) {
   //       var methodList = scala.collection.mutable.ListBuffer[String]()
   //       val methodized_trait_pattern = "^x[0-9]+".r
   //       val traits = (streamMapReverse.keySet.toSet.map{
@@ -345,7 +342,7 @@ trait ChiselFileGen extends ChiselCodegen {
   //   // TODO: Figure out better way to pass constructor args to IOModule.  Currently just recreate args inside IOModule redundantly
   // }""")
   //       }
-      } else if (cfg.compressWires == 0) {
+      } else if (spatialConfig.compressWires == 0) {
         val allTraits = streamExtensions.flatMap{s => List.tabulate(s._2){i => src"${s._1}_${i+1}"}}.toList
                                         .filterNot{a => a.contains("Instantiator") | a.contains("AccelTop") | a.contains("Mapping")}
 

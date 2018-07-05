@@ -1,10 +1,8 @@
 package spatial.codegen.scalagen
 
 import argon._
-
-import spatial.data._
+import spatial.metadata.memory._
 import spatial.lang._
-import spatial.util._
 
 import utils.multiLoopWithIndex
 
@@ -68,7 +66,7 @@ trait ScalaGenMemories extends ScalaGenBits {
 
   def emitBankedInitMem(mem: Sym[_], init: Option[Seq[Sym[_]]], tp: ExpType[_,_]): Unit = {
     val inst = mem.instance
-    val dims = constDimsOf(mem)
+    val dims = mem.constDims
     val size = dims.product
     implicit val ctx: SrcCtx = mem.ctx
 

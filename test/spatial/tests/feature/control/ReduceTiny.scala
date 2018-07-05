@@ -2,8 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class ReduceTiny extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class ReduceTiny extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val sumOut = ArgOut[Int]
@@ -15,11 +14,11 @@ import spatial.dsl._
     }
     assert(getArg(sumOut) == Array.tabulate(16){i => i}.reduce{_+_})
   }
+
 }
 
 
-@test class ReduceAccumTiny extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class ReduceAccumTiny extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val prodOut = ArgOut[Int]
@@ -37,4 +36,5 @@ import spatial.dsl._
     assert(getArg(prodOut) == Array.tabulate(16){i => i}.reduce{_*_})
     assert(getArg(sumOut) == Array.tabulate(16){i => i}.reduce{_+_})
   }
+
 }

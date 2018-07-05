@@ -4,9 +4,9 @@ import argon._
 import utils.implicits.collections._
 import utils.multiLoop
 import poly._
-import spatial.data._
 import spatial.lang._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.control._
 
 import scala.collection.mutable
 

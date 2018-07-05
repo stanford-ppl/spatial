@@ -103,10 +103,10 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     
     case Sequenced => 
       // Define rule for when ctr increments
-      io.ctrInc := io.doneIn.last
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
 
       // Configure synchronization
-      synchronize := io.doneIn.last.D(1)
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
       
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
@@ -163,7 +163,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.selectsIn(i)
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.selectsIn(i) & ~io.done
         active(i).io.input.reset := io.doneIn(i) | io.rst
         iterDone(i).io.input.set := io.doneIn(i)
         iterDone(i).io.input.reset := done(i).io.output.data
@@ -245,7 +245,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data
     active.io.input.reset := io.ctrDone | io.rst | io.parentAck
     active.io.input.asyn_reset := false.B
-    sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := io.ctrDone }
+    sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := Utils.risingEdge(io.ctrDone)}
     done.io.input.reset := io.rst | io.parentAck
     done.io.input.asyn_reset := false.B
 

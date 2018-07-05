@@ -1,19 +1,24 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
-import spatial.data._
+import spatial.metadata.bounds._
+import spatial.metadata.rewrites._
 import spatial.lang._
 import spatial.node._
+import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
-import spatial.internal.spatialConfig
 
 import utils.math.{isPow2,log2}
 
 /** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
 
-  def selectMod[S:BOOL,I:INT,F:INT](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
+  def selectMod[S,I,F](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
+    implicit val S: BOOL[S] = x.fmt.s
+    implicit val I: INT[I] = x.fmt.i
+    implicit val F: INT[F] = x.fmt.f
     val data = x.asBits
     val range = (log2(y.toDouble)-1).toInt :: 0
     val selected = data.apply(range)
@@ -26,13 +31,29 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def fltFMA[M,E](m1: Flt[M,E], m2: Flt[M,E], add: Flt[M,E]): Flt[M,E] = {
-    import add.fmt._
+    implicit val M: INT[M] = add.fmt.m
+    implicit val E: INT[E] = add.fmt.e
     stage(FltFMA(m1,m2,add))
   }
 
+  def fixFMA[S,I,F](m1: Fix[S,I,F], m2: Fix[S,I,F], add: Fix[S,I,F]): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = add.fmt.s
+    implicit val I: INT[I] = add.fmt.i
+    implicit val F: INT[F] = add.fmt.f
+    stage(FixFMA(m1,m2,add))
+  }
+
   def fltRecipSqrt[M,E](x: Flt[M,E]): Flt[M,E] = {
-    import x.fmt._
+    implicit val M: INT[M] = x.fmt.m
+    implicit val E: INT[E] = x.fmt.e
     stage(FltRecipSqrt(x))
+  }
+
+  def fixRecipSqrt[S,I,F](x: Fix[S,I,F]): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = x.fmt.s
+    implicit val I: INT[I] = x.fmt.i
+    implicit val F: INT[F] = x.fmt.f
+    stage(FixRecipSqrt(x))
   }
 
 
@@ -57,28 +78,19 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       case _ => super.transform(lhs, rhs)
     }
 
-    case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw =>
-      import x.fmt._
-      selectMod(x, y).asInstanceOf[Sym[A]]
+    case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => selectMod(x, y).asInstanceOf[Sym[A]]
 
     // 1 / sqrt(b)  ==> invsqrt(b)
     // Square root has already been mirrored, but should be removed if unused
-    // TODO[5]: Why do the Flt nodes require separate methods to type check properly??
     case FltRecip(F( Op(FltSqrt(b)) )) => fltRecipSqrt(b).asInstanceOf[Sym[A]]
-
-    case FixRecip(F( Op(FixSqrt(b: Fix[s,i,f])) )) =>
-      import b.fmt._
-      stage(FixRecipSqrt[s,i,f](b)).asInstanceOf[Sym[A]]
-
+    case FixRecip(F( Op(FixSqrt(b)) )) => fixRecipSqrt(b).asInstanceOf[Sym[A]]
 
     // m1*m2 + add --> fma(m1,m2,add)
     case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA =>
-      import add.fmt._
-      stage(FixFMA[s,i,f](m1,m2,add)).asInstanceOf[Sym[A]]
+      fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
 
     case FixAdd(F(add: Fix[s,i,f]), F(Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA =>
-      import add.fmt._
-      stage(FixFMA[s,i,f](m1,m2,add)).asInstanceOf[Sym[A]]
+      fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
 
     case FltAdd(F(Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA =>
       fltFMA(m1,m2,add).asInstanceOf[Sym[A]]

@@ -3,7 +3,6 @@ package spatial.codegen.scalagen
 import argon._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
 
 trait ScalaGenRegFile extends ScalaGenMemories {
 
@@ -25,6 +24,12 @@ trait ScalaGenRegFile extends ScalaGenMemories {
 
     case op@RegFileVectorRead(rf,addr,ens)       => emitVectorLoad(lhs,rf,addr,ens)(op.A)
     case op@RegFileVectorWrite(rf,data,addr,ens) => emitVectorStore(lhs,rf,data,addr,ens)(op.A)
+
+    case RegFileBankedShiftIn(rf,data,addr,en,axis) =>
+      val ctx = s""""${lhs.ctx}""""
+      (data,addr,en).zipped.foreach{(d,a,e) => 
+        emit(src"val $lhs = if (${and(e)}) $rf.shiftIn($ctx, Seq($a), $axis, $d)")
+      }
 
     case _ => super.gen(lhs, rhs)
   }

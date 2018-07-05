@@ -1,13 +1,8 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
-import spatial.data._
-import spatial.util._
-
 
 trait ChiselGenDelay extends ChiselGenCommon {
 

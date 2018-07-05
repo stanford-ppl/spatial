@@ -203,7 +203,8 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramXBarRPorts).foreach {k => 
-            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+            val sram_index = k - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter(k >= _).lastOption.getOrElse(0)
+            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en & rMask
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
@@ -220,7 +221,8 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramDirectRPorts).foreach {k => 
-            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+            val sram_index = k - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter(k >= _).lastOption.getOrElse(0)
+            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             f.io.directR(bufferBase + k).en := io.directR(k).en & rMask
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(k).ofs
@@ -297,11 +299,11 @@ class NBufMem(val mem: MemType,
         val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
         (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
       }
-      io.full := fifo.io.full
-      io.almostFull := fifo.io.almostFull
-      io.empty := fifo.io.empty
-      io.almostEmpty := fifo.io.almostEmpty
-      io.numel := fifo.io.numel
+      io.full := fifo.io.asInstanceOf[FIFOInterface].full
+      io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
+      io.empty := fifo.io.asInstanceOf[FIFOInterface].empty
+      io.almostEmpty := fifo.io.asInstanceOf[FIFOInterface].almostEmpty
+      io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
 
     case ShiftRegFileType => 
       val rfs = (0 until numBufs).map{ i => 
@@ -312,7 +314,7 @@ class NBufMem(val mem: MemType,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
                         inits, syncMem, fracBits, isBuf = {i != 0}))
       }
-      rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.dump_in.zip(rfs(i).io.output.dump_out).foreach{case(a,b) => a:=b}; rf.io.dump_en := ctrl.io.swap}
+      rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(i).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{case(a,b) => a:=b}; rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap}
 
       // Route NBuf IO to SRAM IOs
       rfs.zipWithIndex.foreach{ case (f,i) => 
@@ -425,15 +427,30 @@ class NBufMem(val mem: MemType,
           f.io.xBarR(xBarRMuxBufferBase + k).ofs := io.broadcastR(k).ofs
           f.io.xBarR(xBarRMuxBufferBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
         }
-
       }
+    case LineBufferType => 
+    case LIFOType => 
+      val fifo = Module(new LIFO(List(logicalDims.head), bitWidth, 
+                                  banks, combinedXBarWMux, combinedXBarRMux))
 
+      fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
+      fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
+      fifo.io.flow := io.flow
+      combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
+        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
+        (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
+      }
+      io.full := fifo.io.asInstanceOf[FIFOInterface].full
+      io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
+      io.empty := fifo.io.asInstanceOf[FIFOInterface].empty
+      io.almostEmpty := fifo.io.asInstanceOf[FIFOInterface].almostEmpty
+      io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
   }
 
 
   var usedMuxPorts = List[(String,(Int,Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr, vecId is taken for this connection style (xBar or direct)
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)) {connectXBarWPort(wBundle, bufferPort, muxAddr, 0)}
-  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)): Unit = {connectXBarWPort(wBundle, bufferPort, muxAddr, 0)}
+  def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
     assert(hasXBarW)
     assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
@@ -455,8 +472,8 @@ class NBufMem(val mem: MemType,
     io.output.data(bufferBase + muxBase)
   }
 
-  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int)) {connectBroadcastWPort(wBundle, muxAddr, 0)}
-  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int) {
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int)): Unit = {connectBroadcastWPort(wBundle, muxAddr, 0)}
+  def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int), vecId: Int): Unit = {
     val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     io.broadcastW(muxBase) := wBundle
   }
@@ -471,7 +488,7 @@ class NBufMem(val mem: MemType,
     io.output.data(xBarRBase + directRBase + muxBase)
   }
 
-  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int) {
+  def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): Unit = {
     assert(hasDirectW)
     assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2,vecId))), s"Attempted to connect to directW port ($bufferPort,$muxAddr,$vecId) twice!")
     usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2, vecId))
@@ -494,7 +511,7 @@ class NBufMem(val mem: MemType,
     io.output.data(xBarRBase + bufferBase + muxBase)
   }
 
-  def connectStageCtrl(done: Bool, en: Bool, port: Int) {
+  def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {
     io.sEn(port) := en
     io.sDone(port) := done
   }
@@ -541,9 +558,9 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     }
   })
 
-  val wMap = NBufXMap(0 -> XMap((0,0) -> 1))
+  val wMap = NBufXMap(0 -> XMap((0,0) -> (1, None)))
   val rMap = NBufXMap((0 until numBufs).map{i => 
-    (i -> XMap((0,0) -> 1))
+    (i -> XMap((0,0) -> (1, None)))
   }.toArray:_*)
 
   val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), 
@@ -552,12 +569,12 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
                                   ))
   io <> nbufFF.io
 
-  def connectStageCtrl(done: Bool, en: Bool, port: Int) {
+  def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {
     io.sEn(port) := en
     io.sDone(port) := done
   }
 
-  def chain_pass[T](dat: T, en: Bool) { // Method specifically for handling reg chains that pass counter values between metapipe stages
+  def chain_pass[T](dat: T, en: Bool): Unit = { // Method specifically for handling reg chains that pass counter values between metapipe stages
     dat match {
       case data: UInt => 
         io.xBarW(0).data := data

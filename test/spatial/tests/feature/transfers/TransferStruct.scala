@@ -2,8 +2,7 @@ package spatial.tests.feature.transfers
 
 import spatial.dsl._
 
-@test class TransferStruct extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class TransferStruct extends SpatialTest {
 
   def foo() : Int = {
     type Tup = Tup2[Int, Int]

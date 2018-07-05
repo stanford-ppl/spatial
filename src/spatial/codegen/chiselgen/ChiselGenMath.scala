@@ -1,14 +1,13 @@
 package spatial.codegen.chiselgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
-
+import spatial.metadata.control._
 
 trait ChiselGenMath extends ChiselGenCommon {
-
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixInv(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (~$x).r")
@@ -18,6 +17,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixAnd(x,y)  => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs := $x & $y")
     case FixOr(x,y)   => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs := $x | $y")
     case FixXor(x,y)  => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs := $x ^ $y")
+    case FixPow(x,y)  => throw new Exception(s"FixPow($x, $y) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
     case VecApply(vector, i) => emitGlobalWireMap(src"""$lhs""", src"""Wire(${lhs.tp})"""); emitt(src"$lhs := $vector.apply($i)")
 
     case FixLst(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x < $y")
@@ -28,36 +28,36 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x <= $y")
     case FltNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x =/= $y")
     case FltEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x === $y")
-    // case UnbMul(x,y) => emitt(src"val $lhs = $x *& $y")
-    // case UnbDiv(x,y) => emitt(src"val $lhs = $x /& $y")
-    // case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
-    // case SatSub(x,y) => emitt(src"val $lhs = $x <-> $y")
-    // case SatMul(x,y) => emitt(src"val $lhs = $x <*> $y")
-    // case SatDiv(x,y) => emitt(src"val $lhs = $x </> $y")
+    case UnbMul(x,y) => emitt(src"val $lhs = $x *& $y")
+    case UnbDiv(x,y) => emitt(src"val $lhs = $x /& $y")
+    case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
+    case SatSub(x,y) => emitt(src"val $lhs = $x <-> $y")
+    case SatMul(x,y) => emitt(src"val $lhs = $x <*> $y")
+    case SatDiv(x,y) => emitt(src"val $lhs = $x </> $y")
     case FixSLA(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x << $shift).r // TODO: cast to proper type (chisel expands bits)")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x}.r << $shift).r // TODO: cast to proper type (chisel expands bits)")
     case FixSRA(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x >> $shift).r")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x} >> $shift).r")
     case FixSRU(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x >>> $shift).r")
-    case BitRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}) === 1.U")
-    case FixRandom(None) => emitt(src"val $lhs = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)})")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x} >>> $shift).r")
+    case BitRandom(None) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
+    case FixRandom(None) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case UnbSatMul(x,y) => emitt(src"val $lhs = $x <*&> $y")
     case UnbSatDiv(x,y) => emitt(src"val $lhs = $x </&> $y")
-    // case FixRandom(x) =>
-    //   val seed = (random*1000).toInt
-    //   val size = x match{
-    //     case Some(Const(xx)) => s"$xx"
-    //     case Some(_) => s"$x"
-    //     case None => "4096"
-    //   }
-    //   emitt(s"val ${quote(lhs)}_bitsize = Utils.log2Up(${size}) max 1")
-    //   emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
-    //   emitGlobalModule(src"${lhs}_rng.io.en := true.B")
-    //   emitt(src"val ${lhs} = ${lhs}_rng.io.output(${lhs}_bitsize,0)")
+    case FixRandom(x) =>
+      val seed = (scala.math.random*1000).toInt
+      val size = x match{
+        case Some(Const(xx)) => s"$xx"
+        case Some(_) => s"$x"
+        case None => "4096"
+      }
+      emitt(s"val ${quote(lhs)}_bitsize = Utils.log2Up(${size}) max 1")
+      emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
+      emitGlobalModule(src"${lhs}_rng.io.en := true.B")
+      emitt(src"val ${lhs} = ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     // case FixUnif() =>
     //   val bits = lhs.tp match {
     //     case FixPtType(s,d,f) => f
@@ -124,7 +124,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixFMA(x,y,z) => 
       alphaconv_register(src"$lhs")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := ($x.*-*($y, ${latencyOptionString("FixMul", Some(bitWidth(lhs.tp)))})+$z).r")
+      emitt(src"Utils.FixFMA($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).cast($lhs)")
 
     case FltFMA(x,y,z) => 
       alphaconv_register(src"$lhs")
@@ -217,6 +217,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case Not(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs} := ~$a")
     case Or(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs} := $a | $b")
     case Xor(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs} := $a ^ $b")
+    case Xnor(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs} := ~($a ^ $b)")
 
     case FixFloor(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Cat(${a}.raw_dec, 0.U(${fracBits(a)}.W))")
     case FixCeil(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Mux(${a}.raw_frac === 0.U, ${a}.r, Cat(${a}.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")

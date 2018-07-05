@@ -1,12 +1,8 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class MemCopyFIFO extends SpatialTest {
-  def runtimeArgs: Args = NoArgs
-
+@spatial class MemCopyFIFO extends SpatialTest {
   val N = 32
 
   def fifoLoadStore[T:Bits](srcHost: Array[T]): Array[T] = {

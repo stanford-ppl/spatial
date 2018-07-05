@@ -25,7 +25,7 @@ import spatial.dsl._
                                                |    |  | |      | |    | |
                                                |____|  |_|      |_|    |_|
 */
-@test class SGD extends SpatialTest {
+@spatial class SGD extends SpatialTest {
   override def runtimeArgs: Args = "40 64 0.0001"
 
   type TM = FixPt[TRUE, _16, _16]

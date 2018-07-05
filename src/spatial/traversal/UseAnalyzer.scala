@@ -1,25 +1,26 @@
 package spatial.traversal
 
 import argon._
-import spatial.data._
-import spatial.node._
-import spatial.util._
+import spatial.metadata.PendingUses
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 
 case class UseAnalyzer(IR: State) extends BlkTraversal {
   var boundSyms: Set[Sym[_]] = Set.empty
 
   override protected def preprocess[R](block: Block[R]): Block[R] = {
-    pendingUses.reset()
+    PendingUses.reset()
     super.preprocess(block)
   }
 
   override protected def postprocess[R](block: Block[R]): Block[R] = {
     def isUnusedRead(read: Sym[_]): Boolean = {
-      if (read.isEphemeral) read.users.isEmpty
+      if (read.isTransient) read.users.isEmpty
       else read.consumers.isEmpty
     }
 
-    localMems.all.foreach{mem =>
+    LocalMemories.all.foreach{mem =>
       if (mem.isReg && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead))) {
         mem.isUnusedMemory = true
         if (mem.name.isDefined) {
@@ -44,7 +45,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
     def inspect(): Unit = {
       if (inHw) checkUses(lhs, rhs)
-      if (lhs.isEphemeral) addPendingUse(lhs)
+      if (lhs.isTransient) addPendingUse(lhs)
       super.visit(lhs, rhs)
     }
 
@@ -64,7 +65,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     val result = super.visitBlock(block)
     block.result.blk match {
       case Blk.Host =>
-      case Blk.Node(ctrl,_) => addUse(ctrl, pendingUses(block.result), blk)
+      case Blk.Node(ctrl,_) => addUse(ctrl, PendingUses(block.result), blk)
     }
 
     boundSyms = saveBounds
@@ -73,14 +74,18 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
 
   private def checkUses(lhs: Sym[_], rhs: Op[_]): Unit = {
-    dbgs(s"  pending: ${pendingUses.all.mkString(", ")}")
-    dbgs(s"  inputs: ${rhs.nonBlockExpInputs.mkString(", ")}")
-    val pending = rhs.nonBlockExpInputs.flatMap{sym => pendingUses(sym) }
-    dbgs(s"  uses: ${pending.mkString(", ")}")
+    dbgs(s"  Pending: ${PendingUses.all.mkString(", ")}")
+    dbgs(s"  Inputs:  ${rhs.nonBlockExpInputs.mkString(", ")}")
+    val pending = rhs.nonBlockExpInputs.flatMap{sym => PendingUses(sym) }
+    dbgs(s"  Uses:    ${pending.mkString(", ")}")
+    dbgs(s"  Transient: ${lhs.isTransient}")
+    // We care about whether the IR scope is outer, not whether the owning controller is outer
+    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl
+    dbgs(s"  Outer: $isOuter")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
-      if (lhs.isEphemeral && !lhs.toCtrl.isInnerControl) addPropagatingUse(lhs, pending.toSet)
+      if (lhs.isTransient && isOuter) addPropagatingUse(lhs, pending.toSet)
       else addUse(lhs, pending.toSet, blk)
     }
   }
@@ -99,19 +104,22 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       use.users += User(user, block)
 
       // Also add stateless nodes that this node uses
-      (pendingUses(use) - use).foreach{pend => pend.users += User(use, block) }
+      (PendingUses(use) - use).foreach{pend =>
+        dbgs(s"  Adding ($use, $block) to uses for $pend")
+        pend.users += User(use, block)
+      }
     }
   }
 
   private def addPropagatingUse(sym: Sym[_], pending: Set[Sym[_]]): Unit = {
     dbgs(s"  Node is propagating reader of:")
     pending.foreach{s => dbgs(s"  - ${stm(s)}")}
-    pendingUses += sym -> (pending + sym)
+    PendingUses += sym -> (pending + sym)
   }
 
-  private def addPendingUse(sym: Sym[_]): Unit = if (!pendingUses.all.contains(sym)) {
+  private def addPendingUse(sym: Sym[_]): Unit = if (!PendingUses.all.contains(sym)) {
     dbgs(s"  Adding pending: $sym [ctrl: ${sym.toCtrl}, block: $blk]")
-    pendingUses += sym -> Set(sym)
+    PendingUses += sym -> Set(sym)
   }
 
 }

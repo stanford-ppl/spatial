@@ -2,8 +2,7 @@ package spatial.tests.syntax
 
 import spatial.dsl._
 
-@test class FlagExample extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class FlagExample extends SpatialTest {
   override def compileArgs: Args = "-Dfoo=16 -Dbar=16 -Dzee=32" and
                                    "-Dfoo=4  -Dbar=12 -Dzee=16"
 

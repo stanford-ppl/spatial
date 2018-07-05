@@ -2,7 +2,7 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class TPCHQ6 extends SpatialTest {
+@spatial class TPCHQ6 extends SpatialTest {
   override def runtimeArgs: Args = "3840"
 
   type FT = Int

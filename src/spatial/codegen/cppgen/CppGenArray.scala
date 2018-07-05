@@ -1,13 +1,11 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
-import host._
-
+import spatial.metadata.control._
+import spatial.metadata.types._
 
 trait CppGenArray extends CppGenCommon {
 
@@ -143,6 +141,10 @@ trait CppGenArray extends CppGenCommon {
               }
               emit(src"return result;")
             close("}")
+            position = 0
+            open(src"${struct}(int128_t bits){ /* Constructor from raw bits */")
+              st.foreach{f => emit(src"set${f._1}((${f._2.tp}) (bits >> $position));"); position = position + bitWidth(f._2.tp)}
+            close("}")
             close(" ")
           } catch { case _:Throwable => }
 
@@ -195,15 +197,23 @@ trait CppGenArray extends CppGenCommon {
         visitBlock(func)
       close("}")
 
+    case ArrayMkString(array,start,delim,end) =>
+      emit(src"""${lhs.tp} $lhs = $start;""")
+      open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i++){ ")
+        emit(src"${lhs} = string_plus(string_plus(${lhs}, ${delim}), std::to_string((*${array})[${lhs}_i]));")
+      close("}")
+      emit(src"""$lhs = string_plus($lhs, $end);""")
+
     case op @ IfThenElse(cond, thenp, elsep) =>
-      if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
+      val star = lhs.tp match {case _: host.Array[_] => "*"; case _ => ""}
+      if (!op.R.isVoid) emit(src"${lhs.tp}${star} $lhs;")
       open(src"if ($cond) { ")
         visitBlock(thenp)
-        if (op.R.isBits) emit(src"${lhs} = ${thenp.result};")
+        if (!op.R.isVoid) emit(src"${lhs} = ${thenp.result};")
       close("}")
       open("else {")
         visitBlock(elsep)
-        if (op.R.isBits) emit(src"${lhs} = ${elsep.result};")
+        if (!op.R.isVoid) emit(src"${lhs} = ${elsep.result};")
       close("}")
 
     case ArrayFilter(array, apply, cond) =>
@@ -252,7 +262,9 @@ trait CppGenArray extends CppGenCommon {
       emitUpdate(lhs, func.result, src"${applyA.inputB}", func.result.tp)
       close("}")
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) => 
+    case ArrayUpdate(arr, id, data) => emitUpdate(arr, data, src"${id}", data.tp)
+
+    case UnrolledForeach(ens,cchain,func,iters,valids) if (!inHw) => 
       val starts = cchain.counters.map(_.start)
       val ends = cchain.counters.map(_.end)
       val steps = cchain.counters.map(_.step)

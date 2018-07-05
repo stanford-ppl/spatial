@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class NestedIfs extends SpatialTest {
+@spatial class NestedIfs extends SpatialTest {
   override def runtimeArgs: Args = "43" and "2"
 
 
@@ -39,8 +39,7 @@ import spatial.dsl._
   }
 }
 
-// @test class NestedIfs1H extends SpatialTest {
-//   override def runtimeArgs: Args = NoArgs
+// @spatial class NestedIfs1H extends SpatialTest {
 
 //   def nestedIfTest(x: Int): Int = {
 //     val in = ArgIn[Int]
@@ -72,9 +71,7 @@ import spatial.dsl._
 //   }
 // }
 
-// @test class NestedIfs1HCtrl extends SpatialTest {
-//   override def runtimeArgs: Args = NoArgs
-
+// @spatial class NestedIfs1HCtrl extends SpatialTest {
 
 //   def nestedIfTest(x: Int): Int = {
 //     val in = ArgIn[Int]

@@ -2,8 +2,7 @@ package spatial.tests.compiler
 
 import spatial.dsl._
 
-@test class AliasProp extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class AliasProp extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)

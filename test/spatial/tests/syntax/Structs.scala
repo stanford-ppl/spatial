@@ -4,8 +4,7 @@ import spatial.dsl._
 
 @struct case class MyStruct(x: I32, y: I32, z: I32)
 
-@test class SimpleStructTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class SimpleStructTest extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     val x = random[MyStruct]

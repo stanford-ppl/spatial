@@ -1,12 +1,8 @@
 package spatial.tests.feature.unit
 
-
 import spatial.dsl._
 
-
-@test class OOBTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class OOBTest extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val y = DRAM[Int](13)

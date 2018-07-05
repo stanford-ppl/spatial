@@ -2,8 +2,9 @@ package spatial.codegen
 package scalagen
 
 import argon._
+import argon.codegen.StructCodegen
+import argon.node._
 import spatial.lang._
-import spatial.node._
 
 trait ScalaGenStructs extends ScalaCodegen with StructCodegen with ScalaGenBits {
 

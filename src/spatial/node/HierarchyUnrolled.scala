@@ -1,6 +1,7 @@
 package spatial.node
 
 import argon._
+import argon.node.EnPrimitive
 import spatial.lang._
 
 abstract class UnrolledAccess {
@@ -21,8 +22,8 @@ case class VectorWrite(mem: Sym[_], data: Seq[Sym[_]], addr: Seq[Seq[Idx]], ens:
 abstract class UnrolledAccessor[A:Type,R:Type] extends EnPrimitive[R] {
   val A: Type[A] = Type[A]
   def mem: Sym[_]
-  def bankedRead: Option[UnrolledRead]
-  def bankedWrite: Option[UnrolledWrite]
+  def unrolledRead: Option[UnrolledRead]
+  def unrolledWrite: Option[UnrolledWrite]
   final var ens: Set[Bit] = Set.empty
   var enss: Seq[Set[Bit]]
 
@@ -46,8 +47,8 @@ abstract class BankedAccessor[A:Type,R:Type] extends UnrolledAccessor[A,R] {
 
 object UnrolledAccessor {
   def unapply(x: Op[_]): Option[(Option[UnrolledWrite],Option[UnrolledRead])] = x match {
-    case a: UnrolledAccessor[_,_] if a.bankedWrite.nonEmpty || a.bankedRead.nonEmpty =>
-      Some((a.bankedWrite,a.bankedRead))
+    case a: UnrolledAccessor[_,_] if a.unrolledWrite.nonEmpty || a.unrolledRead.nonEmpty =>
+      Some((a.unrolledWrite,a.unrolledRead))
     case _ => None
   }
   def unapply(x: Sym[_]): Option[(Option[UnrolledWrite],Option[UnrolledRead])] = x.op.flatMap(UnrolledAccessor.unapply)
@@ -55,13 +56,21 @@ object UnrolledAccessor {
 
 abstract class VectorReader[A:Bits](implicit vT: Type[Vec[A]]) extends UnrolledAccessor[A,Vec[A]] {
   def addr: Seq[Seq[Idx]]
-  def bankedRead = Some(VectorRead(mem,addr,enss))
-  def bankedWrite: Option[UnrolledWrite] = None
+  def unrolledRead = Some(VectorRead(mem,addr,enss))
+  def unrolledWrite: Option[UnrolledWrite] = None
 }
 
 abstract class BankedReader[A:Bits](implicit vT: Type[Vec[A]]) extends BankedAccessor[A,Vec[A]] {
-  def bankedRead = Some(BankedRead(mem,bank,ofs,enss))
-  def bankedWrite: Option[UnrolledWrite] = None
+  def unrolledRead = Some(BankedRead(mem,bank,ofs,enss))
+  def unrolledWrite: Option[UnrolledWrite] = None
+}
+
+object BankedReader {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x match {
+    case a: BankedReader[_] => a.unrolledRead.map{rd => (rd.mem,rd.bank,rd.ofs,rd.ens) }
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x.op.flatMap(BankedReader.unapply)
 }
 
 abstract class BankedDequeue[A:Bits](implicit vT: Type[Vec[A]]) extends BankedReader[A] {
@@ -74,15 +83,23 @@ abstract class VectorWriter[A:Bits] extends UnrolledAccessor[A,Void] {
   override def effects: Effects = Effects.Writes(mem)
   def data: Seq[Sym[_]]
   def addr: Seq[Seq[Idx]]
-  def bankedRead: Option[UnrolledRead] = None
-  def bankedWrite = Some(VectorWrite(mem,data,addr,enss))
+  def unrolledRead: Option[UnrolledRead] = None
+  def unrolledWrite = Some(VectorWrite(mem,data,addr,enss))
 }
 
 abstract class BankedWriter[A:Type] extends BankedAccessor[A,Void] {
   override def effects: Effects = Effects.Writes(mem)
   def data: Seq[Sym[_]]
-  def bankedRead: Option[UnrolledRead] = None
-  def bankedWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
+  def unrolledRead: Option[UnrolledRead] = None
+  def unrolledWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
+}
+
+object BankedWriter {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x match {
+    case a: BankedWriter[_] => a.unrolledWrite.map{rd => (rd.mem,rd.data,rd.bank,rd.ofs,rd.ens) }
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x.op.flatMap(BankedWriter.unapply)
 }
 
 abstract class BankedEnqueue[A:Type] extends BankedWriter[A] {

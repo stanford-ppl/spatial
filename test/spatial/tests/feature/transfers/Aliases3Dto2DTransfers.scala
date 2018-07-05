@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class Aliases3Dto2DTransfers extends SpatialTest {
+@spatial class Aliases3Dto2DTransfers extends SpatialTest {
   override def runtimeArgs: Args = "400"
 
   /* 

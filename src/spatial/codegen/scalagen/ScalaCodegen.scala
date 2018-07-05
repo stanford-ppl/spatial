@@ -2,7 +2,7 @@ package spatial.codegen.scalagen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
-import spatial.data.CLIArgs
+import spatial.metadata.CLIArgs
 import spatial.lang._
 
 trait ScalaCodegen extends Codegen with FileDependencies {

@@ -3,7 +3,7 @@ package spatial.transform.unrolling
 import argon._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.control._
 import utils.tags.instrument
 
 trait ForeachUnrolling extends UnrollingBase {

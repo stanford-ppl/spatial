@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class ReduceArbitraryLambda extends SpatialTest {
+@spatial class ReduceArbitraryLambda extends SpatialTest {
   override def runtimeArgs: Args = "8"
 
 

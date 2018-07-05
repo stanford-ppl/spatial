@@ -1,11 +1,8 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
-@test class MemReduceTiny extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MemReduceTiny extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32,32)

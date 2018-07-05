@@ -51,7 +51,7 @@ trait CommonMain {
     SplitArgs(actualChiselArgs, testArgs)
   }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     val splitArgs = separateChiselArgs(args)
     this.args = splitArgs.testArgs
 

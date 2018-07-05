@@ -15,7 +15,7 @@ class Bits[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[
 
     val fieldTypes = fields.map(_.tpTree)
     val fieldNames = fields.map(_.name)
-    val bitssOpt = fieldTypes.map{tp => q"new argon.static.ExpTypeLowPriority(argon.Type[$tp]).getView[spatial.lang.types.Bits]" }
+    val bitssOpt = fieldTypes.map{tp => q"new argon.static.ExpTypeLowPriority(argon.Type[$tp]).getView[argon.lang.types.Bits]" }
     val bitss  = bitssOpt.map{bits => q"$bits.get" }
     val nbitss = bitss.map{bits => q"$bits.nbits(ctx,state)" }
     val zeros  = bitss.map{bits => q"$bits.zero(ctx,state)" }

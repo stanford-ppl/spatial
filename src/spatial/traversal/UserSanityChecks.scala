@@ -1,12 +1,13 @@
 package spatial.traversal
 
 import argon._
+import argon.node._
 import emul.Number
 
-import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.bounds._
+import spatial.metadata.types._
 
 case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
 
@@ -114,6 +115,10 @@ case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
 
     case RegNew(init) if !init.isFixedBits =>
       error(lhs.ctx, s"Reset value of register ${lhs.fullname} was not a constant.")
+      error(lhs.ctx)
+
+    case RegNew(init) if !inHw =>
+      error(lhs.ctx, s"Register was created outside Accel. Use an ArgIn, ArgOut, or HostIO instead.")
       error(lhs.ctx)
 
     case op @ StreamInNew(bus)  => busWidthCheck(op.A,bus,"StreamIn")

@@ -1,14 +1,18 @@
 package spatial.transform.unrolling
 
 import argon._
+import argon.node.Enabled
 import argon.transform.MutateTransformer
-import utils.tags.instrument
-import spatial.data._
+
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.internal.spatialConfig
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.types._
+import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
+
+import utils.tags.instrument
 
 /** Options when transforming a statement:
   *   0. Remove it: s -> Nil. Statement will not appear in resulting graph.

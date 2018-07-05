@@ -1,18 +1,13 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class GatherStore extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class GatherStore extends SpatialTest {
   val tileSize = 128
   val numAddr = tileSize * 100
   val numData = tileSize * 1000
 
   val P = param(1)
-
 
   def gatherStore[T:Num](addrs: Array[Int], offchip_data: Array[T]): Array[T] = {
 

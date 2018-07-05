@@ -1,13 +1,9 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
-import spatial.data._
-import spatial.util._
-
 
 trait CppGenMath extends CppGenCommon {
 
@@ -23,12 +19,17 @@ trait CppGenMath extends CppGenCommon {
     // case FixURsh(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
     case FixInv(x)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"~(${toTrueFix(quote(x), x.tp)})", x.tp)};")
     case FixNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
+    case FixPow(x,y) => emit(src"${lhs.tp} $lhs = pow($x,$y);")
     case FltNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
     case FixAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
     case FixSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
     case FixMul(x,y) => emit(src"${lhs.tp} $lhs = $x * $y;")
     case FixDiv(x,y) => emit(src"${lhs.tp} $lhs = $x / $y;")
+    case FixMin(x,y) => emit(src"${lhs.tp} $lhs = $x < $y ? $x : $y;")
+    case FixMax(x,y) => emit(src"${lhs.tp} $lhs = $x > $y ? $x : $y;")
     case FixRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
+    case FixFMA(a,b,c) => emit(src"${lhs.tp} $lhs = $a * $b + $c;")
+    case FltFMA(a,b,c) => emit(src"${lhs.tp} $lhs = $a * $b + $c;")
     case FltRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
     case FltAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
     case FltSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
@@ -122,8 +123,6 @@ trait CppGenMath extends CppGenCommon {
         case _ => emit(src"${lhs.tp} $lhs = $x >> $y;")
       }
     case FixSRU(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
-
-
       
     case _ => super.gen(lhs, rhs)
   }

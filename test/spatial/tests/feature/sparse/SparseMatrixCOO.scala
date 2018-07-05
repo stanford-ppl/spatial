@@ -1,12 +1,8 @@
 package spatial.tests.feature.sparse
 
-
 import spatial.dsl._
 
-
-@test class SparseMatrixCOO extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SparseMatrixCOO extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val nnzA = 9

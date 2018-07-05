@@ -1,11 +1,10 @@
 package spatial.transform.unrolling
 
 import argon._
-import spatial.data._
+import spatial.metadata.access._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.internal.spatialConfig
 import utils.tags.instrument
 import utils.implicits.collections._
 
@@ -153,7 +152,6 @@ trait MemoryUnrolling extends UnrollingBase {
         dbgs(s"  Lane IDs: $laneIds")
         dbgs(s"  Port:     $port")
 
-        val ens   = lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => (f(a),p) }               // lanes of ND addresses
@@ -182,11 +180,12 @@ trait MemoryUnrolling extends UnrollingBase {
           val d2 = lanes.inLanes(laneIds){_ => f(d).asInstanceOf[Bits[A]] }  // Chunk of data
           masters.map{t => d2(laneIdToChunkId(t)) }                          // Vector of data
         }
+        val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
         val bank   = addr2.map{a => bankSelects(rhs,a,inst) }
         val ofs    = addr2.map{a => bankOffset(mem,lhs,a,inst) }
-        val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens)
+        val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
 
         banked.s.foreach{s =>
           s.addPort(dispatch=0, Nil, port)
@@ -216,6 +215,11 @@ trait MemoryUnrolling extends UnrollingBase {
     addr: Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
     inst: Memory               // Memory instance associated with this access
   )(implicit ctx: SrcCtx): Seq[Seq[Idx]] = node match {
+    // LineBuffers are special in that their first dimension is always implicitly fully banked
+    //case _:LineBufferRotateEnq[_]  => addr
+    // The unrolled version of register file shifting currently doesn't take a banked address
+    //case _:RegFileVectorShiftIn[_] => addr
+    case _:LUTRead[_,_]         => addr
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr

@@ -3,7 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 
 
-@test class SingleLayerConv_RCIO extends SpatialTest {
+@spatial class SingleLayerConv_RCIO extends SpatialTest {
   override def runtimeArgs: Args = "16 32 32 32 2 0"
   type T = FixPt[TRUE,_16,_0]
   type T2 = FixPt[TRUE,_32,_0]
@@ -176,7 +176,7 @@ import spatial.dsl._
 }
 
 
-// @test class SingleLayerConv_IRCO extends SpatialTest {
+// @spatial class SingleLayerConv_IRCO extends SpatialTest {
 //   type T = FixPt[TRUE,_16,_0]
 
 //   def main(args: Array[String]): Unit = {
@@ -356,7 +356,7 @@ import spatial.dsl._
 // }
 
 
-// @test class SingleLayerConv_OIRC extends SpatialTest {
+// @spatial class SingleLayerConv_OIRC extends SpatialTest {
 //   type T = FixPt[TRUE,_16,_0]
 
 //   def main(args: Array[String]): Unit = {

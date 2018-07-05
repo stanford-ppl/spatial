@@ -2,7 +2,7 @@ package spatial.tests.feature.host
 
 import spatial.dsl._
 
-@test class CSVFileIO extends SpatialTest {
+@spatial class CSVFileIO extends SpatialTest {
   override def runtimeArgs = "32"
 
   def main(args: Array[String]): Unit = {

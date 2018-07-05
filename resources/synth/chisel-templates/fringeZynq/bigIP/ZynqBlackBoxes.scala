@@ -87,6 +87,7 @@ generate_target {all} [get_ips $moduleName]
       val out = Output(UInt(outWidth.W))
     })
 
+    assert(latency > 0, "ERROR: Latency must be > 0 to use Multiplier IP")
     val m = Module(new MultiplierBBox(aWidth, bWidth, outWidth, signed, latency))
     m.io.CLK := clock
     m.io.A := io.a

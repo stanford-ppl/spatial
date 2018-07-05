@@ -2,8 +2,7 @@ package spatial.issues
 
 import argon._
 import forge.tags._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.control._
 
 case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) extends Issue {
   @stateful override def onUnresolved(traversal: String): Unit = {

@@ -1,15 +1,10 @@
 package spatial.node
 
 import argon._
+import argon.node._
 import spatial.lang._
 
-/** An operation supported for acceleration */
-abstract class AccelOp[R:Type] extends Op[R] {
-  /** If true, this node is only supported in host/debug mode, not hardware accel. */
-  val debugOnly: Boolean = false
-}
-
-abstract class FringeNode[A:Bits,R:Type] extends AccelOp[R] {
+abstract class FringeNode[A:Bits,R:Type] extends DSLOp[R] {
   val A: Bits[A] = Bits[A]
 }
 object FringeNode {
@@ -49,7 +44,7 @@ case class InnerStage(blks: (Seq[I32], Block[_])*) extends ControlBody {
 }
 
 /** Nodes with implicit control signals/logic with internal state */
-abstract class Control[R:Type] extends AccelOp[R] {
+abstract class Control[R:Type] extends DSLOp[R] {
   override def inputs: Seq[Sym[_]] = super.inputs diff iters
   override def binds: Set[Sym[_]] = super.binds ++ iters.toSet
   def iters: Seq[I32]

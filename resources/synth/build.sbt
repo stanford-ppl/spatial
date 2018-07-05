@@ -1,6 +1,6 @@
 // Build file for testing spatial apps
 
-organization := "edu.berkeley.cs"
+organization := "edu.stanford.ppl"
 
 version := "3.0-SNAPSHOT"
 
@@ -27,12 +27,14 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.4"
 )
 
+libraryDependencies += "edu.stanford.ppl" %% "templateresources" % "1.0"
+
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),
   Resolver.sonatypeRepo("releases")
 )
 
-resourceDirectory in Compile := baseDirectory.value / "chisel" / "template-level" / "resources"
+// resourceDirectory in Compile := baseDirectory.value / "chisel" / "template-level" / "resources"
 
 scalaSource in Compile := baseDirectory.value / "chisel" 
 

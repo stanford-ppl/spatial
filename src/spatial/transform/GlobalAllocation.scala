@@ -2,8 +2,8 @@ package spatial.transform
 
 import argon._
 import argon.transform.MutateTransformer
-import spatial.data._
-import spatial.util._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 
 import spatial.lang._
 import spatial.node._

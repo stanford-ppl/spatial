@@ -1,14 +1,10 @@
 package spatial.tests.feature.buffering
 
-
 import spatial.dsl._
-
 
 // TODO: Make this actually check a bubbled NBuf (i.e.- s0 = wr, s2 = wr, s4 =rd, s1s2 = n/a)
 // because I think this will break the NBuf SM since it won't detect drain completion properly
-@test class BufferedWrite extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class BufferedWrite extends SpatialTest {
   val tileSize = 16
   val I = 5
   val N = 192

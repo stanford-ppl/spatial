@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class ReduceSimple extends SpatialTest {
+@spatial class ReduceSimple extends SpatialTest {
   override def runtimeArgs: Args = "72" and "7"
 
   val N = 96.to[Int]

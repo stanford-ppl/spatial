@@ -1,7 +1,8 @@
 package spatial.traversal
 
 import argon._
-import spatial.data._
+import argon.node._
+import spatial.metadata.rewrites._
 import spatial.node._
 
 /** Flags whether hardware rewrites should be allowed on given nodes.

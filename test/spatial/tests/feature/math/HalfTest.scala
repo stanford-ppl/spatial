@@ -2,7 +2,7 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-@test class HalfTest extends SpatialTest {
+@spatial class HalfTest extends SpatialTest {
   override def runtimeArgs: Args = "true" and "false"
 
   def main(args: Array[String]): Unit = {

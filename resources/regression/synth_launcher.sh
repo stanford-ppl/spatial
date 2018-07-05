@@ -36,6 +36,7 @@ if [[ ! -f ${REGRESSION_HOME}/lock ]]; then
 	mkdir ${REGRESSION_HOME}/next-spatial
 	cd ${REGRESSION_HOME}/next-spatial
 	git clone git@github.com:stanford-ppl/spatial
+	git clone git@github.com:stanford-ppl/test-data.git
 	cd spatial
 	export apphash="nova-spatial"
 	export hash=`git rev-parse HEAD`

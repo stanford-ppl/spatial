@@ -2,11 +2,8 @@ package spatial.tests.feature.vectors
 
 import spatial.dsl._
 
-@test class UserVectors extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class UserVectors extends SpatialTest {
   type Q4 = FixPt[FALSE,_4,_0]
-
 
   def main(args: Array[String]): Unit = {
     Accel {

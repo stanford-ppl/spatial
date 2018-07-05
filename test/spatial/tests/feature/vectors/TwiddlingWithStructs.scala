@@ -2,9 +2,7 @@ package spatial.tests.feature.vectors
 
 import spatial.dsl._
 
-@test class TwiddlingWithStructs extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class TwiddlingWithStructs extends SpatialTest {
   type UInt8 = FixPt[FALSE,_8,_0]
   type SInt8 = FixPt[TRUE,_8,_0]
 

@@ -1,14 +1,12 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.{Codegen, FileDependencies}
+import argon.codegen.FileDependencies
+import emul.{Bool, FloatPoint, FixedPoint}
 import spatial.codegen.naming._
-import spatial.internal.{spatialConfig => cfg}
-import emul.FloatPoint
-import emul.FixedPoint
 import spatial.lang._
 import spatial.node._
-import emul.Bool
+import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 
 trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTraversal {
@@ -60,6 +58,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   override protected def remap(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
+    // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
     case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
     case BitType() => "Bool()"
     case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
@@ -68,7 +67,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   final protected def wireMap(x: String): String = { 
-    if (cfg.compressWires == 1 | cfg.compressWires == 2) {
+    if (spatialConfig.compressWires == 1 | spatialConfig.compressWires == 2) {
       if (compressorMap.contains(x)) {
         src"${listHandle(compressorMap(x)._1)}(${compressorMap(x)._2})"
       } else {
@@ -222,11 +221,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     inGenn(out, name, ext) {
       startFile()
       open(src"""trait ${name}_1 extends ${prnts} {""")
-      if (cfg.compressWires == 2) { emit(src"""def method_${name}_1() {""") }
+      if (spatialConfig.compressWires == 2) { emit(src"""def method_${name}_1() {""") }
       try { body }
       finally {
         inGennAll(out, name, ext){
-          emit(s"} ${if (cfg.compressWires == 2) "}" else ""}")
+          emit(s"} ${if (spatialConfig.compressWires == 2) "}" else ""}")
         }
       }
     }
@@ -267,7 +266,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         state.gen = newStream
         startFile()
         open(src"""trait ${newStreamString} extends ${curStreamNoExt} {""")
-        if (cfg.compressWires == 2) { emit(src"""def method_${newStreamString}() {""") }
+        if (spatialConfig.compressWires == 2) { emit(src"""def method_${newStreamString}() {""") }
       }
     }
     emit(x)
@@ -285,7 +284,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   final protected def emitGlobalWireMap(lhs: String, rhs: String, forceful: Boolean = false): Unit = {
     val module_type = rhs.replace("new ", "newnbsp").replace(" ", "").replace("nbsp", " ")
-    if (cfg.compressWires == 1 | cfg.compressWires == 2) {
+    if (spatialConfig.compressWires == 1 | spatialConfig.compressWires == 2) {
       if (!compressorMap.contains(lhs)) {
         val id = compressorMap.values.map(_._1).filter(_ == module_type).size
         compressorMap += (lhs -> (module_type, id))
@@ -302,7 +301,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   final protected def emitGlobalRetimeMap(lhs: String, rhs: String, forceful: Boolean = false): Unit = {
     val module_type = rhs.replace(" ", "")
-    if (cfg.compressWires == 1 | cfg.compressWires == 2) {
+    if (spatialConfig.compressWires == 1 | spatialConfig.compressWires == 2) {
       // Assume _retime values only emitted once
       val id = compressorMap.values.map(_._1).filter(_ == "_retime").size
       compressorMap += (lhs -> ("_retime", id))
@@ -315,7 +314,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   final protected def emitGlobalModuleMap(lhs: String, rhs: String, forceful: Boolean = false): Unit = {
     val module_type_white = rhs.replace("new ", "newnbsp").replace(" ", "").replace("nbsp", " ")
     var rtid = "na"
-    if (cfg.compressWires == 1 | cfg.compressWires == 2) {
+    if (spatialConfig.compressWires == 1 | spatialConfig.compressWires == 2) {
       val module_type = if (module_type_white.contains("retime=")) {
         val extract = ".*retime=rt\\(([0-9]+)\\),.*".r
         val extract(x) = module_type_white
@@ -412,19 +411,22 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override def copyDependencies(out: String): Unit = {
     val resourcesPath = "synth/chisel-templates"
 
-    dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
-    dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
-    // dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
+    if (spatialConfig.enableDebugResources) {
+      dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
+      dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
+      // dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
+    }
 
+
+    dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
+    dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
     dependencies ::= FileDep(resourcesPath, "Top.scala", outputPath = Some("Top.scala"))
 
     super.copyDependencies(out)

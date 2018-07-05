@@ -430,17 +430,18 @@ def report_changes(backend):
 	worsened_list = []
 	for t in tests:
 		col = lol[0].index(t) + 1
-		now_pass = lol[2][col] == '1'
-		now_fail = lol[2][col] == '0'
-		now_nocompile = lol[2][col] == ''
-		b4_pass = lol[3][col] == '1'
-		b4_fail = lol[3][col] == '0'
-		b4_nocompile = lol[3][col] == ''
-		if (now_pass): pass_list.append(t)
-		if (now_fail): fail_list.append(t)
-		if (now_nocompile): nocompile_list.append(t)
-		if (now_pass and (not b4_pass)): improved_list.append(t)
-		if ((not now_pass) and b4_pass): worsened_list.append(t)
+		if (len(lol[0]) > col): 
+			now_pass = lol[2][col] == '1'
+			now_fail = lol[2][col] == '0'
+			now_nocompile = lol[2][col] == ''
+			b4_pass = lol[3][col] == '1'
+			b4_fail = lol[3][col] == '0'
+			b4_nocompile = lol[3][col] == ''
+			if (now_pass): pass_list.append(t)
+			if (now_fail): fail_list.append(t)
+			if (now_nocompile): nocompile_list.append(t)
+			if (now_pass and (not b4_pass)): improved_list.append(t)
+			if ((not now_pass) and b4_pass): worsened_list.append(t)
 	print("SUMMARY FOR %s" % backend)
 	print("-------")
 	print("Improved: %d" % len(improved_list))

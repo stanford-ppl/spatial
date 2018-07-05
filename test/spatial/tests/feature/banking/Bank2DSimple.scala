@@ -2,12 +2,9 @@ package spatial.tests.feature.banking
 
 import spatial.dsl._
 
-@test class Bank2DSimple extends SpatialTest {
-  def runtimeArgs: Args = NoArgs
-
+@spatial class Bank2DSimple extends SpatialTest {
   val R = 32; val C = 16
   val P = 1;  val Q = 4
-
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](R,C)
@@ -29,12 +26,9 @@ import spatial.dsl._
   }
 }
 
-@test class ComplicatedMuxPort extends SpatialTest {
-  def runtimeArgs: Args = NoArgs
-
+@spatial class ComplicatedMuxPort extends SpatialTest {
   val R = 32; val C = 16
   val P = 1;  val Q = 4
-
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](R,C)

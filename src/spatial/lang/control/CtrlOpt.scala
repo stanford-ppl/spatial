@@ -1,7 +1,7 @@
 package spatial.lang.control
 
 import argon._
-import spatial.data._
+import spatial.metadata.control._
 
 case class CtrlOpt(
   name:  Option[String] = None,

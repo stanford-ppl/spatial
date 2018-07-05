@@ -21,35 +21,27 @@ object ops {
 
 
   implicit class ArrayOps[T](val b:Array[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
   implicit class ArrayBoolOps[T](val b:Array[Bool]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
 
   implicit class IndexedSeqOps[T](val b:scala.collection.immutable.IndexedSeq[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
 
   implicit class VecOps[T](val b:chisel3.core.Vec[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
@@ -87,15 +79,11 @@ object ops {
   }
   
   // implicit class DspRealOps(val b:DspReal) {
-  //   def raw = {
-  //     b.node
-  //   }
+  //   def raw = //     b.node/   }
   //   def number = {
   //     b.node
   //   }
-  //   def r = {
-  //     b.node
-  //   }
+  //   def r = //     b.node
   // }
 
   implicit class UIntOps(val b:UInt) {
@@ -103,12 +91,9 @@ object ops {
     def number = {
       b
     }
-    def raw = {
-      b
-    }
-    def r = {
-      b
-    }
+    def raw = b
+    def rd = b
+    def r = b
     def msb = {
       b(b.getWidth-1)
     }
@@ -309,6 +294,9 @@ object ops {
     def cast(c: FixedPoint, sign_extend: scala.Boolean = false): Unit = {
       c.r := Utils.FixedPoint(c.s,c.d,c.f,b, sign_extend).r
     }
+    def cast(c: => UInt): Unit = {
+      c.r := b.r
+    }
 
   }
 
@@ -317,12 +305,9 @@ object ops {
     def number = {
       b.asUInt
     }
-    def raw = {
-      b.asUInt
-    }
-    def r = {
-      b.asUInt
-    }
+    def raw = b.asUInt
+    def rd = b.asUInt
+    def r = b.asUInt
     def msb = {
       b(b.getWidth-1)
     }
@@ -618,10 +603,9 @@ object Utils {
       } else x
     }
   }
-  def XMap(xs:((Int, Int), Int)*) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def XMap(xs:((Int, Int), (Int, Option[Int]))*) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
   // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
   def XMap(xs: => Seq[((Int,Int), (Int,Option[Int]))]) = HashMap[(Int,Int),(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftXMap(axis: Int, xs:((Int,Int),Int)*) = HashMap[(Int,Int), (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   /* Map from muxPort to (Banks, isShift) */
   type DMap = HashMap[(Int,Int), (List[Banks],Option[Int])]
   implicit class DMapOps(x: DMap) {
@@ -632,10 +616,9 @@ object Utils {
     def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq) // Combine entries so that every muxOfs = 0, then sort
     def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
   }
-  def DMap(xs:((Int,Int),List[Banks])*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
+  def DMap(xs:((Int,Int),(List[Banks], Option[Int]))*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
   // Example: val b = DMap((0,0) -> List(Banks(0,0), Banks(0,1)), (0,2) -> List(Banks(0,2),Banks(0,3)), (1,0) -> List(Banks(0,0),Banks(1,0)))
   def DMap(xs: => Seq[((Int,Int), (List[Banks],Option[Int]))]) = HashMap[(Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftDMap(axis: Int, xs:((Int,Int),List[Banks])*) = HashMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
   type NBufXMap = HashMap[Int, XMap]
   def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
   def NBufXMap(xs: => Seq[(Int, XMap)]) = HashMap[Int,XMap](xs:_*)
@@ -861,9 +844,10 @@ object Utils {
       result
   }
 
-  def fixrand(seed: Int, bits: Int): FixedPoint = {
+  def fixrand(seed: Int, bits: Int, en: Bool): FixedPoint = {
     val prng = Module(new PRNG(seed, bits))
     val result = Wire(new FixedPoint(false, bits, 0))
+    prng.io.en := en
     result := prng.io.output
     result
   }
@@ -1068,7 +1052,7 @@ object Utils {
   }
 
   def getFF[T<: chisel3.core.Data](sig: T, en: UInt) = {
-    val ff = Module(new fringe.FF(sig))
+    val ff = Module(new fringe.FringeFF(sig))
     ff.io.init := 0.U(sig.getWidth.W).asTypeOf(sig)
     ff.io.in := sig
     ff.io.enable := en
@@ -1086,8 +1070,19 @@ object Utils {
         val sr = Module(new RetimeWrapper(sig.getWidth, delay))
         sr.io.in := sig.asUInt
         sr.io.flow := en
-        sig.cloneType.fromBits(sr.io.out)
+        sr.io.out.asTypeOf(sig)
       }
+    }
+  }
+
+  def FixFMA(mul1: FixedPoint, mul2: FixedPoint, add: FixedPoint, delay: Int, en: Bool = true.B): FixedPoint = {
+    if (delay == 0) {
+      mul1 *-* mul2 + add
+    }
+    else {
+      // TODO: Use IP 
+      mul1.*-*(mul2, Some(delay)) + Utils.getRetimed(add, delay)
+      // sig.cloneType.fromBits(sr.io.out)
     }
   }
 

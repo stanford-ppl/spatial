@@ -3,7 +3,7 @@ package control
 
 import argon._
 import forge.tags._
-import spatial.data._
+import spatial.metadata.control._
 import spatial.node._
 
 class Directives(options: CtrlOpt) {

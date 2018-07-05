@@ -4,7 +4,7 @@ import spatial.dsl._
 
 
 
-@test class ShiftTest extends SpatialTest {
+@spatial class ShiftTest extends SpatialTest {
   override def runtimeArgs: Args = "-14 2"
 
    def main(args: Array[String]): Unit = {

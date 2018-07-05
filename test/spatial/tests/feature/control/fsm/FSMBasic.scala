@@ -1,12 +1,8 @@
 package spatial.tests.feature.control.fsm
 
-
 import spatial.dsl._
 
-
-@test class FSMBasic extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FSMBasic extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)
@@ -26,9 +22,7 @@ import spatial.dsl._
 }
 
 
-@test class FSMBasic2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FSMBasic2 extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)

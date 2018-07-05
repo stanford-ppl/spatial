@@ -2,9 +2,9 @@ package spatial.report
 
 import argon._
 import argon.passes.Pass
-import spatial.data._
-import spatial.util._
-
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.modeling._
 import utils.implicits.collections._
 
 case class MemoryReporter(IR: State) extends Pass {
@@ -15,7 +15,7 @@ case class MemoryReporter(IR: State) extends Pass {
   def run(): Unit = {
     import scala.language.existentials
 
-    val mems = localMems.all.map{case Stm(s,d) =>
+    val mems = LocalMemories.all.map{case Stm(s,d) =>
       val area = areaModel.areaOf(s, d, inHwScope = true, inReduce = false)
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)

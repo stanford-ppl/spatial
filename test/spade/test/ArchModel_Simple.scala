@@ -2,7 +2,7 @@ package spade.test
 
 import spade.dsl._
 
-@test class ArchModel_Simple extends SpadeTest {
+@spade class ArchModel_Simple extends SpadeTest {
 
   val pcuSpec = new PCUSpec(
     nRegs   = 6,

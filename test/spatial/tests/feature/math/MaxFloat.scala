@@ -2,7 +2,7 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-@test class MaxFloat extends SpatialTest {
+@spatial class MaxFloat extends SpatialTest {
   override def runtimeArgs: Args = "128"
   type T = Float
 

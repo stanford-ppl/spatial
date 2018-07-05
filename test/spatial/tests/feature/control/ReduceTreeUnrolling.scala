@@ -2,8 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class ReduceTreeUnrolling extends SpatialTest{
-  override def runtimeArgs: Args = NoArgs
+@spatial class ReduceTreeUnrolling extends SpatialTest{
 
   def main(args: Array[String]): Unit = {
     val out1 = ArgOut[Int]

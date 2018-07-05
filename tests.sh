@@ -70,18 +70,18 @@ elif [[ $type == "vcs-gdocs" ]]; then
   hash=`git rev-parse HEAD`
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  echo "python3 ${curpath}/../resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"nova-spatial\" \"$timestamp\" \"vcs\""
-  python3 ${curpath}/../resources/regression/gdocs.py "prepare_sheet" "$hash" "nova-spatial" "$timestamp" "vcs"
+  echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"nova-spatial\" \"$timestamp\" \"vcs\""
+  python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "nova-spatial" "$timestamp" "vcs"
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
-  python3 ${curpath}/../resources/regression/gdocs.py "report_changes" "vcs"
+  python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs"
 elif [[ $type == "vcs-noretime-gdocs" ]]; then
   export GDOCS=1
   hash=`git rev-parse HEAD`
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  python3 ${curpath}/../resources/regression/gdocs.py "prepare_sheet" "$hash" "nova-spatial" "$timestamp" "vcs-noretime"
+  python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "nova-spatial" "$timestamp" "vcs-noretime"
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
-  python3 ${curpath}/../resources/regression/gdocs.py "report_changes" "vcs-noretime"
+  python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs-noretime"
 else
   echo "Test type '$type' not recognized" 
   echo "Supported types: [sim | vcs(-gdocs) | vcs-noretime(-gdocs) | zynq | aws | zcu | arria10]"

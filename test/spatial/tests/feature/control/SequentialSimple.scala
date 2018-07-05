@@ -3,7 +3,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class SimpleSequential extends SpatialTest { // Regression (Unit) // Args: 5 8
+@spatial class SimpleSequential extends SpatialTest { // Regression (Unit) // Args: 5 8
   override def runtimeArgs: Args = "5 8"
 
 

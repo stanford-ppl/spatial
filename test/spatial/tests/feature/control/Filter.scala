@@ -3,7 +3,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 import spatial.lib._
 
-@test class Scan_fifofull extends SpatialTest {
+@spatial class Scan_fifofull extends SpatialTest {
   override def runtimeArgs: Args = "256"
 
   def main(args: Array[String]): Unit = {
@@ -89,7 +89,7 @@ import spatial.lib._
 
 
 // Working
-@test class Scan_fillfifo extends SpatialTest {
+@spatial class Scan_fillfifo extends SpatialTest {
   override def runtimeArgs: Args = "128"
 
 
@@ -155,7 +155,7 @@ import spatial.lib._
   }
 }
 
-@test class Scan_filter extends SpatialTest {
+@spatial class Scan_filter extends SpatialTest {
   override def runtimeArgs: Args = "128"
 
 
@@ -195,7 +195,7 @@ import spatial.lib._
   }
 }
 
-@test class Scan_filter_wait extends SpatialTest {
+@spatial class Scan_filter_wait extends SpatialTest {
   override def runtimeArgs: Args = "128 16"
 
 

@@ -1,13 +1,17 @@
 package spatial.traversal
 
 import argon._
+import argon.node._
 import argon.passes.Traversal
 import utils.implicits.collections._
 
 import spatial.lang._
-import spatial.data._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.bounds._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.types._
 
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost

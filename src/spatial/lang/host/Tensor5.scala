@@ -3,7 +3,6 @@ package host
 
 import argon._
 import forge.tags._
-import spatial.node._
 
 /** A 5-dimensional tensor on the host */
 @ref class Tensor5[A:Type] extends Struct[Tensor5[A]] with Ref[scala.Array[Any],Tensor5[A]] {

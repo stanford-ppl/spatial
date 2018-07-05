@@ -1,11 +1,8 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class GatherFIFO extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class GatherFIFO extends SpatialTest {
   val n = 32
   val T = 8
 

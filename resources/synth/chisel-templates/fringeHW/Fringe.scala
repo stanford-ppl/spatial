@@ -130,7 +130,7 @@ class Fringe(
   regs.io.wen := io.wen
   regs.io.wdata := io.wdata
   // TODO: Fix this bug asap so that the axi42rf bridge verilog anticipates the 1 cycle delay of the data
-  val bug239_hack = false
+  val bug239_hack = !(FringeGlobals.target == "vcs" || FringeGlobals.target == "asic")
   if (bug239_hack) {
     io.rdata := regs.io.rdata
   } else {

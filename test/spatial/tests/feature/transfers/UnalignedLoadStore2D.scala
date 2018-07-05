@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class UnalignedLoadStore2D extends SpatialTest {
+@spatial class UnalignedLoadStore2D extends SpatialTest {
   override def runtimeArgs: Args = "400"
 
 
@@ -32,7 +32,7 @@ import spatial.dsl._
 }
 
 
-@test class UnalignedTileLoadStore extends SpatialTest { // Regression (Unit) // Args: 100
+@spatial class UnalignedTileLoadStore extends SpatialTest { // Regression (Unit) // Args: 100
   override def runtimeArgs: Args = "100"
 
 

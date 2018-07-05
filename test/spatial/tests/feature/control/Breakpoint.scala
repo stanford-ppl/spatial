@@ -2,8 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class Breakpoint extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class Breakpoint extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     val y = ArgOut[Int]
@@ -21,7 +20,6 @@ import spatial.dsl._
       }
     }
 
-    // Extract results from accelerator
     val Y = getArg(y)
     val Z = getArg(z)
 

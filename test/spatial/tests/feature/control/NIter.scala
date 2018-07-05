@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class NIter extends SpatialTest {
+@spatial class NIter extends SpatialTest {
   override def runtimeArgs: Args = "192"
 
   val constTileSize = 96

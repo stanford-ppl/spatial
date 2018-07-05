@@ -2,8 +2,7 @@ package spatial.tests.feature.banking
 
 import spatial.dsl._
 
-@test class LinearWriteRandomRead extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class LinearWriteRandomRead extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val out1 = ArgOut[Int]

@@ -6,15 +6,16 @@ import poly.ISL
 import utils.implicits.collections._
 
 import spatial.issues.UnbankableGroup
-import spatial.data._
 import spatial.lang._
-import spatial.util._
-import spatial.internal.spatialConfig
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected val rank: Int = rankOf(mem).length
+  protected val rank: Int = mem.rank.length
   protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
   // TODO: This may need to be tweaked based on the fix for issue #23
@@ -86,7 +87,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Added dispatch $dispatch to ${a.access} {${a.unroll.mkString(",")}}")
       }
 
-      if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValue) {
+      if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValues) {
         inst.reads.iterator.flatten.foreach{read =>
           warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
           warn(read.access.ctx)
@@ -126,7 +127,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val grpId = {
         if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
-          val pairs = grp.filter{b => requireConcurrentPortAccess(a, b) && !a.overlapsAddress(b) }
+          // Filter for accesses that require concurrent port access AND either don't overlap or are identical.  Should drop in data broadcasting node in this case
+          val pairs = grp.filter{b => requireConcurrentPortAccess(a, b) && (!a.overlapsAddress(b) | ((a.access == b.access) && (a.matrix == b.matrix)))  }
           if (pairs.nonEmpty) dbg(s"      Group #$i: ")
           else                dbg(s"      Group #$i: <none>")
           pairs.foreach{b => dbgs(s"        ${b.access} [${b.parent}]") }

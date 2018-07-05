@@ -1,11 +1,12 @@
 package pir.node
 
-import pir.lang._
-import spatial.node.{Alloc, Control, Primitive, PseudoStage}
-import spatial.lang._
 import argon._
+import argon.node.{Alloc, Primitive}
 import forge.tags._
-import spatial.util.getCChains
+import spatial.lang._
+import spatial.node.{Control, PseudoStage}
+import spatial.metadata.control.collectCChains
+import pir.lang._
 
 import scala.collection.mutable
 
@@ -26,7 +27,7 @@ abstract class PU extends Control[Void] {
 
   def iterss: Seq[Seq[I32]]
 
-  def ccs: Seq[CounterChain] = this.blocks.flatMap(getCChains)
+  def ccs: Seq[CounterChain] = this.blocks.flatMap(collectCChains)
   override def iters   = iterss.flatten
   override def cchains = ccs.zip(iterss)
   override def bodies  = Seq(PseudoStage(this.blocks.map{blk => iters -> blk}:_*))
@@ -75,8 +76,8 @@ abstract class PU extends Control[Void] {
   outs:  mutable.Map[Int,Out[_]] = mutable.Map.empty
 ) extends PU {
   override def iterss = rdIters ++ wrIters
-  override def cchains = rdPath.toSeq.flatMap{getCChains}.zip(rdIters) ++
-                         wrPath.toSeq.flatMap{getCChains}.zip(wrIters)
+  override def cchains = rdPath.toSeq.flatMap{collectCChains}.zip(rdIters) ++
+                         wrPath.toSeq.flatMap{collectCChains}.zip(wrIters)
 
   override def bodies = {
     rdPath.map{blk => PseudoStage(rdIters.flatten -> blk) }.toSeq ++

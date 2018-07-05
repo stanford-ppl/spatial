@@ -3,7 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 import spatial.targets._
 
-@test class AES extends SpatialTest {
+@spatial class AES extends SpatialTest {
   override def runtimeArgs: Args = "50"
 
   /*
@@ -409,9 +409,7 @@ import spatial.targets._
 }
 
 
-@test class Viterbi extends SpatialTest { // Regression (Dense) // Args: none
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class Viterbi extends SpatialTest {
   /*
 
                     ←       N_OBS            →
@@ -568,10 +566,7 @@ import spatial.targets._
 }
 
 
-// @test class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
-
+// @spatial class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
 //   /*
 //            ←    COLS     →   
 //          ___________________             ___________________                         
@@ -650,10 +645,7 @@ import spatial.targets._
 // }
 
 
-// @test class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
-
+// @spatial class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
 //  /*
                                                                                                                              
 //  H   ↗        ___________________                  ___________________                                                                  
@@ -771,7 +763,7 @@ import spatial.targets._
 // }
 
 
-@test class NW extends SpatialTest {
+@spatial class NW_alg extends SpatialTest { // NW conflicts with something in spade
   override def runtimeArgs: Args = {
     "tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
   }
@@ -939,8 +931,7 @@ import spatial.targets._
 }
 
 
-@test class MD_KNN extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MD_KNN extends SpatialTest {
 
  /*
   
@@ -1057,9 +1048,7 @@ import spatial.targets._
   }
 }      
 
-@test class MD_Grid extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MD_Grid extends SpatialTest {
  /*
   
   Moleckaler Dynamics via the grid, a digital frontier
@@ -1248,7 +1237,7 @@ import spatial.targets._
   }
 }      
 
-@test class KMP extends SpatialTest {
+@spatial class KMP extends SpatialTest {
   override def runtimeArgs: Args = "the"
 
  /*
@@ -1350,11 +1339,8 @@ import spatial.targets._
 }      
 
 
-@test class GEMM_NCubed extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class GEMM_NCubed extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
 
@@ -1402,7 +1388,7 @@ import spatial.targets._
   }
 }      
 
-@test class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+@spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
   override def runtimeArgs: Args = "128"
                                                                                                   
                                                                                                   
@@ -1630,7 +1616,7 @@ import spatial.targets._
       Foreach(dim by i_tileSize par loop_ii) { ii => // this loop defenitilely cant be parallelized right now
         Foreach(dim by tileSize par loop_jj) { jj => 
           val c_col = SRAM[T](i_tileSize,tileSize)
-          MemReduce(c_col par reduce_col)(dim by tileSize par loop_kk) { kk => 
+          MemReduce(c_col(0::i_tileSize, 0::tileSize par reduce_col))(dim by tileSize par loop_kk) { kk => 
             val c_col_partial = SRAM[T](i_tileSize,tileSize)
             val b_sram = SRAM[T](tileSize,tileSize)
             b_sram load b_dram(kk::kk.to[I32]+tileSize, jj::jj.to[I32]+tileSize par par_load)
@@ -1671,10 +1657,7 @@ import spatial.targets._
   }
 }
 
-@test class Sort_Merge extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class Sort_Merge extends SpatialTest {
  /*                                                                                                  
                               |     |                                                                                                                                                                                        
                      |        |     |                                      |     |                                                                                                                                                                                     
@@ -1769,10 +1752,7 @@ import spatial.targets._
 }
 
 
-@test class Sort_Radix extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class Sort_Radix extends SpatialTest {
  /*                                                                                                  
     TODO: Cartoon of what this is doing                                                         
                                                                                                                                                                                                                        
@@ -1928,10 +1908,7 @@ import spatial.targets._
 }
 
 
-@test class SPMV_CRS extends SpatialTest { // Regression (Sparse) // Args: none
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class SPMV_CRS extends SpatialTest {
  /*                                                                                                  
    Sparse Matrix is the IEEE 494 bus interconnect matrix from UF Sparse Datasets   
 
@@ -2001,7 +1978,7 @@ import spatial.targets._
             cols_sram load cols_dram(start_id :: stop_id par par_segment_load)
             values_sram load values_dram(start_id :: stop_id par par_segment_load)
           }
-          vec_sram gather vec_dram(cols_sram) //vec_sram gather vec_dram(cols_sram, stop_id - start_id)
+          vec_sram gather vec_dram(cols_sram, stop_id - start_id)
           println("row " + {i + tile})
           val element = Reduce(Reg[T](0))(stop_id - start_id by 1 par red_par) { j => 
             // println(" partial from " + j + " = " + {values_sram(j) * vec_sram(j)})
@@ -2027,10 +2004,7 @@ import spatial.targets._
   }
 }
 
-@test class SPMV_ELL extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class SPMV_ELL extends SpatialTest {
  /*                                                                                                  
    Sparse Matrix is the IEEE 494 bus interconnect matrix from UF Sparse Datasets   
 
@@ -2110,7 +2084,7 @@ import spatial.targets._
 }
 
 
-@test class Backprop extends SpatialTest {
+@spatial class Backprop extends SpatialTest {
   override def runtimeArgs: Args = "5"
 
  /*                                                                                                  
@@ -2543,8 +2517,7 @@ import spatial.targets._
 }
 
 
-@test class FFT_Strided extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class FFT_Strided extends SpatialTest {
   override def backends: Seq[Backend] = DISABLED // TODO: Producing huge logs during run, disabling for now
 
  /*                                                                                                  
@@ -2639,9 +2612,7 @@ import spatial.targets._
   }
 }
 
-@test class FFT_Transpose extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FFT_Transpose extends SpatialTest {
  /*                                                                                                  
     Concerns: Not sure why machsuite makes a data_x and DATA_x when they only dump values from one row of DATA_x to data_x and back
               Also, is their algorithm even correct?!  It's very suspicion and I can even comment out some of their code and it still passes....
@@ -2854,7 +2825,7 @@ import spatial.targets._
       // Loop 11
       Sequential.Foreach(THREADS by 1) { tid => 
         FFT8(tid)
-        // Do the indirect "reversing"
+        // Do the indirect "reversing" (LUT = 0,4,2,6,1,5,3,7)
         val tmem_x = SRAM[T](8)
         val tmem_y = SRAM[T](8)
         Foreach(8 by 1) { i => 
@@ -2900,10 +2871,7 @@ import spatial.targets._
 }
 
 
-@test class BFS_Bulk extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class BFS_Bulk extends SpatialTest {
  /*                                                                                                  
 
        * Scan levels straight through, and index into nodes if it matches current horizon
@@ -2967,10 +2935,12 @@ import spatial.targets._
       Foreach(16 by 1) {i => widths_sram(i) = if ( i == 0) 1 else 0}
       val level_width = Reg[Int](0)
       FSM(0)(horizon => horizon < N_LEVELS) { horizon =>
-        level_width.reset
+        // level_width.reset
+        level_width := 0
         Sequential.Reduce(level_width)(N_NODES by 1) { n => 
           val node_width = Reg[Int](0)
-          node_width.reset
+          // node_width.reset
+          node_width := 0
           if (levels_sram(n) == horizon) {
             Pipe{
               val start = node_starts_sram(n)
@@ -3007,9 +2977,7 @@ import spatial.targets._
 }
 
 
-@test class BFS_Queue extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class BFS_Queue extends SpatialTest {
  /*                                                                                                  
           ________________
     Q:   |          x x x |

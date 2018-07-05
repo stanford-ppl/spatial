@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class UnalignedMemCopyFIFO extends SpatialTest {
+@spatial class UnalignedMemCopyFIFO extends SpatialTest {
   override def runtimeArgs: Args = "400"
 
   val tileSize = 20

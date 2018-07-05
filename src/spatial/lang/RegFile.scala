@@ -2,10 +2,10 @@ package spatial.lang
 
 import argon._
 import forge.tags._
-import spatial.data._
 import utils.implicits.collections._
 import spatial.node._
 import spatial.lang.types._
+import spatial.metadata.memory._
 
 /** An N-dimensional register file */
 abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) extends LocalMem[A,C] {

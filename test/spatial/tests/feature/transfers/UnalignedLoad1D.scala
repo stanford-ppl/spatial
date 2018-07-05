@@ -4,7 +4,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 
-@test class UnalignedLoad1D extends SpatialTest {
+@spatial class UnalignedLoad1D extends SpatialTest {
   override def runtimeArgs: Args = "100 9"
   val N = 19200
 

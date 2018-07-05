@@ -2,8 +2,7 @@ package spatial.tests.feature.vectors
 
 import spatial.dsl._
 
-@test class BitSelects extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class BitSelects extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     Accel {

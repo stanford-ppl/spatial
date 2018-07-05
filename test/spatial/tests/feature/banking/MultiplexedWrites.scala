@@ -1,16 +1,11 @@
 package spatial.tests.feature.banking
 
-
 import spatial.dsl._
 
-
-@test class MultiplexedWrites extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MultiplexedWrites extends SpatialTest {
   val tileSize = 16
   val I = 5
   val N = 192
-
 
   def multiplexedwrtest[W:Num](w: Array[W], i: Array[W]): Array[W] = {
     val T = param(tileSize)

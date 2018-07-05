@@ -59,10 +59,11 @@ val common = Seq(
 /** Projects **/
 lazy val utils  = project.settings(common)
 lazy val emul   = project.settings(common)
+lazy val templateResources   = (project in file("./resources/synth/chisel-templates")).settings(common).settings(scalaVersion := "2.11")
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
-lazy val argon  = project.settings(common).dependsOn(forge)
+lazy val argon  = project.settings(common).dependsOn(forge, emul)
 lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
 
 lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)

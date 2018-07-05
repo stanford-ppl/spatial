@@ -1,10 +1,8 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-@test class IndirectLoad extends SpatialTest { // This hangs with retime on in SPMV_CRS
-  override def runtimeArgs: Args = NoArgs
+@spatial class IndirectLoad extends SpatialTest { // This hangs with retime on in SPMV_CRS
 
   def main(args: Array[String]): Void = {
     val ids = Array.tabulate(16){i => 32*i}
@@ -32,6 +30,7 @@ import spatial.dsl._
     printArray(result, "result")
     printArray(gold, "gold")
     val cksum = gold.zip(result){_==_}.reduce{_&&_}
+    assert(cksum)
     println("PASS: " + cksum + " (IndirectLoad)")
     assert(cksum)
   }

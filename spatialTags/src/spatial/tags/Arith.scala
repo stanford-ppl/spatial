@@ -15,7 +15,7 @@ class Arith[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro
 
     val fieldTypes = fields.map(_.tpTree)
     val fieldNames = fields.map(_.name)
-    val arithOpt   = fieldTypes.map{tp => q"new argon.static.ExpTypeLowPriority(argon.Type[$tp]).getView[spatial.lang.types.Arith]" }
+    val arithOpt   = fieldTypes.map{tp => q"new argon.static.ExpTypeLowPriority(argon.Type[$tp]).getView[argon.lang.types.Arith]" }
     val arith      = arithOpt.map{a => q"$a.get" }
     val fieldPairs = fieldNames.zip(arith)
     val neg = fieldPairs.map{case (name,a) => q"$a.neg(this.$name(ctx,state))(ctx,state)"}

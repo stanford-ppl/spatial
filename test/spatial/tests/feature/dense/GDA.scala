@@ -2,7 +2,7 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class GDA extends SpatialTest {
+@spatial class GDA extends SpatialTest {
   override def runtimeArgs: Args = "64"
 
   type X = Float

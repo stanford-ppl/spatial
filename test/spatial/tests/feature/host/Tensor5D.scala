@@ -4,7 +4,7 @@ package spatial.tests.feature.host
 import spatial.dsl._
 
 
-@test class Tensor5D extends SpatialTest {
+@spatial class Tensor5D extends SpatialTest {
   override def runtimeArgs: Args = "32 4 4 4 4"
 
   def main(args: Array[String]): Unit = {

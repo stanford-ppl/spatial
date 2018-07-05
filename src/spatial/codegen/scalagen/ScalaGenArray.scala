@@ -1,7 +1,7 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.data._
+import spatial.metadata.CLIArgs
 import spatial.lang._
 import spatial.node._
 

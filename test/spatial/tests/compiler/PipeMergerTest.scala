@@ -3,9 +3,7 @@ package spatial.tests.compiler
 import spatial.dsl._
 import argon.Block
 
-@test class PipeMergerTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-  override def backends = DISABLED // TODO: Add IR check
+@spatial class PipeMergerTest extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val N = ArgIn[Int]

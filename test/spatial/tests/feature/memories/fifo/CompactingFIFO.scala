@@ -2,7 +2,7 @@ package spatial.tests.feature.memories.fifo
 
 import spatial.dsl._
 
-@test class CompactingFIFO extends SpatialTest {
+@spatial class CompactingFIFO extends SpatialTest {
   override def runtimeArgs: Args = "640"
 
   val tileSize = 64

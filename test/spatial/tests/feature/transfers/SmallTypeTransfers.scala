@@ -2,9 +2,7 @@ package spatial.tests.feature.transfers
 
 import spatial.dsl._
 
-@test class SmallTypeTransfers extends SpatialTest {  
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SmallTypeTransfers extends SpatialTest {
   type T1 = FixPt[FALSE,_8,_8]
   type T2 = FixPt[FALSE,_4,_4]
 

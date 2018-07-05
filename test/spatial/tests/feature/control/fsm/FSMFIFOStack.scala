@@ -1,12 +1,8 @@
 package spatial.tests.feature.control.fsm
 
-
 import spatial.dsl._
 
-
-@test class FSMFIFOStack extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FSMFIFOStack extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val size = 128

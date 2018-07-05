@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class MemReduce2D extends SpatialTest {
+@spatial class MemReduce2D extends SpatialTest {
   override def runtimeArgs: Args = "192 384"
 
   val N = 1920
@@ -56,7 +56,7 @@ import spatial.dsl._
   }
 }
 
-@test class PartialMemReduce2D extends SpatialTest { // Regression (Unit) // Args: 192 384
+@spatial class PartialMemReduce2D extends SpatialTest { // Regression (Unit) // Args: 192 384
   override def runtimeArgs: Args = "192 384"
 
 

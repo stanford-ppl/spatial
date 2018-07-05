@@ -82,7 +82,7 @@ trait InwardNode[DI, UI, BI <: Data] extends BaseNode with InwardNodeHandle[DI, 
   private var iRealized = false
 
   protected[diplomacy] def iPushed = accPI.size
-  protected[diplomacy] def iPush(index: Int, node: OutwardNode[DI, UI, BI])(implicit sourceInfo: SourceInfo) {
+  protected[diplomacy] def iPush(index: Int, node: OutwardNode[DI, UI, BI])(implicit sourceInfo: SourceInfo): Unit = {
     val info = sourceLine(sourceInfo, " at ", "")
     val noIs = numPI.size == 1 && numPI.contains(0)
     require (!noIs, s"${name}${lazyModule.line} was incorrectly connected as a sink" + info)
@@ -114,7 +114,7 @@ trait OutwardNode[DO, UO, BO <: Data] extends BaseNode with OutwardNodeHandle[DO
   private var oRealized = false
 
   protected[diplomacy] def oPushed = accPO.size
-  protected[diplomacy] def oPush(index: Int, node: InwardNode [DO, UO, BO])(implicit sourceInfo: SourceInfo) {
+  protected[diplomacy] def oPush(index: Int, node: InwardNode [DO, UO, BO])(implicit sourceInfo: SourceInfo): Unit = {
     val info = sourceLine(sourceInfo, " at ", "")
     val noOs = numPO.size == 1 && numPO.contains(0)
     require (!noOs, s"${name}${lazyModule.line} was incorrectly connected as a source" + info)

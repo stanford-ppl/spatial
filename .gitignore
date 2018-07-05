@@ -8,6 +8,7 @@ target/
 /.idea/
 /out*/
 /gen/
+/poly/emptiness
 
 resources/synth/cpp-templates/fringeDE1SoC/
 resources/synth/cpp-templates/fringeArria10/

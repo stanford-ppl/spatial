@@ -2,7 +2,7 @@ package spatial.tests.feature.memories.reg
 
 import spatial.dsl._
 
-@test class ShiftRegs extends SpatialTest {
+@spatial class ShiftRegs extends SpatialTest {
   override def runtimeArgs: Args = "32"
 
   def main(args: Array[String]): Unit = {
@@ -37,18 +37,41 @@ import spatial.dsl._
     }
 
     val init = getMem(init_dram)
+    println(r"Expect A(i) = i, got: ")
     printArray(init)
-
     assert(init == Array.tabulate(9){i => i})
+
     val regfile_result = getMatrix(regfile_dram)
     val parshiftregfile_result = getMatrix(parshiftregfile_dram)
     val shiftregfile_result = getMatrix(shiftregfile_dram)
 
+    println("GOT                 WANTED")
     for (i <- 0 until 3){
-    	for (j <- 0 until 3){
+      for (j <- 0 until 3){print(r"${regfile_result(i,j)} ")}
+      print("     ")
+      for (j <- 0 until 3){print(r"${i+j} ")}
+      println("")
+    }
+    println("")
+    for (i <- 0 until 3){
+      for (j <- 0 until 3){print(r"${shiftregfile_result(i,j)} ")}
+      print("     ")
+      for (j <- 0 until 3){print(r"${i+1+(2-j)} ")}
+      println("")
+    }
+    println("")
+    for (i <- 0 until 3){
+      for (j <- 0 until 3){print(r"${parshiftregfile_result(i,j)} ")}
+      print("     ")
+      for (j <- 0 until 3){print(r"${i+1+(2-j)} ")}
+      println("")
+    }
+
+    for (i <- 0 until 3){
+      for (j <- 0 until 3){
     		assert(regfile_result(i,j) == i+j)
-    		assert(shiftregfile_result(i,j) == i+1+j)
-    		assert(parshiftregfile_result(i,j) == i+1+j)
+    		assert(shiftregfile_result(i,j) == i+1+(2-j))
+    		assert(parshiftregfile_result(i,j) == i+1+(2-j))
     	}
     }
 

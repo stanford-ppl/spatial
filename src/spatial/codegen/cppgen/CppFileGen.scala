@@ -2,7 +2,7 @@ package spatial.codegen.cppgen
 
 import argon._
 
-import spatial.data._
+import spatial.metadata.CLIArgs
 
 trait CppFileGen extends CppCodegen {
 

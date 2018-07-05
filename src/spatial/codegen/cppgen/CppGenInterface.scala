@@ -1,23 +1,12 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.memory._
 
 
 trait CppGenInterface extends CppGenCommon {
-
-  // override protected def name(s: Dyn[_]): String = s match {
-  //   case Def(ArgInNew(_))  => s"${s}_argin"
-  //   case Def(ArgOutNew(_)) => s"${s}_argout"
-  //   case Def(RegNew(_))    => s"""${s}_${s.name.getOrElse("reg")}"""
-  //   case Def(RegRead(reg:Sym[_]))      => s"${s}_readx${reg.id}"
-  //   case Def(RegWrite(reg:Sym[_],_,_)) => s"${s}_writex${reg.id}"
-  //   case _ => super.name(s)
-  // } 
 
   // override protected def remap(tp: Type[_]): String = tp match {
   //   case tp: RegType[_] => src"${tp.typeArguments.head}"
@@ -86,7 +75,7 @@ trait CppGenInterface extends CppGenCommon {
           emit(src"${lhs.tp} ${lhs};")
           emit(src"memcpy(&${lhs}, &${lhs}_tmp, sizeof(${lhs}));")
         case _ => 
-          emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${get_string};")
+          emit(src"${lhs.tp} $lhs = (${lhs.tp}(${get_string}));")
       }
 
 

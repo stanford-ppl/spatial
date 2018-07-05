@@ -3,47 +3,42 @@ package spatial.tests.feature.transfers
 
 import spatial.dsl._
 
-@test class AXICommandSplit extends SpatialTest { // Regression (Unit) // Args: 100
-  override def runtimeArgs: Args = "100"
+@spatial class AXICommandSplit extends SpatialTest {
+  override def runtimeArgs: Args = "12288"
 
-
-  def onetileload(srcHost: Array[Int], value: Int) = {
-    val loadPar  = 1 (1 -> 1)
-    val storePar = 1 (1 -> 1)
+  val rows = 4
+  
+  def onetilestore(srcHost: Array[Int], value: Int) = {
+    val loadPar  = 16 (1 -> 1)
+    val storePar = 16 (1 -> 1)
     val tileSize = 6144
-
 
     val N = ArgIn[Int]
     setArg(N, value)
-    val srcFPGA = DRAM[Int](N)
-    setMem(srcFPGA, srcHost)
-    val out = ArgOut[Int]
+    val src = DRAM[Int](rows,N)
+    val dst = DRAM[Int](rows,N)
+    setMem(src, srcHost)
+    setMem(dst, Array.fill[Int](rows*value)(0))
+
     Accel {
       Sequential.Foreach(N.value by tileSize par 1) { i =>
-        val b1 = SRAM[Int](tileSize)
-
-        b1 load srcFPGA(i::i+tileSize par 1)
-
-        val acc = Reg[Int]
-        Foreach(tileSize by 1 par 1) { ii =>
-          acc := b1(ii)
-        }
-
-        out := acc
+        val b1 = SRAM[Int](rows,tileSize)
+        b1 load src(0::rows, i::i+tileSize par loadPar)
+        dst(0::rows, i::i+tileSize par storePar) store b1
       }
     }
-    getArg(out)
+    getMem(dst)
   }
 
   def main(args: Array[String]): Void = {
     val arraySize = args(0).to[Int]
 
-    val src = Array.tabulate[Int](arraySize) { i => i }
-    val dst = onetileload(src, arraySize)
-    println("got " + dst)
+    val src = Array.tabulate[Int](rows*arraySize) { i => i }
+    val dst = onetilestore(src, arraySize)
+    printArray(dst, "got ")
 
-    val cksum = dst == src(arraySize-1)
+    val cksum = src.zip(dst){_==_}.reduce{_&&_}
+    println("PASS: " + cksum + " (AXICommandSplit)")
     assert(cksum)
-    println("PASS: " + cksum + " (OneTileLoad)")
   }
 }

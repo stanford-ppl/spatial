@@ -2,7 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class OuterSwitch extends SpatialTest {
+@spatial class OuterSwitch extends SpatialTest {
   override def runtimeArgs: Args = "20" and "30"
 
   def main(args: Array[String]): Unit = {

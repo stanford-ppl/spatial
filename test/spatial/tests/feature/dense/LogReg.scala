@@ -4,7 +4,7 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 
-@test class LogReg extends SpatialTest {
+@spatial class LogReg extends SpatialTest {
   override def runtimeArgs: Args = "20 1024"
 
   type X = Float //FixPt[TRUE,_16,_16]

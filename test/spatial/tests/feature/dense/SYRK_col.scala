@@ -9,7 +9,7 @@ import spatial.dsl._
   * -------------------------
   * C := C + AA' with N*K matrix A, updating only lower triangular part of symmetric N*N matrix C.
   */
-@test class SYRK_col extends SpatialTest {
+@spatial class SYRK_col extends SpatialTest {
   override def runtimeArgs: Args = "64"
   type T = Int
 
@@ -98,7 +98,7 @@ import spatial.dsl._
 
     val C_computed = Array.tabulate(N * N) { i => result(i) }
     val cksum = C_computed.zip(C_check) { (a, b) => a > b - margin && a < b + margin }.reduce{_&&_}
-
+    println("PASS: " + cksum)
     assert(cksum)
   }
 }

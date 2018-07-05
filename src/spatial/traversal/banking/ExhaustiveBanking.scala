@@ -5,8 +5,10 @@ import utils.implicits.collections._
 import utils.math.isPow2
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
-import spatial.data._
 import spatial.lang._
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
@@ -24,13 +26,24 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     dimGrps: Seq[Seq[Seq[Int]]]
   ): Seq[Seq[Banking]] = {
 
-    val grps = (reads ++ writes).map(_.toSeq.map(_.matrix))
+    val grps = (reads ++ writes).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
+    val fullStrategy = Seq.tabulate(rank){i => i}
     if (grps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
     else {
-      dimGrps.flatMap{strategy: Seq[Seq[Int]] =>
-        dbg(s"  Trying dimension group {${strategy.mkString(",")}}")
+      dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
         val banking = strategy.map{dims =>
-          val selGrps = grps.map{grp => grp.map{mat => mat.sliceDims(dims)} }
+          val selGrps = grps.map{grp => 
+            val sliceCompPairs = grp.map{mat => (mat.sliceDims(dims), mat.sliceDims(fullStrategy.diff(dims)))} 
+            var firstInstances: Seq[SparseMatrix[Idx]] = Seq()
+            Seq(sliceCompPairs.indices.collect{case i if (
+                          sliceCompPairs.patch(i,Nil,1).filter(_._1 == sliceCompPairs(i)._1).isEmpty ||  // If this slice is unique
+                          sliceCompPairs.patch(i,Nil,1).filter(_._1 == sliceCompPairs(i)._1).exists(_._2 == sliceCompPairs(i)._2) || // Or if it is not unique but its compliment collides
+                          !firstInstances.contains(sliceCompPairs(i)._1) // Or if it is the first time we are seeing this slice
+                        ) =>  // then add it to the group
+                          firstInstances = firstInstances ++ Seq(sliceCompPairs(i)._1)
+                          sliceCompPairs(i)._1
+            }:_*)
+          }
           findBanking(selGrps, dims)
         }
         if (isValidBanking(banking,grps)) Some(banking) else None
@@ -70,21 +83,24 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int]): ModBanking = {
     val rank = dims.length
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
-
     val (n2,nx) = (Nmin to 8*Nmin).partition{i => isPow2(i) }
     val n2Head = if (n2.head.toDouble/Nmin > MAGIC_CUTOFF_N) Seq(Nmin) else Nil
     val Ns = (n2Head ++ n2 ++ nx).iterator
 
     var banking: Option[ModBanking] = None
+    var attempts = 0
 
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
       val As = Alphas(rank, N)
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
-        if (checkCyclic(N,alpha,grps)) banking = Some(ModBanking(N,1,alpha,dims))
+        if (attempts < 200) dbgs(s"     Checking N=$N and alpha=$alpha")
+        else if (attempts == 200) dbgs(s"    ...")
+        attempts = attempts + 1
+        if (checkCyclic(N,alpha,grps)) {dbgs(s"     Success on N=$N, alpha=$alpha, B=1");banking = Some(ModBanking(N,1,alpha,dims))}
         else {
-          val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          val B = Bs.find{b => val x = checkBlockCyclic(N,b,alpha,grps); if (x) dbgs(s"     Success on N=$N, alpha=$alpha, B=$b"); x}
           banking = B.map{b => ModBanking(N, b, alpha, dims) }
         }
       }

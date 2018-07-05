@@ -10,9 +10,9 @@ trait Spade extends Compiler {
   val desc: String = "Spade"
   val script: String = "spade"
 
-  def entry(): Void
+  def main(): Void
 
-  final def stageApp(args: Array[String]): Block[_] = stageBlock{ entry() }
+  final def stageApp(args: Array[String]): Block[_] = stageBlock{ main() }
 
   def runPasses[R](block: Block[R]): Block[R] = {
     lazy val printer = IRPrinter(state, enable = config.enDbg)

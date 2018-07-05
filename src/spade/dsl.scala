@@ -1,25 +1,15 @@
 package spade
 
-import spade.lang.static.ExternalStatics
+import spade.lang.api.ExternalStatics
 
 object dsl extends ExternalStatics {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
-  import forge.tags.{AppTag,TestTag}
+  import forge.tags.AppTag
 
   /** Annotation class for @spade macro annotation. */
   final class spade extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro spade.impl
   }
   private object spade extends AppTag("spade", "SpadeDesign")
-
-  final class test extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro test.impl
-  }
-  private object test extends TestTag("spade", "SpadeTest", "SpadeDesign")
-
-  final class testv extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro testv.impl
-  }
-  private object testv extends TestTag("spade", "SpadeTest", "SpadeDesign", verbose = true)
 }

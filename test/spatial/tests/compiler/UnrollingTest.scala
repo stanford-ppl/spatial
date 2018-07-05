@@ -2,8 +2,7 @@ package spatial.tests.compiler
 
 import spatial.dsl._
 
-@test class UnrollingTest extends SpatialTest {
-  def runtimeArgs: Args = NoArgs
+@spatial class UnrollingTest extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val o = ArgOut[Int]

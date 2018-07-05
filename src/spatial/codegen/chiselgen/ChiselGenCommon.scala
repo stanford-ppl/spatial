@@ -1,17 +1,21 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
-import spatial.internal.{spatialConfig => cfg}
+import spatial.metadata.bounds._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.retiming._
+import spatial.metadata.types._
+import spatial.util.spatialConfig
 
 trait ChiselGenCommon extends ChiselCodegen { 
 
   // Statistics counters
   var pipeChainPassMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
+  var pipeChainPassMapBug41Hack = new scala.collection.mutable.HashMap[Sym[_], Sym[_]]
   var streamCopyWatchlist = List[Sym[_]]()
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var validPassMap = new scala.collection.mutable.HashMap[Sym[_], Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
@@ -30,9 +34,9 @@ trait ChiselGenCommon extends ChiselCodegen {
   var earlyExits: List[Sym[_]] = List()
 
   def latencyOption(op: String, b: Option[Int]): Double = {
-    if (cfg.enableRetiming) {
-      if (b.isDefined) {cfg.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
-      else cfg.target.latencyModel.model(op)()("LatencyOf") 
+    if (spatialConfig.enableRetiming) {
+      if (b.isDefined) {spatialConfig.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
+      else spatialConfig.target.latencyModel.model(op)()("LatencyOf")
     } else {
       0.0
     }
@@ -62,7 +66,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case Def.Node(id,_) => x match {
         case Op(SimpleStruct(fields)) => 
           var shift = 0
-          fields.reverse.map{f => 
+          fields.map{f => // Used to be .reversed but not sure now
             val x = src"(${quoteAsScala(f._2)} << $shift).toDouble"
             shift = shift + bitWidth(f._2.tp)
             x
@@ -109,29 +113,30 @@ trait ChiselGenCommon extends ChiselCodegen {
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
                        src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
-      emit(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
-      emit(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
-      emit(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
-      emit(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
-      emit(src"""${cchain}.io.input.saturate := true.B""")
-      emit(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
-      emit(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
-      emit(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
-      if (streamCopyWatchlist.contains(cchain)) emit(src"""${cchain}.io.input.isStream := true.B""")
-      else emit(src"""${cchain}.io.input.isStream := false.B""")      
-      emit(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
+      emitt(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
+      emitt(src"""${cchain}.io.input.saturate := true.B""")
+      emitt(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
+      emitt(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
+      emitt(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
+      if (streamCopyWatchlist.contains(cchain)) emitt(src"""${cchain}.io.input.isStream := true.B""")
+      else emitt(src"""${cchain}.io.input.isStream := false.B""")      
+      emitt(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
       cchain.counters.zipWithIndex.foreach { case (c, i) =>
         val x = c.ctrPar.toInt
         if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
         else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
-        emit(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
+        val base = cchain.counters.take(i).map(_.ctrPar.toInt).sum
+        emitt(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($base + j) }""")
       }
 
     }
   }
 
   def latencyOptionString(op: String, b: Option[Int]): String = {
-    if (cfg.enableRetiming) {
+    if (spatialConfig.enableRetiming) {
       val latency = latencyOption(op, b)
       if (b.isDefined) {
         s"""Some(${latency})"""
@@ -156,43 +161,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     //   case _ => throw new Exception(s"Node enable $en not yet handled in partial retiming")
     // }
     // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
-    if (cfg.enableRetiming) lhs.fullDelay else 0.0
+    if (spatialConfig.enableRetiming) lhs.fullDelay else 0.0
   }
-
-
-  protected def emitInhibitor(lhs: Sym[_], fsm: Option[Sym[_]] = None, switch: Option[Sym[_]]): Unit = {
-    if (cfg.enableRetiming) {
-      emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())") // Used to be global module?
-      if (fsm.isDefined) {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(~${fsm.get})")  
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${DL(swap(lhs, Done), src"1 + ${swap(lhs, Latency)}", true)}")
-          /* or'ed  back in because of BasicCondFSM!! */
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${fsm.get}*/ // Really want inhibit to turn on at last enabled cycle")        
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-      } else if (switch.isDefined) {
-        emit(src"${swap(lhs, Inhibitor)} := ${swap(switch.get, Inhibitor)}")
-      } else {
-        if (lhs.cchains.nonEmpty) {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := ${lhs.cchains.head}.io.output.done")  
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${lhs.cchains.head}.io.output.done*/ // Correction not needed because _done should mask dp anyway")
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${swap(lhs, Done)}")
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-        } else {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(${swap(lhs, Done)} /*${lhs}_sm.io.output.ctr_inc*/)")
-          val rster = if (lhs.isInnerControl & getReadStreams(lhs.toCtrl).nonEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Latency)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := $rster")
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data")
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-        }        
-      }
-    } else {
-      emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())");emit(src"${swap(lhs, Inhibitor)} := false.B // Maybe connect to ${swap(lhs, Done)}?  ")
-    }
-  }
-
 
 
   def remappedEns(node: Sym[_], ens: List[Sym[_]]): String = {
@@ -236,9 +206,9 @@ trait ChiselGenCommon extends ChiselCodegen {
       val readsFrom = getReadStreams(c.toCtrl).map{
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
           fifo.readers.head match {
-            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
             case Op(FIFOPeek(_,_)) => src""
           }
         case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
@@ -247,8 +217,8 @@ trait ChiselGenCommon extends ChiselCodegen {
       val writesTo = getWriteStreams(c.toCtrl).map{
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
           fifo.writers.head match {
-            // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-            case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+            case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
           }
         case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
         // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
@@ -279,7 +249,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case _ => ""
     }.mkString(" & ")
     val hasReadiers = if (readiers != "") "&" else ""
-    if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
   def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
@@ -289,19 +259,19 @@ trait ChiselGenCommon extends ChiselCodegen {
       case _ => ""
     }.mkString(" & ")
     val hasReadiers = if (readiers != "") "&" else ""
-    if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers}" else " "
   }
 
   def getFifoReadyLogic(sym: Ctrl): List[String] = {
     getWriteStreams(sym).collect{
-      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
+      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
     }.toList
   }
 
   def getAllReadyLogic(sym: Ctrl): List[String] = {
     getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
+      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
     }.toList
   }
 
@@ -376,6 +346,11 @@ trait ChiselGenCommon extends ChiselCodegen {
       while (nextLevel.isDefined) {
         if (siblings.contains(nextLevel.get)) {
           if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
+          modified = true
+          nextLevel = None
+        }
+        else if (pipeChainPassMapBug41Hack.contains(s) && pipeChainPassMapBug41Hack(s) == nextLevel.get) {
+          result = result + s"_chain_read_${siblings.length-1}"
           modified = true
           nextLevel = None
         } else {

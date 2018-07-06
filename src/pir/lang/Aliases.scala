@@ -1,4 +1,4 @@
-package pir.lang.static
+package pir.lang
 
 // No aliases of the form type X = pir.lang.X (creates a circular reference)
 // Everything else is ok.

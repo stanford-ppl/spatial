@@ -1,5 +1,7 @@
 package pir.lang.static
 
+import pir.lang.{ExternalAliases, InternalAliases}
+
 trait Statics extends Pointers
 
 /** Internal view of PIR */

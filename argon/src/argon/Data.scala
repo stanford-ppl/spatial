@@ -1,7 +1,7 @@
 package argon
 
 import forge.tags._
-import argon.transform.Transformer
+import argon.transform.TransformerInterface
 
 import scala.collection.mutable
 
@@ -69,7 +69,7 @@ object Transfer extends Enumeration {
   * metadata is created.
   */
 abstract class Data[T](val transfer: Transfer.Transfer) { self =>
-  final type Tx = Transformer
+  final type Tx = TransformerInterface
 
   type Transfer = Transfer.Transfer
 

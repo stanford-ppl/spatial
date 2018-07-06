@@ -316,6 +316,21 @@ package object control {
       }
     }
 
+    def writtenMems: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[WrittenMems](sym).map(_.mems) }.getOrElse(Set.empty)
+    }
+    def writtenMems_=(mems: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, WrittenMems(mems)) }
+    }
+
+    def readMems: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[ReadMems](sym).map(_.mems) }.getOrElse(Set.empty)
+    }
+    def readMems_=(mems: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, ReadMems(mems)) }
+    }
+
+
 
     // --- Streaming Controllers --- //
     def listensTo: List[StreamInfo] = {
@@ -447,11 +462,6 @@ package object control {
     def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
     def userSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, UserScheduleDirective(sched))
 
-    def writtenMems: Set[Sym[_]] = metadata[WrittenMems](s).map(_.mems).getOrElse(Set.empty)
-    def writtenMems_=(mems: Set[Sym[_]]): Unit = metadata.add(s, WrittenMems(mems))
-
-    def readMems: Set[Sym[_]] = metadata[ReadMems](s).map(_.mems).getOrElse(Set.empty)
-    def readMems_=(mems: Set[Sym[_]]): Unit = metadata.add(s, ReadMems(mems))
 
     // --- Control Hierarchy --- //
 

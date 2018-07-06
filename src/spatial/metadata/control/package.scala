@@ -54,6 +54,8 @@ package object control {
       case _ => false
     }
 
+    def isFSM: Boolean = op.isInstanceOf[StateMachine[_]]
+
     def isStreamLoad: Boolean = op match {
       case _:FringeDenseLoad[_,_] => true
       case _ => false
@@ -86,6 +88,7 @@ package object control {
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
+    def isFSM: Boolean = op.exists(_.isFSM)
 
     def isMemReduce: Boolean = op.exists(_.isMemReduce)
 
@@ -237,6 +240,7 @@ package object control {
       case _:EnPrimitive[_] | _:EnControl[_] => true
       case _ => false
     }
+
 
     // --- Control hierarchy --- //
 
@@ -443,6 +447,7 @@ package object control {
 
     def userII: Option[Double] = metadata[UserII](s).map(_.interval)
     def userII_=(interval: Option[Double]): Unit = interval.foreach{ii => metadata.add(s, UserII(ii)) }
+
   }
 
 

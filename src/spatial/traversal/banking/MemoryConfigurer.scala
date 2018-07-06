@@ -123,12 +123,16 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
 
     accesses.foreach{a =>
-      dbg(s"    Access: ${a.access} [${a.parent}]")
+      dbg(s"    Access: ${a.access} {${a.unroll.mkString(",")}} [${a.parent}]")
       val grpId = {
         if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
-          // Filter for accesses that require concurrent port access AND either don't overlap or are identical.  Should drop in data broadcasting node in this case
-          val pairs = grp.filter{b => requireConcurrentPortAccess(a, b) && (!a.overlapsAddress(b) | ((a.access == b.access) && (a.matrix == b.matrix)))  }
+          // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
+          // Should drop in data broadcasting node in this case
+          val pairs = grp.filter{b =>
+            requireConcurrentPortAccess(a, b) &&
+            (!a.overlapsAddress(b) | ((a.access == b.access) && (a.matrix == b.matrix)))
+          }
           if (pairs.nonEmpty) dbg(s"      Group #$i: ")
           else                dbg(s"      Group #$i: <none>")
           pairs.foreach{b => dbgs(s"        ${b.access} [${b.parent}]") }

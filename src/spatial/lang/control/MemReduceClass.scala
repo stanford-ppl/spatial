@@ -4,6 +4,7 @@ package control
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.metadata.memory._
 import spatial.util.memops._
 
 protected class MemReduceAccum[A,C[T]](

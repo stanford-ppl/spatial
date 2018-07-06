@@ -4,7 +4,6 @@ import argon._
 import argon.node._
 import forge.tags._
 import spatial.lang._
-import spatial.util._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
   val A: Num[A] = Num[A]

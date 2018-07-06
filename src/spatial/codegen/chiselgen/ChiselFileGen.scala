@@ -1,12 +1,9 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.util.spatialConfig
 
-
 trait ChiselFileGen extends ChiselCodegen {
-
   backend = "accel"
 
   override def emitHeader(): Unit = {

@@ -2,10 +2,13 @@ package spatial.transform
 
 import argon._
 import argon.transform.MutateTransformer
-import spatial.data._
+import spatial.metadata.control._
+import spatial.metadata.retiming._
+import spatial.metadata.types._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.util.modeling._
+import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 
 import scala.collection.immutable.SortedSet

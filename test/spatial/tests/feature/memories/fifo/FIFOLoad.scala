@@ -2,8 +2,6 @@ package spatial.tests.feature.memories.fifo
 
 import spatial.dsl._
 
-
-
 @spatial class FIFOLoad extends SpatialTest {
   override def runtimeArgs: Args = "960"
 

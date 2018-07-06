@@ -4,8 +4,10 @@ import argon._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.bounds._
+import spatial.metadata.control._
+import spatial.metadata.types._
+import spatial.util.spatialConfig
 
 trait ChiselGenController extends ChiselGenCommon {
 
@@ -131,7 +133,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val Op(CounterChainNew(counters)) = lhs.cchains.head
       val par = lhs.cchains.head.pars
       val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
-      scopeIters(lhs.toScope).toList.zipWithIndex.foreach { case (idx,index) =>
+      lhs.toScope.iters.toList.zipWithIndex.foreach { case (idx,index) =>
         val ctr = ctrMapping.count(_ <= index) - 1
         val w = bitWidth(counters(ctr).typeArgs.head)
         inGenn(out, "BufferControlCxns", ext) {
@@ -326,7 +328,7 @@ trait ChiselGenController extends ChiselGenCommon {
     else emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ~${swap(sym, CtrTrivial)} & ~${swap(sym, SM)}.io.ctrDone // Used to have many variations""")
 
     // Update bound sym watchlists
-    (scopeIters(sym.toScope) ++ scopeValids(sym.toScope)).foreach{ item =>
+    (sym.toScope.iters ++ sym.toScope.valids).foreach{ item =>
       if (sym.isPipeControl) pipeChainPassMap += (item -> sym.children.filter(_.s.get != sym).toList.map(_.s.get))
       else if (sym.isStreamControl) {streamCopyWatchlist = streamCopyWatchlist :+ item}
     }

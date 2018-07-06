@@ -1,7 +1,5 @@
 package spatial.tests.feature.memories.lut
 
-
-
 import spatial.dsl._
 
 @spatial class LUTSimple extends SpatialTest {

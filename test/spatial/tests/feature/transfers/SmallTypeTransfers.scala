@@ -64,7 +64,8 @@ import spatial.dsl._
 
     val cksum = big_sram_store_res.zip(init_T1){_==_}.reduce{_&&_} && little_sram_store_res.zip(init_T2){_==_}.reduce{_&&_} && big_pt_res == init_T1(5) && little_pt_res == init_T2(5)
 
-
     println("PASS: " + cksum + " (SmallTypeTransfers)")
+
+    assert(cksum)
   }
 }

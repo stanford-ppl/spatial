@@ -13,7 +13,7 @@ import spatial.dsl._
         sleep(100)
         Pipe{y := i}
         if (i == 8) { Sequential{
-          Pipe{exit()}
+          Pipe{ exit() }
           sleep(100)
         }} // breakpoint() also works
         Pipe{z := i}

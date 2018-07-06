@@ -4,23 +4,20 @@ import argon.lang.api.{BitsAPI, TuplesAPI}
 import spatial.lang.{ExternalAliases, InternalAliases, ShadowingAliases}
 
 /** Internal view of Spatial */
-trait StaticAPI extends Implicits with utils.Overloads with SpatialVirtualization
+trait StaticAPI_Internal extends InternalAliases with SpatialVirtualization with Implicits
+  with utils.Overloads
   with ArrayAPI
-  with TensorConstructorAPI
   with BitsAPI
-  with MuxAPI
+  with ControlAPI
+  with DebuggingAPI_Internal
   with FileIOAPI
   with MathAPI
   with MiscAPI
+  with MuxAPI
+  with TensorConstructorAPI
   with TransferAPI
   with TuplesAPI
   with UserData
-  with ControlAPI {
-  this: InternalAliases =>
-}
-
-trait StaticAPI_Internal extends StaticAPI with InternalAliases
-  with DebuggingAPI_Internal
 
 /** External view for extending DSLs */
 trait StaticAPI_External extends StaticAPI_Internal with ExternalAliases

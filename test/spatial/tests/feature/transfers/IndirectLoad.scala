@@ -32,5 +32,6 @@ import spatial.dsl._
     val cksum = gold.zip(result){_==_}.reduce{_&&_}
     assert(cksum)
     println("PASS: " + cksum + " (IndirectLoad)")
+    assert(cksum)
   }
 }

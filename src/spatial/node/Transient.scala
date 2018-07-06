@@ -4,7 +4,7 @@ import argon._
 import argon.node._
 
 import forge.tags._
-import spatial.data.Expect
+import spatial.metadata.bounds.Expect
 
 // TODO: This is a bit odd to have Primitive in argon and Transient in spatial
 abstract class Transient[R:Type] extends Primitive[R] {

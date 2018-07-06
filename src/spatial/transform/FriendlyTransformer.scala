@@ -4,10 +4,10 @@ import argon._
 import argon.node._
 import argon.transform.MutateTransformer
 import spatial.traversal.AccelTraversal
-import spatial.data._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
 
 case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTraversal {
   private var dimMapping: Map[I32,I32] = Map.empty

@@ -5,8 +5,8 @@ import argon.passes.Pass
 import poly.ISL
 
 import spatial.traversal.banking._
-import spatial.data._
 import spatial.lang._
+import spatial.metadata.memory.LocalMemories
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()
@@ -30,7 +30,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
   }).asInstanceOf[MemoryConfigurer[C]]
 
   def run(): Unit = {
-    val memories = localMems.all
+    val memories = LocalMemories.all
     memories.foreach{m => configurer(m).configure() }
   }
 }

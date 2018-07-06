@@ -6,14 +6,16 @@ import poly.ISL
 import utils.implicits.collections._
 
 import spatial.issues.UnbankableGroup
-import spatial.data._
 import spatial.lang._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected val rank: Int = rankOf(mem).length
+  protected val rank: Int = mem.rank.length
   protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
   // TODO: This may need to be tweaked based on the fix for issue #23

@@ -5,8 +5,10 @@ import utils.implicits.collections._
 import utils.math.isPow2
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
-import spatial.data._
 import spatial.lang._
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?

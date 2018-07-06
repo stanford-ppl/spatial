@@ -1,10 +1,10 @@
 package spatial.traversal
 
 import argon._
-import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.util.spatialConfig
+import spatial.metadata.control._
 import spatial.issues.ControlPrimitiveMix
 
 /** Used to automatically detect invalid changes that occurred during transformations. */

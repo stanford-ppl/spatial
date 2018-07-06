@@ -4,9 +4,8 @@ import argon._
 import forge.tags._
 
 import spatial.lang._
-import spatial.data._
-import spatial.util._
 import spatial.util.memops._
+import spatial.util.modeling.target
 
 /** A sparse transfer between on-chip and off-chip memory.
   * If isGather is true, this is a gather from off-chip memory to on-chip.

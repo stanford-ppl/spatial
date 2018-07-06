@@ -1,7 +1,6 @@
 package spatial.tests.compiler
 
 import argon._
-import spatial.data._
 import spatial.dsl._
 
 @spatial class CLITest extends SpatialTest {
@@ -20,6 +19,8 @@ import spatial.dsl._
   }
 
   override def checkIR(block: Block[_]): Result = {
+    import spatial.metadata.CLIArgs
+
     Console.out.println("CHECKING IR!!")
     CLIArgs.apply(0) shouldBe "x"
     CLIArgs.apply(1) shouldBe "y"

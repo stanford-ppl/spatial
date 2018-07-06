@@ -1,10 +1,11 @@
 package spatial.transform.unrolling
 
 import argon._
-import spatial.data._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.util.spatialConfig
 import utils.tags.instrument
 
 trait MemReduceUnrolling extends ReduceUnrolling {

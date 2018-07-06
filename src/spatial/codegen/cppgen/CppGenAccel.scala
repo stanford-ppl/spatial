@@ -2,11 +2,9 @@ package spatial.codegen.cppgen
 
 import argon._
 import argon.node._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.util.{spatialConfig => cfg}
-
+import spatial.util.spatialConfig
 
 trait CppGenAccel extends CppGenCommon {
 
@@ -27,7 +25,7 @@ trait CppGenAccel extends CppGenCommon {
       emit(s"c1->setNumArgIns(${argIns.toList.length} + ${drams.toList.length} + ${argIOs.toList.length});")
       emit(s"c1->setNumArgIOs(${argIOs.toList.length});")
       emit(s"c1->setNumArgOuts(${argOuts.toList.length});")
-      emit(s"c1->setNumArgOutInstrs(2*${if (cfg.enableInstrumentation) instrumentCounters.length else 0});")
+      emit(s"c1->setNumArgOutInstrs(2*${if (spatialConfig.enableInstrumentation) instrumentCounters.length else 0});")
       emit(s"c1->setNumEarlyExits(${earlyExits.length});")
       emit(s"""c1->flushCache(1024);""")
       emit(s"time_t tstart = time(0);")
@@ -37,10 +35,10 @@ trait CppGenAccel extends CppGenCommon {
       emit(s"""std::cout << "Kernel done, test run time = " << elapsed << " ms" << std::endl;""")
       emit(s"""c1->flushCache(1024);""")
  
-       if (earlyExits.length > 0) {
+       if (earlyExits.nonEmpty) {
          emit("// Capture breakpoint-style exits")
          emit("bool early_exit = false;")
-         val numInstrs = if (cfg.enableInstrumentation) {2*instrumentCounters.length} else 0
+         val numInstrs = if (spatialConfig.enableInstrumentation) {2*instrumentCounters.length} else 0
          earlyExits.zipWithIndex.foreach{ case (b, i) =>
            emit(src"long ${b}_act = c1->getArg(${argIOs.toList.length + argOuts.toList.length + drams.toList.length + argIns.toList.length + numInstrs + i}, false);")
            val msg = b match {
@@ -57,7 +55,7 @@ trait CppGenAccel extends CppGenCommon {
          emit("""if (!early_exit) {std::cout << "No breakpoints triggered :)" << std::endl;} """)
        }
  
-       if (cfg.enableInstrumentation) {
+       if (spatialConfig.enableInstrumentation) {
          emit(src"""std::ofstream instrumentation ("./instrumentation.txt");""")
  
          emit(s"// Need to instrument ${instrumentCounters}")

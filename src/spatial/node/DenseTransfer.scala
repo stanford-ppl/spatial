@@ -4,8 +4,11 @@ import argon._
 import forge.tags._
 
 import spatial.lang._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.bounds._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.modeling.target
 import spatial.util.memops._
 
 /** A dense transfer between on-chip and off-chip memory
@@ -58,7 +61,7 @@ object DenseTransfer {
   ): Void = {
 
     // Special case if dram is a DenseAlias with the last dimension slashed
-    val normalCounting: Boolean = rawRankOf(dram).last == rankOf(dram).last
+    val normalCounting: Boolean = dram.rawRank.last == dram.rank.last
     val dramOffsets: Seq[I32] = dram.starts()
     val rawDramOffsets: Seq[I32] = dram.rawStarts()
     val lens: Seq[I32] = dram.lens() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
@@ -77,8 +80,8 @@ object DenseTransfer {
         val indices = is :+ 0.to[I32]
 
         // Pad indices, strides with 0's against rawDramOffsets
-        val indicesPadded = rawRankOf(dram).map{i => if (rankOf(dram).contains(i)) indices(rankOf(dram).indexOf(i)) else 0.to[I32]}
-        val stridesPadded = rawRankOf(dram).map{i => if (rankOf(dram).contains(i)) strides(rankOf(dram).indexOf(i)) else 1.to[I32]}
+        val indicesPadded = dram.rawRank.map{i => if (dram.rank.contains(i)) indices(dram.rank.indexOf(i)) else 0.to[I32]}
+        val stridesPadded = dram.rawRank.map{i => if (dram.rank.contains(i)) strides(dram.rank.indexOf(i)) else 1.to[I32]}
 
         val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
         val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}

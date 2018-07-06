@@ -1,8 +1,6 @@
 package spatial.tests.feature.memories.fifo
 
-
 import spatial.dsl._
-
 
 @spatial class FIFOPushPop extends SpatialTest {
   override def runtimeArgs: Args = "384"

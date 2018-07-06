@@ -1,8 +1,6 @@
 package spatial.tests.feature.memories.reg
 
-
 import spatial.dsl._
-
 
 @spatial class RegTiny extends SpatialTest {
   override def runtimeArgs: Args = "32"

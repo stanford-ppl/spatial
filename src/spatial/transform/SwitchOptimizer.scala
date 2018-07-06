@@ -6,7 +6,7 @@ import emul.{FALSE, TRUE}
 import spatial.node._
 import spatial.lang._
 import spatial.traversal.AccelTraversal
-import spatial.util.shouldMotion
+import spatial.util.shouldMotionFromConditional
 
 case class SwitchOptimizer(IR: State) extends MutateTransformer with AccelTraversal {
 
@@ -43,7 +43,7 @@ case class SwitchOptimizer(IR: State) extends MutateTransformer with AccelTraver
           else  warn(ctx, "Switch has multiple enabled cases")
           warn(ctx)
         }
-        val canMotion = cases.forall{c => shouldMotion(c.body.stms,inHw) }
+        val canMotion = cases.forall{c => shouldMotionFromConditional(c.body.stms,inHw) }
 
         Type[A] match {
           case Bits(b) if canMotion =>

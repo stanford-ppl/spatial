@@ -3,13 +3,15 @@ package spatial.flows
 import argon._
 import argon.node._
 import forge.tags._
-import spatial.data._
+import spatial.metadata.bounds._
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.node._
-import spatial.util._
 
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
-    case MemAlloc(mem) if mem.isLocalMem => localMems += mem
+    case MemAlloc(mem) if mem.isLocalMem => LocalMemories += mem
     case _ =>
   }
 
@@ -18,7 +20,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
 
-    case BankedAccessor(wr,rd) =>
+    case UnrolledAccessor(wr,rd) =>
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
 
@@ -130,7 +132,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
               wr.foreach{w => s.writtenMems += w.mem }
               rd.foreach{r => s.readMems += r.mem }
 
-            case BankedAccessor(wr,rd) =>
+            case UnrolledAccessor(wr,rd) =>
               wr.foreach{w => s.writtenMems += w.mem }
               rd.foreach{r => s.readMems += r.mem }
 
@@ -201,12 +203,12 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
   @flow def streams(s: Sym[_], op: Op[_]): Unit = {
-    if (s.isStreamLoad)   streamLoadCtrls += s
-    if (s.isTileTransfer) tileTransferCtrls += s
-    if (s.isParEnq)       streamParEnqs += s
+    if (s.isStreamLoad)   StreamLoads += s
+    if (s.isTileTransfer) TileTransfers += s
+    if (s.isParEnq)       StreamParEnqs += s
 
-    if (s.isStreamStageEnabler) streamEnablers += s
-    if (s.isStreamStageHolder)  streamHolders += s
+    if (s.isStreamStageEnabler) StreamEnablers += s
+    if (s.isStreamStageHolder)  StreamHolders += s
   }
 
 

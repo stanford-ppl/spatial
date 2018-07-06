@@ -4,8 +4,8 @@ import argon._
 import argon.passes.Pass
 import models._
 
-import spatial.data._
-import spatial.util._
+import spatial.metadata.memory._
+import spatial.util.modeling.{target, areaModel}
 import spatial.targets.MemoryResource
 
 case class MemoryAllocator(IR: State) extends Pass {
@@ -31,7 +31,7 @@ case class MemoryAllocator(IR: State) extends Pass {
     }
 
     // Memories which can use more specialized memory resources
-    val (sramAble,nonSRAM) = localMems.all.partition(canSRAM)
+    val (sramAble,nonSRAM) = LocalMemories.all.partition(canSRAM)
 
     var unassigned: Set[Instance] = sramAble.flatMap{mem =>
       mem.duplicates.zipWithIndex.map{case (d,i) => Instance(mem,d,i) }

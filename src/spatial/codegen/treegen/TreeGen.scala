@@ -2,11 +2,10 @@ package spatial.codegen.treegen
 
 import argon._
 
-import spatial.data._
+import spatial.metadata.control._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.util.{spatialConfig => cfg}
+import spatial.util.spatialConfig
 import spatial.codegen.naming.NamedCodegen
 import spatial.traversal.AccelTraversal
 
@@ -73,8 +72,8 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
 
   override def emitHeader(): Unit = {
     val options = {
-      (if (!cfg.enableAsyncMem) Seq("SyncMem") else Nil) ++
-      (if (cfg.enableRetiming)  Seq("Retimed") else Nil)
+      (if (!spatialConfig.enableAsyncMem) Seq("SyncMem") else Nil) ++
+      (if (spatialConfig.enableRetiming)  Seq("Retimed") else Nil)
     }
     val optionStr = if (options.isEmpty) "None" else options.mkString(", ")
 
@@ -89,7 +88,7 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
   </head><body>
 
     <div data-role="main" class="ui-content" style="overflow-x:scroll;">
-      <h2>Controller Diagram for ${cfg.name} (Options: $optionStr)</h2>
+      <h2>Controller Diagram for ${spatialConfig.name} (Options: $optionStr)</h2>
   <TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">""")
   }
 

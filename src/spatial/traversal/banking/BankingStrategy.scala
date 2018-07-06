@@ -1,7 +1,8 @@
 package spatial.traversal.banking
 
 import argon._
-import spatial.data._
+import spatial.metadata.access._
+import spatial.metadata.memory._
 
 abstract class BankingStrategy {
 

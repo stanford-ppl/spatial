@@ -4,10 +4,10 @@ import argon._
 import argon.node._
 import emul.Number
 
-import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.bounds._
+import spatial.metadata.types._
 
 case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
 

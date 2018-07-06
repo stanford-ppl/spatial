@@ -6,7 +6,6 @@ import spatial.dsl._
   override def runtimeArgs: Args = "2"
   type T = Int
 
-
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals
     val N = 128

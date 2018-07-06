@@ -1,19 +1,19 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.data._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
 
 trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaGenMemories {
 
   // In Scala simulation, run a pipe until its read fifos and streamIns are empty
   def getReadStreamsAndFIFOs(ctrl: Ctrl): Set[Sym[_]] = {
     ctrl.children.flatMap(getReadStreamsAndFIFOs).toSet ++
-    localMems.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
-                 .filter{mem => mem.isStreamIn || mem.isFIFO }
-                 .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+    LocalMemories.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
+                     .filter{mem => mem.isStreamIn || mem.isFIFO }
+                     .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   def emitControlBlock(lhs: Sym[_], block: Block[_]): Unit = {

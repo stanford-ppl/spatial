@@ -2,7 +2,9 @@ package emul
 
 class Bool(val value: Boolean, val valid: Boolean) extends Equals {
   def unary_!()       = Bool(!this.value, this.valid)
+  def &(that: Bool)   = Bool(this.value && that.value, this.valid && that.valid)
   def &&(that: Bool)  = Bool(this.value && that.value, this.valid && that.valid)
+  def |(that: Bool)   = Bool(this.value || that.value, this.valid && that.valid)
   def ||(that: Bool)  = Bool(this.value || that.value, this.valid && that.valid)
   def ^(that: Bool)   = Bool(this.value ^ that.value, this.valid && that.valid)
   def !==(that: Bool) = Bool(this.value != that.value, this.valid && that.valid)

@@ -1,7 +1,7 @@
 package spatial.lang.api
 
 import argon._
-import spatial.data._
+import spatial.metadata.bounds._
 
 trait UserData { this: Implicits =>
 

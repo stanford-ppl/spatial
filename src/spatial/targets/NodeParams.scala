@@ -3,10 +3,11 @@ package spatial.targets
 import argon._
 import argon.node._
 import forge.tags._
-import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.util.spatialConfig
+import spatial.metadata.control._
+import spatial.metadata.types._
 
 trait NodeParams {
 

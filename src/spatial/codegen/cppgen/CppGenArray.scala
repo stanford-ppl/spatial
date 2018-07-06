@@ -4,8 +4,8 @@ import argon._
 import argon.node._
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.control._
+import spatial.metadata.types._
 
 trait CppGenArray extends CppGenCommon {
 

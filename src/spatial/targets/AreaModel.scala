@@ -7,10 +7,11 @@ import utils.math.{isPow2,log2}
 import utils.implicits.Readable._
 import models._
 
-import spatial.data._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.types._
 
 abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields](target) {
   val FILE_NAME: String = target.name.replaceAll(" ", "_") + "_Area.csv"
@@ -60,7 +61,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
   @stateful def memoryBankDepth(mem: Sym[_], instance: Memory): Int = {
     val width = wordWidth(mem)
-    val dims  = constDimsOf(mem)
+    val dims  = mem.constDims
     memoryBankDepth(width, dims, instance)
   }
 
@@ -70,7 +71,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
   @stateful def rawMemoryBankArea(mem: Sym[_], instance: Memory, resource: MemoryResource): Area = {
     val width = wordWidth(mem)
-    val dims  = constDimsOf(mem)
+    val dims  = mem.constDims
     rawMemoryBankArea(width, dims, instance, resource)
   }
   @stateful def rawMemoryBankArea(width: Int, dims: Seq[Int], instance: Memory, resource: MemoryResource): Area = {
@@ -91,7 +92,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
   @stateful def rawMemoryArea(mem: Sym[_], instance: Memory, resource: MemoryResource): Area = {
     val width = wordWidth(mem)
-    val dims  = constDimsOf(mem)
+    val dims  = mem.constDims
     rawMemoryArea(width, dims, instance, resource)
   }
   @stateful def rawMemoryArea(width: Int, dims: Seq[Int], instance: Memory, resource: MemoryResource): Area = {
@@ -106,7 +107,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
   }
   @stateful def areaOfMemory(mem: Sym[_], instance: Memory): Area = {
     val width = wordWidth(mem)
-    val dims  = constDimsOf(mem)
+    val dims  = mem.constDims
     areaOfMemory(width, dims, instance)
   }
   @stateful def areaOfMemory(width: Int, dims: Seq[Int], instance: Memory): Area = {
@@ -122,7 +123,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
   }
   @stateful def areaOfAccess(access: Sym[_], mem: Sym[_]): Area = {
     val nbits: Int = wordWidth(mem)
-    val dims: Seq[Int] = constDimsOf(mem)
+    val dims: Seq[Int] = mem.constDims
     val instances = mem.duplicates.zipWithIndex
                                   .filter{case (d,i) => access.dispatches.exists(_._2.contains(i)) }
                                   .map(_._1)
@@ -181,8 +182,8 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
     case lut @ LUTNew(dims,_) => model("LUT")("s" -> dims.map(_.toInt).product, "b" -> lut.A.nbits)
 
     case _:MemAlloc[_,_] if lhs.isLocalMem => areaOfMem(lhs)
-    case op:Accessor[_,_]       => areaOfAccess(lhs, op.mem)
-    case op:BankedAccessor[_,_] => areaOfAccess(lhs, op.mem)
+    case op:Accessor[_,_]         => areaOfAccess(lhs, op.mem)
+    case op:UnrolledAccessor[_,_] => areaOfAccess(lhs, op.mem)
     case op:StatusReader[_]       => NoArea
 
     case DelayLine(size,data) => areaOfDelayLine(size,nbits(data),1)

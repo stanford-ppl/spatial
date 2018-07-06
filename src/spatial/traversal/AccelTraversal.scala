@@ -1,8 +1,7 @@
 package spatial.traversal
 
 import argon._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.control._
 
 trait AccelTraversal extends argon.passes.Traversal {
   protected var inHw: Boolean = false

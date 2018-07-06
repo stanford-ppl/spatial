@@ -3,8 +3,8 @@ package spatial.traversal
 import argon._
 import argon.passes.Traversal
 
-import spatial.data._
 import spatial.node._
+import spatial.metadata.CLIArgs
 
 case class CLINaming(IR: State) extends Traversal {
 

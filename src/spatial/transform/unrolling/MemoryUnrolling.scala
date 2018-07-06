@@ -1,10 +1,10 @@
 package spatial.transform.unrolling
 
 import argon._
-import spatial.data._
+import spatial.metadata.access._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
 import utils.tags.instrument
 import utils.implicits.collections._
 
@@ -219,10 +219,10 @@ trait MemoryUnrolling extends UnrollingBase {
     //case _:LineBufferRotateEnq[_]  => addr
     // The unrolled version of register file shifting currently doesn't take a banked address
     //case _:RegFileVectorShiftIn[_] => addr
-    case _:LUTRead[_,_]     => addr
-    case _:RegFileShiftIn[_,_]     => addr
+    case _:LUTRead[_,_]         => addr
+    case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
-    case _:RegFileWrite[_,_]     => addr
+    case _:RegFileWrite[_,_]    => addr
     case _ => addr.map{laneAddr => inst.bankSelects(laneAddr) }
   }
 
@@ -232,7 +232,9 @@ trait MemoryUnrolling extends UnrollingBase {
     addr:   Seq[Seq[Idx]],
     inst:   Memory
   )(implicit ctx: SrcCtx): Seq[Idx] = access match {
-    //case _:LineBufferRotateEnq[_] => Nil
+    case _:RegFileShiftIn[_,_]  => Nil
+    case _:RegFileRead[_,_]     => Nil
+    case _:RegFileWrite[_,_]    => Nil
     case _ => addr.map{laneAddr => inst.bankOffset(mem, laneAddr) }
   }
 
@@ -338,13 +340,13 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:FIFODeq[_]       => UVecRead(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
     case _:LIFOPop[_]       => UVecRead(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))
     case _:LUTRead[_,_]     => UVecRead(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
-    case _:RegFileRead[_,_] => UVecRead(stage(RegFileBankedRead(mem.asInstanceOf[RegFilex[A]], bank, ofs, enss)))
+    case _:RegFileRead[_,_] => UVecRead(stage(RegFileVectorRead(mem.asInstanceOf[RegFilex[A]], bank, enss)))
     case _:SRAMRead[_,_]    => UVecRead(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
     case _:StreamInRead[_]  => UVecRead(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
     case _:FIFOEnq[_]        => UWrite[A](stage(FIFOBankedEnq(mem.asInstanceOf[FIFO[A]], data, enss)))
     case _:LIFOPush[_]       => UWrite[A](stage(LIFOBankedPush(mem.asInstanceOf[LIFO[A]], data, enss)))
-    case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileBankedWrite(mem.asInstanceOf[RegFilex[A]], data, bank, ofs, enss)))
+    case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileVectorWrite(mem.asInstanceOf[RegFilex[A]], data, bank, enss)))
     case _:SRAMWrite[_,_]    => UWrite[A](stage(SRAMBankedWrite(mem.asInstanceOf[SRAMx[A]], data, bank, ofs, enss)))
     case _:StreamOutWrite[_] => UWrite[A](stage(StreamOutBankedWrite(mem.asInstanceOf[StreamOut[A]], data, enss)))
 
@@ -356,13 +358,21 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
     case _:GetReg[_]         => URead(stage(GetReg(mem.asInstanceOf[Reg[A]])))
 
-    // case op:RegFileShiftIn[_,_] => UWrite[A](stage(RegFileShiftInVector(mem.asInstanceOf[RegFilex[A]], data, bank, enss, op.axis, enss.length)))
-
     case op:RegFileShiftIn[_,_] =>
-      UMultiWrite(data.zipWithIndex.map{case (d,i) =>
-        val addr = bank.apply(i)
-        val en = enss.apply(i)
-        UWrite[A](stage(RegFileShiftIn(mem.asInstanceOf[RegFilex[A]], d, addr, en, op.axis)))
+      // Group by the axis being shifted across
+      // e.g. If this is a shift through a row, the axis is 0
+      // TODO[1]: This is close, but how to handle edge cases where the size of the shifted vec may change?
+      /*val writes = (data, bank, enss).zipped.groupBy(_._2.apply(op.axis)).foreach{case (axisAddr,values) =>
+        val data = values.map(_._1).toSeq
+        val ens  = values.map(_._3)
+        val vec = Vec.fromSeq[A](data.map(_.unbox))
+        UWrite[A](stage(RegFileShiftInVector(mem.asInstanceOf[RegFilex[A]],data,addr,ens=????,op.axis)))
+      }
+      if (writes.length == 1) writes.head else UMultiWrite(writes)
+      */
+
+      UMultiWrite((data, bank, enss).zipped.map{case (dat,addr,ens) =>
+        UWrite[A](stage(RegFileShiftIn(mem.asInstanceOf[RegFilex[A]], dat, addr, ens, op.axis)))
       })
 
     //case _:LineBufferEnq[_])      => UWrite[T](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, enss)))

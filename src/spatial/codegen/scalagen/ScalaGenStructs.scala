@@ -2,6 +2,7 @@ package spatial.codegen
 package scalagen
 
 import argon._
+import argon.codegen.StructCodegen
 import argon.node._
 import spatial.lang._
 

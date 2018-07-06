@@ -6,9 +6,10 @@ import poly.ISL
 import utils.implicits.collections._
 
 import spatial.issues.UnbankableGroup
-import spatial.data._
 import spatial.lang._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 
 class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL)
   extends MemoryConfigurer[C](mem,strategy)

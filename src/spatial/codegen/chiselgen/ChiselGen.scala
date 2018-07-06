@@ -1,7 +1,6 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.{Codegen, FileDependencies}
 
 case class ChiselGen(IR: State) extends ChiselCodegen
 	with ChiselFileGen

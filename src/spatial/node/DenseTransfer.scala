@@ -7,6 +7,7 @@ import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.util.modeling.target
 import spatial.util.memops._
 

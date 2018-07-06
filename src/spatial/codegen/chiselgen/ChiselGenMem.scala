@@ -188,9 +188,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileShiftInVector(rf,data,addr,en,axis)  => emitWrite(lhs,rf,data.elems.map(_.asInstanceOf[Sym[_]]).toSeq,Seq(addr),Seq(),Seq(en), Some(axis))
     case RegFileShiftIn(rf,data,addr,en,axis)        => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en), Some(axis))
     case RegFileBankedShiftIn(rf,data,addr,en,axis)  => emitWrite(lhs,rf,data,addr,Seq(),en, Some(axis))
-    // TODO: Update for N-D change
-    // case op@RegFileVectorRead(rf,bank,ofs,ens)       => emitRead(lhs,rf,bank,ofs,ens)
-    // case op@RegFileVectorWrite(rf,data,bank,ofs,ens) => emitWrite(lhs,rf,data,bank,ofs,ens)
+
+    // TODO: Matt are these correct?
+    case RegFileVectorRead(rf,addr,ens)       => emitRead(lhs,rf,addr,addr.map{_ => I32(0) },ens)
+    case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)

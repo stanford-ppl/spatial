@@ -1,4 +1,4 @@
-package spatial.tests.feature.memories.reg
+package spatial.tests.feature.memories.regfile
 
 import spatial.dsl._
 

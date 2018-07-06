@@ -1,10 +1,11 @@
 package spatial.report
 
 import argon._
-import spatial.data._
+import spatial.metadata.retiming._
 import spatial.node._
 import spatial.traversal.AccelTraversal
-import spatial.util._
+import spatial.util.spatialConfig
+import spatial.util.modeling._
 
 case class RetimeReporter(IR: State) extends AccelTraversal {
   override def shouldRun: Boolean = config.enInfo && spatialConfig.enableRetiming

@@ -1,12 +1,12 @@
-package spatial.lang
-package api
+package spatial.lang.api
 
 import forge.tags._
 import argon._
 
 import spatial.node.{Mux,OneHotMux}
 
-trait MuxAPI { this: StaticAPI =>
+trait MuxAPI { this: Implicits =>
+
   @api def mux[A](s: Bit, a: Bits[A], b: Bits[A]): A = {
     implicit val tA: Bits[A] = a.selfType
     stage(Mux(s,a,b))

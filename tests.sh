@@ -7,6 +7,10 @@ type=$1
 numthreads=$NUM_THREADS
 file_or_tests=$2
 
+WARN="[\e[33mwarn\e[39m]"
+INFO="[\e[34minfo\e[39m]"
+FAIL="[\e[31merror\e[39m]"
+
 if [[ $file_or_tests == "" ]]; then
    tests="spatial.tests.*" 
 elif [ -f $file_or_tests ]; then
@@ -28,22 +32,22 @@ else
 fi
 
 if [[ $numthreads == "" ]]; then
-  echo "Defaulting to 4 threads. Set NUM_THREADS environment variable to change."
+  echo -e "$WARN Defaulting to 4 threads. Set NUM_THREADS environment variable to change."
   threads=4
 else
   threads=$numthreads
-  echo "Using $threads thread(s) for testing."
+  echo -e "$INFO Using $threads thread(s) for testing."
 fi
 
 if [[ $TEST_DATA_HOME == "" ]]; then
-  echo "TEST_DATA_HOME is not set. Set TEST_DATA_HOME for data-dependent tests to pass."
+  echo -e "$WARN TEST_DATA_HOME is not set. Set TEST_DATA_HOME for data-dependent tests to pass."
 else 
-  echo "Test Data Directory: $TEST_DATA_HOME"
+  echo -e "$INFO Test Data Directory: $TEST_DATA_HOME"
 fi
 
 fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"
-echo "Running tests $tests"
-echo "Logging tests to $fileout"
+echo -e "$INFO Running tests $tests"
+echo -e "$INFO Logging tests to $fileout"
 
 
 # Basic tests
@@ -83,8 +87,17 @@ elif [[ $type == "vcs-noretime-gdocs" ]]; then
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs-noretime"
 else
-  echo "Test type '$type' not recognized" 
-  echo "Supported types: [sim | vcs(-gdocs) | vcs-noretime(-gdocs) | zynq | aws | zcu | arria10]"
+  echo -e "$FAIL Usage: test_all.sh <test type> [test(s)]"
+  echo -e "$FAIL Test type '$test_type' was not recognized"
+  echo -e "$FAIL Supported types: [sim | vcs(-gdocs) | vcs-noretime(-gdocs) | zynq | aws | zcu | arria10]"
+  echo "  sim          - Scala function simulation"
+  echo "  vcs 	       - Cycle accurate simulation with VCS"
+  echo "  vcs-gdocs    - Cycle accurate simulation with VCS (+google docs)"
+  echo "  vcs-noretime - Cycle accurate simulation with VCS (no retiming)" 
+  echo "  zynq         - Target the ZC706 board"
+  echo "  aws	       - Target the AWS F1 board"
+  echo "  zcu	       - Target the ZCU board"
+  echo "  arria10      - Target the Arria 10 board"
   exit 1
 fi
 

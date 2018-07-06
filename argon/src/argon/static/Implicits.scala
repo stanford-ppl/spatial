@@ -121,6 +121,15 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
   /** Sets the consumers for this symbol. */
   def consumers_=(xs: Set[Sym[_]]): Unit = metadata.add(exp, Consumers(xs))
 
+  /** Returns the set of all nested inputs for any blocks enclosed by this symbol. */
+  def nestedInputs: Set[Sym[_]] = {
+    exp.inputs.toSet ++ exp.op.map{o =>
+      val outs = o.blocks.flatMap(_.nestedStms)
+      val used = outs.flatMap{s => s.nestedInputs }
+      used diff outs
+    }.getOrElse(Set.empty)
+  }
+
   def effects: Effects = metadata[Effects](exp).getOrElse(Effects.Pure)
   def effects_=(eff: Effects): Unit = metadata.add(exp, eff)
   def isMutable: Boolean = effects.isMutable

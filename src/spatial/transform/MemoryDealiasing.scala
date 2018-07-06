@@ -4,7 +4,8 @@ import argon._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.memory._
+import spatial.util.IntLike
 
 import utils.implicits.collections._
 

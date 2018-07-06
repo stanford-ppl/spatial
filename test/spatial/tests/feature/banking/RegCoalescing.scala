@@ -2,7 +2,6 @@ package spatial.tests.feature.banking
 
 import argon._
 import spatial.dsl._
-import spatial.data._
 import spatial.node._
 
 @spatial class RegCoalescing extends SpatialTest {
@@ -23,6 +22,8 @@ import spatial.node._
   }
 
   override def checkIR(block: Block[_]): Result = {
+    import spatial.metadata.memory._
+
     val regs = block.nestedStms.collect{case s @ Op(_:RegNew[_]) => s}
 
     regs.foreach{s => Console.out.println(stm(s) + s" (${s.name})")}

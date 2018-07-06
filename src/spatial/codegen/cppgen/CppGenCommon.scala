@@ -1,17 +1,10 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import emul.FloatPoint
-import emul.FixedPoint
 import utils.escapeString
-import spatial.util._
 import emul.Bool
-import host._
-
-
 
 trait CppGenCommon extends CppCodegen { 
 

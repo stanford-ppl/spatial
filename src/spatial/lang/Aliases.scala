@@ -1,12 +1,10 @@
 package spatial.lang
 
-import argon.lang
-
 /** Aliases visible to spatial.lang.* and outside
   *
   * No aliases of the form "type Foo = spatial.lang.Foo" (creates a circular reference)
   */
-trait InternalAliases extends lang.ExternalAliases {
+trait InternalAliases extends argon.lang.ExternalAliases {
   type Mem[A,C[_]] = spatial.lang.types.Mem[A,C]
   type LocalMem[A,C[_]] = spatial.lang.types.LocalMem[A,C]
   type LocalMem0[A,C[T]<:LocalMem0[T,C]] = spatial.lang.types.LocalMem0[A,C]

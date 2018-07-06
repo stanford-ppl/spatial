@@ -2,7 +2,7 @@ package spatial.issues
 
 import argon._
 import forge.tags.stateful
-import spatial.data.AccessMatrix
+import spatial.metadata.access._
 
 case class UnbankableGroup(mem: Sym[_], reads: Set[AccessMatrix], writes: Set[AccessMatrix]) extends Issue {
   @stateful override def onUnresolved(traversal: String): Unit = {

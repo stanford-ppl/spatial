@@ -3,7 +3,7 @@ package spatial.lang.api
 import argon._
 import forge.tags._
 import spatial.node._
-import spatial.data._
+import spatial.metadata.params._
 import utils.Overloads._
 
 trait Implicits extends argon.lang.api.Implicits { this: MuxAPI =>

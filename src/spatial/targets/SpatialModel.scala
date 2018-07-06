@@ -3,8 +3,7 @@ package spatial.targets
 import argon._
 import models._
 import forge.tags._
-import spatial.data.Expect
-import spatial.util.spatialConfig
+import spatial.metadata.bounds.Expect
 
 import scala.io.Source
 import scala.util.Try

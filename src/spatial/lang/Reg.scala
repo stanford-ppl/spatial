@@ -3,8 +3,8 @@ package spatial.lang
 import argon._
 import forge.Ptr
 import forge.tags._
-import spatial.data._
 import spatial.node._
+import spatial.metadata.memory._
 
 @ref class Reg[A:Bits] extends LocalMem0[A,Reg] with StagedVarLike[A] with Ref[Ptr[Any],Reg[A]] {
   val A: Bits[A] = Bits[A]

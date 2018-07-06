@@ -4,9 +4,9 @@ import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.data._
+import spatial.metadata.memory._
 import spatial.util.memops._
+import spatial.util.IntLike
 
 import utils.implicits.collections._
 

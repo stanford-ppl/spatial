@@ -2,18 +2,6 @@ package emul
 
 import scala.reflect.ClassTag
 
-class Memory[T:ClassTag](name: String) {
-  var data: Array[T] = _
-  private var needsInit: Boolean = true
-  def initMem(size: Int, zero: T): Unit = if (needsInit) {
-    data = Array.fill(size)(zero)
-    needsInit = false
-  }
-
-  def apply(i: Int): T = data.apply(i)
-  def update(i: Int, x: T): Unit = data.update(i, x)
-}
-
 class BankedMemory[T:ClassTag](
   name:     String,
   dims:     Seq[Int],
@@ -40,7 +28,7 @@ class BankedMemory[T:ClassTag](
   def apply(ctx: String, bank: Seq[Seq[FixedPoint]], ofs: Seq[FixedPoint], ens: Seq[Bool]): Array[T] = {
     Array.tabulate(bank.length){i =>
       val addr = s"Bank: ${bank(i).mkString(", ")}; Ofs: ${ofs(i)}"
-      OOB.readOrElse(name, addr, invalid){
+      OOB.readOrElse(name, addr, invalid, ens(i).value){
         if (ens(i).value) data.apply(flattenAddress(banks,bank(i))).apply(ofs(i).toInt) else invalid
       }
     }
@@ -49,7 +37,7 @@ class BankedMemory[T:ClassTag](
   def update(ctx: String, bank: Seq[Seq[FixedPoint]], ofs: Seq[FixedPoint], ens: Seq[Bool], elems: Seq[T]): Unit = {
     bank.indices.foreach{i =>
       val addr = s"Bank: ${bank(i).mkString(", ")}; Ofs: ${ofs(i)}"
-      OOB.writeOrElse(name, addr, elems(i)){
+      OOB.writeOrElse(name, addr, elems(i), ens(i).value){
         if (ens(i).value) data.apply(flattenAddress(banks,bank(i))).update(ofs(i).toInt,elems(i))
       }
     }
@@ -61,38 +49,4 @@ class BankedMemory[T:ClassTag](
 }
 
 
-class ShiftableMemory[T:ClassTag](
-  name:     String,
-  dims:     Seq[Int],
-  banks:    Seq[Int],
-  data:     Array[Array[T]],
-  invalid:  T,
-  saveInit: Boolean,
-  bankedAddr: Seq[FixedPoint] => Seq[FixedPoint],
-  bankedOfs:  Seq[FixedPoint] => FixedPoint
-) extends BankedMemory[T](name,dims,banks,data,invalid,saveInit){
-
-  def unbankedLoad(ctx: String, addr: Seq[FixedPoint]): T = {
-    val bank = bankedAddr(addr)
-    val ofs  = bankedOfs(addr)
-    this.apply(ctx,Seq(bank),Seq(ofs),Seq(Bool(true))).head
-  }
-  def unbankedStore(ctx: String, addr: Seq[FixedPoint], data: T): Unit = {
-    val bank = bankedAddr(addr)
-    val ofs = bankedOfs(addr)
-    this.update(ctx,Seq(bank),Seq(ofs),Seq(Bool(true)),Seq(data))
-  }
-
-  def shiftInVec(ctx: String, inds: Seq[FixedPoint], axis: Int, elems: Array[T]): Unit = {
-    val len = elems.length
-    (dims(axis)-1 to 0 by -1).foreach{j =>
-      val addrFrom = Seq.tabulate(dims.length){d => if (d != axis) inds(d) else FixedPoint.fromInt(j - len) }
-      val addrTo   = Seq.tabulate(dims.length){d => if (d != axis) inds(d) else FixedPoint.fromInt(j) }
-      val dat = if (j < len) elems(len-1 - j) else unbankedLoad(ctx,addrFrom)
-      unbankedStore(ctx,addrTo,dat)
-    }
-  }
-
-  def shiftIn(ctx: String, inds: Seq[FixedPoint], axis: Int, data: T): Unit = shiftInVec(ctx,inds,axis,Array(data))
-}
 

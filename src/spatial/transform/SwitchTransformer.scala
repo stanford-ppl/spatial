@@ -5,7 +5,7 @@ import argon.node._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.util.shouldMotion
+import spatial.util.shouldMotionFromConditional
 import spatial.traversal.AccelTraversal
 
 /** Converts IfThenElse nodes into nested Switch/SwitchCase nodes within Accel scopes.
@@ -56,7 +56,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
     cases:    Seq[() => T]
   )(implicit ctx: SrcCtx): (Seq[Bit], Seq[() => T]) = block.result match {
     // Flatten switch only if there are no enabled primitives or controllers
-    case Op(IfThenElse(cond,thenBlk,elseBlk)) if shouldMotion(block.stms,inHw) =>
+    case Op(IfThenElse(cond,thenBlk,elseBlk)) if shouldMotionFromConditional(block.stms,inHw) =>
       // Move all statements except the result out of the case
       withEn(prevCond){ block.stms.dropRight(1).foreach(visit) }
       val cond2 = f(cond)

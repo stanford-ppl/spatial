@@ -24,6 +24,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+    val flowEnable = if (getAllReadyLogic(parent.toCtrl).nonEmpty) src""",${getAllReadyLogic(parent.toCtrl).mkString("&")}""" else ""
     val ofsWidth = Math.max(1, Math.ceil(scala.math.log(constDimsOf(mem).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) constDimsOf(mem).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -43,13 +44,13 @@ trait ChiselGenMem extends ChiselGenCommon {
       if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
       if (lhs.isDirectlyBanked & !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.toInt)}))") 
-        emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
+        emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
       } else if (isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
         bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         lhs.tp match {
-          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i)""")
-          case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i)""")
+          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
+          case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
         }
 
         
@@ -57,8 +58,8 @@ trait ChiselGenMem extends ChiselGenCommon {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
         bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         lhs.tp match {
-          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
-          case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i)""")
+          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
+          case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
         }
       }
     }

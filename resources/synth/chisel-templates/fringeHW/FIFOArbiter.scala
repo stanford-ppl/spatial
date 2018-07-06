@@ -42,7 +42,7 @@ class FIFOArbiter[T<:Data] (val t: T, val d: Int, val v: Int, val numStreams: In
       f.config := fifoConfig
       f.enq := io.enq(i)
       f.enqVld := io.enqVld(i)
-      f.deqVld := deq & (tag === i.U)
+      f.deqVld := deq & (tag === i.U) & ~f.empty
       io.full(i) := f.full
     }
 

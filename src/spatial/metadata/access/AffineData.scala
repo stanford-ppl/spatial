@@ -39,6 +39,8 @@ case class AccessMatrix(
   override def toString: String = {
     stm(access) + " {" + unroll.mkString(",") + "}\n" + matrix.toString
   }
+
+  def short: String = s"$access {${unroll.mkString(",")}}"
 }
 
 /** The unrolled access patterns of an optionally parallelized memory access represented as affine matrices.

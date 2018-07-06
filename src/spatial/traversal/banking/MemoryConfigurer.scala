@@ -83,8 +83,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       (inst.reads.iterator.flatten ++ inst.writes.iterator.flatten).foreach{a =>
         a.access.addPort(dispatch, a.unroll, inst.ports(a))
         a.access.addDispatch(a.unroll, dispatch)
-        dbgs(s"  Added port ${inst.ports(a)} to ${a.access} {${a.unroll.mkString(",")}}")
-        dbgs(s"  Added dispatch $dispatch to ${a.access} {${a.unroll.mkString(",")}}")
+        dbgs(s"  Added port ${inst.ports(a)} to ${a.short}")
+        dbgs(s"  Added dispatch $dispatch to ${a.short}")
       }
 
       if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValues) {
@@ -118,7 +118,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   def canBroadcast(a: AccessMatrix, b: AccessMatrix): Boolean = {
     // TODO[3]: What about accesses of the same form across different loops?
-    if (a.access != b.access || a.matrix != b.matrix) return false
+    // Should we rely on loop fusion for this? Are there cases where that wouldn't work?
+    val isWrite = a.access.isWriter || b.access.isWriter
+    if (isWrite || a.access != b.access || a.matrix != b.matrix) return false
 
     val iters = accessIterators(a.access, mem)
     // The index of iterators which will differ between a and b
@@ -137,10 +139,15 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Group accesses on this memory.
-    * An access a is grouped with a set of accesses S if there exists some b in S such that:
-    *   [Control] a and b occur simultaneously (in Parallel or pipeline parallel)
-    *   [Space]   and a and b are guaranteed to never hit the same address
-    * Otherwise a is placed in a new group
+    *
+    * For some access a to this memory and some existing group S:
+    * let B = {all b in S | Parallel(a,b) }
+    *   where Parallel(a,b) is true if a and b may occur simultaneously (parallel or pipeline parallel)
+    *
+    * Access a is grouped with S if:
+    *   [Control] B is non-empty
+    *   [Space]   for all b in B: a and b do not conflict (never overlap or can be broadcast)
+    * If no such groups exist, a is placed in a new group S' = {a}
     */
   protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val groups = ArrayBuffer[Set[AccessMatrix]]()
@@ -153,7 +160,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val sortedAccesses = accesses.toSeq.sortBy(_.access.toString).sortBy(_.unroll)
 
     sortedAccesses.foreach{a =>
-      dbg(s"    Access: ${a.access} {${a.unroll.mkString(",")}} [${a.parent}]")
+      dbg(s"    Access: ${a.short} [${a.parent}]")
       val grpId = {
         if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
@@ -166,7 +173,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) }
           if (samePort.nonEmpty) dbg(s"      Group #$i: ")
           else                   dbg(s"      Group #$i: <none>")
-          samePort.foreach{b => dbgs(s"        ${b.access} {${b.unroll.mkString(",")}} [${b.parent}] Conflicts: ${conflicts.contains(b)}") }
+          samePort.foreach{b => dbgs(s"        ${b.short} [${b.parent}] Conflicts: ${conflicts.contains(b)}") }
           samePort.nonEmpty && conflicts.isEmpty
         }
       }
@@ -183,19 +190,26 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     groups.toSet
   }
 
+  /** True if the memory is written in the given controller. */
+  def isWrittenIn(ctrl: Ctrl): Boolean = {
+    mem.writers.exists{write => write.ancestors.contains(ctrl) }
+  }
+
   /** True if accesses a and b may occur concurrently and to the same buffer port.
     * This is true when any of the following hold:
     *   0. a and b are two different unrolled parts of the same node
     *   1. a and b are in the same inner pipeline
     *   2. a and b are in the same fully unrolled inner sequential
     *   3. a and b are in a Parallel controller
-    *   4. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
+    *   4. a and b are in a pipelined controller but NOT buffered w.r.t each other (no writes in LCA(a,b))
+    *   5. TODO[2]: If a and b are in parallel stages in a controller's child dataflow graph
     */
   def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
+      ((lca.isOuterPipeLoop || lca.isOuterStreamLoop) && !isWrittenIn(lca)) ||
       lca.isParallel
   }
 
@@ -316,6 +330,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     }
   }
 
+  // TODO: Some code duplication here with groupAccesses
+  protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val concurrent  = requireConcurrentPortAccess(a, b)
+    val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
+    concurrent && conflicting
+  }
+
+  protected def getGroupConflict(grpA: Set[AccessMatrix], grpB: Set[AccessMatrix]): Option[(AccessMatrix,AccessMatrix)] = {
+    grpA.cross(grpB).find{case (a,b) => accessesConflict(a,b) }
+  }
+
+  protected def getInstanceConflict(a: Instance, b: Instance): Option[(AccessMatrix,AccessMatrix)] = {
+    a.reads.cross(b.reads).mapFind{case (gA, gB) => getGroupConflict(gA, gB) } orElse
+    a.writes.cross(b.writes).mapFind{case (gA, gB) => getGroupConflict(gA, gB) }
+  }
+
   /** Should not attempt to merge instances if any of the following conditions hold:
     *   1. The two instances have a common LCA controller (means they require separate banking)
     *   2. The two instances result in hierarchical buffers (for now)
@@ -326,9 +356,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     lazy val writes = a.writes.flatten ++ b.writes.flatten
     lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
     val commonCtrl = a.ctrls intersect b.ctrls
+    val conflicts  = getInstanceConflict(a, b)
 
     if (commonCtrl.nonEmpty && !isGlobal)
       Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
+    else if (conflicts.nonEmpty)
+      Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")
     else if (metapipes.size > 1)
       Some("Ambiguous metapipes")
     else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce)

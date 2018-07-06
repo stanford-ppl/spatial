@@ -33,14 +33,23 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     if (s.isReader) s.readUses += s
     s.readUses ++= s.inputs.flatMap{in => in.readUses }
 
-    s match {
-      case Writer(wrMem,_,_,_) =>
-        s.readUses.foreach{case Reader(rdMem,_,_) =>
-          if (rdMem == wrMem) {
-            rdMem.accumType = AccumType.Fold
-            s.accumType = AccumType.Fold
-          }
+    def matchReader(rd: Sym[_], mem: Sym[_]): Unit = rd match {
+      case Reader(rdMem,_,_) =>
+        if (rdMem == mem) {
+          mem.accumType = AccumType.Fold
+          s.accumType = AccumType.Fold
         }
+      case UnrolledReader(read) =>
+        if (read.mem == mem) {
+          mem.accumType = AccumType.Fold
+          s.accumType = AccumType.Fold
+        }
+      case _ =>
+    }
+
+    s match {
+      case Writer(mem,_,_,_)  => s.readUses.foreach{rd => matchReader(rd, mem) }
+      case UnrolledWriter(wr) => s.readUses.foreach{rd => matchReader(rd, wr.mem) }
       case _ =>
     }
   }

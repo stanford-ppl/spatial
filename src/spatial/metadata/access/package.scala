@@ -79,26 +79,28 @@ package object access {
     }
   }
 
-  /*implicit class AccessMatrixOps(a: AccessMatrix) {
+  implicit class AccessMatrixOps(a: AccessMatrix) {
     /** True if a and b always occur at the exact same time.
       * This is trivially true if a and b are the same unrolled access.
       *
       * This method is used to enable broadcast reads.
       */
-    def isLockstepWith(b: AccessMatrix, mem: Sym[_]): Boolean = {
+    @stateful def isLockstepWith(b: AccessMatrix, mem: Sym[_]): Boolean = {
+      // TODO[3]: What about accesses of the same form across different loops?
       if (a.access != b.access || a.matrix != b.matrix) return false
 
       val iters = accessIterators(a.access, mem)
-      // The index of the outermost iterator which will differ between a and b
-      val outer = a.unroll.indices.find{i => a.unroll(i) != b.unroll(i) }
-      if (outer.isDefined) {
-        val outerIter = iters(outer.get)
-        // The outermost control parallelized over a and b
-        val ctrl = outerIter.parent
+      // The index of iterators which will differ between a and b
+      // If this list is empty, a and b are identical (so they are trivially lockstep)
+      val differ = a.unroll.indices.filter{i => a.unroll(i) != b.unroll(i) }
+      val itersDiffer = differ.map{i => iters(i) }
+      if (itersDiffer.nonEmpty) {
+        val outer = itersDiffer.head
+        outer.isLockstepAcross(itersDiffer, Some(a.access))
       }
-      else true // a and b are identical - they are trivially lockstep
+      else true
     }
-  }*/
+  }
 
   implicit class AccessOps(a: Sym[_]) {
 
@@ -108,8 +110,11 @@ package object access {
     def isStreamStageHolder: Boolean = a.op.exists(_.isStreamStageHolder)
 
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
-    def isReader: Boolean = Reader.unapply(a).isDefined
-    def isWriter: Boolean = Writer.unapply(a).isDefined
+    def isReader: Boolean = Reader.unapply(a).isDefined || isUnrolledReader
+    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter
+
+    def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
+    def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {
@@ -196,7 +201,7 @@ package object access {
   /** Returns iterators between controller containing access (inclusive) and controller
     * containing mem (exclusive). Iterators are ordered outermost to innermost.
     */
-  @stateful def accessIterators(access: Sym[_], mem: Sym[_]): Seq[Idx] = {
+  def accessIterators(access: Sym[_], mem: Sym[_]): Seq[Idx] = {
     // Use the parent "master" controller when checking for access iterators if the access and
     // memory are in different sub-controllers.
     // This is to account for memories defined, e.g. in the map (block 0) of a MemReduce

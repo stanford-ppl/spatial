@@ -274,6 +274,48 @@ package object control {
     /** True if this control or symbol occurs within a loop. */
     def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
 
+    /** Returns the child of this controller that contains the given symbol x. None if x does not
+      * occur in any of the children.
+      */
+    @stateful def getChildContaining(x: Sym[_]): Option[Ctrl.Node] = {
+      val path = x.ancestors
+      children.find{c => path.contains(c) }
+    }
+
+    /** Returns all children which occur in dataflow order before the given child. */
+    @stateful def childrenPriorTo(child: Ctrl.Node): Seq[Ctrl.Node] = {
+      // TODO: Arbitrary dataflow?
+      children.takeWhile{c => c != child }
+    }
+
+    /** Returns true if all copies of the loop body across iterator iter will have the
+      * same execution time.
+      * If reference is defined, only accounts for the stages up to and including the reference.
+      * This is currently trivially true for inner controllers.
+      */
+    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
+      val child = reference.flatMap(getChildContaining)
+      val ctrls = child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
+      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
+    }
+
+    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean): Boolean = {
+      if (isFSM) false
+      else if (isSwitch && isOuterControl) {
+        allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
+        isLockstepAcross(iters, reference)
+      }
+      else {
+        // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
+        isLockstepAcross(iters, reference) &&
+        cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
+          case Some(Expect(_)) => true
+          case _ => false
+        }}}
+      }
+    }
+
 
     // --- Streaming Controllers --- //
     def listensTo: List[StreamInfo] = {

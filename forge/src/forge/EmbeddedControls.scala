@@ -1,8 +1,8 @@
 package forge
 
-import language.experimental.macros
 import scala.reflect.{ClassTag,classTag}
 import scala.reflect.macros.whitebox
+import scala.language.experimental.macros
 
 /**
   * Default implementation of Scala control structures.

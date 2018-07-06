@@ -1,17 +1,17 @@
-package spatial.tags
+package argon.tags
+
+import utils.tags.MacroUtils
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
-
-import utils.tags.MacroUtils
 
 class Arith[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[Ctx](c) {
   import c.universe._
 
   def implement(cls: ClassDef, obj: ModuleDef, fields: Seq[ValDef]): (ClassDef, ModuleDef) = {
     val utils = new MacroUtils[c.type](c)
-    import utils._
     import c.universe._
+    import utils._
 
     val fieldTypes = fields.map(_.tpTree)
     val fieldNames = fields.map(_.name)

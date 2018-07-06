@@ -1,6 +1,6 @@
 package pir.test
 
-import spatial.libview._
+import spatial.libdsl._
 import pir.dsl._
 import _root_.pir.PIRTest
 

@@ -117,26 +117,34 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   [Space]   and a and b are guaranteed to never hit the same address
     * Otherwise a is placed in a new group
     */
-  protected def groupAccesses(accesses: Set[AccessMatrix], tp: String): Set[Set[AccessMatrix]] = {
+  protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val groups = ArrayBuffer[Set[AccessMatrix]]()
+    val isWrite = accesses.exists(_.access.isWriter)
+    val tp = if (isWrite) "Write" else "Read"
 
     dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
 
-    accesses.foreach{a =>
+    import scala.math.Ordering.Implicits._  // Seq ordering
+    val sortedAccesses = accesses.toSeq.sortBy(_.access.toString).sortBy(_.unroll)
+
+    sortedAccesses.foreach{a =>
       dbg(s"    Access: ${a.access} {${a.unroll.mkString(",")}} [${a.parent}]")
       val grpId = {
         if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
           // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
           // Should drop in data broadcasting node in this case
-          val pairs = grp.filter{b =>
-            requireConcurrentPortAccess(a, b) &&
-            (!a.overlapsAddress(b) | ((a.access == b.access) && (a.matrix == b.matrix)))
+          val samePort = grp.filter{b => requireConcurrentPortAccess(a, b) }
+          // A conflict occurs if there are accesses on the same port with overlapping addresses
+          // for which we can cannot create a broadcaster read
+          // (either because they are not lockstep, not reads, or because broadcasting is disabled)
+          val conflicts = samePort.filter{b =>
+            a.overlapsAddress(b) && !(spatialConfig.enableBroadcast && a.isLockstepWith(b, mem) && !isWrite)
           }
-          if (pairs.nonEmpty) dbg(s"      Group #$i: ")
-          else                dbg(s"      Group #$i: <none>")
-          pairs.foreach{b => dbgs(s"        ${b.access} [${b.parent}]") }
-          pairs.nonEmpty
+          if (samePort.nonEmpty) dbg(s"      Group #$i: ")
+          else                   dbg(s"      Group #$i: <none>")
+          samePort.foreach{b => dbgs(s"        ${b.access} {${b.unroll.mkString(",")}} [${b.parent}] Conflicts: ${conflicts.contains(b)}") }
+          samePort.nonEmpty && conflicts.isEmpty
         }
       }
       if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
@@ -170,8 +178,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
 
   protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix]): Seq[Instance] = {
-    val rdGroups = groupAccesses(readers, "Read")
-    val wrGroups = groupAccesses(writers, "Write")
+    val rdGroups = groupAccesses(readers)
+    val wrGroups = groupAccesses(writers)
     if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups)
     else if (writers.nonEmpty) mergeWriteGroups(wrGroups)
     else Seq(Instance.Unit(rank))

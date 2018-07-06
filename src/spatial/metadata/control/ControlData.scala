@@ -162,4 +162,3 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.S
   * Default: empty set
   */
 case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Self)
-

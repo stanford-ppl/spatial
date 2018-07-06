@@ -79,6 +79,27 @@ package object access {
     }
   }
 
+  /*implicit class AccessMatrixOps(a: AccessMatrix) {
+    /** True if a and b always occur at the exact same time.
+      * This is trivially true if a and b are the same unrolled access.
+      *
+      * This method is used to enable broadcast reads.
+      */
+    def isLockstepWith(b: AccessMatrix, mem: Sym[_]): Boolean = {
+      if (a.access != b.access || a.matrix != b.matrix) return false
+
+      val iters = accessIterators(a.access, mem)
+      // The index of the outermost iterator which will differ between a and b
+      val outer = a.unroll.indices.find{i => a.unroll(i) != b.unroll(i) }
+      if (outer.isDefined) {
+        val outerIter = iters(outer.get)
+        // The outermost control parallelized over a and b
+        val ctrl = outerIter.parent
+      }
+      else true // a and b are identical - they are trivially lockstep
+    }
+  }*/
+
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
@@ -140,6 +161,7 @@ package object access {
       else if (distA < 0 && distB < 0) { distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // p b a
       else false
     }
+
 
     def accessWidth: Int = a match {
       case Op(_:RegFileShiftIn[_,_])        => 1

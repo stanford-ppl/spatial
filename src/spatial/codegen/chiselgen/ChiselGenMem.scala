@@ -118,7 +118,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     def innerMap(t: String): String = s"${t}Map"
     // Create mapping for (bufferPort -> (muxPort -> width)) for XBar accesses
     val XBarW = s"${outerMap("X")}(" + mem.writers.filter(_.ports(0).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
-                              .filter(!_.isDirectlyBanked)              // Filter out statically banked
+                              .filterNot(_.isDirectlyBanked)              // Filter out statically banked
                               .filter(_.accessWidth > 0)
                               .groupBy(_.ports(0).values.head.bufferPort.getOrElse(-1))      // Group by port
                               .map{case(bufp, writes) => 
@@ -126,7 +126,7 @@ trait ChiselGenMem extends ChiselGenCommon {
                                 else writes.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",")
                               }.mkString(",") + ")"
     val XBarR = s"${outerMap("X")}(" + mem.readers.filter(_.ports(0).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
-                              .filter(!_.isDirectlyBanked)              // Filter out statically banked
+                              .filterNot(_.isDirectlyBanked)              // Filter out statically banked
                               .filter(_.accessWidth > 0)
                               .groupBy(_.ports(0).values.head.bufferPort.getOrElse(-1))      // Group by port
                               .map{case(bufp, reads) => 

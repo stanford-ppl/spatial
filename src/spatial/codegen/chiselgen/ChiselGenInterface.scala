@@ -119,7 +119,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       val (isLdMSB, isLdLSB)  = getField(cmdStream.tp.typeArgs.head, "isLoad")
       emit(src"io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB,$addrLSB)")
       emit(src"io.memStreams.loads($id).cmd.bits.size := ${cmdStream}(0)($sizeMSB,$sizeLSB)")
-      emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)} & ${swap(cmdStream, Ready)}")
       emit(src"io.memStreams.loads($id).cmd.bits.isWr := ~${cmdStream}(0)($isLdMSB,$isLdLSB)")
       emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 0.U")
 
@@ -143,7 +143,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"${swap(cmdStream, Ready)} := io.memStreams.loads($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
       emit(src"io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}(0).r")
       emit(src"io.memStreams.loads($id).cmd.bits.size := 1.U")
-      emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.loads($id).cmd.valid :=  ${swap(cmdStream, Valid)} & ${swap(cmdStream, Ready)}")
       emit(src"io.memStreams.loads($id).cmd.bits.isWr := false.B")
       emit(src"io.memStreams.loads($id).cmd.bits.isSparse := 1.U")
 
@@ -181,7 +181,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
       emit(src"io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB,$addrLSB)")
       emit(src"io.memStreams.stores($id).cmd.bits.size := ${cmdStream}(0)($sizeMSB,$sizeLSB)")
-      emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)} & ${swap(cmdStream, Ready)}")
       emit(src"io.memStreams.stores($id).cmd.bits.isWr := ~${cmdStream}(0)($isLdMSB,$isLdLSB)")
       emit(src"io.memStreams.stores($id).cmd.bits.isSparse := 0.U")
 
@@ -211,10 +211,10 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"io.memStreams.stores($id).wdata.valid := ${swap(cmdStream, Valid)}")
       emit(src"io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}(0)($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
       emit(src"io.memStreams.stores($id).cmd.bits.size := 1.U")
-      emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)}")
+      emit(src"io.memStreams.stores($id).cmd.valid :=  ${swap(cmdStream, Valid)} & ${swap(cmdStream, Ready)}")
       emit(src"io.memStreams.stores($id).cmd.bits.isWr := 1.U")
       emit(src"io.memStreams.stores($id).cmd.bits.isSparse := 1.U")
-      emit(src"${swap(cmdStream, Ready)} := io.memStreams.stores($id).cmd.ready")
+      emit(src"${swap(cmdStream, Ready)} := io.memStreams.stores($id).cmd.ready & io.memStreams.stores($id).wdata.ready")
       emit(src"""${swap(ackStream, NowValid)} := io.memStreams.stores($id).wresp.valid""")
       emit(src"""${swap(ackStream, Valid)} := ${DL(swap(ackStream, NowValid), src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
       emit(src"""io.memStreams.stores($id).wresp.ready := ${swap(ackStream, Ready)}""")

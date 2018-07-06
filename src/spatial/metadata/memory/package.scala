@@ -158,19 +158,6 @@ package object memory {
       case _ => false
     }
 
-
-    def banks: Seq[Seq[Idx]] = mem match {
-      case Op(SRAMBankedRead(_,bank,_,_)) => bank
-      case Op(SRAMBankedWrite(_,_,bank,_,_)) => bank
-      case _ => Seq(Seq())
-    }
-
-    def isDirectlyBanked: Boolean = {
-      if (mem.banks.toList.flatten.isEmpty) false
-      else if (mem.banks.head.head.isConst) true
-      else false
-    }
-
     def hasInitialValues: Boolean = mem match {
       case Op(RegNew(_)) => true
       case Op(RegFileNew(_,inits)) => inits.isDefined

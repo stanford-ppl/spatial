@@ -156,6 +156,18 @@ package object access {
       case Op(op: RegFileShiftInVector[_,_]) => Some(op.axis)
       case _ => None
     }
+
+    def banks: Seq[Seq[Idx]] = a match {
+      case BankedReader(_,banks,_,_)   => banks
+      case BankedWriter(_,_,banks,_,_) => banks
+      case _ => Seq(Seq())
+    }
+
+    def isDirectlyBanked: Boolean = {
+      if (a.banks.toList.flatten.isEmpty) false
+      else if (a.banks.head.head.isConst) true
+      else false
+    }
   }
 
 

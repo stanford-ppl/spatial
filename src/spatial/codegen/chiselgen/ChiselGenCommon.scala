@@ -255,7 +255,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
     // If we are inside a stream pipe, the following may be set
     val readiers = getWriteStreams(c.toCtrl).map {
-      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Ready)}"
+      case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
       case _ => ""
     }.mkString(" & ")
     val hasReadiers = if (readiers != "") "&" else ""

@@ -111,6 +111,31 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     }
   }
 
+  /** True if a and b always occur at the exact same time.
+    * This is trivially true if a and b are the same unrolled access.
+    *
+    * This method is used to enable broadcast reads.
+    */
+  def canBroadcast(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    // TODO[3]: What about accesses of the same form across different loops?
+    if (a.access != b.access || a.matrix != b.matrix) return false
+
+    val iters = accessIterators(a.access, mem)
+    // The index of iterators which will differ between a and b
+    // If this list is empty, a and b are identical (so they are trivially lockstep)
+    val differ = a.unroll.indices.filter{i => a.unroll(i) != b.unroll(i) }
+    val itersDiffer = differ.map{i => iters(i) }
+    if (itersDiffer.nonEmpty) {
+      val outermost = itersDiffer.head
+      if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
+      else {
+        // Need more specialized logic for broadcasting across controllers
+        spatialConfig.enableBroadcast && outermost.isLockstepAcross(itersDiffer, Some(a.access))
+      }
+    }
+    else true
+  }
+
   /** Group accesses on this memory.
     * An access a is grouped with a set of accesses S if there exists some b in S such that:
     *   [Control] a and b occur simultaneously (in Parallel or pipeline parallel)
@@ -138,9 +163,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // A conflict occurs if there are accesses on the same port with overlapping addresses
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
-          val conflicts = samePort.filter{b =>
-            a.overlapsAddress(b) && !(spatialConfig.enableBroadcast && a.isLockstepWith(b, mem) && !isWrite)
-          }
+          val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) }
           if (samePort.nonEmpty) dbg(s"      Group #$i: ")
           else                   dbg(s"      Group #$i: <none>")
           samePort.foreach{b => dbgs(s"        ${b.access} {${b.unroll.mkString(",")}} [${b.parent}] Conflicts: ${conflicts.contains(b)}") }

@@ -79,29 +79,6 @@ package object access {
     }
   }
 
-  implicit class AccessMatrixOps(a: AccessMatrix) {
-    /** True if a and b always occur at the exact same time.
-      * This is trivially true if a and b are the same unrolled access.
-      *
-      * This method is used to enable broadcast reads.
-      */
-    @stateful def isLockstepWith(b: AccessMatrix, mem: Sym[_]): Boolean = {
-      // TODO[3]: What about accesses of the same form across different loops?
-      if (a.access != b.access || a.matrix != b.matrix) return false
-
-      val iters = accessIterators(a.access, mem)
-      // The index of iterators which will differ between a and b
-      // If this list is empty, a and b are identical (so they are trivially lockstep)
-      val differ = a.unroll.indices.filter{i => a.unroll(i) != b.unroll(i) }
-      val itersDiffer = differ.map{i => iters(i) }
-      if (itersDiffer.nonEmpty) {
-        val outer = itersDiffer.head
-        outer.isLockstepAcross(itersDiffer, Some(a.access))
-      }
-      else true
-    }
-  }
-
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)

@@ -162,8 +162,8 @@ case class Memory(
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
-    val w = mem.dims.map(_.toInt)
-    val D = mem.rank.length
+    val w = mem.stagedDims.map(_.toInt)
+    val D = mem.seqRank.length
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride

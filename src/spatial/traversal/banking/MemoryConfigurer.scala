@@ -15,7 +15,7 @@ import spatial.util.spatialConfig
 import scala.collection.mutable.ArrayBuffer
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected val rank: Int = mem.rank.length
+  protected val rank: Int = mem.seqRank.length
   protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
   // TODO: This may need to be tweaked based on the fix for issue #23

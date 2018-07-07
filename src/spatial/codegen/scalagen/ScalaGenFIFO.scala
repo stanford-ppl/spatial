@@ -17,7 +17,7 @@ trait ScalaGenFIFO extends ScalaGenMemories {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FIFONew(size)    => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Queue[${op.A}]") }
     case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.isEmpty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.size >= ${fifo.size} ")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.size >= ${fifo.stagedSize} ")
 
     case FIFOIsAlmostEmpty(fifo,_) =>
       val rPar = fifo.readWidths.maxOrElse(1)
@@ -25,7 +25,7 @@ trait ScalaGenFIFO extends ScalaGenMemories {
 
     case FIFOIsAlmostFull(fifo,_) =>
       val wPar = fifo.writeWidths.maxOrElse(1)
-      emit(src"val $lhs = $fifo.size === ${fifo.size} - $wPar")
+      emit(src"val $lhs = $fifo.size === ${fifo.stagedSize} - $wPar")
 
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = if ($fifo.nonEmpty) $fifo.head else ${invalid(op.A)}")
     case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.size")

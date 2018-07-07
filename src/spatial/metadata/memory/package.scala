@@ -65,7 +65,7 @@ package object memory {
 
   implicit class MemoryOps(mem: Sym[_]) {
     /** Returns the statically defined rank (number of dimensions) of the given memory. */
-    def rank: Seq[Int] = mem match {
+    def seqRank: Seq[Int] = mem match {
       case Op(m: MemAlloc[_,_])   => m.rank
       case Op(m: MemAlias[_,_,_]) => m.rank
       case _ => throw new Exception(s"Could not statically determine the rank of $mem")
@@ -79,20 +79,20 @@ package object memory {
     }
 
     /** Returns the statically defined staged dimensions (symbols) of the given memory. */
-    def dims: Seq[I32] = mem match {
+    def stagedDims: Seq[I32] = mem match {
       case Op(m: MemAlloc[_,_]) => m.dims
       case _ => throw new Exception(s"Could not statically determine the dimensions of $mem")
     }
 
-    def size: I32 = mem match {
+    def stagedSize: I32 = mem match {
       case Op(m: MemAlloc[_,_]) if m.dims.size == 1 => m.dims.head
       case _ => throw new Exception(s"Could not get static size of $mem")
     }
 
     /** Returns constant values of the dimensions of the given memory. */
     def constDims: Seq[Int] = {
-      if (dims.forall{case Expect(c) => true; case _ => false}) {
-        dims.collect{case Expect(c) => c.toInt }
+      if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
+        stagedDims.collect{case Expect(c) => c.toInt }
       }
       else {
         throw new Exception(s"Could not get constant dimensions of $mem")

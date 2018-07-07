@@ -61,7 +61,7 @@ object DenseTransfer {
   ): Void = {
 
     // Special case if dram is a DenseAlias with the last dimension slashed
-    val normalCounting: Boolean = dram.rawRank.last == dram.rank.last
+    val normalCounting: Boolean = dram.rawRank.last == dram.seqRank.last
     val dramOffsets: Seq[I32] = dram.starts()
     val rawDramOffsets: Seq[I32] = dram.rawStarts()
     val lens: Seq[I32] = dram.lens() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
@@ -80,8 +80,8 @@ object DenseTransfer {
         val indices = is :+ 0.to[I32]
 
         // Pad indices, strides with 0's against rawDramOffsets
-        val indicesPadded = dram.rawRank.map{i => if (dram.rank.contains(i)) indices(dram.rank.indexOf(i)) else 0.to[I32]}
-        val stridesPadded = dram.rawRank.map{i => if (dram.rank.contains(i)) strides(dram.rank.indexOf(i)) else 1.to[I32]}
+        val indicesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) indices(dram.seqRank.indexOf(i)) else 0.to[I32]}
+        val stridesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) strides(dram.seqRank.indexOf(i)) else 1.to[I32]}
 
         val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
         val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}

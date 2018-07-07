@@ -9,6 +9,56 @@ import spatial.metadata.control._
 
 trait ChiselGenMath extends ChiselGenCommon {
 
+  // TODO: Clean this and make it nice
+  private def MathDL(lhs: Sym[_], rhs: Op[_], lat: String): Unit = {
+    alphaconv_register(src"$lhs")
+    emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+
+    if (controllerStack.nonEmpty) {
+      val streamOuts = getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")
+      if (controllerStack.head.hasStreamAncestor & streamOuts.replace(" ","") != "" & lat != "None") {
+        rhs match {
+          case FixMul(a,b) => emitt(src"${lhs}.r := (${a}.*-*($b, ${lat}, ${streamOuts})).r")
+          case UnbMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, ${streamOuts}, rounding = Unbiased)).r")
+          case SatMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, ${streamOuts}, saturating = Saturation)).r")
+          case UnbSatMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, ${streamOuts}, saturating = Saturation, rounding = Unbiased)).r")
+          case FixDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, ${streamOuts})).r")
+          case UnbDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, ${streamOuts}, rounding = Unbiased)).r")
+          case SatDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, ${streamOuts}, saturating = Saturation)).r")
+          case UnbSatDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, ${streamOuts}, saturating = Saturation, rounding = Unbiased)).r")
+          case FixMod(a,b) => emitt(src"${lhs}.r := ($a.%-%($b, ${lat}, ${streamOuts})).r")
+          case FixRecip(a) => emitt(src"${lhs}.r := (${lhs}_one./-/($a, ${lat}, ${streamOuts})).r")
+        }
+      } else {
+        rhs match {
+          case FixMul(a,b) => emitt(src"${lhs}.r := (${a}.*-*($b, ${lat}, true.B)).r")
+          case UnbMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, true.B, rounding = Unbiased)).r")
+          case SatMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, true.B, saturating = Saturation)).r")
+          case UnbSatMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, true.B, saturating = Saturation, rounding = Unbiased)).r")
+          case FixDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B)).r")
+          case UnbDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B, rounding = Unbiased)).r")
+          case SatDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B, saturating = Saturation)).r")
+          case UnbSatDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B, saturating = Saturation, rounding = Unbiased)).r")
+          case FixMod(a,b) => emitt(src"${lhs}.r := ($a.%-%($b, ${lat}, true.B)).r")
+          case FixRecip(a) => emitt(src"${lhs}.r := (${lhs}_one./-/($a, ${lat}, true.B)).r")
+        }
+      }
+    } else {
+      rhs match {
+        case FixMul(a,b) => emitt(src"${lhs}.r := (${a}.*-*($b, ${lat}, true.B)).r")
+        case UnbMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, true.B, rounding = Unbiased)).r")
+        case SatMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, true.B, saturating = Saturation)).r")
+        case UnbSatMul(a,b) => emitt(src"${lhs}.r := ($a.*-*($b, ${lat}, true.B, saturating = Saturation, rounding = Unbiased)).r")
+        case FixDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B)).r")
+        case UnbDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B, rounding = Unbiased)).r")
+        case SatDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B, saturating = Saturation)).r")
+        case UnbSatDiv(a,b) => emitt(src"${lhs}.r := ($a./-/($b, ${lat}, true.B, saturating = Saturation, rounding = Unbiased)).r")
+        case FixMod(a,b) => emitt(src"${lhs}.r := ($a.%-%($b, ${lat}, true.B)).r")
+        case FixRecip(a) => emitt(src"${lhs}.r := (${lhs}_one./-/($a, ${lat}, true.B)).r")
+      }
+    }
+  }
+
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixInv(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (~$x).r")
     case FixNeg(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (-$x).r")
@@ -28,12 +78,23 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x <= $y")
     case FltNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x =/= $y")
     case FltEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x === $y")
-    case UnbMul(x,y) => emitt(src"val $lhs = $x *& $y")
-    case UnbDiv(x,y) => emitt(src"val $lhs = $x /& $y")
+    case UnbMul(x,y) => MathDL(lhs, rhs, latencyOptionString("UnbMul", Some(bitWidth(lhs.tp)))) 
+    case UnbDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("UnbDiv", Some(bitWidth(lhs.tp)))) 
+    case SatMul(x,y) => MathDL(lhs, rhs, latencyOptionString("SatMul", Some(bitWidth(lhs.tp)))) 
+    case SatDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("SatDiv", Some(bitWidth(lhs.tp)))) 
+    case UnbSatMul(x,y) => MathDL(lhs, rhs, latencyOptionString("SatMul", Some(bitWidth(lhs.tp)))) 
+    case UnbSatDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("SatDiv", Some(bitWidth(lhs.tp)))) 
+    case FixMul(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMul", Some(bitWidth(lhs.tp))))
+    case FixDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp))))
+    case FixRecip(y) => 
+      emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
+      emit(src"1.U.cast(${lhs}_one)")
+      MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
+
+    case FixMod(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))) 
+
     case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
     case SatSub(x,y) => emitt(src"val $lhs = $x <-> $y")
-    case SatMul(x,y) => emitt(src"val $lhs = $x <*> $y")
-    case SatDiv(x,y) => emitt(src"val $lhs = $x </> $y")
     case FixSLA(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x}.r << $shift).r // TODO: cast to proper type (chisel expands bits)")
@@ -45,8 +106,6 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x} >>> $shift).r")
     case BitRandom(None) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
     case FixRandom(None) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
-    case UnbSatMul(x,y) => emitt(src"val $lhs = $x <*&> $y")
-    case UnbSatDiv(x,y) => emitt(src"val $lhs = $x </&> $y")
     case FixRandom(x) =>
       val seed = (scala.math.random*1000).toInt
       val size = x match{
@@ -93,25 +152,6 @@ trait ChiselGenMath extends ChiselGenCommon {
     //   case LongType() => emitt(src"val $lhs = $x.toLong")
     //   case _ => emitt(src"val $lhs = $x // No rule for this")
     // }
-
-     case FixMul(x,y) =>
-      alphaconv_register(src"$lhs")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := ($x.*-*($y, ${latencyOptionString("FixMul", Some(bitWidth(lhs.tp)))}).r)")
-
-    case FixDiv(x,y) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := ($x./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))}).r)")
-
-    case FixRecip(y) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
-      emit(src"1.U.cast(${lhs}_one)")
-      emitt(src"${lhs}.r := (${lhs}_one./-/($y, ${latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))}).r)")
-
-    case FixMod(x,y) =>
-      emitGlobalWireMap(src"$lhs",src"Wire(${lhs.tp})")
-      emitt(src"$lhs := $x.%-%($y, ${latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))})")
 
     case FixAbs(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")

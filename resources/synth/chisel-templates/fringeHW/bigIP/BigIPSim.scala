@@ -5,35 +5,35 @@ import templates.Utils
 import types._
 
 class BigIPSim extends BigIP {
-  def divide(dividend: UInt, divisor: UInt, latency: Int): UInt = {
+  def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
     getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
       case Some(bigNum) => dividend / bigNum.U
-      case None => Utils.getRetimed(dividend/divisor, latency)
+      case None => Utils.getRetimed(dividend/divisor, latency, flow)
     }
   }
 
-  def divide(dividend: SInt, divisor: SInt, latency: Int): SInt = {
+  def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
     getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
       case Some(bigNum) => dividend / bigNum.S
-      case None => Utils.getRetimed(dividend/divisor, latency)
+      case None => Utils.getRetimed(dividend/divisor, latency, flow)
     }
   }
 
-  def mod(dividend: UInt, divisor: UInt, latency: Int): UInt = {
+  def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
     getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
       case Some(bigNum) => dividend % bigNum.U
-      case None => Utils.getRetimed(dividend % divisor, latency)
+      case None => Utils.getRetimed(dividend % divisor, latency, flow)
     }
   }
 
-  def mod(dividend: SInt, divisor: SInt, latency: Int): SInt = {
+  def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
     getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
       case Some(bigNum) => dividend % bigNum.S
-      case None => Utils.getRetimed(dividend % divisor, latency)
+      case None => Utils.getRetimed(dividend % divisor, latency, flow)
     }
   }
 
-  def multiply(a: UInt, b: UInt, latency: Int): UInt = {
+  def multiply(a: UInt, b: UInt, latency: Int, flow: Bool): UInt = {
     val aconst = getConst(a)
     val bconst = getConst(b)
     if (aconst.isDefined | bconst.isDefined) { // Constant optimization
@@ -41,13 +41,13 @@ class BigIPSim extends BigIP {
       else {
         val const = if (aconst.isDefined) aconst.get else bconst.get
         val other = if (aconst.isDefined) b else a
-        Utils.getRetimed(const.U * other, 0)
+        Utils.getRetimed(const.U * other, 0, flow)
       }
     } else {
-      Utils.getRetimed(a * b, latency)
+      Utils.getRetimed(a * b, latency, flow)
     }
   }
-  def multiply(a: SInt, b: SInt, latency: Int): SInt = {
+  def multiply(a: SInt, b: SInt, latency: Int, flow: Bool): SInt = {
     val aconst = getConst(a)
     val bconst = getConst(b)
     if (aconst.isDefined | bconst.isDefined) { // Constant optimization
@@ -55,10 +55,10 @@ class BigIPSim extends BigIP {
       else {
         val const = if (aconst.isDefined) aconst.get else bconst.get
         val other = if (aconst.isDefined) b else a
-        Utils.getRetimed(const.S * other, 0)
+        Utils.getRetimed(const.S * other, 0, flow)
       }
     } else {
-      Utils.getRetimed(a * b, latency)
+      Utils.getRetimed(a * b, latency, flow)
     }
   }
 

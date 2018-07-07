@@ -14,6 +14,7 @@ trait ASICBlackBoxes {
     val io = IO(new Bundle {
       val dividend = Input(UInt(dividendWidth.W))
       val divisor  = Input(UInt(divisorWidth.W))
+      val flow = Input(Bool())
       val out      = Output(UInt(dividendWidth.W))
     })
 
@@ -21,6 +22,7 @@ trait ASICBlackBoxes {
 
     val m = Module(new designware_divmod(dividendWidth, divisorWidth, signed, false, fractionBits, latency))
     m.io.clock    := clock
+    // TODO: Wire up Clock Enable
     m.io.reset    := reset.toBool
     m.io.dividend := io.dividend
     m.io.divisor  := io.divisor
@@ -31,6 +33,7 @@ trait ASICBlackBoxes {
     val io = IO(new Bundle {
       val dividend = Input(UInt(dividendWidth.W))
       val divisor  = Input(UInt(divisorWidth.W))
+      val flow = Input(Bool())
       val out      = Output(UInt(dividendWidth.W))
     })
 
@@ -38,6 +41,7 @@ trait ASICBlackBoxes {
 
     val m = Module(new designware_divmod(dividendWidth, divisorWidth, signed, true, fractionBits, latency))
     m.io.clock    := clock
+    // TODO: Wire up Clock Enable
     m.io.reset    := reset.toBool
     m.io.dividend := io.dividend
     m.io.divisor  := io.divisor
@@ -54,6 +58,7 @@ trait ASICBlackBoxes {
     override def desiredName = s"designware_divmod"
     val io = IO(new Bundle {
       val clock    = Input(Clock())
+      // TODO: Wire up Clock Enable
       val reset    = Input(Bool())
       val dividend = Input(UInt(dividendWidth.W))
       val divisor  = Input(UInt(divisorWidth.W))
@@ -72,6 +77,7 @@ trait ASICBlackBoxes {
 
     val m = Module(new designware_mult(aWidth, bWidth, outWidth, signed, latency))
     m.io.clock := clock
+    // TODO: Wire up Clock Enable
     m.io.reset := reset.toBool
     m.io.in0 := io.a
     m.io.in1 := io.b
@@ -90,6 +96,7 @@ trait ASICBlackBoxes {
 
     val io = IO(new Bundle {
       val clock = Input(Clock())
+      // TODO: Wire up Clock Enable
       val reset = Input(Bool())
       val in0 = Input(UInt(aWidth.W))
       val in1 = Input(UInt(bWidth.W))

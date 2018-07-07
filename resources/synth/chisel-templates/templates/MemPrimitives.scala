@@ -176,7 +176,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     usedMuxPorts ::= ("DirectR", (muxAddr._1,muxAddr._2, vecId))
     val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum + vecId
     io.directR(base) := rBundle    
-    io.flow(base) := flow
+    io.flow(base + p.numXBarR) := flow
     // Temp fix for merged readers not recomputing port info
     val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum
     io.output.data(outBase + vecId)
@@ -266,8 +266,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
     }
-
-    mem._1.io.flow := io.flow.reduce{_|_} // TODO: Dangerous but probably works
+    mem._1.io.flow   := chisel3.util.PriorityMux(directSelect.map(_.en) ++ xBarSelect, io.flow)
   }
 
   // Connect read data to output
@@ -686,8 +685,8 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
         reg := Mux(io.w.en & (io.w.ofs === i.U(addrWidth.W)) & io.wMask, io.w.data, reg)
         (i.U(addrWidth.W) -> reg)
       }
-      val radder = Utils.getRetimed(io.r.ofs,1)
-      io.output.data := Utils.getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1)
+      val radder = Utils.getRetimed(io.r.ofs,1,io.flow)
+      io.output.data := Utils.getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.flow)
     } else {
       val m = Module(new fringe.SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
       m.io.raddr     := Utils.getRetimed(io.r.ofs, 1, io.flow)
@@ -790,18 +789,18 @@ class SRAM_Old(val logicalDims: List[Int], val bitWidth: Int,
     // Writer conversion
     val convertedW = Wire(new multidimW(N,logicalDims,bitWidth))
     val physicalAddrs = bankingMode match {
-      case DiagonalMemory => wbundle.addr.zipWithIndex.map {case (logical, i) => if (i == N - 1) logical./-/(banks.head.U,None) else logical}
-      case BankedMemory => wbundle.addr.zip(banks).map{ case (logical, b) => logical./-/(b.U,None) }
+      case DiagonalMemory => wbundle.addr.zipWithIndex.map {case (logical, i) => if (i == N - 1) logical./-/(banks.head.U,None,true.B) else logical}
+      case BankedMemory => wbundle.addr.zip(banks).map{ case (logical, b) => logical./-/(b.U,None,true.B) }
     }
     physicalAddrs.zipWithIndex.foreach { case (calculatedAddr, i) => convertedW.addr(i) := calculatedAddr}
     convertedW.data := wbundle.data
     convertedW.en := wbundle.en
     val flatBankId = bankingMode match {
-      case DiagonalMemory => wbundle.addr.reduce{_+_}.%-%(banks.head.U, None)
+      case DiagonalMemory => wbundle.addr.reduce{_+_}.%-%(banks.head.U, None, true.B)
       case BankedMemory => 
-        val bankCoords = wbundle.addr.zip(banks).map{ case (logical, b) => logical.%-%(b.U,None) }
-       bankCoords.zipWithIndex.map{ case (c, i) => c.*-*((banks.drop(i).reduce{_*_}/banks(i)).U,None) }.reduce{_+_}
-        // bankCoords.zipWithIndex.map{ case (c, i) => FringeGlobals.bigIP.multiply(c, (banks.drop(i).reduce{_.*-*(_,None)}/-/banks(i)).U, 0) }.reduce{_+_}
+        val bankCoords = wbundle.addr.zip(banks).map{ case (logical, b) => logical.%-%(b.U,None, true.B) }
+       bankCoords.zipWithIndex.map{ case (c, i) => c.*-*( (banks.drop(i).reduce{_*_}/banks(i)).U,None, true.B) }.reduce{_+_}
+        // bankCoords.zipWithIndex.map{ case (c, i) => FringeGlobals.bigIP.multiply(c, (banks.drop(i).reduce{_.*-*( _,None)}/-/banks(i)).U, 0) }.reduce{_+_}
     }
 
     (convertedW, flatBankId)
@@ -813,18 +812,18 @@ class SRAM_Old(val logicalDims: List[Int], val bitWidth: Int,
     // Reader conversion
     val convertedR = Wire(new multidimR(N,logicalDims,bitWidth))
     val physicalAddrs = bankingMode match {
-      case DiagonalMemory => rbundle.addr.zipWithIndex.map {case (logical, i) => if (i == N - 1) logical./-/(banks.head.U,None) else logical}
-      case BankedMemory => rbundle.addr.zip(banks).map{ case (logical, b) => logical./-/(b.U,None) }
+      case DiagonalMemory => rbundle.addr.zipWithIndex.map {case (logical, i) => if (i == N - 1) logical./-/(banks.head.U,None,true.B) else logical}
+      case BankedMemory => rbundle.addr.zip(banks).map{ case (logical, b) => logical./-/(b.U,None,true.B) }
     }
     physicalAddrs.zipWithIndex.foreach { case (calculatedAddr, i) => convertedR.addr(i) := calculatedAddr}
     convertedR.en := rbundle.en
     val syncDelay = 0//if (syncMem) 1 else 0
     val flatBankId = bankingMode match {
-      case DiagonalMemory => Utils.getRetimed(rbundle.addr.reduce{_+_}, syncDelay).%-%(banks.head.U, None)
+      case DiagonalMemory => Utils.getRetimed(rbundle.addr.reduce{_+_}, syncDelay).%-%(banks.head.U, None, true.B)
       case BankedMemory => 
-        val bankCoords = rbundle.addr.zip(banks).map{ case (logical, b) => Utils.getRetimed(logical, syncDelay).%-%(b.U,None) }
-       bankCoords.zipWithIndex.map{ case (c, i) => c.*-*((banks.drop(i).reduce{_*_}/banks(i)).U,None) }.reduce{_+_}
-        // bankCoords.zipWithIndex.map{ case (c, i) => FringeGlobals.bigIP.multiply(c, (banks.drop(i).reduce{_.*-*(_,None)}/-/banks(i)).U, 0) }.reduce{_+_}
+        val bankCoords = rbundle.addr.zip(banks).map{ case (logical, b) => Utils.getRetimed(logical, syncDelay).%-%(b.U,None, true.B) }
+       bankCoords.zipWithIndex.map{ case (c, i) => c.*-*( (banks.drop(i).reduce{_*_}/banks(i)).U,None, true.B) }.reduce{_+_}
+        // bankCoords.zipWithIndex.map{ case (c, i) => FringeGlobals.bigIP.multiply(c, (banks.drop(i).reduce{_.*-*( _,None)}/-/banks(i)).U, 0) }.reduce{_+_}
     }
     (convertedR, flatBankId)
   }
@@ -948,12 +947,12 @@ class MemND_Old(val dims: List[Int], bitWidth: Int = 32, syncMem: Boolean = fals
 
   // Address flattening
   m.io.w.addr := Utils.getRetimed(io.w.addr.zipWithIndex.map{ case (addr, i) =>
-    // FringeGlobals.bigIP.multiply(addr, (banks.drop(i).reduce{_.*-*(_,None)}/-/banks(i)).U, 0)
-   addr.*-*((dims.drop(i).reduce{_*_}/dims(i)).U, None)
+    // FringeGlobals.bigIP.multiply(addr, (banks.drop(i).reduce{_.*-*( _,None)}/-/banks(i)).U, 0)
+   addr.*-*( (dims.drop(i).reduce{_*_}/dims(i)).U, None, true.B)
   }.reduce{_+_}, 0 max Utils.sramstore_latency - 1)
   m.io.r.addr := Utils.getRetimed(io.r.addr.zipWithIndex.map{ case (addr, i) =>
-    // FringeGlobals.bigIP.multiply(addr, (dims.drop(i).reduce{_.*-*(_,None)}/dims(i)).U, 0)
-   addr.*-*((dims.drop(i).reduce{_*_}/dims(i)).U, None)
+    // FringeGlobals.bigIP.multiply(addr, (dims.drop(i).reduce{_.*-*( _,None)}/dims(i)).U, 0)
+   addr.*-*( (dims.drop(i).reduce{_*_}/dims(i)).U, None, true.B)
   }.reduce{_+_}, 0 max {Utils.sramload_latency - 1}, io.flow) // Latency set to 2, give 1 cycle for bank to resolve
 
   // Connect the other ports

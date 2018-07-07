@@ -314,9 +314,10 @@ trait ChiselGenController extends ChiselGenCommon {
     //  Capture rst out (ctrRst)
     emitGlobalWireMap(src"""${swap(sym, RstEn)}""", """Wire(Bool())""") 
 
-    // Capture sm done, and handle pipeline stalls for streaming case
+    // Capture sm done
     val streamOuts = getAllReadyLogic(sym.toCtrl).mkString(" && ")
-    emitt(src"""${swap(sym, Done)} := ${swap(sym, SM)}.io.done // Used to do something different for stream and have delay""")
+    emitt(src"""${swap(sym, Done)} := ${swap(sym, SM)}.io.done // Used to delay in cg, now delay in templates""")
+    emitt(src"""${swap(sym, SM)}.io.flow := ${swap(sym, BaseEn)} ${getStreamReadyLogic(sym)}""")
     // if (!(streamOuts.replaceAll(" ", "") == "")) {
     //   emitt(src"""${swap(sym, Done)} := Utils.streamCatchDone(${swap(sym, SM)}.io.done, $streamOuts, ${swap(sym, Retime)}, rr, accelReset) // Directly connecting *_done.D* creates a hazard on stream pipes if ~*_ready turns off for that exact cycle, since the retime reg will reject it""")
     // } else {

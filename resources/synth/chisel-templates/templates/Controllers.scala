@@ -34,6 +34,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     val ctrInc = Output(Bool())
     val ctrRst = Output(Bool())
     val parentAck = Input(Bool())
+    val flow = Input(Bool())
 
     // Signals from children
     val doneIn = Vec(depth, Input(Bool()))
@@ -223,6 +224,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     val ctrInc = Output(Bool())
     val ctrRst = Output(Bool())
     val parentAck = Input(Bool())
+    val flow = Input(Bool())
 
     // Switch signals
     val selectsIn = Vec(cases, Input(Bool()))
@@ -260,7 +262,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
       io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
       io.ctrInc := active.io.output.data & io.enable
     }
-    io.done := Utils.getRetimed(Utils.risingEdge(done.io.output.data), latency)
+    io.done := Utils.risingEdge(Utils.getRetimed(done.io.output.data, latency, io.flow))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner

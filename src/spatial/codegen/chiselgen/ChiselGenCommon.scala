@@ -244,22 +244,20 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
     // If we are inside a stream pipe, the following may be set
-    val readiers = getReadStreams(c.toCtrl).map {
+    val readiers = getReadStreams(c.toCtrl).collect {
       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
-      case _ => ""
-    }.mkString(" & ")
-    val hasReadiers = if (readiers != "") "&" else ""
-    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    }
+    val hasReadiers = if (readiers.size > 0) "&" else ""
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
   }
 
   def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
     // If we are inside a stream pipe, the following may be set
-    val readiers = getWriteStreams(c.toCtrl).map {
+    val readiers = getWriteStreams(c.toCtrl).collect {
       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-      case _ => ""
-    }.mkString(" & ")
-    val hasReadiers = if (readiers != "") "&" else ""
-    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    }
+    val hasReadiers = if (readiers.size > 0) "&" else ""
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
   }
 
   def getFifoReadyLogic(sym: Ctrl): List[String] = {

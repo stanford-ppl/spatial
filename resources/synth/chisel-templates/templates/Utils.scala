@@ -1027,13 +1027,13 @@ object Utils {
     }
   }
 
-  def FixFMA(mul1: FixedPoint, mul2: FixedPoint, add: FixedPoint, delay: Int, en: Bool = true.B): FixedPoint = {
+  def FixFMA(mul1: FixedPoint, mul2: FixedPoint, add: FixedPoint, delay: Int, flow: Bool): FixedPoint = {
     if (delay == 0) {
       mul1 *-* mul2 + add
     }
     else {
       // TODO: Use IP 
-      mul1.*-*(mul2, Some(delay)) + Utils.getRetimed(add, delay)
+      mul1.*-*(mul2, Some(delay), flow) + Utils.getRetimed(add, delay, flow)
       // sig.cloneType.fromBits(sr.io.out)
     }
   }

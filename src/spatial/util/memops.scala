@@ -14,22 +14,22 @@ object memops {
   implicit class AliasOps[A](mem: Sym[A]) {
     @rig def starts(): Seq[I32] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get starts of sparse alias")
-      Seq.tabulate(mem.rank.length){i => stage(MemStart(mem, mem.rank(i))) }
+      Seq.tabulate(mem.seqRank.length){i => stage(MemStart(mem, mem.seqRank(i))) }
     }
     @rig def steps(): Seq[I32] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get steps of sparse alias")
-      Seq.tabulate(mem.rank.length){i => stage(MemStep(mem, mem.rank(i))) }
+      Seq.tabulate(mem.seqRank.length){i => stage(MemStep(mem, mem.seqRank(i))) }
     }
     @rig def ends(): Seq[I32] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get ends of sparse alias")
-      Seq.tabulate(mem.rank.length){i => stage(MemEnd(mem, mem.rank(i))) }
+      Seq.tabulate(mem.seqRank.length){i => stage(MemEnd(mem, mem.seqRank(i))) }
     }
     @rig def pars(): Seq[I32] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get pars of sparse alias")
-      Seq.tabulate(mem.rank.length){i => stage(MemPar(mem, mem.rank(i))) }
+      Seq.tabulate(mem.seqRank.length){i => stage(MemPar(mem, mem.seqRank(i))) }
     }
     @rig def lens(): Seq[I32] = {
-      Seq.tabulate(mem.rank.length){i => stage(MemLen(mem, mem.rank(i))) }
+      Seq.tabulate(mem.seqRank.length){i => stage(MemLen(mem, mem.seqRank(i))) }
     }
 
     @rig def rawStarts(): Seq[I32] = {
@@ -44,11 +44,11 @@ object memops {
 
     @rig def series(): Seq[Series[I32]] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
-      Seq.tabulate(mem.rank.length){i =>
-        val start = stage(MemStart(mem, mem.rank(i)))
-        val end   = stage(MemEnd(mem, mem.rank(i)))
-        val step  = stage(MemStep(mem, mem.rank(i)))
-        val par   = stage(MemPar(mem, mem.rank(i)))
+      Seq.tabulate(mem.seqRank.length){i =>
+        val start = stage(MemStart(mem, mem.seqRank(i)))
+        val end   = stage(MemEnd(mem, mem.seqRank(i)))
+        val step  = stage(MemStep(mem, mem.seqRank(i)))
+        val par   = stage(MemPar(mem, mem.seqRank(i)))
         Series(start, end, step, par)
       }
     }

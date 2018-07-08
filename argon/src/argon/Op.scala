@@ -1,7 +1,7 @@
 package argon
 
 import Freq._
-import argon.transform.Transformer
+import argon.transform.TransformerInterface
 import forge.tags.rig
 
 /** Any staged operation.
@@ -11,7 +11,7 @@ import forge.tags.rig
   * NOTE: Op is NOT covariant with R - strange things happen with pattern matching if it is.
   */
 abstract class Op[R:Type] extends Serializable with Product {
-  final type Tx = Transformer
+  final type Tx = TransformerInterface
   val R: Type[R] = Type[R]
   def name: String = productPrefix
 

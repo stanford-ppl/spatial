@@ -1,10 +1,10 @@
-package spatial.tags
+package argon.tags
+
+import utils.tags.MacroUtils
 
 import scala.annotation.StaticAnnotation
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
-
-import utils.tags.MacroUtils
 
 /** Annotation class for @struct macro annotation. */
 final class struct extends StaticAnnotation {
@@ -33,8 +33,8 @@ object StagedStructsMacro {
     )
 
     val utils = new MacroUtils[c.type](c)
-    import utils._
     import c.universe._
+    import utils._
 
     val (cls,obj) = annottees.toList match {
       case List(cd: ClassDef, md: ModuleDef) => (cd,md)

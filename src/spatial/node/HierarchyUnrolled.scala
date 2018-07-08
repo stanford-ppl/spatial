@@ -39,6 +39,21 @@ abstract class UnrolledAccessor[A:Type,R:Type] extends EnPrimitive[R] {
   }
 }
 
+object UnrolledReader {
+  def unapply(x: Op[_]): Option[UnrolledRead] = x match {
+    case a: UnrolledAccessor[_,_] => a.unrolledRead
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[UnrolledRead] = x.op.flatMap(UnrolledReader.unapply)
+}
+object UnrolledWriter {
+  def unapply(x: Op[_]): Option[UnrolledWrite] = x match {
+    case a: UnrolledAccessor[_,_] => a.unrolledWrite
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[UnrolledWrite] = x.op.flatMap(UnrolledWriter.unapply)
+}
+
 /** Banked accessors */
 abstract class BankedAccessor[A:Type,R:Type] extends UnrolledAccessor[A,R] {
   def bank: Seq[Seq[Idx]]

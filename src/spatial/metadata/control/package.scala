@@ -54,6 +54,8 @@ package object control {
       case _ => false
     }
 
+    def isFSM: Boolean = op.isInstanceOf[StateMachine[_]]
+
     def isStreamLoad: Boolean = op match {
       case _:FringeDenseLoad[_,_] => true
       case _ => false
@@ -86,6 +88,7 @@ package object control {
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
+    def isFSM: Boolean = op.exists(_.isFSM)
 
     def isMemReduce: Boolean = op.exists(_.isMemReduce)
 
@@ -238,6 +241,7 @@ package object control {
       case _ => false
     }
 
+
     // --- Control hierarchy --- //
 
     /** Returns the controller or Host which is the direct controller parent of this controller. */
@@ -269,6 +273,63 @@ package object control {
 
     /** True if this control or symbol occurs within a loop. */
     def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
+
+    /** Returns the child of this controller that contains the given symbol x. None if x does not
+      * occur in any of the children.
+      */
+    @stateful def getChildContaining(x: Sym[_]): Option[Ctrl.Node] = {
+      val path = x.ancestors
+      children.find{c => path.contains(c) }
+    }
+
+    /** Returns all children which occur in dataflow order before the given child. */
+    @stateful def childrenPriorTo(child: Ctrl.Node): Seq[Ctrl.Node] = {
+      // TODO: Arbitrary dataflow?
+      children.takeWhile{c => c != child }
+    }
+
+    /** Returns true if all copies of the loop body across iterator iter will have the
+      * same execution time.
+      * If reference is defined, only accounts for the stages up to and including the reference.
+      * This is currently trivially true for inner controllers.
+      */
+    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
+      val child = reference.flatMap(getChildContaining)
+      val ctrls = child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
+      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
+    }
+
+    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean): Boolean = {
+      if (isFSM) false
+      else if (isSwitch && isOuterControl) {
+        allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
+        isLockstepAcross(iters, reference)
+      }
+      else {
+        // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
+        isLockstepAcross(iters, reference) &&
+        cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
+          case Some(Expect(_)) => true
+          case _ => false
+        }}}
+      }
+    }
+
+    def writtenMems: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[WrittenMems](sym).map(_.mems) }.getOrElse(Set.empty)
+    }
+    def writtenMems_=(mems: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, WrittenMems(mems)) }
+    }
+
+    def readMems: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[ReadMems](sym).map(_.mems) }.getOrElse(Set.empty)
+    }
+    def readMems_=(mems: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, ReadMems(mems)) }
+    }
+
 
 
     // --- Streaming Controllers --- //
@@ -401,11 +462,6 @@ package object control {
     def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
     def userSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, UserScheduleDirective(sched))
 
-    def writtenMems: Set[Sym[_]] = metadata[WrittenMems](s).map(_.mems).getOrElse(Set.empty)
-    def writtenMems_=(mems: Set[Sym[_]]): Unit = metadata.add(s, WrittenMems(mems))
-
-    def readMems: Set[Sym[_]] = metadata[ReadMems](s).map(_.mems).getOrElse(Set.empty)
-    def readMems_=(mems: Set[Sym[_]]): Unit = metadata.add(s, ReadMems(mems))
 
     // --- Control Hierarchy --- //
 
@@ -443,6 +499,7 @@ package object control {
 
     def userII: Option[Double] = metadata[UserII](s).map(_.interval)
     def userII_=(interval: Option[Double]): Unit = interval.foreach{ii => metadata.add(s, UserII(ii)) }
+
   }
 
 

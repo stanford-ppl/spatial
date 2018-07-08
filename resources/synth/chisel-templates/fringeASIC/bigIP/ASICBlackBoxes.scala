@@ -72,6 +72,7 @@ trait ASICBlackBoxes {
     val io = IO(new Bundle {
       val a = Input(UInt(aWidth.W))
       val b = Input(UInt(bWidth.W))
+      val flow = Input(Bool())
       val out = Output(UInt(outWidth.W))
     })
 

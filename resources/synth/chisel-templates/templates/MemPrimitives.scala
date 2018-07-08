@@ -266,7 +266,17 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
     }
-    mem._1.io.flow   := chisel3.util.PriorityMux(directSelect.map(_.en) ++ xBarSelect, io.flow) | (directSelect.map(_.en) ++ xBarSelect).reduce[Bool]{case (x:Bool,y:Bool) => ~x & ~y}
+    // Use flow for last active r port
+    val sels = Array.tabulate(directSelect.size + xBarSelect.size){i => 
+      val r = Module(new SRFF())
+      if (i < directSelect.size) r.io.input.set := directSelect(i).en 
+      else r.io.input.set := xBarSelect(i - directSelect.size)
+      r.io.input.reset := false.B
+      if (i < directSelect.size) r.io.input.asyn_reset :=  (directSelect.patch(i,Nil,1).map(_.en) ++ xBarSelect).foldLeft(false.B)(_|_) 
+      else r.io.input.asyn_reset := (directSelect.map(_.en) ++ xBarSelect.patch(i-directSelect.size, Nil, 1)).foldLeft(false.B)(_|_)
+      r.io.output.data
+    }
+    mem._1.io.flow   := chisel3.util.PriorityMux(sels, io.flow)
   }
 
   // Connect read data to output

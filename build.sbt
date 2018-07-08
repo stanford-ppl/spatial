@@ -63,10 +63,9 @@ lazy val templateResources   = (project in file("./resources/synth/chisel-templa
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
-lazy val argon  = project.settings(common).dependsOn(forge, emul)
-lazy val spatialTags = project.settings(common).dependsOn(utils, forge)
+lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 
-lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly, spatialTags)
+lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly)
 lazy val apps = project.settings(common).dependsOn(nova)
 
 /** Set number of threads for testing **/

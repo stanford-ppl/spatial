@@ -84,6 +84,26 @@ object collections {
     def pairs: Iterator[(A,A)] = {
       if (x.size >= 2) (x.tail.iterator.map{m1 => (x.head,m1) } ++ x.tail.pairs) else Iterator.empty
     }
+
+    def mapFind[B](func: A => Option[B]): Option[B] = {
+      var res: Option[B] = None
+      val iter = x.iterator
+      while (res.isEmpty && iter.hasNext) {
+        res = func(iter.next())
+      }
+      res
+    }
+  }
+
+  implicit class IteratorHelpers[A](x: Iterator[A]) {
+    def mapFind[B](func: A => Option[B]): Option[B] = {
+      var res: Option[B] = None
+      val iter = x
+      while (res.isEmpty && iter.hasNext) {
+        res = func(iter.next())
+      }
+      res
+    }
   }
 
   implicit class HashMapOps[K,V](map: mutable.Map[K,V]) {

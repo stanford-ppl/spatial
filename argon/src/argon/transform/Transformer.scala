@@ -19,7 +19,7 @@ import scala.collection.mutable
   *   Mirror - Create a recursive copy of a value with substitutions
   *   Update - Modify the existing value with substitutions
   */
-abstract class Transformer extends Pass {
+abstract class Transformer extends Pass with TransformerInterface {
   protected val f: Transformer = this
 
   /** Helper method for performing substitutions within pattern matching. */

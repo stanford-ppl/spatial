@@ -87,8 +87,11 @@ package object access {
     def isStreamStageHolder: Boolean = a.op.exists(_.isStreamStageHolder)
 
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
-    def isReader: Boolean = Reader.unapply(a).isDefined
-    def isWriter: Boolean = Writer.unapply(a).isDefined
+    def isReader: Boolean = Reader.unapply(a).isDefined || isUnrolledReader
+    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter
+
+    def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
+    def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {
@@ -141,6 +144,7 @@ package object access {
       else false
     }
 
+
     def accessWidth: Int = a match {
       case Op(_:RegFileShiftIn[_,_])        => 1
       case Op(op:RegFileShiftInVector[_,_]) => op.data.width
@@ -174,7 +178,7 @@ package object access {
   /** Returns iterators between controller containing access (inclusive) and controller
     * containing mem (exclusive). Iterators are ordered outermost to innermost.
     */
-  @stateful def accessIterators(access: Sym[_], mem: Sym[_]): Seq[Idx] = {
+  def accessIterators(access: Sym[_], mem: Sym[_]): Seq[Idx] = {
     // Use the parent "master" controller when checking for access iterators if the access and
     // memory are in different sub-controllers.
     // This is to account for memories defined, e.g. in the map (block 0) of a MemReduce

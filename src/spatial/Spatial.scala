@@ -197,6 +197,8 @@ trait Spatial extends Compiler {
     cli.note("")
     cli.note("Experimental:")
 
+    cli.opt[Unit]("broadcast").action{(_,_) => spatialConfig.enableBroadcast = true }.text("Enable broadcast reads")
+
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")
 
     cli.opt[Int]("compressWires").action{(t,_) => spatialConfig.compressWires = t }.text("Enable string compression on chisel wires to shrink JVM bytecode")

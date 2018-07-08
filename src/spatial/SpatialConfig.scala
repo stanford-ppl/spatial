@@ -39,6 +39,8 @@ class SpatialConfig extends Config {
   var enableAsyncMem = false
   var enableRetiming = true
 
+  var enableBroadcast = false // Allow broadcasting reads
+
   // Internal flag used to mark whether unit pipe transformer has been run or not
   var allowPrimitivesInOuterControl = true
 

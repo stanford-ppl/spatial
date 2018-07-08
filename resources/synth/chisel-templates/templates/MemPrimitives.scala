@@ -266,7 +266,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       mem._1.io.r.ofs  := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).ofs
       mem._1.io.r.en   := chisel3.util.PriorityMux(directSelect.map(_.en), directSelect).en 
     }
-    mem._1.io.flow   := chisel3.util.PriorityMux(directSelect.map(_.en) ++ xBarSelect, io.flow)
+    mem._1.io.flow   := chisel3.util.PriorityMux(directSelect.map(_.en) ++ xBarSelect, io.flow) | (directSelect.map(_.en) ++ xBarSelect).reduce[Bool]{case (x:Bool,y:Bool) => ~x & ~y}
   }
 
   // Connect read data to output

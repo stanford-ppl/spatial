@@ -374,12 +374,12 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   override protected def quote(s: Sym[_]): String = s.rhs match {
     case Def.Bound(id)  => 
-      val base = super.quote(s)
+      val base = wireMap(super.quote(s))
       val (pipelineRemap, pmod) = appendChainPass(s, base)
       val (streamRemap, smod) = appendStreamSuffix(s, base)
       if (pmod & smod) throw new Exception(s"ERROR: Seemingly impossible bound sym that is both part of a pipeline and a stream pipe!")
-      if (smod) streamRemap
-      else if (pmod) pipelineRemap
+      if (smod) wireMap(streamRemap)
+      else if (pmod) wireMap(pipelineRemap)
       else base
     case Def.Node(_,_) => // Specifically places suffix on ctrchains
       val base = super.quote(s)

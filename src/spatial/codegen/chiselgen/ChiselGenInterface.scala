@@ -44,17 +44,17 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case GetReg(reg) if reg.isHostIO =>
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
       val id = argHandle(reg)
-      emitGlobalWire(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
+      emitt(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
 
     case RegRead(reg)  if reg.isArgIn =>
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
       val id = argHandle(reg)
-      emitGlobalWire(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
+      emitt(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
 
     case RegRead(reg)  if reg.isHostIO =>
       emitGlobalWireMap(src"""${lhs}""",src"Wire(${lhs.tp})")
       val id = argHandle(reg)
-      emitGlobalWire(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
+      emitt(src"""${lhs}.r := io.argIns(api.${id}_arg)""")
 
     case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)

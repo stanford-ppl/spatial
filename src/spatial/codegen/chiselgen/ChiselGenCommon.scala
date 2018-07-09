@@ -382,9 +382,9 @@ trait ChiselGenCommon extends ChiselCodegen {
       else if (pmod) wireMap(pipelineRemap)
       else base
     case Def.Node(_,_) => // Specifically places suffix on ctrchains
-      val base = super.quote(s)
+      val base = wireMap(super.quote(s))
       val (streamRemap, smod) = appendStreamSuffix(s, base)
-      if (smod) streamRemap
+      if (smod) wireMap(streamRemap)
       else DLTrace(s).getOrElse(base)
     case _ => super.quote(s)
   }

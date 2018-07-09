@@ -447,7 +447,8 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs)
       emitIICounter(lhs)
-      allocateIters(iters, cchain)
+      if (lhs.isStreamControl) forEachChild(lhs){case (c,i) => allocateIters(iters, cchain)}
+      else allocateIters(iters, cchain)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
@@ -484,7 +485,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
       emitIICounter(lhs)
-      allocateIters(iters, cchain)
+      if (lhs.isStreamControl) forEachChild(lhs){case (c,i) => controllerStack.push(c); allocateIters(iters, cchain); controllerStack.pop()}
+      else allocateIters(iters, cchain)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {

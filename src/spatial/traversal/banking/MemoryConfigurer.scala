@@ -111,7 +111,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     }
   }
 
-  /** True if a and b always occur at the exact same time.
+  /** True if a and b always occur at the exact same time, or if are interface arg reads.
     * This is trivially true if a and b are the same unrolled access.
     *
     * This method is used to enable broadcast reads.
@@ -119,6 +119,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   def canBroadcast(a: AccessMatrix, b: AccessMatrix): Boolean = {
     // TODO[3]: What about accesses of the same form across different loops?
     // Should we rely on loop fusion for this? Are there cases where that wouldn't work?
+    if (isGlobal) return true
     val isWrite = a.access.isWriter || b.access.isWriter
     if (isWrite || a.access != b.access || a.matrix != b.matrix) return false
 
@@ -334,6 +335,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
+    dbgs(s"$a and $b = $concurrent and $conflicting")
     concurrent && conflicting
   }
 

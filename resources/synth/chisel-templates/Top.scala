@@ -134,7 +134,7 @@ class DE1SoCInterface(p: TopParams) extends TopInterface {
 }
 
 class AWSInterface(p: TopParams) extends TopInterface {
-  val axiLiteParams = new AXI4BundleParameters(p.dataWidth, p.dataWidth, 1)
+  val axiLiteParams = new AXI4BundleParameters(p.addrWidth, p.dataWidth, 1)
   val axiParams = new AXI4BundleParameters(p.dataWidth, 512, 16)
 
   val enable = Input(UInt(p.dataWidth.W))

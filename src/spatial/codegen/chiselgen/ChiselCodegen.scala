@@ -117,75 +117,44 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
       val extractor(d,w) = rhs
       s"${vec}ff${d}_${w}"
-    } else if (rhs.contains(" R_Info(")) {
-      val extractor = ".*R_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
-      val extractor(n,dims) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}mdr${n}_${d}"
-    } else if (rhs.contains(" W_Info(")) {
-      val extractor = ".*W_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(n,dims,w) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}mdw${n}_${d}_${w}"
-    } else if (rhs.contains(" RegR_Info(")) {
-      val extractor = ".*RegR_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
-      val extractor(n,dims) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}ri${n}_${d}"
-    } else if (rhs.contains(" RegW_Info(")) {
-      val extractor = ".*RegW_Info\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(n,dims,w) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}wi${n}_${d}_${w}"
-    } else if (rhs.contains(" multidimRegW(")) {
-      val extractor = ".*multidimRegW\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9, ]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(n,dims,w) = rhs
-      val d = dims.replace(" ", "").replace(",","_")
-      s"${vec}mdrw${n}_${d}_${w}"
-    } else if (rhs.contains(" Seqpipe(")) {
-      val extractor = ".*Seqpipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
+    } else if (rhs.contains(" W_Direct(")) {
+      val extractor = ".*W_Direct\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(ofsW,bankWs,dW) = rhs
+      val bWs = bankWs.replace(" ", "").replace(",","_")
+      s"${vec}wdbar${ofsW}_${bWs}_${dW}"
+    } else if (rhs.contains(" R_Direct(")) {
+      val extractor = ".*R_Direct\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
+      val extractor(ofsW,bankWs) = rhs
+      val bWs = bankWs.replace(" ", "").replace(",","_")
+      s"${vec}rdbar${ofsW}_${bWs}"
+    } else if (rhs.contains(" W_XBar(")) {
+      val extractor = ".*W_XBar\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(ofsW,bankWs,dW) = rhs
+      val bWs = bankWs.replace(" ", "").replace(",","_")
+      s"${vec}wxbar${ofsW}_${bWs}_${dW}"
+    } else if (rhs.contains(" R_XBar(")) {
+      val extractor = ".*R_XBar\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
+      val extractor(ofsW,bankWs) = rhs
+      val bWs = bankWs.replace(" ", "").replace(",","_")
+      s"${vec}rxbar${ofsW}_${bWs}"
+    } else if (rhs.contains(" RegChainPass(")) {
+      val extractor = ".*RegChainPass\\([ ]*([0-9]+)[ ]*,[ ]*([0-9,]+)[ ]*\\).*".r
+      val extractor(depth,width) = rhs
+      s"${vec}rcp${depth}_${width}"
+    } else if (rhs.contains(" InnerControl(")) {
+      val extractor = ".*InnerControl\\([ ]*templates\\.([a-zA-Z]+)[ ]*,[ ]*([falsetrue]+)[ ]*.*\\).*".r
+      val extractor(style,fsm) = rhs
+      val st = style.take(3)
       val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}seq${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Metapipe(")) {
-      val extractor = ".*Metapipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
+      s"${vec}inr${st}_${f}"
+    } else if (rhs.contains(" OuterControl(")) {
+      val extractor = ".*OuterControl\\([ ]*templates\\.([a-zA-Z]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*.*\\).*".r
+      val extractor(style,children,fsm) = rhs
       val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}meta${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Innerpipe(")) {
-      val extractor = ".*Innerpipe\\([ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(strm,ctrd,stw,static,isRed) = rhs
-      val st = strm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}inner${st}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Streaminner(")) {
-      val extractor = ".*Streaminner\\([ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(strm,ctrd,stw,static,isRed) = rhs
-      val st = strm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}strinner${st}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Parallel(")) {
-      val extractor = ".*Parallel\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
-      val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}parallel${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains(" Streampipe(")) {
-      val extractor = ".*Streampipe\\([ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*,[ ]*ctrDepth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*stateWidth[ ]*=[ ]*([0-9]+)[ ]*,[ ]*staticNiter[ ]*=[ ]*([falsetrue]+),[ ]*isReduce[ ]*=[ ]*([falsetrue]+)\\).*".r
-      val extractor(stages,fsm,ctrd,stw,static,isRed) = rhs
-      val f = fsm.replace("false", "f").replace("true", "t")
-      val s = static.replace("false", "f").replace("true", "t")
-      val ir = isRed.replace("false", "f").replace("true", "t")
-      s"${vec}strmpp${stages}_${f}_${ctrd}_${stw}_${s}_${ir}"
-    } else if (rhs.contains("_retime")) {
-      "rt"
+      val st = style.take(3)
+      s"${vec}outr${st}_${children}_${f}"
+    } else if (rhs.contains("_latency")) {
+      "lat"
     } else {
       throw new Exception(s"Cannot compress ${rhs}!")
     }
@@ -198,9 +167,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         case Const(_) => src"$data"
         case _ => wireMap(src"${data}_D$size" + alphaconv.getOrElse(src"${data}_D$size", ""))
       }
-      case _ => super.named(s, id)
+      case _ => wireMap(super.named(s, id))
     }
-    case _ => super.named(s, id)
+    case _ => wireMap(super.named(s, id))
   }
 
   final protected def startFile(): Unit = {
@@ -302,9 +271,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   final protected def emitGlobalRetimeMap(lhs: String, rhs: String, forceful: Boolean = false): Unit = {
     val module_type = rhs.replace(" ", "")
     if (spatialConfig.compressWires == 1 | spatialConfig.compressWires == 2) {
-      // Assume _retime values only emitted once
-      val id = compressorMap.values.map(_._1).filter(_ == "_retime").size
-      compressorMap += (lhs -> ("_retime", id))
+      // Assume _latency values only emitted once
+      val id = compressorMap.values.map(_._1).filter(_ == "_latency").size
+      compressorMap += (lhs -> ("_latency", id))
       retimeList += rhs
     } else {
       emitGlobalWire(src"val $lhs = $rhs", forceful)
@@ -315,11 +284,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     val module_type_white = rhs.replace("new ", "newnbsp").replace(" ", "").replace("nbsp", " ")
     var rtid = "na"
     if (spatialConfig.compressWires == 1 | spatialConfig.compressWires == 2) {
-      val module_type = if (module_type_white.contains("retime=")) {
-        val extract = ".*retime=rt\\(([0-9]+)\\),.*".r
+      val module_type = if (module_type_white.contains("latency=")) {
+        val extract = ".*,latency=lat\\(([0-9]+)\\).*".r
         val extract(x) = module_type_white
         rtid = x
-        module_type_white.replace(s"retime=rt(${rtid}),","")
+        module_type_white.replace(s",latency=lat(${rtid})","")
       } else {
         module_type_white
       }

@@ -342,7 +342,7 @@ trait ChiselFileGen extends ChiselCodegen {
   //   // TODO: Figure out better way to pass constructor args to IOModule.  Currently just recreate args inside IOModule redundantly
   // }""")
   //       }
-      } else if (spatialConfig.compressWires == 0) {
+      } else if (spatialConfig.compressWires == 0 | spatialConfig.compressWires == 1) {
         val allTraits = streamExtensions.flatMap{s => List.tabulate(s._2){i => src"${s._1}_${i+1}"}}.toList
                                         .filterNot{a => a.contains("Instantiator") | a.contains("AccelTop") | a.contains("Mapping")}
 

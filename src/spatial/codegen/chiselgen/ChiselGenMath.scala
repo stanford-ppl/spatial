@@ -261,7 +261,7 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixFloor(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Cat(${a}.raw_dec, 0.U(${fracBits(a)}.W))")
     case FixCeil(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Mux(${a}.raw_frac === 0.U, ${a}.r, Cat(${a}.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
-    case DataAsBits(data) => emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})");emitt(src"${lhs}.zipWithIndex.foreach{case (b, i) => b := ${data}(i)}")
+    case DataAsBits(data) => emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})");emitt(src"${lhs}.zipWithIndex.foreach{case (dab, i) => dab := ${data}(i)}")
     case BitsAsData(data, fmt) => emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := chisel3.util.Cat(${data}.reverse)")
     // case FltInvSqrt(x) => x.tp match {
     //   case DoubleType() => throw new Exception("DoubleType not supported for FltInvSqrt") 

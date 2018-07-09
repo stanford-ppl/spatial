@@ -14,8 +14,8 @@ trait ChiselGenVec extends ChiselGenCommon {
 
     case VecConcat(list) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"var ${lhs}_i = 0")
-      list.zipWithIndex.foreach{case (a, i) => emitt(src"${a}.zipWithIndex.foreach{case (a,i) => ${lhs}(${lhs}_i + i) := a}; ${lhs}_i = ${lhs}_i + ${a}.length") }
+      emitt(s"var ${lhs}_i = 0")
+      list.zipWithIndex.foreach{case (a, i) => emitt(s"${quote(a)}.zipWithIndex.foreach{case (a,i) => ${quote(lhs)}(${lhs}_i + i) := a}; ${lhs}_i = ${lhs}_i + ${quote(a)}.length") }
 
     case VecApply(vec, id) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")

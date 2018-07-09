@@ -106,7 +106,7 @@ trait ChiselGenController extends ChiselGenCommon {
         // emitGlobalWire(s"//${validPassMap}")
         emitGlobalModuleMap(src"${v}","Wire(Bool())")  
         if (lhs.isOuterPipeControl) {
-          lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModuleMap(src"""${v}_chain_read_$i""", "Wire(Bool())")}
+          lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModuleMap(src"""${swap(src"$v", Blank)}_chain_read_$i""", "Wire(Bool())")}
         }
       }
     }
@@ -140,7 +140,7 @@ trait ChiselGenController extends ChiselGenCommon {
           stages.zipWithIndex.foreach{ case (s, i) =>
             emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
             emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
-            emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${swap(s, Done)}, ${swap(s, En)}, $i) // Used to be delay of 1 on Nov 26, 2017 but not sure why""")
+            emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${swap(s, Done)}, ${swap(s, En)}, $i)""")
           }
         }
         emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.doneIn.head)""")
@@ -208,19 +208,22 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-  final private def emitIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
+  final private def allocateIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
     val Op(CounterChainNew(counters)) = cchain
-
     iters.zipWithIndex.foreach{ case (is, i) =>
       val w = bitWidth(counters(i).typeArgs.head)
-      if (is.size == 1) { // This level is not parallelized, so assign the iter as-is  
-        emitGlobalWireMap(src"${is(0)}", src"Wire(new FixedPoint(true,$w,0))")
-        emitt(src"${swap(src"${is(0)}", Blank)}.raw := ${counters(i)}(0).r")
-      } else { // This level IS parallelized, index into the counters correctly
-        is.zipWithIndex.foreach{ case (iter, j) =>
-          emitGlobalWireMap(src"${iter}", src"Wire(new FixedPoint(true,$w,0))")
-          emitt(src"${swap(src"${iter}", Blank)}.raw := ${counters(i)}($j).r")
-        }
+      is.zipWithIndex.foreach{ case (iter, j) =>
+        emitGlobalWireMap(src"${iter}", src"Wire(new FixedPoint(true,${w},0))")
+      }
+    }
+  }
+
+
+  final private def emitIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
+    val Op(CounterChainNew(counters)) = cchain
+    iters.zipWithIndex.foreach{ case (is, i) =>
+      is.zipWithIndex.foreach{ case (iter, j) =>
+        emitt(src"${swap(src"${iter}", Blank)}.raw := ${counters(i)}($j).r")
       }
     }
   }
@@ -300,7 +303,10 @@ trait ChiselGenController extends ChiselGenCommon {
     // Generate standard control signals for all types
     emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
     emitGlobalRetimeMap(src"""${sym}_ii""", s"$ii.toInt")
-    emitControlSignals(sym)
+
+    // Emit control signals for children up front because of blk/parent distinction, a regread in an outer pipe may use control signals of a still-to-be-visited controller
+    forEachChild(sym){case (c, idx) => emitControlSignals(c)}
+
     createInstrumentation(sym)
 
     // Create controller
@@ -308,11 +314,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getStreamReadyLogic(sym)}""")
-    emitt(src"""${swap(sym, RstEn)} := ${swap(sym, SM)}.io.ctrRst // Generally used in inner pipes""")
     emitt(src"""${swap(sym, SM)}.io.rst := ${swap(sym, Resetter)} // generally set by parent""")
 
     //  Capture rst out (ctrRst)
     emitGlobalWireMap(src"""${swap(sym, RstEn)}""", """Wire(Bool())""") 
+    emitt(src"""${swap(sym, RstEn)} := ${swap(sym, SM)}.io.ctrRst // Generally used in inner pipes""")
 
     // Capture sm done
     val streamOuts = getAllReadyLogic(sym.toCtrl).mkString(" && ")
@@ -371,6 +377,7 @@ trait ChiselGenController extends ChiselGenCommon {
       inAccel{
         hwblock = Some(enterCtrl(lhs))
         val streamAddition = getStreamEnablers(lhs)
+        emitControlSignals(lhs)
         emitController(lhs)
         emitGlobalWire(src"val accelReset = reset.toBool | io.reset")
         emitt(s"""${swap(lhs, BaseEn)} := io.enable""")
@@ -416,10 +423,9 @@ trait ChiselGenController extends ChiselGenCommon {
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
       inSubGen(src"${lhs}", src"${parent_kernel}") {
         emitt(s"// Controller Stack: ${controllerStack.tail}")
-        emitChildrenCxns(lhs)
         visitBlock(func)
+        emitChildrenCxns(lhs)
       }
-      val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
       exitCtrl(lhs)
 
     case ParallelPipe(ens,func) =>
@@ -429,8 +435,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitGlobalWire(src"""${swap(lhs, IIDone)} := true.B""")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
         emitt(s"// Controller Stack: ${controllerStack.tail}")
-        emitChildrenCxns(lhs)
         visitBlock(func)
+        emitChildrenCxns(lhs)
       } 
       val en = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" && ")
       emitt(src"${swap(lhs, Mask)} := $en")
@@ -439,17 +445,17 @@ trait ChiselGenController extends ChiselGenCommon {
 
     case UnrolledForeach(ens,cchain,func,iters,valids) if (inHw) =>
       val parent_kernel = enterCtrl(lhs)
-      emitController(lhs) // If this is a stream, then each child has its own ctr copy
-      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
+      emitController(lhs)
       emitIICounter(lhs)
+      allocateIters(iters, cchain)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
           emitt(s"// Controller Stack: ${controllerStack.tail}")
           emitIters(iters, cchain)
           allocateValids(lhs, cchain, iters, valids)
-          emitChildrenCxns(lhs)
           visitBlock(func)
+          emitChildrenCxns(lhs)
         }
         emitValids(lhs, cchain, iters, valids)
       }
@@ -460,8 +466,8 @@ trait ChiselGenController extends ChiselGenCommon {
             emitIters(iters, cchain)
             allocateValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
           }
-          emitChildrenCxns(lhs)
           visitBlock(func)
+          emitChildrenCxns(lhs)
         }
         forEachChild(lhs){case (_,_) =>
           emitValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
@@ -478,14 +484,15 @@ trait ChiselGenController extends ChiselGenCommon {
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
       emitIICounter(lhs)
+      allocateIters(iters, cchain)
       allocateRegChains(lhs, iters.flatten, cchain)
       if (lhs.isPipeControl | lhs.isSeqControl) {
         inSubGen(src"${lhs}", src"${parent_kernel}") {
           emitt(s"// Controller Stack: ${controllerStack.tail}")
           emitIters(iters, cchain)
           allocateValids(lhs, cchain, iters, valids)
-          emitChildrenCxns(lhs)
           visitBlock(func)
+          emitChildrenCxns(lhs)
         }
         emitValids(lhs, cchain, iters, valids)
       }
@@ -496,8 +503,8 @@ trait ChiselGenController extends ChiselGenCommon {
             emitIters(iters, cchain)
             allocateValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
           }
-          emitChildrenCxns(lhs)
           visitBlock(func)
+          emitChildrenCxns(lhs)
         }
         forEachChild(lhs){case (_,_) =>
           emitValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
@@ -548,7 +555,6 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       emitIICounter(lhs)
-      emitChildrenCxns(lhs, false)
       val cases = lhs.children.filter(_.s.get != lhs).map(_.s.get)
       
       // Route through signals
@@ -577,6 +583,7 @@ trait ChiselGenController extends ChiselGenCommon {
         }
         visitBlock(body)
       }
+      emitChildrenCxns(lhs, false)
       exitCtrl(lhs)
 
 
@@ -584,7 +591,6 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs) // If this is a stream, then each child has its own ctr copy
       emitIICounter(lhs)
-      emitChildrenCxns(lhs, false)
       // emitInhibitor(lhs, None, Some(lhs.parent.s.get))
       emitt(src"""${swap(lhs, CtrTrivial)} := ${DL(swap(controllerStack.tail.head, CtrTrivial), 1, true)} | false.B""")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
@@ -597,6 +603,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"$lhs.r := ${body.result}.r")
         }
       }
+      emitChildrenCxns(lhs, false)
       exitCtrl(lhs)
 
 
@@ -609,7 +616,23 @@ trait ChiselGenController extends ChiselGenCommon {
         inGenn(out, "GlobalModules", ext) {
           emitt(src"val ic = List.fill(${instrumentCounters.length*2}){Module(new InstrumentationCounter())}")
         }
+        inGenn(out, "Mapping", ext) {
+          emit("// Found the following wires:")
+          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
+            emit(s"    // $wire (${listHandle(wire)})")
+          }
+          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
+            val handle = listHandle(wire)
+            emit("")
+            emit(s"// ${wire}")
+            emit("// ##################")
+            compressorMap.filter(_._2._1 == wire).foreach{entry => 
+              emit(s"      // ${handle}(${entry._2._2}) = ${entry._1}")
+            }
+          }
+        }
       }
+
 
       emitGlobalWire(s"val max_latency = $maxretime")
 
@@ -648,30 +671,30 @@ trait ChiselGenController extends ChiselGenCommon {
         emit (s"val io_numArgOuts_instr = ${instrumentCounters.length*2}")
         emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
 
-        // emit ("""// Set Build Info""")
-        // val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
-        // if (config.multifile == 5 || config.multifile == 6) {
-        //   pipeRtMap.groupBy(_._1._1).map{x => 
-        //     val listBuilder = x._2.toList.sortBy(_._1._2).map(_._2)
-        //     emit (src"val ${listHandle(x._1)}_rtmap = List(${listBuilder.mkString(",")})")
-        //   }
-        //   // TODO: Make the things below more efficient
-        //   compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
-        //     if (wire == "_retime") {
-        //       emit (src"val ${listHandle(wire)} = List[Int](${retimeList.mkString(",")})")  
-        //     }
-        //   }
-        //   compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
-        //     if (wire == "_retime") {
-        //     } else if (wire.contains("pipe(") || wire.contains("inner(")) {
-        //       val numel = compressorMap.filter(_._2._1 == wire).size
-        //       emit (src"val ${listHandle(wire)} = List.tabulate(${numel}){i => ${wire.replace("))", src",retime=${listHandle("_retime")}(${listHandle(wire)}_rtmap(i))))")}}")
-        //     } else {
-        //       val numel = compressorMap.filter(_._2._1 == wire).size
-        //       emit (src"val ${listHandle(wire)} = List.fill(${numel}){${wire}}")            
-        //     }
-        //   }
-        // }
+        emit ("""// Set Build Info""")
+        val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
+        if (spatialConfig.compressWires >= 1) {
+          pipeRtMap.groupBy(_._1._1).map{x => 
+            val listBuilder = x._2.toList.sortBy(_._1._2).map(_._2)
+            emit (src"val ${listHandle(x._1)}_latmap = List(${listBuilder.mkString(",")})")
+          }
+          // TODO: Make the things below more efficient
+          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
+            if (wire == "_latency") {
+              emit (src"val ${listHandle(wire)} = List[Int](${retimeList.mkString(",")})")  
+            }
+          }
+          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
+            if (wire == "_latency") {
+            } else if (wire.contains("InnerControl(") || wire.contains("OuterControl(")) {
+              val numel = compressorMap.filter(_._2._1 == wire).size
+              emit (src"val ${listHandle(wire)} = List.tabulate(${numel}){i => ${wire.replace("))", src",latency=${listHandle("_latency")}(${listHandle(wire)}_latmap(i))))")}}")
+            } else {
+              val numel = compressorMap.filter(_._2._1 == wire).size
+              emit (src"val ${listHandle(wire)} = List.fill(${numel}){${wire}}")            
+            }
+          }
+        }
 
         emit (s"Utils.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
         emit (s"Utils.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
@@ -684,7 +707,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit (s"Utils.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
         emit (s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
         emit (s"Utils.SramThreshold = 4")
-        // emit (s"""Utils.target = ${trgt}""")
+        emit (s"""Utils.target = ${trgt}""")
         emit (s"""Utils.retime = ${spatialConfig.enableRetiming}""")
 
       }

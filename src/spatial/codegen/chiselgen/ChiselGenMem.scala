@@ -42,9 +42,6 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
 
     ens.zipWithIndex.foreach{case (e, i) => 
-      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
       if (lhs.isDirectlyBanked & !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.toInt)}))") 
         emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
@@ -55,8 +52,6 @@ trait ChiselGenMem extends ChiselGenCommon {
           case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
           case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
         }
-
-        
       } else {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
         bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
@@ -65,6 +60,9 @@ trait ChiselGenMem extends ChiselGenCommon {
           case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
         }
       }
+      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
+      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
     }
     
   }
@@ -85,10 +83,6 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     data.zipWithIndex.foreach{case (d, i) => 
       val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
-      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable}""")
-      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable} & ${ens(i).map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
-      emitt(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
       if (lhs.isDirectlyBanked && !isBroadcast) {
         emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_Direct($ofsWidth, ${bank(i).map(_.toInt)}, $width))") 
         emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, (${muxPort}, $muxOfs), $i)""")
@@ -101,6 +95,10 @@ trait ChiselGenMem extends ChiselGenCommon {
         bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
         emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, (${muxPort}, $muxOfs), $i)""")
       }
+      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable}""")
+      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable} & ${ens(i).map(quote).mkString(" & ")}""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
+      emitt(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
     }
   }
 

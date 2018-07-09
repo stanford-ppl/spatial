@@ -131,7 +131,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## Integer Multiplier
 create_ip -name mult_gen -vendor xilinx.com -library ip -version 12.0 -module_name $moduleName
-set_property -dict [list CONFIG.MultType {Parallel_Multiplier} CONFIG.PortAType {$signedString}  CONFIG.PortAWidth {$aWidth} CONFIG.PortBType {$signedString} CONFIG.PortBWidth {$bWidth} CONFIG.Multiplier_Construction {$multConstruction} CONFIG.OptGoal {Speed} CONFIG.Use_Custom_Output_Width {true} CONFIG.OutputWidthHigh {$outWidth} CONFIG.PipeStages {$latency} CONFIG.ClockEnable {true}]] [get_ips $moduleName]
+set_property -dict [list CONFIG.MultType {Parallel_Multiplier} CONFIG.PortAType {$signedString}  CONFIG.PortAWidth {$aWidth} CONFIG.PortBType {$signedString} CONFIG.PortBWidth {$bWidth} CONFIG.Multiplier_Construction {$multConstruction} CONFIG.OptGoal {Speed} CONFIG.Use_Custom_Output_Width {true} CONFIG.OutputWidthHigh {$outWidth} CONFIG.PipeStages {$latency} CONFIG.ClockEnable {true}] [get_ips $moduleName]
 set_property -dict [list CONFIG.clk_intf.FREQ_HZ $$CLOCK_FREQ_HZ] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]

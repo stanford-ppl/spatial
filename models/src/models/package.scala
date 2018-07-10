@@ -75,6 +75,7 @@ package object models {
 
     def apply(xs: (String,Double)*): Model[Double,C] = a.map(_.eval(xs:_*))
     def eval(xs: (String,Double)*): Model[Double,C] = a.map(_.eval(xs:_*))
+    def exactEval(xs: (String,Double)*): Model[Double,C] = a.map(_.exactEval(xs:_*))
     def partial(xs: (String,Double)*): Model[LinearModel,C] = a.map(_.partial(xs:_*))
 
     def cleanup: Model[LinearModel,C] = a.map(_.cleanup)
@@ -85,5 +86,6 @@ package object models {
     implicit val dbl: C[Double] = a.config.convert(d = 0.0)
     def apply(xs: (String,Double)*): Model[Double,C] = a.map{nm => nm.eval(xs:_*) }
     def eval(xs: (String,Double)*): Model[Double,C] = a.map(_.eval(xs:_*))
+    def exactEval(xs: (String,Double)*): Model[Double,C] = a.map(_.exactEval(xs:_*))
   }
 }

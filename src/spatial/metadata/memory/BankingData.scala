@@ -19,14 +19,16 @@ sealed abstract class Banking {
   def stride: Int
   def dims: Seq[Int]
   def alphas: Seq[Int]
+  def Ps: Seq[Int]
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int]) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int]) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
+  override def Ps: Seq[Int] = P
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
@@ -34,11 +36,11 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int]) extends B
   }
   override def toString: String = {
     val name = if (B == 1) "Cyclic" else "Block Cyclic"
-    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>"
+    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}>"
   }
 }
 object ModBanking {
-  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i})
+  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
 }
 
 
@@ -162,58 +164,14 @@ case class Memory(
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
-    val w = mem.stagedDims.map(_.toInt)
+    val w = mem.stagedDims.map(_.toInt).zip(mem.getPadding.getOrElse(Seq.fill(mem.stagedDims.size)(0))).map{case(x,y) => x+y}
     val D = mem.seqRank.length
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride
-
-      /* Offset correction not mentioned in p199-wang
-         0. Equations in paper must be wrong.  Example 
-             ex-     alpha = 1,2    N = 4     B = 1
-                          
-                 banks:   0 2 0 2    ofs (bank0):   0 * 0 *
-                          1 3 1 3                   * * * *
-                          2 0 2 0                   * 2 * 2 
-                          1 3 1 3                   * * * *
-
-            These offsets conflict!  They went wrong by assuming NB periodicity of 1 in leading dimension
-
-         1. Proposed correction: Divide memory into "offset chunks" by finding the 
-            periodicity of the banking pattern and fencing off a portion that contains each bank exactly once
-             P_i = NB / gcd(NB,alpha_i)
-                 ** if alpha_i = 0, then P_i = infinity **
-
-             ex-     alpha = 3,4    N = 6     B = 1
-                          _____
-                 banks:  |0 4 2|0 4 2 0 4 2
-                         |3_1_5|3 1 5 3 1 5
-                          0 4 2 0 4 2 0 4 2
-                          3 1 5 3 1 5 3 1 5
-                 banking pattern: 0 4 2
-                                  3 1 5
-                 P = 2,3
-         2. If any dimesion has period = NB, then set all other periods to 1 as this sliver contains all banks.  Otherwise, do not change P
-         3. Compute offset chunk
-            ofsdim_i = floor(x_i/P_i)
-         4. Flatten these ofsdims
-            ofschunk = ... + (ofsdim_0 * ceil(w_1 / P_1)) + ofsdim_1
-         5. If B != 1, do extra math to compute index within the block
-            intrablockdim_i = x_i mod B
-         6. Flatten intrablockdims
-            intrablockofs = ... + intrablockdim_0 * B + intrablockdim_1
-         7. Combine ofschunk and intrablockofs
-            ofs = ofschunk * exp(B,D) + intrablockofs
-
-      */
       val alpha = banking.head.alphas
-      def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
-      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 65535 else n*b/gcd(n*b,alpha(i))}
-      val P = if (P_raw.contains(n*b)) { 
-        val i = P_raw.indexOf(n*b)
-        (0 until D).map{id => if (id == i) n*b else 1}
-      } else P_raw
-     
+      val P = banking.head.Ps
+
       val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
         val p = P(t)
@@ -265,6 +223,15 @@ object Memory {
   * Default: undefined
   */
 case class Duplicates(d: Seq[Memory]) extends Data[Duplicates](Transfer.Mirror)
+
+
+/** Padding on memory per dimension so that offset calculation works out
+  * Option:  sym.getPadding
+  * Getter:  sym.padding
+  * Setter:  sym.padding = (Seq[Int])
+  * Default: undefined
+  */
+case class Padding(dims: Seq[Int]) extends Data[Padding](SetBy.Analysis.Self)
 
 
 /** Map of a set of memory dispatch IDs for each unrolled instance of an access node.

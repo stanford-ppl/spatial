@@ -1,6 +1,7 @@
 package spatial.metadata
 
 import argon._
+import spatial.node._
 
 package object retiming {
 
@@ -10,6 +11,12 @@ package object retiming {
 
     def fullDelay: Double = metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
     def fullDelay_=(d: Double): Unit = metadata.add(s, FullDelay(d))
+
+    def trace: Sym[_] = s match {
+    	case Op(DelayLine(_,data)) => data.trace
+    	case _ => s
+    }
+
   }
 
 }

@@ -6,6 +6,7 @@ import forge.tags._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.retiming._
 import poly.{ISL,ConstraintMatrix}
 
 package object access {
@@ -169,7 +170,7 @@ package object access {
 
     def isDirectlyBanked: Boolean = {
       if (a.banks.toList.flatten.isEmpty) false
-      else if (a.banks.head.head.isConst) true
+      else if (a.banks.head.head.asInstanceOf[Sym[_]].trace.isConst) true
       else false
     }
   }

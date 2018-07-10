@@ -27,6 +27,11 @@ package object memory {
     def duplicates: Seq[Memory] = getDuplicates.getOrElse{throw new Exception(s"No duplicates defined for $s")}
     def duplicates_=(ds: Seq[Memory]): Unit = metadata.add(s, Duplicates(ds))
 
+    /** Post-banking analysis metadata about padding based on banking selection */
+
+    def getPadding: Option[Seq[Int]] = metadata[Padding](s).map(_.dims)
+    def padding: Seq[Int] = getPadding.getOrElse{throw new Exception(s"No padding defined for $s")}
+    def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
 
     /** Post-unrolling duplicates (exactly one Memory instance per node) */
 

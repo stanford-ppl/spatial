@@ -22,8 +22,8 @@ trait ChiselGenDelay extends ChiselGenCommon {
           alphaconv_register(src"$lhs")
           emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
           lhs.tp match {
-            case a:Vec[_] => emit(src"(0 until ${a.width}).foreach{i => ${lhs}(i).r := ${DL(src"${data}(i).r", delay)}}")
-            case _ =>        emit(src"""${lhs}.r := ${DL(src"${data}.r", delay, false)}""")
+            case a:Vec[_] => emitt(src"(0 until ${a.width}).foreach{i => ${lhs}(i).r := ${DL(src"${data}(i).r", delay)}}")
+            case _ =>        emitt(src"""${lhs}.r := ${DL(src"${data}.r", delay, false)}""")
           }
       }
 

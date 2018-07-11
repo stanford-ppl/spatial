@@ -544,7 +544,7 @@ object Utils {
     def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
     def sortByMuxPortAndOfs: XMap = XMap(x.toSeq.sortBy(r => (r._1._1, r._1._2))) // Order the map by (muxPort, muxOfs)
-    def sortByMuxPortAndCombine: XMap = XMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).sum, entries.head._2._2)}.toSeq) // Combine entries so that every muxOfs = 0, then sort
+    def sortByMuxPortAndCombine: XMap = XMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).sum, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2))) // Combine entries so that every muxOfs = 0, then sort
     def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
     def merge(y: XMap): XMap = {
       if (y.nonEmpty) {
@@ -565,7 +565,7 @@ object Utils {
     def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1.length).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
     def sortByMuxPortAndOfs: DMap = DMap(x.toSeq.sortBy(r => (r._1._1, r._1._2)))
-    def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq) // Combine entries so that every muxOfs = 0, then sort
+    def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2))) // Combine entries so that every muxOfs = 0, then sort
     def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
   }
   def DMap(xs:((Int,Int),(List[Banks], Option[Int]))*) = ListMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)

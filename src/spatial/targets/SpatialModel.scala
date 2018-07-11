@@ -51,12 +51,20 @@ abstract class SpatialModel[F[A]<:Fields[A,F]](target: HardwareTarget) extends N
     }
   }
   @stateful def model(sym: Sym[_], key: String): Double = model(sym).apply(key)
+  @stateful def exactModel(sym: Sym[_], key: String): Double = exactModel(sym).apply(key)
 
   @stateful def model(sym: Sym[_]): Resources = sym match {
     case Expect(_) => NONE
     case Op(op) =>
       val (name, params) = nodeParams(sym, op)
       model(name)(params:_*)
+    case _ => NONE
+  }
+  @stateful def exactModel(sym: Sym[_]): Resources = sym match {
+    case Expect(_) => NONE
+    case Op(op) =>
+      val (name, params) = nodeParams(sym, op)
+      exactModel(name)(params:_*)
     case _ => NONE
   }
 

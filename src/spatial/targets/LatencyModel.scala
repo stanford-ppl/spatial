@@ -16,7 +16,7 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
     if (inReduce) latencyInReduce(s) else latencyOfNode(s)
   }
 
-  @stateful def latencyInReduce(s: Sym[_]): Double = model(s, "LatencyInReduce")
+  @stateful def latencyInReduce(s: Sym[_]): Double = exactModel(s, "LatencyInReduce")
 
 
   @stateful def requiresRegisters(s: Sym[_], inReduce: Boolean): Boolean = {
@@ -24,13 +24,13 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
   }
 
   @stateful def requiresRegistersInReduce(s: Sym[_]): Boolean = {
-    spatialConfig.addRetimeRegisters && model(s, "RequiresInReduce") > 0
+    spatialConfig.addRetimeRegisters && exactModel(s, "RequiresInReduce") > 0
   }
   @stateful def requiresRegisters(s: Sym[_]): Boolean = {
-    spatialConfig.addRetimeRegisters && model(s, "RequiresRegs") > 0
+    spatialConfig.addRetimeRegisters && exactModel(s, "RequiresRegs") > 0
   }
 
-  @stateful def latencyOfNode(s: Sym[_]): Double = model(s, "LatencyOf")
+  @stateful def latencyOfNode(s: Sym[_]): Double = exactModel(s, "LatencyOf")
 
 
   /** For some templates, I have to manually put a delay inside the template to break a
@@ -40,5 +40,5 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
     * stick a register on this input and then treat the output as having a latency of 2 but needing
     * only 1 injected by transformer
     */
-  @stateful def builtInLatencyOfNode(s: Sym[_]): Double = model(s, "BuiltInLatency")
+  @stateful def builtInLatencyOfNode(s: Sym[_]): Double = exactModel(s, "BuiltInLatency")
 }

@@ -17,7 +17,7 @@ import spatial.dsl._
     val PX = 1 //1
     val P1 = 2 //2 // Unsafe parallelization if OC < 1 burst (16)
     val P2 = 2 //2 // Unsafe parallelization if OC < 1 burst (16)
-    val P3 = 2 //2
+    val P3 = 1 //2
     val P4 = 2 //2
     val P5 = 1 //4
     val P6 = 1 //16

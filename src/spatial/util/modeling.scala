@@ -6,6 +6,7 @@ import forge.tags.stateful
 import models.Area
 import spatial.node._
 import spatial.metadata.access._
+import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
@@ -249,7 +250,7 @@ object modeling {
       }
     }
 
-    val warCycles = accums.map{case AccumTriple(mem,reader,writer) =>
+    val warCycles = accums.collect{case AccumTriple(mem,reader,writer) if (!mem.isSRAM || {reader.parent.s.isDefined && reader.parent.parent.s.isDefined && {reader.parent.parent.s.get match {case Op(_:UnrolledReduce) => false; case _ => true}}}) => // Hack to specifically catch problem mentioned in #61
       val symbols = cycles(writer)
       val cycleLengthExact = paths(writer) - paths(reader)
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?

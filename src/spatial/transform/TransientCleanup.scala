@@ -18,6 +18,8 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   // Substitutions per use location
   private var statelessSubstRules = Map[(Sym[_],Blk), Seq[(Sym[_], () => Sym[_])]]()
 
+  private var curBlockResult: Option[Sym[_]] = None
+
   private val completedMirrors = mutable.HashMap[(Sym[_],Blk), Sym[_]]()
 
   private def delayedMirror[T](lhs: Sym[T], rhs: Op[T], blk: Blk)(implicit ctx: SrcCtx): () => Sym[_] = () => {
@@ -87,7 +89,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
     case RegWrite(reg,value,en) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg write]")
-      if (reg.isUnusedMemory) {
+      if (reg.isUnusedMemory & lhs != curBlockResult.getOrElse(Invalid)) {
         dbgs(s"REMOVING register write $lhs")
         Invalid
       }
@@ -96,11 +98,12 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
     case RegNew(_) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg new]")
-      if (lhs.isUnusedMemory) {
-        dbgs(s"REMOVING register $lhs")
-        Invalid
-      }
-      else updateWithContext(lhs, rhs)
+      // if (lhs.isUnusedMemory) {
+      //   dbgs(s"REMOVING register $lhs")
+      //   Invalid
+      // }
+      // else updateWithContext(lhs, rhs)
+      updateWithContext(lhs, rhs)
 
     case _ if lhs.isControl => inCtrl(lhs){ updateWithContext(lhs, rhs) }
     case _ => updateWithContext(lhs, rhs)
@@ -140,6 +143,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
     advanceBlk() // Advance block counter before transforming inputs
+    curBlockResult = Some(b.result)
 
     withBlockSubsts(b.result) {
       inlineWith(b){stms =>

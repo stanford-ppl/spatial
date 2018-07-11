@@ -252,7 +252,7 @@ object modeling {
 
     val warCycles = accums.collect{case AccumTriple(mem,reader,writer) if (!mem.isSRAM || {reader.parent.s.isDefined && reader.parent.parent.s.isDefined && {reader.parent.parent.s.get match {case Op(_:UnrolledReduce) => false; case _ => true}}}) => // Hack to specifically catch problem mentioned in #61
       val symbols = cycles(writer)
-      val cycleLengthExact = paths(writer) - paths(reader)
+      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?
       val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
       WARCycle(reader, writer, mem, symbols, cycleLength)

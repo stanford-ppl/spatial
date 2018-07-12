@@ -37,11 +37,11 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     stage(FltFMA(m1,m2,add))
   }
 
-  def fixFMAAccum[S,I,F](m1: Fix[S,I,F], m2: Fix[S,I,F]): Fix[S,I,F] = {
-    implicit val S: BOOL[S] = m1.fmt.s
-    implicit val I: INT[I] = m1.fmt.i
-    implicit val F: INT[F] = m1.fmt.f
-    stage(FixFMAAccum(m1,m2))
+  def fixFMA[S,I,F](m1: Fix[S,I,F], m2: Fix[S,I,F], add: Fix[S,I,F]): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = add.fmt.s
+    implicit val I: INT[I] = add.fmt.i
+    implicit val F: INT[F] = add.fmt.f
+    stage(FixFMA(m1,m2,add))
   }
 
   def fltRecipSqrt[M,E](x: Flt[M,E]): Flt[M,E] = {

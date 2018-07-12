@@ -6,6 +6,8 @@ import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 trait ChiselGenMath extends ChiselGenCommon {
 
@@ -94,8 +96,9 @@ trait ChiselGenMath extends ChiselGenCommon {
       emit(src"1.U.cast(${lhs}_one)")
       MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixMod(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))) 
-    case FixFMA(x,y,z) => 
+    case FixFMA(x,y,z) if (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA))) => 
       MathDL(lhs, rhs, latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))) 
+    case FixFMA(x,y,z) if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) => 
       
 
     case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
@@ -231,9 +234,10 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := Mux1H(List($sels), List(${opts.map{x => src"${x}.r"}}))")
 
-    case Mux(sel, a, b) => 
+    case Mux(sel, a, b) if (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA))) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := Mux(($sel), ${a}.r, ${b}.r)")
+    case Mux(sel, a, b) if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) => 
 
     // // Assumes < and > are defined on runtime type...
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Mux(($a < $b), $a, $b).r")

@@ -29,6 +29,7 @@ class SpatialConfig extends Config {
   var enableTightControl: Boolean = false
   var enableDebugResources: Boolean = false
   var useCheapFifos: Boolean = false
+  var enableOptimizedReduce: Boolean = false
 
   var enableSplitting: Boolean = false
   var enableArchDSE: Boolean = false

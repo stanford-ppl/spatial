@@ -3,6 +3,7 @@ package spatial.transform.unrolling
 import argon._
 import spatial.lang._
 import spatial.node._
+import argon.node._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.spatialConfig
@@ -169,7 +170,13 @@ trait ReduceUnrolling extends UnrollingBase {
     val redLanes = UnitUnroller(s"${accum}_accum", isInnerLoop = true)
 
     inLanes(redLanes) {
-      val redType = reduce.result.reduceType
+      val redType = reduce.result match {
+        case Op(FixFMA(_,_,_)) => Some(FixPtFMA)
+        case Op(FixAdd(_,_)) => Some(FixPtSum)
+        case _ => None
+      }
+      reduce.result.reduceType = redType
+
       val treeResult = inReduce(redType, isInner) {
         unrollReduceTree[A](inputs, valids, ident, reduce.toFunction2)
       }

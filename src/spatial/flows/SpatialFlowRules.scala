@@ -15,6 +15,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ =>
   }
 
+  @flow def delaylines(a: Sym[_], op: Op[_]): Unit = op match {
+    case DelayLine(_,data) =>
+      a.reduceType = data.reduceType         // Sketchy things for issue #63
+      a.fmaReduceInfo = data.fmaReduceInfo   // Sketchy things for issue #63      
+    case _ =>
+  }
+
   @flow def accesses(s: Sym[_], op: Op[_]): Unit = op match {
     case Accessor(wr,rd) =>
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }

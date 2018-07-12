@@ -15,6 +15,10 @@ package object memory {
     def reduceType: Option[ReduceFunction] = metadata[ReduceType](s).map(_.func)
     def reduceType_=(func: ReduceFunction): Unit = metadata.add(s, ReduceType(func))
     def reduceType_=(func: Option[ReduceFunction]): Unit = func.foreach{f => s.reduceType = f }
+
+    def fmaReduceInfo: Option[(Sym[_],Sym[_],Sym[_],Double)] = metadata[FMAReduce](s).map(_.info)
+    def fmaReduceInfo_=(info: (Sym[_],Sym[_],Sym[_],Double)): Unit = metadata.add(s, FMAReduce(info))
+    def fmaReduceInfo_=(info: Option[(Sym[_],Sym[_],Sym[_],Double)]): Unit = info.foreach{f => s.fmaReduceInfo = f }
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {

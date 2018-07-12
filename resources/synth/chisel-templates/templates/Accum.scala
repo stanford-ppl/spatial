@@ -4,110 +4,43 @@ import ops._
 import chisel3._
 import types._
 
-class UIntAccum(val w: Int, val lambda: String) extends Module {
-  def this(tuple: (Int, String)) = this(tuple._1, tuple._2)
+class FixFMAAccum(val cycleLatency: Double, val fmaLatency: Double, val s: Boolean, val d: Int, val f: Int, init: Double) extends Module {
+  def this(tup: (Double, Double, Boolean, Int, Int, Double)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
 
+  val cw = Utils.log2Up(cycleLatency) + 2
+  val initBits = (init*scala.math.pow(2,f)).toLong.S((d+f).W).asUInt
   val io = IO(new Bundle{
-    val next = Input(UInt(w.W))
+    val input1 = Input(UInt((d+f).W))
+    val input2 = Input(UInt((d+f).W))
     val enable = Input(Bool())
     val reset = Input(Bool())
-    val init = Input(UInt(w.W))
-    val output = Output(UInt(w.W))
+    val output = Output(UInt((d+f).W))
   })
 
-  val current = RegInit(io.init)
-  val asyncCurrent = Mux(io.reset, io.init, current)
-  val update = lambda match { 
-    case "add" => asyncCurrent + io.next
-    case "max" => Mux(asyncCurrent > io.next, asyncCurrent, io.next)
-    case "min" => Mux(asyncCurrent < io.next, asyncCurrent, io.next)
-    case _ => asyncCurrent
-  }
-  current := Mux(io.enable, update, asyncCurrent)
+  val fixin1 = Wire(new FixedPoint(s,d,f))
+  fixin1.r := io.input1
+  val fixin2 = Wire(new FixedPoint(s,d,f))
+  fixin2.r := io.input2
 
-  io.output := asyncCurrent
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
+  laneCtr.io.input.enable := io.enable
+  laneCtr.io.input.reset := io.reset
+  laneCtr.io.input.saturate := false.B
 
-  def read(port: Int) = {
-    io.output
+  val dispatchLane = laneCtr.io.output.count(0).asUInt
+  val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
+  accums.foreach{case (acc, lane) => 
+    val fixadd = Wire(new FixedPoint(s,d,f))
+    fixadd.r := acc.io.output.data(0)
+    val result = Wire(new FixedPoint(s,d,f))
+    Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
+    acc.io.xBarW(0).data := result.r
+    acc.io.xBarW(0).en := Utils.getRetimed(io.enable & dispatchLane === lane, fmaLatency.toInt)
+    acc.io.xBarW(0).reset := io.reset
+    acc.io.xBarW(0).init := initBits
   }
+
+  io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, (Utils.log2Up(cycleLatency).toDouble).toInt).r // TODO: Please build tree and retime appropriately
 
 }
 
-// latency = lanes for accumulation
-
-class SpecialAccum(val latency: Int, val lambda: String, val typ: String, val params: List[Int]) extends Module {
-  def this(tuple: (Int, String, String, List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4)
-
-  val w = if (typ == "FixedPoint") params.drop(1).reduce{_+_} else params.reduce{_+_}
-
-  val io = IO(new Bundle{
-    val input = new Bundle{
-      val next = Input(UInt(w.W))
-      val enable = Input(Bool())
-      val direct_enable = Input(Bool())
-      val direct_data = Input(UInt(w.W))
-      val reset = Input(Bool())
-      val init = Input(UInt(w.W))      
-    }
-    val output = Output(UInt(w.W))
-  })
-
-
-  typ match { // Reinterpret "io.next" bits
-    case "UInt" => 
-      val current = RegInit(io.input.init)
-      val asyncCurrent = Mux(io.input.reset, io.input.init, current)
-      val update = lambda match { 
-        case "add" => asyncCurrent + io.input.next
-        case "max" => Mux(asyncCurrent > io.input.next, asyncCurrent, io.input.next)
-        case "min" => Mux(asyncCurrent < io.input.next, asyncCurrent, io.input.next)
-        case _ => asyncCurrent
-      }
-      current := Mux(io.input.direct_enable, io.input.direct_data, Mux(io.input.enable, update, asyncCurrent))
-      io.output := asyncCurrent
-    case "FixedPoint" => 
-      val current = RegInit(io.input.init)
-      val asyncCurrent = Mux(io.input.reset, io.input.init, current)
-
-      val fixnext = Wire(new types.FixedPoint(params(0), params(1), params(2)))
-      val fixcurrent = Wire(new types.FixedPoint(params(0), params(1), params(2))) 
-      val fixasync = Wire(new types.FixedPoint(params(0), params(1), params(2))) 
-      fixnext.number := io.input.next
-      fixcurrent.number := current
-      fixasync.number := asyncCurrent
-      val update = lambda match { 
-        case "add" => fixcurrent + fixnext
-        case "max" => Mux(fixasync > fixnext, fixasync, fixnext)
-        case "min" => Mux(fixasync < fixnext, fixasync, fixnext)
-        case _ => fixasync
-      }
-      current := Mux(io.input.direct_enable, io.input.direct_data, Mux(io.input.enable, update.number, fixasync.number))
-
-      io.output := asyncCurrent
-    case "FloatingPoint" => // Not implemented
-      val current = RegInit(io.input.init)
-      val asyncCurrent = Mux(io.input.reset, io.input.init, current)
-      val update = lambda match { 
-        case "add" => asyncCurrent + io.input.next
-        case "max" => Mux(asyncCurrent > io.input.next, asyncCurrent, io.input.next)
-        case "min" => Mux(asyncCurrent < io.input.next, asyncCurrent, io.input.next)
-        case _ => asyncCurrent
-      }
-      current := Mux(io.input.direct_enable, io.input.direct_data, Mux(io.input.enable, update, asyncCurrent))
-      io.output := asyncCurrent  }
-
-  def write[T](data: T, en: Bool, reset: Bool, port: List[Int]) = {
-    io.input.direct_enable := en
-    data match {
-      case d: UInt =>
-        io.input.direct_data := d
-      case d: types.FixedPoint =>
-        io.input.direct_data := d.number
-    }
-  }
-
-  def read(port: Int) = {
-    io.output
-  }
-
-}

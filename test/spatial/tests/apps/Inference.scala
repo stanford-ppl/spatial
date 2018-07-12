@@ -16,9 +16,9 @@ import spatial.dsl._
 
     val PX = 1 //1
     val P1 = 2 //2 // Unsafe parallelization if OC < 1 burst (16)
-    val P2 = 2 //2 // Unsafe parallelization if OC < 1 burst (16)
+    val P2 = 1 //2 // Unsafe parallelization if OC < 1 burst (16)
     val P3 = 1 //2
-    val P4 = 2 //2
+    val P4 = 1 //2
     val P5 = 1 //4
     val P6 = 1 //16
     val loadPar = 4 (1 -> 16)
@@ -103,7 +103,7 @@ import spatial.dsl._
               val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
                 local_data(i,j,ic).to[T2]
               }}.flatten
-              val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}
+              val accum = data_elements.zip(filter_elements).map{case(a,b) => a*!b}.reduce{_+!_}
               local_accum_line(oc) = accum
               // if (debug) println(" at " + oc + "," + R + "," + C + " = " + filter_elements(0) + " * " + data_elements(0) + " + " +
               //                     filter_elements(1) + " * " + data_elements(1) + " + " +
@@ -117,7 +117,7 @@ import spatial.dsl._
               //                   )
             }
             local_accum_line
-          }{_+_}
+          }{_+!_}
           // RELU
           Foreach(OUTPUT_CHANS by 1 par P6){i => accum_line(i) = max(0.to[T], accum_line_upcast(i).bits(27::12).as[T] + bias_sram(i))}
           OUTPUT_DATA(row/STRIDE,col/STRIDE,0::OUTPUT_CHANS par storePar) store accum_line

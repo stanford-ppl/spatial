@@ -163,6 +163,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c, delay.get.toInt, flow)
         else FringeGlobals.bigIP.multiply(b, c, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b*c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b*c // Raghu's box
@@ -178,6 +180,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.multiply(b.asSInt, c, delay.get.toInt, flow)
         else FringeGlobals.bigIP.multiply(b.asSInt, c, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b.asSInt*c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b.asSInt*c // Raghu's box
@@ -197,6 +201,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.divide(b, c, delay.get.toInt, flow) 
         else FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b/c, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b/c // Raghu's box
@@ -212,6 +218,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.divide(b.asSInt, c, delay.get.toInt, flow) 
         else FringeGlobals.bigIP.divide(b.asSInt, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b.asSInt/c, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b.asSInt/c // Raghu's box
@@ -236,6 +244,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.mod(b, c, delay.get.toInt, flow)
         else FringeGlobals.bigIP.mod(b, c, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b%c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b%c // Raghu's box
@@ -252,6 +262,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.mod(b.asSInt, c, delay.get.toInt, flow)
         else FringeGlobals.bigIP.mod(b.asSInt, c, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b.asSInt%c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b.asSInt%c // Raghu's box
@@ -353,6 +365,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c.asSInt, delay.get.toInt, flow)
         else FringeGlobals.bigIP.multiply(b, c.asSInt, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b*c.asSInt, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b*c.asSInt // Raghu's box
@@ -368,6 +382,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c, delay.get.toInt, flow)
         else FringeGlobals.bigIP.multiply(b, c, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b*c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b*c // Raghu's box
@@ -389,6 +405,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.divide(b, c.asSInt, delay.get.toInt, flow)
         else FringeGlobals.bigIP.divide(b, c.asSInt, (Utils.fixdiv_latency * b.getWidth).toInt, flow) // Raghu's box. Divide latency set to 16.
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b/c.asSInt, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b/c.asSInt // Raghu's box
@@ -404,6 +422,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.divide(b, c, delay.get.toInt, flow) // Raghu's box. Divide latency set to 16.
         else FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) // Raghu's box. Divide latency set to 16.
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b/c, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b/c // Raghu's box
@@ -427,6 +447,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.mod(b, c.asSInt, delay.get.toInt, flow)
         else FringeGlobals.bigIP.mod(b, c.asSInt, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b%c.asSInt, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b%c.asSInt // Raghu's box
@@ -442,6 +464,8 @@ object ops {
       if (Utils.retime) {
         if (delay.isDefined) FringeGlobals.bigIP.mod(b, c, delay.get.toInt, flow)
         else FringeGlobals.bigIP.mod(b, c, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b%c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b%c // Raghu's box

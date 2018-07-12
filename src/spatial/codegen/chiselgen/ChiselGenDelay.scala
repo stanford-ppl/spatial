@@ -3,6 +3,9 @@ package spatial.codegen.chiselgen
 import argon._
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.memory._
+import spatial.util.spatialConfig
+
 
 trait ChiselGenDelay extends ChiselGenCommon {
 
@@ -11,7 +14,7 @@ trait ChiselGenDelay extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
-    case DelayLine(delay, data) =>
+    case DelayLine(delay, data) if (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA))) =>
       if (delay > maxretime) maxretime = delay
       // emit(src"""val $lhs = Utils.delay($data, $size)""")
 
@@ -27,6 +30,7 @@ trait ChiselGenDelay extends ChiselGenCommon {
           }
       }
 
+  case DelayLine(delay, data) if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) =>
 	case _ => super.gen(lhs, rhs)
   }
 

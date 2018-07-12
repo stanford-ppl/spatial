@@ -244,7 +244,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	def *-*[T] (rawop: T, delay: Option[Double], flow: Bool, rounding:LSBCasting = Truncate, saturating:MSBCasting = Lazy): FixedPoint = {
 		rawop match { 
 			case op: FixedPoint => 
-				val op_latency = if (Utils.retime) { 
+				val op_latency = if (Utils.retime | delay.isDefined) { 
 					if (delay.isDefined) delay.get.toDouble
 					else (Utils.fixmul_latency * op.getWidth).toDouble
 				} else 0
@@ -289,7 +289,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	def /-/[T] (rawop: T, delay: Option[Double], flow: Bool, rounding:LSBCasting = Truncate, saturating:MSBCasting = Lazy): FixedPoint = {
 		rawop match { 
 			case op: FixedPoint => 
-				val op_latency = if (Utils.retime) { 
+				val op_latency = if (Utils.retime | !delay.isDefined) { 
 					if (delay.isDefined) delay.get.toDouble
 					else (Utils.fixdiv_latency * op.getWidth).toDouble
 				} else 0

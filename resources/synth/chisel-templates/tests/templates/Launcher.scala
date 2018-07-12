@@ -35,15 +35,9 @@ object Inst {
 
 // Start args
 object Arguments {
-  val UIntAccum = List(
-    (32, "add"),
-    (32, "min"),
-    (32, "max")
-  )
-  val SpecialAccum = List(
-    (0,"add","UInt",List(32)),
-    (1,"add","FixedPoint",List(1,16,16))
-    // (18,"max","FloatingPoint",List(24,8))
+  val FixFMAAccum = List(
+    (7.0, 6.0, true, 32, 0, 0.0),
+    (4.0, 3.0, true, 16, 0, 0.0)
   )
   val FF = List(
     (16, XMap((0,0) -> (1, None))),
@@ -191,27 +185,12 @@ object Launcher {
   //   commonOptions = commonOptions.copy(topName = "pipe", targetDirName = "./seqpipe")
   //   firrtlOptions = firrtlOptions.copy()
   // }
-  // templates = templates ++ Arguments.UIntAccum.zipWithIndex.map{ case(arg,i) => 
-  //   (s"UIntAccum$i" -> { (backendName: String) =>
-  //     Driver.execute(() => new UIntAccum(arg), optionsManager) {
-  //         (c) => new UIntAccumTests(c)
-  //       }
-  //     }) 
-  // }.toMap
 
   // Start launcher
-  templates = templates ++ Arguments.UIntAccum.zipWithIndex.map{ case(arg,i) => 
-    (s"UIntAccum$i" -> { (backendName: String) =>
-    	Driver(() => new UIntAccum(arg), "verilator") {
-          (c) => new UIntAccumTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.SpecialAccum.zipWithIndex.map{ case(arg,i) => 
-    (s"SpecialAccum$i" -> { (backendName: String) =>
-    	Driver(() => new SpecialAccum(arg), "verilator") {
-          (c) => new SpecialAccumTests(c)
+  templates = templates ++ Arguments.FixFMAAccum.zipWithIndex.map{ case(arg,i) => 
+    (s"FixFMAAccum$i" -> { (backendName: String) =>
+    	Driver(() => new FixFMAAccum(arg), "verilator") {
+          (c) => new FixFMAAccumTests(c)
         }
       }) 
   }.toMap

@@ -4,6 +4,7 @@ import argon._
 import argon.node._
 import argon.transform.MutateTransformer
 import spatial.metadata.bounds._
+import spatial.metadata.memory._
 import spatial.metadata.rewrites._
 import spatial.lang._
 import spatial.node._
@@ -36,11 +37,11 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     stage(FltFMA(m1,m2,add))
   }
 
-  def fixFMA[S,I,F](m1: Fix[S,I,F], m2: Fix[S,I,F], add: Fix[S,I,F]): Fix[S,I,F] = {
-    implicit val S: BOOL[S] = add.fmt.s
-    implicit val I: INT[I] = add.fmt.i
-    implicit val F: INT[F] = add.fmt.f
-    stage(FixFMA(m1,m2,add))
+  def fixFMAAccum[S,I,F](m1: Fix[S,I,F], m2: Fix[S,I,F]): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = m1.fmt.s
+    implicit val I: INT[I] = m1.fmt.i
+    implicit val F: INT[F] = m1.fmt.f
+    stage(FixFMAAccum(m1,m2))
   }
 
   def fltRecipSqrt[M,E](x: Flt[M,E]): Flt[M,E] = {
@@ -57,20 +58,31 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
 
-
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
 
-    // Change a write from a mux with the register or some other value to an enabled register write
     case RegWrite(F(reg), F(data), F(en)) => data match {
+      // Look for very specific FixFMA pattern and replace with FixFMAAccum node (Issue #63).. This gives error about not wanting to match Node[Fix[S,I,F]] <: Node[Any] because Op is type R and not +R
+      // case Op(Mux(
+      //             F(Op(FixEql(a,b))),
+      //             F(Op(FixMul(mul1: Fix[s,i,f], mul2))),
+      //             F(Op(FixFMA(mul11,mul22,Op(RegRead(`reg`)))))
+      //         )) => 
+      //   // fixFMAAccum(mul1,mul2).asInstanceOf[Sym[A]] // Assumes the FixEql is just flagging the first iter, which can be done in template
+      //   super.transform(lhs,rhs)
+
+      // Change a write from a mux with the register or some other value to an enabled register write
       case Op( Mux(sel, Op(RegRead(`reg`)), b) ) =>
         val lhs2 = writeReg(lhs, reg, b, en + !sel)
+        println(s"b is $b ${b.tp}")
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]
 
+      // Change a write from a mux with the register or some other value to an enabled register write
       case Op( Mux(sel, a, Op(RegRead(`reg`))) ) =>
         val lhs2 = writeReg(lhs, reg, a, en + sel)
+        println(s"a is $a ${a.tp}")
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]
@@ -87,10 +99,14 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     // m1*m2 + add --> fma(m1,m2,add)
     case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA =>
-      fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
+      val lhs2 = fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
+      if (lhs.reduceType == Some(FixPtSum)) lhs2.reduceType = Some(FixPtFMA) // Best place to update other nodes in this reduce cycle? Issue #63
+      lhs2
 
     case FixAdd(F(add: Fix[s,i,f]), F(Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA =>
-      fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
+      val lhs2 = fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
+      if (lhs.reduceType == Some(FixPtSum)) lhs2.reduceType = Some(FixPtFMA) // Best place to update other nodes in this reduce cycle? Issue #63
+      lhs2
 
     case FltAdd(F(Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA =>
       fltFMA(m1,m2,add).asInstanceOf[Sym[A]]

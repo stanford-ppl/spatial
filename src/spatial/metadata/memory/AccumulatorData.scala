@@ -38,6 +38,7 @@ case object FixPtSum extends ReduceFunction
 case object FltPtSum extends ReduceFunction
 case object FixPtMin extends ReduceFunction
 case object FixPtMax extends ReduceFunction
+case object FixPtFMA extends ReduceFunction
 case object OtherReduction extends ReduceFunction
 
 
@@ -57,4 +58,11 @@ case class Accumulator(tp: AccumType) extends Data[Accumulator](SetBy.Flow.Consu
   * Setter:  sym.reduceType = (ReduceFunction | Option[ReduceFunction])
   * Default: None
   */
-case class ReduceType(func: ReduceFunction) extends Data[ReduceType](SetBy.Analysis.Consumer)
+case class ReduceType(func: ReduceFunction) extends Data[ReduceType](SetBy.Analysis.Self)
+
+/** TODO: Update description
+  * Getter:  sym.fmaReduceInfo : Option[(data, mul1, mul2, latency)]
+  * Setter:  sym.fmaReduceInfo = ((data, mul1, mul2, latency) | Option[(data, mul1, mul2, latency)])
+  * Default: None
+  */
+case class FMAReduce(info: (Sym[_], Sym[_], Sym[_], Double)) extends Data[FMAReduce](SetBy.Analysis.Self)

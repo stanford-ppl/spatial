@@ -86,13 +86,7 @@ object modeling {
       // Sketchy things for issue #63
       val scopeContainsSpecial = scope.exists(x => x.reduceType.contains(FixPtFMA) )
       val cycleContainsSpecial = c.symbols.exists{case Op(FixFMA(_,_,_)) => true; case _ => false}
-      val length = if (cycleContainsSpecial && scopeContainsSpecial && spatialConfig.enableOptimizedReduce) {
-        val (mul1,mul2) = c.symbols.collect{case Op(FixFMA(mul1,mul2,_)) => (mul1,mul2)}.head
-        val data = c.symbols.collect{case Op(RegWrite(_,d,_)) => d}.head
-        c.symbols.foreach{x => x.reduceType = Some(FixPtFMA); x.fmaReduceInfo = (data, mul1, mul2, c.length)}
-        1
-      } else c.length
-      length
+      if (cycleContainsSpecial && scopeContainsSpecial && spatialConfig.enableOptimizedReduce) 1 else c.length
     } + 0).max
     // HACK: Set initiation interval to 1 if it contains a specialized reduction
     // This is a workaround for chisel codegen currently specializing and optimizing certain reduction types

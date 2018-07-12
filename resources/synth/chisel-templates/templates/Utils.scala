@@ -12,6 +12,7 @@ import scala.math._
 sealed trait DeviceTarget
 object Default extends DeviceTarget
 object Zynq extends DeviceTarget
+object ZCU extends DeviceTarget
 object DE1 extends DeviceTarget // Do not use this one
 object de1soc extends DeviceTarget
 object AWS_F1 extends DeviceTarget
@@ -169,6 +170,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b*c // Raghu's box
           case Zynq => b*c // Raghu's box
+          case ZCU => b*c // Raghu's box
           case DE1 => b*c // Raghu's box
           case `de1soc` => b*c // Raghu's box
           case Default => b*c
@@ -186,6 +188,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b.asSInt*c // Raghu's box
           case Zynq => b.asSInt*c // Raghu's box
+          case ZCU => b.asSInt*c // Raghu's box
           case DE1 => b.asSInt*c // Raghu's box
           case `de1soc` => b.asSInt*c // Raghu's box
           case Default => b.asSInt*c
@@ -207,6 +210,7 @@ object ops {
        Utils.target match {
          case AWS_F1 => b/c // Raghu's box
          case Zynq => FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
+        case ZCU => FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
          case DE1 => b/c // Raghu's box
         case `de1soc` => b/c // Raghu's box
          case Default => b/c
@@ -224,6 +228,7 @@ object ops {
        Utils.target match {
          case AWS_F1 => b.asSInt/c // Raghu's box
          case Zynq => b.asSInt/c // Raghu's box
+        case ZCU => b.asSInt/c // Raghu's box
          case DE1 => b.asSInt/c // Raghu's box
          case `de1soc` => b.asSInt/c // Raghu's box
          case Default => b.asSInt/c
@@ -250,6 +255,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b%c // Raghu's box
           case Zynq => b%c // Raghu's box
+          case ZCU => b%c // Raghu's box
           case DE1 => b%c // Raghu's box
           case `de1soc` => b%c // Raghu's box
           case Default => b%c
@@ -268,6 +274,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b.asSInt%c // Raghu's box
           case Zynq => b.asSInt%c // Raghu's box
+          case ZCU => b.asSInt%c // Raghu's box
           case DE1 => b.asSInt%c // Raghu's box
           case `de1soc` => b.asSInt%c // Raghu's box
           case Default => b.asSInt%c
@@ -371,6 +378,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b*c.asSInt // Raghu's box
           case Zynq => b*c.asSInt // Raghu's box
+          case ZCU => b*c.asSInt // Raghu's box
           case DE1 => b*c.asSInt // Raghu's box
           case `de1soc` => b*c.asSInt // Raghu's box
           case Default => b*c.asSInt
@@ -388,6 +396,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b*c // Raghu's box
           case Zynq => b*c // Raghu's box
+          case ZCU => b*c // Raghu's box
           case DE1 => b*c // Raghu's box
           case `de1soc` => b*c // Raghu's box
           case Default => b*c
@@ -411,6 +420,7 @@ object ops {
        Utils.target match {
          case AWS_F1 => b/c.asSInt // Raghu's box
          case Zynq => b/c.asSInt // Raghu's box
+        case ZCU => b/c.asSInt // Raghu's box
          case DE1 => b/c.asSInt // Raghu's box
          case `de1soc` => b/c.asSInt // Raghu's box
          case Default => b/c.asSInt
@@ -428,6 +438,7 @@ object ops {
        Utils.target match {
          case AWS_F1 => b/c // Raghu's box
          case Zynq => b/c // Raghu's box
+        case ZCU => b/c // Raghu's box
          case DE1 => b/c // Raghu's box
          case `de1soc` => b/c // Raghu's box
          case Default => b/c
@@ -453,6 +464,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b%c.asSInt // Raghu's box
           case Zynq => b%c.asSInt // Raghu's box
+          case ZCU => b%c.asSInt // Raghu's box
           case DE1 => b%c.asSInt // Raghu's box
           case `de1soc` => b%c.asSInt // Raghu's box
           case Default => b%c.asSInt
@@ -470,6 +482,7 @@ object ops {
         Utils.target match {
           case AWS_F1 => b%c // Raghu's box
           case Zynq => b%c // Raghu's box
+          case ZCU => b%c // Raghu's box
           case DE1 => b%c // Raghu's box
           case `de1soc` => b%c // Raghu's box
           case Default => b%c

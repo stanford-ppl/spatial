@@ -1294,7 +1294,7 @@ import spatial.targets._
       // Scan string portions
       val global_matches = Sequential.Reduce(Reg[Int](0))(STRING_SIZE by (STRING_SIZE/outer_par) by STRING_SIZE/outer_par par outer_par) {chunk => 
         val num_matches = Reg[Int](0)
-        num_matches.reset
+        Pipe{num_matches := 0}
         val string_sram = SRAM[Int8](32411) // Conveniently sized
         string_sram load string_dram(chunk::chunk + (STRING_SIZE/outer_par) + (PATTERN_SIZE-1) par par_load)
         val q = Reg[Int](0)

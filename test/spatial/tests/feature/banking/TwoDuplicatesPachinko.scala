@@ -26,8 +26,8 @@ import spatial.dsl._
       }
     }
 
-    val last32 = Array.tabulate(32){i => data(511 - i) }.reduce{_+_}
-    assert(getArg(out) == last32, r"${getArg(out)} != $last32")
+    val last32 = Array.tabulate(16){i => data(511 - i - 16) }.reduce{_+_}*2
+    assert(getArg(out) == last32, r" ${getArg(out)} != $last32")
   }
 }
 

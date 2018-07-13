@@ -24,7 +24,7 @@ import spatial.dsl._
     Accel {      
       Sequential.Foreach(N+1 by 1){ j => 
         val x = Reg[T](0)
-        Reduce(x)(j by 1){ i =>
+        Reduce(x)(j by 1 par 3){ i =>
           i.to[T] * i.to[T] 
         }{_+_}
         Pipe{out0 := x.value}

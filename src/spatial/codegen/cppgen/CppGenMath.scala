@@ -109,6 +109,7 @@ trait CppGenMath extends CppGenCommon {
     case FixToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
     case FixToFlt(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
     case FltToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FltToFlt(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
 
     case Mux(sel, a, b) => 
       emit(src"${lhs.tp} $lhs;")

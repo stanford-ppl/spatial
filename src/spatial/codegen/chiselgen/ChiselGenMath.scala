@@ -96,9 +96,9 @@ trait ChiselGenMath extends ChiselGenCommon {
       emit(src"1.U.cast(${lhs}_one)")
       MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixMod(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))) 
-    case FixFMA(x,y,z) if (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA))) => 
+    case FixFMA(x,y,z) if (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty)) => 
       MathDL(lhs, rhs, latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))) 
-    case FixFMA(x,y,z) if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) => 
+    case FixFMA(x,y,z) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
       
 
     case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
@@ -234,10 +234,10 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := Mux1H(List($sels), List(${opts.map{x => src"${x}.r"}}))")
 
-    case Mux(sel, a, b) if (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA))) => 
+    case Mux(sel, a, b) if (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty)) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := Mux(($sel), ${a}.r, ${b}.r)")
-    case Mux(sel, a, b) if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) => 
+    case Mux(sel, a, b) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
 
     // // Assumes < and > are defined on runtime type...
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Mux(($a < $b), $a, $b).r")

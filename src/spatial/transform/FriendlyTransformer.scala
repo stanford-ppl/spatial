@@ -23,13 +23,16 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
-    case Some(data) if lhs.parent.hasAncestor(data.parent) =>
+    case Some(data) if (lhs.parent.hasAncestor(data.parent)) =>
       // Don't get rid of reads being used for DRAM allocations
       if (lhs.consumers.exists{case Op(DRAMNew(_, _)) => true; case _ => false }) {
         dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
         super.transform(lhs, rhs)
       }
-      else {
+      else if (lhs.ancestors.exists(_.isAccel) ^ !data.ancestors.exists(_.isAccel)) {
+        dbg(s"Node $lhs ($rhs) is in accel, but $data is not (or vice versa).. Cannot extract")
+        super.transform(lhs, rhs)
+      } else {
         dbg(s"Node $lhs ($rhs) has data that can be directly extracted ($data -> ${f(data)})")
         f(data).asInstanceOf[Sym[A]]
       }

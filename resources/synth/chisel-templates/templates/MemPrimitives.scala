@@ -613,20 +613,18 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
 
 class LUT(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, 
-            xBarRMux: XMap, // muxPort -> accessPar
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), XMap(), xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
+            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, isBuf: Boolean = false) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf))
 
-  def this(tuple: (List[Int], Int, XMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
   def this(logicalDims: List[Int], bitWidth: Int, 
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarRMux, init, syncMem, fracBits)
-  def this(logicalDims: List[Int], bitWidth: Int, 
-           banks: List[Int], strides: List[Int], 
-           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
-           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarRMux, if (init.isDefined) Some(init.get.map(_.toDouble)) else None, syncMem, fracBits)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
+
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until p.depth).map{ i => 
@@ -638,18 +636,22 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
     (mem,coords,i)
   }
 
-  // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
     // Figure out which read port was active in xBar
     val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val xBarCandidates = xBarIds.map(io.xBarR(_))
-
+    // Figure out which read port was active in direct
+    val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
+    val directCandidates = directIds.map(io.directR(_))
     // Create bit vector to select which bank was activated by this i
     val sel = m.map{ case(mem,coords,flatCoord) => 
-      if (xBarCandidates.toList.length > 0) xBarCandidates.map {x =>
+      val xBarWants = if (xBarCandidates.toList.length > 0) xBarCandidates.map {x => 
         x.banks.zip(coords).map{case (b, coord) => b === coord.U}.reduce{_&&_} && x.en
-      }.reduce{_||_}
-      else false.B
+      }.reduce{_||_} else false.B
+      val directWants = if (directCandidates.toList.length > 0) directCandidates.map {x => 
+        x.banks.zip(coords).map{case (b, coord) => b == coord}.reduce{_&&_}.B && x.en
+      }.reduce{_||_} else false.B
+      xBarWants || directWants
     }
     val datas = m.map{ _._1 }
     val d = chisel3.util.PriorityMux(sel, datas)

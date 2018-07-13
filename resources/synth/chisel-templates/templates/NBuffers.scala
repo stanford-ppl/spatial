@@ -478,13 +478,14 @@ class NBufMem(val mem: MemType,
     io.broadcastW(muxBase) := wBundle
   }
 
-  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int)): UInt = {connectBroadcastRPort(rBundle, muxAddr, 0)}
-  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), vecId: Int): UInt = {
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int)): UInt = {connectBroadcastRPort(rBundle, muxAddr, 0, true.B)}
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), vecId: Int): UInt = {connectBroadcastRPort(rBundle, muxAddr, vecId, true.B)}
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {
     val muxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
     val xBarRBase = xBarRMux.accessPars.sum
     val directRBase = directRMux.accessPars.sum
     io.broadcastR(muxBase) := rBundle
-    io.flow(xBarRBase + directRBase + muxBase) := true.B
+    io.flow(xBarRBase + directRBase + muxBase) := flow
     io.output.data(xBarRBase + directRBase + muxBase)
   }
 

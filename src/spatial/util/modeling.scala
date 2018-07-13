@@ -258,10 +258,10 @@ object modeling {
       val scopeContainsSpecial = scope.exists(x => x.reduceType.contains(FixPtFMA) )
       val cycleContainsSpecial = symbols.exists{case Op(FixFMA(_,_,_)) => true; case _ => false}
       if (cycleContainsSpecial && scopeContainsSpecial && spatialConfig.enableOptimizedReduce) {
-        val (mul1,mul2) = symbols.collect{case Op(FixFMA(mul1,mul2,_)) => (mul1,mul2)}.head
+        val (mul1,mul2,fma) = symbols.collect{case fma@Op(FixFMA(mul1,mul2,_)) => (mul1,mul2,fma)}.head
         val data = symbols.collect{case Op(RegWrite(_,d,_)) => d}.head
         fmaAccumRes += ((data, cycleLengthExact.toDouble))
-        symbols.foreach{x => x.reduceType = Some(FixPtFMA); x.fmaReduceInfo = (data, mul1, mul2, cycleLengthExact.toDouble)}
+        symbols.foreach{x => x.reduceType = Some(FixPtFMA); x.fmaReduceInfo = (data, mul1, mul2, fma, cycleLengthExact.toDouble)}
       }
 
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?

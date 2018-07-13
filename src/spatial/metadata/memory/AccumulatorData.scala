@@ -61,8 +61,8 @@ case class Accumulator(tp: AccumType) extends Data[Accumulator](SetBy.Flow.Consu
 case class ReduceType(func: ReduceFunction) extends Data[ReduceType](SetBy.Analysis.Self)
 
 /** TODO: Update description
-  * Getter:  sym.fmaReduceInfo : Option[(data, mul1, mul2, latency)]
-  * Setter:  sym.fmaReduceInfo = ((data, mul1, mul2, latency) | Option[(data, mul1, mul2, latency)])
+  * Getter:  sym.fmaReduceInfo : Option[(data, mul1, mul2, fma, latency)]
+  * Setter:  sym.fmaReduceInfo = ((data, mul1, mul2, fma, latency) | Option[(data, mul1, mul2, fma, latency)])
   * Default: None
   */
-case class FMAReduce(info: (Sym[_], Sym[_], Sym[_], Double)) extends Data[FMAReduce](SetBy.Analysis.Self)
+case class FMAReduce(info: (Sym[_], Sym[_], Sym[_], Sym[_], Double)) extends Data[FMAReduce](SetBy.Analysis.Self)

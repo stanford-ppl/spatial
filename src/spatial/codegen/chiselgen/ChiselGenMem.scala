@@ -173,24 +173,24 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // Registers
     case RegNew(init) => emitMem(lhs, "FF", Some(List(init)))
-    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO & (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA)))) => 
+    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO & (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty))) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO & (!spatialConfig.enableOptimizedReduce || (lhs.reduceType != Some(FixPtFMA)))) => 
+    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO & (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty))) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
     // Specialized FMA Register
-    case RegWrite(reg, data, ens) if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) => 
+    case RegWrite(reg, data, ens) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
       
-    case RegRead(reg)  if (spatialConfig.enableOptimizedReduce && (lhs.reduceType == Some(FixPtFMA))) => 
+    case RegRead(reg)  if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
       val info = lhs.fmaReduceInfo.get
       val latency = latencyOption("FixFMA", Some(bitWidth(lhs.tp)))
       val FixPtType(s,d,f) = lhs.tp
       val Op(RegNew(init)) = reg
-      val treeLatency = scala.math.ceil(scala.math.log(info._4)/scala.math.log(2))
-      emitGlobalModule(src"val ${reg}_accum = Module(new FixFMAAccum(${info._4}, ${latency}, $s,$d,$f, ${quoteAsScala(init)}))")
+      val treeLatency = scala.math.ceil(scala.math.log(info._5)/scala.math.log(2))
+      emitGlobalModule(src"val ${reg}_accum = Module(new FixFMAAccum(${info._5}, ${latency}, $s,$d,$f, ${quoteAsScala(init)}))")
       emitt(src"${reg}_accum.io.input1 := ${info._2}.r")
       emitt(src"${reg}_accum.io.input2 := ${info._3}.r")
-      emitt(src"""${reg}_accum.io.enable := ${DL(src"${swap(lhs.parent.s.get, DatapathEn)} & ${swap(lhs.parent.s.get, IIDone)}", info._2.fullDelay, true)}""")
-      emitt(src"""${reg}_accum.io.reset := ${DL(src"${swap(lhs.parent.s.get, Done)}", info._2.fullDelay + treeLatency + 1, true)}""")
+      emitt(src"""${reg}_accum.io.enable := ${DL(src"${swap(lhs.parent.s.get, DatapathEn)} & ${swap(lhs.parent.s.get, IIDone)}", info._4.fullDelay, true)}""")
+      emitt(src"""${reg}_accum.io.reset := ${DL(src"${swap(lhs.parent.s.get, Done)}", info._4.fullDelay + treeLatency + 1, true)}""")
       emitGlobalWireMap(src"${info._1}", src"Wire(${info._1.tp})")
       emitt(src"""${info._1}.r := ${reg}_accum.io.output""")
 

@@ -35,7 +35,7 @@ import spatial.dsl._
   }
 
   def main(args: Array[String]): Void = {
-    val config = loadCSV2D[String](s"$DATA/training/svrg.config", "\n")
+    val config = loadCSV2D[String](s"$DATA/training/svrg.config", ",", "\n")
     printMatrix(config, "Config")
 
     val epochs = getValue(config, "epochs").to[Int]

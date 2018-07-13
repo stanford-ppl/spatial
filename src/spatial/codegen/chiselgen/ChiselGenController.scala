@@ -5,6 +5,7 @@ import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
+import spatial.metadata.retiming._
 import spatial.metadata.control._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
@@ -541,7 +542,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emitt("// Emitting nextState")
       visitBlock(nextState)
       emitt(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
-      emitt(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${swap(lhs, Latency)} - 1", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
+      emitt(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${if (spatialConfig.enableRetiming) nextState.result.fullDelay else 0}", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
       emitt(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")

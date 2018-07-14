@@ -85,7 +85,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
 
     val a2 = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0)
-    val adim = (
+    val alikely = (
                 Seq(0,1) ++ 
                 Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product) ++ 
                 Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N) ++ 
@@ -99,9 +99,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
     def AlphasLikely(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
-        adim.iterator.flatMap{aD => AlphasLikely(dim+1, prev :+ aD) }
+        alikely.iterator.flatMap{aD => AlphasLikely(dim+1, prev :+ aD) }
       }
-      else adim.iterator.map{aR => prev :+ aR}
+      else alikely.iterator.map{aR => prev :+ aR}
     }
     def AlphasX(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {

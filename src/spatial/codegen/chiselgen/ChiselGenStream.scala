@@ -95,9 +95,10 @@ trait ChiselGenStream extends ChiselGenCommon {
       val muxPort = lhs.ports(0).values.head.muxPort
       val base = stream.writers.filter(_.ports(0).values.head.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
+      val maskingLogic = getAllReadyLogic(parent.toCtrl).mkString(" && ")
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${lhs.fullDelay}.toInt", true)} & $en """)
+        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
 
       // emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} // Should be delayed by body latency + ready-off bubbles""")

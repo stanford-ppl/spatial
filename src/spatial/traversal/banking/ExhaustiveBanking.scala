@@ -68,15 +68,40 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   /**
     * Generates an iterator over all vectors of given rank, with values up to N
     * Prioritizes vectors which are entirely powers of 2 first
+    * Next prioritizes vectors composed of either 
+    *    1) Number that evenly divides N
+    *    2) Number that is the result of a product of some combination of stagedDims (Not sure if this increases the likelihood of valid schemes compared to option 1 only)
+    *    3) Number that is also power of 2
+    *    (consider something like 96x3x3x96 sram N = 36, want to try things like alpha = 18,1,3,9)
     * Note that the total size is O(N**rank)
     */
-  def Alphas(rank: Int, N: Int): Iterator[Seq[Int]] = {
+  def Alphas(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
+    // Prime factors of number, for shortcircuiting the brute force alphas
+    def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+      for(n <- 2 to number if (number % n == 0)) {
+        return factorize(number / n, list :+ n)
+      }
+      list
+    }
+
     val a2 = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0)
+    val adim = (
+                Seq(0,1) ++ 
+                Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product) ++ 
+                Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N) ++ 
+                (0 to 2*N).filter(isPow2(_))
+               )
     def Alphas2(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
         a2.iterator.flatMap{aD => Alphas2(dim+1, prev :+ aD) }
       }
       else a2.iterator.map{aR => prev :+ aR }
+    }
+    def AlphasLikely(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
+      if (dim < rank) {
+        adim.iterator.flatMap{aD => AlphasLikely(dim+1, prev :+ aD) }
+      }
+      else adim.iterator.map{aR => prev :+ aR}
     }
     def AlphasX(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
@@ -84,7 +109,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
       else (0 to 2*N).iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
     }
-    Alphas2(1, Nil).filterNot(_.forall(_ == 0)) ++ AlphasX(1, Nil).filterNot(_.forall(_ == 0))
+    Alphas2(1, Nil).filterNot(_.forall(_ == 0)) ++ AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2(_))} ++ AlphasX(1, Nil).filterNot(_.forall(_ == 0))
   }
 
   private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int]): Seq[Int] = {
@@ -174,7 +199,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
-      val As = Alphas(rank, N)
+      val As = Alphas(rank, N, stagedDims)
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
         if (attempts < 200) dbgs(s"     Checking N=$N and alpha=$alpha")

@@ -244,7 +244,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
     bases.zipWithIndex.foreach{ case (b,i) => 
       b.io.xBarW(0).init := inits(i).asUInt
-      b.io.xBarW(0).reset := io.input.reset
+      b.io.xBarW(0).reset := io.input.reset | {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}}
       b.io.xBarW(0).en := io.input.enable
     }
 
@@ -258,10 +258,6 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       newvals(0) >= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}, 
       newvals(0) <= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}
     )
-    // io.output.debug1 := newval
-    // io.output.debug2 := io.input.stride >= 0.S((width).W)
-    // io.output.debug3 := newval >= io.input.stop
-    // io.output.debug4 := io.input.stop
     val wasMax = RegNext(isMax, false.B)
     val wasEnabled = RegNext(io.input.enable, false.B)
     bases.zipWithIndex.foreach {case (b,i) => 

@@ -290,7 +290,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     doneReg.io.input.asyn_reset := false.B
     io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
-    io.done := Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, io.enable)
+    io.done := Utils.risingEdge(Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, true.B))
 
   }
 }

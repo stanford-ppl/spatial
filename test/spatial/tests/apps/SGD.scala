@@ -195,5 +195,6 @@ import spatial.dsl._
 
     val cksum = cartesian_dist < threshold.to[TM]
     println("PASS: " + cksum + " (SGD)")
+    assert(cksum)
   }
 }

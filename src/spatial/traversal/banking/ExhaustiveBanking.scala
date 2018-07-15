@@ -84,13 +84,13 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       list
     }
 
-    val a2 = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0)
+    val a2 = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N)
     val alikely = (
                 Seq(0,1) ++ 
                 Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product) ++ 
                 Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N) ++ 
                 (0 to 2*N).filter(isPow2(_))
-               )
+               ).uniqueModN(N)
     def Alphas2(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
         a2.iterator.flatMap{aD => Alphas2(dim+1, prev :+ aD) }
@@ -105,9 +105,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
     def AlphasX(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
-        (0 to 2*N).iterator.flatMap{aD => AlphasX(dim+1, prev :+ aD) }
+        (0 to 2*N).uniqueModN(N).iterator.flatMap{aD => AlphasX(dim+1, prev :+ aD) }
       }
-      else (0 to 2*N).iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
+      else (0 to 2*N).uniqueModN(N).iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
     }
     Alphas2(1, Nil).filterNot(_.forall(_ == 0)) ++ AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2(_))} ++ AlphasX(1, Nil).filterNot(_.forall(_ == 0))
   }

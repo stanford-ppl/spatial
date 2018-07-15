@@ -260,5 +260,6 @@ import spatial.dsl._
     println("Cartesian Distance From W_gold: " + cartesian_dist + " <? " + {threshold.to[Float]})
 
     println("PASS: " + cksum + " (LP_SGD)")
+    assert(cksum)
   }
 }

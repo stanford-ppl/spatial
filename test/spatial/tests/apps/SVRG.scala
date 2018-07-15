@@ -236,5 +236,6 @@ import spatial.dsl._
 
 
     println("PASS: " + cksum + " (SVRG)")
+    assert(cksum)
   }
 }

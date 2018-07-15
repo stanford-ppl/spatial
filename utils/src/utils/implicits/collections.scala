@@ -32,6 +32,20 @@ object collections {
       */
     def lengthIs(len: Int): Boolean = x.lengthCompare(len) == 0
 
+    /** Returns seq containing only elements who are unique in mod N
+      */
+    def uniqueModN(N: Int): Seq[A] = {
+      var map = scala.collection.mutable.ListMap[Int,Int]()
+      x.foreach{e => 
+        e match {
+          case i: Int => 
+            map.getOrElseUpdate(i % N, i)
+          case _ => throw new Exception(s"Cannot get uniqueModN values on seq ${e}")
+        } 
+      }
+      map.values.toList.sorted.map(_.asInstanceOf[A]).toSeq
+    }
+
     /** Returns true if length of x is less than len, false otherwise.
       * Equivalent to (but faster than) x.length < len
       */

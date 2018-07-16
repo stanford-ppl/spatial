@@ -121,3 +121,16 @@ abstract class BankedEnqueue[A:Type] extends BankedWriter[A] {
   def bank: Seq[Seq[Idx]] = Nil
   def ofs: Seq[Idx] = Nil
 }
+
+
+
+abstract class Accumulator[A:Bits] extends UnrolledAccessor[A,A] {
+  def en: Set[Bit]
+  def data: Seq[Sym[_]] = Nil // We don't actually have a symbol for data being written to the memory
+  def bank: Seq[Seq[Idx]]
+  def ofs: Seq[Idx]
+  def first: Bit
+  override var enss = Seq(en)
+  def unrolledRead = Some(BankedRead(mem,bank,ofs,enss))
+  def unrolledWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
+}

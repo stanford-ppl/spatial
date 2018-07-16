@@ -6,6 +6,7 @@ import argon.transform.MutateTransformer
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.types._
 import spatial.lang._
 import spatial.node._
 import spatial.traversal.BlkTraversal
@@ -17,8 +18,6 @@ import scala.collection.mutable
 case class TransientCleanup(IR: State) extends MutateTransformer with BlkTraversal {
   // Substitutions per use location
   private var statelessSubstRules = Map[(Sym[_],Blk), Seq[(Sym[_], () => Sym[_])]]()
-
-  private var curBlockResult: Option[Sym[_]] = None
 
   private val completedMirrors = mutable.HashMap[(Sym[_],Blk), Sym[_]]()
 
@@ -89,7 +88,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
     case RegWrite(reg,value,en) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg write]")
-      if (reg.isUnusedMemory & lhs != curBlockResult.getOrElse(Invalid)) {
+      if (reg.isUnusedMemory) {
         dbgs(s"REMOVING register write $lhs")
         Invalid
       }
@@ -98,12 +97,11 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
     case RegNew(_) =>
       dbgs("")
       dbgs(s"$lhs = $rhs [reg new]")
-      // if (lhs.isUnusedMemory) {
-      //   dbgs(s"REMOVING register $lhs")
-      //   Invalid
-      // }
-      // else updateWithContext(lhs, rhs)
-      updateWithContext(lhs, rhs)
+      if (lhs.isUnusedMemory) {
+        dbgs(s"REMOVING register $lhs")
+        Invalid
+      }
+      else updateWithContext(lhs, rhs)
 
     case _ if lhs.isControl => inCtrl(lhs){ updateWithContext(lhs, rhs) }
     case _ => updateWithContext(lhs, rhs)
@@ -143,12 +141,17 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
     advanceBlk() // Advance block counter before transforming inputs
-    curBlockResult = Some(b.result)
 
     withBlockSubsts(b.result) {
       inlineWith(b){stms =>
         stms.foreach(visit)
-        withBlockSubsts(b.result){ f(b.result) } // Have to call again in case subst was added inside block
+        // Note: This assumes that non-void return types in blocks are always used
+        if (b.result.isVoid) void.asInstanceOf[Sym[T]]
+        else {
+          // Have to call withBlockSubsts again in case subst was added inside block in order
+          // to get updated substitution for block result
+          withBlockSubsts(b.result){ f(b.result) }
+        }
       }
     }
   }

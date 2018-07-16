@@ -33,13 +33,6 @@ object AccumType {
     def >(that: AccumType): Boolean = false
   }
 }
-sealed trait ReduceFunction
-case object FixPtSum extends ReduceFunction
-case object FltPtSum extends ReduceFunction
-case object FixPtMin extends ReduceFunction
-case object FixPtMax extends ReduceFunction
-case object FixPtFMA extends ReduceFunction
-case object OtherReduction extends ReduceFunction
 
 
 /** Flags that this symbol is associated with an accumulator.
@@ -52,6 +45,14 @@ case object OtherReduction extends ReduceFunction
   */
 case class Accumulator(tp: AccumType) extends Data[Accumulator](SetBy.Flow.Consumer)
 
+// TODO: Need to refactor this
+sealed trait ReduceFunction
+case object FixPtSum extends ReduceFunction
+case object FltPtSum extends ReduceFunction
+case object FixPtMin extends ReduceFunction
+case object FixPtMax extends ReduceFunction
+case object FixPtFMA extends ReduceFunction
+case object OtherReduction extends ReduceFunction
 
 /** TODO: Update description
   * Getter:  sym.reduceType : Option[ReduceFunction]

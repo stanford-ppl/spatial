@@ -18,7 +18,7 @@ import spatial.dsl._
     val P1 = 2 //2 // Unsafe parallelization if OC < 16 (1 burst) because multiple writers may perform unaligned store to same burst simultaneously
     val P2 = 1 //2 // Unsafe parallelization if OC < 16 (1 burst) because multiple writers may perform unaligned store to same burst simultaneously
     val P3 = 2 //2
-    val P4 = 2 //2
+    val P4 = 1 //2
     val P5 = 1 //4
     val P6 = 1 //16
     val loadPar = 4 (1 -> 16)
@@ -40,7 +40,7 @@ import spatial.dsl._
     val stride = args(4).to[Int]
     val print_data = args(5).to[Bit]
 
-    if (P1 >= 0) assert(output_chans >= 16, r"Need at least 1 burst (oc=16) if P1 = $P1")
+    if (P1 >= 0) assert(output_chans > 16, r"Need at least 1 burst (oc=16) if P1 = $P1")
 
     // Set args
     setArg(INPUT_ROWS, input_rows)

@@ -137,9 +137,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                         3 1 5 3 1 5 3 1 5
                banking pattern: 0 4 2
                                 3 1 5
-               P = 2,3
-       2. Find subset of P whose product == N*B, with preference given to smallest volume after padding, and this will fence off a region that contains each bank
-          exactly once.  This property is (probably) provable.
+               P_raw = 2,3
+       2. Create P_expanded: List[List[Int]], where P_i is a list containing P_raw, all divisors of P_raw, and dim_i
+       2. Find list, selecting one element from each list in P, whose product == N*B and whose ranges, (0 until p*a by a), touches each bank exactly once, with 
+          preference given to smallest volume after padding, and this will fence off a region that contains each bank
+          exactly once.
        3. Pad the memory so that P evenly divides its respective dim (Currently stored as .padding metadata)
        4. Compute offset chunk
           ofsdim_i = floor(x_i/P_i)
@@ -153,32 +155,30 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           ofs = ofschunk * exp(B,D) + intrablockofs
 
     */
+    def combs(lol: List[List[Int]]): List[List[Int]] = lol match {
+        case Nil => List(Nil)
+        case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
+      }
+    def allLoops(maxes: Seq[Int], steps: Seq[Int], iterators: Seq[Int]): Seq[Int] = maxes match {
+      case Nil => Nil
+      case h::tail if tail.nonEmpty => (0 to h-1).map{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}.flatten
+      case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
+    }
+    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int): Boolean = {
+      allLoops(p,a,Nil).map(_%N).sorted.distinct.length == N
+    }
     def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+    def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if (x % i == 0) => i}
     try {
-      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 65535 else n*b/gcd(n*b,alpha(i))}
-      val options_raw = Seq.tabulate(alpha.size){i => P_raw.combinations(i+1).toList}.flatten.sortBy(_.size)
-      val regions_raw = options_raw.collect{case x if (x.product == n*b) => x}
-      val PandCost_raw = regions_raw.map{region => 
-        var map = scala.collection.mutable.HashMap[Int,Int]()
-        val keep = region.map{x => val start = map.getOrElse(x,0);val id = P_raw.indexOf(x, start); map.update(x, id+1); id}
-        val P = Seq.tabulate(alpha.size){id => if (keep.contains(id)) P_raw(id) else 1}
-        val padding = stagedDims.zip(P).map{case(d,p) => (p - d%p) % p}
+      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
+      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ List(stagedDims(i))}
+      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == n*b).collect{case p if (spansAllBanks(p,alpha,n*b)) => p}
+      val PandCost = options.map{option => 
+        val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product
-        (P,volume)
+        (option,volume)
       }
-      // Below is a potentially cheaper scheme, since it avoids padding in cases like a 96x3x3 mem banked a=0,1,3
-      val P_capped = alpha.indices.map{i => if (alpha(i) == 0) 65535 else {val p = n*b/gcd(n*b,alpha(i)); if (p > stagedDims(i)) stagedDims(i) else p}} 
-      val options_capped = Seq.tabulate(alpha.size){i => P_capped.combinations(i+1).toList}.flatten.sortBy(_.size)
-      val regions_capped = options_capped.collect{case x if (x.product == n*b) => x}
-      val PandCost_capped = regions_capped.map{region => 
-        var map = scala.collection.mutable.HashMap[Int,Int]()
-        val keep = region.map{x => val start = map.getOrElse(x,0);val id = P_capped.indexOf(x, start); map.update(x, id+1); id}
-        val P = Seq.tabulate(alpha.size){id => if (keep.contains(id)) P_capped(id) else 1}
-        val padding = stagedDims.zip(P).map{case(d,p) => (p - d%p) % p}
-        val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product
-        (P,volume)
-      }
-      (PandCost_raw++PandCost_capped).sortBy(_._2).head._1
+      PandCost.sortBy(_._2).head._1
     }
     catch { case t:Throwable =>
       bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha")

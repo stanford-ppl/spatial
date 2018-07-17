@@ -13,7 +13,6 @@ trait ChiselGenMath extends ChiselGenCommon {
 
   // TODO: Clean this and make it nice
   private def MathDL(lhs: Sym[_], rhs: Op[_], lat: String): Unit = {
-    alphaconv_register(src"$lhs")
     emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
 
     if (controllerStack.nonEmpty) {
@@ -75,14 +74,14 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixPow(x,y)  => throw new Exception(s"FixPow($x, $y) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
     case VecApply(vector, i) => emitGlobalWireMap(src"""$lhs""", src"""Wire(${lhs.tp})"""); emitt(src"$lhs := $vector.apply($i)")
 
-    case FixLst(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x < $y")
-    case FixLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x <= $y")
-    case FixNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x =/= $y")
-    case FixEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x === $y")
-    case FltLst(x,y)  => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x < $y")
-    case FltLeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x <= $y")
-    case FltNeq(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x =/= $y")
-    case FltEql(x,y) => alphaconv_register(src"$lhs"); emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x === $y")
+    case FixLst(x,y)  =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x < $y")
+    case FixLeq(x,y) =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x <= $y")
+    case FixNeq(x,y) =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x =/= $y")
+    case FixEql(x,y) =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x === $y")
+    case FltLst(x,y)  =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x < $y")
+    case FltLeq(x,y) =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x <= $y")
+    case FltNeq(x,y) =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x =/= $y")
+    case FltEql(x,y) =>  emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $x === $y")
     case UnbMul(x,y) => MathDL(lhs, rhs, latencyOptionString("UnbMul", Some(bitWidth(lhs.tp)))) 
     case UnbDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("UnbDiv", Some(bitWidth(lhs.tp)))) 
     case SatMul(x,y) => MathDL(lhs, rhs, latencyOptionString("SatMul", Some(bitWidth(lhs.tp)))) 
@@ -170,28 +169,23 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitt(src"${lhs}.r := sqrt(${x}).r")
 
     case FltFMA(x,y,z) => 
-      alphaconv_register(src"$lhs")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+            emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ($x.FltFMA($y, $z).r)")
 
     case FltAdd(x,y) => 
-      alphaconv_register(src"$lhs")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+            emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ($x + $y).r")
 
     case FltSub(x,y) => 
-      alphaconv_register(src"$lhs")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+            emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ($x - $y).r")
 
     case FltMul(x,y) => 
-      alphaconv_register(src"$lhs")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+            emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ($x * $y).r")
 
     case FltDiv(x,y) => 
-      alphaconv_register(src"$lhs")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+            emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ($x / $y).r")
 
     // //case FltAbs(x)  =>

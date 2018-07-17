@@ -5,21 +5,13 @@ import utils.io.files
 import utils._
 import utils.implicits.terminal._
 
-trait Compiler { self =>
-  // TODO[2]: Support multiple compile runs? How to preserve global declarations across compilations?
-  final protected[argon] implicit lazy val IR: State = {
-    val ir = new State
-    ir.config = initConfig()
-    ir.config.name = name
-    ir.newScope(motion = false)
-    ir
-  }
+trait Compiler extends DSLRunnable { self =>
+
   private val instrument = new Instrument()
   private val memWatch = new MemoryLogger()
 
   val script: String
   val desc: String
-  var name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
 
   var directives: Map[String,String] = Map.empty
   def define[T](name: String, default: T)(implicit ctx: SrcCtx): T = directives.get(name.toLowerCase) match {
@@ -123,6 +115,8 @@ trait Compiler { self =>
   }
 
   final def compileProgram(args: Array[String]): Unit = instrument("compile"){
+    checkBugs("staging")
+    checkErrors("staging")
     info(s"Compiling ${config.name} to ${config.genDir}")
     if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
     if (config.test) info("Running in testbench mode")
@@ -161,8 +155,6 @@ trait Compiler { self =>
   /** Called after initial command-line argument parsing has finished. */
   def settings(): Unit = { }
 
-  /** Override to create a custom Config instance */
-  def initConfig(): Config = new Config
   def flows(): Unit = { }
   def rewrites(): Unit = { }
 

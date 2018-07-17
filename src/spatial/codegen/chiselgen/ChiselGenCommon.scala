@@ -389,7 +389,9 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => super.quote(s)
   }
 
-
+  def and(ens: Set[Bit]): String = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" & ")
+  def or(ens: Set[Bit]): String = if (ens.isEmpty) "false.B" else ens.map(quote).mkString(" | ")
+    
   def swap(tup: (Sym[_], RemapSignal)): String = swap(tup._1, tup._2)
   def swap(lhs: Sym[_], s: RemapSignal): String = swap(src"$lhs", s)
   def swap(lhs: Ctrl, s: RemapSignal): String = swap(src"${lhs.s.get}", s)

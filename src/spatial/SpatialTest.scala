@@ -43,7 +43,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --fpga Zynq --debugResources --optimizeReduce",
+    args = "--synth --fpga Zynq --debugResources",
     make = "make vcs",
     run  = "bash scripts/regression_run.sh vcs"
   ) {
@@ -53,7 +53,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object VCS_noretime extends ChiselBackend(
     name = "VCS_noretime",
-    args = "--synth --noretime --debugResources --optimizeReduce",
+    args = "--synth --noretime --debugResources",
     make = "make vcs",
     run  = "bash scripts/regression_run.sh vcs-noretime"
   ) {
@@ -63,7 +63,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object Zynq extends ChiselBackend(
     name = "Zynq",
-    args = "--synth --fpga Zynq --debugResources --optimizeReduce",
+    args = "--synth --fpga Zynq --debugResources",
     make = "make zynq",
     run  = "bash scripts/scrape.sh Zynq"
   ) {
@@ -73,7 +73,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth --fpga ZCU --debugResources --optimizeReduce",
+    args = "--synth --fpga ZCU --debugResources",
     make = "make zcu",
     run  = "bash scripts/scrape.sh ZCU"
   ) {
@@ -83,7 +83,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object AWS extends ChiselBackend(
     name = "AWS",
-    args = "--synth --fpga AWS_F1 --debugResources --optimizeReduce",
+    args = "--synth --fpga AWS_F1 --debugResources",
     make = "make aws-F1-afi",
     run  = "bash scripts/scrape.sh AWS"
   ) {

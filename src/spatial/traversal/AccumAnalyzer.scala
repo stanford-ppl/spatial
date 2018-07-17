@@ -28,6 +28,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       }
 
 
+
     }
     super.visitBlock(block)
   }

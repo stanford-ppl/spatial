@@ -39,3 +39,4 @@ abstract class RegAccum[A:Bits] extends Accumulator[A] {
     en:  Set[Bit],
     func: Lambda1[A,A],
     first: Bit)
+  extends RegAccum[A]

@@ -6,7 +6,7 @@ import utils.io.NullOutputStream
 
 import scala.collection.mutable
 
-class State extends forge.AppState {
+class State(app: DSLRunnable) extends forge.AppState {
   /** Config */
   var config: Config = _
 
@@ -88,6 +88,11 @@ class State extends forge.AppState {
   /** Back-edges */
   var issues: Set[Issue] = Set.empty
   def hasIssues: Boolean = issues.nonEmpty
+
+  def runtimeArgs: Seq[String] = app match {
+    case test: DSLTest => test.runtimeArgs.cmds
+    case _ => Nil
+  }
 
   def reset(): Unit = {
     config.reset()

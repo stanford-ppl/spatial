@@ -8,14 +8,13 @@ import spatial.node._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.retiming._
 import spatial.metadata.types._
 import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
 
 import utils.implicits.collections._
 
 import scala.collection.mutable
-
-
 
 object modeling {
   private var fmaAccumRes = Set[(Sym[_], Double)]()

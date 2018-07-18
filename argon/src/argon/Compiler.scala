@@ -228,8 +228,14 @@ trait Compiler extends DSLRunnable { self =>
     if (config.enMemLog) memWatch.finish()
     if (config.enDbg) {
       instrument.dump("Nova Profiling Report", getOrCreateStream(config.logDir,"9999_Timing.log"))
-      Instrumented.set.foreach{i =>
-        val log = i.fullName.replace('.','_')
+
+      Instrumented.set.groupBy(_.fullName).foreach{case (fullName, is) =>
+        // Combine instruments with the same name
+        val i = is.head
+        is.drop(1).foreach{i2 => i.instrument.add(i2.instrument) }
+
+        // Log results
+        val log = fullName.replace('.','_')
         val heading = s"${i.instrumentName}: ${i.toString} (${i.hashCode()})"
         val stream = getOrCreateStream(config.logDir,log + ".log")
         i.dumpInstrument(heading, stream)
@@ -237,9 +243,10 @@ trait Compiler extends DSLRunnable { self =>
         i.dumpAllInstrument(stream)
         stream.println("\n")
         stream.close()
+        info(s"Profiling results for $fullName dumped to ${config.logDir}$log.log")
 
-        info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
-        i.resetInstrument()
+        // Reset instruments
+        is.foreach(_.resetInstrument())
       }
 
       val heading = s"@flow analyses"
@@ -248,7 +255,6 @@ trait Compiler extends DSLRunnable { self =>
       stream.println("\n")
       IR.flows.instrument.dumpAll(stream)
       stream.close()
-
 
       OutlierFinder.set.foreach{f =>
         val log = f.finderName + ".log"

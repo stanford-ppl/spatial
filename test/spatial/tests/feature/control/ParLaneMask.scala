@@ -16,6 +16,7 @@ import spatial.dsl._
     val y = ArgOut[Int]
     val ymem = DRAM[Int](4,16)
     setArg(x, args(0).to[Int])
+    assert(args(0).to[Int]%2 != 0)
 
     Accel {
       val s = SRAM[Int](64)

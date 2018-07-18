@@ -21,4 +21,9 @@ package object retiming {
 
   }
 
+  implicit object ValueDelayOrdering extends Ordering[ValueDelay] {
+    override def compare(x: ValueDelay, y: ValueDelay): Int = implicitly[Ordering[Int]].compare(y.delay,x.delay)
+  }
+
+
 }

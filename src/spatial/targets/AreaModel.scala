@@ -25,7 +25,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
   final def NoArea: Area = Area.empty[Double]
 
-  @stateful def apply(e: Sym[_], inHwScope: Boolean, inReduce: Boolean): Area = e.op match {
+  @stateful def areaOf(e: Sym[_], inHwScope: Boolean, inReduce: Boolean): Area = e.op match {
     case Some(d) => areaOf(e, d, inHwScope, inReduce)
     case None => NoArea
   }

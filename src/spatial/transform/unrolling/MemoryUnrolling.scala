@@ -51,7 +51,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dbgs(s"Unrolling status ${stm(lhs)}")
     dbgs(s"  on memory $mem -> ${memories((mem,0))}")
     val lhs2s = lanes.map{i =>
-      val lhs2 = isolateWith(escape=Nil, mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
+      val lhs2 = isolateSubstWith(escape=Nil, mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
       dbgs(s"  Lane #$i: ${stm(lhs2)}")
       register(lhs -> lhs2)     // Use this duplicate in this lane
       lhs2
@@ -99,7 +99,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val mem = rhs.mem
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
-      isolateWith(escape=Nil, mem -> memories(dup)){
+      isolateSubstWith(escape=Nil, mem -> memories(dup)){
         val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
         lhs2
       }

@@ -110,9 +110,13 @@ trait CppFileGen extends CppCodegen {
       close("}")
       emit("")
       open("void printHelp() {")
-        val argsList = CLIArgs.listNames.mkString(" ")
+        val argsList = CLIArgs.listNames
+        val examples: Iterator[Seq[String]] = if (argsList.size > 0) IR.runtimeArgs.grouped(argsList.size) else Iterator(Seq(""))
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
-  	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
+        emit(s"""fprintf(stderr, "  -- Args:    ${argsList.mkString(" ")}\\n");""")
+        while(examples.hasNext) {
+          emit(s"""fprintf(stderr, "    -- Example: bash run.sh ${examples.next.mkString(" ")}\\n");""")  
+        }
   	    emit(s"""exit(0);""")
       close("}")
 

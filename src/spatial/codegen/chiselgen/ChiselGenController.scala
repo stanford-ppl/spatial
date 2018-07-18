@@ -523,6 +523,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
+      alphaconv_register(src"$state")
 
       emitt("// Emitting notDone")
       visitBlock(notDone)

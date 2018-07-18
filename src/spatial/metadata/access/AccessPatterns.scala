@@ -157,7 +157,7 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
     */
   @stateful def getSparseVector: Option[SparseVector[Idx]] = {
     val is = comps.map(_.i)
-    val starts = is.map(iterStarts).filter(!_.isConst)
+    val starts = is.collect{case x if (iterStarts.contains(x)) => iterStarts(x)}.filter(!_.isConst)
     val as = comps.map{_.a.partialEval{case Expect(c) => c}}
     val bx = ofs.partialEval{case Expect(c) => c}
     if (as.forall(_.isConst) && (bx.isConst || bx.ps.forall(_.isSymWithMultiplier)) ) {

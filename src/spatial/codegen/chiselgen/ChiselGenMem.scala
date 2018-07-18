@@ -105,7 +105,8 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
-    val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    val paddingRaw = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    val padding = if (paddingRaw.size < dims.size) Seq.fill(dims.length)(0) else paddingRaw // Remove once issue #67 is fixed
     val broadcastWrites = mem.writers.filter{w => w.ports(0).values.head.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
     val broadcastReads = mem.readers.filter{w => w.ports(0).values.head.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
 

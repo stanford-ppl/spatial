@@ -65,7 +65,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   object Plus  { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixAdd(a,b) => (a,b) }}
   object Minus { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixSub(a,b) => (a,b) }}
-  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixMul(a,b) => (a,b) }}
+  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixMul(a,b) => (a,b); case FixSLA(a,b) => (a,a.from(scala.math.pow(2,b.toInt))) }}
+  object Divide { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixDiv(a,b) => (a,b); case FixSRA(a,b) => (a,a.from(scala.math.pow(2,b.toInt))) }}
   object Index { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x).filter(iters.contains) }
 
   private lazy val Zero = Sum.single(0)
@@ -107,6 +108,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       case Times(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) => Some(a * b2, b1 * b2)
       case Times(Offset(b1), Affine(a,b2)) if isAllInvariant(a.inds, b1.syms) => Some(a * b1, b1 * b2)
 
+      // TODO: Doubt that this is correct for the general case
+      case Divide(Affine(a,b1), Offset(b2)) if (isAllInvariant(a.inds, b2.syms) && b2.ps.size == 1 && a.forall(_.a.m % b2.ps.head.m == 0)) => 
+        val a2 = a.map{ac => AffineComponent(Prod.single(ac.a.m / b2.ps.head.m), ac.i)}
+        Some(a2, Zero)
+
       case s => Some(Nil, Sum.single(s))
     }
   }
@@ -127,6 +133,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * @param x a single dimension of the (potentially multi-dimensional) access address
     */
   private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx, mod: Int = 0): AddressPattern = {
+    println(s"getting affine pattern for $x")
     val Affine(products, offset) = x
     val components = products.toAffineProducts
     val is = accessIterators(access, mem)

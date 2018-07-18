@@ -30,7 +30,14 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
   }).asInstanceOf[MemoryConfigurer[C]]
 
   def run(): Unit = {
-    val memories = LocalMemories.all
-    memories.foreach{m => configurer(m).configure() }
+    val memories = LocalMemories.all.toSeq
+    val times = memories.map{m =>
+      val startTime = System.currentTimeMillis()
+      configurer(m).configure()
+      System.currentTimeMillis() - startTime
+    }
+    memories.zip(times).sortBy(_._2).foreach{case (m, time) =>
+      dbg(s"$m completed in: $time ms")
+    }
   }
 }

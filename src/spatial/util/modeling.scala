@@ -4,16 +4,19 @@ import argon._
 import argon.node._
 import forge.tags.stateful
 import models.Area
+import spatial.lang._
 import spatial.node._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.retiming.ValueDelay
 import spatial.metadata.types._
 import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
 
 import utils.implicits.collections._
 
 import scala.collection.mutable
+import scala.collection.immutable.SortedSet
 
 abstract class Cycle {
   def length: Double
@@ -27,6 +30,7 @@ case class WARCycle(reader: Sym[_], writer: Sym[_], memory: Sym[_], symbols: Set
 case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
   def symbols: Set[Sym[_]] = accesses
 }
+
 
 
 object modeling {
@@ -64,18 +68,18 @@ object modeling {
   }
   @stateful def builtInLatencyOf(e: Sym[_]): Double = latencyModel.builtInLatencyOfNode(e)
 
-  @stateful def latencyOfCycle(b: Block[_]): (Double, Double) = latencyOfPipe(b, inReduce = true)
+  @stateful def latencyOfCycle(b: Block[_]): Double = latencyOfPipe(b, inCycle = true)
 
   @stateful def latencyOfPipe(
-    block:    Block[_],
-    inReduce: Boolean = false,
-    verbose:  Boolean = false
-  ): (Double, Double) = latencyAndInterval(block, inReduce, verbose)
+    block:   Block[_],
+    inCycle: Boolean = false,
+    verbose: Boolean = false
+  ): Double = latencyAndInterval(block, inCycle, verbose)._1
 
   @stateful def latencyAndInterval(
-    block:    Block[_],
-    inReduce: Boolean = false,
-    verbose:  Boolean = false
+    block:   Block[_],
+    inCycle: Boolean = false,
+    verbose: Boolean = false
   ): (Double, Double) = {
     val (latencies, cycles) = latenciesAndCycles(block, verbose = verbose)
     val scope = latencies.keySet
@@ -283,7 +287,7 @@ object modeling {
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
       val instances = mem.duplicates.length
-      (0 until instances).map{id =>
+      (0 to instances-1).map{id =>
         val accs = accesses.filter(_.dispatches.values.exists(_.contains(id)))
 
         val muxPairs = accs.map{access =>
@@ -349,6 +353,101 @@ object modeling {
     }
 
     (paths.toMap, allCycles)
+  }
+
+  // Round out to nearest 1/1000 because numbers like 1.1999999997 - 0.2 < 1.0 and screws things up
+  def scrubNoise(x: Double): Double = {
+    if ( (x*1000) % 1 == 0) x
+    else if ( (x*1000) % 1 < 0.5) (x*1000).toInt.toDouble/1000.0
+    else ((x*1000).toInt + 1).toDouble/1000.0
+  }
+
+  def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filter{_.isBits}.toSeq
+
+
+
+
+  @stateful def computeDelayLines(
+    scope: Seq[Sym[_]],
+    latencies: Map[Sym[_], Double],
+    hierarchy: Int,
+    delayLines: Map[Sym[_], SortedSet[ValueDelay]],
+    cycles: Set[Sym[_]],
+    createLine: Option[(Int, Sym[_], SrcCtx) => Sym[_]]
+  ): Seq[(Sym[_], ValueDelay)] = {
+    val innerScope = scope.flatMap(_.blocks.flatMap(_.stms)).toSet
+
+    def delayOf(x: Sym[_]): Double = latencies.getOrElse(x, 0.0)
+    def requiresRegisters(x: Sym[_]): Boolean = latencyModel.requiresRegisters(x, cycles.contains(x))
+    def retimingDelay(x: Sym[_]): Double = if (requiresRegisters(x)) latencyOf(x, cycles.contains(x)) else 0.0
+
+    def delayLine(size: Int, in: Sym[_], ctx: SrcCtx): () => Sym[_] = createLine match {
+      case Some(func) => () => func(size, in, ctx)
+      case None       => () => Invalid
+    }
+
+
+    def createValueDelay(input: Sym[_], reader: Sym[_], delay: Int): ValueDelay = {
+      if (delay < 0) {
+        bug("Compiler bug? Attempting to create a negative delay between input: ")
+        bug(s"  ${stm(input)}")
+        bug("and consumer: ")
+        bug(s"  ${stm(reader)}")
+        state.logBug()
+      }
+      // Retime inner block results as if we were already in the inner hierarchy
+      val h = if (innerScope.contains(input)) hierarchy + 1 else hierarchy
+      val existing = delayLines.getOrElse(input, SortedSet[ValueDelay]())
+      existing.find{_.delay <= delay} match {
+        case Some(prev) =>
+          val size = delay - prev.delay
+          if (size > 0) {
+            logs(s"    Extending existing line of ${prev.delay}")
+            ValueDelay(input, delay, size, h, Some(prev), delayLine(size, prev.value(), input.ctx))
+          }
+          else {
+            logs(s"    Using existing line of ${prev.delay}")
+            prev
+          }
+
+        case None =>
+          logs(s"    Created new delay line of $delay")
+          ValueDelay(input, delay, delay, h, None, delayLine(delay, input, input.ctx))
+      }
+    }
+
+    val consumerDelays = scope.flatMap{case Stm(reader, d) =>
+      val inReduce = cycles.contains(reader)
+      val criticalPath = scrubNoise(delayOf(reader) - latencyOf(reader, inReduce))  // All inputs should arrive at this offset
+
+      // Ignore non-bit based values
+      val inputs = bitBasedInputs(d) //diff d.blocks.flatMap(blk => exps(blk))
+
+      dbgs(s"[Arrive = Dly - Lat: $criticalPath = ${delayOf(reader)} - ${latencyOf(reader,inReduce)}] ${stm(reader)}")
+      //logs(c"  " + inputs.map{in => c"in: ${delayOf(in)}"}.mkString(", ") + "[max: " + criticalPath + "]")
+      inputs.flatMap{in =>
+        val latency_required = scrubNoise(criticalPath)    // Target latency required upon reaching this reader
+        val latency_achieved = scrubNoise(delayOf(in))                       // Latency already achieved at the output of this in (assuming latency_missing is already injected)
+        val latency_missing  = scrubNoise(retimingDelay(in) - builtInLatencyOf(in)) // Latency of this input that still requires manual register injection
+        val latency_actual   = scrubNoise(latency_achieved - latency_missing)
+        val delay = latency_required.toInt - latency_actual.toInt
+        dbgs(s"..[${latency_required - latency_actual} (-> $delay) = $latency_required - ($latency_achieved - $latency_missing) (-> ${latency_required.toInt} - ${latency_actual.toInt})] ${stm(in)}")
+        if (delay.toInt != 0) Some(in -> (reader, delay.toInt)) else None
+      }
+    }
+    val inputDelays = consumerDelays.groupBy(_._1).mapValues(_.map(_._2)).toSeq
+    inputDelays.flatMap{case (input, consumers) =>
+      val consumerGroups = consumers.groupBy(_._2).mapValues(_.map(_._1))
+      val delays = consumerGroups.keySet.toList.sorted  // Presort to maximize coalescing
+      delays.flatMap{delay =>
+        val readers = consumerGroups(delay)
+        readers.map{reader =>
+          dbgs(s"  Creating value delay on $input for reader $reader with delay $delay: ")
+          logs(s"  Creating value delay on $input for reader $reader with delay $delay: ")
+          reader -> createValueDelay(input, reader, delay)
+        }
+      }
+    }
   }
 
 }

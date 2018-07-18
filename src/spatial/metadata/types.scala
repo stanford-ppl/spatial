@@ -25,6 +25,12 @@ object types extends UtilsIRLowPriority {
     def isNum:  Boolean = x.isInstanceOf[Num[_]]
     def isBits: Boolean = x.isInstanceOf[Bits[_]]
     def isVoid: Boolean = x.isInstanceOf[Void]
+
+    def bitInputs: Seq[Sym[_]] = x.op.map(_.bitInputs).getOrElse(Nil)
+  }
+
+  implicit class OpUtils(op: Op[_]) {
+    def bitInputs: Seq[Sym[_]] = op.expInputs.filter(_.isBits)
   }
 
   implicit class ParamHelpers(x: Sym[_]) {

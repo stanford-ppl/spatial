@@ -34,9 +34,13 @@ trait ScalaCodegen extends Codegen with FileDependencies {
         emitPostMain()
       close(src"}")
       open("def printHelp(): Unit = {")
-        val argsList = CLIArgs.listNames.mkString(" ")
+        val argsList = CLIArgs.listNames
+        val examples: Iterator[Seq[String]] = if (argsList.size > 0) IR.runtimeArgs.grouped(argsList.size) else Iterator(Seq(""))
         emit(s"""System.out.print("Help for app: ${config.name}\\n")""")
-        emit(s"""System.out.print("  -- bash run.sh $argsList\\n\\n");""")
+        emit(s"""System.out.print("  -- Args:    ${argsList.mkString(" ")}\\n");""")
+        while(examples.hasNext) {
+          emit(s"""System.out.print("    -- Example: bash run.sh ${examples.next.mkString(" ")}\\n");""")  
+        }
         emit(s"""System.exit(0);""")
       close("}")
     close(src"}")

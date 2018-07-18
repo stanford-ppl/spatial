@@ -45,6 +45,7 @@ trait SpatialVirtualization extends LowPriorityVirtualization { this: Implicits 
   }
 
 
+  def __assign(lhs: Any, rhs: Any): Unit = macro forge.EmbeddedControls.assignImpl
 
   // TODO[4]: Implicit staged conversions when assigning to vars
   @rig def __assign[T](v: VarLike[T], rhs: Any): Unit = v match {

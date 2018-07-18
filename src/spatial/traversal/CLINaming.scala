@@ -5,6 +5,7 @@ import argon.passes.Traversal
 
 import spatial.node._
 import spatial.metadata.CLIArgs
+import spatial.SpatialTest
 
 case class CLINaming(IR: State) extends Traversal {
 
@@ -13,16 +14,16 @@ case class CLINaming(IR: State) extends Traversal {
       var out: Option[String] = None
       val deps = lhs.consumers.iterator
       while (deps.hasNext && out.isEmpty) {
-        out = traceName(deps.next(), idx+1)
+        val n = deps.next()
+        out = traceName(n, idx+1)
       }
-      out
+      if (idx == 0 && out.isEmpty) Some(s"[unnamed (line ${lhs.ctx.line})]") else out
     }
   }
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case ArrayApply(Op(InputArguments()), i) =>
       val argName = traceName(lhs,0)
-
       if (argName.isDefined) {
         val ii = i match {case Const(c) => c.toInt; case _ => -1}
         CLIArgs(ii) = argName.get

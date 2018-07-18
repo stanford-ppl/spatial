@@ -11,6 +11,10 @@ class Instrument(val top: String = "") {
   var scope: String = top
   val times = new mutable.HashMap[String,Long]()
 
+  def add(i2: Instrument): Unit = {
+    i2.times.foreach{case (k,v) => times += k -> (v + times.getOrElse(k, 0L)) }
+  }
+
   @inline def apply[A](name: String)(blk: => A): A = {
     val prev = scope.split('.')
     if (prev.contains(name)) { // Don't double count recursive calls (we're already timing this)

@@ -187,13 +187,19 @@ case class Memory(
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)
-      val n = banking.map(_.nBanks)
-      val dims = (0 until D).map{t => (t+1 until D).map{k => math.ceil(w(k)/n(k)).toInt }.product }
-
-      (0 until D).map{t =>
+      val P = banking.map(_.Ps).flatten
+      val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
-        ( ( xt/(b(t)*n(t)) )*b(t) + xt%b(t) ) * dims(t)
+        val p = P(t)
+        val ofsdim_t = xt / p
+        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
+      val intrablockofs = (0 until D).map{t => 
+        val xt = addr(t)
+        val ofsdim_t = xt % b(t)
+        ofsdim_t * b.slice(t+1,D).product.toInt
+      }.sumTree
+      ofschunk * b.product.toInt + intrablockofs
     }
     else {
       // TODO: Bank address for mixed dimension groups

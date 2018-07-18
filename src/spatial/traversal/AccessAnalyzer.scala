@@ -15,21 +15,25 @@ import spatial.metadata.types._
 
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
+  private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective starting point
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
   private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of looop iterators to all symbols defined in that scope
 
-  private def inLoop(loop: Sym[_], is: Seq[Idx], block: Block[_]): Unit = {
+  private def inLoop(loop: Sym[_], is: Seq[Idx], istarts: Seq[Ind[_]], block: Block[_]): Unit = {
     val saveIters = iters
+    val saveIterStarts = iterStarts
     val saveLoops = loops
     val saveScopes = scopes
 
     val scope = block.nestedStms.toSet
     iters ++= is
+    iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
     scopes ++= is.map{_ -> scope}
     visitBlock(block)
 
     iters = saveIters
+    iterStarts = saveIterStarts
     loops = saveLoops
     scopes = saveScopes
   }
@@ -107,13 +111,14 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     }
   }
 
-  private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum): AddressPattern = {
+  private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum, modulus: Int = 0): AddressPattern = {
+    val starts = iterStarts.filterKeys(is.filter{i => offset.syms.contains(i) || components.exists{prod => prod.syms.contains(i)}}.contains)
     val lastIters = offset.syms.mapping{x => lastVariantIter(is,x) } ++
-                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }}
+                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }} ++
+                    starts.values.mapping{x => lastVariantIter(is,x)}
 
     val lastIter  = lastIters.values.maxByOrElse(None){i => i.map{is.indexOf}.getOrElse(-1) }
-
-    AddressPattern(components, offset, lastIters, lastIter)
+    AddressPattern(components, offset, lastIters, lastIter, starts, modulus)
   }
 
   /** Return the affine access pattern of the given address component x as an AddressPattern.
@@ -121,11 +126,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * @param access the symbol of the memory access
     * @param x a single dimension of the (potentially multi-dimensional) access address
     */
-  private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx): AddressPattern = {
+  private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx, mod: Int = 0): AddressPattern = {
     val Affine(products, offset) = x
     val components = products.toAffineProducts
     val is = accessIterators(access, mem)
-    makeAddressPattern(is, components, offset)
+    makeAddressPattern(is, components, offset, mod)
   }
 
   /** Return the affine pattern of the given value x as an AddressPattern.
@@ -143,15 +148,15 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * This spoofing is done by treating the streaming access as a linear access and is used so that
     * streaming and addressed accesses can be analyzed using the same affine pattern logic.
     */
-  private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx]): Unit = {
+  private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx], mods: Seq[Int]): Unit = {
     dbgs(s"${stm(access)}")
 
-    val pattern = addr.map{x => getAccessAddressPattern(mem, access, x) }
+    val pattern = addr.zip(mods).map{case(x,mod) => getAccessAddressPattern(mem, access, x, mod) }
 
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
-    val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
+    val matrices = getUnrolledMatrices(mem,access,addr,mods,pattern,Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
@@ -183,7 +188,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
-    val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
+    val matrices = getUnrolledMatrices(mem, access, Nil, Nil, pattern, Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
@@ -193,25 +198,41 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
     case Op(op@CounterNew(start,end,step,_)) if op.A.isIdx =>
+      dbgs(s"$lhs = $rhs [COUNTER]")
       start.accessPattern = Seq(getValueAddressPattern(start.asInstanceOf[Idx]))
       end.accessPattern   = Seq(getValueAddressPattern(end.asInstanceOf[Idx]))
       step.accessPattern  = Seq(getValueAddressPattern(step.asInstanceOf[Idx]))
+      dbgs(s"  start: ${start.accessPattern}")
+      dbgs(s"  end: ${end.accessPattern}")
+      dbgs(s"  step: ${step.accessPattern}")
 
     case Op(loop: Loop[_]) =>
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
         scope.blocks.foreach{case (iters, block) =>
+          val iterStarts = iters.map(_.ctrStart)//loop.cchains.map(_._1.counters.map(_.start)).flatten
           dbgs(s"  Iters:  $iters")
+          dbgs(s"  Starts:  $iterStarts")
           dbgs(s"  Blocks: $block")
-          inLoop(lhs, iters, block)
+          inLoop(lhs, iters, iterStarts, block)
         }
 
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
     case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
-    case Reader(mem,adr,_)   => setAccessPattern(mem, lhs, adr)
-    case Writer(mem,_,adr,_) => setAccessPattern(mem, lhs, adr)
+    case Reader(mem,adr,_)   => 
+      val affineAddrsAndMod = adr.map{
+        case Op(FixMod(a,b)) if b.isConst => (a.asInstanceOf[Idx],b.toInt)
+        case a => (a, 0)
+      }
+      setAccessPattern(mem, lhs, affineAddrsAndMod.map(_._1), affineAddrsAndMod.map(_._2))
+    case Writer(mem,_,adr,_) => 
+      val affineAddrsAndMod = adr.map{
+        case Op(FixMod(a,b)) if b.isConst => (a.asInstanceOf[Idx],b.toInt)
+        case a => (a, 0)
+      }
+      setAccessPattern(mem, lhs, affineAddrsAndMod.map(_._1), affineAddrsAndMod.map(_._2))
     case _ => super.visit(lhs, rhs)
   }
 }

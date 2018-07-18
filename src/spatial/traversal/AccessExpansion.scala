@@ -49,8 +49,8 @@ trait AccessExpansion {
   def domain(x: Idx): ConstraintMatrix[Idx] = getOrAddDomain(x)
 
 
-  def getAccessCompactMatrix(access: Sym[_], addr: Seq[Idx], pattern: Seq[AddressPattern]): SparseMatrix[Idx] = {
-    val rows = pattern.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => addr.indexOrElse(d,nextRand())} }
+  def getAccessCompactMatrix(access: Sym[_], addr: Seq[Idx], mod: Seq[Int], pattern: Seq[AddressPattern]): SparseMatrix[Idx] = {
+    val rows = pattern.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => (addr.indexOrElse(d,nextRand()), mod(d))} }
     val matrix = SparseMatrix[Idx](rows)
     matrix.keys.foreach{x => getOrAddDomain(x) }
     matrix
@@ -60,16 +60,18 @@ trait AccessExpansion {
     mem:     Sym[_],
     access:  Sym[_],
     addr:    Seq[Idx],
+    mod:     Seq[Int],
     pattern: Seq[AddressPattern],
     vecID:   Seq[Int] = Nil
   ): Seq[AccessMatrix] = {
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrParOr1)
+    val starts = is.map(_.ctrStart)
 
-    dbgs("Iterators: " + is.map{i => s"$i (${i.ctrParOr1})"}.mkString(", "))
+    dbgs("Iterators: " + is.indices.map{i => s"${is(i)} (${ps(i)}) - ${starts(i)}"}.mkString(", "))
 
     val iMap = is.zipWithIndex.toMap
-    val matrix = getAccessCompactMatrix(access, addr, pattern)
+    val matrix = getAccessCompactMatrix(access, addr, mod, pattern)
 
     multiLoop(ps).map{uid =>
       val mat = matrix.map{vec =>
@@ -98,8 +100,9 @@ trait AccessExpansion {
         val as = components.map(_._1)
         val xs = components.map(_._2)
         val c  = components.map(_._3).sum + vec.c
+        val modulus = vec.modulus
         val lI = components.collectAsMap{case (_,x,_,i) if !i.contains(x) => (x, i): (Idx,Option[Idx]) }  // Scala really doesn't like Option with wildcards
-        SparseVector[Idx](xs.zip(as).toMap, c, lI)
+        SparseVector[Idx](xs.zip(as).toMap, c, lI, modulus)
       }
       val amat = AccessMatrix(access, mat, uid ++ vecID)
       amat.keys.foreach{x => getOrAddDomain(x) }

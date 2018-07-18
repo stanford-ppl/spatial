@@ -52,7 +52,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           findBanking(selGrps, dims, stagedDims)
         }
         if (isValidBanking(banking,grps)) {
-          if (!mem.getPadding.isDefined) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.head.Ps).map{case(d,p) => (p - d%p) % p}
+          if (!mem.getPadding.isDefined) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.map(_.Ps).flatten).map{case(d,p) => (p - d%p) % p}
           Some(banking)
         } else None
       }
@@ -194,7 +194,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int]): ModBanking = {
     val rank = dims.length
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
-    val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= stagedDims.product).partition{i => isPow2(i) }
+    val Ncap = stagedDims.product max Nmin
+    val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= Ncap).partition{i => isPow2(i) }
     val n2Head = if ((n2.isEmpty && nx.isEmpty) || (!n2.isEmpty && n2.head.toDouble/Nmin > MAGIC_CUTOFF_N)) Seq(Nmin) else Nil
     val Ns = (n2Head ++ n2 ++ nx).iterator
 

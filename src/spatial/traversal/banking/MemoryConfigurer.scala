@@ -4,6 +4,7 @@ package banking
 import argon._
 import poly.ISL
 import utils.implicits.collections._
+import utils.tags.instrument
 
 import spatial.issues.UnbankableGroup
 import spatial.lang._
@@ -14,7 +15,7 @@ import spatial.util.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 
-class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
+@instrument class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
   protected val rank: Int = mem.seqRank.length
   protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 

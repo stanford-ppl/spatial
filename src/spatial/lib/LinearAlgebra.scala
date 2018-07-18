@@ -254,13 +254,12 @@ trait LinearAlgebra {
     }
   }
 
-
   @virtualize
   def maxpool2d[T:Num](
     Y: SRAM4[T],
     X: SRAM4[T],
     kernel: (Int,Int),
-    pad: (Int,Int),
+    pad: (Int,Int,Int,Int),
     stride: (Int,Int)
   )(implicit state: State): Unit = {
     val D0 = Y.dim0
@@ -288,11 +287,11 @@ trait LinearAlgebra {
   }
 
   @virtualize
-  def averagepool2d[T:Num](
+  def averagepool2d[T:Type:Num](
     Y: SRAM4[T],
     X: SRAM4[T],
     kernel: (Int,Int),
-    pad: (Int,Int),
+    pad: (Int,Int,Int,Int),
     stride: (Int,Int)
   )(implicit state: State): Unit = {
     val D0 = Y.dim0

@@ -100,22 +100,23 @@ case class AffineProduct(a: Sum, i: Idx) {
   * @param ofs   A sum of products representing the symbolic offset
   * @param lastIters A map from each symbol to its
   */
-case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Idx,Option[Idx]], last: Option[Idx]) {
+case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Idx,Option[Idx]], last: Option[Idx], iterStarts: Map[Idx,Ind[_]], modulus: Int) {
 
   /** Convert this to a sparse vector representation if it is representable as an affine equation with
     * constant multipliers. Returns None otherwise.
     */
   @stateful def getSparseVector: Option[SparseVector[Idx]] = {
     val is = comps.map(_.i)
+    val starts = is.map(iterStarts).filter(!_.isConst)
     val as = comps.map{_.a.partialEval{case Expect(c) => c}}
     val bx = ofs.partialEval{case Expect(c) => c}
     if (as.forall(_.isConst) && (bx.isConst || bx.ps.forall(_.isSymWithMultiplier)) ) {
       val randComponents = bx.ps.map{p => (p.m, p.xs.head) }
       val rs: Seq[(Idx,Int)] = randComponents.groupBy(_._2).mapValues{as => as.map(_._1).sum}.toSeq
 
-      val xs_all: Seq[Idx] = is ++ rs.map(_._1)
-      val as_all: Seq[Int] = as.map(_.b) ++ rs.map(_._2)
-      Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters) )
+      val xs_all: Seq[Idx] = is ++ rs.map(_._1) ++ starts
+      val as_all: Seq[Int] = as.map(_.b) ++ rs.map(_._2) ++ starts.indices.map{_ => 1}
+      Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters, modulus) )
     }
     else None
   }
@@ -124,10 +125,12 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
     * Convert this to a sparse vector representation if it is representable as an affine equation with
     * constant multipliers. Falls back to a representation of 1*x + 0 otherwise.
     */
-  @stateful def toSparseVector(x: () => Idx): SparseVector[Idx] = {
+  @stateful def toSparseVector(x: () => (Idx, Int)): SparseVector[Idx] = {
     getSparseVector.getOrElse{
-      val y = x()
-      SparseVector(Map(y -> 1), 0, Map(y -> last))
+      val info = x()
+      val y = info._1
+      val m = info._2
+      SparseVector(Map(y -> 1), 0, Map(y -> last), m)
     }
   }
 

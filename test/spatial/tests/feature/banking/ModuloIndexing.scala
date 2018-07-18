@@ -14,7 +14,7 @@ import argon.Block
     val dram1 = DRAM[Int](16)
     val dram2 = DRAM[Int](15)
     val dram3 = DRAM[Int](16)
-    val dram4 = DRAM[Int](16)
+    val dram4 = DRAM[Int](8)
     Accel {
       val x1 = SRAM[Int](16)
       Foreach(16 by 1 par P1){i => x1((i+1) % 16) = i}
@@ -28,7 +28,7 @@ import argon.Block
       Foreach(32 by 2 par P3){i => x3(i/2) = i}
       dram3 store x3
 
-      val x4 = SRAM[Int](30)
+      val x4 = SRAM[Int](32)
       Foreach(16 by 2 par P4){i => x4(i*2) = i}
       dram4 store x4(0::32 by 4)
 
@@ -40,7 +40,7 @@ import argon.Block
     val result2 = getMem(dram2)
     val gold3 = Array.tabulate(16){i => i*2}
     val result3 = getMem(dram3)
-    val gold4 = Array.tabulate(16){i => i*2}
+    val gold4 = Array.tabulate(8){i => i*2}
     val result4 = getMem(dram4)
 
     printArray(gold1, "Gold1: ")

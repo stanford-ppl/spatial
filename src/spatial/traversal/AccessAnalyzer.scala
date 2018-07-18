@@ -133,7 +133,6 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * @param x a single dimension of the (potentially multi-dimensional) access address
     */
   private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx, mod: Int = 0): AddressPattern = {
-    println(s"getting affine pattern for $x")
     val Affine(products, offset) = x
     val components = products.toAffineProducts
     val is = accessIterators(access, mem)

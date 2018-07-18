@@ -8,6 +8,8 @@ import spatial.metadata.bounds.Expect
 
 import utils.implicits.collections._
 
+case class InvalidDivisionException(x: Any, c: Int)
+  extends Exception(s"Cannot statically divide $x by $c")
 
 case class Prod(xs: Seq[Idx], m: Int = 1) {
   def syms: Seq[Idx] = xs
@@ -27,6 +29,14 @@ case class Prod(xs: Seq[Idx], m: Int = 1) {
   def +(c: Int): Sum  = Sum(Seq(this), c)
   def -(c: Int): Sum  = Sum(Seq(this), c)
 
+  def /(c: Int): Prod = {
+    if (canDivideBy(c)) Prod(xs, m / c)
+    else throw InvalidDivisionException(this, c)
+  }
+
+  def canDivideBy(c: Int): Boolean = m % c == 0
+  def canDivideBy(s: Sum): Boolean = s.isConst && m % s.b == 0
+
   def partialEval(f: PartialFunction[Idx,Int]): Prod = {
     val (cs,ys) = xs.partition(f.isDefinedAt)
     val c = m * cs.map(f).product
@@ -39,23 +49,55 @@ case class Prod(xs: Seq[Idx], m: Int = 1) {
 object Prod {
   def single(c: Int): Prod = Prod(Nil, c)
   def single(x: Idx): Prod = Prod(Seq(x))
+
+
 }
 
 case class Sum(ps: Seq[Prod], b: Int = 0) {
+
+  implicit class SumOfProdsOps(ps: Seq[Prod]) {
+    def unary_-(): Seq[Prod] = ps.map{p => -p}                 // -(p1 + p2)
+
+    def *(p2: Seq[Prod]): Seq[Prod] = p2.flatMap{p => ps * p } // (p1 + p2) * (p3 + p4)
+    def *(p: Prod): Seq[Prod] = ps.map(_ * p)                  // (p1 + p2) * p
+    def *(s: Sum): Seq[Prod] = ps * s.ps + ps * s.b            // (p1 + p2) * (p3 + p4 + c)
+    def *(c: Int): Seq[Prod] = ps.flatMap(_ * c)               // (p1 + p2) * c
+
+    def +(p2: Seq[Prod]): Seq[Prod] = ps ++ p2                 // (p1 + p2) + (p3 + p4)
+    def +(p: Option[Prod]): Seq[Prod] = ps ++ p                // (p1 + p2) + (p|0)
+    def +(p: Prod): Seq[Prod] = p +: ps                        // (p1 + p2) + p
+    def +(c: Int): Sum = Sum(ps, c)                            // (p1 + p2) + c
+
+    def -(p: Prod): Seq[Prod] = -p +: ps                       // (p1 + p2) - p
+    def -(c: Int): Sum = Sum(ps, -c)                           // (p1 + p2) - c
+  }
+
+
   def syms: Seq[Idx] = ps.flatMap(_.syms)
   def isConst: Boolean = ps.isEmpty
   def unary_-(): Sum = Sum(ps.map{p => -p }, -b)
+
+  def *(p: Prod): Sum = ps*p + p*b + 0
   def *(s: Sum): Sum = Sum(ps.flatMap{p => s.ps.map{p2 => p * p2 }} ++ s.ps.flatMap{_*b} ++ ps.flatMap{_*s.b}, b * s.b)
-  def +(s: Sum): Sum = Sum(ps ++ s.ps, b + s.b)
-  def -(s: Sum): Sum = -s + this
+  def *(c: Int): Sum = Sum(ps*c, b*c)
 
-  def *(p: Prod): Sum = Sum(ps.map{_ * p} ++ p*b, 0)
-  def +(p: Prod): Sum = Sum(p +: ps, b)
-  def -(p: Prod): Sum = Sum(-p +: ps, b)
-
-  def *(c: Int): Sum = Sum(ps.flatMap(_ * c), b*c)
+  def +(p: Prod): Sum = ps + p + b
+  def +(s: Sum): Sum = ps + s.ps + b + s.b
   def +(c: Int): Sum = Sum(ps, b + c)
+
+  def -(s: Sum): Sum = -s + this
+  def -(p: Prod): Sum = Sum(ps - p, b)
   def -(c: Int): Sum = Sum(ps, b - c)
+
+  def /(c: Int): Sum = {
+    if (canDivideBy(c)) Sum(ps.map{_ / c}, b / c)
+    else throw InvalidDivisionException(this, c)
+  }
+
+  def canDivideBy(c: Int): Boolean = b % c == 0 && ps.forall(_.canDivideBy(c))
+  def canDivideBy(s: Sum): Boolean = {
+    (b == 0 || (s.isConst && b % s.b == 0)) && ps.forall(_.canDivideBy(s))
+  }
 
   def partialEval(f: PartialFunction[Idx,Int]): Sum = {
     val (cs,ys) = ps.map(_.partialEval(f)).partition(_.isConst)
@@ -63,13 +105,21 @@ case class Sum(ps: Seq[Prod], b: Int = 0) {
     Sum(ys, c)
   }
 
+  def canDivide(acs: Seq[AffineComponent]): Boolean = acs.forall{ac => this.canDivide(ac) }
+  def canDivide(ac: AffineComponent): Boolean = this.canDivide(ac.a)
+  def canDivide(p: Prod): Boolean = this.isConst && p.m % b == 0
+  def canDivide(s: Sum): Boolean = this.isConst && s.b % b == 0 && s.ps.forall{p => this.canDivide(p)}
+
   override def toString: String = if (isConst) b.toString else {
     ps.mkString(" + ") + (if (b != 0) s" + $b" else "")
   }
 }
 object Sum {
   def single(c: Int): Sum = Sum(Nil, c)
-  def single(x: Idx): Sum = Sum(Seq(Prod.single(x)))
+  def single(x: Idx): Sum = x match {
+    case Expect(c) => Sum.single(c)
+    case _ => Sum(Seq(Prod.single(x)))
+  }
 }
 
 case class AffineComponent(a: Prod, i: Idx) {
@@ -98,7 +148,7 @@ case class AffineProduct(a: Sum, i: Idx) {
   *
   * @param comps A list of sum of products multipliers for distinct loop indices
   * @param ofs   A sum of products representing the symbolic offset
-  * @param lastIters A map from each symbol to its
+  * @param lastIters Mapping from symbol to the innermost iterator it varies with, None if it is entirely loop invariant
   */
 case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Idx,Option[Idx]], last: Option[Idx], iterStarts: Map[Idx,Ind[_]], modulus: Int) {
 

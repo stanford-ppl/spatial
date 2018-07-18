@@ -92,6 +92,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   private object Offset {
+    /** Returns only affine patterns which have no loop iterators. */
     def unapply(x: Idx): Option[Sum] = x match {
       case Affine(a,b) if a.isEmpty => Some(b)
       case _ => None
@@ -99,17 +100,33 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   private object Affine {
+    /** Recursively finds affine patterns in the dataflow graph starting from the given symbol x.
+      * Examples of patterns:
+      *   3       ==> Nil, Sum(3)
+      *   x       ==> Nil, Sum(x) (if x is not a loop iterator or defined by an affine function)
+      *   i*3 + j ==> Seq(AffineComponent(Prod(3), i), AffineComponent(Prod(1), j)), Sum(0)
+      *   i*x*y   ==> Seq(AffineComponent(Prod(x, y), i)), Sum(0)
+      *
+      */
     def unapply(x: Idx): Option[(Seq[AffineComponent], Sum)] = x match {
+      // A single loop iterator
       case Index(i) => Some(Seq(AffineComponent(stride(i), i)), Zero)
 
+      // Any affine component plus any other affine component (e.g. (4*i + 5) + (3*j + 2))
       case Plus(Affine(a1,b1), Affine(a2,b2))  => Some(a1 ++ a2, b1 + b2)
+
+      // Any affine component minus any other affine component (e.g. j - 1)
       case Minus(Affine(a1,b1), Affine(a2,b2)) => Some(a1 ++ (-a2), b1 - b2)
 
+      // Product of an affine component with a loop independent value, e.g. 4*i or (i + j)*32
+      // Note: the multiplier only has to be loop invariant w.r.t. to iterators in a.
+      // Note: products of affine components (e.g. i*j) are NOT themselves affine
+      // Multiplication on sequences of AffineComponents is implicitly defined to be distributive
       case Times(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) => Some(a * b2, b1 * b2)
       case Times(Offset(b1), Affine(a,b2)) if isAllInvariant(a.inds, b1.syms) => Some(a * b1, b1 * b2)
 
       // TODO: Doubt that this is correct for the general case
-      case Divide(Affine(a,b1), Offset(b2)) if (isAllInvariant(a.inds, b2.syms) && b2.ps.size == 1 && a.forall(_.a.m % b2.ps.head.m == 0)) => 
+      case Divide(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && b2.ps.size == 1 && a.forall(_.a.m % b2.ps.head.m == 0) =>
         val a2 = a.map{ac => AffineComponent(Prod.single(ac.a.m / b2.ps.head.m), ac.i)}
         Some(a2, Zero)
 

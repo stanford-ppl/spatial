@@ -276,7 +276,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
 
     stateFSM.io.xBarW(0).data := io.nextState.asUInt
     stateFSM.io.xBarW(0).init := io.initState.asUInt
-    stateFSM.io.xBarW(0).en := io.enable & io.ctrDone.D(latency)
+    stateFSM.io.xBarW(0).en := io.enable & io.ctrDone
     // if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
     // else stateFSM.io.xBarW(0).en := io.enable
     stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable

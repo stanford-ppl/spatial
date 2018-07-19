@@ -3,7 +3,7 @@ package schedule
 
 import scala.collection.mutable
 
-class SimpleScheduler extends Scheduler {
+class SimpleScheduler(enableDCE: Boolean = true) extends Scheduler {
   def mustMotion = false
 
   /** Returns the schedule of the given scope. */
@@ -22,7 +22,7 @@ class SimpleScheduler extends Scheduler {
     // Simple dead code elimination
     scope.reverseIterator.foreach{s =>
       val uses = s.consumers diff unused
-      if (s != result && uses.isEmpty && s.effects.isIdempotent) unused += s
+      if (s != result && uses.isEmpty && s.effects.isIdempotent && enableDCE) unused += s
     }
     val keep  = scope.filter{s => !unused.contains(s) }
 
@@ -31,4 +31,4 @@ class SimpleScheduler extends Scheduler {
   }
 }
 
-object SimpleScheduler extends SimpleScheduler
+object SimpleScheduler extends SimpleScheduler(enableDCE = true)

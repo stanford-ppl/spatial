@@ -46,7 +46,8 @@ trait CppGenMath extends CppGenCommon {
     case FltLeq(x,y) => emit(src"${lhs.tp} $lhs = $x <= $y;")
     case FltNeq(x,y) => emit(src"${lhs.tp} $lhs = $x != $y;")
     case FltEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
-    case FixMod(x,y) => emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"${toTrueFix(quote(x), x.tp)} % ${toTrueFix(quote(y), y.tp)}", lhs.tp)};")
+    case FixMod(x,y) => 
+        emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"(${toTrueFix(quote(x), x.tp)} % ${toTrueFix(quote(y), y.tp)} + ${toTrueFix(quote(y), y.tp)}) % ${toTrueFix(quote(y), y.tp)}", lhs.tp)};")
     case FixRandom(x) => emit(src"${lhs.tp} $lhs = rand() % ${x.getOrElse(100)};")
     case FltRandom(x) => emit(src"${lhs.tp} $lhs = ((float) rand() / (float) RAND_MAX) * (float) ${x.getOrElse(100)};")
     case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")

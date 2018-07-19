@@ -10,9 +10,11 @@ trait DSLRunnable { self =>
     val state = new State(this)
     state.config = initConfig()
     val cwd = new File(".").getAbsolutePath
-    state.config.logDir = s"$cwd/logs/testbench/$name/"
-    state.config.genDir = s"$cwd/gen/testbench/$name/"
-    state.config.repDir = s"$cwd/reports/testbench/$name/"
+    val name = self.name.replace("_", "/")
+    state.config.logDir = s"$cwd/logs/$name/"
+    state.config.genDir = s"$cwd/gen/$name/"
+    state.config.repDir = s"$cwd/reports/$name/"
+    state.config.setV(1)
     state.newScope(motion=false)  // Start a new scope (allows global declarations)
     state
   }

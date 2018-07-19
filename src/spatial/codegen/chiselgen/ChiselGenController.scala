@@ -9,6 +9,7 @@ import spatial.metadata.access._
 import spatial.metadata.retiming._
 import spatial.metadata.control._
 import spatial.metadata.types._
+import spatial.util.modeling.scrubNoise
 import spatial.util.spatialConfig
 
 trait ChiselGenController extends ChiselGenCommon {
@@ -287,8 +288,8 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) sym.bodyLatency.sum else 0.0
-    val ii = sym.II
+    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) scrubNoise(sym.bodyLatency.sum) else 0.0
+    val ii = scrubNoise(sym.II)
 
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
@@ -370,7 +371,7 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.filter(_.s.get != sym).head.s.get, Done)}""")
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc).D(1) // Used to be delayed by 1 & validNow""")
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(1) // Used to be delayed by 1 & validNow""")
       } else {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc) // Used to be delayed by 1 & validNow""")
       }

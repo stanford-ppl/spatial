@@ -15,21 +15,25 @@ import spatial.metadata.types._
 
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
+  private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective starting point
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
   private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of looop iterators to all symbols defined in that scope
 
-  private def inLoop(loop: Sym[_], is: Seq[Idx], block: Block[_]): Unit = {
+  private def inLoop(loop: Sym[_], is: Seq[Idx], istarts: Seq[Ind[_]], block: Block[_]): Unit = {
     val saveIters = iters
+    val saveIterStarts = iterStarts
     val saveLoops = loops
     val saveScopes = scopes
 
     val scope = block.nestedStms.toSet
     iters ++= is
+    iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
     scopes ++= is.map{_ -> scope}
     visitBlock(block)
 
     iters = saveIters
+    iterStarts = saveIterStarts
     loops = saveLoops
     scopes = saveScopes
   }
@@ -61,7 +65,14 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   object Plus  { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixAdd(a,b) => (a,b) }}
   object Minus { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixSub(a,b) => (a,b) }}
-  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixMul(a,b) => (a,b) }}
+  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{
+    case FixMul(a,b) => (a,b)
+    case FixSLA(a,Expect(b)) => (a,a.from(scala.math.pow(2,b)))
+  }}
+  object Divide { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{
+    case FixDiv(a,b) => (a,b)
+    case FixSRA(a,Expect(b)) => (a,a.from(scala.math.pow(2,b)))
+  }}
   object Index { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x).filter(iters.contains) }
 
   private lazy val Zero = Sum.single(0)
@@ -72,7 +83,10 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     def unary_-(): Seq[AffineComponent] = x.map{c => -c}
 
     def inds: Seq[Idx] = x.map(_.i)
-    def *(a: Sum): Seq[AffineComponent] = x.flatMap(_ * a)
+    def *(s: Sum): Seq[AffineComponent] = x.flatMap(_ * s)
+    def /(s: Sum): Seq[AffineComponent] = x.map(_ / s)
+
+    def canBeDividedBy(s: Sum): Boolean = x.forall(_.canBeDividedBy(s))
 
     /**
       * Converts a representation of the form
@@ -87,6 +101,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   private object Offset {
+    /** Returns only affine patterns which have no loop iterators. */
     def unapply(x: Idx): Option[Sum] = x match {
       case Affine(a,b) if a.isEmpty => Some(b)
       case _ => None
@@ -94,26 +109,46 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   private object Affine {
+    /** Recursively finds affine patterns in the dataflow graph starting from the given symbol x.
+      * Examples of patterns:
+      *   3       ==> Nil, Sum(3)
+      *   x       ==> Nil, Sum(x) (if x is not a loop iterator or defined by an affine function)
+      *   i*3 + j ==> Seq(AffineComponent(Prod(3), i), AffineComponent(Prod(1), j)), Sum(0)
+      *   i*x*y   ==> Seq(AffineComponent(Prod(x, y), i)), Sum(0)
+      *
+      */
     def unapply(x: Idx): Option[(Seq[AffineComponent], Sum)] = x match {
+      // A single loop iterator
       case Index(i) => Some(Seq(AffineComponent(stride(i), i)), Zero)
 
+      // Any affine component plus any other affine component (e.g. (4*i + 5) + (3*j + 2))
       case Plus(Affine(a1,b1), Affine(a2,b2))  => Some(a1 ++ a2, b1 + b2)
+
+      // Any affine component minus any other affine component (e.g. j - 1)
       case Minus(Affine(a1,b1), Affine(a2,b2)) => Some(a1 ++ (-a2), b1 - b2)
 
+      // Product of an affine component with a loop independent value, e.g. 4*i or (i + j)*32
+      // Note: the multiplier only has to be loop invariant w.r.t. to iterators in a.
+      // Note: products of affine components (e.g. i*j) are NOT themselves affine
+      // Multiplication on sequences of AffineComponents is implicitly defined to be distributive
       case Times(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) => Some(a * b2, b1 * b2)
       case Times(Offset(b1), Affine(a,b2)) if isAllInvariant(a.inds, b1.syms) => Some(a * b1, b1 * b2)
+
+      case Divide(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && a.canBeDividedBy(b2) && b1.canBeDividedBy(b2) =>
+        Some(a / b2, b1 / b2)
 
       case s => Some(Nil, Sum.single(s))
     }
   }
 
-  private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum): AddressPattern = {
+  private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum, modulus: Int = 0): AddressPattern = {
+    val starts = iterStarts.filterKeys(is.filter{i => offset.syms.contains(i) || components.exists{prod => prod.syms.contains(i)}}.contains)
     val lastIters = offset.syms.mapping{x => lastVariantIter(is,x) } ++
-                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }}
+                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }} ++
+                    starts.values.mapping{x => lastVariantIter(is,x)}
 
     val lastIter  = lastIters.values.maxByOrElse(None){i => i.map{is.indexOf}.getOrElse(-1) }
-
-    AddressPattern(components, offset, lastIters, lastIter)
+    AddressPattern(components, offset, lastIters, lastIter, starts, modulus)
   }
 
   /** Return the affine access pattern of the given address component x as an AddressPattern.
@@ -121,11 +156,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * @param access the symbol of the memory access
     * @param x a single dimension of the (potentially multi-dimensional) access address
     */
-  private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx): AddressPattern = {
+  private def getAccessAddressPattern(mem: Sym[_], access: Sym[_], x: Idx, mod: Int = 0): AddressPattern = {
     val Affine(products, offset) = x
     val components = products.toAffineProducts
     val is = accessIterators(access, mem)
-    makeAddressPattern(is, components, offset)
+    makeAddressPattern(is, components, offset, mod)
   }
 
   /** Return the affine pattern of the given value x as an AddressPattern.
@@ -143,15 +178,15 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * This spoofing is done by treating the streaming access as a linear access and is used so that
     * streaming and addressed accesses can be analyzed using the same affine pattern logic.
     */
-  private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx]): Unit = {
+  private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx], mods: Seq[Int]): Unit = {
     dbgs(s"${stm(access)}")
 
-    val pattern = addr.map{x => getAccessAddressPattern(mem, access, x) }
+    val pattern = addr.zip(mods).map{case(x,mod) => getAccessAddressPattern(mem, access, x, mod) }
 
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
-    val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
+    val matrices = getUnrolledMatrices(mem,access,addr,mods,pattern,Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
@@ -183,7 +218,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
-    val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
+    val matrices = getUnrolledMatrices(mem, access, Nil, Nil, pattern, Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
@@ -193,25 +228,41 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
     case Op(op@CounterNew(start,end,step,_)) if op.A.isIdx =>
+      dbgs(s"$lhs = $rhs [COUNTER]")
       start.accessPattern = Seq(getValueAddressPattern(start.asInstanceOf[Idx]))
       end.accessPattern   = Seq(getValueAddressPattern(end.asInstanceOf[Idx]))
       step.accessPattern  = Seq(getValueAddressPattern(step.asInstanceOf[Idx]))
+      dbgs(s"  start: ${start.accessPattern}")
+      dbgs(s"  end: ${end.accessPattern}")
+      dbgs(s"  step: ${step.accessPattern}")
 
     case Op(loop: Loop[_]) =>
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
         scope.blocks.foreach{case (iters, block) =>
+          val iterStarts = iters.map(_.ctrStart)
           dbgs(s"  Iters:  $iters")
+          dbgs(s"  Starts:  $iterStarts")
           dbgs(s"  Blocks: $block")
-          inLoop(lhs, iters, block)
+          inLoop(lhs, iters, iterStarts, block)
         }
 
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
     case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
-    case Reader(mem,adr,_)   => setAccessPattern(mem, lhs, adr)
-    case Writer(mem,_,adr,_) => setAccessPattern(mem, lhs, adr)
+    case Reader(mem,adr,_)   => 
+      val affineAddrsAndMod = adr.map{
+        case Op(FixMod(a,b)) if b.isConst => (a.asInstanceOf[Idx],b.toInt)
+        case a => (a, 0)
+      }
+      setAccessPattern(mem, lhs, affineAddrsAndMod.map(_._1), affineAddrsAndMod.map(_._2))
+    case Writer(mem,_,adr,_) => 
+      val affineAddrsAndMod = adr.map{
+        case Op(FixMod(a,b)) if b.isConst => (a.asInstanceOf[Idx],b.toInt)
+        case a => (a, 0)
+      }
+      setAccessPattern(mem, lhs, affineAddrsAndMod.map(_._1), affineAddrsAndMod.map(_._2))
     case _ => super.visit(lhs, rhs)
   }
 }

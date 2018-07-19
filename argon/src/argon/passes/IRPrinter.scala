@@ -29,6 +29,16 @@ case class IRPrinter(IR: State, enable: Boolean) extends Traversal {
     if (rhs.blocks.nonEmpty) dbgs(s"$lhs = $rhs {") else dbgs(s"$lhs = $rhs")
     strMeta(lhs)
 
+    if (rhs.binds.nonEmpty) {
+      dbgs(s"binds: ")
+      state.logTab += 1
+      rhs.binds.filter(_.isBound).foreach{b =>
+        dbgs(s"$b")
+        strMeta(b)
+      }
+      state.logTab -= 1
+    }
+
     printBlocks(lhs, rhs.blocks)
 
     if (rhs.blocks.nonEmpty) dbgs(s"} // End of $lhs")

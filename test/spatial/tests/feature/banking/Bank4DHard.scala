@@ -4,7 +4,7 @@ import spatial.dsl._
 
 @spatial class Bank4DHard extends SpatialTest {
   // Not really "hard", but used to keep ExhaustiveBanking churning for a crazy long time
-  val I = 96; val R = 3; val C = 3; val O = 96
+  val I = 16; val R = 3; val C = 3; val O = 16
   val PI = 2; val PR = 3;val PC= 3; val PO = 2
 
   def main(args: Array[String]): Unit = {

@@ -339,7 +339,7 @@ object modeling {
 
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    pushOptimizedReduce()  // Issue #63 sketchiness
+    if (spatialConfig.enableOptimizedReduce) pushOptimizedReduce()  // Issue #63 sketchiness
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
     dbgs(s"Found cycles: ")
     allCycles.foreach{x => dbgs(s"$x")}

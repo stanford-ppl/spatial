@@ -371,9 +371,9 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.filter(_.s.get != sym).head.s.get, Done)}""")
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(1) // Used to be delayed by 1 & validNow""")
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${swap(sym, II)}) // extremely screwy logic?""")
       } else {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc) // Used to be delayed by 1 & validNow""")
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)""")
       }
     }
 
@@ -528,15 +528,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
       emitt("// Emitting notDone")
       visitBlock(notDone)
-      // emitInhibitor(lhs, Some(notDone.result), None)
 
       connectMask(None)
       emitIICounter(lhs)
-      // emitGlobalWire(src"""val ${swap(lhs, IIDone)} = true.B // Maybe this should handled differently""")
 
       emitt("// Emitting action")
-      // emitGlobalWire(src"val ${notDone.result}_doneCondition = Wire(Bool())")
-      // emitt(src"${notDone.result}_doneCondition := ~${notDone.result} // Seems unused")
       inSubGen(src"${lhs}", src"${parent_kernel}") {
         emitt(s"// Controller Stack: ${controllerStack.tail}")
         visitBlock(action)
@@ -544,7 +540,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emitt("// Emitting nextState")
       visitBlock(nextState)
       emitt(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
-      emitt(src"${swap(lhs, SM)}.io.nextState := Mux(${DL(swap(lhs, IIDone), src"1 max ${if (spatialConfig.enableRetiming) nextState.result.fullDelay else 0}", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
+      emitt(src"${swap(lhs, SM)}.io.nextState := ${nextState.result}.r.asSInt //Mux(${DL(swap(lhs, IIDone), src"1 max ${if (spatialConfig.enableRetiming) nextState.result.fullDelay else 0}", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
       emitt(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")

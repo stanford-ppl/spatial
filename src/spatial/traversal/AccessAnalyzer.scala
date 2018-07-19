@@ -65,8 +65,14 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   object Plus  { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixAdd(a,b) => (a,b) }}
   object Minus { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixSub(a,b) => (a,b) }}
-  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixMul(a,b) => (a,b); case FixSLA(a,b) => (a,a.from(scala.math.pow(2,b.toInt))) }}
-  object Divide { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixDiv(a,b) => (a,b); case FixSRA(a,b) => (a,a.from(scala.math.pow(2,b.toInt))) }}
+  object Times { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{
+    case FixMul(a,b) => (a,b)
+    case FixSLA(a,Expect(b)) => (a,a.from(scala.math.pow(2,b)))
+  }}
+  object Divide { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{
+    case FixDiv(a,b) => (a,b)
+    case FixSRA(a,Expect(b)) => (a,a.from(scala.math.pow(2,b)))
+  }}
   object Index { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x).filter(iters.contains) }
 
   private lazy val Zero = Sum.single(0)
@@ -77,7 +83,10 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     def unary_-(): Seq[AffineComponent] = x.map{c => -c}
 
     def inds: Seq[Idx] = x.map(_.i)
-    def *(a: Sum): Seq[AffineComponent] = x.flatMap(_ * a)
+    def *(s: Sum): Seq[AffineComponent] = x.flatMap(_ * s)
+    def /(s: Sum): Seq[AffineComponent] = x.map(_ / s)
+
+    def canBeDividedBy(s: Sum): Boolean = x.forall(_.canBeDividedBy(s))
 
     /**
       * Converts a representation of the form
@@ -125,10 +134,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       case Times(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) => Some(a * b2, b1 * b2)
       case Times(Offset(b1), Affine(a,b2)) if isAllInvariant(a.inds, b1.syms) => Some(a * b1, b1 * b2)
 
-      // TODO: Doubt that this is correct for the general case
-      case Divide(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && b2.ps.size == 1 && a.forall(_.a.m % b2.ps.head.m == 0) =>
-        val a2 = a.map{ac => AffineComponent(Prod.single(ac.a.m / b2.ps.head.m), ac.i)}
-        Some(a2, Zero)
+      case Divide(Affine(a,b1), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && a.canBeDividedBy(b2) && b1.canBeDividedBy(b2) =>
+        Some(a / b2, b1 / b2)
 
       case s => Some(Nil, Sum.single(s))
     }
@@ -233,7 +240,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
         scope.blocks.foreach{case (iters, block) =>
-          val iterStarts = iters.map(_.ctrStart)//loop.cchains.map(_._1.counters.map(_.start)).flatten
+          val iterStarts = iters.map(_.ctrStart)
           dbgs(s"  Iters:  $iters")
           dbgs(s"  Starts:  $iterStarts")
           dbgs(s"  Blocks: $block")

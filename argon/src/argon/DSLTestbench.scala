@@ -1,7 +1,9 @@
 package argon
 
+import argon.schedule.SimpleScheduler
 import utils.io.CaptureStream
 import utils.isSubtype
+
 import scala.reflect.{ClassTag, classTag}
 
 trait DSLTestbench extends utils.Testbench with DSLRunnable { self =>
@@ -22,6 +24,9 @@ trait DSLTestbench extends utils.Testbench with DSLRunnable { self =>
     require(lines.exists{line => line.contains("warn") && line.contains(expect)}, s"$msg. Expected warning $expect")
   }
 
-  s"$name" should "complete without requirement failures" in { true }
+  def checks(): Unit = { }
+
+  // Having this as a should statement makes it lazily evaluated (even though its part of the constructor)
+  s"$name" should "check without requirement failures" in { checks() }
 }
 

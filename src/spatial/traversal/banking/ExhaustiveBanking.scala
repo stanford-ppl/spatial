@@ -16,6 +16,7 @@ import spatial.util.IntLike._
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
   private val MAGIC_CUTOFF_N = 1.4
+  private val maxAttempts = 1500
   private val k = boundVar[I32]
   private val k0 = boundVar[I32]
   private val k1 = boundVar[I32]
@@ -51,7 +52,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           findBanking(selGrps, dims, stagedDims)
         }
         if (isValidBanking(banking,grps)) {
-          if (!mem.getPadding.isDefined) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.head.Ps).map{case(d,p) => (p - d%p) % p}
+          if (!mem.getPadding.isDefined) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.map(_.Ps).flatten).map{case(d,p) => (p - d%p) % p}
           Some(banking)
         } else None
       }
@@ -109,7 +110,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
       else (0 to 2*N).uniqueModN(N).iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
     }
-    Alphas2(1, Nil).filterNot(_.forall(_ == 0)) ++ AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2(_))} ++ AlphasX(1, Nil).filterNot(_.forall(_ == 0))
+    val pow2As = Alphas2(1, Nil).filterNot(_.forall(_ == 0))
+    val likelyAs = AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2(_))}
+    val xAs = AlphasX(1, Nil).filterNot(_.forall(_ == 0))
+    if (pow2As.size + likelyAs.size >= maxAttempts) pow2As ++ likelyAs
+    else pow2As ++ likelyAs ++ xAs.take(maxAttempts - pow2As.size - likelyAs.size)
+    pow2As ++ likelyAs ++ xAs
   }
 
   private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int]): Seq[Int] = {
@@ -190,8 +196,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int]): ModBanking = {
     val rank = dims.length
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
-    val (n2,nx) = (Nmin to 8*Nmin).partition{i => isPow2(i) }
-    val n2Head = if (n2.head.toDouble/Nmin > MAGIC_CUTOFF_N) Seq(Nmin) else Nil
+    val Ncap = stagedDims.product max Nmin
+    val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= Ncap).partition{i => isPow2(i) }
+    val n2Head = if ((n2.isEmpty && nx.isEmpty) || (!n2.isEmpty && n2.head.toDouble/Nmin > MAGIC_CUTOFF_N)) Seq(Nmin) else Nil
     val Ns = (n2Head ++ n2 ++ nx).iterator
 
     var banking: Option[ModBanking] = None
@@ -204,6 +211,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         val alpha = As.next()
         if (attempts < 200) dbgs(s"     Checking N=$N and alpha=$alpha")
         else if (attempts == 200) dbgs(s"    ...")
+        else if (!As.hasNext) dbgs(s"    Could not find banking scheme after $attempts attempts!  Giving up...")
         attempts = attempts + 1
         if (checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
@@ -226,7 +234,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     def *(b: SparseMatrix[Idx]): SparseVector[Idx] = {
       val vec = b.keys.mapping{k => b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i(k)*a_i }.sum }
       val c = b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i.c*a_i}.sum
-      SparseVector[Idx](vec,c,Map.empty)
+      // Combined modulus is sum of moduli: a0*dim0 mod m0 + a1*dim1 mod m1 = a0*dim0 + a1*dim1 + k(m0+m1)
+      val mod = b.rows.map(_.modulus).sum
+      SparseVector[Idx](vec,c,Map.empty,mod)
     }
   }
 

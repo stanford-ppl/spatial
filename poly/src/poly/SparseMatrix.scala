@@ -20,8 +20,8 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
 
   override def toString: String = {
     val header = this.keys.toSeq
-    val rowStrs = rows.map{row => header.map{k => row(k).toString } :+ row.c.toString }
-    val entries = (header.map(_.toString) :+ "c") +: rowStrs
+    val rowStrs = rows.map{row => header.map{k => row(k).toString } :+ row.c.toString :+ row.modulus.toString}
+    val entries = (header.map(_.toString) :+ "c" :+ "mod") +: rowStrs
     val maxCol = entries.flatMap(_.map(_.length)).maxOrElse(0)
     entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n")
   }

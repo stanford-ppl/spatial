@@ -6,6 +6,7 @@ import argon.transform.MutateTransformer
 import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.rewrites._
+import spatial.metadata.math._
 import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
@@ -21,9 +22,12 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     implicit val I: INT[I] = x.fmt.i
     implicit val F: INT[F] = x.fmt.f
     val data = x.asBits
-    val range = (log2(y.toDouble)-1).toInt :: 0
-    val selected = data.apply(range)
-    selected.as[Fix[S,I,F]]
+    if (log2(y.toDouble) == 0) x.from(0)
+    else {
+      val range = (log2(y.toDouble)-1).toInt :: 0
+      val selected = data.apply(range)
+      selected.asUnchecked[Fix[S,I,F]]
+    }
   }
 
   def writeReg[A](lhs: Sym[_], reg: Reg[_], data: Bits[A], ens: Set[Bit]): Void = {
@@ -90,7 +94,10 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       case _ => super.transform(lhs, rhs)
     }
 
-    case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => selectMod(x, y).asInstanceOf[Sym[A]]
+    case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => 
+      val m = selectMod(x, y).asInstanceOf[Sym[A]]
+      m.modulus = y
+      m
 
     // 1 / sqrt(b)  ==> invsqrt(b)
     // Square root has already been mirrored, but should be removed if unused

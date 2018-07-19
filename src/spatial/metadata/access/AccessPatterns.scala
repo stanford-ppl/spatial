@@ -8,7 +8,7 @@ import spatial.metadata.bounds.Expect
 
 import utils.implicits.collections._
 
-case class InvalidDivisionException(x: Any, c: Int)
+case class InvalidDivisionException(x: Any, c: Any)
   extends Exception(s"Cannot statically divide $x by $c")
 
 case class Prod(xs: Seq[Idx], m: Int = 1) {
@@ -30,12 +30,28 @@ case class Prod(xs: Seq[Idx], m: Int = 1) {
   def -(c: Int): Sum  = Sum(Seq(this), c)
 
   def /(c: Int): Prod = {
-    if (canDivideBy(c)) Prod(xs, m / c)
+    if (canBeDividedBy(c)) Prod(xs, m / c)
     else throw InvalidDivisionException(this, c)
   }
+  def /(s: Sum): Prod = {
+    if (canBeDividedBy(s) && s.isConst) Prod(xs, m / s.b)
+    else if (canBeDividedBy(s)) this / s.ps.head
+    else throw InvalidDivisionException(this, s)
+  }
+  def /(p: Prod): Prod = {
+    if (canBeDividedBy(p)) Prod(xs diff p.xs, m / p.m)
+    else throw InvalidDivisionException(this, p)
+  }
 
-  def canDivideBy(c: Int): Boolean = m % c == 0
-  def canDivideBy(s: Sum): Boolean = s.isConst && m % s.b == 0
+  def canBeDividedBy(c: Int): Boolean = m % c == 0
+  def canBeDividedBy(s: Sum): Boolean = {
+    (s.isConst && m % s.b == 0) ||
+      (s.b == 0 && s.ps.size == 1 && this.canBeDividedBy(s.ps.head))
+  }
+  def canBeDividedBy(p: Prod): Boolean = {
+    // All symbols in p also exist in this, and the constant multiplier divides this multiplier
+    p.xs.diff(xs).isEmpty && m % p.m == 0
+  }
 
   def partialEval(f: PartialFunction[Idx,Int]): Prod = {
     val (cs,ys) = xs.partition(f.isDefinedAt)
@@ -43,20 +59,25 @@ case class Prod(xs: Seq[Idx], m: Int = 1) {
     Prod(ys,c)
   }
   override def toString: String = if (isConst) m.toString else {
-    (if (m != 1) s"$m" else "") + xs.mkString("*")
+    (if (m != 1) s"$m*" else "") + xs.mkString("*")
   }
 }
 object Prod {
   def single(c: Int): Prod = Prod(Nil, c)
-  def single(x: Idx): Prod = Prod(Seq(x))
-
-
+  def single(x: Idx): Prod = x match {
+    case Expect(c) => Prod.single(c)
+    case _ => Prod(Seq(x))
+  }
 }
 
 case class Sum(ps: Seq[Prod], b: Int = 0) {
 
   implicit class SumOfProdsOps(ps: Seq[Prod]) {
     def unary_-(): Seq[Prod] = ps.map{p => -p}                 // -(p1 + p2)
+
+    def canBeDividedBy(c: Int): Boolean = ps.forall(_.canBeDividedBy(c))
+    def canBeDividedBy(s: Sum): Boolean = ps.forall(_.canBeDividedBy(s))
+    def canBeDividedBy(p: Prod): Boolean = ps.forall(_.canBeDividedBy(p))
 
     def *(p2: Seq[Prod]): Seq[Prod] = p2.flatMap{p => ps * p } // (p1 + p2) * (p3 + p4)
     def *(p: Prod): Seq[Prod] = ps.map(_ * p)                  // (p1 + p2) * p
@@ -70,6 +91,10 @@ case class Sum(ps: Seq[Prod], b: Int = 0) {
 
     def -(p: Prod): Seq[Prod] = -p +: ps                       // (p1 + p2) - p
     def -(c: Int): Sum = Sum(ps, -c)                           // (p1 + p2) - c
+
+    def /(c: Int): Seq[Prod] = ps.map(_ / c)
+    def /(s: Sum): Seq[Prod] = ps.map(_ / s)
+    def /(p: Prod): Seq[Prod] = ps.map(_ / p)
   }
 
 
@@ -90,13 +115,29 @@ case class Sum(ps: Seq[Prod], b: Int = 0) {
   def -(c: Int): Sum = Sum(ps, b - c)
 
   def /(c: Int): Sum = {
-    if (canDivideBy(c)) Sum(ps.map{_ / c}, b / c)
+    if (canBeDividedBy(c)) Sum(ps / c, b / c)
     else throw InvalidDivisionException(this, c)
   }
+  def /(s: Sum): Sum = {
+    if (s.isConst) this / s.b
+    else if (b != 0) throw InvalidDivisionException(this, s)
+    else Sum(ps / s, 0)
+  }
+  def /(p: Prod): Sum = {
+    if (p.isConst) this / p.m
+    else if (b != 0) throw InvalidDivisionException(this, p)
+    else Sum(ps / p, 0)
+  }
 
-  def canDivideBy(c: Int): Boolean = b % c == 0 && ps.forall(_.canDivideBy(c))
-  def canDivideBy(s: Sum): Boolean = {
-    (b == 0 || (s.isConst && b % s.b == 0)) && ps.forall(_.canDivideBy(s))
+  def canBeDividedBy(c: Int): Boolean = b % c == 0 && ps.canBeDividedBy(c)
+  def canBeDividedBy(s: Sum): Boolean = {
+    // Can only statically divide a sum by another sum if
+    // b is zero or the sum is a constant value which divides b
+    // and the sum divides all the product components.
+    (b == 0 || (s.isConst && b % s.b == 0)) && ps.canBeDividedBy(s)
+  }
+  def canBeDividedBy(p: Prod): Boolean = {
+    (b == 0 || (p.isConst && b % p.m == 0)) && ps.canBeDividedBy(p)
   }
 
   def partialEval(f: PartialFunction[Idx,Int]): Sum = {
@@ -104,11 +145,6 @@ case class Sum(ps: Seq[Prod], b: Int = 0) {
     val c = b + cs.map(_.m).sum
     Sum(ys, c)
   }
-
-  def canDivide(acs: Seq[AffineComponent]): Boolean = acs.forall{ac => this.canDivide(ac) }
-  def canDivide(ac: AffineComponent): Boolean = this.canDivide(ac.a)
-  def canDivide(p: Prod): Boolean = this.isConst && p.m % b == 0
-  def canDivide(s: Sum): Boolean = this.isConst && s.b % b == 0 && s.ps.forall{p => this.canDivide(p)}
 
   override def toString: String = if (isConst) b.toString else {
     ps.mkString(" + ") + (if (b != 0) s" + $b" else "")
@@ -126,12 +162,16 @@ case class AffineComponent(a: Prod, i: Idx) {
   def syms: Seq[Idx] = i +: a.syms
   def unary_-(): AffineComponent = AffineComponent(-a, i)
   def *(s: Sum): Seq[AffineComponent] = (s * a).ps.map{p => AffineComponent(p,i) }
+  def /(s: Sum): AffineComponent = AffineComponent(a / s, i)
+
+  def canBeDividedBy(s: Sum): Boolean = a.canBeDividedBy(s)
+
   override def toString: String = s"$a*$i"
 }
 
 case class AffineProduct(a: Sum, i: Idx) {
   def syms: Seq[Idx] = i +: a.syms
-  override def toString: String = s"($a)$i"
+  override def toString: String = if (a.isConst || (a.b == 0 && a.ps.size == 1)) s"$a*$i" else s"($a)*$i"
 }
 
 

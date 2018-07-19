@@ -72,7 +72,7 @@ trait ZynqBlackBoxes {
 s"""
 ## Integer Divider
 create_ip -name div_gen -vendor xilinx.com -library ip -version 5.1 -module_name $moduleName
-set_property -dict [list CONFIG.latency_configuration {Manual} CONFIG.latency {$latency} CONFIG.ClockEnable {true}]] [get_ips $moduleName]
+set_property -dict [list CONFIG.latency_configuration {Manual} CONFIG.latency {$latency} CONFIG.aclken {true}] [get_ips $moduleName]
 set_property -dict [list CONFIG.dividend_and_quotient_width {$dividendWidth} CONFIG.divisor_width {$divisorWidth} CONFIG.remainder_type {$modString} CONFIG.clocks_per_division {1} CONFIG.fractional_width {$fractionBits} CONFIG.operand_sign {$signedString}] [get_ips $moduleName]
 set_property -dict [list CONFIG.ACLK_INTF.FREQ_HZ $$CLOCK_FREQ_HZ] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]

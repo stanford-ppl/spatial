@@ -13,6 +13,7 @@ import spatial.dsl._
     val ROWS = 32
     val lut_size = 9
     val border = -1
+    val P = 3
 
     // Set initial and bias patterns:
     // Checkerboard
@@ -34,8 +35,8 @@ import spatial.dsl._
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
 
       Foreach(iters by 1) { iter =>
-        Foreach(ROWS by 1 par 4) { i =>
-          val this_body = i % 1
+        Foreach(ROWS by 1 par P) { i =>
+          val this_body = i % P
           Sequential.Foreach(-this_body until COLS by 1) { j =>
             val N = grid_sram((i+1)%ROWS, j)
             val E = grid_sram(i, (j+1)%COLS)

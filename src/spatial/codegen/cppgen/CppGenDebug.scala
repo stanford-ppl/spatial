@@ -12,8 +12,8 @@ trait CppGenDebug extends CppGenCommon {
     case FltToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
     case CharArrayToText(array) => 
         emit(src"""${lhs.tp} $lhs;""")
-        open(src"""for (${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i ++){""")
-            emit(src"""${lhs} += ${array}[${lhs}_i];""")
+        open(src"""for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i ++){""")
+            emit(src"""${lhs} += (*${array})[${lhs}_i];""")
         close("}")
     case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stof($x);")
       // lhs.tp match {

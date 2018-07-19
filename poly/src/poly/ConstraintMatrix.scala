@@ -20,7 +20,7 @@ case class ConstraintMatrix[K](rows: Set[SparseConstraint[K]], hasDomain: Boolea
   def toDenseString: String = {
     val keys = this.keys.toSeq
     val denseRows = rows.toSeq.map(_.toDenseString(keys))
-    s"${denseRows.size} ${keys.size + 2}\n" + denseRows.mkString("\n")
+    s"${denseRows.size} ${keys.size + 3}\n" + denseRows.mkString("\n")
   }
   def toDenseMatrix: DenseMatrix = {
     val keys = this.keys.toSeq
@@ -33,8 +33,8 @@ case class ConstraintMatrix[K](rows: Set[SparseConstraint[K]], hasDomain: Boolea
 
   override def toString: String = {
     val header = this.keys.toSeq
-    val rowStrs = rows.toSeq.map{row => row.tp.toString +: header.map{k => row(k).toString } :+ row.c.toString }
-    val entries = (" " +: header.map(_.toString) :+ "c") +: rowStrs
+    val rowStrs = rows.toSeq.map{row => row.tp.toString +: header.map{k => row(k).toString } :+ row.modulus.toString :+ row.c.toString }
+    val entries = (" " +: header.map(_.toString) :+ "mod" :+ "c") +: rowStrs
     val maxCol = entries.flatMap(_.map(_.length)).maxOrElse(0)
     entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n")
   }

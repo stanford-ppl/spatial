@@ -16,7 +16,7 @@ import spatial.util.IntLike._
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
   private val MAGIC_CUTOFF_N = 1.4
-  private val maxAttempts = 1000
+  private val maxAttempts = 1500
   private val k = boundVar[I32]
   private val k0 = boundVar[I32]
   private val k1 = boundVar[I32]
@@ -113,6 +113,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val pow2As = Alphas2(1, Nil).filterNot(_.forall(_ == 0))
     val likelyAs = AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2(_))}
     val xAs = AlphasX(1, Nil).filterNot(_.forall(_ == 0))
+    if (pow2As.size + likelyAs.size >= maxAttempts) pow2As ++ likelyAs
+    else pow2As ++ likelyAs ++ xAs.take(maxAttempts - pow2As.size - likelyAs.size)
     pow2As ++ likelyAs ++ xAs
   }
 
@@ -205,11 +207,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
       val As = Alphas(rank, N, stagedDims)
-      while (As.hasNext && banking.isEmpty && attempts < maxAttempts) {
+      while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
         if (attempts < 200) dbgs(s"     Checking N=$N and alpha=$alpha")
         else if (attempts == 200) dbgs(s"    ...")
-          else if (attempts == maxAttempts-2) dbgs(s"    Could not find banking scheme after $attempts attempts!  Giving up...")
+        else if (!As.hasNext) dbgs(s"    Could not find banking scheme after $attempts attempts!  Giving up...")
         attempts = attempts + 1
         if (checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")

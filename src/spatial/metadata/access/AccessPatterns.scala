@@ -192,21 +192,28 @@ case class AffineProduct(a: Sum, i: Idx) {
   */
 case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Idx,Option[Idx]], last: Option[Idx], iterStarts: Map[Idx,Ind[_]], modulus: Int) {
 
+
   /** Convert this to a sparse vector representation if it is representable as an affine equation with
-    * constant multipliers. Returns None otherwise.
+    * constant multipliers. If some of the comps are affine, make a sparse vector of these and group the rest as
+    * random.  If none are affine returns None.
     */
+
   @stateful def getSparseVector: Option[SparseVector[Idx]] = {
     val is = comps.map(_.i)
     val starts = is.collect{case x if (iterStarts.contains(x)) => iterStarts(x)}.filter(!_.isConst)
     val as = comps.map{_.a.partialEval{case Expect(c) => c}}
     val bx = ofs.partialEval{case Expect(c) => c}
-    if (as.forall(_.isConst) && (bx.isConst || bx.ps.forall(_.isSymWithMultiplier)) ) {
+
+    if ((as.forall(_.isConst) || as.exists(_.isConst)) && (bx.isConst || bx.ps.forall(_.isSymWithMultiplier)) ) {
       val randComponents = bx.ps.map{p => (p.m, p.xs.head) }
       val rs: Seq[(Idx,Int)] = randComponents.groupBy(_._2).mapValues{as => as.map(_._1).sum}.toSeq
 
-      val xs_all: Seq[Idx] = is ++ rs.map(_._1) ++ starts
-      val as_all: Seq[Int] = as.map(_.b) ++ rs.map(_._2) ++ starts.indices.map{_ => 1}
-      Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters, modulus) )
+      val (affine_comps, others) = as.zip(is).partition{case (a,i) => a.isConst}
+      val rand: Seq[(Idx, Int)] = if (others.nonEmpty) Seq((boundVar[I32],1)) else Nil
+      val xs_all: Seq[Idx] = affine_comps.map(_._2) ++ rs.map(_._1) ++ starts ++ rand.map(_._1)
+      val as_all: Seq[Int] = affine_comps.map(_._1.b) ++ rs.map(_._2) ++ starts.indices.map{_ => 1} ++ rand.map(_._2)
+      if (rand.isEmpty) Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters, modulus) )
+      else Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters ++ Map[Idx, Option[Idx]]((rand.head._1 -> last)), modulus) )
     }
     else None
   }

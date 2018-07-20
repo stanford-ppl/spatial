@@ -18,6 +18,9 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def asConstraintEqlZero = ConstraintMatrix(rows.map(_.asConstraintEqlZero).toSet)
   def asConstraintGeqZero = ConstraintMatrix(rows.map(_.asConstraintGeqZero).toSet)
 
+  def >==(b: Int): ConstraintMatrix[K] = ConstraintMatrix(rows.map(_ >== b).toSet)
+  def ===(b: Int): ConstraintMatrix[K] = ConstraintMatrix(rows.map(_ === b).toSet)
+
   override def toString: String = {
     val header = this.keys.toSeq
     val rowStrs = rows.map{row => header.map{k => row(k).toString } :+ row.c.toString :+ row.modulus.toString}

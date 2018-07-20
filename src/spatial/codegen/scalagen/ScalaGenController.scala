@@ -89,7 +89,6 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     val ins    = func.nestedInputs
     val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Set.empty).toSeq
     val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).filterNot(_.isMem).distinct diff binds
-    val en = if (ens.isEmpty) "true" else ens.map(quote).mkString(" && ")
 
     dbgs(s"${stm(lhs)}")
     inputs.foreach{in => dbgs(s" - ${stm(in)}") }
@@ -97,13 +96,11 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     inGen(kernel(lhs)){
       emitHeader()
       open(src"object $lhs {")
-      open(src"def run(")
-      inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
-      closeopen("): Unit = {")
-      open(src"if ($en) {")
-      contents
-      close("}")
-      close("}")
+        open(src"def run(")
+          inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
+        closeopen(s"): Unit = if (${and(ens)}) {")
+          contents
+        close("}")
       close("}")
       emitFooter()
     }
@@ -116,13 +113,13 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
       globalMems = true
       if (!lhs.willRunForever) {
         open(src"def accel(): Unit = {")
-        open(src"val $lhs = try {")
-        visitBlock(func)
-        close("}")
-        open("catch {")
-        emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
-        emit(src"""case t: Throwable => throw t""")
-        close("}")
+          open(src"val $lhs = try {")
+            visitBlock(func)
+          close("}")
+          open("catch {")
+            emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
+            emit(src"""case t: Throwable => throw t""")
+          close("}")
         close("}")
         emit("accel()")
       }

@@ -197,7 +197,6 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
     * constant multipliers. If some of the comps are affine, make a sparse vector of these and group the rest as
     * random.  If none are affine returns None.
     */
-
   @stateful def getSparseVector: Option[SparseVector[Idx]] = {
     val is = comps.map(_.i)
     val starts = is.collect{case x if (iterStarts.contains(x)) => iterStarts(x)}.filter(!_.isConst)

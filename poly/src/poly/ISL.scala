@@ -42,7 +42,7 @@ trait ISL {
     * Trivially true for random accesses with no constraints.
     */
   def overlapsAddress[K](a: SparseMatrix[K], b: SparseMatrix[K]): Boolean = {
-    val equal = (a - b).asConstraintEqlZero
+    val equal = (a - b) === 0
     nonEmpty(equal.andDomain)
   }
 

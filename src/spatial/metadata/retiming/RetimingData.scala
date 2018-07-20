@@ -12,6 +12,7 @@ import argon._
 abstract class Cycle extends Data[Cycle](Transfer.Remove) {
   def length: Double
   def symbols: Set[Sym[_]]
+  def shouldSpecialize: Boolean
 }
 
 /** Write-after-read (WAR) cycle: Standard read-accumulate loop. */
@@ -20,12 +21,14 @@ case class WARCycle(
     writer: Sym[_],
     memory: Sym[_],
     symbols: Set[Sym[_]],
-    length: Double)
+    length: Double,
+    shouldSpecialize: Boolean = false)
   extends Cycle
 
 /** Access-after-access (AAA) cycle: Time-multiplexed reads/writes. */
 case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
   def symbols: Set[Sym[_]] = accesses
+  def shouldSpecialize: Boolean = false
 }
 
 

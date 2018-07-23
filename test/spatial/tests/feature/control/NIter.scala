@@ -1,8 +1,6 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
-
 
 @spatial class NIter extends SpatialTest {
   override def runtimeArgs: Args = "192"

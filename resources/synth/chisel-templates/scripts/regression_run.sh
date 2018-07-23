@@ -26,7 +26,7 @@ if [[ $GDOCS -eq 1 ]]; then
 	fi
 
 	# Hacky go back until $SPATIAL_HOME
-	hash=`git rev-parse HEAD`
+	hash=`cat ${basepath}/reghash`
 	ahash=nova-spatial
 	#appname=`basename \`pwd\``
 	fullname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`

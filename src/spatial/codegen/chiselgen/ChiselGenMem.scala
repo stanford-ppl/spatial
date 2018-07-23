@@ -14,18 +14,11 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
 
-  // private def switchCaseLookaheadHack(parent: Sym[_]): Sym[_] = {
-  //   parent match {
-  //     case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get match {case s @ Op(_: SwitchCase[_]) => true; case _ => false}) => switchCaseLookaheadHack(parent.parent.s.get.parent.s.get)
-  //     case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get.isInnerControl) => parent.parent.s.get.parent.s.get
-  //     case _ => parent
-  //   }
-  // }
-
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
+    val parent = lhs.parent.s.get 
+    emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val flowEnable = if (getAllReadyLogic(parent.toCtrl).nonEmpty) src""",${getAllReadyLogic(parent.toCtrl).mkString(" & ")}""" else ""
     val ofsWidth = Math.max(1, Math.ceil(scala.math.log(mem.constDims.product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)

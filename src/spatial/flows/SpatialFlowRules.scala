@@ -203,6 +203,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
       if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isUnitPipe && s.rawSchedule == Fork) s.rawSchedule = Sequenced // Undo transfer of metadata copied from Switch in PipeInserter
+      if (s.isOuterControl && s.children.size > 1 && s.toCtrl.children.size > 1 && s.rawSchedule == Sequenced && s.getUserSchedule.isEmpty) s.rawSchedule = Pipelined // Capture new children from pipe insertion
 
       logs(s"  Final Schedule:   ${s.rawSchedule}")
 

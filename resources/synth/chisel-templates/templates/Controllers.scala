@@ -78,7 +78,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
   // Wire up stage communication
   sched match {
-    case Pipelined => 
+    case Pipelined if (!isFSM) => 
       // Define rule for when ctr increments
       io.ctrInc := iterDone(0).io.output.data & synchronize
 
@@ -170,6 +170,28 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
         iterDone(i).io.input.reset := done(i).io.output.data
         done(i).io.input.set := synchronize
       }
+
+    case _ => // FSM, do sequential
+      // Define rule for when ctr increments
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+
+      // Configure synchronization
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      
+      // Define logic for first stage
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
+      active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
+      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
+      done(0).io.input.set := io.ctrDone & ~io.rst
+
+      // Define logic for the rest of the stages
+      for (i <- 1 until depth) {
+        active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable)) & ~synchronize
+        active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
+        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)) & ~synchronize
+        done(i).io.input.set := io.ctrDone & ~io.rst
+      }
+
 
 
   }

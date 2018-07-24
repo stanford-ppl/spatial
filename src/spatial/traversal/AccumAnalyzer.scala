@@ -27,17 +27,20 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
         dbgs(s"Candidate cycle: ")
 
         val overlapping = disjointCycles.filter{c2 => (c1.symbols intersect c2.symbols).nonEmpty }
-        val closed = c1.symbols.forall{s =>
-          dbgs(s"  $s")
+        val isClosedCycle = c1.symbols.forall{s =>
+          dbgs(s"  ${stm(s)}")
+          dbgs(s"    consumers: ${s.consumers.mkString(", ")}")
           val outsideConsumers = s.consumers diff c1.symbols
           outsideConsumers.isEmpty
         }
-        if (overlapping.isEmpty) disjointCycles += c1
-        else disjointCycles --= overlapping
+        val isDisjoint = overlapping.isEmpty && isClosedCycle
+
+        if (isDisjoint) disjointCycles += c1
+        if (overlapping.nonEmpty) disjointCycles --= overlapping
       }
 
-      disjointCycles.foreach{c =>
-        val cycle = c.copy(shouldSpecialize = true)
+      disjointCycles.zipWithIndex.foreach{case (c,id) =>
+        val cycle = c.copy(shouldSpecialize = true, cycleID = id)
         c.symbols.foreach{s => s.reduceCycle = cycle }
       }
     }

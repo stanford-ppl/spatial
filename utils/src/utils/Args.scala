@@ -11,8 +11,8 @@ trait Args extends LowPriorityArgsImplicits {
     def and(cmd: java.lang.String): Args = Args(cmds :+ cmd)
   }
 
-  implicit class StringArgs(cmd2: java.lang.String) {
-    def and(cmd1: java.lang.String): Args = Args(Seq(cmd1, cmd2))
+  implicit class StringArgs(cmd1: java.lang.String) {
+    def and(cmd2: java.lang.String): Args = Args(Seq(cmd1, cmd2))
   }
 
 

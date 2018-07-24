@@ -30,16 +30,16 @@ trait ScalaGenArray extends ScalaCodegen {
           case Some(name) => emit(src"""println("Missing argument " + $i + " ('$name')")""")
           case _          => emit(src"""println("Missing argument " + $i)""")
         }
-        emit(src"printHelp()")
+        emit(src"Main.printHelp()")
         emit(src"sys.exit(-1)")
       close("}")
 
 
     case ArrayApply(array, i)   => emit(src"val $lhs = $array.apply($i)")
-    case ArrayLength(array)     => emit(src"val $lhs = $array.length")
+    case ArrayLength(array)     => emit(src"val $lhs = FixedPoint.fromInt($array.length)")
     case InputArguments()       => 
       emit(src"val $lhs = args")
-      emit(src"""if (args.contains("--help") || args.contains("-h")) {printHelp()}""")
+      emit(src"""if (args.contains("--help") || args.contains("-h")) { Main.printHelp() }""")
 
     case ArrayUpdate(array, i, data) => emit(src"val $lhs = $array.update($i, $data)")
     case MapIndices(size, func) =>

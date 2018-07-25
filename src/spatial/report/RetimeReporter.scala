@@ -38,7 +38,7 @@ case class RetimeReporter(IR: State) extends AccelTraversal {
     lhs.name.foreach{name => emit(s" - Name: $name") }
     emit(s" - Type: ${lhs.tp}")
     val inCycle = lhs.isInCycle
-    if (inCycle) {
+    if (!inCycle) {
       emit(s" - Cycle: <no cycle>")
     }
     else {

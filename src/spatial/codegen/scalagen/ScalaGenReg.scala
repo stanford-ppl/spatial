@@ -38,9 +38,23 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
     case SetReg(reg, v)  => emit(src"val $lhs = $reg.set($v)")
     case GetReg(reg)     => emit(src"val $lhs = $reg.value")
 
+    case RegAccumOp(reg,in,en,op,first) =>
+      open(src"val $lhs = if (${and(en)}) {")
+        val input = op match {
+          case Accum.Add => src"$reg.value + $in"
+          case Accum.Mul => src"$reg.value * $in"
+          case Accum.Max => src"Number.max($reg.value, $in)"
+          case Accum.Min => src"Number.min($reg.value, $in)"
+        }
+        emit(src"$reg.set((if ($first) $in else $input))")
+      close("}")
 
-    //case RegWriteAccum(reg,data,first,en,_) =>
-    //  emit(src"val $lhs = if ($en && $first) $reg.update(0,$data) else if ($en) $reg.update(0,$data + $reg.apply(0))")
+    case RegAccumFMA(reg,m0,m1,en,first) =>
+      open(src"val $lhs = if (${and(en)}) {")
+        val input = src"$m0 * $m1 + $reg.value"
+        emit(src"$reg.set((if ($first) $m0*$m1 else $input))")
+      close("}")
+
     case _ => super.gen(lhs, rhs)
   }
 

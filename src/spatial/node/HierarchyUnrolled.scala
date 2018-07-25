@@ -124,7 +124,7 @@ abstract class BankedEnqueue[A:Type] extends BankedWriter[A] {
 
 
 
-abstract class Accumulator[A:Bits] extends UnrolledAccessor[A,A] {
+abstract class Accumulator[A:Bits] extends UnrolledAccessor[A,Void] {
   def en: Set[Bit]
   def data: Seq[Sym[_]] = Nil // We don't actually have a symbol for data being written to the memory
   def bank: Seq[Seq[Idx]]

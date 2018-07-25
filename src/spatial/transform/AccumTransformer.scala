@@ -12,7 +12,7 @@ import spatial.traversal.AccelTraversal
 case class AccumTransformer(IR: State) extends MutateTransformer with AccelTraversal {
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case AccelScope(_) => inHw{ transformControl(lhs,rhs) }
+    case AccelScope(_) => inAccel{ transformControl(lhs,rhs) }
     case _ => transformControl(lhs,rhs)
   }
 
@@ -29,6 +29,17 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
     case _ => super.transform(lhs,rhs)
   }
 
+
+  def regAccumOp[A](reg: Reg[_], data: Bits[A], first: Bit, ens: Set[Bit], op: Accum, invert: Boolean): Void = {
+    implicit val A: Bits[A] = data.selfType
+    val trueFirst = if (invert) !first else first
+    stage(RegAccumOp(reg.asInstanceOf[Reg[A]],data,ens,op,trueFirst))
+  }
+  def regAccumFMA[A](reg: Reg[_], m0: Bits[A], m1: Bits[_], first: Bit, ens: Set[Bit], invert: Boolean): Void = {
+    implicit val A: Bits[A] = m0.selfType
+    val trueFirst = if (invert) !first else first
+    stage(RegAccumFMA(reg.asInstanceOf[Reg[A]],m0,m1.asInstanceOf[Bits[A]],ens,trueFirst))
+  }
 
   def optimizeAccumulators[R](block: Block[R]): Block[R] = {
     val stms = block.stms
@@ -48,16 +59,12 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
         syms.head.reduceCycle match {
           case WARCycle(reader,writer,mem,_,len,_,_) => writer match {
             case RegAccumlike(RegAccum_Op(reg,data,first,ens,op,invert)) =>
-              implicit val A: Bits[_] = data.tp.asInstanceOf[Bits[_]]
-              val trueFirst = if (invert) !first else first
-              val result = stage(RegAccumOp(reg,data,ens,op,trueFirst))
+              val result = regAccumOp(reg,data,first,ens,op,invert)
               register(writer -> result)
               result
 
             case RegAccumlike(RegAccum_FMA(reg,m0,m1,first,ens,invert)) =>
-              implicit val A: Bits[_] = m0.tp.asInstanceOf[Bits[_]]
-              val trueFirst = if (invert) !first else first
-              val result = stage(RegAccumFMA(reg,m0,m1,ens,trueFirst))
+              val result = regAccumFMA(reg,m0,m1,first,ens,invert)
               register(writer -> result)
               result
 
@@ -156,7 +163,7 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
 
         // Specializing FMA
         case RegFMA(`reg`,m0,m1) => Some(RegAccum_FMA(reg,m0,m1,false,ens,invert=false))
-        case RegMux(first,`reg`,RegFMA(`reg`,m0,m1),invert) => Some(RegAccumFMA(reg,m0,m1,first,ens,invert))
+        case RegMux(first,`reg`,RegFMA(`reg`,m0,m1),invert) => Some(RegAccum_FMA(reg,m0,m1,first,ens,invert))
         case _ => Some(RegAccum_Gen)
       }
       case _ => None

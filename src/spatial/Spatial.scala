@@ -71,7 +71,7 @@ trait Spatial extends Compiler {
     lazy val memoryAllocator    = MemoryAllocator(state)
     lazy val rewriteAnalyzer    = RewriteAnalyzer(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
-
+    lazy val accumAnalyzer      = AccumAnalyzer(state)
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
@@ -89,6 +89,7 @@ trait Spatial extends Compiler {
     lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
+    lazy val accumTransformer      = AccumTransformer(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -127,6 +128,9 @@ trait Spatial extends Compiler {
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
         flatteningTransformer ==> printer ==> transformerChecks ==>
+        /** Accumulation Specialization **/
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==>
+        (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>

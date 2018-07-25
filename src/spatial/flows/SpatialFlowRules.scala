@@ -180,7 +180,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _: SwitchCase[_]        => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
     case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
-    case _: Control[_] =>
+    case ctrl: Control[_] =>
       logs(s"Determining schedule of $s = $op")
       logs(s"  User Schedule:    ${s.getUserSchedule}")
       logs(s"  Raw Schedule:     ${s.getRawSchedule}")
@@ -193,6 +193,21 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
           val default = if (s.isUnitPipe || s.isAccel) Sequenced else Pipelined
           s.rawSchedule = default
       }
+
+      val toBePiped: Boolean = if (s.isOuterControl) {
+        ctrl.bodies.zipWithIndex.exists{ case (body, id) =>
+          val stage = Ctrl.Node(s, id)
+          body.blocks.zipWithIndex.exists{case ((_,block),bid) =>
+            if (stage.mayBeOuterBlock) {
+              block.stms.exists{
+                case Primitive(s)  => true
+                case _ => false
+              }
+            } else false
+          }
+        }
+      }
+
       logs(s"=>")
       logs(s"  Initial Schedule: ${s.rawSchedule}")
       logs(s"  Single Control:   ${s.isSingleControl}")
@@ -201,9 +216,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
       if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
-      if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
+      if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && !toBePiped && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isUnitPipe && s.rawSchedule == Fork) s.rawSchedule = Sequenced // Undo transfer of metadata copied from Switch in PipeInserter
-      if (s.isOuterControl && s.children.size > 1 && s.toCtrl.children.size > 1 && s.rawSchedule == Sequenced && s.getUserSchedule.isEmpty) s.rawSchedule = Pipelined // Capture new children from pipe insertion
 
       logs(s"  Final Schedule:   ${s.rawSchedule}")
 

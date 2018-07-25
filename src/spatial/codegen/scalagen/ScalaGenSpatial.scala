@@ -1,14 +1,12 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.codegen.naming.NamedCodegen
 
 case class ScalaGenSpatial(IR: State) extends ScalaCodegen
   with ScalaGenArray
   with ScalaGenBit
   with ScalaGenFixPt
   with ScalaGenFltPt
-  with ScalaGenIfThenElse
   with ScalaGenStructs
   with ScalaGenText
   with ScalaGenVoid
@@ -25,12 +23,9 @@ case class ScalaGenSpatial(IR: State) extends ScalaCodegen
   with ScalaGenVec
   with ScalaGenStream
   with ScalaGenRegFile
-  with ScalaGenStateMachine
   with ScalaGenFileIO
   with ScalaGenDelays
-  with ScalaGenLUTs
-  with ScalaGenSwitch
-  with NamedCodegen {
+  with ScalaGenLUTs {
 
   override def copyDependencies(out: String): Unit = {
     dependencies ::= FileDep("scalagen", "Makefile", "../")

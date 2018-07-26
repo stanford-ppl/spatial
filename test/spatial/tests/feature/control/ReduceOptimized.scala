@@ -1,8 +1,6 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
-
 
 @spatial class ReduceOptimized extends SpatialTest {
   override def runtimeArgs: Args = "100"

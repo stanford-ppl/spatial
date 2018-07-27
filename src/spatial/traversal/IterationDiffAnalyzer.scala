@@ -47,7 +47,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                 val nextIterReads  = List.tabulate(par){i => read.increment(iters.last,1).incrementConst(i*stride.get)}
                 val diff = thisIterWrites.last - thisIterReads.head // How far is the last write from the first read?
                 val advancePerInc = nextIterReads.head - thisIterReads.head // How far do we advance in one tick?
-                val minIterDiff = diff.collapse.zip(advancePerInc.collapse).map{case (a,b) => if(a == 0 && b == 0) 1 else  a / b}.min
+                val minIterDiff = diff.collapse.zip(advancePerInc.collapse).map{case (a,b) => if(a != 0 && b == 0) 0 else if(a == 0 && b == 0) 1 else  a / b}.min
                 dbgs(s"Iteration Diff = ${minIterDiff}")
                 reader.iterDiff = minIterDiff
                 writer.iterDiff = minIterDiff

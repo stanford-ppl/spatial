@@ -597,6 +597,8 @@ package object control {
     def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
     def isUnit: Boolean = counters.forall(_.isUnit)
     def isStatic: Boolean = counters.forall(_.isStatic)
+
+
   }
 
 

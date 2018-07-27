@@ -64,13 +64,14 @@ trait Spatial extends Compiler {
     lazy val finalSanityChecks = CompilerSanityChecks(state, enable = true)
 
     // --- Analysis
-    lazy val cliNaming          = CLINaming(state)
-    lazy val useAnalyzer        = UseAnalyzer(state)
-    lazy val accessAnalyzer     = AccessAnalyzer(state)
-    lazy val memoryAnalyzer     = MemoryAnalyzer(state)
-    lazy val memoryAllocator    = MemoryAllocator(state)
-    lazy val rewriteAnalyzer    = RewriteAnalyzer(state)
-    lazy val initiationAnalyzer = InitiationAnalyzer(state)
+    lazy val cliNaming             = CLINaming(state)
+    lazy val useAnalyzer           = UseAnalyzer(state)
+    lazy val accessAnalyzer        = AccessAnalyzer(state)
+    lazy val memoryAnalyzer        = MemoryAnalyzer(state)
+    lazy val memoryAllocator       = MemoryAllocator(state)
+    lazy val rewriteAnalyzer       = RewriteAnalyzer(state)
+    lazy val iterationDiffAnalyzer = IterationDiffAnalyzer(state)
+    lazy val initiationAnalyzer    = InitiationAnalyzer(state)
 
 
     // --- Reports
@@ -118,6 +119,8 @@ trait Spatial extends Compiler {
         accessAnalyzer      ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
+        /** Iteration difference analysis */
+        iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         useAnalyzer         ==>

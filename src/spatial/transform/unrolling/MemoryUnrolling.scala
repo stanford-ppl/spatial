@@ -190,6 +190,7 @@ trait MemoryUnrolling extends UnrollingBase {
         banked.s.foreach{s =>
           s.addPort(dispatch=0, Nil, port)
           s.addDispatch(Nil, 0)
+          if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
 

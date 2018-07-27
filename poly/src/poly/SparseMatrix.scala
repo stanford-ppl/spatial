@@ -15,8 +15,22 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def unary_-(): SparseMatrix[K] = this.map{row => -row}
   def +(that: SparseMatrix[K]): SparseMatrix[K] = this.zip(that){_+_}
   def -(that: SparseMatrix[K]): SparseMatrix[K] = this.zip(that){_-_}
+  def increment(key: K, value: Int): SparseMatrix[K] = {
+    val rows2 = this.rows.map{r => 
+      val cols2 = r.cols.map{case (k,v) => k -> (if (k == key) {v + v*value} else v) }
+      SparseVector[K](cols2, r.c, r.lastIters, r.mod)
+    }
+    SparseMatrix[K](rows2)
+  }
+  def incrementConst(value: Int): SparseMatrix[K] = {
+    val rows2 = this.rows.map{r => 
+      SparseVector[K](r.cols, r.c + value, r.lastIters, r.mod)
+    }
+    SparseMatrix[K](rows2)
+  }
   def asConstraintEqlZero = ConstraintMatrix(rows.map(_.asConstraintEqlZero).toSet)
   def asConstraintGeqZero = ConstraintMatrix(rows.map(_.asConstraintGeqZero).toSet)
+  def collapse: Seq[Int] = rows.map{r => r.cols.map(_._2).reduce{_+_} + r.c}
 
   def >==(b: Int): ConstraintMatrix[K] = ConstraintMatrix(rows.map(_ >== b).toSet)
   def ===(b: Int): ConstraintMatrix[K] = ConstraintMatrix(rows.map(_ === b).toSet)

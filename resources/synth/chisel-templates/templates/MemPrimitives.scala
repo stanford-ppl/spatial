@@ -222,7 +222,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     val directSelect = io.directW.filter(_.banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_))
 
     // Unmask write port if any of the above match
-    mem._1.io.wMask := xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.en).reduce(_|_) else false.B}
+    mem._1.io.wMask := xBarSelect.reduce{_|_} | {if (directSelect.nonEmpty) directSelect.map(_.en).reduce(_|_) else false.B}
 
     // Connect matching W port to memory
     if (directSelect.length > 0 & p.hasXBarW) {           // Has direct and x
@@ -546,7 +546,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val directSelect = io.directW.filter(_.banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_))
 
     // Unmask write port if any of the above match
-    val wMask = xBarSelect.reduce{_|_} | {if (p.hasDirectW) directSelect.map{x => x.en | x.shiftEn}.reduce(_|_) else false.B}
+    val wMask = xBarSelect.reduce{_|_} | {if (directSelect.nonEmpty) directSelect.map{x => x.en | x.shiftEn}.reduce(_|_) else false.B}
 
     // Check if shiftEn is turned on for this line, guaranteed false on entry plane
     val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
@@ -558,7 +558,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
       val axisShiftDirect = io.directW.filter{case x => stripCoord(x.banks, p.axis).zip(stripCoord(coords, p.axis)).map{case (b,coord) => b == coord}.reduce(_&_)}
 
       // Unmask shift if any of the above match
-      axisShiftXBar.reduce{_|_} | {if (p.hasDirectW) directSelect.map(_.shiftEn).reduce(_|_) else false.B}
+      axisShiftXBar.reduce{_|_} | {if (directSelect.nonEmpty) directSelect.map(_.shiftEn).reduce(_|_) else false.B}
     } else false.B
 
     // Connect matching W port to memory

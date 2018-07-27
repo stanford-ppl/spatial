@@ -206,7 +206,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
             } else false
           }
         }
-      }
+      } else false
 
       logs(s"=>")
       logs(s"  Initial Schedule: ${s.rawSchedule}")

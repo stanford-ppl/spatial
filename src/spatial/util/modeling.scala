@@ -179,7 +179,7 @@ object modeling {
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
-    accumReads.foreach{reader => dbgs(s"$reader is part of an accum cycle");cycles(reader) = Set(reader) }
+    accumReads.foreach{reader => cycles(reader) = Set(reader) }
 
     def fullDFS(cur: Sym[_]): Double = cur match {
       case Op(d) if scope.contains(cur) =>
@@ -255,7 +255,7 @@ object modeling {
       }
     }
 
-    val warCycles = accums.collect{case AccumTriple(mem,reader,writer) if (!mem.isSRAM || {reader.parent.s.isDefined && reader.parent.parent.s.isDefined && {reader.parent.parent.s.get match {case Op(_:UnrolledReduce) => false; case _ => true}}}) => // Hack to specifically catch problem mentioned in #61
+    val warCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
       val symbols = cycles(writer)
       val cycleLengthExact = paths(writer).toInt - paths(reader).toInt
       // Sketchy thing for issue #63

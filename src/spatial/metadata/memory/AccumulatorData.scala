@@ -66,3 +66,14 @@ case class ReduceType(func: ReduceFunction) extends Data[ReduceType](SetBy.Analy
   * Default: None
   */
 case class FMAReduce(info: (Sym[_], Sym[_], Sym[_], Sym[_], Double)) extends Data[FMAReduce](SetBy.Analysis.Self)
+
+/** TODO: Update description
+  * Getter:  sym.iterDiff : Int
+  * Setter:  sym.iterDiff = Int
+  * Default: 1
+  */
+case class IterDiff(diff: Int) extends Data[IterDiff](SetBy.Analysis.Self)
+
+/** TODO: Update description
+  */
+case class LaneWaits(mapping: Map[Int,Int]) extends Data[LaneWaits](SetBy.Analysis.Self)

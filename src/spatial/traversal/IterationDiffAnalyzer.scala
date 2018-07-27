@@ -32,7 +32,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
         if (cycles.nonEmpty) {
           dbgs(s"\n\nFound cycles in $lhs ($iters): ")
           cycles.foreach{c => dbgs(s"  $c")}
-          cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem) => 
+          cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem && reader != writer) => 
 
             val read = reader.affineMatrices.head.matrix
             val write = writer.affineMatrices.head.matrix
@@ -88,20 +88,22 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                   */
                   val advancePerLane = (thisIterReads(1) - thisIterReads.head).collapse.max
                   val diffPerLane = (write-read).collapse.max
-                  val dependsOnLane = List.tabulate(par){i => i * advancePerLane - diffPerLane}
-                  val laneWaitMapping = dependsOnLane.zipWithIndex.map{case(d,i) =>
-                    val laneWait = if (d < 0) 0 else {
-                      ((0 max dependsOnLane(i))/diffPerLane).toInt + 1
-                    }
-                    (i -> laneWait)
-                  }.toMap
-                  dbgs(s"advancePerLane = $advancePerLane, diffPerLane = $diffPerLane, lane dependencies $dependsOnLane")
-                  dbgs(s"laneWaits = ${laneWaitMapping}")
-                  reader.laneWaits = laneWaitMapping
-                  writer.laneWaits = laneWaitMapping
-                  mem.laneWaits = laneWaitMapping
-                  // TODO: Tie this in to unrolling
-                  if (laneWaitMapping.values.toList.distinct.length > 1) throw new Exception("Inter-lane access dependencies in cycles not yet supported")
+                  if (diffPerLane > 0) { // diffPerLane = 0 is a case of mem(i) = mem(i) + ...
+                    val dependsOnLane = List.tabulate(par){i => i * advancePerLane - diffPerLane}
+                    val laneWaitMapping = dependsOnLane.zipWithIndex.map{case(d,i) =>
+                      val laneWait = if (d < 0) 0 else {
+                        ((0 max dependsOnLane(i))/diffPerLane).toInt + 1
+                      }
+                      (i -> laneWait)
+                    }.toMap
+                    dbgs(s"advancePerLane = $advancePerLane, diffPerLane = $diffPerLane, lane dependencies $dependsOnLane")
+                    dbgs(s"laneWaits = ${laneWaitMapping}")
+                    reader.laneWaits = laneWaitMapping
+                    writer.laneWaits = laneWaitMapping
+                    mem.laneWaits = laneWaitMapping
+                    // TODO: Tie this in to unrolling
+                    if (laneWaitMapping.values.toList.distinct.length > 1) throw new Exception("Inter-lane access dependencies in cycles not yet supported")
+                  }
                 }
               }
             }

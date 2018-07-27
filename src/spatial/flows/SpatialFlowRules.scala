@@ -62,6 +62,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
   @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = op match {
+    case ctrl: IfThenElse[_] => 
+      val children = op.blocks.flatMap(_.stms.filter(_.isControl))
+      s.rawChildren = children.map{c => Ctrl.Node(c,-1)}
+
+      val isOuter = children.exists{c => !c.isBranch || c.isOuterControl} || op.isMemReduce
+      s.rawLevel = if (isOuter) Outer else Inner
+      
     case ctrl: Control[_] =>
       // Find all children controllers within this controller
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
@@ -177,10 +184,11 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
     case _: ParallelPipe         => s.rawSchedule = ForkJoin
     case _: Switch[_]            => s.rawSchedule = Fork
+    case _: IfThenElse[_]        => s.rawSchedule = Fork
     case _: SwitchCase[_]        => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
     case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
-    case _: Control[_] =>
+    case ctrl: Control[_] =>
       logs(s"Determining schedule of $s = $op")
       logs(s"  User Schedule:    ${s.getUserSchedule}")
       logs(s"  Raw Schedule:     ${s.getRawSchedule}")
@@ -198,6 +206,20 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       logs(s"  Single Control:   ${s.isSingleControl}")
       logs(s"  # Children:       ${s.children.size}")
       logs(s"  # Childen (Ctrl): ${s.toCtrl.children.size}")
+
+      val toBePiped: Boolean = if (s.isOuterControl) {
+        ctrl.bodies.zipWithIndex.exists{ case (body, id) =>
+          val stage = Ctrl.Node(s, id)
+          body.blocks.zipWithIndex.exists{case ((_,block),bid) =>
+            if (stage.mayBeOuterBlock) {
+              block.stms.exists{
+                case Primitive(s)  => true
+                case _ => false
+              }
+            } else false
+          }
+        }
+      } else false
 
       if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
@@ -247,4 +269,3 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
 }
-

@@ -17,9 +17,9 @@ import spatial.dsl._
     val PX = 1 //1
     val P1 = 1 //2 // Unsafe parallelization if OC < 16 (1 burst) because multiple writers may perform unaligned store to same burst simultaneously
     val P2 = 1 //2 // Unsafe parallelization if OC < 16 (1 burst) because multiple writers may perform unaligned store to same burst simultaneously
-    val P3 = 2 //2
+    val P3 = 1 //2
     val P4 = 1 //2
-    val P5 = 2 //4
+    val P5 = 1 //4
     val P6 = 1 //16
     val loadPar = 4 (1 -> 16)
     val storePar = 4 (1 -> 16)
@@ -28,6 +28,7 @@ import spatial.dsl._
     val INPUT_COLS = ArgIn[Int]
     val INPUT_CHANS = ArgIn[Int]
     val OUTPUT_CHANS = ArgIn[Int]
+
     val STRIDE = ArgIn[Int] // Assume horiz and vert stride match
     val KERNEL_ROWS = 3
     val KERNEL_COLS = 3
@@ -55,15 +56,15 @@ import spatial.dsl._
     val OUTPUT_CHANS_MAX = 96
 
     // Memories
-    val INPUT_DATA = DRAM[T](INPUT_ROWS, INPUT_COLS, INPUT_CHANS)
-    val OUTPUT_DATA = DRAM[T]((INPUT_ROWS-(KERNEL_ROWS-STRIDE))/STRIDE, (INPUT_COLS-(KERNEL_COLS-STRIDE))/STRIDE, OUTPUT_CHANS)
-    val KERNEL_DATA = DRAM[T](OUTPUT_CHANS, KERNEL_ROWS, KERNEL_COLS, INPUT_CHANS)
+    val INPUT_DATA = DRAM[T](INPUT_COLS, INPUT_ROWS, INPUT_CHANS)
+    val OUTPUT_DATA = DRAM[T]((INPUT_COLS-(KERNEL_COLS-STRIDE))/STRIDE, (INPUT_ROWS-(KERNEL_ROWS-STRIDE))/STRIDE, OUTPUT_CHANS)
+    val KERNEL_DATA = DRAM[T](OUTPUT_CHANS, KERNEL_COLS, KERNEL_ROWS, INPUT_CHANS)
     val BIAS_DATA =   DRAM[T](OUTPUT_CHANS)
 
     // Load data (placeholder)
-    val input = (0::INPUT_ROWS, 0::INPUT_COLS, 0::INPUT_CHANS) {(i,j,k) => ((i + j + k) % 64 - 8).to[T]}
-    val output = (0::(INPUT_ROWS-(KERNEL_ROWS-STRIDE))/STRIDE, 0::(INPUT_COLS-(KERNEL_COLS-STRIDE))/STRIDE, 0::OUTPUT_CHANS){(i,j,k) => 0.to[T]}
-    val kernel = (0::OUTPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS, 0::INPUT_CHANS) {(i,j,k,l) => if (random[Int](10) > 7) 64.to[T] else 0.to[T]}
+    val input = (0::INPUT_COLS, 0::INPUT_ROWS, 0::INPUT_CHANS) {(i,j,k) => ((i + j + k) % 64 - 8).to[T]}
+    val output = (0::(INPUT_COLS-(KERNEL_COLS-STRIDE))/STRIDE, 0::(INPUT_ROWS-(KERNEL_ROWS-STRIDE))/STRIDE, 0::OUTPUT_CHANS){(i,j,k) => 0.to[T]}
+    val kernel = (0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS) {(i,j,k,l) => if (random[Int](10) > 7) 64.to[T] else 0.to[T]}
     val bias =   Array.tabulate(OUTPUT_CHANS){i => 1.to[T]}
 
     printTensor3(input, "Input")
@@ -80,10 +81,10 @@ import spatial.dsl._
     // println("MANUALLY COPY KERNEL_DATA PTR TO ME!")
 
     Accel{
-      val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, KERNEL_ROWS, KERNEL_COLS, INPUT_CHANS_MAX)
+      val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, KERNEL_COLS, KERNEL_ROWS, INPUT_CHANS_MAX)
       val bias_sram = SRAM[T](OUTPUT_CHANS_MAX)
       Parallel{
-        kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS, 0::INPUT_CHANS)
+        kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS)
         bias_sram load BIAS_DATA(0::OUTPUT_CHANS)        
       }
       val rowspan = if (STRIDE.value == 1) INPUT_ROWS-(KERNEL_ROWS-STRIDE) else (INPUT_ROWS-(KERNEL_ROWS-STRIDE) >> 1)
@@ -100,12 +101,12 @@ import spatial.dsl._
             val local_accum_line = SRAM[T2](OUTPUT_CHANS_MAX)
             Foreach(OUTPUT_CHANS by 1 par P4){ oc =>
               val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
-                kernel_sram(oc,i,j,ic).to[T2]
+                kernel_sram(oc,j,i,ic).to[T2]
               }}.flatten
               val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
-                local_data(i,j,ic).to[T2]
+                local_data(j,i,ic).to[T2]
               }}.flatten
-              val accum = data_elements.zip(filter_elements).map{case(a,b) => a*!b}.reduce{_+!_}
+              val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}
               local_accum_line(oc) = accum
               // if (debug) println(" at " + oc + "," + R + "," + C + " = " + filter_elements(0) + " * " + data_elements(0) + " + " +
               //                     filter_elements(1) + " * " + data_elements(1) + " + " +
@@ -119,9 +120,14 @@ import spatial.dsl._
               //                   )
             }
             local_accum_line
-          }{_+!_}
+          }{_+_}
           // RELU
-          Foreach(OUTPUT_CHANS by 1 par P6){i => accum_line(i) = max(0.to[T], accum_line_upcast(i).bits(27::12).as[T] + bias_sram(i))}
+          Foreach(OUTPUT_CHANS by 1 par P6){i => 
+            val bitshifted = if (accum_line_upcast(i) < (-134217728).to[T2]) -32768.to[T]
+                             else if (accum_line_upcast(i) > (134217727).to[T2]) 32767.to[T]
+                             else accum_line_upcast(i).bits(27::12).as[T]
+            accum_line(i) = max(0.to[T], bitshifted +! bias_sram(i))
+          }
           OUTPUT_DATA(row/STRIDE,col/STRIDE,0::OUTPUT_CHANS par storePar) store accum_line
         }
       }
@@ -132,7 +138,7 @@ import spatial.dsl._
     println("Results are " + results.dim0 + " x " + results.dim1 + " x " + results.dim2)
 
     // Compute Checks
-    val gold = (0::(INPUT_ROWS-(KERNEL_ROWS-STRIDE)) / STRIDE, 0::(INPUT_COLS-(KERNEL_COLS-STRIDE)) / STRIDE, 0::OUTPUT_CHANS){(i,j,k) => 
+    val gold = (0::(INPUT_COLS-(KERNEL_COLS-STRIDE)) / STRIDE, 0::(INPUT_ROWS-(KERNEL_ROWS-STRIDE)) / STRIDE, 0::OUTPUT_CHANS){(j,i,k) => 
       val el = Array.tabulate(INPUT_CHANS){page => 
         if (debug && print_data) {
             println("Result working on " + k + "," + page + "," + i + "," + j)
@@ -146,7 +152,7 @@ import spatial.dsl._
         }
 
 
-        Array.tabulate(KERNEL_ROWS){ii => Array.tabulate(KERNEL_COLS){jj => 
+        Array.tabulate(KERNEL_COLS){jj => Array.tabulate(KERNEL_ROWS){ii => 
           val pxl = input(i*STRIDE+ii,j*STRIDE+jj, page)
           val f = kernel(k, ii, jj, page)
           if (debug && print_data && f != 0.to[T]) println(" Partial is " + pxl + " * " + f + " @ " + ii + "," + jj)
@@ -162,7 +168,7 @@ import spatial.dsl._
       printTensor3(gold, "Gold")
       printTensor3(results, "Extracted")  
 
-      val bitmask = (0::(INPUT_ROWS-(KERNEL_ROWS-STRIDE)) / STRIDE, 0::(INPUT_COLS-(KERNEL_COLS-STRIDE)) / STRIDE, 0::OUTPUT_CHANS){(i,j,k) =>
+      val bitmask = (0::(INPUT_COLS-(KERNEL_COLS-STRIDE)) / STRIDE, 0::(INPUT_ROWS-(KERNEL_ROWS-STRIDE)) / STRIDE, 0::OUTPUT_CHANS){(j,i,k) =>
         if (results(i,j, k) == gold(i,j,k)) 1.to[Int] else 0.to[Int]
       }
       val num_wrong = bitmask.length - bitmask.reduce{_+_}

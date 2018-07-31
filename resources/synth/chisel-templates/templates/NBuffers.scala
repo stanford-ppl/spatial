@@ -117,7 +117,7 @@ class NBufMem(val mem: MemType,
         Input(new W_Direct(directWMux.accessPars.getOr1(i), ofsWidth, dBanks, bitWidth))
       })
     val directR = HVec(Array.tabulate(1 max numDirectRPorts){i => 
-        val dBanks = if (hasDirectW) {
+        val dBanks = if (hasDirectR) {
           directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values.map(_._1)).flatten.toList(i) 
         } else defaultDirect
         Input(new R_Direct(directWMux.accessPars.getOr1(i), ofsWidth, dBanks))
@@ -219,8 +219,12 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramXBarRPorts).foreach {k => 
-            val sram_index = k - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter(k >= _).lastOption.getOrElse(0)
-            io.output.data(bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
+            val port_width = portMapping.accessPars(k)
+            val k_base = portMapping.accessPars.take(k).sum
+            (0 until port_width).foreach{m => 
+              val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
+              io.output.data(bufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
+            }
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en.map(_ & rMask)
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
@@ -237,8 +241,13 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramDirectRPorts).foreach {k => 
-            val sram_index = k - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter(k >= _).lastOption.getOrElse(0)
-            io.output.data(xBarRBase + bufferBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
+            val port_width = portMapping.accessPars(k)
+            val k_base = portMapping.accessPars.take(k).sum
+            (0 until port_width).foreach{m => 
+              val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
+              io.output.data(xBarRBase + bufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
+            }
+
             f.io.directR(bufferBase + k).en := io.directR(k).en.map(_ & rMask)
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(k).ofs
@@ -253,7 +262,12 @@ class NBufMem(val mem: MemType,
         val sramXBarRPorts = broadcastRMux.accessPars.length
         val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.head === a.U, {if (Utils.retime) 1 else 0}) }
         (0 until sramXBarRPorts).foreach {k => 
-          io.output.data(xBarRBase + directRBase + k) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(k)})
+          val port_width = broadcastRMux.accessPars(k)
+          val k_base = broadcastRMux.accessPars.take(k).sum
+          (0 until port_width).foreach{m => 
+            io.output.data(xBarRBase + directRBase + (k_base+m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data((k_base+m))})
+          }
+         
           f.io.xBarR(xBarRBase + k).en := io.broadcastR( k).en
           // f.io.xBarR(xBarRBase + k).data := io.xBarR(xBarRBase + k).data
           f.io.xBarR(xBarRBase + k).ofs := io.broadcastR( k).ofs

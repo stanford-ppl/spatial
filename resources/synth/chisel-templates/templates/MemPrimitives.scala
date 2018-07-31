@@ -310,7 +310,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     // Figure out which read port was active in direct
     val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val directCandidatesEns = directIds.map(io.directR.map(_.en).flatten.toList(_))
-    val directCandidatesBanks = directIds.map(io.xBarR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
+    val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
     val directCandidatesOffsets = directIds.map(io.directR.map(_.ofs).flatten.toList(_))
     // Create bit vector to select which bank was activated by this io
     val sel = m.map{ mem => 

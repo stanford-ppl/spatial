@@ -120,7 +120,7 @@ class NBufMem(val mem: MemType,
         val dBanks = if (hasDirectR) {
           directRMux.toSeq.sortBy(_._1).toMap.values.map(_.toSeq.sortBy(_._1).toMap.values.map(_._1)).flatten.toList(i) 
         } else defaultDirect
-        Input(new R_Direct(directWMux.accessPars.getOr1(i), ofsWidth, dBanks))
+        Input(new R_Direct(directRMux.accessPars.getOr1(i), ofsWidth, dBanks))
       })
     val broadcastW = HVec(Array.tabulate(1 max numBroadcastWPorts){i => Input(new W_XBar(broadcastWMux.accessPars.getOr1(i), ofsWidth, banksWidths, bitWidth))})
     val broadcastR = HVec(Array.tabulate(1 max numBroadcastRPorts){i => Input(new R_XBar(broadcastRMux.accessPars.getOr1(i), ofsWidth, banksWidths))})

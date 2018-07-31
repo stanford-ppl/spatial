@@ -371,8 +371,8 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   // Create bank counters
   val headCtr = Module(new CompactingCounter(p.numXBarW, p.depth, p.elsWidth))
   val tailCtr = Module(new CompactingCounter(p.numXBarR, p.depth, p.elsWidth))
-  (0 until p.numXBarW).foreach{i => headCtr.io.input.enables.zip(io.xBarW.map(_.en)).foreach{case (l,r) => l := r}}
-  (0 until p.numXBarR).foreach{i => tailCtr.io.input.enables.zip(io.xBarR.map(_.en)).foreach{case (l,r) => l := r}}
+  (0 until p.numXBarW).foreach{i => headCtr.io.input.enables.zip(io.xBarW.map(_.en).flatten).foreach{case (l,r) => l := r}}
+  (0 until p.numXBarR).foreach{i => tailCtr.io.input.enables.zip(io.xBarR.map(_.en).flatten).foreach{case (l,r) => l := r}}
   headCtr.io.input.reset := reset
   tailCtr.io.input.reset := reset
   headCtr.io.input.dir := true.B
@@ -380,8 +380,8 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create numel counter
   val elements = Module(new CompactingIncDincCtr(p.numXBarW, p.numXBarR, p.depth, p.elsWidth))
-  (0 until p.numXBarW).foreach{i => elements.io.input.inc_en(i)  := io.xBarW(i).en}
-  (0 until p.numXBarR).foreach{i => elements.io.input.dinc_en(i) := io.xBarR(i).en}
+  elements.io.input.inc_en.zip(io.xBarW.map(_.en).flatten).foreach{case(l,r) => l := r}
+  elements.io.input.dinc_en.zip(io.xBarR.map(_.en).flatten).foreach{case(l,r) => l := r}
 
   // Create physical mems
   val m = (0 until p.numBanks).map{ i => Module(new Mem1D(p.depth/p.numBanks, p.bitWidth))}
@@ -390,16 +390,19 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   val enqCompactor = Module(new CompactingEnqNetwork(p.xBarWMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
   enqCompactor.io.headCnt := headCtr.io.output.count
-  (0 until p.numXBarW).foreach{i => enqCompactor.io.in(i).data := io.xBarW(i).data; enqCompactor.io.in(i).en := io.xBarW(i).en}
+  (0 until p.numXBarW).foreach{i => 
+    enqCompactor.io.in.map(_.data).zip(io.xBarW.map(_.data).flatten).foreach{case (l,r) => l := r}; 
+    enqCompactor.io.in.map(_.en).zip(io.xBarW.map(_.en).flatten).foreach{case(l,r) => l := r}
+  }
 
   // Connect compacting network to banks
   val active_w_bank = Utils.singleCycleModulo(headCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
   val active_w_addr = Utils.singleCycleDivide(headCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
   (0 until p.numBanks).foreach{i => 
     val addr = Mux(i.S(p.elsWidth.W) < active_w_bank, active_w_addr + 1.S(p.elsWidth.W), active_w_addr)
-    m(i).io.w.ofs := addr.asUInt
-    m(i).io.w.data := enqCompactor.io.out(i).data
-    m(i).io.w.en   := enqCompactor.io.out(i).en
+    m(i).io.w.ofs.head := addr.asUInt
+    m(i).io.w.data.head := enqCompactor.io.out(i).data
+    m(i).io.w.en.head   := enqCompactor.io.out(i).en
     m(i).io.wMask  := enqCompactor.io.out(i).en
   }
 
@@ -410,11 +413,11 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   val active_r_addr = Utils.singleCycleDivide(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
   (0 until p.numBanks).foreach{i => 
     val addr = Mux(i.S(p.elsWidth.W) < active_r_bank, active_r_addr + 1.S(p.elsWidth.W), active_r_addr)
-    m(i).io.r.ofs := addr.asUInt
+    m(i).io.r.ofs.head := addr.asUInt
     deqCompactor.io.input.data(i) := m(i).io.output.data
   }
   (0 until p.numXBarR).foreach{i =>
-    deqCompactor.io.input.deq(i) := io.xBarR(i).en
+    deqCompactor.io.input.deq.zip(io.xBarR.map(_.en).flatten).foreach{case (l,r) => l := r}
   }
   (0 until p.xBarRMux.accessPars.max).foreach{i =>
     io.output.data(i) := deqCompactor.io.output.data(i)
@@ -480,9 +483,9 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
       val xBarIds = p.xBarWMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }.toList
       val xBarCandidates = xBarIds.map{case n => io.xBarW(n+i)}
       // Make connections to memory
-      mem.io.w.ofs := accessor.io.output.count(0).asUInt
-      mem.io.w.data := Mux1H(xBarCandidates.map(_.en).flatten.toList, xBarCandidates.map(_.data).flatten.toList)
-      mem.io.w.en := xBarCandidates.map(_.en).flatten.toList.reduce{_|_}
+      mem.io.w.ofs.head := accessor.io.output.count(0).asUInt
+      mem.io.w.data.head := Mux1H(xBarCandidates.map(_.en).flatten.toList, xBarCandidates.map(_.data).flatten.toList)
+      mem.io.w.en.head := xBarCandidates.map(_.en).flatten.toList.reduce{_|_}
       mem.io.wMask := xBarCandidates.map(_.en).flatten.toList.reduce{_|_}
     }
   } else {
@@ -492,9 +495,9 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
         val xBarIds = p.xBarWMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }.toList
         val xBarCandidates = xBarIds.map{case n => io.xBarW(n+(i*pW+w_i))}
         // Make connections to memory
-        m(w_i + i*-*pW).io.w.ofs := accessor.io.output.count(0).asUInt
-        m(w_i + i*-*pW).io.w.data := Mux1H(xBarCandidates.map(_.en).flatten.toList, xBarCandidates.map(_.data).flatten.toList)
-        m(w_i + i*-*pW).io.w.en := xBarCandidates.map(_.en).flatten.toList.reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
+        m(w_i + i*-*pW).io.w.ofs.head := accessor.io.output.count(0).asUInt
+        m(w_i + i*-*pW).io.w.data.head := Mux1H(xBarCandidates.map(_.en).flatten.toList, xBarCandidates.map(_.data).flatten.toList)
+        m(w_i + i*-*pW).io.w.en.head := xBarCandidates.map(_.en).flatten.toList.reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
         m(w_i + i*-*pW).io.wMask := xBarCandidates.map(_.en).flatten.toList.reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
       }
     }
@@ -503,8 +506,8 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   // Connect popper
   if (pW == pR) {
     m.zipWithIndex.foreach { case (mem, i) => 
-      mem.io.r.ofs := (accessor.io.output.count(0) - 1.S(a_width.W)).asUInt
-      mem.io.r.en := io.xBarR.map(_.en).flatten.toList.reduce{_|_}
+      mem.io.r.ofs.head := (accessor.io.output.count(0) - 1.S(a_width.W)).asUInt
+      mem.io.r.en.head := io.xBarR.map(_.en).flatten.toList.reduce{_|_}
       mem.io.rMask := io.xBarR.map(_.en).flatten.toList.reduce{_|_}
       io.output.data(i) := mem.io.output.data
     }
@@ -513,8 +516,8 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
       val rSel = Wire(Vec( (par/pR), Bool()))
       val rData = Wire(Vec( (par/pR), UInt(p.bitWidth.W)))
       (0 until (par /-/ pR)).foreach { i => 
-        m(r_i + i*-*pR).io.r.ofs := (accessor.io.output.count(0) - 1.S(sa_width.W)).asUInt
-        m(r_i + i*-*pR).io.r.en := io.xBarR.map(_.en).flatten.toList.reduce{_|_} & (subAccessor_prev === (i*-*pR).S(sa_width.W))
+        m(r_i + i*-*pR).io.r.ofs.head := (accessor.io.output.count(0) - 1.S(sa_width.W)).asUInt
+        m(r_i + i*-*pR).io.r.en.head := io.xBarR.map(_.en).flatten.toList.reduce{_|_} & (subAccessor_prev === (i*-*pR).S(sa_width.W))
         m(r_i + i*-*pR).io.rMask := io.xBarR.map(_.en).flatten.toList.reduce{_|_} & (subAccessor_prev === (i*-*pR).S(sa_width.W))
         rSel(i) := subAccessor_prev === i.S
         rData(i) := m(r_i + i*pR).io.output.data

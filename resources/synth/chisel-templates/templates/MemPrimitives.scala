@@ -371,8 +371,8 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   // Create bank counters
   val headCtr = Module(new CompactingCounter(p.numXBarW, p.depth, p.elsWidth))
   val tailCtr = Module(new CompactingCounter(p.numXBarR, p.depth, p.elsWidth))
-  (0 until p.numXBarW).foreach{i => headCtr.io.input.enables(i) := io.xBarW(i).en}
-  (0 until p.numXBarR).foreach{i => tailCtr.io.input.enables(i) := io.xBarR(i).en}
+  (0 until p.numXBarW).foreach{i => headCtr.io.input.enables.zip(io.xBarW.map(_.en)).foreach{case (l,r) => l := r}}
+  (0 until p.numXBarR).foreach{i => tailCtr.io.input.enables.zip(io.xBarR.map(_.en)).foreach{case (l,r) => l := r}}
   headCtr.io.input.reset := reset
   tailCtr.io.input.reset := reset
   headCtr.io.input.dir := true.B

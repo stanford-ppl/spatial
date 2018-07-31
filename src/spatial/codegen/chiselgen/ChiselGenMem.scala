@@ -64,7 +64,6 @@ trait ChiselGenMem extends ChiselGenCommon {
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val isBroadcast = lhs.ports(0).values.head.bufferPort.isEmpty & mem.instance.depth > 1
     val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
-    // val issue35hack = if (mem.instance.depth == 1 & lhs.ports(0).values.head.bufferPort.isEmpty) -1 else 0
     val muxPort = lhs.ports(0).values.head.muxPort
     val muxOfs = lhs.ports(0).values.head.muxOfs
 

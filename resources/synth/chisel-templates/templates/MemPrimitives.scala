@@ -267,11 +267,11 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
   m.foreach{ mem => 
     // Check all xBar r ports against this bank's coords
     val xBarSelect = io.xBarR.map(_.banks).flatten.grouped(p.banks.length).toList.zip(io.xBarR.map(_.en).flatten).map{ case(bids, en) => 
-      bids.zip(mem._2).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
+      bids.zip(mem._2).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarR) en else false.B}
     }
     // Check all direct r ports against this bank's coords
-    val directSelectEns = io.directR.map(_.en).flatten.zip(io.directW.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-    val directSelectOffsets = io.directR.map(_.ofs).flatten.zip(io.directW.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectEns = io.directR.map(_.en).flatten.zip(io.directR.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectOffsets = io.directR.map(_.ofs).flatten.zip(io.directR.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 
     // Unmask write port if any of the above match
     mem._1.io.rMask := {if (p.hasXBarR) xBarSelect.reduce{_|_} else true.B} & directSelectEns.or
@@ -310,7 +310,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     // Figure out which read port was active in direct
     val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val directCandidatesEns = directIds.map(io.directR.map(_.en).flatten.toList(_))
-    val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
+    val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList(_))
     val directCandidatesOffsets = directIds.map(io.directR.map(_.ofs).flatten.toList(_))
     // Create bit vector to select which bank was activated by this io
     val sel = m.map{ mem => 
@@ -631,7 +631,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     // Figure out which read port was active in direct
     val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val directCandidatesEns = directIds.map(io.directR.map(_.en).flatten.toList(_))
-    val directCandidatesBanks = directIds.map(io.xBarR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
+    val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList(_))
     val directCandidatesOffsets = directIds.map(io.directR.map(_.ofs).flatten.toList(_))
     // Create bit vector to select which bank was activated by this io
     val sel = m.map{ mem => 
@@ -686,7 +686,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
     // Figure out which read port was active in direct
     val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }
     val directCandidatesEns = directIds.map(io.directR.map(_.en).flatten.toList(_))
-    val directCandidatesBanks = directIds.map(io.xBarR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
+    val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList(_))
     val directCandidatesOffsets = directIds.map(io.directR.map(_.ofs).flatten.toList(_))
     // Create bit vector to select which bank was activated by this io
     val sel = m.map{ mem => 

@@ -17,12 +17,12 @@ import spatial.dsl._
     val PX = 1 //1
     val P1 = 1 //2 // Unsafe parallelization if OC < 16 (1 burst) because multiple writers may perform unaligned store to same burst simultaneously
     val P2 = 1 //2 // Unsafe parallelization if OC < 16 (1 burst) because multiple writers may perform unaligned store to same burst simultaneously
-    val P3 = 1 //2
-    val P4 = 1 //2
-    val P5 = 1 //4
+    val P3 = 2 //2
+    val P4 = 2 //2
+    val P5 = 2 //4
     val P6 = 1 //16
-    val loadPar = 4 (1 -> 16)
-    val storePar = 4 (1 -> 16)
+    val loadPar = 16 (1 -> 16)
+    val storePar = 16 (1 -> 16)
     // Scalar params
     val INPUT_ROWS = ArgIn[Int]
     val INPUT_COLS = ArgIn[Int]
@@ -96,7 +96,7 @@ import spatial.dsl._
           val local_data = SRAM[T](3,3,INPUT_CHANS_MAX)
           val accum_line_upcast = SRAM[T2](OUTPUT_CHANS_MAX)
           val accum_line = SRAM[T](OUTPUT_CHANS_MAX)
-          local_data load INPUT_DATA(row::row+3, col::col+3, 0::INPUT_CHANS par loadPar)
+          local_data load INPUT_DATA(col::col+3, row::row+3, 0::INPUT_CHANS par loadPar)
           MemReduce(accum_line_upcast(0::OUTPUT_CHANS par P5))(INPUT_CHANS by 1 par P3){ ic =>
             val local_accum_line = SRAM[T2](OUTPUT_CHANS_MAX)
             Foreach(OUTPUT_CHANS by 1 par P4){ oc =>
@@ -128,7 +128,7 @@ import spatial.dsl._
                              else accum_line_upcast(i).bits(27::12).as[T]
             accum_line(i) = max(0.to[T], bitshifted +! bias_sram(i))
           }
-          OUTPUT_DATA(row/STRIDE,col/STRIDE,0::OUTPUT_CHANS par storePar) store accum_line
+          OUTPUT_DATA(col/STRIDE,row/STRIDE,0::OUTPUT_CHANS par storePar) store accum_line
         }
       }
     }
@@ -153,7 +153,7 @@ import spatial.dsl._
 
 
         Array.tabulate(KERNEL_COLS){jj => Array.tabulate(KERNEL_ROWS){ii => 
-          val pxl = input(i*STRIDE+ii,j*STRIDE+jj, page)
+          val pxl = input(j*STRIDE+jj,i*STRIDE+ii, page)
           val f = kernel(k, ii, jj, page)
           if (debug && print_data && f != 0.to[T]) println(" Partial is " + pxl + " * " + f + " @ " + ii + "," + jj)
           pxl.to[T2] * f.to[T2]

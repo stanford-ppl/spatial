@@ -72,7 +72,7 @@ elif [[ $type == "arria10" ]]; then
 elif [[ $type == "vcs-gdocs" ]]; then
   export GDOCS=1
   hash=`git rev-parse HEAD`
-  branchname=`git rev-parse --abbrev-ref HEAD | sed -i "s/HEAD/unknown/g"`
+  branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash
@@ -84,7 +84,7 @@ elif [[ $type == "vcs-gdocs" ]]; then
 elif [[ $type == "vcs-noretime-gdocs" ]]; then
   export GDOCS=1
   hash=`git rev-parse HEAD`
-  branchname=`git rev-parse --abbrev-ref HEAD | sed -i "s/HEAD/unknown/g"`
+  branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash

@@ -1,6 +1,7 @@
 package spatial.node
 
 import argon._
+import argon.node._
 import forge.tags._
 import spatial.lang._
 
@@ -10,6 +11,15 @@ object Accum {
   case object Mul extends Accum
   case object Min extends Accum
   case object Max extends Accum
+}
+sealed abstract class AccumMarker
+object AccumMarker {
+  object Reg {
+    case class Op(reg: Reg[_], data: Bits[_], first: Bit, ens: Set[Bit], op: Accum, invert: Boolean) extends AccumMarker
+    case class FMA(reg: Reg[_], m0: Bits[_], m1: Bits[_], first: Bit, ens: Set[Bit], invert: Boolean) extends AccumMarker
+    case object Lambda extends AccumMarker
+  }
+  object Unknown extends AccumMarker
 }
 
 abstract class RegAccum[A:Bits] extends Accumulator[A] {

@@ -1,5 +1,6 @@
 package spatial.tests.feature.memories.reg
 
+import argon.Block
 import spatial.dsl._
 
 @spatial class ReduceSpecialization extends SpatialTest {
@@ -73,5 +74,26 @@ import spatial.dsl._
     assert(goldMin == minn.value)
     assert(goldFma32 == fma32.value)
     assert(goldFma8 == fma8.value)
+  }
+
+  override def checkIR(block: Block[_]): Result = {
+    import argon._
+    import spatial.metadata.memory._
+    import spatial.node._
+
+    val regs = block.nestedStms.collect{case reg:Reg[_] => reg }
+    val sumAccum = regs.filter(_.name.exists(_.startsWith("sumAccum")))
+    val prodAccum = regs.filter(_.name.exists(_.startsWith("prodAccum")))
+    val maxAccum = regs.filter(_.name.exists(_.startsWith("maxAccum")))
+    val minAccum = regs.filter(_.name.exists(_.startsWith("minAccum")))
+    val fma32Accum = regs.filter(_.name.exists(_.startsWith("fma32Accum")))
+    val fma8Accum  = regs.filter(_.name.exists(_.startsWith("fma8Accum")))
+    require(sumAccum.exists{reg => reg.writers.exists{case Op(w: RegAccumOp[_]) => w.op == Accum.Add; case _ => false }}, "Sum specialization (Int)")
+    require(prodAccum.exists{reg => reg.writers.exists{case Op(w: RegAccumOp[_]) => w.op == Accum.Mul; case _ => false }}, "Product specialization (Int)")
+    require(maxAccum.exists{reg => reg.writers.exists{case Op(w: RegAccumOp[_]) => w.op == Accum.Max; case _ => false }}, "Max specialization (Int)")
+    require(minAccum.exists{reg => reg.writers.exists{case Op(w: RegAccumOp[_]) => w.op == Accum.Min; case _ => false }}, "Min specialization (Int)")
+    require(fma32Accum.exists{reg => reg.writers.exists{case Op(w: RegAccumFMA[_]) => true; case _ => false }}, "FMA32 specialization (Int)")
+    require(fma8Accum.exists{reg => reg.writers.exists{case Op(w: RegAccumFMA[_]) => true; case _ => false }}, "FMA8 specialization (Int)")
+    Unknown
   }
 }

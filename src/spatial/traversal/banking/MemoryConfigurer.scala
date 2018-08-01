@@ -120,7 +120,7 @@ import scala.collection.mutable.ArrayBuffer
   def canBroadcast(a: AccessMatrix, b: AccessMatrix): Boolean = {
     // TODO[3]: What about accesses of the same form across different loops?
     // Should we rely on loop fusion for this? Are there cases where that wouldn't work?
-    if (isGlobal) return true
+    if (isGlobal || a == b) return true
     val isWrite = a.access.isWriter || b.access.isWriter
     if (isWrite || a.access != b.access || a.matrix != b.matrix) return false
 

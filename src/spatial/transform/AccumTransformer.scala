@@ -16,17 +16,21 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
     case _ => transformControl(lhs,rhs)
   }
 
-  def transformControl[A:Type](lhs: Sym[A], rhs: Op[A]): Sym[A] = rhs match {
-    case ctrl: Control[_] if !(lhs.isSwitch && lhs.isInnerControl) =>
-      ctrl.bodies.foreach{body =>
-        if (body.isInnerStage || lhs.isInnerControl) {
-          body.blocks.foreach{case (_, block) =>
-            register(block -> optimizeAccumulators(block))
+  def transformControl[A:Type](lhs: Sym[A], rhs: Op[A]): Sym[A] = {
+    if (inHw && rhs.blocks.nonEmpty) dbgs(stm(lhs))
+
+    rhs match {
+      case ctrl: Control[_] if !(lhs.isSwitch && lhs.isInnerControl) =>
+        ctrl.bodies.foreach{body =>
+          if (body.isInnerStage || lhs.isInnerControl) {
+            body.blocks.foreach{case (_, block) =>
+              register(block -> optimizeAccumulators(block))
+            }
           }
         }
-      }
-      super.transform(lhs,rhs)
-    case _ => super.transform(lhs,rhs)
+        super.transform(lhs,rhs)
+      case _ => super.transform(lhs,rhs)
+    }
   }
 
 
@@ -43,7 +47,7 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
 
   def optimizeAccumulators[R](block: Block[R]): Block[R] = {
     val stms = block.stms
-    val (cycles, nonCycles) = stms.partition{s => s.isInCycle && s.reduceCycle.shouldSpecialize }
+    val (cycles, nonCycles) = stms.partition{s => s.isInCycle && s.reduceCycle.cycleID > -1 }
 
     // We assume here that the analysis has marked only closed accumulation cycles for specialization
     // We define a cycle as closed if:
@@ -52,121 +56,60 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
     //
     // This allows us to treat the graph as one chunk of compute with zero or more consumer cycles
     // effectively at the end.
-    stageScope(f(block.inputs), block.options){
-      nonCycles.foreach(visit)
+    isolateSubst(block.result) {
+      stageScope(f(block.inputs), block.options) {
+        nonCycles.foreach(visit)
 
-      cycles.groupBy(_.reduceCycle.cycleID).values.filterNot(_.isEmpty).foreach{syms: Seq[Sym[_]] =>
-        syms.head.reduceCycle match {
-          case WARCycle(reader,writer,mem,_,len,_,_) => writer match {
-            case RegAccumlike(RegAccum_Op(reg,data,first,ens,op,invert)) =>
-              val result = regAccumOp(reg,data,first,ens,op,invert)
-              register(writer -> result)
-              result
+        val cycleGroups = cycles.groupBy(_.reduceCycle.cycleID)
+        dbgs(s"Cycle groups: ${cycleGroups.keySet.mkString(", ")}")
 
-            case RegAccumlike(RegAccum_FMA(reg,m0,m1,first,ens,invert)) =>
-              val result = regAccumFMA(reg,m0,m1,first,ens,invert)
-              register(writer -> result)
-              result
+        cycleGroups.filterNot(_._2.isEmpty).foreach{case (id, syms: Seq[Sym[_]]) =>
+          dbgs(s"  Cycle #$id: ")
+          syms.foreach{s => dbgs(s"    ${stm(s)}")}
+          val cycle = syms.head.reduceCycle
 
-            // TODO: General lambda case
-            //case RegAccumlike(RegAccum_Gen) =>
-            //  val block = stageBlock{ syms.foreach(visit) }
-            //  stage(RegAccumLambda(reg,))
+          cycle match {
+            case cycle @ WARCycle(reader, writer, mem, cycleSyms, len, _, _) =>
+              dbgs(s"  WAR CYCLE: Writer: $writer, Reader: $reader")
+              cycle.marker match {
+                case AccumMarker.Reg.Op(reg, data, first, ens, op, invert) =>
+                  dbgs(s"Specializing the accumulation on $reg:")
+                  dbgs(s"  Cycle: ")
+                  cycleSyms.foreach(s => dbgs("    " + stm(s)))
+                  dbgs(s"  Operation: $op")
+                  dbgs(s"  First: $first")
+                  dbgs(s"  Invert: $invert")
+                  dbgs(s"  Data: $data")
+
+                  val result = regAccumOp(f(reg), f(data), f(first), f(ens), op, invert)
+                  register(writer -> result)
+                  result
+
+                case AccumMarker.Reg.FMA(reg, m0, m1, first, ens, invert) =>
+                  dbgs(s"Specializing the accumulation on $reg as an FMA:")
+                  dbgs(s"  Cycle: ")
+                  cycleSyms.foreach(s => dbgs("    " + stm(s)))
+                  dbgs(s"  First: $first")
+                  dbgs(s"  Invert: $invert")
+                  dbgs(s"  M0: $m0")
+                  dbgs(s"  M1: $m1")
+
+                  val result = regAccumFMA(f(reg), f(m0), f(m1), f(first), f(ens), invert)
+                  register(writer -> result)
+                  result
+
+                // TODO: General lambda case
+                //case RegAccumlike(RegAccum_Gen) =>
+                //  val block = stageBlock{ syms.foreach(visit) }
+                //  stage(RegAccumLambda(reg,))
+                case _ => syms.foreach(visit)
+              }
             case _ => syms.foreach(visit)
           }
-          case _ => syms.foreach(visit)
         }
+
+        f(block.result)
       }
-
-      f(block.result)
-    }
-  }
-
-  private object RegAdd {
-    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_])] = s match {
-      case Op(FixAdd(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FixAdd(data, Op(RegRead(reg)))) => Some((reg,data))
-      case Op(FltAdd(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FltAdd(data, Op(RegRead(reg)))) => Some((reg,data))
-      case _ => None
-    }
-  }
-
-  private object RegMul {
-    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_])] = s match {
-      case Op(FixMul(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FixMul(data, Op(RegRead(reg)))) => Some((reg,data))
-      case Op(FltMul(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FltMul(data, Op(RegRead(reg)))) => Some((reg,data))
-      case _ => None
-    }
-  }
-
-  private object RegMin {
-    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_])] = s match {
-      case Op(FixMin(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FixMin(data, Op(RegRead(reg)))) => Some((reg,data))
-      case Op(FltMin(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FltMin(data, Op(RegRead(reg)))) => Some((reg,data))
-      case _ => None
-    }
-  }
-
-  private object RegMax {
-    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_])] = s match {
-      case Op(FixMax(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FixMax(data, Op(RegRead(reg)))) => Some((reg,data))
-      case Op(FltMax(Op(RegRead(reg)), data)) => Some((reg,data))
-      case Op(FltMax(data, Op(RegRead(reg)))) => Some((reg,data))
-      case _ => None
-    }
-  }
-
-  private object RegFMA {
-    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_], Bits[_])] = s match {
-      case Op(FixFMA(m0, m1, Op(RegRead(reg)))) => Some((reg,m0,m1))
-      case Op(FltFMA(m0, m1, Op(RegRead(reg)))) => Some((reg,m0,m1))
-      case _ => None
-    }
-  }
-
-  private object RegMux {
-    def unapply(s: Sym[_]): Option[(Bit, Reg[_], Bits[_], Boolean)] = s match {
-      case Op(Mux(sel, Op(RegRead(reg)), data)) => Some((sel, reg, data, false))
-      case Op(Mux(sel, data, Op(RegRead(reg)))) => Some((sel, reg, data, true))
-    }
-  }
-
-  // TODO[5]: Is there a better way to write these patterns?
-  sealed abstract class RegAccumlike
-  case class RegAccum_Op(reg: Reg[_], data: Bits[_], first: Bit, ens: Set[Bit], op: Accum, invert: Boolean) extends RegAccumlike
-  case class RegAccum_FMA(reg: Reg[_], m0: Bits[_], m1: Bits[_], first: Bit, ens: Set[Bit], invert: Boolean) extends RegAccumlike
-  case object RegAccum_Gen extends RegAccumlike
-  object RegAccumlike {
-    def unapply(writer: Sym[_]): Option[RegAccumlike] = writer match {
-      case Op(RegWrite(reg,update,ens)) => update match {
-        // Specializing sums
-        case RegAdd(`reg`,data) => Some(RegAccum_Op(reg,data,false,ens,Accum.Add,invert=false))
-        case RegMux(first,`reg`,RegAdd(`reg`,data),invert) => Some(RegAccum_Op(reg,data,first,ens,Accum.Add,invert))
-
-        // Specializing product
-        case RegMul(`reg`,data) => Some(RegAccum_Op(reg,data,false,ens,Accum.Mul,invert=false))
-        case RegMux(first,`reg`,RegMul(`reg`,data),invert) => Some(RegAccum_Op(reg,data,first,ens,Accum.Mul,invert))
-
-        // Specializing min
-        case RegMin(`reg`,data) => Some(RegAccum_Op(reg,data,false,ens,Accum.Min,invert=false))
-        case RegMux(first,`reg`,RegMin(`reg`,data),invert) => Some(RegAccum_Op(reg,data,first,ens,Accum.Min,invert))
-
-        // Specializing max
-        case RegMax(`reg`,data) => Some(RegAccum_Op(reg,data,false,ens,Accum.Max,invert=false))
-        case RegMux(first,`reg`,RegMax(`reg`,data),invert) => Some(RegAccum_Op(reg,data,first,ens,Accum.Max,invert))
-
-        // Specializing FMA
-        case RegFMA(`reg`,m0,m1) => Some(RegAccum_FMA(reg,m0,m1,false,ens,invert=false))
-        case RegMux(first,`reg`,RegFMA(`reg`,m0,m1),invert) => Some(RegAccum_FMA(reg,m0,m1,first,ens,invert))
-        case _ => Some(RegAccum_Gen)
-      }
-      case _ => None
     }
   }
 

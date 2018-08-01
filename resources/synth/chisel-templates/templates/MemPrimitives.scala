@@ -481,24 +481,28 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
     m.zipWithIndex.foreach { case (mem, i) => 
       // Figure out which write port was active in xBar
       val xBarIds = p.xBarWMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }.toList
-      val xBarCandidates = xBarIds.map{case n => io.xBarW(n+i)}
+      val xBarCandidatesEns = xBarIds.map{case n => io.xBarW.map(_.en).flatten.toList(n+i)}
+      val xBarCandidatesDatas = xBarIds.map{case n => io.xBarW.map(_.data).flatten.toList(n+i)}
+
       // Make connections to memory
       mem.io.w.ofs.head := accessor.io.output.count(0).asUInt
-      mem.io.w.data.head := Mux1H(xBarCandidates.map(_.en).flatten.toList, xBarCandidates.map(_.data).flatten.toList)
-      mem.io.w.en.head := xBarCandidates.map(_.en).flatten.toList.reduce{_|_}
-      mem.io.wMask := xBarCandidates.map(_.en).flatten.toList.reduce{_|_}
+      mem.io.w.data.head := Mux1H(xBarCandidatesEns, xBarCandidatesDatas)
+      mem.io.w.en.head := xBarCandidatesEns.or
+      mem.io.wMask := xBarCandidatesEns.or
     }
   } else {
     (0 until pW).foreach { w_i => 
       (0 until (par /-/ pW)).foreach { i => 
         // Figure out which write port was active in xBar
         val xBarIds = p.xBarWMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,0).sum + i }.toList
-        val xBarCandidates = xBarIds.map{case n => io.xBarW(n+(i*pW+w_i))}
+        val xBarCandidatesEns = xBarIds.map{case n => io.xBarW.map(_.en).flatten.toList(n+(i*pW+w_i))}
+        val xBarCandidatesDatas = xBarIds.map{case n => io.xBarW.map(_.data).flatten.toList(n+(i*pW+w_i))}
+
         // Make connections to memory
         m(w_i + i*-*pW).io.w.ofs.head := accessor.io.output.count(0).asUInt
-        m(w_i + i*-*pW).io.w.data.head := Mux1H(xBarCandidates.map(_.en).flatten.toList, xBarCandidates.map(_.data).flatten.toList)
-        m(w_i + i*-*pW).io.w.en.head := xBarCandidates.map(_.en).flatten.toList.reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
-        m(w_i + i*-*pW).io.wMask := xBarCandidates.map(_.en).flatten.toList.reduce{_|_} & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
+        m(w_i + i*-*pW).io.w.data.head := Mux1H(xBarCandidatesEns, xBarCandidatesDatas)
+        m(w_i + i*-*pW).io.w.en.head := xBarCandidatesEns.or & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
+        m(w_i + i*-*pW).io.wMask := xBarCandidatesEns.or & (subAccessor.io.output.count(0) === (i*pW).S(sa_width.W))
       }
     }
   }

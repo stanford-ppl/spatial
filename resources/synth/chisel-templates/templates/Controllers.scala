@@ -206,10 +206,10 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     val stateFSM = Module(new FF(stateWidth))
     val doneReg = Module(new SRFF())
 
-    stateFSM.io.xBarW(0).data := io.nextState.asUInt
-    stateFSM.io.xBarW(0).init := io.initState.asUInt
-    stateFSM.io.xBarW(0).en := io.enable & iterDone.last.io.output.data
-    stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable
+    stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
+    stateFSM.io.xBarW(0).init.head := io.initState.asUInt
+    stateFSM.io.xBarW(0).en.head := io.enable & iterDone.last.io.output.data
+    stateFSM.io.xBarW(0).reset.head := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data(0).asSInt
 
     doneReg.io.input.set := io.doneCondition & io.enable & iterDone.last.io.output.data.D(1)
@@ -296,12 +296,12 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     // if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
     // else depulser := true.B
 
-    stateFSM.io.xBarW(0).data := io.nextState.asUInt
-    stateFSM.io.xBarW(0).init := io.initState.asUInt
-    stateFSM.io.xBarW(0).en := io.enable & io.ctrDone
+    stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
+    stateFSM.io.xBarW(0).init.head := io.initState.asUInt
+    stateFSM.io.xBarW(0).en.head := io.enable & io.ctrDone
     // if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
     // else stateFSM.io.xBarW(0).en := io.enable
-    stateFSM.io.xBarW(0).reset := reset.toBool | ~io.enable
+    stateFSM.io.xBarW(0).reset.head := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data(0).asSInt
 
     // Screwiness with "switch" signals until we have better fsm test cases

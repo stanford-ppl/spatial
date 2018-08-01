@@ -351,8 +351,8 @@ class NBufMem(val mem: MemType,
         // Connect XBarW ports
         if (xBarWMux.contains(i)) {
           val xBarWMuxPortMapping = xBarWMux(i)
-          val xBarWMuxBufferBase = xBarWMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-          val sramXBarWPorts = xBarWMuxPortMapping.accessPars.sum
+          val xBarWMuxBufferBase = xBarWMux.accessParsBelowBufferPort(i).length // Index into NBuf io
+          val sramXBarWPorts = xBarWMuxPortMapping.accessPars.length
           (0 until sramXBarWPorts).foreach {k => 
             f.io.xBarW(k).en := io.xBarW(xBarWMuxBufferBase + k).en
             f.io.xBarW(k).shiftEn := io.xBarW(xBarWMuxBufferBase + k).shiftEn
@@ -365,8 +365,8 @@ class NBufMem(val mem: MemType,
         // Connect DirectW ports
         if (directWMux.contains(i)) {
           val directWMuxPortMapping = directWMux(i)
-          val directWMuxBufferBase = directWMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-          val sramDirectWPorts = directWMuxPortMapping.accessPars.sum
+          val directWMuxBufferBase = directWMux.accessParsBelowBufferPort(i).length // Index into NBuf io
+          val sramDirectWPorts = directWMuxPortMapping.accessPars.length
           (0 until sramDirectWPorts).foreach {k => 
             f.io.directW(k).en := io.directW(directWMuxBufferBase + k).en
             f.io.directW(k).shiftEn := io.directW(directWMuxBufferBase + k).shiftEn
@@ -377,8 +377,8 @@ class NBufMem(val mem: MemType,
 
         // Connect BroadcastW ports
         if (hasBroadcastW) {
-          val sramXBarWBase = if (xBarWMux.contains(i)) xBarWMux(i).values.map(_._1).sum else 0
-          val sramBroadcastWPorts = broadcastWMux.accessPars.sum
+          val sramXBarWBase = if (xBarWMux.contains(i)) xBarWMux(i).values.size else 0
+          val sramBroadcastWPorts = broadcastWMux.accessPars.length
           (0 until sramBroadcastWPorts).foreach {k => 
             f.io.xBarW(sramXBarWBase + k).en := io.broadcastW(k).en
             f.io.xBarW(sramXBarWBase + k).shiftEn := io.broadcastW(k).shiftEn
@@ -390,8 +390,8 @@ class NBufMem(val mem: MemType,
 
         // Connect BroadcastR ports
         if (hasBroadcastR) {
-          val sramXBarRBase = if (xBarRMux.contains(i)) xBarRMux(i).values.map(_._1).sum else 0
-          val sramBroadcastRPorts = broadcastRMux.accessPars.sum
+          val sramXBarRBase = if (xBarRMux.contains(i)) xBarRMux(i).values.size else 0
+          val sramBroadcastRPorts = broadcastRMux.accessPars.length
           (0 until sramBroadcastRPorts).foreach {k => 
             f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
             // f.io.xBarR(sramXBarRBase + k).shiftEn := io.broadcastR(k).shiftEn
@@ -404,10 +404,15 @@ class NBufMem(val mem: MemType,
         // Connect XBarR ports and the associated outputs
         if (xBarRMux.contains(i)) {
           val xBarRMuxPortMapping = xBarRMux(i)
-          val xBarRMuxBufferBase = xBarRMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-          val sramXBarRPorts = xBarRMuxPortMapping.accessPars.sum
+          val xBarRMuxBufferBase = xBarRMux.accessParsBelowBufferPort(i).length // Index into NBuf io
+          val sramXBarRPorts = xBarRMuxPortMapping.accessPars.length
           (0 until sramXBarRPorts).foreach {k => 
-            io.output.data(xBarRMuxBufferBase + k) := f.io.output.data(k)
+            val port_width = xBarRMuxPortMapping.accessPars(k)
+            val k_base = xBarRMuxPortMapping.accessPars.take(k).sum
+            (0 until port_width).foreach{m => 
+              val sram_index = (k_base + m) - xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
+              io.output.data(xBarRMuxBufferBase + (k_base + m)) := f.io.output.data(k_base + m)
+            }
             f.io.xBarR(k).en := io.xBarR(xBarRMuxBufferBase + k).en
             // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
             f.io.xBarR(k).ofs := io.xBarR(xBarRMuxBufferBase + k).ofs
@@ -419,30 +424,20 @@ class NBufMem(val mem: MemType,
         // Connect DirectR ports and the associated outputs
         if (directRMux.contains(i)) {
           val directRMuxPortMapping = directRMux(i)
-          val directRMuxBufferBase = directRMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-          val xBarRBase = xBarRMux.accessPars.sum
-          val sramDirectRPorts = directRMuxPortMapping.accessPars.sum
+          val directRMuxBufferBase = directRMux.accessParsBelowBufferPort(i).length // Index into NBuf io
+          val xBarRBase = xBarRMux.accessPars.length
+          val sramDirectRPorts = directRMuxPortMapping.accessPars.length
           (0 until sramDirectRPorts).foreach {k => 
-            io.output.data(xBarRBase + directRMuxBufferBase + k) := f.io.output.data(xBarRBase + k)
+            val port_width = directRMuxPortMapping.accessPars(k)
+            val k_base = directRMuxPortMapping.accessPars.take(k).sum
+            (0 until port_width).foreach{m => 
+              val sram_index = (k_base + m) - directRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => directRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
+              io.output.data(xBarRBase + directRMuxBufferBase + (k_base + m)) := f.io.output.data(xBarRBase + k_base + m)
+            }
             f.io.directR(k).en := io.directR(directRMuxBufferBase + k).en
             // f.io.directR(directRMuxBufferBase + k).data := io.directR(directRMuxBufferBase + k).data
             f.io.directR(k).ofs := io.directR(directRMuxBufferBase + k).ofs
             // f.io.flow(k + {if (hasXBarR) numXBarR else 0}) := io.flow(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
-          }
-        }
-
-        // Connect XBarR ports and the associated outputs
-        if (xBarRMux.contains(i)) {
-          val xBarRMuxPortMapping = xBarRMux(i)
-          val xBarRMuxBufferBase = xBarRMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-          val sramXBarRPorts = xBarRMuxPortMapping.accessPars.sum
-          (0 until sramXBarRPorts).foreach {k => 
-            io.output.data(xBarRMuxBufferBase + k) := f.io.output.data(k)
-            f.io.xBarR(k).en := io.xBarR(xBarRMuxBufferBase + k).en
-            // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
-            f.io.xBarR(k).ofs := io.xBarR(xBarRMuxBufferBase + k).ofs
-            f.io.xBarR(k).banks.zip(io.xBarR(xBarRMuxBufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-              // f.io.flow(k) := io.flow(k) // Dangerous move here
           }
         }
 

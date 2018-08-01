@@ -35,7 +35,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
 
     if (lhs.isDirectlyBanked & !isBroadcast) {
-      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt)}.toList.grouped(${bank.head.length}).toList))") 
+      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList))") 
       emitt(src"""${lhs}.toSeq.zip(${mem}.connectDirectRPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else if (isBroadcast) {
       val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
@@ -69,7 +69,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
     if (lhs.isDirectlyBanked && !isBroadcast) {
-      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt)}.toList.grouped(${bank.head.length}).toList, $width))") 
+      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width))") 
       emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, (${muxPort}, $muxOfs))""")
     } else if (isBroadcast) {
       val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")

@@ -118,12 +118,12 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor(d,w) = rhs
       s"${vec}ff${d}_${w}"
     } else if (rhs.contains(" W_Direct(")) {
-      val extractor = ".*W_Direct\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor = ".*W_Direct\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\).grouped\\([0-9]+\\).toList[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
       val extractor(pw,ofsW,bankWs,dW) = rhs
       val bWs = bankWs.replace(" ", "").replace(",","_")
       s"${vec}wdbar${pw}_${ofsW}_${bWs}_${dW}"
     } else if (rhs.contains(" R_Direct(")) {
-      val extractor = ".*R_Direct\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
+      val extractor = ".*R_Direct\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\).grouped\\([0-9]+\\).toList[ ]*\\).*".r
       val extractor(pw,ofsW,bankWs) = rhs
       val bWs = bankWs.replace(" ", "").replace(",","_")
       s"${vec}rdbar${pw}_${ofsW}_${bWs}"

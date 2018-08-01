@@ -129,7 +129,7 @@ trait Spatial extends Compiler {
         /** Pipe Flattening */
         flatteningTransformer ==> printer ==> transformerChecks ==>
         /** Accumulation Specialization **/
-        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==>
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>

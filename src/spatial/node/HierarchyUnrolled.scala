@@ -133,4 +133,6 @@ abstract class Accumulator[A:Bits] extends UnrolledAccessor[A,Void] {
   override var enss = Seq(en)
   def unrolledRead = Some(BankedRead(mem,bank,ofs,enss))
   def unrolledWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
+  override def effects: Effects = Effects.Writes(mem)
+
 }

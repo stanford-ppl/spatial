@@ -19,7 +19,6 @@ import scala.collection.mutable
 import scala.collection.immutable.SortedSet
 
 object modeling {
-  private var fmaAccumRes = Set[(Sym[_], Double)]()
 
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
@@ -149,9 +148,11 @@ object modeling {
     verbose:  Boolean = false
   ): (Map[Sym[_],Double], Set[Cycle]) = {
 
-    dbgs(s"----------------------------------")
-    dbgs(s"Computing pipeLatencies for scope:")
-    schedule.foreach{e => dbgs(s"  ${stm(e)}")}
+    def debugs(x: => Any): Unit = if (verbose) dbgs(x)
+
+    debugs(s"----------------------------------")
+    debugs(s"Computing pipeLatencies for scope:")
+    schedule.foreach{ e => debugs(s"  ${stm(e)}") }
 
     val scope = schedule.toSet
 
@@ -164,7 +165,10 @@ object modeling {
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
-    accumReads.foreach{reader => dbgs(s"$reader is part of an accum cycle");cycles(reader) = Set(reader) }
+    accumReads.foreach{reader =>
+      dbgs(s"$reader is part of an accum cycle")
+      cycles(reader) = Set(reader)
+    }
 
     def fullDFS(cur: Sym[_]): Double = cur match {
       case Op(d) if scope.contains(cur) =>
@@ -190,13 +194,13 @@ object modeling {
           // TODO[3]: + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
           val delay = critical + latencyOf(cur, inReduce)
 
-          if (verbose) dbgs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+          debugs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
         }
         else {
           val inReduce = knownCycles.contains(cur)
           val delay = latencyOf(cur, inReduce)
-          if (verbose) dbgs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+          debugs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
           delay
         }
 
@@ -209,17 +213,17 @@ object modeling {
       case s: Sym[_] if cycle contains cur =>
         val forward = s.consumers intersect scope
         if (forward.nonEmpty) {
-          if (verbose) dbgs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
+          debugs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
 
           val earliestConsumer = forward.map{e =>
             val in = paths.getOrElse(e, 0.0) - latencyOf(e, inReduce=cycle.contains(e))
-            if (verbose) dbgs(s"  [$in = ${paths.getOrElse(e, 0L)} - ${latencyOf(e,inReduce = cycle.contains(e))}] ${stm(e)}")
+            debugs(s"  [$in = ${paths.getOrElse(e, 0L)} - ${latencyOf(e,inReduce = cycle.contains(e))}] ${stm(e)}")
             in
           }.min
 
           val push = Math.max(earliestConsumer, paths.getOrElse(cur, 0.0))
 
-          if (verbose) dbgs(s"  [$push]")
+          debugs(s"  [$push]")
 
           paths(cur) = push
         }
@@ -235,10 +239,12 @@ object modeling {
       // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
-        if (verbose) dbgs(s"Cycle #$i: ")
+        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
         reverseDFS(writer, cycle)
       }
     }
+
+    //var fmaAccumRes = Set[(Sym[_], Double)]()
 
     val warCycles = accums.collect{case AccumTriple(mem,reader,writer) if (!mem.isSRAM || {reader.parent.s.isDefined && reader.parent.parent.s.isDefined && {reader.parent.parent.s.get match {case Op(_:UnrolledReduce) => false; case _ => true}}}) => // Hack to specifically catch problem mentioned in #61
       val symbols = cycles(writer)
@@ -249,7 +255,7 @@ object modeling {
       if (cycleContainsSpecial && scopeContainsSpecial && spatialConfig.enableOptimizedReduce) {
         val (mul1,mul2,fma) = symbols.collect{case fma@Op(FixFMA(mul1,mul2,_)) => (mul1,mul2,fma)}.head
         val data = symbols.collect{case Op(RegWrite(_,d,_)) => d}.head
-        fmaAccumRes += ((data, cycleLengthExact.toDouble))
+        //fmaAccumRes += ((data, cycleLengthExact.toDouble))
         symbols.foreach{x => x.reduceType = Some(FixPtFMA); x.fmaReduceInfo = (data, mul1, mul2, fma, cycleLengthExact.toDouble)}
       }
 
@@ -266,8 +272,10 @@ object modeling {
     }
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
-      dbgs(s"Multiplexed accesses for memory $mem: ")
-      accesses.foreach{access => dbgs(s"  ${stm(access)}") }
+      if (accesses.nonEmpty && verbose){
+        debugs(s"Multiplexed accesses for memory $mem: ")
+        accesses.foreach{access => debugs(s"  ${stm(access)}") }
+      }
 
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
@@ -294,13 +302,13 @@ object modeling {
           pairs.foreach{case (access, dly, _) =>
             val oldPath = paths(access)
             paths(access) = writeDelay
-            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
+            debugs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
             if (writeDelay-oldPath > 0) {
-              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              debugs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
               val affectedNodes = consumersDfs(access.consumers, Set()) intersect scope
               affectedNodes.foreach{x => 
-                dbgs(s"  $x")
+                debugs(s"  $x")
                 paths(x) = paths(x) + (writeDelay-oldPath)
               }
             }
@@ -311,29 +319,33 @@ object modeling {
       }
     }
 
-    def pushOptimizedReduce(): Unit = { // Issue #63 sketchiness
+    /*def pushOptimizedReduce(): Unit = { // Issue #63 sketchiness
       fmaAccumRes.foreach{case (muxNode, ii) => 
         val extraLatency = scala.math.ceil(scala.math.log(ii)/scala.math.log(2)) + 1
         val affectedNodes = consumersDfs(muxNode.consumers, Set()) intersect scope
         affectedNodes.foreach{x => 
-          dbgs(s"Pushing node $x by $extraLatency due to fma accumulator optimization")
+          debugs(s"Pushing node $x by $extraLatency due to fma accumulator optimization")
           paths(x) = paths(x) + extraLatency
         }
       }
-    }
+    }*/
 
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    if (spatialConfig.enableOptimizedReduce) pushOptimizedReduce()  // Issue #63 sketchiness
+    //if (spatialConfig.enableOptimizedReduce) pushOptimizedReduce()  // Issue #63 sketchiness
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
-    dbgs(s"Found cycles: ")
-    allCycles.foreach{x => dbgs(s"$x")}
+
 
     if (verbose) {
+      if (allCycles.nonEmpty) {
+        debugs(s"Found cycles: ")
+        allCycles.foreach{x => debugs(s"$x")}
+      }
+
       def dly(x: Sym[_]) = paths.getOrElse(x, 0.0)
-      dbgs(s"  Schedule after pipeLatencies calculation:")
+      debugs(s"  Schedule after pipeLatencies calculation:")
       schedule.sortWith{(a,b) => dly(a) < dly(b)}.foreach{node =>
-        dbgs(s"  [${dly(node)}] ${stm(node)}")
+        debugs(s"  [${dly(node)}] ${stm(node)}")
       }
     }
 

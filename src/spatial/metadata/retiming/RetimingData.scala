@@ -1,6 +1,7 @@
 package spatial.metadata.retiming
 
 import argon._
+import spatial.node.AccumMarker
 
 /** For a given symbol, if the symbol is used in a reduction cycle, information about that cycle.
   *
@@ -12,7 +13,7 @@ import argon._
 abstract class Cycle extends Data[Cycle](Transfer.Remove) {
   def length: Double
   def symbols: Set[Sym[_]]
-  def shouldSpecialize: Boolean
+  def marker: AccumMarker
   def cycleID: Int
 }
 
@@ -23,15 +24,18 @@ case class WARCycle(
     memory: Sym[_],
     symbols: Set[Sym[_]],
     length: Double,
-    shouldSpecialize: Boolean = false,
+    marker: AccumMarker = AccumMarker.Unknown,
     cycleID: Int = -1)
-  extends Cycle
+  extends Cycle {
+  override def key: Class[_] = classOf[Cycle]
+}
 
 /** Access-after-access (AAA) cycle: Time-multiplexed reads/writes. */
 case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
   def symbols: Set[Sym[_]] = accesses
-  def shouldSpecialize: Boolean = false
+  def marker: AccumMarker = AccumMarker.Unknown
   def cycleID: Int = -1
+  override def key: Class[_] = classOf[Cycle]
 }
 
 

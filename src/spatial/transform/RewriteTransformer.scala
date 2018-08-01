@@ -21,12 +21,12 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     implicit val S: BOOL[S] = x.fmt.s
     implicit val I: INT[I] = x.fmt.i
     implicit val F: INT[F] = x.fmt.f
-    val data = x.asBits
+    // val data = x.asBits
     if (log2(y.toDouble) == 0) x.from(0)
     else {
-      val range = (log2(y.toDouble)-1).toInt :: 0
-      val selected = data.apply(range)
-      selected.asUnchecked[Fix[S,I,F]]
+      // val range = (log2(y.toDouble)-1).toInt :: 0
+      // val selected = data.apply(range)
+      x.asUnchecked[Fix[S,I,F]]
     }
   }
 

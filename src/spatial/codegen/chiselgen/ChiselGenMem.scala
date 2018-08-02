@@ -48,8 +48,9 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
       emitt(src"""${lhs}.toSeq.zip(${mem}.connectXBarRPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
     }
-    val ensString = ens.map{e => and(e)}.mkString("List(",",",")")
-    emitt(src"""${swap(src"${lhs}_port", Blank)}.en.zip(${ensString}.toSeq.map(_ && ${invisibleEnable})).foreach{case (left, right) => left := right}""")
+    val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
+    val ensString = ens.map{e => and(e.filter(!commonEns.contains(_)))}.mkString("List(",",",")")
+    emitt(src"""${swap(src"${lhs}_port", Blank)}.en.zip(${ensString}.toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})).foreach{case (left, right) => left := right}""")
     if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_port", Blank)}.ofs.zip(${ofs.map(quote(_) + ".r").mkString("List[UInt](",",",")")}.toSeq.map(_.rd)).foreach{case (left, right) => left.r := right}""")
     
   }
@@ -82,8 +83,9 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
       emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, (${muxPort}, $muxOfs))""")
     }
-    val ensString = ens.map{e => and(e)}.mkString("List(",",",")")
-    emitt(src"""${swap(src"${lhs}_port", Blank)}.$enport.zip(${ensString}.toSeq.map(_ && ${invisibleEnable})).foreach{case (left, right) => left := right}""")
+    val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
+    val ensString = ens.map{e => and(e.filter(!commonEns.contains(_)))}.mkString("List(",",",")")
+    emitt(src"""${swap(src"${lhs}_port", Blank)}.$enport.zip(${ensString}.toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})).foreach{case (left, right) => left := right}""")
     if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_port", Blank)}.ofs.zip(${ofs.map(quote(_) + ".r").mkString("List[UInt](",",",")")}.toSeq.map(_.rd)).foreach{case (left, right) => left.r := right}""")
     emitt(src"""${swap(src"${lhs}_port", Blank)}.data.zip(${data.map(quote(_) + ".r").mkString("List[UInt](",",",")")}).foreach{case (left, right) => left.r := right}""")
   }

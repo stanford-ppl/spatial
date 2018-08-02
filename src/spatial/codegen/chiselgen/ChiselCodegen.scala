@@ -17,7 +17,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   var streamLines = collection.mutable.Map[String, Int]() // Map from filename number of lines it has
   var streamExtensions = collection.mutable.Map[String, Int]() // Map from filename to number of extensions it has
   val tabWidth: Int = 2
-  val maxLinesPerFile = 400
+  val maxLinesPerFile = 200
   var compressorMap = collection.mutable.HashMap[String, (String,Int)]()
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()

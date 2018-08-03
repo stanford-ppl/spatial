@@ -173,26 +173,30 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // Registers
     case RegNew(init) => 
-      val FixPtType(s,d,f) = lhs.tp.typeArgs.head
       lhs.optimizedRegType match {
         case None            => emitMem(lhs, "FF", Some(List(init)))
         case Some(AccumAdd) =>
+          val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = latencyOption("FixAdd", Some(d+f))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Add, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumMul) =>
+          val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = latencyOption("FixMul", Some(d+f))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Mul, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumMin) =>
+          val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = latencyOption("FixMin", Some(d+f))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Min, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumMax) =>
+          val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = latencyOption("FixMax", Some(d+f))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Max, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumFMA) =>
+          val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = latencyOption("FixFMA", Some(d+f))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixFMAAccum(${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")

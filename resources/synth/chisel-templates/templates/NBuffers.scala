@@ -229,7 +229,7 @@ class NBufMem(val mem: MemType,
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
             f.io.xBarR(bufferBase + k).banks.zip(io.xBarR(bufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-            f.io.flow(k) := io.flow(k) // Dangerous move here
+            f.io.flow(k + bufferBase) := io.flow(k + bufferBase) // Dangerous move here
           }
         }
 
@@ -248,10 +248,10 @@ class NBufMem(val mem: MemType,
               io.output.data(xBarRBase + bufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
 
-            f.io.directR(bufferBase + k).en := io.directR(k).en.map(_ & rMask)
+            f.io.directR(bufferBase + k).en := io.directR(bufferBase + k).en.map(_ & rMask)
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
-            f.io.directR(bufferBase + k).ofs := io.directR(k).ofs
-            f.io.flow(k + numXBarR) := io.flow(k + numXBarR) // Dangerous move here
+            f.io.directR(bufferBase + k).ofs := io.directR(bufferBase + k).ofs
+            f.io.flow(k + bufferBase + numXBarR) := io.flow(k + bufferBase + numXBarR) // Dangerous move here
           }
         }
 

@@ -209,6 +209,8 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"${reg}.io.enable := ${and(ens)} && $invisibleEnable")
       emitt(src"${reg}.io.reset := ${swap(parent, Resetter)}")
       emitt(src"${reg}.io.first := ${first}")
+      emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
+      emitt(src"${lhs}.r := ${reg}.io.output")
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val parent = lhs.parent.s.get
       val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
@@ -217,6 +219,8 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"${reg}.io.enable := ${and(ens)} && $invisibleEnable")
       emitt(src"${reg}.io.reset := ${swap(parent, Resetter)}")
       emitt(src"${reg}.io.first := ${first}")
+      emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
+      emitt(src"${lhs}.r := ${reg}.io.output")
     // Specialized FMA Register
 
     // RegFiles

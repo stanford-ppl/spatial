@@ -67,15 +67,9 @@ object modeling {
   ): (Double, Double) = {
     val (latencies, cycles) = latenciesAndCycles(block, verbose = verbose)
     val scope = latencies.keySet
-
     val latency = latencies.values.fold(0.0){(a,b) => Math.max(a,b) }
     // TODO: Safer way of determining if THIS cycle is the reduceType
-    val interval = (cycles.map{c =>
-      // Sketchy things for issue #63
-      val scopeContainsSpecial = scope.exists(x => x.reduceType.contains(FixPtFMA) )
-      val cycleContainsSpecial = c.symbols.exists{case Op(FixFMA(_,_,_)) => true; case _ => false}
-      if (cycleContainsSpecial && scopeContainsSpecial && spatialConfig.enableOptimizedReduce) 1 else c.length
-    } + 0).max
+    val interval = (cycles.map{c => c.length} + 0).max
     // HACK: Set initiation interval to 1 if it contains a specialized reduction
     // This is a workaround for chisel codegen currently specializing and optimizing certain reduction types
     val compilerII = interval
@@ -249,15 +243,6 @@ object modeling {
     val warCycles = accums.collect{case AccumTriple(mem,reader,writer) if (!mem.isSRAM || {reader.parent.s.isDefined && reader.parent.parent.s.isDefined && {reader.parent.parent.s.get match {case Op(_:UnrolledReduce) => false; case _ => true}}}) => // Hack to specifically catch problem mentioned in #61
       val symbols = cycles(writer)
       val cycleLengthExact = paths(writer).toInt - paths(reader).toInt
-      // Sketchy thing for issue #63
-      val scopeContainsSpecial = scope.exists(x => x.reduceType.contains(FixPtFMA) )
-      val cycleContainsSpecial = symbols.exists{case Op(FixFMA(_,_,_)) => true; case _ => false}
-      if (cycleContainsSpecial && scopeContainsSpecial && spatialConfig.enableOptimizedReduce) {
-        val (mul1,mul2,fma) = symbols.collect{case fma@Op(FixFMA(mul1,mul2,_)) => (mul1,mul2,fma)}.head
-        val data = symbols.collect{case Op(RegWrite(_,d,_)) => d}.head
-        //fmaAccumRes += ((data, cycleLengthExact.toDouble))
-        symbols.foreach{x => x.reduceType = Some(FixPtFMA); x.fmaReduceInfo = (data, mul1, mul2, fma, cycleLengthExact.toDouble)}
-      }
 
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?
       val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
@@ -288,7 +273,7 @@ object modeling {
           (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
         }.toSeq
 
-        val length = muxPairs.map(_._3).maxOrElse(0) + 1
+        val length = muxPairs.map(_._3).maxOrElse(0) - muxPairs.map(_._3).minOrElse(0) + 1
 
         // Keep accesses with the same mux index together, even if they have different delays
         // TODO[1]: This isn't quite right - should order by common parent instead?
@@ -319,20 +304,8 @@ object modeling {
       }
     }
 
-    /*def pushOptimizedReduce(): Unit = { // Issue #63 sketchiness
-      fmaAccumRes.foreach{case (muxNode, ii) => 
-        val extraLatency = scala.math.ceil(scala.math.log(ii)/scala.math.log(2)) + 1
-        val affectedNodes = consumersDfs(muxNode.consumers, Set()) intersect scope
-        affectedNodes.foreach{x => 
-          debugs(s"Pushing node $x by $extraLatency due to fma accumulator optimization")
-          paths(x) = paths(x) + extraLatency
-        }
-      }
-    }*/
-
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    //if (spatialConfig.enableOptimizedReduce) pushOptimizedReduce()  // Issue #63 sketchiness
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
 
 

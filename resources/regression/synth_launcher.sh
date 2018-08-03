@@ -38,11 +38,12 @@ if [[ ! -f ${REGRESSION_HOME}/lock ]]; then
 	git clone git@github.com:stanford-ppl/spatial
 	git clone git@github.com:stanford-ppl/test-data.git
 	cd spatial
-	export apphash="nova-spatial"
+	export 
+	export branchname=`git rev-parse --abbrev-ref HEAD | sed -i "s/HEAD/unknown/g"`
 	export hash=`git rev-parse HEAD`
 	export timestamp=`git show -s --format=%ci`
 	echo $hash > ${REGRESSION_HOME}/data/hash
-	echo $apphash > ${REGRESSION_HOME}/data/apphash
+	echo $branchname > ${REGRESSION_HOME}/data/branchname
 	echo $timestamp > ${REGRESSION_HOME}/data/timestamp
 
 	# Run tests

@@ -34,10 +34,10 @@ class FixFMAAccum(val cycleLatency: Double, val fmaLatency: Double, val s: Boole
     fixadd.r := acc.io.output.data(0)
     val result = Wire(new FixedPoint(s,d,f))
     Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
-    acc.io.xBarW(0).data := result.r
-    acc.io.xBarW(0).en := Utils.getRetimed(io.enable & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset := io.reset
-    acc.io.xBarW(0).init := initBits
+    acc.io.xBarW(0).data.head := result.r
+    acc.io.xBarW(0).en.head := Utils.getRetimed(io.enable & dispatchLane === lane, fmaLatency.toInt)
+    acc.io.xBarW(0).reset.head := io.reset
+    acc.io.xBarW(0).init.head := initBits
   }
 
   io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, (Utils.log2Up(cycleLatency).toDouble).toInt).r // TODO: Please build tree and retime appropriately
@@ -71,10 +71,10 @@ class FixAddAccum(val cycleLatency: Double, val addLatency: Double, val s: Boole
     val fixadd = Wire(new FixedPoint(s,d,f))
     fixadd.r := acc.io.output.data(0)
     val result = Wire(new FixedPoint(s,d,f))
-    acc.io.xBarW(0).data := (fixadd + fixin1).r
-    acc.io.xBarW(0).en := Utils.getRetimed(io.enable & dispatchLane === lane, addLatency.toInt)
-    acc.io.xBarW(0).reset := io.reset
-    acc.io.xBarW(0).init := initBits
+    acc.io.xBarW(0).data.head := (fixadd + fixin1).r
+    acc.io.xBarW(0).en.head := Utils.getRetimed(io.enable & dispatchLane === lane, addLatency.toInt)
+    acc.io.xBarW(0).reset.head := io.reset
+    acc.io.xBarW(0).init.head := initBits
   }
 
   io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, (Utils.log2Up(cycleLatency).toDouble).toInt).r // TODO: Please build tree and retime appropriately

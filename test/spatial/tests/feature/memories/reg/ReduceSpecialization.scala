@@ -74,6 +74,12 @@ import spatial.dsl._
         data(5)(i) = Reduce(fma8Accum_Pipe)(0 until 32){j => sram(j).to[Int8] * sram(j).to[Int8] * i.to[Int8] }{_+_}.value.to[Int]
       }
 
+      val intermediateAccum = Reg[Float]
+      Foreach(0 until 32){i =>
+        intermediateAccum := intermediateAccum.value + i.to[Float]
+        println(intermediateAccum.value)
+      }
+
       data.zip(out).foreach{case (sramN, dramN) => dramN store sramN }
     }
 

@@ -7,10 +7,13 @@ import spatial.lang._
 import spatial.metadata.control.Ctrl
 
 sealed abstract class Accum
+
 case object AccumAdd extends Accum
 case object AccumMul extends Accum
 case object AccumMin extends Accum
 case object AccumMax extends Accum
+case object AccumFMA extends Accum
+case object AccumUnk extends Accum
 
 sealed abstract class AccumMarker {
   var control: Option[Ctrl] = None

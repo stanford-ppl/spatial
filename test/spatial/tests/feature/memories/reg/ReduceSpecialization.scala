@@ -74,11 +74,11 @@ import spatial.dsl._
         data(5)(i) = Reduce(fma8Accum_Pipe)(0 until 32){j => sram(j).to[Int8] * sram(j).to[Int8] * i.to[Int8] }{_+_}.value.to[Int]
       }
 
-      val intermediateAccum = Reg[Float]
-      Foreach(0 until 32){i =>
-        intermediateAccum := intermediateAccum.value + i.to[Float]
-        println(intermediateAccum.value)
-      }
+      // val intermediateAccum = Reg[Float]
+      // Foreach(0 until 32){i =>
+      //   intermediateAccum := intermediateAccum.value + i.to[Float]
+      //   println(intermediateAccum.value)
+      // }
 
       data.zip(out).foreach{case (sramN, dramN) => dramN store sramN }
     }
@@ -136,6 +136,20 @@ import spatial.dsl._
     println(r"Result: ${results(5)}")
     println(r"Golden: $goldFma8_Pipe")
 
+    println(r"""
+Test Sum:         ${goldSum == sum.value}
+Test Prod:        ${goldProd == prod.value}
+Test Max:         ${goldMax == maxn.value}
+Test Min:         ${goldMin == minn.value}
+Test Fma32:       ${goldFma32 == fma32.value}
+Test Fma8:        ${goldFma8 == fma8.value}
+Test Sum_Pipe:    ${goldSum_Pipe == results(0)}
+Test Prod_Pipe:   ${goldProd_Pipe == results(1)}
+Test Max_Pipe:    ${goldMax_Pipe == results(2)}
+Test Min_Pipe:    ${goldMin_Pipe == results(3)}
+Test Fma32_Pipe:  ${goldFma32_Pipe == results(4)}
+Test Fma8_Pipe:   ${goldFma8_Pipe == results(5)}
+""")
     assert(goldSum == sum.value)
     assert(goldProd == prod.value)
     assert(goldMax == maxn.value)

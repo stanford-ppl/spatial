@@ -45,6 +45,7 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
           case Accum.Mul => src"$reg.value * $in"
           case Accum.Max => src"Number.max($reg.value, $in)"
           case Accum.Min => src"Number.min($reg.value, $in)"
+          case _ => ""
         }
         emit(src"$reg.set((if ($first) $in else $input))")
       close("}")

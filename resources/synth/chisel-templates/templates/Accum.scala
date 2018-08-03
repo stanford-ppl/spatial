@@ -112,14 +112,17 @@ class FixOpAccum(val t: Accum, val cycleLatency: Double, val opLatency: Double, 
     acc.io.xBarW(0).init := initBits
   }
 
+    // Use log2Down to be consistent with latency model that truncates
+    val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
     t match {
-      case Accum.Add => io.output := accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
+      case Accum.Add => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
         t1.r := a
         t2.r := b
-        Utils.getRetimed(t1 + t2, opLatency.toInt).r
-      }
+        (t1+t2).r
+        // Utils.getRetimed(t1 + t2, opLatency.toInt).r
+      }, drain_latency)
       case Accum.Mul => io.output := accums.map(_._1.io.output.data(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
@@ -127,20 +130,22 @@ class FixOpAccum(val t: Accum, val cycleLatency: Double, val opLatency: Double, 
         t2.r := b
         (t1.*-*(t2, Some(opLatency), true.B)).r
       }
-      case Accum.Min => io.output := accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
+      case Accum.Min => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
         t1.r := a
         t2.r := b
-        Utils.getRetimed(Mux(t1 < t2, t1.r,t2.r), opLatency.toInt)
-      }
-      case Accum.Max => io.output := accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
+        Mux(t1 < t2, t1.r, t2.r)
+        // Utils.getRetimed(Mux(t1 < t2, t1.r,t2.r), opLatency.toInt)
+      }, drain_latency)
+      case Accum.Max => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
         t1.r := a
         t2.r := b
-        Utils.getRetimed(Mux(t1 > t2, t1.r,t2.r), opLatency.toInt)
-      }
+        Mux(t1 > t2, t1.r,t2.r)
+        // Utils.getRetimed(Mux(t1 > t2, t1.r,t2.r), opLatency.toInt)
+      }, drain_latency)
     }
 
 

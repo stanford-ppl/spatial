@@ -109,8 +109,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSRU(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x} >>> $shift).r")
-    case BitRandom(None) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
-    case FixRandom(None) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
+    case BitRandom(None) if (lhs.parent.s.isDefined) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
+    case FixRandom(None) if (lhs.parent.s.isDefined) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>
       val seed = (scala.math.random*1000).toInt
       val size = x match{

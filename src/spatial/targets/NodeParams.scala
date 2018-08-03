@@ -30,7 +30,7 @@ trait NodeParams {
           (op.name + "Mul", Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> nbits(d), "correction" -> log2correction))
         case _ => 
           val log2correction = if (nbits(d) < 33) 1 else 0
-          (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> 1, "correction" -> log2correction))
+          (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> nbits(d)/32, "correction" -> log2correction))
       }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 

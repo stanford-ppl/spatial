@@ -8,6 +8,8 @@ import spatial.node._
 import spatial.util.spatialConfig
 import spatial.metadata.control._
 import spatial.metadata.types._
+import spatial.metadata.memory._
+import scala.math.log
 
 trait NodeParams {
 
@@ -18,6 +20,12 @@ trait NodeParams {
   @stateful def nStages(e: Sym[_]): Int = e.children.length
 
   @stateful def nodeParams(s: Sym[_], op: Op[_]): (String,Seq[(String,Double)]) = op match {
+    case op@RegAccumFMA(_,d,_,_,_) => (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> 1))
+    case op@RegAccumOp(_,d,_,t,_) => 
+      t match {
+        case Accum.Mul => (op.name + "Mul", Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> nbits(d)))
+        case _ => (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> 1))
+      }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 
     case op:FltOp[_,_,_]   => (s"${op.name}_${op.fmt.mbits}_${op.fmt.ebits}", Nil)

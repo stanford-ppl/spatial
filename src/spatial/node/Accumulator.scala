@@ -11,6 +11,8 @@ object Accum {
   case object Mul extends Accum
   case object Min extends Accum
   case object Max extends Accum
+  case object FMA extends Accum
+  case object Unk extends Accum
 }
 sealed abstract class AccumMarker
 object AccumMarker {

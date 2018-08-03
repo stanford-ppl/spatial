@@ -172,27 +172,52 @@ trait ChiselGenMem extends ChiselGenCommon {
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitWrite(lhs, sram, data, bank, ofs, ens)
 
     // Registers
-    case RegNew(init) => emitMem(lhs, "FF", Some(List(init)))
-    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO & (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty))) => 
+    case RegNew(init) => 
+      val FixPtType(s,d,f) = lhs.tp.typeArgs.head
+      lhs.optimizedRegType match {
+        case None            => emitMem(lhs, "FF", Some(List(init)))
+        case Some(AccumAdd) =>
+          val opLatency = latencyOption("FixAdd", Some(d+f))
+          val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
+          emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Add, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+        case Some(AccumMul) =>
+          val opLatency = latencyOption("FixMul", Some(d+f))
+          val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
+          emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Mul, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+        case Some(AccumMin) =>
+          val opLatency = latencyOption("FixMin", Some(d+f))
+          val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
+          emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Min, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+        case Some(AccumMax) =>
+          val opLatency = latencyOption("FixMax", Some(d+f))
+          val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
+          emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Max, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+        case Some(AccumFMA) =>
+          val opLatency = latencyOption("FixFMA", Some(d+f))
+          val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
+          emitGlobalModuleMap(src"${lhs}", src"Module(new FixFMAAccum(${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+        case Some(AccumUnk) => throw new Exception(s"Cannot emit Reg with specialized reduce of type Unk yet!")
+      }
+    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO & (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty))) => 
+    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
+    case RegAccumOp(reg, data, ens, t, first) => 
+      val parent = lhs.parent.s.get
+      val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+      emitt(src"${reg}.io.input1 := $data.r")
+      emitt(src"${reg}.io.enable := ${and(ens)} && $invisibleEnable")
+      emitt(src"${reg}.io.reset := ${swap(parent, Resetter)}")
+      emitt(src"${reg}.io.first := ${first}")
+    case RegAccumFMA(reg, data1, data2, ens, first) => 
+      val parent = lhs.parent.s.get
+      val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+      emitt(src"${reg}.io.input1 := $data1.r")
+      emitt(src"${reg}.io.input2 := $data2.r")
+      emitt(src"${reg}.io.enable := ${and(ens)} && $invisibleEnable")
+      emitt(src"${reg}.io.reset := ${swap(parent, Resetter)}")
+      emitt(src"${reg}.io.first := ${first}")
     // Specialized FMA Register
-    case RegWrite(reg, data, ens) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
-      
-    case RegRead(reg)  if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
-      val info = lhs.fmaReduceInfo.get
-      val latency = latencyOption("FixFMA", Some(bitWidth(lhs.tp)))
-      val FixPtType(s,d,f) = lhs.tp
-      val Op(RegNew(init)) = reg
-      val treeLatency = scala.math.ceil(scala.math.log(info._5)/scala.math.log(2))
-      emitGlobalModule(src"val ${reg}_accum = Module(new FixFMAAccum(${info._5}, ${latency}, $s,$d,$f, ${quoteAsScala(init)}))")
-      emitt(src"${reg}_accum.io.input1 := ${info._2}.r")
-      emitt(src"${reg}_accum.io.input2 := ${info._3}.r")
-      emitt(src"""${reg}_accum.io.enable := ${DL(src"${swap(lhs.parent.s.get, DatapathEn)} & ${swap(lhs.parent.s.get, IIDone)}", info._4.fullDelay, true)}""")
-      emitt(src"""${reg}_accum.io.reset := ${DL(src"${swap(lhs.parent.s.get, Done)}", info._4.fullDelay + treeLatency + 1, true)}""")
-      emitGlobalWireMap(src"${info._1}", src"Wire(${info._1.tp})")
-      emitt(src"""${info._1}.r := ${reg}_accum.io.output""")
 
     // RegFiles
     case op@RegFileNew(_, inits) => emitMem(lhs, "ShiftRegFile", inits)

@@ -46,6 +46,8 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
             case AccumMul => src"$reg.value * $in"
             case AccumMax => src"Number.max($reg.value, $in)"
             case AccumMin => src"Number.min($reg.value, $in)"
+            case AccumFMA => throw new Exception("This shouldn't happen!")
+            case AccumUnk => throw new Exception("This shouldn't happen!")
           }
           emit(src"$reg.set((if ($first) $in else $input))")
         close("}")

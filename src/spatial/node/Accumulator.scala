@@ -4,22 +4,24 @@ import argon._
 import argon.node._
 import forge.tags._
 import spatial.lang._
+import spatial.metadata.control.Ctrl
 
 sealed abstract class Accum
-object Accum {
-  case object Add extends Accum
-  case object Mul extends Accum
-  case object Min extends Accum
-  case object Max extends Accum
+case object AccumAdd extends Accum
+case object AccumMul extends Accum
+case object AccumMin extends Accum
+case object AccumMax extends Accum
+
+sealed abstract class AccumMarker {
+  var control: Option[Ctrl] = None
+  def first: Bit
 }
-sealed abstract class AccumMarker
 object AccumMarker {
   object Reg {
-    case class Op(reg: Reg[_], data: Bits[_], first: Bit, ens: Set[Bit], op: Accum, invert: Boolean) extends AccumMarker
-    case class FMA(reg: Reg[_], m0: Bits[_], m1: Bits[_], first: Bit, ens: Set[Bit], invert: Boolean) extends AccumMarker
-    case object Lambda extends AccumMarker
+    case class Op(reg: Reg[_], data: Bits[_], written: Bits[_], first: Bit, ens: Set[Bit], op: Accum, invert: Boolean) extends AccumMarker
+    case class FMA(reg: Reg[_], m0: Bits[_], m1: Bits[_], written: Bits[_], first: Bit, ens: Set[Bit], invert: Boolean) extends AccumMarker
   }
-  object Unknown extends AccumMarker
+  object Unknown extends AccumMarker { def first: Bit = null }
 }
 
 abstract class RegAccum[A:Bits] extends Accumulator[A] {

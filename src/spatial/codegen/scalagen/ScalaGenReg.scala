@@ -39,20 +39,26 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
     case GetReg(reg)     => emit(src"val $lhs = $reg.value")
 
     case RegAccumOp(reg,in,en,op,first) =>
-      open(src"val $lhs = if (${and(en)}) {")
-        val input = op match {
-          case Accum.Add => src"$reg.value + $in"
-          case Accum.Mul => src"$reg.value * $in"
-          case Accum.Max => src"Number.max($reg.value, $in)"
-          case Accum.Min => src"Number.min($reg.value, $in)"
-        }
-        emit(src"$reg.set((if ($first) $in else $input))")
+      open(src"val $lhs = {")
+        open(src"if (${and(en)}) {")
+          val input = op match {
+            case AccumAdd => src"$reg.value + $in"
+            case AccumMul => src"$reg.value * $in"
+            case AccumMax => src"Number.max($reg.value, $in)"
+            case AccumMin => src"Number.min($reg.value, $in)"
+          }
+          emit(src"$reg.set((if ($first) $in else $input))")
+        close("}")
+        emit(src"$reg.value")
       close("}")
 
     case RegAccumFMA(reg,m0,m1,en,first) =>
-      open(src"val $lhs = if (${and(en)}) {")
-        val input = src"$m0 * $m1 + $reg.value"
-        emit(src"$reg.set((if ($first) $m0*$m1 else $input))")
+      open(src"val $lhs = {")
+        open(src"if (${and(en)}) {")
+          val input = src"$m0 * $m1 + $reg.value"
+          emit(src"$reg.set((if ($first) $m0*$m1 else $input))")
+        close("}")
+        emit(src"$reg.value")
       close("}")
 
     case _ => super.gen(lhs, rhs)

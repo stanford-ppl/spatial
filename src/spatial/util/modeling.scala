@@ -166,7 +166,7 @@ object modeling {
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
     accumReads.foreach{reader =>
-      dbgs(s"$reader is part of an accum cycle")
+      debugs(s"$reader is part of an accum cycle")
       cycles(reader) = Set(reader)
     }
 
@@ -186,7 +186,7 @@ object modeling {
           val cycleSyms = deps intersect cycles.keySet
           if (cycleSyms.nonEmpty) {
             cycles(cur) = cycleSyms.flatMap(cycles) + cur
-            dbgs(s"cycle deps of $cur: ${cycles(cur)}")
+            debugs(s"cycle deps of $cur: ${cycles(cur)}")
           }
 
           val inReduce = knownCycles.contains(cur)

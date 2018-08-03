@@ -9,8 +9,8 @@ import spatial.metadata.control._
 package object memory {
 
   implicit class AccumulatorOps(s: Sym[_]) {
-    def accumType: AccumType = metadata[Accumulator](s).map(_.tp).getOrElse(AccumType.None)
-    def accumType_=(tp: AccumType): Unit = metadata.add(s, Accumulator(tp))
+    def accumType: AccumType = metadata[AccumulatorType](s).map(_.tp).getOrElse(AccumType.Unknown)
+    def accumType_=(tp: AccumType): Unit = metadata.add(s, AccumulatorType(tp))
 
     def reduceType: Option[ReduceFunction] = metadata[ReduceType](s).map(_.func)
     def reduceType_=(func: ReduceFunction): Unit = metadata.add(s, ReduceType(func))

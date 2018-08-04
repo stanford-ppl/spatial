@@ -44,7 +44,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
 
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
   laneCtr.io.input.enable := activeEn
-  laneCtr.io.input.reset := activeReset | activeLast.D(1)
+  laneCtr.io.input.reset := activeReset | activeLast.D(2)
   laneCtr.io.input.saturate := false.B
 
   val firstRound = Module(new SRFF())
@@ -52,6 +52,15 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
   firstRound.io.input.asyn_reset := false.B
   firstRound.io.input.reset := laneCtr.io.output.done | activeReset
   val isFirstRound = firstRound.io.output.data
+
+  // Use log2Down to be consistent with latency model that truncates
+  val drain_latency = (log(cycleLatency)/log(2)).toInt
+
+  val drainState = Module(new SRFF())
+  drainState.io.input.set := activeLast
+  drainState.io.input.asyn_reset := false.B
+  drainState.io.input.reset := activeLast.D(drain_latency)
+  val isDrainState = drainState.io.output.data
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
@@ -62,13 +71,11 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | activeLast.D(1)
+    acc.io.xBarW(0).reset := activeReset | activeLast.D(2)
     acc.io.xBarW(0).init := initBits
   }
 
-  // Use log2Down to be consistent with latency model that truncates
-  val drain_latency = (log(cycleLatency)/log(2)).toInt
-  io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, drain_latency).r // TODO: Please build tree and retime appropriately
+  io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, drain_latency, isDrainState).r // TODO: Please build tree and retime appropriately
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {io.output}
@@ -100,7 +107,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
 
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
   laneCtr.io.input.enable := activeEn
-  laneCtr.io.input.reset := activeReset | activeLast.D(1)
+  laneCtr.io.input.reset := activeReset | activeLast.D(2)
   laneCtr.io.input.saturate := false.B
 
   val firstRound = Module(new SRFF())
@@ -108,6 +115,15 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   firstRound.io.input.asyn_reset := false.B
   firstRound.io.input.reset := laneCtr.io.output.done | activeReset
   val isFirstRound = firstRound.io.output.data
+
+    // Use log2Down to be consistent with latency model that truncates
+    val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
+
+  val drainState = Module(new SRFF())
+  drainState.io.input.set := activeLast
+  drainState.io.input.asyn_reset := false.B
+  drainState.io.input.reset := activeLast.D(drain_latency)
+  val isDrainState = drainState.io.output.data
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
@@ -124,12 +140,10 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     }
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | activeLast.D(1)
+    acc.io.xBarW(0).reset := activeReset | activeLast.D(2)
     acc.io.xBarW(0).init := initBits
   }
 
-    // Use log2Down to be consistent with latency model that truncates
-    val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
     t match {
       case Accum.Add => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
@@ -138,14 +152,14 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
         t2.r := b
         (t1+t2).r
         // Utils.getRetimed(t1 + t2, opLatency.toInt).r
-      }, drain_latency)
-      case Accum.Mul => io.output := accums.map(_._1.io.output.data(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) => 
+      }, drain_latency, isDrainState)
+      case Accum.Mul => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
         t1.r := a
         t2.r := b
-        (t1.*-*(t2, Some(opLatency), true.B)).r
-      }
+        (t1.*-*(t2, None, true.B)).r
+      }, drain_latency, isDrainState)
       case Accum.Min => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
@@ -153,7 +167,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
         t2.r := b
         Mux(t1 < t2, t1.r, t2.r)
         // Utils.getRetimed(Mux(t1 < t2, t1.r,t2.r), opLatency.toInt)
-      }, drain_latency)
+      }, drain_latency, isDrainState)
       case Accum.Max => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))
         val t2 = Wire(new FixedPoint(s,d,f))
@@ -161,7 +175,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
         t2.r := b
         Mux(t1 > t2, t1.r,t2.r)
         // Utils.getRetimed(Mux(t1 > t2, t1.r,t2.r), opLatency.toInt)
-      }, drain_latency)
+      }, drain_latency, isDrainState)
     }
 
 

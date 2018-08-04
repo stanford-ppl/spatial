@@ -25,6 +25,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     val input2 = Vec(numWriters, Input(UInt((d+f).W)))
     val enable = Vec(numWriters, Input(Bool()))
     val reset = Vec(numWriters, Input(Bool()))
+    val last = Vec(numWriters, Input(Bool()))
     val first = Vec(numWriters, Input(Bool()))
     val output = Output(UInt((d+f).W))
   })
@@ -32,6 +33,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
   val activeIn1 = Mux1H(io.enable, io.input1)
   val activeIn2 = Mux1H(io.enable, io.input2)
   val activeEn  = io.enable.reduce{_|_}
+  val activeLast = Mux1H(io.enable, io.last)
   val activeReset = io.reset.reduce{_|_}
   val activeFirst = io.first.reduce{_|_}
 
@@ -42,7 +44,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
 
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
   laneCtr.io.input.enable := activeEn
-  laneCtr.io.input.reset := activeReset | Utils.risingEdge(activeFirst)
+  laneCtr.io.input.reset := activeReset | activeLast.D(1)
   laneCtr.io.input.saturate := false.B
 
   val firstRound = Module(new SRFF())
@@ -60,7 +62,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | Utils.risingEdge(activeFirst)
+    acc.io.xBarW(0).reset := activeReset | activeLast.D(1)
     acc.io.xBarW(0).init := initBits
   }
 
@@ -82,12 +84,14 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     val input1 = Vec(numWriters, Input(UInt((d+f).W)))
     val enable = Vec(numWriters, Input(Bool()))
     val reset = Vec(numWriters, Input(Bool()))
+    val last = Vec(numWriters, Input(Bool()))
     val first = Vec(numWriters, Input(Bool()))
     val output = Output(UInt((d+f).W))
   })
 
   val activeIn1 = Mux1H(io.enable, io.input1)
   val activeEn  = io.enable.reduce{_|_}
+  val activeLast = Mux1H(io.enable, io.last)
   val activeReset = io.reset.reduce{_|_}
   val activeFirst = io.first.reduce{_|_}
 
@@ -96,7 +100,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
 
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
   laneCtr.io.input.enable := activeEn
-  laneCtr.io.input.reset := activeReset | Utils.risingEdge(activeFirst)
+  laneCtr.io.input.reset := activeReset | activeLast.D(1)
   laneCtr.io.input.saturate := false.B
 
   val firstRound = Module(new SRFF())
@@ -120,7 +124,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     }
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | Utils.risingEdge(activeFirst)
+    acc.io.xBarW(0).reset := activeReset | activeLast.D(1)
     acc.io.xBarW(0).init := initBits
   }
 

@@ -217,6 +217,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
       emitt(src"${reg}.io.input1($index) := $data.r")
       emitt(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
+      emitt(src"${reg}.io.last($index)   := ${DL(src"${swap(parent, SM)}.io.ctrDone", lhs.fullDelay, true)}")
       emitt(src"${reg}.io.reset($index) := false.B//${swap(parent, Resetter)}")
       emitt(src"${reg}.io.first($index) := ${first}")
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
@@ -228,6 +229,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"${reg}.io.input1($index) := $data1.r")
       emitt(src"${reg}.io.input2($index) := $data2.r")
       emitt(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
+      emitt(src"${reg}.io.last($index)   := ${DL(src"${swap(parent, SM)}.io.ctrDone", lhs.fullDelay, true)}")
       emitt(src"${reg}.io.reset($index) := false.B//${swap(parent, Resetter)}")
       emitt(src"${reg}.io.first($index) := ${first}")
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")

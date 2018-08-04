@@ -39,12 +39,12 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     val (_, cycles) = latenciesAndCycles(block)
     val warCycles = cycles.collect{case cycle:WARCycle => cycle }.zipWithIndex
 
-    def accumControl(first: Bit, writer: Sym[_]): Ctrl = {
+    def accumControl(first: Bit, writer: Sym[_]): Option[Ctrl] = {
       val iters = first match {
         case IterAnd(is) => is
         case _ => writer.scopes.flatMap(_.iters).toSet
       }
-      LCA(iters.map(_.parent))
+      if (iters.size > 0) Some(LCA(iters.map(_.parent))) else None
     }
 
     // Find sets of cycles which are entirely disjoint
@@ -70,6 +70,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       val noIntermediates = intermediates.forall{s => externalUses(s).isEmpty }
       val noEscaping      = c1.memory.accumType == AccumType.Reduce || noIntermediates
       val noVisibleIntermediates = isClosedCycle && noEscaping
+      val isLocalMem      = !c1.memory.isRemoteMem
 
       dbgs(s"Cycle #$i on ${c1.memory}: ")
       dbgs(s"  ${stm(c1.memory)} [${c1.memory.name.getOrElse(c1.toString)}]")
@@ -77,13 +78,14 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       dbgs(s"  no visible intermediates:")
       dbgs(s"    closed cycle:     $isClosedCycle")
       dbgs(s"    no intermediates: $noIntermediates")
+      dbgs(s"    is local mem:     $isLocalMem")
       dbgs(s"    accum type:       ${c1.memory.accumType} (if reduce, overrides no intermediates)")
 
-      if (isDisjoint && noVisibleIntermediates) {
+      if (isDisjoint && noVisibleIntermediates && isLocalMem) {
         val marker = c1.writer match {
           case AssociateReduce(m) =>
-            m.control = Some(accumControl(m.first,c1.writer))
-            Some(m)
+            m.control = accumControl(m.first,c1.writer)
+            if (m.control.isDefined) Some(m) else None
           case _ => None
         }
         marker.foreach{m =>

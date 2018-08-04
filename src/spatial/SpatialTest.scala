@@ -43,7 +43,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --fpga Zynq --debugResources --optimizeReduce",
+    args = "--synth --fpga Zynq --debugResources",
     make = "make vcs",
     run  = "bash scripts/regression_run.sh vcs"
   ) {

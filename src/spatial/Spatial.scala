@@ -236,11 +236,9 @@ trait Spatial extends Compiler {
       overrideRetime = true
     }.text("Enable cheap fifos where accesses must be multiples of each other and not have lane-enables")
 
-    cli.opt[Unit]("optimizeReduce").action { (_,_) => // Must necessarily turn on retiming
-      spatialConfig.enableOptimizedReduce = true
-      spatialConfig.enableRetiming = true
-      overrideRetime = true
-    }.text("Squeeze II of reductions to 1 where possible, and instantiate specialized reduce node")
+    cli.opt[Unit]("noOptimizeReduce").action { (_,_) => 
+      spatialConfig.enableOptimizedReduce = false
+    }.text("Do not squeeze II of reductions to 1 where possible, and instantiate specialized reduce node")
 
     cli.opt[Unit]("runtime").action{ (_,_) =>
       spatialConfig.enableRuntimeModel = true

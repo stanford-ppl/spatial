@@ -214,6 +214,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
+    case uloop: UnrolledLoop[_] => 
+      uloop.cchainss.foreach{case (cchain,is) =>
+        cchain.counters.zip(is).foreach{case (ctr, i) => i.foreach(_.counter = ctr) }
+      }
     case loop: Loop[_] =>
       loop.cchains.foreach{case (cchain,is) =>
         cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = ctr }

@@ -60,7 +60,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset
+    acc.io.xBarW(0).reset := activeReset | Utils.risingEdge(activeFirst)
     acc.io.xBarW(0).init := initBits
   }
 
@@ -120,7 +120,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     }
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset
+    acc.io.xBarW(0).reset := activeReset | Utils.risingEdge(activeFirst)
     acc.io.xBarW(0).init := initBits
   }
 

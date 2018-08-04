@@ -68,7 +68,17 @@ object ModBanking {
   * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
   *
   */
-case class Port(bufferPort: Option[Int], muxPort: Int, muxSize: Int, muxOfs: Int, broadcast: Int)
+case class Port(
+  bufferPort: Option[Int],
+  muxPort: Int,
+  muxSize: Int,
+  muxOfs:  Int,
+  castgroup: Int,    // The broadcast group the access belongs to within this port
+  broadcast: Int     // The broadcast index of this group (0 = broadcasting, >0 = receiving)
+) {
+  def isBroadcastSender: Boolean = broadcast == 0
+  def isBroadcastReceiver: Boolean = broadcast > 0
+}
 
 
 /** Used during memory analysis to track intermediate results. */

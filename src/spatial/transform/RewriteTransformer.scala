@@ -95,7 +95,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
 
     case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => 
-      val m = selectMod(x, y).asInstanceOf[Sym[A]]
+      val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
       m.modulus = y
       m
 
@@ -106,20 +106,16 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     // m1*m2 + add --> fma(m1,m2,add)
     case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA =>
-      val lhs2 = fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
-      if (lhs.reduceType == Some(FixPtSum)) lhs2.reduceType = Some(FixPtFMA) // Best place to update other nodes in this reduce cycle? Issue #63
-      lhs2
+      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
     case FixAdd(F(add: Fix[s,i,f]), F(Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA =>
-      val lhs2 = fixFMA(m1,m2,add).asInstanceOf[Sym[A]]
-      if (lhs.reduceType == Some(FixPtSum)) lhs2.reduceType = Some(FixPtFMA) // Best place to update other nodes in this reduce cycle? Issue #63
-      lhs2
+      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
     case FltAdd(F(Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA =>
-      fltFMA(m1,m2,add).asInstanceOf[Sym[A]]
+      transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
     case FltAdd(F(add: Flt[m,e]), F(Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA =>
-      fltFMA(m1,m2,add).asInstanceOf[Sym[A]]
+      transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
     case _ => super.transform(lhs,rhs)
   }

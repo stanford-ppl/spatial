@@ -17,8 +17,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
   @flow def delaylines(a: Sym[_], op: Op[_]): Unit = op match {
     case DelayLine(_,data) =>
-      a.reduceType = data.reduceType         // Sketchy things for issue #63
-      a.fmaReduceInfo = data.fmaReduceInfo   // Sketchy things for issue #63      
+      // Shouldn't need these anymore
+      //a.reduceType = data.reduceType         // Sketchy things for issue #63
+      //a.fmaReduceInfo = data.fmaReduceInfo   // Sketchy things for issue #63
+      a.isBroadcastAddr = data.isBroadcastAddr
     case _ =>
   }
 

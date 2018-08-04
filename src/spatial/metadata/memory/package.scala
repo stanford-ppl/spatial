@@ -190,6 +190,9 @@ package object memory {
 
     def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
     def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
+
+    def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
+    def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
   }
 
 

@@ -183,8 +183,18 @@ trait MemoryUnrolling extends UnrollingBase {
         val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
-        val bank   = addr2.map{a => bankSelects(rhs,a,inst) }
-        val ofs    = addr2.map{a => bankOffset(mem,lhs,a,inst) }
+
+        /** Begin withFlow -- set whether this is a broadcast address (true if its a receiver). **/
+        val (bank, ofs) = withFlow("broadcastAddr", {sym: Sym[_] =>
+          // Denotes that the addresses are only placeholders if this is a broadcast receive
+          sym.isBroadcastAddr = port.isBroadcastReceiver
+        }){
+          val bank = addr2.map{a => bankSelects(rhs,a,inst) }
+          val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
+          (bank, ofs)
+        }
+        /** End withFlow **/
+
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
 
         banked.s.foreach{s =>
@@ -205,6 +215,7 @@ trait MemoryUnrolling extends UnrollingBase {
           case UWrite(write) => lanes.unifyLanes(laneIds)(lhs, write)
           case UMultiWrite(vs) => lanes.unifyLanes(laneIds)(lhs, vs.head.s.head)
         }
+
       }
     }
     else Nil
@@ -281,10 +292,13 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicateGroups = mems.groupBy(_.memory).toList
 
     duplicateGroups.flatMap{case (mem2, vs) =>
-      // Then gruop by which physical port (buffer + mux) these accesses are connected to
-      val portGroups = vs.groupBy{v => (v.port.bufferPort, v.port.muxPort) }.toSeq
+      // Then group by which physical port (buffer + mux) these accesses are connected to and
+      // which broadcast group each access is in
+      val portGroups = vs.groupBy{v =>
+        (v.port.bufferPort, v.port.muxPort, v.port.castgroup, v.port.broadcast)
+      }.toSeq
 
-      portGroups.flatMap{case ((bufferPort,muxPort), muxVs) =>
+      portGroups.flatMap{case ((bufferPort,muxPort,castgroup,broadcast), muxVs) =>
         // Finally, merge contiguous vector sections together into single vector accesses
         val muxSize = muxVs.map(_.port.muxSize).maxOrElse(0)
         val accesses = muxVs.sortBy(_.port.muxOfs)
@@ -297,12 +311,11 @@ trait MemoryUnrolling extends UnrollingBase {
         }
         vectors.map{vec =>
           val muxOfs = vec.head.port.muxOfs
-          val broadcast = vec.head.port.broadcast
           UnrollInstance(
             memory  = mem2,
             dispIds = vec.flatMap(_.dispIds),
             laneIds = vec.flatMap(_.laneIds),
-            port    = Port(bufferPort,muxPort,muxSize,muxOfs,broadcast),
+            port    = Port(bufferPort,muxPort,muxSize,muxOfs,castgroup,broadcast),
             vecOfs  = vec.flatMap(_.vecOfs)
           )
         }

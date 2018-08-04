@@ -15,7 +15,7 @@ import spatial.util.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 
-@instrument class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
+class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
   protected val rank: Int = mem.seqRank.length
   protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
@@ -134,7 +134,7 @@ import scala.collection.mutable.ArrayBuffer
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && outermost.isLockstepAcross(itersDiffer, Some(a.access))
+        spatialConfig.enableBroadcast && outermost.parent.isLockstepAcross(itersDiffer, Some(a.access))
       }
     }
     else true
@@ -268,15 +268,40 @@ import scala.collection.mutable.ArrayBuffer
 
       muxPorts.foreach{case (muxPort, matrices) =>
         var muxOfs: Int = 0
+
+        var nGroups: Int = -1
+        var broadcastGroups: Map[Int,Set[AccessMatrix]] = Map.empty
+        def checkBroadcast(m1: AccessMatrix): (Int,Int) = {
+          val group = broadcastGroups.find{case (_,mats) =>
+            mats.exists{m2 => canBroadcast(m1, m2) }
+          }
+          val groupID = group match {
+            case Some((bID,mats)) =>
+              broadcastGroups += bID -> (mats + m1)
+              bID
+            case None =>
+              nGroups += 1
+              broadcastGroups += nGroups -> Set(m1)
+              nGroups
+          }
+          // Broadcast ID is the number of accesses in that group - 1
+          (groupID, broadcastGroups(groupID).size - 1)
+        }
+
+        // Assign mux offsets per access
         matrices.groupBy(_.access).values.foreach{mats =>
+          // And assign mux offsets in unroll order
           import scala.math.Ordering.Implicits._
           mats.toSeq.sortBy(_.unroll).foreach{m =>
+            val (castgroup, broadcast) = checkBroadcast(m)
+
             val port = Port(
               bufferPort = bufferPort,
               muxPort    = muxPort,
               muxSize    = muxSize,
               muxOfs     = muxOfs,
-              broadcast  = 0
+              castgroup  = castgroup,
+              broadcast  = broadcast
             )
             ports += m -> port
             muxOfs += 1

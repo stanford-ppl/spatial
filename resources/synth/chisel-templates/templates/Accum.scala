@@ -158,7 +158,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
         val t2 = Wire(new FixedPoint(s,d,f))
         t1.r := a
         t2.r := b
-        (t1.*-*(t2, None, true.B)).r
+        (t1.*-*(t2, Some(0), true.B)).r
       }, drain_latency, isDrainState)
       case Accum.Min => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
         val t1 = Wire(new FixedPoint(s,d,f))

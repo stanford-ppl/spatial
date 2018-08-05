@@ -177,31 +177,31 @@ trait ChiselGenMem extends ChiselGenCommon {
         case None            => emitMem(lhs, "FF", Some(List(init)))
         case Some(AccumAdd) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
-          val opLatency = latencyOption("FixAdd", Some(d+f))
+          val opLatency = scala.math.max(1.0, latencyOption("FixAdd", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Add, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumMul) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
-          val opLatency = latencyOption("FixMul", Some(d+f))
+          val opLatency = scala.math.max(1.0, latencyOption("FixMul", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Mul, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumMin) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
-          val opLatency = latencyOption("FixMin", Some(d+f))
+          val opLatency = scala.math.max(1.0, latencyOption("FixMin", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Min, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumMax) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
-          val opLatency = latencyOption("FixMax", Some(d+f))
+          val opLatency = scala.math.max(1.0, latencyOption("FixMax", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Max, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
         case Some(AccumFMA) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
-          val opLatency = latencyOption("FixFMA", Some(d+f))
+          val opLatency = scala.math.max(1.0, latencyOption("FixFMA", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixFMAAccum($numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")

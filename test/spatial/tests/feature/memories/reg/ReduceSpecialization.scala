@@ -4,12 +4,13 @@ import argon.Block
 import spatial.dsl._
 
 @spatial class ReduceSpecialization extends SpatialTest {
-  override def compileArgs = "--optimizeReduce --fpga Zynq"
+  // override def compileArgs = "--fpga Zynq"
 
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32)
     val data = Array.tabulate(32){i => i + 1 }
+    val data16 = Array.tabulate(32){i => i.to[Int16]}
     setMem(dram, data)
 
     val sum  = ArgOut[Int]
@@ -20,6 +21,7 @@ import spatial.dsl._
     val fma8 = ArgOut[Int8]
 
     val out: List[DRAM1[Int]] = List.tabulate(6){i => DRAM[Int](32) }
+    val out16: List[DRAM1[Int16]] = List.tabulate(6){i => DRAM[Int16](32) }
 
     Accel {
       val sram = SRAM[Int](32)
@@ -74,6 +76,14 @@ import spatial.dsl._
         data(5)(i) = Reduce(fma8Accum_Pipe)(0 until 32){j => sram(j).to[Int8] * sram(j).to[Int8] * i.to[Int8] }{_+_}.value.to[Int]
       }
 
+      val sram16 = SRAM[Int16](32)
+      Foreach(0 until 32 by 1){i => sram16(i) = i.to[Int16]}
+      val data16: List[SRAM1[Int16]] = List.tabulate(1){i => SRAM[Int16](32) }
+      Foreach(0 until 32){i =>
+        val sumAccum_Pipe = Reg[Int16]
+        data16(0)(i) = Reduce(sumAccum_Pipe)(0 until 32){j => sram16(j) + i.to[Int16] }{_+_}
+      }
+
       // val intermediateAccum = Reg[Float]
       // Foreach(0 until 32){i =>
       //   intermediateAccum := intermediateAccum.value + i.to[Float]
@@ -81,6 +91,7 @@ import spatial.dsl._
       // }
 
       data.zip(out).foreach{case (sramN, dramN) => dramN store sramN }
+      data16.zip(out16).foreach{case (sramN, dramN) => dramN store sramN }
     }
 
     val goldSum  = data.reduce(_+_)
@@ -96,8 +107,10 @@ import spatial.dsl._
     val goldMin_Pipe  = (0 :: 32){i => data.map(_*i).reduce{(a,b) => min(a,b) }}
     val goldFma32_Pipe = (0 :: 32){i => data.map{a => a*a*i }.reduce{_+_}}
     val goldFma8_Pipe = (0 :: 32){i => data.map{a => a.to[Int8]*a.to[Int8]*i.to[Int8] }.reduce{_+_}.to[Int] }
+    val goldAdd16_Pipe = (0 :: 32){i => data16.map(_+i.to[Int16]).reduce{_+_}}
 
     val results: List[Array[Int]] = out.map{o => getMem(o) }
+    val results16: List[Array[Int16]] = out16.map{o => getMem(o) }
 
     println("--- Sum ---")
     println(r"Result: $sum")
@@ -135,6 +148,9 @@ import spatial.dsl._
     println("--- FMA8 [Pipe] ---")
     println(r"Result: ${results(5)}")
     println(r"Golden: $goldFma8_Pipe")
+    println("--- Add16 [Pipe] ---")
+    println(r"Result: ${results16(0)}")
+    println(r"Golden: $goldAdd16_Pipe")
 
     println(r"""
 Test Sum:         ${goldSum == sum.value}
@@ -149,6 +165,7 @@ Test Max_Pipe:    ${goldMax_Pipe == results(2)}
 Test Min_Pipe:    ${goldMin_Pipe == results(3)}
 Test Fma32_Pipe:  ${goldFma32_Pipe == results(4)}
 Test Fma8_Pipe:   ${goldFma8_Pipe == results(5)}
+Test Add16_Pipe:   ${goldAdd16_Pipe == results16(0)}
 """)
     assert(goldSum == sum.value)
     assert(goldProd == prod.value)
@@ -162,6 +179,7 @@ Test Fma8_Pipe:   ${goldFma8_Pipe == results(5)}
     assert(goldMin_Pipe == results(3))
     assert(goldFma32_Pipe == results(4))
     assert(goldFma8_Pipe == results(5))
+    assert(goldAdd16_Pipe == results16(0))
   }
 
   override def checkIR(block: Block[_]): Result = {

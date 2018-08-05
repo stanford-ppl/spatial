@@ -183,7 +183,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
-        val bank   = addr2.map{a => bankSelects(rhs,a,inst) }
+        val bank   = addr2.map{a => bankSelects(mem,rhs,a,inst) }
         val ofs    = addr2.map{a => bankOffset(mem,lhs,a,inst) }
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
 
@@ -211,6 +211,7 @@ trait MemoryUnrolling extends UnrollingBase {
   }
 
   def bankSelects(
+    mem:  Sym[_],
     node: Op[_],               // Pre-unrolled access
     addr: Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
     inst: Memory               // Memory instance associated with this access
@@ -223,7 +224,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
-    case _ => addr.map{laneAddr => inst.bankSelects(laneAddr) }
+    case _ => addr.map{laneAddr => inst.bankSelects(mem, laneAddr) }
   }
 
   def bankOffset(

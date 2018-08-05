@@ -22,15 +22,15 @@ trait NodeParams {
   @stateful def nodeParams(s: Sym[_], op: Op[_]): (String,Seq[(String,Double)]) = op match {
     case op@RegAccumFMA(_,d,_,_,_) => 
       val log2correction = if (nbits(d) < 6) 1 else 0
-      (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> 1, "correction" -> log2correction))
+      (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.1875 + 1)/log(2), "drain" -> 1, "correction" -> 0))
     case op@RegAccumOp(_,d,_,t,_) => 
       t match {
         case AccumMul => 
           val log2correction = if (nbits(d) < 6) 1 else 0
-          (op.name + "Mul", Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> 6*nbits(d)/32, "correction" -> log2correction))
+          (op.name + "Mul", Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.1875 + 1)/log(2), "drain" -> 0.1875*nbits(d), "correction" -> 0))
         case _ => 
           val log2correction = if (nbits(d) < 33) 1 else 0
-          (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d))/log(2), "drain" -> nbits(d)/32, "correction" -> log2correction))
+          (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.1875 + 1)/log(2), "drain" -> nbits(d)/32, "correction" -> 0))
       }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 

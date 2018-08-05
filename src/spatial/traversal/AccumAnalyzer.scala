@@ -71,6 +71,8 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       val noEscaping      = c1.memory.accumType == AccumType.Reduce || noIntermediates
       val noVisibleIntermediates = isClosedCycle && noEscaping
       val isLocalMem      = !c1.memory.isRemoteMem
+      val numWriters      = c1.memory.writers.size
+      val outerReduce     = c1.memory.writers.head.parent.isUnitPipe
 
       dbgs(s"Cycle #$i on ${c1.memory}: ")
       dbgs(s"  ${stm(c1.memory)} [${c1.memory.name.getOrElse(c1.toString)}]")
@@ -79,9 +81,11 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       dbgs(s"    closed cycle:     $isClosedCycle")
       dbgs(s"    no intermediates: $noIntermediates")
       dbgs(s"    is local mem:     $isLocalMem")
+      dbgs(s"    number of writers:  $numWriters")
+      dbgs(s"    outer reduce:     $outerReduce")
       dbgs(s"    accum type:       ${c1.memory.accumType} (if reduce, overrides no intermediates)")
 
-      if (isDisjoint && noVisibleIntermediates && isLocalMem) {
+      if (isDisjoint && noVisibleIntermediates && isLocalMem && numWriters == 1 && !outerReduce) {
         val marker = c1.writer match {
           case AssociateReduce(m) =>
             m.control = accumControl(m.first,c1.writer)

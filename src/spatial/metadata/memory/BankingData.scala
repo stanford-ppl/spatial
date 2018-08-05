@@ -160,7 +160,11 @@ case class Memory(
     }.product.toInt
   }
 
-  @api def bankSelects[T:IntLike](addr: Seq[T]): Seq[T] = banking.map(_.bankSelect(addr))
+  @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = {
+    if (banking.lengthIs(mem.seqRank.length)) {
+      banking.zip(addr).map{case(a,b) => a.bankSelect(Seq(b))}
+    } else banking.map(_.bankSelect(addr))
+  }
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._

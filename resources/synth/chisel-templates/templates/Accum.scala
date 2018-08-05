@@ -42,9 +42,12 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
   val fixin2 = Wire(new FixedPoint(s,d,f))
   fixin2.r := activeIn2
 
+  // Use log2Down to be consistent with latency model that truncates
+  val drain_latency = (log(cycleLatency)/log(2)).toInt
+
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
   laneCtr.io.input.enable := activeEn
-  laneCtr.io.input.reset := activeReset | activeLast.D(2)
+  laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
   laneCtr.io.input.saturate := false.B
 
   val firstRound = Module(new SRFF())
@@ -53,13 +56,10 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
   firstRound.io.input.reset := laneCtr.io.output.done | activeReset
   val isFirstRound = firstRound.io.output.data
 
-  // Use log2Down to be consistent with latency model that truncates
-  val drain_latency = (log(cycleLatency)/log(2)).toInt
-
   val drainState = Module(new SRFF())
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
-  drainState.io.input.reset := activeLast.D(drain_latency)
+  drainState.io.input.reset := activeLast.D(drain_latency + fmaLatency)
   val isDrainState = drainState.io.output.data
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
@@ -71,7 +71,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | activeLast.D(2)
+    acc.io.xBarW(0).reset := activeReset | activeLast.D(drain_latency + fmaLatency)
     acc.io.xBarW(0).init := initBits
   }
 
@@ -105,9 +105,12 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val fixin1 = Wire(new FixedPoint(s,d,f))
   fixin1.r := activeIn1
 
+  // Use log2Down to be consistent with latency model that truncates
+  val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
+
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
   laneCtr.io.input.enable := activeEn
-  laneCtr.io.input.reset := activeReset | activeLast.D(2)
+  laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + opLatency)
   laneCtr.io.input.saturate := false.B
 
   val firstRound = Module(new SRFF())
@@ -116,13 +119,10 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   firstRound.io.input.reset := laneCtr.io.output.done | activeReset
   val isFirstRound = firstRound.io.output.data
 
-    // Use log2Down to be consistent with latency model that truncates
-    val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
-
   val drainState = Module(new SRFF())
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
-  drainState.io.input.reset := activeLast.D(drain_latency)
+  drainState.io.input.reset := activeLast.D(drain_latency + opLatency)
   val isDrainState = drainState.io.output.data
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
@@ -140,7 +140,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     }
     acc.io.xBarW(0).data := result.r
     acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | activeLast.D(2)
+    acc.io.xBarW(0).reset := activeReset | activeLast.D(drain_latency + opLatency)
     acc.io.xBarW(0).init := initBits
   }
 

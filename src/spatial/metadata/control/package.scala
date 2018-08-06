@@ -30,7 +30,7 @@ package object control {
       case _ => false
     }
 
-    def isControl: Boolean = op.isInstanceOf[Control[_]]
+    def isControl: Boolean = op.isInstanceOf[Control[_]] || op.isInstanceOf[IfThenElse[_]]
     def isPrimitive: Boolean = op.isInstanceOf[Primitive[_]]
     def isTransient: Boolean = op match {
       case p: Primitive[_] => p.isTransient
@@ -566,6 +566,9 @@ package object control {
           // Otherwise return the subcontroller for this "future" stage
           else Seq(Ctrl.Node(sym, id))
         }
+
+        case Op(ctrl: IfThenElse[_]) => sym.rawChildren // Fixme?
+
         case _ => throw new Exception(s"Cannot get children of non-controller.")
       }
       // Subcontroller case - return all children which have this subcontroller as an owner

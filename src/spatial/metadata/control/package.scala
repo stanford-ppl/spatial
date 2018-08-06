@@ -105,6 +105,25 @@ package object control {
       case _         => Inner
     }
 
+    def innerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+      case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
+        val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
+        if (!stage.mayBeOuterBlock || this.isInnerControl) body.blocks else Nil
+      }
+      case _ => Nil
+    }
+    def outerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+      case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
+        val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
+        if (stage.mayBeOuterBlock && this.isOuterControl) body.blocks else Nil
+      }
+      case _ => Nil
+    }
+
+    def innerAndOuterBlocks: (Seq[(Seq[I32],Block[_])], Seq[(Seq[I32],Block[_])]) = {
+      (innerBlocks, outerBlocks)
+    }
+
     /** Returns whether this control node is a Looped control or Single iteration control.
       * Nodes which will be fully unrolled are considered Single control.
       */

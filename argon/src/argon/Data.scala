@@ -78,7 +78,7 @@ abstract class Data[T](val transfer: Transfer.Transfer) { self =>
   /** Defines how to copy metadata during mirroring/updating. */
   def mirror(f: Tx): T = this.asInstanceOf[T]
 
-  final def key: Class[_] = self.getClass
+  def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
 }
 

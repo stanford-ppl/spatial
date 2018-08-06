@@ -128,7 +128,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
       // Activate / lookup duplication rules
       val rules = statelessSubstRules((lhs,scp)).map{case (s,s2) => s -> s2()}
       rules.foreach{case (s,s2) => dbgs(s"  $s -> ${stm(s2)}") }
-      val lhs2 = isolateWith(escape=Nil, rules:_*){ update(lhs,rhs) }
+      val lhs2 = isolateSubstWith(escape=Nil, rules:_*){ update(lhs,rhs) }
       dbgs(s"${stm(lhs2)}")
       lhs2
     }
@@ -147,7 +147,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
           statelessSubstRules.getOrElse(scope, Nil).map{case (s1, s2) => s1 -> s2() }
     }
     if (rules.nonEmpty) rules.foreach{rule => dbgs(s"  ${rule._1} -> ${rule._2}") }
-    isolateWith(escape, rules: _*){ block }
+    isolateSubstWith(escape, rules: _*){ block }
   }
 
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/

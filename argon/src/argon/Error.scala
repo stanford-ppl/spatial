@@ -18,3 +18,7 @@ case class CompilerErrors(stage: String, n: Int)
 case class CompilerBugs(stage: String, n: Int)
    extends Exception(s"$n ${plural(n,"bug")} found during $stage")
       with NoStackTrace
+
+case class RequirementFailure(ctx: SrcCtx, msg: String)
+   extends Exception("Requirement failure: " + msg)
+      with NoStackTrace

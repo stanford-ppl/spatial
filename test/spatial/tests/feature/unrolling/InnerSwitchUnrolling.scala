@@ -1,11 +1,10 @@
-package spatial.tests.compiler
+package spatial.tests.feature.unrolling
 
 import spatial.dsl._
 
 @spatial class InnerSwitchUnrolling extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
-
     val data = Array.tabulate(32){i => i }
     val dram = DRAM[Int](32)
     setMem(dram, data)

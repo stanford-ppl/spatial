@@ -151,6 +151,7 @@ case class Memory(
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
+  def updateDepth(d: Int): Memory = Memory(banking, d, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {

@@ -54,3 +54,29 @@ trait BlkTraversal extends AccelTraversal {
 
 }
 
+
+trait ScopeTraversal extends AccelTraversal {
+  // The current block (raw index)
+  protected var blk: Blk = Blk.Host
+  protected var scp: Scope = Scope.Host
+  protected def inCtrl[A](c: Sym[_])(func: => A): A = {blk = Blk.Node(c,-1); inScope(Scope.Node(c,-1,-1)){ func }}
+  protected def inScope[A](b: Scope)(func: => A): A = {
+    val prevScope = scp
+    val saveHW  = inHw
+    scp = b
+    inHw = inHw || b.s.exists(_.isAccel)
+    val result = func
+    scp = prevScope
+    inHw = saveHW
+    result
+  }
+
+  def advanceScope(): Unit = {
+    blk = blk match {
+      case Blk.Host => Blk.Host
+      case Blk.Node(s,blk) => Blk.Node(s,blk+1)
+    }
+    scp = blk.toScope
+  }
+
+}

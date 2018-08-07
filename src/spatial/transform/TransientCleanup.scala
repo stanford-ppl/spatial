@@ -9,42 +9,48 @@ import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.lang._
 import spatial.node._
-import spatial.traversal.ScopeTraversal
+import spatial.traversal.BlkTraversal
 
 import utils.implicits.collections._
 
 import scala.collection.mutable
 
-case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTraversal {
+case class TransientCleanup(IR: State) extends MutateTransformer with BlkTraversal {
   // Substitutions per use location
-  private var statelessSubstRules = Map[(Sym[_],Scope), Seq[(Sym[_], () => Sym[_])]]()
+  private var statelessSubstRules = Map[(Sym[_],Blk), Seq[(Sym[_], () => Sym[_])]]()
 
-  private val completedMirrors = mutable.HashMap[(Sym[_],Scope), Sym[_]]()
+  private val completedMirrors = mutable.HashMap[(Sym[_],Blk), Sym[_]]()
 
   override protected def preprocess[R](block: Block[R]): Block[R] = {
     blk = Blk.Host
-    scp = Scope.Host
     super.preprocess(block)
   }
 
-  private def delayedMirror[T](lhs: Sym[T], rhs: Op[T], scope: Scope)(implicit ctx: SrcCtx): () => Sym[_] = () => {
-    val key = (lhs, scope)
+  private def delayedMirror[T](lhs: Sym[T], rhs: Op[T], blk: Blk)(implicit ctx: SrcCtx): () => Sym[_] = () => {
+    val key = (lhs, blk)
     if (completedMirrors.contains(key)) {
-      dbgs(s"Using mirror ${completedMirrors(key)} for $lhs in $scope")
+      dbgs(s"Using mirror ${completedMirrors(key)} for $lhs in $blk")
       completedMirrors(key)
     } else {
-      val newMirror = inScope(scope){ inCopyMode(copy = true){ updateWithContext(lhs, rhs) } }
+      val newMirror = inBlk(blk){ inCopyMode(copy = true){ updateWithContext(lhs, rhs) } }
       completedMirrors += ((key -> newMirror))
-      dbgs(s"Created new mirror ${newMirror} for $lhs in $scope")
+      dbgs(s"Created new mirror ${newMirror} for $lhs in $blk")
       newMirror
     }
   }
 
+  private def blkOfUser(x: User): Blk = {
+    x.sym match {
+      case s if (s.isControl) => Blk.Node(s,-1)
+      case s if (s.isCounter && s.getOwner.isDefined) => Blk.Node(s.owner,-1)
+      case _ => x.blk
+    }
+  }
   def requiresMoveOrDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
     case node:Primitive[_] =>
       // Duplicate stateless nodes when they have users across control or not the current block
-      val scopes = lhs.users.map(_.sym match {case s if s.isControl => s.toScope; case s => s.scope})
-      node.isTransient && (scopes.size > 1 || scopes.exists(_ != scp))
+      val blks = lhs.users.map(blkOfUser)
+      node.isTransient && (blks.size > 1 || blks.exists(_ != blk))
 
     case _ => false
   }
@@ -57,17 +63,17 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
 
       // For all uses within a single control node, create a single copy of this node
       // Then associate all uses within that control with that copy
-      val users = lhs.users.groupBy(_.sym match {case s if s.isControl => s.toScope; case s => s.scope})
+      val users = lhs.users.groupBy(blkOfUser)
 
-      users.foreach{case (scope, uses) =>
-        val read = delayedMirror(lhs, rhs, scope)
+      users.foreach{case (block, uses) =>
+        val read = delayedMirror(lhs, rhs, block)
 
-        dbgs(s" - ctrl: $scope")
+        dbgs(s" - ctrl: $block")
 
         uses.foreach{ case User(use,_) =>
-          val subs = (lhs -> read) +: statelessSubstRules.getOrElse((use,scope), Nil)
-          dbgs(s"    - ($use, $scope): $lhs -> $read")
-          statelessSubstRules += (use,scope) -> subs
+          val subs = (lhs -> read) +: statelessSubstRules.getOrElse((use,block), Nil)
+          dbgs(s"    - ($use, $block): $lhs -> $read")
+          statelessSubstRules += (use,block) -> subs
         }
       }
 
@@ -84,7 +90,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
       dbgs("")
       dbgs(s"$lhs = $rhs [stateless]")
       dbgs(s" - users: ${lhs.users}")
-      dbgs(s" - ctrl:  $scp, $blk")
+      dbgs(s" - ctrl:  $blk")
       if (lhs.users.isEmpty) {
         dbgs(s"REMOVING stateless $lhs")
         Invalid
@@ -120,31 +126,34 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
   }).asInstanceOf[Sym[A]]
 
   private def updateWithContext[T](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
-    dbgs(s"${stm(lhs)} [$scp, $blk]")
-    //statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
-    if ( statelessSubstRules.contains((lhs,scp)) ) {
+    dbgs(s"${stm(lhs)} [$blk]")
+    // statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
+    if ( statelessSubstRules.contains((lhs,blk)) ) {
       dbgs("")
-      dbgs(s"$lhs = $rhs [external user, scp = $scp, blk = $blk]")
+      dbgs(s"$lhs = $rhs [external user, blk = $blk]: Subst Rule ${statelessSubstRules((lhs,blk))}")
       // Activate / lookup duplication rules
-      val rules = statelessSubstRules((lhs,scp)).map{case (s,s2) => s -> s2()}
+      val rules = statelessSubstRules((lhs,blk)).map{case (s,s2) => s -> s2()}
       rules.foreach{case (s,s2) => dbgs(s"  $s -> ${stm(s2)}") }
       val lhs2 = isolateSubstWith(escape=Nil, rules:_*){ update(lhs,rhs) }
       dbgs(s"${stm(lhs2)}")
       lhs2
     }
-    else update(lhs, rhs)
+    else {
+      dbgs(s"Updating $lhs since there are no subst rules for it")
+      update(lhs, rhs)
+    }
   }
 
   def withBlockSubsts[A](escape: Sym[_]*)(block: => A): A = {
-    val rules = scp match {
-      case Scope.Host      => Nil
-      case Scope.Node(s,_,_) =>
+    val rules = blk match {
+      case Blk.Host      => Nil
+      case Blk.Node(s,_) =>
         // Add substitutions for this node (ctrl.node, -1) and for the current block (ctrl)
-        val node  = (s, Scope.Node(s,-1,-1))
-        val scope = (s, scp)
-        dbgs(s"node: $node, scope: $scope")
+        val node  = (s, Blk.Node(s,-1))
+        val block = (s, blk)
+        dbgs(s"node: $node, block: $block")
         statelessSubstRules.getOrElse(node, Nil).map{case (s1, s2) => s1 -> s2() } ++
-          statelessSubstRules.getOrElse(scope, Nil).map{case (s1, s2) => s1 -> s2() }
+          statelessSubstRules.getOrElse(block, Nil).map{case (s1, s2) => s1 -> s2() }
     }
     if (rules.nonEmpty) rules.foreach{rule => dbgs(s"  ${rule._1} -> ${rule._2}") }
     isolateSubstWith(escape, rules: _*){ block }
@@ -152,7 +161,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
 
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
-    advanceScope() // Advance block counter before transforming inputs
+    advanceBlk() // Advance block counter before transforming inputs
 
     withBlockSubsts(b.result) {
       inlineWith(b){stms =>

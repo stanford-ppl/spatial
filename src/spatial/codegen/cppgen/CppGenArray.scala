@@ -319,7 +319,7 @@ trait CppGenArray extends CppGenCommon {
         emit(src"$lhs = ${reduce.result};")
       close("}")
 
-    case op@Switch(selects,block) =>
+    case op@Switch(selects,block) if !inHw =>
 
       emit(src"/** BEGIN SWITCH $lhs **/")
       if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
@@ -331,7 +331,7 @@ trait CppGenArray extends CppGenCommon {
       }
       emit(src"/** END SWITCH $lhs **/")
 
-    case SwitchCase(body) => // Controlled by Switch
+    case SwitchCase(body) if !inHw => // Controlled by Switch
 
     // case ArrayFilter(array, apply, cond) =>
     //   open(src"val $lhs = $array.filter{${apply.result} => ")

@@ -5,8 +5,8 @@ if [[ ! -f instrumentation.txt ]]; then
 	exit 1
 fi
 
-if [[ ! -f html/controller_tree.html.bak ]]; then
-	cp html/controller_tree.html html/controller_tree.html.bak
+if [[ ! -f html/controller_tree.bak.html ]]; then
+	cp html/controller_tree.html html/controller_tree.bak.html
 fi
 
 appname=`cat html/controller_tree.html | grep "Diagram for" | sed 's/.*Diagram for //g' | sed 's/<\/h2>.*//g'`

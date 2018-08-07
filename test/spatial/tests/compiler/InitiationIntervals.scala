@@ -121,7 +121,7 @@ import spatial.metadata.control._
         val sram = SRAM[Int](16)
         inits.zipWithIndex.foreach{case (init, i) => if (step > 0) sram(i) = init else sram(15 - i) = init}
         'FREACH.Foreach(start until stop by step par P){ i =>
-          sram(i) = sram(i + rhsoffset) + X * numoffset
+          sram(i) = sram(i + rhsoffset) * X + X * numoffset
         }
         dram(dstrow.to[Int], 0::16) store sram
         track := track.value ^ (1 << dstrow)
@@ -151,8 +151,8 @@ import spatial.metadata.control._
       // // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
       // 'TEST4.Pipe{IIChecker(1,  16,  1, 2, List(0),         -1, 1, 4)} // II = single lane latency * 2
 
-      // // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      // 'TEST5.Pipe{IIChecker(2,  16,  1, 2, List(0,1),       -2, 2, 5)} // II = single lane latency * 1
+      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+      'TEST5.Pipe{IIChecker(2,  16,  1, 2, List(0,1),       -2, 2, 5)} // II = single lane latency * 1
 
       // // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
       // 'TEST6.Pipe{IIChecker(2,  16,  1, 3, List(0,1),       -2, 2, 6)} // II = single lane latency * 2
@@ -196,6 +196,14 @@ import spatial.metadata.control._
       } else {
         println(r"Test $i Not Executed")
         true
+      }
+    }
+
+    (0 to num_tests-1).foreach{i => 
+      if ((tests_valid | (1 << i)) == tests_valid) {
+        println(r"Test $i: ${tests_results(i)}")
+      } else {
+        println(r"Test $i: Not Executed")
       }
     }
 

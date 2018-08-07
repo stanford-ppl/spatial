@@ -162,7 +162,12 @@ trait ChiselGenMem extends ChiselGenCommon {
     emitGlobalModule(src"""val $mem = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $BXBarW $BXBarR $bankingMode, $initStr, ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}))""")
   }
 
-
+  private def ifaceType(mem: Sym[_]): String = {
+    mem match {
+      case Op(_:FIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
+      case _ => ""
+    }
+  }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
@@ -253,23 +258,23 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
-    case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].empty")
-    case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].full")
-    case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostFull")
+    case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
+    case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
     case op@FIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].numel")
+    case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, "LIFO", None)
-    case LIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].empty")
-    case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].full")
-    case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostEmpty")
-    case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].almostFull")
+    case LIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
+    case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
     case op@LIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io.asInstanceOf[FIFOInterface].numel")
+    case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     

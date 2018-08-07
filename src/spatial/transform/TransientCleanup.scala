@@ -84,7 +84,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
       dbgs("")
       dbgs(s"$lhs = $rhs [stateless]")
       dbgs(s" - users: ${lhs.users}")
-      dbgs(s" - ctrl:  $scp")
+      dbgs(s" - ctrl:  $scp, $blk")
       if (lhs.users.isEmpty) {
         dbgs(s"REMOVING stateless $lhs")
         Invalid
@@ -120,11 +120,11 @@ case class TransientCleanup(IR: State) extends MutateTransformer with ScopeTrave
   }).asInstanceOf[Sym[A]]
 
   private def updateWithContext[T](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
-    dbgs(s"${stm(lhs)} [$scp]")
+    dbgs(s"${stm(lhs)} [$scp, $blk]")
     //statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
     if ( statelessSubstRules.contains((lhs,scp)) ) {
       dbgs("")
-      dbgs(s"$lhs = $rhs [external user, scp = $scp]")
+      dbgs(s"$lhs = $rhs [external user, scp = $scp, blk = $blk]")
       // Activate / lookup duplication rules
       val rules = statelessSubstRules((lhs,scp)).map{case (s,s2) => s -> s2()}
       rules.foreach{case (s,s2) => dbgs(s"  $s -> ${stm(s2)}") }

@@ -257,7 +257,7 @@ object modeling {
 
     val warCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
       val symbols = cycles(writer)
-      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt
+      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
       // Sketchy thing for issue #63
       val scopeContainsSpecial = scope.exists(x => x.reduceType.contains(FixPtFMA) )
       val cycleContainsSpecial = symbols.exists{case Op(FixFMA(_,_,_)) => true; case _ => false}

@@ -756,10 +756,10 @@ package object control {
         val topB = pathB(ctrlIdxB + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
-        dbgs(s"  A: $a, B: $b")
-        dbgs(s"  ${ctrl.children.mkString(" ")}")
-        dbgs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
-        dbgs(s"  Dist = ${idxB - idxA}")
+        logs(s"  A: $a, B: $b")
+        logs(s"  ${ctrl.children.mkString(" ")}")
+        logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
+        logs(s"  Dist = ${idxB - idxA}")
         if (idxA < 0 || idxB < 0) None
         Some(idxB - idxA)
       }

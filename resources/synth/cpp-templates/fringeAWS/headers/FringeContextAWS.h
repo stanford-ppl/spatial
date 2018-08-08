@@ -2,12 +2,37 @@
 #define __FRINGE_CONTEXT_AWS_H__
 
 #include "FringeContextBase.h"
-#include "commonDefs.h"
+//#include "commonDefs.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #define UINT64_C_AWS(c) c ## ULL
+
+#ifndef EPRINTF
+#define EPRINTF(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
+#ifndef ASSERT
+#define ASSERT(cond, ...) \
+  if (!(cond)) { \
+    EPRINTF("\n");        \
+    EPRINTF(__VA_ARGS__); \
+    EPRINTF("\n");        \
+    EPRINTF("Assertion (%s) failed in %s, %d\n", #cond, __FILE__, __LINE__); \
+    assert(0);  \
+  }
+
+struct opts {
+  int sobelMode;
+  int webcam;
+  char *videoFile;
+  char *instBuf;
+  char *inBuf;
+  char *outBuf;
+  int debug;
+};
+#endif
 
 #ifdef SIM // Sim
   #include "sh_dpi_tasks.h"

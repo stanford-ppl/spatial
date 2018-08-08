@@ -1,5 +1,4 @@
-package argon
-package static
+package argon.static
 
 import forge.tags.rig
 

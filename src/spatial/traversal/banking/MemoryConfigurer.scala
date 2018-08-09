@@ -120,7 +120,7 @@ import scala.collection.mutable.ArrayBuffer
   def canBroadcast(a: AccessMatrix, b: AccessMatrix): Boolean = {
     // TODO[3]: What about accesses of the same form across different loops?
     // Should we rely on loop fusion for this? Are there cases where that wouldn't work?
-    if (isGlobal) return true
+    if (isGlobal || a == b) return true
     val isWrite = a.access.isWriter || b.access.isWriter
     if (isWrite || a.access != b.access || a.matrix != b.matrix) return false
 
@@ -173,9 +173,14 @@ import scala.collection.mutable.ArrayBuffer
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
           val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) }
-          if (samePort.nonEmpty) dbg(s"      Group #$i: ")
-          else                   dbg(s"      Group #$i: <none>")
-          samePort.foreach{b => dbgs(s"        ${b.short} [${b.parent}] Conflicts: ${conflicts.contains(b)}") }
+          if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
+          else                    dbg(s"      Group #$i conflicts: <none>")
+          if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
+
+          if (samePort.nonEmpty)  dbg(s"      Group #$i same port: <${samePort.size} accesses>")
+          else                    dbg(s"      Group #$i same port: <none> ")
+          if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
+
           samePort.nonEmpty && conflicts.isEmpty
         }
       }
@@ -336,8 +341,9 @@ import scala.collection.mutable.ArrayBuffer
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
-    dbgs(s"$a and $b = $concurrent and $conflicting")
-    concurrent && conflicting
+    val trueConflict = concurrent && conflicting
+    if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
+    trueConflict
   }
 
   protected def getGroupConflict(grpA: Set[AccessMatrix], grpB: Set[AccessMatrix]): Option[(AccessMatrix,AccessMatrix)] = {

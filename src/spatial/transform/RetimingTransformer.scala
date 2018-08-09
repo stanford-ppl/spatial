@@ -26,9 +26,14 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   var hierarchy: Int = 0
   var inInnerScope: Boolean = false
 
-  def findDelayLines(scope: Seq[Sym[_]]): Seq[(Sym[_], ValueDelay)] = {
-    computeDelayLines(scope, latencies, hierarchy, delayLines, cycles, Some(createDelayLine))
-  }
+  def findDelayLines(scope: Seq[Sym[_]]): Seq[(Sym[_], ValueDelay)] = computeDelayLines(
+    scope = scope,
+    latencies = latencies,
+    hierarchy = hierarchy,
+    delayLines = delayLines,
+    cycles = cycles,
+    createLine = Some({(size: Int, data: Sym[_], ctx: SrcCtx) => delayLine(size,f(data))(ctx) })
+  )
 
   def inBlock[A](block: Block[_])(func: => A): A = {
     val saveDelayLines = delayLines
@@ -54,8 +59,6 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     result
   }
 
-  def createDelayLine(size: Int, data: Sym[_], ctx: SrcCtx): Sym[_] = delayLine(size, f(data))(ctx)
-
   def delayLine[A](size: Int, data: Sym[A])(implicit ctx: SrcCtx): Sym[A] = data.tp match {
     case Bits(bits) =>
       implicit val A: Bits[A] = bits
@@ -72,10 +75,10 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
       .map{line => line.input -> line }
       .toMap    // Unique-ify by line input - makes sure we only register one substitution per input
       .foreach{case (in, line) =>
-      val dly = line.value()
-      logs(s"  $in -> $dly [${line.size}]")
-      register(in, dly)
-    }
+        val dly = line.value()
+        logs(s"  $in -> $dly [${line.size}]")
+        register(in, dly)
+      }
   }
 
   private def addDelayLine(reader: Sym[_], line: ValueDelay): Unit = {
@@ -90,17 +93,21 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
 
-  // This is needed to allow multiple blocks to use the same delay line.
-  // Delay lines are created lazily, which can lead to issues where multiple blocks claim the same symbol.
-  // To avoid this, we instead create the symbol in the outermost block
-  // Since we don't control when stageBlock is called, we have to do this before symbol mirroring.
-  // Note that this requires checking *blockNestedContents*, not just blockContents
-  private def precomputeDelayLines(d: Op[_]): Unit = {
+  /** Computes the delay lines which will be created within any blocks within the given operation.
+    *
+    * This is needed to allow multiple blocks to use the same delay line. Delay lines are created
+    * lazily, which can lead to issues where multiple blocks claim the same symbol. To avoid this,
+    * we instead create the symbol in the outermost block. Since we don't control when stageBlock
+    * is called, we have to do this before symbol mirroring.
+    *
+    * Note that this requires checking block.nestedStms, not just block.stms.
+    */
+  private def precomputeDelayLines(op: Op[_]): Unit = {
     hierarchy += 1
-    if (d.blocks.nonEmpty) logs(s"  Precomputing delay lines for $d")
-    d.blocks.foreach{block =>
-      val scope = block.nestedStms
-      val lines = findDelayLines(scope).map(_._2)
+    if (op.blocks.nonEmpty) logs(s"  Precomputing delay lines for $op")
+    op.blocks.foreach{block =>
+      val innerScope = block.nestedStms
+      val lines = findDelayLines(innerScope).map(_._2)
       // Create all of the lines that need to be visible outside this block
       (lines ++ lines.flatMap(_.prev)).filter(_.hierarchy < hierarchy).foreach{line =>
         if (!line.alreadyExists) {
@@ -129,8 +136,8 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   private def retimeStm(sym: Sym[_]): Unit = sym match {
     case Stm(reader, d) =>
       logs(s"Retiming $reader = $d")
-      val inputs = bitBasedInputs(d)
-      val reader2 = isolate() {
+      val inputs = d.bitInputs
+      val reader2 = isolateSubst(){
         registerDelays(reader, inputs)
         visit(sym)
         f(reader)
@@ -147,10 +154,10 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     precomputeDelayLines(op)
     dbgs(s"Retiming case ${stm(cas)}")
     // Note: Don't call inBlock here - it's already being called in retimeStms
-    val caseBody2: Block[A] = isolate(body.result){ stageBlock{
+    val caseBody2: Block[A] = isolateSubst(body.result){ stageBlock{
       retimeStms(body)
       val size = delayConsumers.getOrElse(switch, Nil).find(_.input == cas).map(_.size).getOrElse(0) +
-        delayConsumers.getOrElse(cas, Nil).find(_.input == body.result).map(_.size).getOrElse(0)
+                 delayConsumers.getOrElse(cas, Nil).find(_.input == body.result).map(_.size).getOrElse(0)
       if (size > 0) {
         dbgs(s"Adding retiming delay of size $size at end of case $cas")
         delayLine(size, f(body.result))
@@ -181,7 +188,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         }
       }, options)
     }
-    val switch2 = isolate() {
+    val switch2 = isolateSubst() {
       registerDelays(switch, selects)
       implicit val ctx: SrcCtx = switch.ctx
       stageWithFlow(Switch(f(selects), body2)){switch2 => transferData(switch, switch2) }
@@ -214,7 +221,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
         dbgs(s"  [$l = ${newLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
 
-    isolate(){ retimeStms(block) }
+    isolateSubst(){ retimeStms(block) }
   }
 
 

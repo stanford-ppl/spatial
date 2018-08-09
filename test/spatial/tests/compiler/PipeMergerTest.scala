@@ -70,7 +70,7 @@ import argon.Block
   override def checkIR(block: Block[_]): Result = {
     val pipes = block.nestedStms.collect{case p:spatial.node.UnitPipe => p }
 
-    require(pipes.length == 5, r"There should (probably) only be 5 Unit Pipes in this app, found ${pipes.length}")
+    require(pipes.length == 5,s"There should (probably) only be 5 Unit Pipes in this app, found ${pipes.length}")
 
     super.checkIR(block)
   }

@@ -107,6 +107,7 @@ class ExpMiscOps[C,A](exp: Exp[C,A]) {
 
   /** Returns data dependencies of the symbol. */
   final def inputs: Seq[Sym[_]] = op.map(_.inputs).getOrElse(Nil)
+  final def nonBlockInputs: Seq[Sym[_]] = op.map(_.nonBlockExpInputs).getOrElse(Nil)
   final def blocks: Seq[Block[_]] = op.map(_.blocks).getOrElse(Nil)
 
   /** Returns non-data, effect dependencies of the symbol. */

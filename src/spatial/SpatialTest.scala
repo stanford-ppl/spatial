@@ -5,14 +5,14 @@ import forge.SrcCtx
 import spatial.lang.{Bit, Text, Void}
 
 trait SpatialTest extends Spatial with DSLTest {
-  private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
+  /** By default, SpatialTests have no runtime arguments. Override to add list(s) of arguments. */
   override def runtimeArgs: Args = NoArgs
 
-  def assert(cond: Bit)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond)
-  def assert(cond: Bit, msg: Text)(implicit ctx: SrcCtx): Void = spatial.dsl.assert(cond, msg)
 
   abstract class ChiselBackend(name: String, args: String, make: String, run: String)
     extends Backend(name,args,make,run) {
+
+    private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
 
     override def parseMakeError(line: String): Result = {
       if (line.contains("Placer could not place all instances")) Error(line)
@@ -97,20 +97,5 @@ trait SpatialTest extends Spatial with DSLTest {
   }
 
   override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, VCS_noretime)
-
-  protected def checkIR(block: argon.Block[_]): Result = Unknown
-
-  final override def postprocess(block: argon.Block[_]): Unit = {
-    import argon._
-    import argon.node.AssertIf
-    super.postprocess(block)
-
-    if (config.test) {
-      val stms = block.nestedStms
-      val hasAssert = stms.exists{case Op(_: AssertIf) => true; case _ => false }
-      if (!hasAssert) throw Indeterminate
-      checkIR(block)
-    }
-  }
 
 }

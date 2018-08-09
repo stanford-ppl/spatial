@@ -2,8 +2,6 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 /*
 
   Sketch of this GEMM:
@@ -232,9 +230,7 @@ import spatial.dsl._
 
     printMatrix(gold, "Gold:")
     printMatrix(result, "Result:")
-
-    val cksum = gold.zip(result){_==_}.reduce{_&&_}
-    assert(cksum)
+    assert(gold == result)
   }
 }
 

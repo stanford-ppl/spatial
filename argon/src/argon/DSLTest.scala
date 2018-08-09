@@ -12,9 +12,61 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
   // Testing Arguments //
   //-------------------//
 
+  /** Override to supply list(s) of input arguments to the compiler to compile the application with.
+    * The test is compiled multiple times for each backend if multiple lists are given.
+    *
+    * Suggested argument syntax is:
+    *   override def compileArgs: Args = "arg00 arg01 arg02" and "arg10 arg11 arg12"
+    *   OR, e.g.
+    *   override def compileArgs = Args(Seq.tabulate(N){i => s"$i ${i+1}" })
+    *
+    *   Use the first version for a small number of diverse arguments.
+    *   Use the second version to generate a large number of runtime arguments using some pattern.
+    */
   def compileArgs: Args = NoArgs
+
+  /** Override to supply list(s) of input arguments to run the test with for each backend.
+    * The backend is run multiple times if multiple lists are given.
+    * The number of runs for each backend is C*R, (C: # of compile lists, R: # of runtime lists)
+    *
+    * Suggested argument syntax is:
+    *   override def runtimeArgs: Args = "arg00 arg01 arg02" and "arg10 arg11 arg12"
+    *   OR, e.g.
+    *   override def runtimeArgs = Args(Seq.tabulate(N){i => s"$i ${i+1}" })
+    *
+    *   Use the first version for a small number of diverse arguments.
+    *   Use the second version to generate a large number of runtime arguments using some pattern.
+    */
   def runtimeArgs: Args
   lazy val DATA = sys.env("TEST_DATA_HOME")
+
+  //-------------------//
+  //     Assertions    //
+  //-------------------//
+  // These provide staged versions of assert that shadow the native Scala and scalatest versions.
+  // These assertions will be checked at application runtime (after backend code generation)
+  // Use 'require' methods for unstaged assertions
+  import argon.lang.{Bit,Text,Void}
+  import argon.node.AssertIf
+
+  /** Staged (application runtime) assertion.
+    * This version is not recommended - give explicit failure message if possible.
+    */
+  def assert(cond: Bit)(implicit ctx: SrcCtx): Void = stage(AssertIf(Set.empty, cond, None))
+
+  /** Staged (application runtime) assertion with failure message. */
+  def assert(cond: Bit, msg: Text)(implicit ctx: SrcCtx): Void = stage(AssertIf(Set.empty, cond, Some(msg)))
+
+  /** Unstaged (application staging) assertion.
+    * This version is not recommended - give explicit failure message if possible.
+    */
+  def require(cond: Boolean)(implicit ctx: SrcCtx): Unit = {
+    if (!cond) throw RequirementFailure(ctx,"")
+  }
+  /** Unstaged (application staging) assertion  with failure message. */
+  def require(cond: Boolean, msg: String)(implicit ctx: SrcCtx): Unit = {
+    if (!cond) throw RequirementFailure(ctx, msg)
+  }
 
   //-------------------//
   //      Backends     //
@@ -179,6 +231,22 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
   ) {
     def shouldRun: Boolean = true
     override def runBackend(): Unit = ignore should "compile, run, and verify" in { () }
+  }
+
+  /** Override this method to provide custom IR checking after compilation has completed. */
+  protected def checkIR(block: argon.Block[_]): Result = Unknown
+
+  /** Postprocessing phase after compilation has completed. Only the last block is passed. */
+  override def postprocess(block: argon.Block[_]): Unit = {
+    import argon.node.AssertIf
+    super.postprocess(block)
+
+    if (config.test) {
+      val stms = block.nestedStms
+      val hasAssert = stms.exists{case Op(_: AssertIf) => true; case _ => false }
+      if (!hasAssert) throw Indeterminate
+      checkIR(block)
+    }
   }
 
 

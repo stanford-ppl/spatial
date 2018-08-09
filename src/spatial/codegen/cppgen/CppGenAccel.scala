@@ -104,15 +104,13 @@ trait CppGenAccel extends CppGenCommon {
       visitBlock(func)
       controllerStack.pop()      
 
-    case op@Switch(selects, body) => 
+    case op@Switch(selects, body) if inHw => 
       controllerStack.push(lhs)
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-      selects.indices.foreach{i => 
-        visitBlock(op.cases(i).body)
-      }
+      visitBlock(body)
       controllerStack.pop()      
 
-    case op@SwitchCase(body) =>
+    case op@SwitchCase(body) if inHw =>
       controllerStack.push(lhs)
       instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(body)

@@ -95,9 +95,7 @@ trait ChiselGenMath extends ChiselGenCommon {
       emit(src"1.U.cast(${lhs}_one)")
       MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixMod(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))) 
-    case FixFMA(x,y,z) if (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty)) => 
-      MathDL(lhs, rhs, latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))) 
-    case FixFMA(x,y,z) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
+    case FixFMA(x,y,z) => MathDL(lhs, rhs, latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))) 
       
 
     case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
@@ -111,8 +109,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSRU(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (${x} >>> $shift).r")
-    case BitRandom(None) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
-    case FixRandom(None) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
+    case BitRandom(None) if (lhs.parent.s.isDefined) => emitt(src"val ${lhs} = Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
+    case FixRandom(None) if (lhs.parent.s.isDefined) => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"${lhs}.r := Utils.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>
       val seed = (scala.math.random*1000).toInt
       val size = x match{
@@ -228,10 +226,9 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := Mux1H(List($sels), List(${opts.map{x => src"${x}.r"}}))")
 
-    case Mux(sel, a, b) if (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty)) => 
+    case Mux(sel, a, b) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := Mux(($sel), ${a}.r, ${b}.r)")
-    case Mux(sel, a, b) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) => 
 
     // // Assumes < and > are defined on runtime type...
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Mux(($a < $b), $a, $b).r")

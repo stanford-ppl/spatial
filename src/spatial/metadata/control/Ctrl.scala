@@ -12,6 +12,7 @@ import spatial.node._
   */
 sealed abstract class Ctrl(val s: Option[Sym[_]], val stage: Int) {
   def master: Ctrl
+  /** True if this stage is an outer stage when the corresponding controller is outer. */
   def mayBeOuterBlock: Boolean
 }
 object Ctrl {

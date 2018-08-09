@@ -64,15 +64,15 @@ trait Spatial extends Compiler {
     lazy val finalSanityChecks = CompilerSanityChecks(state, enable = true)
 
     // --- Analysis
-    lazy val cliNaming             = CLINaming(state)
-    lazy val useAnalyzer           = UseAnalyzer(state)
-    lazy val accessAnalyzer        = AccessAnalyzer(state)
-    lazy val memoryAnalyzer        = MemoryAnalyzer(state)
-    lazy val memoryAllocator       = MemoryAllocator(state)
-    lazy val rewriteAnalyzer       = RewriteAnalyzer(state)
+    lazy val cliNaming          = CLINaming(state)
+    lazy val useAnalyzer        = UseAnalyzer(state)
+    lazy val accessAnalyzer     = AccessAnalyzer(state)
+    lazy val memoryAnalyzer     = MemoryAnalyzer(state)
+    lazy val memoryAllocator    = MemoryAllocator(state)
+    lazy val rewriteAnalyzer    = RewriteAnalyzer(state)
     lazy val iterationDiffAnalyzer = IterationDiffAnalyzer(state)
-    lazy val initiationAnalyzer    = InitiationAnalyzer(state)
-
+    lazy val initiationAnalyzer = InitiationAnalyzer(state)
+    lazy val accumAnalyzer      = AccumAnalyzer(state)
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
@@ -91,6 +91,7 @@ trait Spatial extends Compiler {
     lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
+    lazy val accumTransformer      = AccumTransformer(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -132,6 +133,9 @@ trait Spatial extends Compiler {
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
         flatteningTransformer ==> printer ==> transformerChecks ==>
+        /** Accumulation Specialization **/
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
+        (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>
@@ -237,11 +241,9 @@ trait Spatial extends Compiler {
       overrideRetime = true
     }.text("Enable cheap fifos where accesses must be multiples of each other and not have lane-enables")
 
-    cli.opt[Unit]("optimizeReduce").action { (_,_) => // Must necessarily turn on retiming
-      spatialConfig.enableOptimizedReduce = true
-      spatialConfig.enableRetiming = true
-      overrideRetime = true
-    }.text("Squeeze II of reductions to 1 where possible, and instantiate specialized reduce node")
+    cli.opt[Unit]("noOptimizeReduce").action { (_,_) => 
+      spatialConfig.enableOptimizedReduce = false
+    }.text("Do not squeeze II of reductions to 1 where possible, and instantiate specialized reduce node")
 
     cli.opt[Unit]("runtime").action{ (_,_) =>
       spatialConfig.enableRuntimeModel = true

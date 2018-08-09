@@ -30,7 +30,7 @@ package object control {
       case _ => false
     }
 
-    def isControl: Boolean = op.isInstanceOf[Control[_]]
+    def isControl: Boolean = op.isInstanceOf[Control[_]] || op.isInstanceOf[IfThenElse[_]]
     def isPrimitive: Boolean = op.isInstanceOf[Primitive[_]]
     def isTransient: Boolean = op match {
       case p: Primitive[_] => p.isTransient
@@ -103,6 +103,25 @@ package object control {
       case ctrl @ Ctrl.Node(sym,_) if sym.isRawOuter && ctrl.mayBeOuterBlock => Outer
       case Ctrl.Host => Outer
       case _         => Inner
+    }
+
+    def innerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+      case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
+        val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
+        if (!stage.mayBeOuterBlock || this.isInnerControl) body.blocks else Nil
+      }
+      case _ => Nil
+    }
+    def outerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+      case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
+        val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
+        if (stage.mayBeOuterBlock && this.isOuterControl) body.blocks else Nil
+      }
+      case _ => Nil
+    }
+
+    def innerAndOuterBlocks: (Seq[(Seq[I32],Block[_])], Seq[(Seq[I32],Block[_])]) = {
+      (innerBlocks, outerBlocks)
     }
 
     /** Returns whether this control node is a Looped control or Single iteration control.
@@ -547,6 +566,9 @@ package object control {
           // Otherwise return the subcontroller for this "future" stage
           else Seq(Ctrl.Node(sym, id))
         }
+
+        case Op(ctrl: IfThenElse[_]) => sym.rawChildren // Fixme?
+
         case _ => throw new Exception(s"Cannot get children of non-controller.")
       }
       // Subcontroller case - return all children which have this subcontroller as an owner
@@ -734,10 +756,10 @@ package object control {
         val topB = pathB(ctrlIdxB + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
-        dbgs(s"  A: $a, B: $b")
-        dbgs(s"  ${ctrl.children.mkString(" ")}")
-        dbgs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
-        dbgs(s"  Dist = ${idxB - idxA}")
+        logs(s"  A: $a, B: $b")
+        logs(s"  ${ctrl.children.mkString(" ")}")
+        logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
+        logs(s"  Dist = ${idxB - idxA}")
         if (idxA < 0 || idxB < 0) None
         Some(idxB - idxA)
       }

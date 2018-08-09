@@ -92,6 +92,17 @@ trait CppGenArray extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
+
+    case ArrayApply(array @ Def(InputArguments()), i) =>
+      // Note this doesn't match if we map over the input arguments and then apply, for example.
+      emit(src"${lhs.tp} $lhs;")
+      open(src"try {")
+        emit(src"$lhs = (*$array).at($i);")
+      close("}")
+      open(src"catch (std::out_of_range& e) {")
+        emit(src"printHelp();")
+      close("}")
+
     case ArrayApply(array, i)   => 
       val (ast,amp) = if (lhs.tp match {case _:Vec[_] => true; case _:host.Array[_] => true; case _ => false}) ("*","&") else ("","")
       emit(src"${lhs.tp}${ast} $lhs = ${amp}(*${array})[$i];")  

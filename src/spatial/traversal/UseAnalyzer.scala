@@ -45,7 +45,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
     def inspect(): Unit = {
       if (inHw) checkUses(lhs, rhs)
-      if (lhs.isTransient) addPendingUse(lhs)
+      if (lhs.isTransient | lhs.isCounter) addPendingUse(lhs)
       super.visit(lhs, rhs)
     }
 
@@ -85,7 +85,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node
       // Add propagating use if outer or outside Accel
-      if (lhs.isTransient && isOuter) addPropagatingUse(lhs, pending.toSet)
+      if ((lhs.isTransient | lhs.isCounter) && isOuter) addPropagatingUse(lhs, pending.toSet)
       else addUse(lhs, pending.toSet, blk)
     }
   }

@@ -144,7 +144,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
           implicit val ctx: SrcCtx = SrcCtx.empty
           Pipe {
-            isolate() {
+            isolateSubst() {
               stg.nodes.foreach(visit)
               escaping.zip(escapingHolders).foreach{case (s, r) => resWrite(r,s) }
             }

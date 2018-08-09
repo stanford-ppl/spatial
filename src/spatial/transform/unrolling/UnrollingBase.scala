@@ -91,7 +91,9 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
   }
 
-  /** Duplicate the given controller based on the global Unroller helper instance lanes. */
+  /** Duplicate the given controller based on the global Unroller helper instance lanes.
+    * For parallelization greater than 1, this adds a Parallel node around the control copies.
+    */
   final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     dbgs(s"Duplicating controller $lhs = $rhs")
     def duplicate(): Sym[A] = unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]]
@@ -148,8 +150,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     case _ => super.updateNode(node)
   }
 
-  override def isolateIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
-    super.isolateIf(cond, escape){ lanes.isolateIf(cond, escape){ block } }
+  override def isolateSubstIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
+    super.isolateSubstIf(cond, escape){ lanes.isolateIf(cond, escape){ block } }
   }
 
   override def usedRemovedSymbol[T](x: T): Nothing = {

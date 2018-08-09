@@ -211,6 +211,10 @@ trait Compiler extends DSLRunnable { self =>
       error(s"${IR.errors} ${plural(n,"error")} found during $stage")
       Some(t)
 
+    case t @ RequirementFailure(ctx, msg) =>
+      error(ctx, "Requirement failed: " + msg)
+      Some(t)
+
     case t: Throwable =>
       onException(t)
       val except = UnhandledException(t)

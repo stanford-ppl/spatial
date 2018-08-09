@@ -9,8 +9,8 @@ import spatial.metadata.control._
 package object memory {
 
   implicit class AccumulatorOps(s: Sym[_]) {
-    def accumType: AccumType = metadata[Accumulator](s).map(_.tp).getOrElse(AccumType.None)
-    def accumType_=(tp: AccumType): Unit = metadata.add(s, Accumulator(tp))
+    def accumType: AccumType = metadata[AccumulatorType](s).map(_.tp).getOrElse(AccumType.Unknown)
+    def accumType_=(tp: AccumType): Unit = metadata.add(s, AccumulatorType(tp))
 
     def reduceType: Option[ReduceFunction] = metadata[ReduceType](s).map(_.func)
     def reduceType_=(func: ReduceFunction): Unit = metadata.add(s, ReduceType(func))
@@ -145,6 +145,14 @@ package object memory {
       case _ => false
     }
 
+    def isOptimizedReg: Boolean = mem.writers.exists{ _.op.get.isInstanceOf[RegAccum[_]] }
+    def optimizedRegType: Option[Accum] = if (!mem.isOptimizedReg) None else 
+      mem.writers.collect{ 
+      case x if x.op.get.isInstanceOf[RegAccum[_]] => x}.head match {
+        case Op(RegAccumOp(_,_,_,t,_)) => Some(t)
+        case Op(_: RegAccumFMA[_]) => Some(AccumFMA)
+        case Op(_: RegAccumLambda[_]) => Some(AccumUnk)
+      }
     def isReg: Boolean = mem.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgInNew[_]] }
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }

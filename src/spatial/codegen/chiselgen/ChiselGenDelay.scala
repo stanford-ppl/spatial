@@ -14,7 +14,7 @@ trait ChiselGenDelay extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
-    case DelayLine(delay, data) if (!spatialConfig.enableOptimizedReduce || (lhs.fmaReduceInfo.isEmpty)) =>
+    case DelayLine(delay, data) =>
       if (delay > maxretime) maxretime = delay
       // emit(src"""val $lhs = Utils.delay($data, $size)""")
 
@@ -30,7 +30,6 @@ trait ChiselGenDelay extends ChiselGenCommon {
           }
       }
 
-  case DelayLine(delay, data) if (spatialConfig.enableOptimizedReduce && (lhs.fmaReduceInfo.isDefined)) =>
 	case _ => super.gen(lhs, rhs)
   }
 

@@ -32,7 +32,7 @@ abstract class MutateTransformer extends ForwardTransformer {
   }
 
   final override protected def blockToFunction0[R](b: Block[R]): () => R = {
-    () => isolate(){
+    () => isolateSubst(){
       inCopyMode(copy = true){ inlineBlock(b).unbox }
     }
   }

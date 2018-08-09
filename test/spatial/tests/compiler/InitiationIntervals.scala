@@ -98,7 +98,7 @@ import spatial.metadata.control._
 
     val X = ArgIn[Int]
 
-    val num_tests = 10
+    val num_tests = 11
     val sum1 = ArgOut[Int]
     val sum2 = ArgOut[Int]
     val tests_run = ArgOut[Int]
@@ -166,6 +166,17 @@ import spatial.metadata.control._
       // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
       'TEST9.Pipe{IIChecker(0, 16, 1, 1, List.tabulate(16){i => i-1}, 0, 1, 9)} // II = 1
 
+      'TEST10.Pipe{  // II = body latency
+        val sram11 = SRAM[Int](16)
+        Foreach(16 by 1){i => sram11(i) = 0}
+        Foreach(48 by 1){i => 
+          val addr = Reg[Int](0)
+          Foreach(3 by 1){_ => addr := i/3}
+          Pipe{sram11(addr.value) = sram11(addr.value) + 1}
+        }
+        dram(10.to[Int], 0::16) store sram11
+        track := track.value ^ (1 << 10)
+      }
       tests_run := track
     }
 
@@ -174,6 +185,7 @@ import spatial.metadata.control._
       if (i == 0) j*2
       else if (i == 7) {if (j < 15) 1 else 0}
       else if (i == 8) 15-j
+      else if (i == 10) 3
       else j
     }
 

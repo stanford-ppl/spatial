@@ -153,6 +153,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def ifaceType(mem: Sym[_]): String = {
     mem match {
       case Op(_:FIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
+      case Op(_:LIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
       case _ => ""
     }
   }

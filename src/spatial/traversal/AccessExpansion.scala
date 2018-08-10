@@ -49,8 +49,8 @@ trait AccessExpansion {
   def domain(x: Idx): ConstraintMatrix[Idx] = getOrAddDomain(x)
 
 
-  def getAccessCompactMatrix(access: Sym[_], addr: Seq[Idx], mod: Seq[Int], pattern: Seq[AddressPattern]): SparseMatrix[Idx] = {
-    val rows = pattern.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => (addr.indexOrElse(d,nextRand()), mod(d))} }
+  def getAccessCompactMatrix(access: Sym[_], addr: Seq[Idx], pattern: Seq[AddressPattern]): SparseMatrix[Idx] = {
+    val rows = pattern.zipWithIndex.map{case (ap,d) => ap.toSparseVector{() => (addr.indexOrElse(d,nextRand()), ap.modulus)} }
     val matrix = SparseMatrix[Idx](rows)
     matrix.keys.foreach{x => getOrAddDomain(x) }
     matrix
@@ -60,7 +60,6 @@ trait AccessExpansion {
     mem:     Sym[_],
     access:  Sym[_],
     addr:    Seq[Idx],
-    mod:     Seq[Int],
     pattern: Seq[AddressPattern],
     vecID:   Seq[Int] = Nil
   ): Seq[AccessMatrix] = {
@@ -71,7 +70,7 @@ trait AccessExpansion {
     dbgs("Iterators: " + is.indices.map{i => s"${is(i)} (${ps(i)}) - ${starts(i)}"}.mkString(", "))
 
     val iMap = is.zipWithIndex.toMap
-    val matrix = getAccessCompactMatrix(access, addr, mod, pattern)
+    val matrix = getAccessCompactMatrix(access, addr, pattern)
 
     multiLoop(ps).map{uid =>
       val mat = matrix.map{vec =>

@@ -190,7 +190,6 @@ trait MemoryUnrolling extends UnrollingBase {
         // hack for issue #90
         val newSize = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.filter(_ == (mem2,port)).size
         val newOfs = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.take(i).filter(_ == (mem2,port)).size
-        println(s"starting to bump $mem2, which is instance $i, edit mux size by $newSize ofs by $newOfs")
         val port2 = Port(port.bufferPort,port.muxPort,port.muxSize + newSize,port.muxOfs + newOfs,port.broadcast) 
 
         banked.s.foreach{s =>

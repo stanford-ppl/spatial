@@ -147,7 +147,7 @@ trait MemoryUnrolling extends UnrollingBase {
 
       dbgs(s"Unrolling ${stm(lhs)}"); strMeta(lhs)
 
-      mems.flatMap{case UnrollInstance(mem2,dispIds,laneIds,port,_) =>
+      mems.zipWithIndex.flatMap{case (UnrollInstance(mem2,dispIds,laneIds,port,_),i) =>
         dbgs(s"  Dispatch: $dispIds")
         dbgs(s"  Lane IDs: $laneIds")
         dbgs(s"  Port:     $port")
@@ -187,8 +187,14 @@ trait MemoryUnrolling extends UnrollingBase {
         val ofs    = addr2.map{a => bankOffset(mem,lhs,a,inst) }
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
 
+        // hack for issue #90
+        val newSize = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.filter(_ == (mem2,port)).size
+        val newOfs = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.take(i).filter(_ == (mem2,port)).size
+        println(s"starting to bump $mem2, which is instance $i, edit mux size by $newSize ofs by $newOfs")
+        val port2 = Port(port.bufferPort,port.muxPort,port.muxSize + newSize,port.muxOfs + newOfs,port.broadcast) 
+
         banked.s.foreach{s =>
-          s.addPort(dispatch=0, Nil, port)
+          s.addPort(dispatch=0, Nil, port2)
           s.addDispatch(Nil, 0)
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }

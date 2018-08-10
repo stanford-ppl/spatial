@@ -20,7 +20,7 @@ case class BufferRecompute(IR: State) extends BlkTraversal {
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
-    case _: MemAlloc[_,_] if (lhs.getDuplicates.isDefined && !lhs.isFIFO) => 
+    case _: MemAlloc[_,_] if (lhs.getDuplicates.isDefined && !lhs.isFIFO & !lhs.isNonBuffer) => 
       dbgs(s"Recomputing depth of $lhs")
       val (_, bufPorts, _) = findMetaPipe(lhs, lhs.readers, lhs.writers)
       val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1

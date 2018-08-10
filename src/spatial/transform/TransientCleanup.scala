@@ -46,10 +46,22 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
       case _ => x.blk
     }
   }
+
+  /* Gets rid of cases where the user has already been visited,
+     such as an OpForeach's block 0 may return a value who is considered
+     to be used by the OpForeach's block -1
+  */
+  private def priorUser(x: User): Boolean = { 
+    x.sym match {
+      case s if (s.isControl) => (blk.s == Some(s)) && (blk.block >= -1)
+      case s if (s.isCounter && s.getOwner.isDefined) => (blk.s == Some(s.owner)) && (blk.block >= -1)
+      case _ => (blk.s == x.blk.s) && (blk.block >= x.blk.block)
+    }
+  }
   def requiresMoveOrDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
     case node:Primitive[_] =>
       // Duplicate stateless nodes when they have users across control or not the current block
-      val blks = lhs.users.map(blkOfUser)
+      val blks = lhs.users.filterNot(priorUser).map(blkOfUser)
       node.isTransient && (blks.size > 1 || blks.exists(_ != blk))
 
     case _ => false
@@ -58,12 +70,13 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case node: Primitive[_] if requiresMoveOrDuplication(lhs, rhs) =>
       dbgs("")
+      dbgs(s"Transforming node that is primitive and requires move or dup")
       dbgs(s"$lhs = $rhs")
       dbgs(s" - users: ${lhs.users} [stateless]")
 
       // For all uses within a single control node, create a single copy of this node
       // Then associate all uses within that control with that copy
-      val users = lhs.users.groupBy(blkOfUser)
+      val users = lhs.users.filterNot(priorUser).groupBy(blkOfUser)
 
       users.foreach{case (block, uses) =>
         val read = delayedMirror(lhs, rhs, block)
@@ -88,6 +101,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
 
     case node: Primitive[_] if inHw && node.isTransient =>
       dbgs("")
+      dbgs(s"Transforming node that is primitive, is inHw, and is transient")
       dbgs(s"$lhs = $rhs [stateless]")
       dbgs(s" - users: ${lhs.users}")
       dbgs(s" - ctrl:  $blk")
@@ -161,7 +175,10 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
 
   /** Requires slight tweaks to make sure we transform block results properly, primarily for OpReduce **/
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
+    dbgs(s"Advancing blk")
+    dbgs(s"   From: $blk")
     advanceBlk() // Advance block counter before transforming inputs
+    dbgs(s"   To: $blk")
 
     withBlockSubsts(b.result) {
       inlineWith(b){stms =>

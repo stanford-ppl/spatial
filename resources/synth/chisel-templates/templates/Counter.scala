@@ -233,6 +233,11 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
   })
 
   if (par > 0) {
+    val lock = Module(new SRFF())
+    lock.io.input.set := io.input.enable  & ~io.input.reset
+    lock.io.input.reset := io.input.reset || io.output.done
+    lock.io.input.asyn_reset := false.B
+    val locked = lock.io.output.data | io.input.enable
     val bases = List.tabulate(par){i => Module(new FF((width)))}
     val inits = List.tabulate(par){i => 
       Utils.getRetimed(

@@ -15,18 +15,34 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def unary_-(): SparseMatrix[K] = this.map{row => -row}
   def +(that: SparseMatrix[K]): SparseMatrix[K] = this.zip(that){_+_}
   def -(that: SparseMatrix[K]): SparseMatrix[K] = this.zip(that){_-_}
-  def increment(key: K, value: Int): SparseMatrix[K] = {
-    val rows2 = this.rows.map{r => 
-      val cols2 = r.cols.map{case (k,v) => k -> (if (k == key) {v + v*value} else v) }
-      SparseVector[K](cols2, r.c, r.lastIters, r.mod)
-    }
-    SparseMatrix[K](rows2)
+
+  private def combs(lol: List[List[SparseVector[K]]]): List[List[SparseVector[K]]] = lol match {
+    case Nil => List(Nil)
+    case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
   }
-  def incrementConst(value: Int): SparseMatrix[K] = {
-    val rows2 = this.rows.map{r => 
-      SparseVector[K](r.cols, r.c + value, r.lastIters, r.mod)
+  private def allLoops(maxes: Seq[Int], steps: Seq[Int], iterators: Seq[Int]): Seq[Int] = maxes match {
+    case Nil => Nil
+    case h::tail if tail.nonEmpty => (0 to h-1).map{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}.flatten
+    case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
+  }
+  private def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+  def expand: Seq[SparseMatrix[K]] = {
+    val rowOptions = rows.map{row => 
+      if (row.mod != 0) {
+        val a = row.cols.map(_._2).filter(_ != 0)
+        val p = a.map{x => row.mod/gcd(row.mod,x)}
+        val possible = if (p.toSeq.contains(row.mod)) Seq.tabulate(row.mod){i => i} else allLoops(p.toSeq,a.toSeq,Nil).map(_%row.mod).sorted.distinct
+        if (possible.size == 0) List(SparseVector[K](row.cols,row.c,row.lastIters,0))
+        else possible.map{ i =>
+               row.empty(i)
+             }.toList  
+      }
+      else {
+        List(row)
+      }
     }
-    SparseMatrix[K](rows2)
+
+    combs(rowOptions.toList).map{sm => SparseMatrix[K](sm)}
   }
   def asConstraintEqlZero = ConstraintMatrix(rows.map(_.asConstraintEqlZero).toSet)
   def asConstraintGeqZero = ConstraintMatrix(rows.map(_.asConstraintGeqZero).toSet)

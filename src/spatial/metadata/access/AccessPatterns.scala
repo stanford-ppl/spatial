@@ -158,6 +158,23 @@ object Sum {
   }
 }
 
+case class Modulus(m: Int, set: Boolean = true) {
+  def +(b: Modulus): Modulus = if (b.set && set) {Modulus(m + b.m, true)}
+                               else if (b.set && !set) {Modulus(b.m, true)}
+                               else if (!b.set && set) {Modulus(m, true)}
+                               else {Modulus(0, false)}
+  def %(b: Modulus): Modulus = if (b.set && set) {Modulus(m min b.m, true)}
+                               else if (b.set && !set) {Modulus(b.m, true)}
+                               else if (!b.set && set) {Modulus(m, true)}
+                               else {Modulus(0, false)}
+  def toInt: Int = if (set) m else 0
+  override def toString: String = if (set) s"mod $m" else ""
+}
+object Modulus {
+  def notset: Modulus = Modulus(0, false)
+}
+
+
 case class AffineComponent(a: Prod, i: Idx) {
   def syms: Seq[Idx] = i +: a.syms
   def unary_-(): AffineComponent = AffineComponent(-a, i)
@@ -230,7 +247,7 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
     }
   }
 
-  override def toString: String = comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs
+  override def toString: String = comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs + {if (modulus != 0) s" mod $modulus" else ""}
 }
 
 /** Access pattern metadata for memory accesses.

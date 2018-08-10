@@ -2,7 +2,6 @@ package spatial.tests.apps
 
 import spatial.dsl._
 
-
 @spatial class SingleLayerConv_RCIO extends SpatialTest {
   override def runtimeArgs: Args = "16 32 32 32 2 0"
   type T = FixPt[TRUE,_16,_0]

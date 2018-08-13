@@ -517,6 +517,18 @@ class NBufMem(val mem: MemType,
     io.sDone(port) := done
   }
  
+  def snoopXBarRPort(bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {
+    val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum
+    val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
+    io.output.data(bufferBase + muxBase)
+  }
+
+  def snoopDirectRPort(bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {
+    val bufferBase = directRMux.accessParsBelowBufferPort(bufferPort).sum
+    val muxBase = xBarRMux.accessPars.sum
+    val xBarRBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum + vecId
+    io.output.data(xBarRBase + bufferBase + muxBase)
+  }
   // def connectUntouchedPorts(ports: List[Int]) {
   //   ports.foreach{ port => 
   //     io.sEn(port) := false.B

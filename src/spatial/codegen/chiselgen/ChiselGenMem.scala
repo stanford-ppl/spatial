@@ -35,34 +35,48 @@ trait ChiselGenMem extends ChiselGenCommon {
     val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
     val muxPort = lhs.ports(0).values.head.muxPort
     val muxOfs = lhs.ports(0).values.head.muxOfs
+    val shouldReadCaster = lhs.ports(0).values.head.broadcast == 0
 
     lhs.tp match {
       case _: Vec[_] => emitGlobalWireMap(src"""${lhs}""", src"""Wire(Vec(${ens.length}, ${mem.tp.typeArgs.head}))""") 
       case _ => emitGlobalWireMap(src"""${lhs}""", src"""Wire(${mem.tp.typeArgs.head})""") 
     }
 
-    ens.zipWithIndex.foreach{case (e, i) => 
-      if (lhs.isDirectlyBanked & !isBroadcast) {
-        emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.trace.toInt)}))") 
-        emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
-      } else if (isBroadcast) {
-        emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
-        lhs.tp match {
-          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
-          case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
+    if (shouldReadCaster) {
+      ens.zipWithIndex.foreach{case (e, i) => 
+        if (lhs.isDirectlyBanked & !isBroadcast) {
+          emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.trace.toInt)}))") 
+          emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
+        } else if (isBroadcast) {
+          emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
+          bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
+          lhs.tp match {
+            case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
+            case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
+          }
+        } else {
+          emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
+          bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
+          lhs.tp match {
+            case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
+            case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
+          }
         }
-      } else {
-        emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
-        lhs.tp match {
-          case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
-          case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
+        if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
+        else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
+        if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
+      }
+    } else {
+      ens.zipWithIndex.foreach{case (e, i) => 
+        if (lhs.isDirectlyBanked) {
+          emitt(src"""${lhs}($i).r := ${mem}.snoopDirectRPort($bufferPort, ($muxPort, $muxOfs), $i)""")
+        } else {
+          lhs.tp match {
+            case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.snoopXBarRPort($bufferPort, ($muxPort, $muxOfs), $i)""")
+            case _ => emitt(src"""${lhs}.r := ${mem}.snoopXBarRPort($bufferPort, ($muxPort, $muxOfs), $i)""")
+          }
         }
       }
-      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
     }
     
   }

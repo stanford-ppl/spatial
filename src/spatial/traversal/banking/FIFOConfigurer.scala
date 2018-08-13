@@ -47,7 +47,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
     g1 != g2 && g1.cross(g2).exists{case (a,b) => requireConcurrentPortAccess(a,b) }
   }
 
-  override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Either[Issue,Instance] = {
+  override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
     val haveConcurrentReads = groupsAreConcurrent(rdGroups)
     val haveConcurrentWrites = groupsAreConcurrent(wrGroups)
 

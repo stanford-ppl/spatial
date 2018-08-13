@@ -852,29 +852,48 @@ package object control {
     }
   }
 
-  @stateful def findMetaPipe(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {
+  /** Computes the required buffer depth for the given memory and accesses.
+    * Memories are buffered on producers/consumers across stages in coarse-grained pipelines.
+    *
+    * Returns a buffer pipeline controller, if applicable.
+    * Returns a mapping from access symbol to buffer port.
+    * Returns an optional issue if hiearchical pipelining is required to support the reads.
+    *
+    * A buffer port is either Some(index), where index is the port location on an N-buffer.
+    * The maximum port for an N-buffer is N-1.
+    * Reads and writes which occur in a time-multiplexed fashion outside the pipeline are notated
+    * with a buffer port of None.
+    */
+  @stateful def computeMemoryBufferPorts(mem: Sym[_], readers: Set[Sym[_]], writers: Set[Sym[_]]): (Option[Ctrl], Map[Sym[_],Option[Int]], Option[Issue]) = {
     val accesses = readers ++ writers
-    val metapipeLCAs = findAllMetaPipes(readers, writers)
-    val hierarchicalBuffer = metapipeLCAs.keys.size > 1
-    val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
 
-    metapipeLCAs.keys.headOption match {
-      case Some(metapipe) =>
-        val group: Set[(Sym[_],Sym[_])] = metapipeLCAs(metapipe)
-        val anchor: Sym[_] = group.head._1
-        val dists = accesses.map{a =>
-          val dist = getCoarseDistance(metapipe, anchor, a)
-          dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
+    if (mem.isNonBuffer) {
+      val ports = accesses.map{a => a -> Some(0) }.toMap
+      (None, ports, None)
+    }
+    else {
+      val metapipeLCAs = findAllMetaPipes(readers, writers)
+      val hierarchicalBuffer = metapipeLCAs.keys.size > 1
+      val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
 
-          if (group.exists{x => a == x._1 || a == x._2 }) a -> dist else a -> None
-        }
-        val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
-        val minDist = buffers.minOrElse(0)
-        val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
-        (Some(metapipe), ports, issue)
+      metapipeLCAs.keys.headOption match {
+        case Some(metapipe) =>
+          val group: Set[(Sym[_],Sym[_])] = metapipeLCAs(metapipe)
+          val anchor: Sym[_] = group.head._1
+          val dists = accesses.map{a =>
+            val dist = getCoarseDistance(metapipe, anchor, a)
+            dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
 
-      case None =>
-        (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+            if (group.exists{x => a == x._1 || a == x._2 }) a -> dist else a -> None
+          }
+          val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
+          val minDist = buffers.minOrElse(0)
+          val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
+          (Some(metapipe), ports, issue)
+
+        case None =>
+          (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+      }
     }
   }
 

@@ -182,6 +182,14 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     io.output.data(outBase + vecId)
   }
 
+  def snoopXBarRPort(bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {
+    val outBase = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum - p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0).sum
+    io.output.data(outBase + vecId)
+  }
+  def snoopDirectRPort(bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {
+    val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0).sum
+    io.output.data(outBase + vecId)
+  }
 }
 
 

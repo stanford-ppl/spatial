@@ -43,9 +43,9 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                 val par = iters.last.ctrParOr1
                 if (stride.isDefined) {
                   // iterDiff between iters
-                  val thisIterReads  = List.tabulate(par){i => read.incrementConst(i*stride.get)}  // TODO: Replace this with access.affineMatrices.map(_.matrix)?
-                  val thisIterWrites = List.tabulate(par){i => write.incrementConst(i*stride.get)}  // TODO: Replace this with access.affineMatrices.map(_.matrix)?
-                  val nextIterReads  = List.tabulate(par){i => read.increment(iters.last,1).incrementConst(i*stride.get)}
+                  val thisIterReads  = reader.affineMatrices.map(_.matrix)
+                  val thisIterWrites = writer.affineMatrices.map(_.matrix)
+                  val nextIterReads  = reader.affineMatrices.map(_.matrix.increment(iters.last,1))
                   val diff = thisIterWrites.last - thisIterReads.head // How far is the last write from the first read?
                   val advancePerInc = nextIterReads.head - thisIterReads.head // How far do we advance in one tick?
                   val minIterDiff = diff.collapse.zip(advancePerInc.collapse).map{case (a,b) => if(a != 0 && b == 0) 0 else if(a == 0 && b == 0) 1 else  a / b}.sorted.headOption
@@ -71,7 +71,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                                               |
                                               |     II  = lat
                                                     lat = 2 * single lane's latency 
-                                                    laneWaits = Map( 0 -> 0, 1 -> 1 )
+                                                    segmentMapping = Map( 0 -> 0, 1 -> 1 )
                 
                                     Foreach(N by 1 par 3){i => mem(i) = mem(i-2)}
                                       O   O   O   O   O
@@ -86,25 +86,25 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                                                       |
                                                         II  = lat
                                                         lat = 2 * single lane's latency 
-                                                        laneWaits = Map( 0 -> 0, 1 -> 0, 2 -> 1)
+                                                        segmentMapping = Map( 0 -> 0, 1 -> 0, 2 -> 1)
                       */
                       val advancePerLane = (thisIterReads(1) - thisIterReads.head).collapse.max
                       val diffPerLane = (write-read).collapse.max
                       if (diffPerLane > 0) { // diffPerLane = 0 is a case of mem(i) = mem(i) + ...
                         val dependsOnLane = List.tabulate(par){i => i * advancePerLane - diffPerLane}
-                        val laneWaitMapping = dependsOnLane.zipWithIndex.map{case(d,i) =>
-                          val laneWait = if (d < 0) 0 else {
+                        val segMapping = dependsOnLane.zipWithIndex.map{case(d,i) =>
+                          val segment = if (d < 0) 0 else {
                             ((0 max dependsOnLane(i))/diffPerLane).toInt + 1
                           }
-                          (i -> laneWait)
+                          (i -> segment)
                         }.toMap
                         dbgs(s"advancePerLane = $advancePerLane, diffPerLane = $diffPerLane, lane dependencies $dependsOnLane")
-                        dbgs(s"laneWaits = ${laneWaitMapping}")
-                        reader.laneWaits = laneWaitMapping
-                        writer.laneWaits = laneWaitMapping
-                        mem.laneWaits = laneWaitMapping
+                        dbgs(s"segmentMapping = ${segMapping}")
+                        reader.segmentMapping = segMapping
+                        writer.segmentMapping = segMapping
+                        mem.segmentMapping = segMapping
                         // TODO: Tie this in to unrolling
-                        if (laneWaitMapping.values.toList.distinct.length > 1) throw new Exception("Inter-lane access dependencies in cycles not yet supported")
+                        // if (segMapping.values.toList.distinct.length > 1) throw new Exception("Inter-lane access dependencies in cycles not yet supported")
                       }
                     }
                   }

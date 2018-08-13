@@ -24,9 +24,8 @@ package object memory {
     def iterDiff: Int = metadata[IterDiff](s).map(_.diff).getOrElse(1)
     def iterDiff_=(diff: Int): Unit = metadata.add(s, IterDiff(diff))
 
-    def getLaneWait(lane: Int): Int = metadata[LaneWaits](s).map(_.mapping).getOrElse(Map(lane -> 0)).getOrElse(lane, 0)
-    def laneWaits: Map[Int,Int] = metadata[LaneWaits](s).map(_.mapping).getOrElse(Map[Int,Int]())
-    def laneWaits_=(mapping: Map[Int,Int]): Unit = metadata.add(s, LaneWaits(mapping))
+    def segmentMapping: Map[Int,Int] = metadata[SegmentMapping](s).map(_.mapping).getOrElse(Map[Int,Int]())
+    def segmentMapping_=(mapping: Map[Int,Int]): Unit = metadata.add(s, SegmentMapping(mapping))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {

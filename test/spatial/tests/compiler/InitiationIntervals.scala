@@ -148,14 +148,14 @@ import spatial.metadata.control._
       // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
       'TEST3.Pipe{IIChecker(3,  16,  1, 1, List(0,1,2),     -3, 3, 3)} // II = body latency / 3
 
-      // // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      // 'TEST4.Pipe{IIChecker(1,  16,  1, 2, List(0),         -1, 1, 4)} // II = single lane latency * 2
+      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+      'TEST4.Pipe{IIChecker(1,  16,  1, 2, List(0),         -1, 1, 4)} // II = single lane latency * 2
 
       // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
       'TEST5.Pipe{IIChecker(2,  16,  1, 2, List(0,1),       -2, 2, 5)} // II = single lane latency * 1
 
-      // // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      // 'TEST6.Pipe{IIChecker(2,  16,  1, 3, List(0,1),       -2, 2, 6)} // II = single lane latency * 2
+      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+      'TEST6.Pipe{IIChecker(2,  16,  1, 3, List(0,1),       -2, 2, 6)} // II = single lane latency * 2
 
       // 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0
       'TEST7.Pipe{IIChecker(0,  15,  1, 1, List.fill(16)(0),  1, 1, 7)} // II = 1

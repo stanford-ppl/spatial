@@ -173,7 +173,6 @@ trait MemoryUnrolling extends UnrollingBase {
         def vecToLaneAddr(vec: Int): Int = vec2Lane.map(_.apply(vec)).getOrElse(laneIds.apply(vec))
 
         dbgs(s"  Masters: $masters // Non-duplicated lane indices")
-
         // Writing two different values to the same address currently just writes the last value
         // Note this defines a race condition, so its behavior is undefined by the language
         val data2 = data.map{d =>
@@ -221,13 +220,14 @@ trait MemoryUnrolling extends UnrollingBase {
         }
 
         banked.map( _ match{
-          case (UVecRead(vec), lanesInSegment, _) =>
-            val vecsInSegment = lanesInSegment.map(laneIdToVecId)
+          case (UVecRead(vec), vecsInSegment, _) =>
+            // val vecsInSegment = lanesInSegment.map(laneIdToVecId)
             val vecbase = vecsInSegment.min
             val elems: Seq[A] = vecsInSegment.map{i => vec(i - vecbase) }
-            val thisLaneIds = lanesInSegment//.map(vecToLaneAddr)
-            lanes.inLanes(vecsInSegment){p =>
-              val elem: Sym[A] = elems(p - vecbase)
+            val thisLaneIds = laneIds.filter(vecsInSegment.map(vecToLaneAddr).contains)
+            dbgs(s"info $vec $vecsInSegment, laneids are $laneIds vs $thisLaneIds")
+            lanes.inLanes(thisLaneIds){p =>
+              val elem: Sym[A] = elems(laneIdToVecId(p) - vecbase)
               register(lhs -> elem)
               elem
             }

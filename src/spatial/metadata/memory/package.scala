@@ -25,6 +25,9 @@ package object memory {
     def isWriteBuffer: Boolean = metadata[EnableWriteBuffer](s).exists(_.flag)
     def isWriteBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableWriteBuffer(flag))
 
+    def isNonBuffer: Boolean = metadata[EnableNonBuffer](s).exists(_.flag)
+    def isNonBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableNonBuffer(flag))
+
     /** Pre-unrolling duplicates (one or more Memory instances per node) */
 
     def getDuplicates: Option[Seq[Memory]] = metadata[Duplicates](s).map(_.d)

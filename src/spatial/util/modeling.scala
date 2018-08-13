@@ -292,9 +292,10 @@ object modeling {
               debugs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
               val affectedNodes = consumersDfs(access.consumers, Set()) intersect scope
-              affectedNodes.foreach{x => 
-                debugs(s"  $x")
-                paths(x) = paths(x) + (writeDelay-oldPath)
+              affectedNodes.foreach{case x if (paths.contains(x)) => 
+                  debugs(s"  $x")
+                  paths(x) = paths(x) + (writeDelay-oldPath)
+                case _ =>
               }
             }
           }

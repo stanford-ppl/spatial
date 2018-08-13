@@ -40,7 +40,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val readMatrices = readers.flatMap{rd => rd.affineMatrices }
     val writeMatrices = writers.flatMap{wr => wr.affineMatrices }
 
-    val instances = bank(readMatrices, writeMatrices)
+    val forceNoBuf = mem.isNonBuffer
+    val instances = bank(readMatrices, writeMatrices, forceNoBuf)
 
     summarize(instances)
     finalize(instances)
@@ -221,11 +222,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
 
-  protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix]): Seq[Instance] = {
+  protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix], forceNoBuf: Boolean): Seq[Instance] = {
     val rdGroups = groupAccesses(readers)
     val wrGroups = groupAccesses(writers)
-    if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups)
-    else if (writers.nonEmpty) mergeWriteGroups(wrGroups)
+    if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups, forceNoBuf)
+    else if (writers.nonEmpty) mergeWriteGroups(wrGroups, forceNoBuf)
     else Seq(Instance.Unit(rank))
   }
 
@@ -323,7 +324,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     * Also calculates whether the associated memory should be considered a "buffer accumulator";
     * this occurs if at least one read and write occur in the same controller within a buffer.
     */
-  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
+  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Either[Issue,Instance] = {
     val reads = rdGroups.flatten
     val ctrls = reads.map(_.parent)
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
@@ -335,11 +336,19 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (issue.isEmpty) {
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
 
-        val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
+        val depth = if (forceNoBuf) 1 else bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val bankingCosts = bankings.map{b => b -> cost(b,depth) }
         val (banking, bankCost) = bankingCosts.minBy(_._2)
         // TODO[5]: Assumption: All memories are at least simple dual port
-        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
+        val truePorts = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
+        val ports = if (forceNoBuf) truePorts.map{case (am, port) => 
+          val port2 = port match {case Port(bufferPort, muxPort, muxSize, muxOfs, broadcast) => 
+            val portsBelowBuffer = truePorts.map(_._2).collect{case Port(bp,_,_,_,_) => bp}.size
+            Port(None, muxPort + portsBelowBuffer, muxSize, muxOfs, broadcast)
+          }
+          (am -> port2)
+        }
+        else truePorts
         val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
@@ -419,7 +428,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Greedily banks and merges groups of readers into memory instances. */
-  protected def mergeReadGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
+  protected def mergeReadGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Seq[Instance] = {
     dbgs("\n\n")
     dbgs(s"Merging memory instance groups:")
     val instances = ArrayBuffer[Instance]()
@@ -427,7 +436,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     rdGroups.zipWithIndex.foreach{case (grp,grpId) =>
       dbgs(s"Group #$grpId: ")
       state.logTab += 1
-      bankGroups(Set(grp),wrGroups) match {
+      bankGroups(Set(grp),wrGroups,forceNoBuf) match {
         case Right(i1) =>
           var instIdx = 0
           var merged = false
@@ -438,7 +447,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
             val err = getMergeAttemptError(i1, i2)
             if (err.isEmpty) {
-              bankGroups(i1.reads ++ i2.reads, wrGroups) match {
+              bankGroups(i1.reads ++ i2.reads, wrGroups,forceNoBuf) match {
                 case Right(i3) =>
                   val err = getMergeError(i1, i2, i3)
                   if (err.isEmpty) {
@@ -473,9 +482,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   /** Greedily banks and merges groups of writers into memory instances.
     * Only used if the memory has no readers.
     */
-  protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
+  protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Seq[Instance] = {
     // Assumes that all writers reach some unknown reader external to Accel.
-    bankGroups(Set.empty, wrGroups) match {
+    bankGroups(Set.empty, wrGroups, forceNoBuf) match {
       case Right(instance) => Seq(instance)
       case Left(issue)     => raiseIssue(issue); Nil
     }

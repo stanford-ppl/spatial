@@ -16,12 +16,17 @@ case class SparseVector[K](cols: Map[K,Int], c: Int, lastIters: Map[K,Option[K]]
     SparseVector(cols2, func(c), lastIters, mod)
   }
 
+  def empty(cst: Int): SparseVector[K] = {
+    val cols2 = cols.mapValues{v => 0}
+    SparseVector(cols2, cst, lastIters, 0)
+  }
+
   override def modulus = mod
 
   def zip(that: SparseVector[K])(func: (Int,Int) => Int): SparseVector[K] = {
     val keys = this.keys ++ that.keys
     val cols2 = keys.map{k => k -> func(this(k), that(k)) }.toMap
-    val mod2 = mod + that.modulus // a mod b + c mod d = a + c mod(b+d)
+    val mod2 = if (mod > 0 && that.modulus > 0) {mod min that.modulus} else {mod + that.modulus}
     SparseVector(cols2, func(this.c, that.c), this.lastIters ++ that.lastIters, mod2)
   }
 

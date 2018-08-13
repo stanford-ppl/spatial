@@ -18,6 +18,7 @@ import spatial.metadata.memory._
   @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))
 
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
+  def nonbuffer: Reg[A] = { this.isNonBuffer = true; me }
 
   // --- Typeclass Methods
   @rig def __sread(): A = Reg.read(this)

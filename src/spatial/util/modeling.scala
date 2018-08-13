@@ -70,9 +70,14 @@ object modeling {
     val latency = latencies.values.fold(0.0){(a,b) => Math.max(a,b) }
     // TODO: Safer way of determining if THIS cycle is the reduceType
     val interval = (cycles.map{c => c.length} + 0).max
-    // HACK: Set initiation interval to 1 if it contains a specialized reduction
-    // This is a workaround for chisel codegen currently specializing and optimizing certain reduction types
-    val compilerII = interval
+    // Combine segmented cycleSyms
+    val segmentedInterval = cycles.filter(_.memory.segmentMapping.size > 1).filter(_.isInstanceOf[WARCycle])
+                                  .groupBy(_.memory)
+                                  .map{case (mem, cycs) => cycs.toList.map{c => c.length}.sum}.toList
+                                  .sorted.reverse.headOption.getOrElse(0.0)
+    dbgs(s"cycles are $cycles, interval is $interval")
+    // Look across cycles from different segments
+    val compilerII = scala.math.max(interval, segmentedInterval)
     (latency, compilerII)
   }
 
@@ -276,10 +281,12 @@ object modeling {
         val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
         var writeStage = 0.0
         orderedMuxPairs.foreach{pairs =>
-          val dlys = pairs.map(_._2) :+ writeStage
+          // Filter out accesses that are already retimed to different cycles
+          val conflictPairs = pairs.collect{case x if (pairs.map(_._2).count(_ == x._2) > 1) => x}
+          val dlys = conflictPairs.map(_._2) :+ writeStage
           val writeDelay = dlys.max
           writeStage = writeDelay + 1
-          pairs.foreach{case (access, dly, _) =>
+          conflictPairs.foreach{case (access, dly, _) =>
             val oldPath = paths(access)
             paths(access) = writeDelay
             debugs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
@@ -300,10 +307,34 @@ object modeling {
       }
     }
 
+    def pushSegmentationAccesses(): Unit = {
+      accums.foreach{case AccumTriple(mem, reader, writer) => 
+        if (reader.segmentMapping.nonEmpty && reader.segmentMapping.values.head > 0 && paths.contains(reader)) {
+          dbgs(s"pushing segmentation access for $mem, $reader, $writer.. metadata ${reader.segmentMapping}")
+          // Find any writer of previous segment
+          val prevWriter = accums.collectFirst{case AccumTriple(m,_,w) if (scope.contains(w) && (m == mem) && (w.segmentMapping.values.head == reader.segmentMapping.values.head-1)) => w}
+          dbgs(s"Found writer $prevWriter in segment ${reader.segmentMapping.values.head-1}")
+          // Find latency where this previous writer occurs
+          val baseLatency = if (paths.contains(prevWriter.get)) paths(prevWriter.get) else 0
+          dbgs(s"reader $reader of $mem must begin after $baseLatency because it is part of segment ${reader.segmentMapping.values.head}")
+          // Place reader at this latency
+          val originalReadLatency = paths(reader)
+          paths(reader) = baseLatency + 2 /*sram load latency*/
+          val affectedNodes = (consumersDfs(reader.consumers, Set()) intersect scope) diff Set(reader)
+          dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
+          // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
+          affectedNodes.foreach{case x if (paths.contains(x)) => 
+            val relativeLatency = paths(x) - originalReadLatency
+            dbgs(s"  $x - Originally at ${paths(x)}, relative latency from read of $relativeLatency")
+            paths(x) = baseLatency + relativeLatency + 2
+          }
+        }
+      }
+    }
+
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet
-
 
     if (verbose) {
       if (allCycles.nonEmpty) {
@@ -317,6 +348,8 @@ object modeling {
         debugs(s"  [${dly(node)}] ${stm(node)}")
       }
     }
+
+    pushSegmentationAccesses()
 
     (paths.toMap, allCycles)
   }

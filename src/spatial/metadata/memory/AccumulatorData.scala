@@ -86,6 +86,8 @@ case class FMAReduce(info: (Sym[_], Sym[_], Sym[_], Sym[_], Double)) extends Dat
   */
 case class IterDiff(diff: Int) extends Data[IterDiff](SetBy.Analysis.Self)
 
-/** TODO: Update description
+/** Mapping from lane to which segment of an unrolled accumulation it should be placed in.  Segmentation
+    occurs when later lanes of an unrolled read depend on earlier lanes of the unrolled write
+
   */
-case class LaneWaits(mapping: Map[Int,Int]) extends Data[LaneWaits](SetBy.Analysis.Self)
+case class SegmentMapping(mapping: Map[Int,Int]) extends Data[SegmentMapping](SetBy.Analysis.Self)

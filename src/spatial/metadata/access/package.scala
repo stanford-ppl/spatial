@@ -227,8 +227,8 @@ package object access {
 
       intersects && mayPrecede
     }
-    dbgs(s"  Preceding writes for ${read.access} {${read.unroll.mkString(",")}}: ")
-    preceding.foreach{write => dbgs(s"    ${write.access} {${write.unroll.mkString(",")}}")}
+    dbgs(s"  Preceding writes for ${read.short}: ")
+    preceding.foreach{write => dbgs(s"    ${write.short}")}
     preceding.partition{write => !write.access.mayFollow(read.access) }
   }
 

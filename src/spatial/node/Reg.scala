@@ -17,6 +17,7 @@ import spatial.lang._
 
 
 @op case class RegRead[A:Bits](mem: Reg[A]) extends Reader[A,A] {
+  override def effects: Effects = super.effects andAlso Effects.Unique
   override val isTransient = true
   // Register read never takes enables
   override var ens: Set[Bit] = Set.empty

@@ -1,4 +1,4 @@
-package spatial.tests.feature.control
+package spatial.tests.feature.unrolling
 
 import spatial.dsl._
 

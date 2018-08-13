@@ -110,6 +110,7 @@ trait ReduceUnrolling extends UnrollingBase {
     val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs)){lhs2 => transferData(lhs,lhs2) }
     //accumulatesTo(lhs2) = accum
     dbgs(s"Created reduce ${stm(lhs2)}")
+    accum.accumType = AccumType.Reduce
     lhs2
   }
 

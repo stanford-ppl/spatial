@@ -38,9 +38,31 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
     case SetReg(reg, v)  => emit(src"val $lhs = $reg.set($v)")
     case GetReg(reg)     => emit(src"val $lhs = $reg.value")
 
+    case RegAccumOp(reg,in,en,op,first) =>
+      open(src"val $lhs = {")
+        open(src"if (${and(en)}) {")
+          val input = op match {
+            case AccumAdd => src"$reg.value + $in"
+            case AccumMul => src"$reg.value * $in"
+            case AccumMax => src"Number.max($reg.value, $in)"
+            case AccumMin => src"Number.min($reg.value, $in)"
+            case AccumFMA => throw new Exception("This shouldn't happen!")
+            case AccumUnk => throw new Exception("This shouldn't happen!")
+          }
+          emit(src"$reg.set((if ($first) $in else $input))")
+        close("}")
+        emit(src"$reg.value")
+      close("}")
 
-    //case RegWriteAccum(reg,data,first,en,_) =>
-    //  emit(src"val $lhs = if ($en && $first) $reg.update(0,$data) else if ($en) $reg.update(0,$data + $reg.apply(0))")
+    case RegAccumFMA(reg,m0,m1,en,first) =>
+      open(src"val $lhs = {")
+        open(src"if (${and(en)}) {")
+          val input = src"$m0 * $m1 + $reg.value"
+          emit(src"$reg.set((if ($first) $m0*$m1 else $input))")
+        close("}")
+        emit(src"$reg.value")
+      close("}")
+
     case _ => super.gen(lhs, rhs)
   }
 

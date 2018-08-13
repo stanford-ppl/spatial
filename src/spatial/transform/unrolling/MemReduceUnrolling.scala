@@ -140,7 +140,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
           logs(s"[Accum-fold $lhs] Unrolling accumulator store")
           // Use a default substitution for the reduction result to satisfy the block scheduler
-          inReduce(redType,false){ isolate(){
+          inReduce(redType,false){ isolateSubst(){
             register(storeAcc.inputA -> accum)
             register(reduce.result -> results.head)
             unroll(storeAcc, reduceLanes)

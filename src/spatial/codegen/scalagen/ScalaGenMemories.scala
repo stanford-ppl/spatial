@@ -104,7 +104,7 @@ trait ScalaGenMemories extends ScalaGenBits {
           import scala.math.Ordering.Implicits._
 
           val banks = multiLoopWithIndex(dims).map { case (is, i) =>
-            val bankAddr = inst.bankSelects(is)
+            val bankAddr = inst.bankSelects(mem, is)
             val ofs = inst.bankOffset(mem, is)
             dbg("  " + is.mkString(", ") + s" ($i): elem:${elems(i)}, bankAddr:$bankAddr, ofs:$ofs" )
 

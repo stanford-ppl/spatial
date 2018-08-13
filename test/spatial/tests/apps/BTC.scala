@@ -146,8 +146,18 @@ import spatial.dsl._
       def SHA256(): Unit = {
         // Init
         Pipe{
-          bitlen.reset
-          state.reset
+          bitlen(0) = 0.to[ULong]
+          bitlen(1) = 0.to[ULong]
+          state(0) = 0x6a09e667L.to[ULong]
+          state(1) = 0xbb67ae85L.to[ULong]
+          state(2) = 0x3c6ef372L.to[ULong]
+          state(3) = 0xa54ff53aL.to[ULong]
+          state(4) = 0x510e527fL.to[ULong]
+          state(5) = 0x9b05688cL.to[ULong]
+          state(6) = 0x1f83d9abL.to[ULong]
+          state(7) = 0x5be0cd19L.to[ULong]
+          // bitlen.reset
+          // state.reset
         }
 
         // Update

@@ -294,3 +294,12 @@ case class Ports(m: Map[Int, Map[Seq[Int],Port]]) extends Data[Ports](Transfer.M
   * Default: false
   */
 case class EnableWriteBuffer(flag: Boolean) extends Data[EnableWriteBuffer](SetBy.User)
+
+/** Flag set by the user to disable buffering caused by accesses over metapipeline stages.
+  * Used for manually creating a memory that behaves like a line-buffer
+  *
+  * Getter:  sym.isWriteBuffer
+  * Setter:  sym.isWriteBuffer = (true | false)
+  * Default: false
+  */
+case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.User)

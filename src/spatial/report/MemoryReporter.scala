@@ -72,12 +72,18 @@ case class MemoryReporter(IR: State) extends Pass {
             val muxSize: Int = accesses.map{case (a,uid,pt) => pt.muxSize }.maxOrElse(0)
 
             emit(s"$prefix  $p [Type:$tp, Width:$muxSize]:")
-            accesses.groupBy(_._3.muxPort).foreach{case (muxPort, accs) =>
+            accesses.groupBy(_._3.muxPort).toSeq.sortBy(_._1).foreach{case (muxPort, muxAccs) =>
               emit(s"$prefix    - Mux Port #$muxPort: ")
-              accs.foreach{case (a,uid,pt) =>
-                val line = a.ctx.content.map(_.trim).getOrElse(stm(a))
-                emit(s"$prefix      [Ofs: ${pt.muxOfs}] ${stm(a)} {${uid.mkString(",")}} [Direct: ${a.isDirectlyBanked}]")
-                emit(s"$prefix      [Ofs: ${pt.muxOfs}] $line (${a.ctx})")
+              val castgroups = muxAccs.groupBy(_._3.castgroup).toSeq.sortBy(_._1)
+              castgroups.foreach{case (castgroup, accs) =>
+                if (castgroups.size > 1) emit(s"$prefix    - Broadcast Group #$castgroup: ")
+                val tab = if (castgroups.size > 1) "  " else ""
+
+                accs.toSeq.sortBy(_._3.broadcast).foreach{case (a,uid,pt) =>
+                  val line = a.ctx.content.map(_.trim).getOrElse(stm(a))
+                  emit(s"$prefix$tab      [Broadcast: ${pt.broadcast}] ${stm(a)} {${uid.mkString(",")}} [Direct: ${a.isDirectlyBanked}, Ofs: ${pt.muxOfs}]")
+                  emit(s"$prefix$tab      [Broadcast: ${pt.broadcast}] $line (${a.ctx})")
+                }
               }
             }
           }

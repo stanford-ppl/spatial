@@ -253,6 +253,10 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *              |( ) O|O O|    |(   )|( ) O|
     * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
     *
+    *
+    * broadcast    | A  B |
+    *
+    *
     */
   protected def computePorts(groups: Set[Set[AccessMatrix]], bufPorts: Map[Sym[_],Option[Int]]): Map[AccessMatrix,Port] = {
     var ports: Map[AccessMatrix,Port] = Map.empty
@@ -277,21 +281,21 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
         var nGroups: Int = -1
         var broadcastGroups: Map[Int,Set[AccessMatrix]] = Map.empty
-        def checkBroadcast(m1: AccessMatrix): (Int,Int) = {
+        def checkBroadcast(m1: AccessMatrix): (Int,Int,Int) = {
           val group = broadcastGroups.find{case (_,mats) =>
             mats.exists{m2 => canBroadcast(m1, m2) }
           }
-          val groupID = group match {
+          val (groupID, muxOffset) = group match {
             case Some((bID,mats)) =>
               broadcastGroups += bID -> (mats + m1)
-              bID
+              (bID, ports(mats.head).muxOfs)
             case None =>
               nGroups += 1
               broadcastGroups += nGroups -> Set(m1)
-              nGroups
+              (nGroups, muxOfs)
           }
           // Broadcast ID is the number of accesses in that group - 1
-          (groupID, broadcastGroups(groupID).size - 1)
+          (groupID, broadcastGroups(groupID).size - 1, muxOffset)
         }
 
         // Assign mux offsets per access
@@ -299,18 +303,18 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // And assign mux offsets in unroll order
           import scala.math.Ordering.Implicits._
           mats.toSeq.sortBy(_.unroll).foreach{m =>
-            val (castgroup, broadcast) = checkBroadcast(m)
+            val (castgroup, broadcast, muxOffset) = checkBroadcast(m)
 
             val port = Port(
               bufferPort = bufferPort,
               muxPort    = muxPort,
               muxSize    = muxSize,
-              muxOfs     = muxOfs,
+              muxOfs     = muxOffset,
               castgroup  = castgroup,
               broadcast  = broadcast
             )
             ports += m -> port
-            muxOfs += 1
+            if (broadcast == 0) muxOfs += 1
           }
         }
       }

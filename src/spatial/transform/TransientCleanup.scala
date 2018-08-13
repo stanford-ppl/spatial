@@ -53,9 +53,9 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   */
   private def priorUser(x: User): Boolean = { 
     x.sym match {
-      case s if (s.isControl) => (blk.s == Some(s)) && (blk.block >= -1)
-      case s if (s.isCounter && s.getOwner.isDefined) => (blk.s == Some(s.owner)) && (blk.block >= -1)
-      case _ => (blk.s == x.blk.s) && (blk.block >= x.blk.block)
+      case s if (s.isControl) => (blk.s == Some(s)) && (blk.block > -1)
+      case s if (s.isCounter && s.getOwner.isDefined) => (blk.s == Some(s.owner)) && (blk.block > -1)
+      case _ => (blk.s == x.blk.s) && (blk.block > x.blk.block)
     }
   }
   def requiresMoveOrDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {

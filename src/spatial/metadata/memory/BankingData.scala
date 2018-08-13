@@ -161,6 +161,7 @@ case class Memory(
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
+  def updateDepth(d: Int): Memory = Memory(banking, d, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
@@ -170,7 +171,11 @@ case class Memory(
     }.product.toInt
   }
 
-  @api def bankSelects[T:IntLike](addr: Seq[T]): Seq[T] = banking.map(_.bankSelect(addr))
+  @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = {
+    if (banking.lengthIs(mem.seqRank.length)) {
+      banking.zip(addr).map{case(a,b) => a.bankSelect(Seq(b))}
+    } else banking.map(_.bankSelect(addr))
+  }
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._

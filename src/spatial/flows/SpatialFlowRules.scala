@@ -45,13 +45,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     def matchReader(rd: Sym[_], mem: Sym[_]): Unit = rd match {
       case Reader(rdMem,_,_) =>
         if (rdMem == mem) {
-          mem.accumType = AccumType.Fold
-          s.accumType = AccumType.Fold
+          mem.accumType = AccumType.Fold & mem.accumType
+          s.accumType   = AccumType.Fold & s.accumType
         }
       case UnrolledReader(read) =>
         if (read.mem == mem) {
-          mem.accumType = AccumType.Fold
-          s.accumType = AccumType.Fold
+          mem.accumType = AccumType.Fold & mem.accumType
+          s.accumType   = AccumType.Fold & s.accumType
         }
       case _ =>
     }
@@ -64,6 +64,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
   @flow def controlLevel(s: Sym[_], op: Op[_]): Unit = op match {
+    case ctrl: IfThenElse[_] => 
+      val children = op.blocks.flatMap(_.stms.filter(_.isControl))
+      s.rawChildren = children.map{c => Ctrl.Node(c,-1)}
+
+      val isOuter = children.exists{c => !c.isBranch || c.isOuterControl} || op.isMemReduce
+      s.rawLevel = if (isOuter) Outer else Inner
+      
     case ctrl: Control[_] =>
       // Find all children controllers within this controller
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
@@ -179,10 +186,11 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
     case _: ParallelPipe         => s.rawSchedule = ForkJoin
     case _: Switch[_]            => s.rawSchedule = Fork
+    case _: IfThenElse[_]        => s.rawSchedule = Fork
     case _: SwitchCase[_]        => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
     case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
-    case _: Control[_] =>
+    case ctrl: Control[_] =>
       logs(s"Determining schedule of $s = $op")
       logs(s"  User Schedule:    ${s.getUserSchedule}")
       logs(s"  Raw Schedule:     ${s.getRawSchedule}")
@@ -200,10 +208,14 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       logs(s"  Single Control:   ${s.isSingleControl}")
       logs(s"  # Children:       ${s.children.size}")
       logs(s"  # Childen (Ctrl): ${s.toCtrl.children.size}")
+      val hasPrimitives = s.outerBlocks.exists(_._2.stms.exists(s => s.isPrimitive && !s.isTransient))
+      val isSingleChildOuter = {
+        s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && !hasPrimitives
+      }
 
-      if (s.isSingleControl && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
-      if (s.isInnerControl && s.rawSchedule == Streaming) s.rawSchedule = Pipelined
-      if (s.isOuterControl && s.children.size == 1 && s.toCtrl.children.size == 1 && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
+      if (s.isSingleControl && s.rawSchedule == Pipelined)  s.rawSchedule = Sequenced
+      if (s.isInnerControl && s.rawSchedule == Streaming)   s.rawSchedule = Pipelined
+      if (isSingleChildOuter && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isUnitPipe && s.rawSchedule == Fork) s.rawSchedule = Sequenced // Undo transfer of metadata copied from Switch in PipeInserter
 
       logs(s"  Final Schedule:   ${s.rawSchedule}")
@@ -212,6 +224,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
   @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
+    case uloop: UnrolledLoop[_] => 
+      uloop.cchainss.foreach{case (cchain,is) =>
+        cchain.counters.zip(is).foreach{case (ctr, i) => i.foreach(_.counter = ctr) }
+      }
     case loop: Loop[_] =>
       loop.cchains.foreach{case (cchain,is) =>
         cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = ctr }
@@ -249,4 +265,3 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   }
 
 }
-

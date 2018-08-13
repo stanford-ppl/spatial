@@ -70,11 +70,8 @@ trait NamedCodegen extends Codegen {
       case FixDiv(_,_)  => s"${s}_${s.nameOr("div")}"
       case FixMul(_,_)  => s"${s}_${s.nameOr("mul")}"
 
-      case DelayLine(size, data) => data match {
-            case Const(_) => Console.println(s"quoting const as $data");src"$data"
-            case _ => s"${s}_D${size}"
-            // case _ => wireMap(s"${quote(data)}_D$size" + alphaconv.getOrElse(s"${quote(data)}_D$size", ""))
-      }
+      case DelayLine(size, data) if data.isConst => src"$data"
+      case DelayLine(size, data)                 => s"${s}_D$size"
 
       case _ => super.named(s,id)
     }

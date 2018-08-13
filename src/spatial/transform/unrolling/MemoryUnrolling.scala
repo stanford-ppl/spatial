@@ -51,7 +51,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dbgs(s"Unrolling status ${stm(lhs)}")
     dbgs(s"  on memory $mem -> ${memories((mem,0))}")
     val lhs2s = lanes.map{i =>
-      val lhs2 = isolateWith(escape=Nil, mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
+      val lhs2 = isolateSubstWith(escape=Nil, mem -> memories((mem,0)) ){ mirror(lhs, rhs) }
       dbgs(s"  Lane #$i: ${stm(lhs2)}")
       register(lhs -> lhs2)     // Use this duplicate in this lane
       lhs2
@@ -99,7 +99,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val mem = rhs.mem
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
-      isolateWith(escape=Nil, mem -> memories(dup)){
+      isolateSubstWith(escape=Nil, mem -> memories(dup)){
         val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
         lhs2
       }
@@ -189,7 +189,7 @@ trait MemoryUnrolling extends UnrollingBase {
           // Denotes that the addresses are only placeholders if this is a broadcast receive
           sym.isBroadcastAddr = port.isBroadcastReceiver
         }){
-          val bank = addr2.map{a => bankSelects(rhs,a,inst) }
+          val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
           val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
           (bank, ofs)
         }
@@ -222,6 +222,7 @@ trait MemoryUnrolling extends UnrollingBase {
   }
 
   def bankSelects(
+    mem:  Sym[_],
     node: Op[_],               // Pre-unrolled access
     addr: Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
     inst: Memory               // Memory instance associated with this access
@@ -234,7 +235,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
-    case _ => addr.map{laneAddr => inst.bankSelects(laneAddr) }
+    case _ => addr.map{laneAddr => inst.bankSelects(mem, laneAddr) }
   }
 
   def bankOffset(

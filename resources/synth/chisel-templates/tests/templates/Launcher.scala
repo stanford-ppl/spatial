@@ -36,8 +36,8 @@ object Inst {
 // Start args
 object Arguments {
   val FixFMAAccum = List(
-    (7.0, 6.0, true, 32, 0, 0.0),
-    (4.0, 3.0, true, 16, 0, 0.0)
+    (1, 7.0, 6.0, true, 32, 0, 0.0),
+    (1, 4.0, 3.0, true, 16, 0, 0.0)
   )
   val FF = List(
     (16, XMap((0,0) -> (1, None))),

@@ -14,23 +14,23 @@ class Mem1DTests(c: Mem1D) extends PeekPokeTester(c) {
   step(1)
   reset(1)
   for (i <- 0 until c.size ) {
-    poke(c.io.w.ofs, i)
-    poke(c.io.w.data, i*2)
-    poke(c.io.w.en, 1)
+    poke(c.io.w.ofs.head, i)
+    poke(c.io.w.data.head, i*2)
+    poke(c.io.w.en.head, 1)
     poke(c.io.wMask, 1)
     step(1) 
-    poke(c.io.w.en, 0)
+    poke(c.io.w.en.head, 0)
     poke(c.io.wMask, 0)
     step(1)
   }
 
   for (i <- 0 until c.size ) {
-    poke(c.io.r.ofs, i)
-    poke(c.io.r.en, 1)
+    poke(c.io.r.ofs.head, i)
+    poke(c.io.r.en.head, 1)
     poke(c.io.rMask, 1)
     step(1)
     expect(c.io.output.data, i*2)
-    poke(c.io.r.en, 0)
+    poke(c.io.r.en.head, 0)
     poke(c.io.rMask, 0)
     step(1)
   }
@@ -39,17 +39,17 @@ class Mem1DTests(c: Mem1D) extends PeekPokeTester(c) {
 
 class FFTests(c: FF) extends PeekPokeTester(c) {
   val initval = 10
-  poke(c.io.xBarW(0).init, initval)
-  poke(c.io.xBarW(0).reset, 1)
+  poke(c.io.xBarW(0).init.head, initval)
+  poke(c.io.xBarW(0).reset.head, 1)
   reset(1)
   step(1)
   expect(c.io.output.data(0), initval)
-  poke(c.io.xBarW(0).reset, 0)
+  poke(c.io.xBarW(0).reset.head, 0)
   step(1)
 
   // overwrite init
-  poke(c.io.xBarW(0).data, 0)
-  poke(c.io.xBarW(0).en, 1)
+  poke(c.io.xBarW(0).data.head, 0)
+  poke(c.io.xBarW(0).en.head, 1)
   step(1)
   expect(c.io.output.data(0), 0)
   step(1)
@@ -58,8 +58,8 @@ class FFTests(c: FF) extends PeekPokeTester(c) {
   for (i <- 0 until numCycles) {
     val newenable = rnd.nextInt(2)
     val oldout = peek(c.io.output.data(0))
-    poke(c.io.xBarW(0).data, i)
-    poke(c.io.xBarW(0).en, newenable)
+    poke(c.io.xBarW(0).data.head, i)
+    poke(c.io.xBarW(0).en.head, newenable)
     step(1)
     if (newenable == 1) {
       // val a = peek(c.io.output.data(0))
@@ -71,8 +71,8 @@ class FFTests(c: FF) extends PeekPokeTester(c) {
       expect(c.io.output.data(0), oldout)
     }
   }
-  poke(c.io.xBarW(0).reset, 1)
-  poke(c.io.xBarW(0).en, 0)
+  poke(c.io.xBarW(0).reset.head, 1)
+  poke(c.io.xBarW(0).en.head, 0)
   // val b = peek(c.io.output.data(0))
   // println(s"expect $b to be $initval ? ${b == initval}")
   step(1)
@@ -81,7 +81,7 @@ class FFTests(c: FF) extends PeekPokeTester(c) {
   // val cc = peek(c.io.output.data(0))
   // println(s"expect $cc to be $initval ? ${cc == initval}")
   expect(c.io.output.data(0), initval)
-  poke(c.io.xBarW(0).reset, 0)
+  poke(c.io.xBarW(0).reset.head, 0)
   step(1)
   // val d = peek(c.io.output.data(0))
   // println(s"expect $d to be $initval ? ${d == initval}")
@@ -97,12 +97,12 @@ class ShiftRegFileTests(c: ShiftRegFile) extends PeekPokeTester(c) {
       for (j <- 0 until c.p.logicalDims(1)) {
         poke(c.io.xBarW(0).banks(0), i)
         poke(c.io.xBarW(0).banks(1), j)
-        poke(c.io.xBarW(0).data, i+j)
-        poke(c.io.xBarW(0).en, 1)
+        poke(c.io.xBarW(0).data.head, i+j)
+        poke(c.io.xBarW(0).en.head, 1)
         step(1)
       }
     }
-    poke(c.io.xBarW(0).en, 0)
+    poke(c.io.xBarW(0).en.head, 0)
     step(1)
 
     // Read RegFile
@@ -110,7 +110,7 @@ class ShiftRegFileTests(c: ShiftRegFile) extends PeekPokeTester(c) {
       for (j <- 0 until c.p.logicalDims(1)) {
         poke(c.io.xBarR(0).banks(0), i)
         poke(c.io.xBarR(0).banks(1), j)
-        poke(c.io.xBarR(0).en, 1)
+        poke(c.io.xBarR(0).en.head, 1)
         expect(c.io.output.data(0), i+j)
         step(1)
       }
@@ -121,14 +121,14 @@ class ShiftRegFileTests(c: ShiftRegFile) extends PeekPokeTester(c) {
       for (i <- 0 until c.p.logicalDims(0)) {
         poke(c.io.xBarW(0).banks(0), i)
         poke(c.io.xBarW(0).banks(1), 0)
-        poke(c.io.xBarW(0).data, i+wavefront*10)
-        poke(c.io.xBarW(0).shiftEn, 1)
-        poke(c.io.xBarW(0).en, 1)
+        poke(c.io.xBarW(0).data.head, i+wavefront*10)
+        poke(c.io.xBarW(0).shiftEn.head, 1)
+        poke(c.io.xBarW(0).en.head, 1)
         step(1)
       }
 
-      poke(c.io.xBarW(0).en, 0)
-      poke(c.io.xBarW(0).shiftEn, 0)
+      poke(c.io.xBarW(0).en.head, 0)
+      poke(c.io.xBarW(0).shiftEn.head, 0)
       step(1)
 
 
@@ -137,7 +137,7 @@ class ShiftRegFileTests(c: ShiftRegFile) extends PeekPokeTester(c) {
         for (j <- 0 until c.p.logicalDims(1)) {
           poke(c.io.xBarR(0).banks(0), i)
           poke(c.io.xBarR(0).banks(1), j)
-          poke(c.io.xBarR(0).en, 1)
+          poke(c.io.xBarR(0).en.head, 1)
           // if (j < wavefront) expect(c.io.output.data(i), 0)
           // else expect(c.io.output.data(i), 0)
           val d = peek(c.io.output.data(0))
@@ -173,16 +173,16 @@ class SRAMTests(c: SRAM) extends PeekPokeTester(c) {
         val kdim = ii * c.p.banks(1) + jj
         // poke(c.io.directW(kdim).banks(0), i % c.p.banks(0))
         // poke(c.io.directW(kdim).banks(1), (j+kdim) % c.p.banks(1))
-        poke(c.io.directW(kdim).ofs, (i+ii) / c.p.banks(0) * (c.p.logicalDims(1) / c.p.banks(1)) + (j+jj) / c.p.banks(1))
-        poke(c.io.directW(kdim).data, (i*c.p.logicalDims(0) + j + kdim)*2)
-        poke(c.io.directW(kdim).en, true)
+        poke(c.io.directW.head.ofs(kdim), (i+ii) / c.p.banks(0) * (c.p.logicalDims(1) / c.p.banks(1)) + (j+jj) / c.p.banks(1))
+        poke(c.io.directW.head.data(kdim), (i*c.p.logicalDims(0) + j + kdim)*2)
+        poke(c.io.directW.head.en(kdim), true)
       }}
       step(1)
     }
   }
   // Turn off wEn
   (0 until wPar).foreach{ kdim => 
-    poke(c.io.directW(kdim).en, false)
+    poke(c.io.directW.head.en(kdim), false)
   }
 
   step(30)
@@ -196,8 +196,8 @@ class SRAMTests(c: SRAM) extends PeekPokeTester(c) {
         val kdim = ii * c.p.banks(1) + jj
         // poke(c.io.directR(kdim).banks(0), i % c.p.banks(0))
         // poke(c.io.directR(kdim).banks(1), (j+kdim) % c.p.banks(1))
-        poke(c.io.directR(kdim).ofs, (i+ii) / c.p.banks(0) * (c.p.logicalDims(1) / c.p.banks(1)) + (j+jj) / c.p.banks(1))
-        poke(c.io.directR(kdim).en, true)
+        poke(c.io.directR.head.ofs(kdim), (i+ii) / c.p.banks(0) * (c.p.logicalDims(1) / c.p.banks(1)) + (j+jj) / c.p.banks(1))
+        poke(c.io.directR.head.en(kdim), true)
       }}
       step(1)
       (0 until rPar).foreach { kdim => 
@@ -207,7 +207,7 @@ class SRAMTests(c: SRAM) extends PeekPokeTester(c) {
   }
   // Turn off rEn
   (0 until rPar).foreach{ reader => 
-    poke(c.io.directR(reader).en, false)
+    poke(c.io.directR.head.en(reader), false)
   }
 
   step(1)
@@ -234,24 +234,24 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
           (0 until c.banks(0)).foreach{ ii => (0 until c.banks(1)).foreach{ jj =>
             poke(c.io.broadcastW(0).banks(0), ii)
             poke(c.io.broadcastW(0).banks(1), jj)
-            poke(c.io.broadcastW(0).ofs, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
-            poke(c.io.broadcastW(0).data, 999)
-            poke(c.io.broadcastW(0).en, true)
+            poke(c.io.broadcastW(0).ofs.head, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
+            poke(c.io.broadcastW(0).data.head, 999)
+            poke(c.io.broadcastW(0).en.head, true)
             step(1)      
           }}
         }
       }
     case FFType => 
-      poke(c.io.broadcastW(0).data, 999)
-      poke(c.io.broadcastW(0).en, true)
+      poke(c.io.broadcastW(0).data.head, 999)
+      poke(c.io.broadcastW(0).en.head, true)
       step(1)
     case ShiftRegFileType => 
       for (i <- 0 until c.logicalDims(0)) {
         for (j <- 0 until c.logicalDims(1)) {
           poke(c.io.broadcastW(0).banks(0), i)
           poke(c.io.broadcastW(0).banks(1), j)
-          poke(c.io.broadcastW(0).data, 999)
-          poke(c.io.broadcastW(0).en, true)
+          poke(c.io.broadcastW(0).data.head, 999)
+          poke(c.io.broadcastW(0).en.head, true)
           step(1)      
         }
       }
@@ -259,7 +259,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
     case LIFOType =>
     case LineBufferType => 
   }
-  c.io.broadcastW.foreach{p => poke(p.en, false)}
+  c.io.broadcastW.foreach{p => poke(p.en.head, false)}
   step(1)
 
   // Read all bufs
@@ -276,8 +276,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
               val kdim = ii * c.banks(1) + jj
               // poke(c.io.directR(kdim).banks(0), i % c.banks(0))
               // poke(c.io.directR(kdim).banks(1), (j+kdim) % c.banks(1))
-              poke(c.io.directR(kdim).ofs, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
-              poke(c.io.directR(kdim).en, true)
+              poke(c.io.directR.head.ofs(kdim), (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
+              poke(c.io.directR.head.en(kdim), true)
             }}
             step(1)
             (0 until rPar).foreach { kdim => 
@@ -294,7 +294,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
           for (j <- 0 until c.logicalDims(1)) {
             poke(c.io.xBarR(0).banks(0), i)
             poke(c.io.xBarR(0).banks(1), j)
-            poke(c.io.xBarR(0).en, true)
+            poke(c.io.xBarR(0).en.head, true)
             expect(c.io.output.data(0),999)
             val x = peek(c.io.output.data(0))
             print(" " + x)
@@ -307,7 +307,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
       case LineBufferType => 
 
     }
-    c.io.directR.foreach{p => poke(p.en, false)}
+    c.io.directR.foreach{p => poke(p.en.head, false)}
     // Rotate buffer
     poke(c.io.sEn(0), 1)
     step(1)
@@ -333,24 +333,24 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
               val kdim = ii * c.banks(1) + jj
               // poke(c.io.directW(kdim).banks(0), i % c.banks(0))
               // poke(c.io.directW(kdim).banks(1), (j+kdim) % c.banks(1))
-              poke(c.io.directW(kdim).ofs, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
-              poke(c.io.directW(kdim).data, epoch*100 + (i*c.logicalDims(0) + j + kdim)*2)
-              poke(c.io.directW(kdim).en, 1)
+              poke(c.io.directW.head.ofs(kdim), (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
+              poke(c.io.directW.head.data(kdim), epoch*100 + (i*c.logicalDims(0) + j + kdim)*2)
+              poke(c.io.directW.head.en(kdim), 1)
             }}
             step(1)
           }
         }
       case FFType => 
-        poke(c.io.xBarW(0).data, epoch*100)
-        poke(c.io.xBarW(0).en, true)
+        poke(c.io.xBarW(0).data.head, epoch*100)
+        poke(c.io.xBarW(0).en.head, true)
         step(1)
       case ShiftRegFileType => 
         for (i <- 0 until c.logicalDims(0)) {
           for (j <- 0 until c.logicalDims(1)) {
             poke(c.io.xBarW(0).banks(0), i)
             poke(c.io.xBarW(0).banks(1), j)
-            poke(c.io.xBarW(0).data, epoch*100 + (i*c.logicalDims(0)+j)*2)
-            poke(c.io.xBarW(0).en, true)
+            poke(c.io.xBarW(0).data.head, epoch*100 + (i*c.logicalDims(0)+j)*2)
+            poke(c.io.xBarW(0).en.head, true)
             step(1)      
           }
         }
@@ -361,8 +361,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
     }
 
     // Turn off wEn
-    c.io.directW.foreach{p => poke(p.en, false)}
-    c.io.xBarW.foreach{p => poke(p.en, false)}
+    c.io.directW.foreach{p => poke(p.en.head, false)}
+    c.io.xBarW.foreach{p => poke(p.en.head, false)}
 
     step(30)
 
@@ -389,8 +389,8 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
               val kdim = ii * c.banks(1) + jj
               // poke(c.io.directR(kdim).banks(0), i % c.banks(0))
               // poke(c.io.directR(kdim).banks(1), (j+kdim) % c.banks(1))
-              poke(c.io.directR(kdim).ofs, (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
-              poke(c.io.directR(kdim).en, 1)
+              poke(c.io.directR.head.ofs(kdim), (i+ii) / c.banks(0) * (c.logicalDims(1) / c.banks(1)) + (j+jj) / c.banks(1))
+              poke(c.io.directR.head.en(kdim), 1)
             }}
             step(1)
             (0 until rPar).foreach { kdim => 
@@ -421,7 +421,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
     println("")
     
     // Turn off rEn
-    c.io.directR.foreach{p => poke(p.en, false)}
+    c.io.directR.foreach{p => poke(p.en.head, false)}
 
     step(1)
   }
@@ -438,15 +438,15 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
 
   var fifo = scala.collection.mutable.Queue[Int]()
   def enq(datas: Seq[Int], ens: Seq[Int]): Unit = {
-    (0 until datas.length).foreach { i => poke(c.io.xBarW(i).data, datas(i)) }
-    (0 until datas.length).foreach { i => poke(c.io.xBarW(i).en, ens(i)) }
+    (0 until datas.length).foreach { i => poke(c.io.xBarW.head.data(i), datas(i)) }
+    (0 until datas.length).foreach { i => poke(c.io.xBarW.head.en(i), ens(i)) }
     step(1)
-    (0 until datas.length).foreach { i => poke(c.io.xBarW(i).en, 0) }
+    (0 until datas.length).foreach { i => poke(c.io.xBarW.head.en(i), 0) }
     step(1)
     (0 until datas.length).foreach{i => if (ens(i) != 0) fifo.enqueue(datas(i))}
   }
   def deq(ens: Seq[Int]): Unit = {
-    (0 until ens.length).foreach { i => poke(c.io.xBarR(i).en, ens(i)) }
+    (0 until ens.length).foreach { i => poke(c.io.xBarR.head.en(i), ens(i)) }
     val num_popping = ens.reduce{_+_}
     (0 until ens.length).foreach{i => 
       val out = peek(c.io.output.data(i))
@@ -456,7 +456,7 @@ class FIFOTests(c: FIFO) extends PeekPokeTester(c) {
       }
     }
     step(1)
-    (0 until ens.length).foreach{ i => poke(c.io.xBarR(i).en,0)}
+    (0 until ens.length).foreach{ i => poke(c.io.xBarR.head.en(i),0)}
   }
 
   // fill FIFO halfway

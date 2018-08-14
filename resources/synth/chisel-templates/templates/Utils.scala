@@ -27,7 +27,16 @@ object ops {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
+  implicit class SeqIntOps[T](val b:Seq[Int]) {
+    def getOr1(idx: Int): Int = if (b.size > idx) b(idx) else 1
+  }
+  implicit class SeqBoolOps[T](val b:Seq[Bool]) {
+    def or = if (b.size == 0) false.B else b.reduce{_||_}
+    def and = if (b.size == 0) true.B else b.reduce{_&&_}
+  }
   implicit class ArrayBoolOps[T](val b:Array[Bool]) {
+    def or = if (b.size == 0) false.B else b.reduce{_||_}
+    def and = if (b.size == 0) true.B else b.reduce{_&&_}
     def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
@@ -50,6 +59,8 @@ object ops {
   }
 
   implicit class BoolOps(val b:Bool) {
+    def toSeq: Seq[Bool] = Seq(b)
+
     def D(delay: Int, retime_released: Bool): Bool = {
 //      Mux(retime_released, chisel3.util.ShiftRegister(b, delay, false.B, true.B), false.B)
       Mux(retime_released, Utils.getRetimed(b, delay), false.B)
@@ -88,6 +99,7 @@ object ops {
   // }
 
   implicit class UIntOps(val b:UInt) {
+    def toSeq: Seq[UInt] = Seq(b)
     // Define number so that we can be compatible with FixedPoint type
     def number = {
       b
@@ -296,6 +308,7 @@ object ops {
   }
 
   implicit class SIntOps(val b:SInt) {
+    def toSeq: Seq[SInt] = Seq(b)
     // Define number so that we can be compatible with FixedPoint type
     def number = {
       b.asUInt
@@ -524,6 +537,9 @@ object ops {
     def *-*(x: Long): Long = {b*x}
     def /-/(x: Long): Long = {b/x}
     def %-%(x: Long): Long = {b%x}
+    def indices[T](func: Int => T): Seq[T] = {
+      (0 until b).map{ i => func(i) }.toSeq
+    }
   }
 
   implicit class DoubleOps(val b: Double) {

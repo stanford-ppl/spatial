@@ -70,6 +70,7 @@ trait Spatial extends Compiler {
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
     lazy val memoryAllocator    = MemoryAllocator(state)
     lazy val rewriteAnalyzer    = RewriteAnalyzer(state)
+    lazy val iterationDiffAnalyzer = IterationDiffAnalyzer(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
     lazy val accumAnalyzer      = AccumAnalyzer(state)
 
@@ -120,6 +121,8 @@ trait Spatial extends Compiler {
         accessAnalyzer      ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
+        /** Iteration difference analysis */
+        iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         useAnalyzer         ==>

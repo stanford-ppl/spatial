@@ -69,16 +69,16 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     fixadd.r := Mux(isFirstRound, 0.U, acc.io.output.data(0))
     val result = Wire(new FixedPoint(s,d,f))
     Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
-    acc.io.xBarW(0).data := result.r
-    acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | activeLast.D(drain_latency + fmaLatency)
-    acc.io.xBarW(0).init := initBits
+    acc.io.xBarW(0).data(0) := result.r
+    acc.io.xBarW(0).en(0) := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
+    acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + fmaLatency)
+    acc.io.xBarW(0).init(0) := initBits
   }
 
   io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, drain_latency, isDrainState).r // TODO: Please build tree and retime appropriately
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {io.output}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int)): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), flow: Bool): Seq[UInt] = {Seq(io.output)}
 
 }
 
@@ -138,10 +138,10 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
       case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), Utils.getRetimed(fixin1.r, opLatency.toInt), Utils.getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
 
     }
-    acc.io.xBarW(0).data := result.r
-    acc.io.xBarW(0).en := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
-    acc.io.xBarW(0).reset := activeReset | activeLast.D(drain_latency + opLatency)
-    acc.io.xBarW(0).init := initBits
+    acc.io.xBarW(0).data(0) := result.r
+    acc.io.xBarW(0).en(0) := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
+    acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + opLatency)
+    acc.io.xBarW(0).init(0) := initBits
   }
 
     t match {
@@ -179,7 +179,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     }
 
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int): UInt = {connectXBarRPort(rBundle, bufferPort, muxAddr, vecId, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), vecId: Int, flow: Bool): UInt = {io.output}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int)): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), flow: Bool): Seq[UInt] = {Seq(io.output)}
 
 }

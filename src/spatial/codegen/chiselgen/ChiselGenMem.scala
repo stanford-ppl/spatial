@@ -14,18 +14,11 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
 
-  // private def switchCaseLookaheadHack(parent: Sym[_]): Sym[_] = {
-  //   parent match {
-  //     case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get match {case s @ Op(_: SwitchCase[_]) => true; case _ => false}) => switchCaseLookaheadHack(parent.parent.s.get.parent.s.get)
-  //     case Op(_: SwitchCase[_]) if (parent.parent.s.get.parent.s.get.isInnerControl) => parent.parent.s.get.parent.s.get
-  //     case _ => parent
-  //   }
-  // }
-
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get) //mem.readers.find{_.node == lhs}.get.ctrlNode
+    val parent = lhs.parent.s.get 
+    emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val flowEnable = if (getAllReadyLogic(parent.toCtrl).nonEmpty) src""",${getAllReadyLogic(parent.toCtrl).mkString(" & ")}""" else ""
     val ofsWidth = Math.max(1, Math.ceil(scala.math.log(mem.constDims.product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
@@ -35,48 +28,38 @@ trait ChiselGenMem extends ChiselGenCommon {
     val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
     val muxPort = lhs.ports(0).values.head.muxPort
     val muxOfs = lhs.ports(0).values.head.muxOfs
-    val shouldReadCaster = lhs.ports(0).values.head.broadcast == 0
+    val shouldReadCaster = lhs.ports(0).values.head.broadcast > 0
 
     lhs.tp match {
       case _: Vec[_] => emitGlobalWireMap(src"""${lhs}""", src"""Wire(Vec(${ens.length}, ${mem.tp.typeArgs.head}))""") 
       case _ => emitGlobalWireMap(src"""${lhs}""", src"""Wire(${mem.tp.typeArgs.head})""") 
     }
 
-    if (shouldReadCaster) {
-      ens.zipWithIndex.foreach{case (e, i) => 
-        if (lhs.isDirectlyBanked & !isBroadcast) {
-          emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_Direct($ofsWidth, ${bank(i).map(_.trace.toInt)}))") 
-          emitt(src"""${lhs}($i).r := ${mem}.connectDirectRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
-        } else if (isBroadcast) {
-          emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-          bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
-          lhs.tp match {
-            case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
-            case _ => emitt(src"""${lhs}.r := ${mem}.connectBroadcastRPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i $flowEnable)""")
-          }
-        } else {
-          emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new R_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-          bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
-          lhs.tp match {
-            case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
-            case _ => emitt(src"""${lhs}.r := ${mem}.connectXBarRPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, ($muxPort, $muxOfs), $i $flowEnable)""")
-          }
-        }
-        if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable}""")
-        else emitt(src"""${swap(src"${lhs}_$i", Blank)}.en := ${invisibleEnable} & ${e.map(quote).mkString(" & ")}""")
-        if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
+    if (!shouldReadCaster) {
+      if (lhs.isDirectlyBanked & !isBroadcast) {
+        emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList))") 
+        emitt(src"""${lhs}.toSeq.zip(${mem}.connectDirectRPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      } else if (isBroadcast) {
+        val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+        emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
+        emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+        emitt(src"""${lhs}.toSeq.zip(${mem}.connectBroadcastRPort(${swap(src"${lhs}_port", Blank)}, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      } else {
+        val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+        emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
+        emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+        emitt(src"""${lhs}.toSeq.zip(${mem}.connectXBarRPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
       }
+      val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
+      val ensString = ens.map{e => and(e.filter(!commonEns.contains(_)))}.mkString("List(",",",")")
+      emitt(src"""${swap(src"${lhs}_port", Blank)}.en.zip(${ensString}.toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})).foreach{case (left, right) => left := right}""")
+      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_port", Blank)}.ofs.zip(${ofs.map(quote(_) + ".r").mkString("List[UInt](",",",")")}.toSeq.map(_.rd)).foreach{case (left, right) => left.r := right}""")
     } else {
-      ens.zipWithIndex.foreach{case (e, i) => 
-        if (lhs.isDirectlyBanked) {
-          emitt(src"""${lhs}($i).r := ${mem}.snoopDirectRPort($bufferPort, ($muxPort, $muxOfs), $i)""")
-        } else {
-          lhs.tp match {
-            case _: Vec[_] => emitt(src"""${lhs}($i).r := ${mem}.snoopXBarRPort($bufferPort, ($muxPort, $muxOfs), $i)""")
-            case _ => emitt(src"""${lhs}.r := ${mem}.snoopXBarRPort($bufferPort, ($muxPort, $muxOfs), $i)""")
-          }
-        }
-      }
+      if (lhs.isDirectlyBanked) {
+        emitt(src"""${lhs}.toSeq.zip(${mem}.snoopDirectRPort(${ofs.size}, $bufferPort, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      } else {
+        emitt(src"""${lhs}.toSeq.zip(${mem}.snoopXBarRPort(${ofs.size}, $bufferPort, ($muxPort, $muxOfs) $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      }      
     }
     
   }
@@ -91,29 +74,29 @@ trait ChiselGenMem extends ChiselGenCommon {
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
     val isBroadcast = lhs.ports(0).values.head.bufferPort.isEmpty & mem.instance.depth > 1
     val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
-    // val issue35hack = if (mem.instance.depth == 1 & lhs.ports(0).values.head.bufferPort.isEmpty) -1 else 0
     val muxPort = lhs.ports(0).values.head.muxPort
     val muxOfs = lhs.ports(0).values.head.muxOfs
 
-    data.zipWithIndex.foreach{case (d, i) => 
-      val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
-      if (lhs.isDirectlyBanked && !isBroadcast) {
-        emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_Direct($ofsWidth, ${bank(i).map(_.trace.toInt)}, $width))") 
-        emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, (${muxPort}, $muxOfs), $i)""")
-      } else if (isBroadcast) {
-        emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
-        emitt(src"""${mem}.connectBroadcastWPort(${swap(src"${lhs}_$i", Blank)}, ($muxPort, $muxOfs), $i)""")        
-      } else {
-        emitGlobalWireMap(src"""${lhs}_$i""", s"Wire(new W_XBar($ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-        bank(i).zipWithIndex.foreach{case (b,j) => emitt(src"""${swap(src"${lhs}_$i", Blank)}.banks($j) := ${b}.rd""")}
-        emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_$i", Blank)}, $bufferPort, (${muxPort}, $muxOfs), $i)""")
-      }
-      if (ens(i).isEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable}""")
-      else emitt(src"""${swap(src"${lhs}_$i", Blank)}.$enport := ${invisibleEnable} & ${ens(i).map(quote).mkString(" & ")}""")
-      if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_$i", Blank)}.ofs := ${ofs(i)}.rd""")
-      emitt(src"""${swap(src"${lhs}_$i", Blank)}.data := ${d}.r""")
+    val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
+    if (lhs.isDirectlyBanked && !isBroadcast) {
+      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width))") 
+      emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, (${muxPort}, $muxOfs))""")
+    } else if (isBroadcast) {
+      val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
+      emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+      emitt(src"""${mem}.connectBroadcastWPort(${swap(src"${lhs}_port", Blank)}, ($muxPort, $muxOfs))""")        
+    } else {
+      val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+      emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
+      emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+      emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, (${muxPort}, $muxOfs))""")
     }
+    val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
+    val ensString = ens.map{e => and(e.filter(!commonEns.contains(_)))}.mkString("List(",",",")")
+    emitt(src"""${swap(src"${lhs}_port", Blank)}.$enport.zip(${ensString}.toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})).foreach{case (left, right) => left := right}""")
+    if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_port", Blank)}.ofs.zip(${ofs.map(quote(_) + ".r").mkString("List[UInt](",",",")")}.toSeq.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+    emitt(src"""${swap(src"${lhs}_port", Blank)}.data.zip(${data.map(quote(_) + ".r").mkString("List[UInt](",",",")")}).foreach{case (left, right) => left.r := right}""")
   }
 
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
@@ -179,6 +162,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def ifaceType(mem: Sym[_]): String = {
     mem match {
       case Op(_:FIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
+      case Op(_:LIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
       case _ => ""
     }
   }

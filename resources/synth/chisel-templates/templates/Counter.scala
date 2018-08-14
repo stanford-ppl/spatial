@@ -170,16 +170,16 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
   })
 
   val base = Module(new FF((width)))
-  base.io.xBarW(0).init := 0.U(width.W)
-  base.io.xBarW(0).reset := io.input.reset
-  base.io.xBarW(0).en := io.input.enables.reduce{_|_}
+  base.io.xBarW(0).init.head := 0.U(width.W)
+  base.io.xBarW(0).reset.head := io.input.reset
+  base.io.xBarW(0).en.head := io.input.enables.reduce{_|_}
 
   val count = base.io.output.data(0).asSInt
   val num_enabled = io.input.enables.map{e => Mux(e, 1.S(width.W), 0.S(width.W))}.reduce{_+_}
   val newval = count + Mux(io.input.dir, num_enabled, -num_enabled)
   val isMax = Mux(io.input.dir, newval >= depth.S, newval <= 0.S)
   val next = Mux(isMax, newval - depth.S(width.W), newval)
-  base.io.xBarW(0).data := Mux(io.input.reset, 0.asUInt, next.asUInt)
+  base.io.xBarW(0).data.head := Mux(io.input.reset, 0.asUInt, next.asUInt)
 
   io.output.count := base.io.output.data(0).asSInt
   io.output.done := io.input.enables.reduce{_|_} & isMax
@@ -248,9 +248,9 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
         ,0) // Maybe delay by 1 cycle just in case this is a critical path.  Init should never change during execution
     }
     bases.zipWithIndex.foreach{ case (b,i) => 
-      b.io.xBarW(0).init := inits(i).asUInt
-      b.io.xBarW(0).reset := io.input.reset | ~locked // {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}}
-      b.io.xBarW(0).en := io.input.enable
+      b.io.xBarW(0).init.head := inits(i).asUInt
+      b.io.xBarW(0).reset.head := io.input.reset | {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}}
+      b.io.xBarW(0).en.head := io.input.enable
     }
 
     val counts = bases.map(_.io.output.data(0).asSInt)
@@ -266,7 +266,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     val wasMax = RegNext(isMax, false.B)
     val wasEnabled = RegNext(io.input.enable, false.B)
     bases.zipWithIndex.foreach {case (b,i) => 
-      b.io.xBarW(0).data := Mux(io.input.reset, inits(i).asUInt, Mux(isMax, Mux(io.input.saturate, counts(i).asUInt, inits(i).asUInt), newvals(i).asUInt))
+      b.io.xBarW(0).data.head := Mux(io.input.reset, inits(i).asUInt, Mux(isMax, Mux(io.input.saturate, counts(i).asUInt, inits(i).asUInt), newvals(i).asUInt))
     }
 
     if(stride.isDefined) {
@@ -367,9 +367,9 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
   if (par > 0) {
     val base = Module(new FF((width)))
     val init = io.input.start
-    base.io.xBarW(0).init := init.asUInt
-    base.io.xBarW(0).reset := io.input.reset
-    base.io.xBarW(0).en := io.input.reset | io.input.enable
+    base.io.xBarW(0).init.head := init.asUInt
+    base.io.xBarW(0).reset.head := io.input.reset
+    base.io.xBarW(0).en.head := io.input.reset | io.input.enable
 
     val count = base.io.output.data(0).asSInt
     val newval = count + (io.input.stride * par.S((width).W)) + io.input.gap // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
@@ -379,7 +379,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     val wasMin = RegNext(isMin, false.B)
     val wasEnabled = RegNext(io.input.enable, false.B)
     val next = Mux(isMax, Mux(io.input.saturate, count, init), Mux(isMin, io.input.stop + io.input.stride, newval))
-    base.io.xBarW(0).data := Mux(io.input.reset, init.asUInt, next.asUInt)
+    base.io.xBarW(0).data.head := Mux(io.input.reset, init.asUInt, next.asUInt)
 
     (0 until par).foreach { i => io.output.count(i) := count + i.S((width).W)*io.input.stride } // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
     (0 until par).foreach { i => 
@@ -427,9 +427,9 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
   if (par > 0) {
     val base = Module(new FF((width)))
     val init = start.asSInt
-    base.io.xBarW(0).init := init.asUInt
-    base.io.xBarW(0).reset := io.input.reset
-    base.io.xBarW(0).en := io.input.enable
+    base.io.xBarW(0).init.head := init.asUInt
+    base.io.xBarW(0).reset.head := io.input.reset
+    base.io.xBarW(0).en.head := io.input.enable
 
     val count = base.io.output.data(0).asSInt
     val newval_up = count + ((strideUp * par + gap).S((width).W))
@@ -441,7 +441,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     val wasEnabled = RegNext(io.input.enable, false.B)
     // TODO: stop + strideDown in line below.. correct?
     val next = Mux(isMax & io.input.dir, Mux(io.input.saturate, count, init), Mux(isMin & ~io.input.dir & ~io.input.reset , (stop + strideDown).asSInt, Mux(io.input.dir, newval_up, newval_down)))
-    base.io.xBarW(0).data := Mux(io.input.reset, init.asUInt, next.asUInt)
+    base.io.xBarW(0).data.head := Mux(io.input.reset, init.asUInt, next.asUInt)
 
     (0 until par).foreach { i => io.output.count(i) := Mux(io.input.dir, count + (i*strideUp).S((width).W), count + (i*strideDown).S((width).W)) }
     (0 until par).foreach { i => 

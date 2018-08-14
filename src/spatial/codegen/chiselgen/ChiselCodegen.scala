@@ -17,7 +17,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   var streamLines = collection.mutable.Map[String, Int]() // Map from filename number of lines it has
   var streamExtensions = collection.mutable.Map[String, Int]() // Map from filename to number of extensions it has
   val tabWidth: Int = 2
-  val maxLinesPerFile = 400
+  val maxLinesPerFile = 200
   var compressorMap = collection.mutable.HashMap[String, (String,Int)]()
   var retimeList = collection.mutable.ListBuffer[String]()
   val pipeRtMap = collection.mutable.HashMap[(String,Int), String]()
@@ -118,25 +118,25 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor(d,w) = rhs
       s"${vec}ff${d}_${w}"
     } else if (rhs.contains(" W_Direct(")) {
-      val extractor = ".*W_Direct\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(ofsW,bankWs,dW) = rhs
+      val extractor = ".*W_Direct\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\).grouped\\([0-9]+\\).toList[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(pw,ofsW,bankWs,dW) = rhs
       val bWs = bankWs.replace(" ", "").replace(",","_")
-      s"${vec}wdbar${ofsW}_${bWs}_${dW}"
+      s"${vec}wdbar${pw}_${ofsW}_${bWs}_${dW}"
     } else if (rhs.contains(" R_Direct(")) {
-      val extractor = ".*R_Direct\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
-      val extractor(ofsW,bankWs) = rhs
+      val extractor = ".*R_Direct\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\).grouped\\([0-9]+\\).toList[ ]*\\).*".r
+      val extractor(pw,ofsW,bankWs) = rhs
       val bWs = bankWs.replace(" ", "").replace(",","_")
-      s"${vec}rdbar${ofsW}_${bWs}"
+      s"${vec}rdbar${pw}_${ofsW}_${bWs}"
     } else if (rhs.contains(" W_XBar(")) {
-      val extractor = ".*W_XBar\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
-      val extractor(ofsW,bankWs,dW) = rhs
+      val extractor = ".*W_XBar\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
+      val extractor(pw,ofsW,bankWs,dW) = rhs
       val bWs = bankWs.replace(" ", "").replace(",","_")
-      s"${vec}wxbar${ofsW}_${bWs}_${dW}"
+      s"${vec}wxbar${pw}_${ofsW}_${bWs}_${dW}"
     } else if (rhs.contains(" R_XBar(")) {
-      val extractor = ".*R_XBar\\([ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
-      val extractor(ofsW,bankWs) = rhs
+      val extractor = ".*R_XBar\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*List\\(([0-9,]+)\\)[ ]*\\).*".r
+      val extractor(pw,ofsW,bankWs) = rhs
       val bWs = bankWs.replace(" ", "").replace(",","_")
-      s"${vec}rxbar${ofsW}_${bWs}"
+      s"${vec}rxbar${pw}_${ofsW}_${bWs}"
     } else if (rhs.contains(" RegChainPass(")) {
       val extractor = ".*RegChainPass\\([ ]*([0-9]+)[ ]*,[ ]*([0-9,]+)[ ]*\\).*".r
       val extractor(depth,width) = rhs

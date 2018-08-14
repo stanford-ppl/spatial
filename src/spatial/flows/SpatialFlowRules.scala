@@ -203,6 +203,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
           val default = if (s.isUnitPipe || s.isAccel) Sequenced else Pipelined
           s.rawSchedule = default
       }
+
       logs(s"=>")
       logs(s"  Initial Schedule: ${s.rawSchedule}")
       logs(s"  Single Control:   ${s.isSingleControl}")

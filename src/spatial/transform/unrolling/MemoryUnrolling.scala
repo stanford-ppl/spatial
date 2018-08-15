@@ -334,8 +334,6 @@ trait MemoryUnrolling extends UnrollingBase {
 
       portGroups.flatMap{case ((bufferPort,muxPort), muxVs) =>
         // Finally, merge contiguous vector sections together into single vector accesses
-        val broadcasts = muxVs.flatMap(_.port.broadcast)
-        val castgroups = muxVs.flatMap(_.port.castgroup)
         val muxSize = muxVs.map(_.port.muxSize).maxOrElse(0)
         val accesses = muxVs.sortBy(_.port.muxOfs)
         val vectors: ArrayBuffer[ArrayBuffer[UnrollInstance]] = ArrayBuffer.empty
@@ -347,6 +345,8 @@ trait MemoryUnrolling extends UnrollingBase {
         }
         vectors.map{vec =>
           val muxOfs = vec.head.port.muxOfs
+          val castgroups = vec.flatMap(_.port.castgroup)
+          val broadcasts = vec.flatMap(_.port.broadcast)
           UnrollInstance(
             memory  = mem2,
             dispIds = vec.flatMap(_.dispIds),

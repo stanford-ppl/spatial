@@ -1,15 +1,15 @@
-val nova_version      = "1.0"
+val spatial_version   = "1.0"
 val scala_version     = "2.12.6"
 val paradise_version  = "2.1.0"
 val scalatestVersion  = "3.0.5"
 
-name := "nova"
+name := "spatial"
 organization := "edu.stanford.ppl"
 trapExit := false
 
 val common = Seq(
   scalaVersion := scala_version,
-  version := nova_version,
+  version := spatial_version,
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
@@ -65,8 +65,8 @@ lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 
-lazy val nova = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly)
-lazy val apps = project.settings(common).dependsOn(nova)
+lazy val spatial = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly)
+lazy val apps = project.settings(common).dependsOn(spatial)
 
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt

@@ -53,7 +53,7 @@ clear:
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
 clean:
-	sbt "; forge/clean; argon/clean; nova/clean"
+	sbt "; forge/clean; argon/clean; spatial/clean"
 	sbt clean
 
 

@@ -68,10 +68,7 @@ case class MemoryReporter(IR: State) extends Pass {
                 .flatMap{a => a.ports(id).filter(_._2.bufferPort == port).map{case (unroll,pt) => (a,unroll,pt) } }
             }
 
-            // Find the maximum width of this buffer port
-            val muxSize: Int = accesses.map{case (a,uid,pt) => pt.muxSize }.maxOrElse(0)
-
-            emit(s"$prefix  $p [Type:$tp, Width:$muxSize]:")
+            emit(s"$prefix  $p [Type:$tp]:")
             accesses.groupBy(_._3.muxPort).toSeq.sortBy(_._1).foreach{case (muxPort, muxAccs) =>
               emit(s"$prefix    - Mux Port #$muxPort: ")
               muxAccs.foreach{case (a,uid,pt) =>

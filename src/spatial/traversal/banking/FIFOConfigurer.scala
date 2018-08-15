@@ -24,8 +24,6 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
   }
 
   private def computePorts(groups: Set[Set[AccessMatrix]]): Map[AccessMatrix,Port] = {
-    val muxSize = groups.map(_.size).maxOrElse(0)
-
     groups.zipWithIndex.flatMap{case (group,muxPort) =>
       // TODO: Broadcast possible for FIFOs?
       import scala.math.Ordering.Implicits._
@@ -33,7 +31,6 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
         val port = Port(
           bufferPort = Some(0),
           muxPort    = muxPort,
-          muxSize    = muxSize,
           muxOfs     = muxOfs,
           castgroup  = Seq(0),
           broadcast  = Seq(0)

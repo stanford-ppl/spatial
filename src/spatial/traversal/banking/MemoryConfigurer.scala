@@ -242,7 +242,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *            |   Buffer 0   |   Buffer 1   |
     *            |--------------|--------------|
     * bufferPort         0              1           The buffer port (None for access outside pipeline)
-    * muxSize            3              3           Width of a single time multiplexed vector
     *                 |x x x|        |x x x|
     *
     *                /       \      /       \
@@ -274,7 +273,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       }
 
       val muxPorts: Map[Int,Set[AccessMatrix]] = grps.flatten.groupBy{m => muxPortMap(m) }
-      val muxSize: Int = muxPorts.values.map(_.size).maxOrElse(0)
 
       muxPorts.foreach{case (muxPort, matrices) =>
         var muxOfs: Int = 0
@@ -308,7 +306,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val port = Port(
               bufferPort = bufferPort,
               muxPort    = muxPort,
-              muxSize    = muxSize,
               muxOfs     = muxOffset,
               castgroup  = Seq(castgroup),
               broadcast  = Seq(broadcast)

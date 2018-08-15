@@ -573,7 +573,6 @@ object Utils {
   *            |   Buffer 0   |   Buffer 1   |
   *            |--------------|--------------|
   * bufferPort         0              1           The buffer port (None for access outside pipeline)
-  * muxSize            3              3           Width of a single time multiplexed vector
   *                 |x x x|        |x x x|
   *
   *                /       \      /       \

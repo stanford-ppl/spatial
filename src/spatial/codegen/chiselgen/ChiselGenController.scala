@@ -75,18 +75,6 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-  protected def emitControlSignals(lhs: Sym[_]): Unit = {
-    emitGlobalWireMap(src"""${swap(lhs, Done)}""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${swap(lhs, BaseEn)}""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${swap(lhs, IIDone)}""", """Wire(Bool())""")
-    // emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
-    emitGlobalWireMap(src"""${lhs}_ctr_trivial""", """Wire(Bool())""")
-  }
-
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)

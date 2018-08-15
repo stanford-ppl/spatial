@@ -44,6 +44,8 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	def apply(msb:Int, lsb:Int): UInt = this.number(msb,lsb)
 	def apply(bit:Int): Bool = this.number(bit)
 
+    def toSeq: Seq[FixedPoint] = Seq(this)
+
 	// Properties
 	val number = UInt((d + f).W)
 	val debug_overflow = Bool()

@@ -69,16 +69,13 @@ object ModBanking {
   *
   */
 case class Port(
-  bufferPort: Option[Int],
-  muxPort: Int,
-  muxSize: Int,
-  muxOfs:  Int,
-  castgroup: Int,    // The broadcast group the access belongs to within this port
-  broadcast: Int     // The broadcast index of this group (0 = broadcasting, >0 = receiving)
-) {
-  def isBroadcastSender: Boolean = broadcast == 0
-  def isBroadcastReceiver: Boolean = broadcast > 0
-}
+  bufferPort: Option[Int],  // The ID for a buffered access (None if time-multiplexed with buffer)
+  muxPort: Int,             // The ID on the multiplexed mux for a single port
+  muxSize: Int,             // The total size of the mux port (in words)
+  muxOfs:  Int,             // The offset of the first element of this access within a mux port
+  castgroup: Seq[Int],      // The broadcast group(s) the access belongs to within this port
+  broadcast: Seq[Int]       // The broadcast index of this group (0 = broadcasting, >0 = receiving)
+)
 
 
 /** Used during memory analysis to track intermediate results. */

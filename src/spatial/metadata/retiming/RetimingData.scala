@@ -14,6 +14,7 @@ abstract class Cycle extends Data[Cycle](Transfer.Remove) {
   def length: Double
   def symbols: Set[Sym[_]]
   def marker: AccumMarker
+  def memory: Sym[_]
   def cycleID: Int
 }
 

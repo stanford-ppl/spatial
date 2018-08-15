@@ -173,7 +173,6 @@ trait MemoryUnrolling extends UnrollingBase {
         def vecToLaneAddr(vec: Int): Int = vec2Lane.map(_.apply(vec)).getOrElse(laneIds.apply(vec))
 
         dbgs(s"  Masters: $masters // Non-duplicated lane indices")
-
         // Writing two different values to the same address currently just writes the last value
         // Note this defines a race condition, so its behavior is undefined by the language
         val data2 = data.map{d =>
@@ -190,32 +189,59 @@ trait MemoryUnrolling extends UnrollingBase {
         val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst,broadcast) }
         /** End withFlow **/
 
-        val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
+        val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty) {
+          val segmentMapping = lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}
+          if (segmentMapping.size > 1) {
+            dbgs(s"Fracturing access $lhs into more than 1 segment:")
+            segmentMapping.map{case (segment, lanesInSegment) => 
+              dbgs(s"needa lookup $lanesInSegment in $lane2Vec")
+              val vecsInSegment = lanesInSegment.map(laneIdToVecId)
+              dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
+              val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
+              val bank3 = vecsInSegment.map(bank.getOrElse(Nil)(_))
+              val ofs3 = vecsInSegment.map(ofs.getOrElse(Nil)(_))
+              val ens3 = vecsInSegment.map(ens2(_))
+              (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
+            }.toSeq
+          } else {
+            Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
+          }
+        } else {
+          Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
+        }
 
         // hack for issue #90
         val newSize = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.count(_ == (mem2,port))
         val newOfs = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.take(i).count(_ == (mem2,port))
-        val port2 = Port(port.bufferPort,port.muxPort,port.muxSize + newSize,port.muxOfs + newOfs,port.castgroup,port.broadcast)
-
-        banked.s.foreach{s =>
+        
+        banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, i) =>
+          val segmentBase = banked.flatMap(_._2).take(i).length
+          val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
+          val port2 = Port(port.bufferPort,port.muxPort,port.muxSize + newSize,port.muxOfs + newOfs + segmentBase,port.castgroup,port.broadcast) 
           s.addPort(dispatch=0, Nil, port2)
           s.addDispatch(Nil, 0)
+          s.segmentMapping = Map(0 -> segment)
+          if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); strMeta(s)
         }
 
-        banked match{
-          case UVecRead(vec) =>
-            val elems: Seq[A] = vecIds.map{i => vec(i) }
-            lanes.inLanes(laneIds){p =>
-              val elem: Sym[A] = elems(laneIdToVecId(p))
+        banked.flatMap{
+          case (UVecRead(vec), vecsInSegment, _) =>
+            // val vecsInSegment = lanesInSegment.map(laneIdToVecId)
+            val elems: Seq[A] = if (lhs.segmentMapping.values.toList.sorted.reverse.headOption.getOrElse(0) >= 1) vecsInSegment.indices.map{i => vec(i) }
+                                else vecsInSegment.map{i => vec(i)}
+            val thisLaneIds = laneIds.filter(vecsInSegment.map(vecToLaneAddr).contains)
+            dbgs(s"info $vec $vecsInSegment, laneids are $laneIds vs $thisLaneIds")
+            dbgs(s"vecs -> lane $vec2Lane, lane -> vec $lane2Vec")
+            lanes.inLanes(thisLaneIds){p =>
+              val elem: Sym[A] = elems(vecsInSegment.indexOf(laneIdToVecId(p)))
               register(lhs -> elem)
               elem
             }
-          case URead(v)      => lanes.unifyLanes(laneIds)(lhs, v)
-          case UWrite(write) => lanes.unifyLanes(laneIds)(lhs, write)
-          case UMultiWrite(vs) => lanes.unifyLanes(laneIds)(lhs, vs.head.s.head)
+          case (URead(v), _, _)        => lanes.unifyLanes(laneIds)(lhs, v)
+          case (UWrite(write), _, _)   => lanes.unifyLanes(laneIds)(lhs, write)
+          case (UMultiWrite(vs), _, _) => lanes.unifyLanes(laneIds)(lhs, vs.head.s.head)
         }
-
       }
     }
     else Nil
@@ -303,8 +329,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicateGroups = mems.groupBy(_.memory).toList
 
     duplicateGroups.flatMap{case (mem2, vs) =>
-      // Then group by which physical port (buffer + mux) these accesses are connected to and
-      // which broadcast group each access is in
+      // Then group by which physical port (buffer + mux) these accesses are connected to
       val portGroups = vs.groupBy{v => (v.port.bufferPort, v.port.muxPort) }.toSeq
 
       portGroups.flatMap{case ((bufferPort,muxPort), muxVs) =>

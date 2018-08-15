@@ -13,6 +13,13 @@ import spatial.util.spatialConfig
 
 trait ChiselGenCommon extends ChiselCodegen { 
 
+  /* Set of controllers that we've already emitted control signals for.  Sometimes a RegRead
+   * can sit in an outer controller and be used by a controller that is a descendent of the 
+   * other controllers in this outer controller 
+  **/
+  private var initializedControllers = Set.empty[Sym[_]]
+
+
   // Statistics counters
   var pipeChainPassMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
   var pipeChainPassMapBug41Hack = new scala.collection.mutable.HashMap[Sym[_], Sym[_]]
@@ -85,6 +92,21 @@ trait ChiselGenCommon extends ChiselCodegen {
       val precBits = prec.map{case (_,bt) => bitWidth(bt)}.sum
       (precBits+width-1, precBits)
     case _ => (-1, -1)
+  }
+
+  protected def emitControlSignals(lhs: Sym[_]): Unit = {
+    if (!initializedControllers.contains(lhs)) {
+      emitGlobalWireMap(src"""${swap(lhs, Done)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, BaseEn)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, IIDone)}""", """Wire(Bool())""")
+      // emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_ctr_trivial""", """Wire(Bool())""")
+      initializedControllers += lhs
+    }
   }
 
   def emitCounterChain(lhs: Sym[_]): Unit = {

@@ -92,6 +92,7 @@ trait Spatial extends Compiler {
     lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
     lazy val accumTransformer      = AccumTransformer(state)
+    lazy val regReadCSE            = RegReadCSE(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -114,7 +115,9 @@ trait Spatial extends Compiler {
         memoryDealiasing    ==> printer ==> transformerChecks ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
-        /** Dead code cleanup */
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Memory analysis */
@@ -125,8 +128,12 @@ trait Spatial extends Compiler {
         iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
         useAnalyzer         ==>
-        transientCleanup    ==> 
+        transientCleanup    ==>
+        /** Update buffer depths */
         bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>

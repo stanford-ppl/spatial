@@ -31,11 +31,11 @@ trait ChiselGenMem extends ChiselGenCommon {
     val ofsWidth = Math.max(1, Math.ceil(scala.math.log(mem.constDims.product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) mem.constDims.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-    val isBroadcast = lhs.ports(0).values.head.bufferPort.isEmpty & mem.instance.depth > 1
-    val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
-    val muxPort = lhs.ports(0).values.head.muxPort
-    val muxOfs = lhs.ports(0).values.head.muxOfs
-    val shouldReadCaster = lhs.ports(0).values.head.broadcast == 0
+    val isBroadcast = lhs.port.bufferPort.isEmpty & mem.instance.depth > 1
+    val bufferPort = lhs.port.bufferPort.getOrElse(-1)
+    val muxPort = lhs.port.muxPort
+    val muxOfs = lhs.port.muxOfs
+    val shouldReadCaster = lhs.port.broadcast.head == 0 // FIXME: Assumes broadcast is same across all right now
 
     lhs.tp match {
       case _: Vec[_] => emitGlobalWireMap(src"""${lhs}""", src"""Wire(Vec(${ens.length}, ${mem.tp.typeArgs.head}))""") 
@@ -89,11 +89,11 @@ trait ChiselGenMem extends ChiselGenCommon {
     val ofsWidth = 1 max Math.ceil(scala.math.log(mem.constDims.product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) mem.constDims.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-    val isBroadcast = lhs.ports(0).values.head.bufferPort.isEmpty & mem.instance.depth > 1
-    val bufferPort = lhs.ports(0).values.head.bufferPort.getOrElse(-1)
-    // val issue35hack = if (mem.instance.depth == 1 & lhs.ports(0).values.head.bufferPort.isEmpty) -1 else 0
-    val muxPort = lhs.ports(0).values.head.muxPort
-    val muxOfs = lhs.ports(0).values.head.muxOfs
+    val isBroadcast = lhs.port.bufferPort.isEmpty & mem.instance.depth > 1
+    val bufferPort = lhs.port.bufferPort.getOrElse(-1)
+    // val issue35hack = if (mem.instance.depth == 1 & lhs.port.bufferPort.isEmpty) -1 else 0
+    val muxPort = lhs.port.muxPort
+    val muxOfs = lhs.port.muxOfs
 
     data.zipWithIndex.foreach{case (d, i) => 
       val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
@@ -120,8 +120,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
     val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-    val broadcastWrites = mem.writers.filter{w => w.ports(0).values.head.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
-    val broadcastReads = mem.readers.filter{w => w.ports(0).values.head.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
+    val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
+    val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
 
     val templateName = if (inst.depth == 1) s"${name}("
                        else {appPropertyStats += HasNBufSRAM; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
@@ -131,37 +131,37 @@ trait ChiselGenMem extends ChiselGenCommon {
     def outerMap(t: String): String = if (inst.depth > 1) s"NBuf${t}Map" else s"${t}Map"
     def innerMap(t: String): String = s"${t}Map"
     // Create mapping for (bufferPort -> (muxPort -> width)) for XBar accesses
-    val XBarW = s"${outerMap("X")}(" + mem.writers.filter(_.ports(0).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val XBarW = s"${outerMap("X")}(" + mem.writers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filterNot(_.isDirectlyBanked)              // Filter out statically banked
                               .filter(_.accessWidth > 0)
-                              .groupBy(_.ports(0).values.head.bufferPort.getOrElse(-1))      // Group by port
+                              .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                               .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + writes.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",") + ")"
-                                else writes.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs}) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",") + ")"
+                                else writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs}) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",")
                               }.mkString(",") + ")"
-    val XBarR = s"${outerMap("X")}(" + mem.readers.filter(_.ports(0).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val XBarR = s"${outerMap("X")}(" + mem.readers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filterNot(_.isDirectlyBanked)              // Filter out statically banked
                               .filter(_.accessWidth > 0)
-                              .groupBy(_.ports(0).values.head.bufferPort.getOrElse(-1))      // Group by port
+                              .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                               .map{case(bufp, reads) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + reads.map{r => src"(${r.ports(0).values.head.muxPort},${r.ports(0).values.head.muxOfs}) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",") + ")"
-                                else reads.map{r => src"(${r.ports(0).values.head.muxPort},${r.ports(0).values.head.muxOfs}) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs}) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",") + ")"
+                                else reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs}) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",")
                               }.mkString(",") + ")"
-    val DirectW = s"${outerMap("D")}(" + mem.writers.filter(_.ports(0).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val DirectW = s"${outerMap("D")}(" + mem.writers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .filter(_.accessWidth > 0)
-                              .groupBy(_.ports(0).values.head.bufferPort.getOrElse(-1))      // Group by port
+                              .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                               .map{case(bufp, writes) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
-                                else writes.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
+                                else writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",")
                               }.mkString(",") + ")"
-    val DirectR = s"${outerMap("D")}(" + mem.readers.filter(_.ports(0).values.head.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val DirectR = s"${outerMap("D")}(" + mem.readers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
                               .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                               .filter(_.accessWidth > 0)
-                              .groupBy(_.ports(0).values.head.bufferPort.getOrElse(-1))      // Group by port
+                              .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                               .map{case(bufp, reads) => 
-                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
-                                else reads.map{w => src"(${w.ports(0).values.head.muxPort},${w.ports(0).values.head.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",")
+                                if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{w => src"(${w.port.muxPort},${w.port.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
+                                else reads.map{w => src"(${w.port.muxPort},${w.port.muxOfs}) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",")
                               }.mkString(",") + ")"
     val BXBarW = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastWrites.mkString(",") + ")," else ""
     val BXBarR = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastReads.mkString(",") + ")," else ""
@@ -300,7 +300,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
-    val accesses = mem.accesses.filter(_.ports(0).values.head.bufferPort.isDefined)
+    val accesses = mem.accesses.filter(_.port.bufferPort.isDefined)
 
     var specialLB = false
     // val readCtrls = readPorts.map{case (port, readers) =>

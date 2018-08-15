@@ -72,6 +72,9 @@ package object memory {
 
     def getPort(dispatch: Int, uid: Seq[Int]): Option[Port] = getPorts(dispatch).flatMap(_.get(uid))
     def port(dispatch: Int, uid: Seq[Int]): Port = getPort(dispatch, uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }
+
+    /** Returns the final port after unrolling. For use after unrolling only. */
+    def port: Port = getPorts(0).flatMap(_.values.headOption).getOrElse{ throw new Exception(s"No final port defined for $s") }
   }
 
 

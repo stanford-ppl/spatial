@@ -184,15 +184,10 @@ trait MemoryUnrolling extends UnrollingBase {
 
         implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
 
-        /** Begin withFlow -- set whether this is a broadcast address (true if its a receiver). **/
-        val (bank, ofs) = withFlow("broadcastAddr", {sym: Sym[_] =>
-          // Denotes that the addresses are only placeholders if this is a broadcast receive
-          sym.isBroadcastAddr = port.isBroadcastReceiver
-        }){
-          val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
-          val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
-          (bank, ofs)
-        }
+        val broadcast = port.broadcast.map(_ > 0)
+
+        val bank = addr2.map{a => bankSelects(mem,rhs,a,inst,broadcast) }
+        val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst,broadcast) }
         /** End withFlow **/
 
         val banked = bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2)
@@ -226,11 +221,16 @@ trait MemoryUnrolling extends UnrollingBase {
     else Nil
   }
 
+  def broadcastAddr[T](broadcast: Boolean)(func: => T): T = {
+    withFlow("broadcastAddr", {sym: Sym[_] => sym.isBroadcastAddr = broadcast }){ func }
+  }
+
   def bankSelects(
-    mem:  Sym[_],
-    node: Op[_],               // Pre-unrolled access
-    addr: Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
-    inst: Memory               // Memory instance associated with this access
+    mem:       Sym[_],
+    node:      Op[_],               // Pre-unrolled access
+    addr:      Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
+    inst:      Memory,              // Memory instance associated with this access
+    broadcast: Seq[Boolean]
   )(implicit ctx: SrcCtx): Seq[Seq[Idx]] = node match {
     // LineBuffers are special in that their first dimension is always implicitly fully banked
     //case _:LineBufferRotateEnq[_]  => addr
@@ -240,19 +240,24 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
-    case _ => addr.map{laneAddr => inst.bankSelects(mem, laneAddr) }
+    case _ => addr.zip(broadcast).map{case (laneAddr,b) =>
+      broadcastAddr(b){ inst.bankSelects(mem, laneAddr) }
+    }
   }
 
   def bankOffset(
     mem:    Sym[_],
     access: Sym[_],
     addr:   Seq[Seq[Idx]],
-    inst:   Memory
+    inst:   Memory,
+    broadcast: Seq[Boolean]
   )(implicit ctx: SrcCtx): Seq[Idx] = access match {
     case _:RegFileShiftIn[_,_]  => Nil
     case _:RegFileRead[_,_]     => Nil
     case _:RegFileWrite[_,_]    => Nil
-    case _ => addr.map{laneAddr => inst.bankOffset(mem, laneAddr) }
+    case _ => addr.zip(broadcast).map{case (laneAddr,b) =>
+      broadcastAddr(b){ inst.bankOffset(mem, laneAddr) }
+    }
   }
 
 
@@ -300,12 +305,12 @@ trait MemoryUnrolling extends UnrollingBase {
     duplicateGroups.flatMap{case (mem2, vs) =>
       // Then group by which physical port (buffer + mux) these accesses are connected to and
       // which broadcast group each access is in
-      val portGroups = vs.groupBy{v =>
-        (v.port.bufferPort, v.port.muxPort, v.port.castgroup, v.port.broadcast)
-      }.toSeq
+      val portGroups = vs.groupBy{v => (v.port.bufferPort, v.port.muxPort) }.toSeq
 
-      portGroups.flatMap{case ((bufferPort,muxPort,castgroup,broadcast), muxVs) =>
+      portGroups.flatMap{case ((bufferPort,muxPort), muxVs) =>
         // Finally, merge contiguous vector sections together into single vector accesses
+        val broadcasts = muxVs.flatMap(_.port.broadcast)
+        val castgroups = muxVs.flatMap(_.port.castgroup)
         val muxSize = muxVs.map(_.port.muxSize).maxOrElse(0)
         val accesses = muxVs.sortBy(_.port.muxOfs)
         val vectors: ArrayBuffer[ArrayBuffer[UnrollInstance]] = ArrayBuffer.empty
@@ -321,7 +326,7 @@ trait MemoryUnrolling extends UnrollingBase {
             memory  = mem2,
             dispIds = vec.flatMap(_.dispIds),
             laneIds = vec.flatMap(_.laneIds),
-            port    = Port(bufferPort,muxPort,muxSize,muxOfs,castgroup,broadcast),
+            port    = Port(bufferPort,muxPort,muxSize,muxOfs,castgroups,broadcasts),
             vecOfs  = vec.flatMap(_.vecOfs)
           )
         }

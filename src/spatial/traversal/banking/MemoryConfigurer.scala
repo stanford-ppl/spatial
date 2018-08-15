@@ -310,8 +310,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
               muxPort    = muxPort,
               muxSize    = muxSize,
               muxOfs     = muxOffset,
-              castgroup  = castgroup,
-              broadcast  = broadcast
+              castgroup  = Seq(castgroup),
+              broadcast  = Seq(broadcast)
             )
             ports += m -> port
             if (broadcast == 0) muxOfs += 1

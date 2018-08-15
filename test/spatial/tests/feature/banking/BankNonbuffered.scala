@@ -41,6 +41,6 @@ import spatial.dsl._
     import spatial.metadata.memory._
     val xs = LocalMemories.all.filter(_.name.exists{_.startsWith("x")})
     xs.forall(_.instance.depth == 1) &&
-      xs.forall{x => x.readers.map{read => read.ports(0).values.head.muxPort }.size == 1 }
+      xs.forall{x => x.readers.map{read => read.port.muxPort }.size == 1 }
   }
 }

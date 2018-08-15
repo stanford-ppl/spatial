@@ -35,8 +35,8 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
           muxPort    = muxPort,
           muxSize    = muxSize,
           muxOfs     = muxOfs,
-          castgroup  = 0,
-          broadcast  = 0
+          castgroup  = Seq(0),
+          broadcast  = Seq(0)
         )
         matrix -> port
       }

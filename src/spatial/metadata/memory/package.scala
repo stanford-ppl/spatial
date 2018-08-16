@@ -53,7 +53,7 @@ package object memory {
     def instance: Memory = getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
 
-    def broadcastsAnyRead: Boolean = s.readers.exists{r => r.port.broadcast.exists(_ > 0)}
+    def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {

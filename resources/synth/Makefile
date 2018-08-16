@@ -383,6 +383,7 @@ vcs-sw:
 	ln -sf cpp/Top .
 
 vcs-hw:
+	echo "$$(date +%s)" >> start.log
 	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" chisel/template-level/fringeVCS/Top-harness.sv; fi 
 	# sed -i "s/val bug239_hack = .*/val bug239_hack = false/g" chisel/template-level/fringeHW/Fringe.scala
 	sbt "runMain top.Instantiator --verilog --testArgs vcs"
@@ -390,6 +391,7 @@ vcs-hw:
 	touch in.txt
 	make -C verilog-vcs
 	ln -sf verilog-vcs verilog
+	echo "$$(date +%s)" > end.log
 
 vcs-clean:
 	make -C verilog-vcs clean

@@ -194,8 +194,8 @@ trait MemoryUnrolling extends UnrollingBase {
 
         val broadcast = port.broadcast.map(_ > 0)
 
-        val bank = addr2.map{a => bankSelects(mem,rhs,a,inst,broadcast) }
-        val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst,broadcast) }
+        val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
+        val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
         /** End withFlow **/
 
         val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty) {
@@ -203,7 +203,6 @@ trait MemoryUnrolling extends UnrollingBase {
           if (segmentMapping.size > 1) {
             dbgs(s"Fracturing access $lhs into more than 1 segment:")
             segmentMapping.map{case (segment, lanesInSegment) => 
-              dbgs(s"needa lookup $lanesInSegment in $lane2Vec")
               val vecsInSegment = lanesInSegment.map(laneIdToVecId)
               dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
               val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
@@ -239,10 +238,13 @@ trait MemoryUnrolling extends UnrollingBase {
             val elems: Seq[A] = if (lhs.segmentMapping.values.toList.sorted.reverse.headOption.getOrElse(0) >= 1) vecsInSegment.indices.map{i => vec(i) }
                                 else vecsInSegment.map{i => vec(i)}
             val thisLaneIds = laneIds.filter(vecsInSegment.map(vecToLaneAddr).contains)
-            dbgs(s"info $vec $vecsInSegment, laneids are $laneIds vs $thisLaneIds")
-            dbgs(s"vecs -> lane $vec2Lane, lane -> vec $lane2Vec")
             lanes.inLanes(thisLaneIds){p =>
-              val elem: Sym[A] = elems(vecsInSegment.indexOf(laneIdToVecId(p)))
+              // Convert lane to vecId
+              val vecId = laneIdToVecId(p)
+              // Convert vecId to true index in this segment
+              val id = vecsInSegment.indexOf(vecId)
+              // Get this element
+              val elem: Sym[A] = elems(id)
               register(lhs -> elem)
               elem
             }
@@ -255,16 +257,11 @@ trait MemoryUnrolling extends UnrollingBase {
     else Nil
   }
 
-  def broadcastAddr[T](broadcast: Boolean)(func: => T): T = {
-    withFlow("broadcastAddr", {sym: Sym[_] => sym.isBroadcastAddr = broadcast }){ func }
-  }
-
   def bankSelects(
     mem:       Sym[_],
     node:      Op[_],               // Pre-unrolled access
     addr:      Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
-    inst:      Memory,              // Memory instance associated with this access
-    broadcast: Seq[Boolean]
+    inst:      Memory               // Memory instance associated with this access
   )(implicit ctx: SrcCtx): Seq[Seq[Idx]] = node match {
     // LineBuffers are special in that their first dimension is always implicitly fully banked
     //case _:LineBufferRotateEnq[_]  => addr
@@ -274,8 +271,8 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
-    case _ => addr.zip(broadcast).map{case (laneAddr,b) =>
-      broadcastAddr(b){ inst.bankSelects(mem, laneAddr) }
+    case _ => addr.map{case laneAddr =>
+      inst.bankSelects(mem, laneAddr)
     }
   }
 
@@ -283,14 +280,13 @@ trait MemoryUnrolling extends UnrollingBase {
     mem:    Sym[_],
     access: Sym[_],
     addr:   Seq[Seq[Idx]],
-    inst:   Memory,
-    broadcast: Seq[Boolean]
+    inst:   Memory
   )(implicit ctx: SrcCtx): Seq[Idx] = access match {
     case _:RegFileShiftIn[_,_]  => Nil
     case _:RegFileRead[_,_]     => Nil
     case _:RegFileWrite[_,_]    => Nil
-    case _ => addr.zip(broadcast).map{case (laneAddr,b) =>
-      broadcastAddr(b){ inst.bankOffset(mem, laneAddr) }
+    case _ => addr.map{case laneAddr =>
+      inst.bankOffset(mem, laneAddr)
     }
   }
 

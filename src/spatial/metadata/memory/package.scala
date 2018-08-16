@@ -52,6 +52,8 @@ package object memory {
     def getInstance: Option[Memory] = getDuplicates.flatMap(_.headOption)
     def instance: Memory = getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
+
+    def broadcastsAnyRead: Boolean = s.readers.exists{r => r.port.broadcast.exists(_ > 0)}
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {
@@ -212,6 +214,7 @@ package object memory {
     def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
     def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
 
+    def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
     def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
     def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
   }

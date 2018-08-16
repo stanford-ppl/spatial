@@ -73,6 +73,7 @@ trait Spatial extends Compiler {
     lazy val iterationDiffAnalyzer = IterationDiffAnalyzer(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
     lazy val accumAnalyzer      = AccumAnalyzer(state)
+    lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
@@ -146,6 +147,8 @@ trait Spatial extends Compiler {
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>
+        /** Broadcast cleanup */
+        broadcastCleanup    ==> printer ==>
         /** Schedule finalization */
         initiationAnalyzer  ==>
         /** Reports */

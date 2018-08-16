@@ -102,10 +102,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val used = instances.flatMap(_.accesses).toSet
     val unused = mem.accesses diff used
     unused.foreach{access =>
-      val msg = if (access.isReader) s"Read of ${mem.nameOr("memory")} was unused. Read will be removed."
-                else s"Write to memory ${mem.nameOr("memory")} is never used. Write will be removed."
-      warn(access.ctx, msg)
-      warn(access.ctx)
+      if (mem.name.isDefined) {
+        val msg = if (access.isReader) s"Read of memory ${mem.name.get} was unused. Read will be removed."
+                  else s"Write to memory ${mem.name.get} is never used. Write will be removed."
+        warn(access.ctx, msg)
+        warn(access.ctx)
+      }
 
       access.isUnusedAccess = true
 
@@ -331,7 +333,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     val bankings = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, dimGrps)
-    if (bankings.nonEmpty) {
+    val result = if (bankings.nonEmpty) {
       val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
 
       if (issue.isEmpty) {
@@ -346,22 +348,18 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
-        val instance = Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp)
-
-        dbgs(s"  Reads:")
-        rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
-        dbgs(s"  Writes:")
-        reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
-        dbgs(s"  Instance: ")
-        dbgss("  ", instance)
-
-        Right(instance)
+        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp))
       }
       else Left(issue.get)
     }
-    else {
-      Left(UnbankableGroup(mem, reads, writes))
-    }
+    else Left(UnbankableGroup(mem, reads, writes))
+
+    dbgs(s"  Reads:")
+    rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+    dbgs(s"  Writes:")
+    reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+    dbgs(s"  Result: $result")
+    result
   }
 
   // TODO: Some code duplication here with groupAccesses

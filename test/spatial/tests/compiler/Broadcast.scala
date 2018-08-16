@@ -5,9 +5,9 @@ import spatial.dsl._
 @spatial class Broadcast extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
-    val M = 64
-    val N = 64
-    val K = 64
+    val M = 16
+    val N = 16
+    val K = 16
     val MP = 1
     val NP = 8
     val KP = 4
@@ -17,8 +17,8 @@ import spatial.dsl._
     val dram1 = DRAM[Int](M,K)
     val dram2 = DRAM[Int](K, N)
     val dram3 = DRAM[Int](M,N)
-    val data1 = (0::M,0::K){(i,j) => random[Int](32) }
-    val data2 = (0::K,0::N){(i,j) => random[Int](32) }
+    val data1 = (0::M,0::K){(i,j) => i*K + j}//random[Int](32) }
+    val data2 = (0::K,0::N){(i,j) => i*N + j}//random[Int](32) }
 
     setMem(dram1, data1)
     setMem(dram2, data2)
@@ -41,12 +41,13 @@ import spatial.dsl._
 
     val result_y = getMatrix(dram3)
 
-    val golden_y = (0::64,0::64){(i,j) =>
-      (0::64){k => data1(i,k) * data2(k,j) }.reduce{_+_}
+    val golden_y = (0::M,0::N){(i,j) =>
+      (0::K){k => data1(i,k) * data2(k,j) }.reduce{_+_}
     }
 
     printMatrix(result_y, "Result")
     printMatrix(golden_y, "Golden")
+    println(r"Pass: ${golden_y == result_y}")
     assert(golden_y == result_y)
   }
 

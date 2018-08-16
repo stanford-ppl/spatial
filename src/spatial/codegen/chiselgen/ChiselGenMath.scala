@@ -64,6 +64,7 @@ trait ChiselGenMath extends ChiselGenCommon {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case _ if (lhs.isBroadcastAddr) => // Do nothing
     case FixInv(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (~$x).r")
     case FixNeg(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := (-$x).r")
     case FixAdd(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ($x + $y).r")

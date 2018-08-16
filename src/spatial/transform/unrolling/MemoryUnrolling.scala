@@ -224,7 +224,9 @@ trait MemoryUnrolling extends UnrollingBase {
         banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, i) =>
           val segmentBase = banked.flatMap(_._2).take(i).length
           val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
-          val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,port.castgroup,port.broadcast)
+          val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(port.castgroup) else port.castgroup
+          val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(port.broadcast) else port.broadcast
+          val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,broadcast2)
           s.addPort(dispatch=0, Nil, port2)
           s.addDispatch(Nil, 0)
           s.segmentMapping = Map(0 -> segment)

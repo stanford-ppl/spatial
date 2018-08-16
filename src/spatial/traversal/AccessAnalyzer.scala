@@ -15,9 +15,9 @@ import spatial.metadata.types._
 
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
-  private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective starting point
+  private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective start value
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
-  private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of looop iterators to all symbols defined in that scope
+  private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
   private var mostRecentWrite: Map[Reg[_], Sym[_]] = Map.empty
 
   private def inLoop(loop: Sym[_], is: Seq[Idx], istarts: Seq[Ind[_]], block: Block[_]): Unit = {
@@ -121,29 +121,30 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       *   i*3 + j ==> Seq(AffineComponent(Prod(3), i), AffineComponent(Prod(1), j)), Sum(0)
       *   i*x*y   ==> Seq(AffineComponent(Prod(x, y), i)), Sum(0)
       *
+      * Modulus is always unset for now.
       */
     def unapply(x: Idx): Option[(Seq[AffineComponent], Sum, Modulus)] = x match {
       // A single loop iterator
       case Index(i) if !isNullIndex(i) => Some(Seq(AffineComponent(stride(i), i)), Zero, NotSet)
-      case Index(i) if isNullIndex(i) => Some(Nil, Zero, NotSet)
+      case Index(i) if isNullIndex(i)  => Some(Nil, Zero, NotSet)
 
       // Any affine component plus any other affine component (e.g. (4*i + 5) + (3*j + 2))
-      case Plus(Affine(a1,b1,m1), Affine(a2,b2,m2))  => Some(a1 ++ a2, b1 + b2, m1 + m2)
+      case Plus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set  => Some(a1 ++ a2, b1 + b2, NotSet)
 
       // Any affine component minus any other affine component (e.g. j - 1)
-      case Minus(Affine(a1,b1,m1), Affine(a2,b2,m2)) => Some(a1 ++ (-a2), b1 - b2, m1 + m2)
+      case Minus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set => Some(a1 ++ (-a2), b1 - b2, NotSet)
 
       // Product of an affine component with a loop independent value, e.g. 4*i or (i + j)*32
       // Note: the multiplier only has to be loop invariant w.r.t. to iterators in a.
       // Note: products of affine components (e.g. i*j) are NOT themselves affine
       // Multiplication on sequences of AffineComponents is implicitly defined to be distributive
-      case Times(Affine(a,b1,m), Offset(b2)) if (isAllInvariant(a.inds, b2.syms) && m.set == false) => Some(a * b2, b1 * b2, NotSet)
-      case Times(Offset(b1), Affine(a,b2,m)) if (isAllInvariant(a.inds, b1.syms) && m.set == false) => Some(a * b1, b1 * b2, NotSet)
+      case Times(Affine(a,b1,m), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && !m.set => Some(a * b2, b1 * b2, NotSet)
+      case Times(Offset(b1), Affine(a,b2,m)) if isAllInvariant(a.inds, b1.syms) && !m.set => Some(a * b1, b1 * b2, NotSet)
 
-      case Mod(Affine(a,b,m1), m2) => Some(a, b, m1 % Modulus(m2))
+      //case Mod(Affine(a,b,m1), m2) => Some(a, b, m1 % Modulus(m2))
 
-      case Divide(Affine(a,b1,m), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && a.canBeDividedBy(b2) && b1.canBeDividedBy(b2) =>
-        Some(a / b2, b1 / b2, m)
+      //case Divide(Affine(a,b1,m), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && a.canBeDividedBy(b2) && b1.canBeDividedBy(b2) =>
+      //  Some(a / b2, b1 / b2, m)
 
       case s => Some(Nil, Sum.single(s), NotSet)
     }
@@ -156,7 +157,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
                     starts.values.mapping{x => lastVariantIter(is,x)}
 
     val lastIter  = lastIters.values.maxByOrElse(None){i => i.map{is.indexOf}.getOrElse(-1) }
-    AddressPattern(components, offset, lastIters, lastIter, starts, modulus.toInt)
+    AddressPattern(components, offset, lastIters, lastIter, starts)
   }
 
   /** Return the affine access pattern of the given address component x as an AddressPattern.
@@ -192,14 +193,14 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     val pattern = addr.map{x => getAccessAddressPattern(mem, access, x) }
 
     dbgs(s"  Access pattern: ")
-    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
+    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"    [$d] $p") }
 
     val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
-    dbgs(s"  Access matrices: ")
-    matrices.foreach{m => dbgss(m) }
+    dbgs(s"  Unrolled matrices: ")
+    matrices.foreach{m => dbgss("    ", m) }
   }
 
   /**
@@ -230,8 +231,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
-    dbgs(s"  Access matrices: ")
-    matrices.foreach{m => dbgss(m) }
+    dbgs(s"  Unrolled matrices: ")
+    matrices.foreach{m => dbgss("    ", m) }
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
@@ -259,7 +260,12 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
     case Enqueuer(mem,_,adr,_) if adr.isEmpty => 
-      lhs match {case Op(_@RegWrite(reg, data, _)) => dbgs(s"adding recent write of $data to $reg");mostRecentWrite += reg -> data; case _ => }
+      lhs match {
+        case Op(RegWrite(reg, data, _)) =>
+          dbgs(s"adding recent write of $data to $reg")
+          mostRecentWrite += reg -> data
+        case _ =>
+      }
       setStreamingPattern(mem, lhs)
     case Reader(mem,adr,_)   => 
       setAccessPattern(mem, lhs, adr)

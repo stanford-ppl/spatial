@@ -254,9 +254,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     def *(b: SparseMatrix[Idx]): SparseVector[Idx] = {
       val vec = b.keys.mapping{k => b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i(k)*a_i }.sum }
       val c = b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i.c*a_i}.sum
-      // Combined modulus is sum of moduli: a0*dim0 mod m0 + a1*dim1 mod m1 = a0*dim0 + a1*dim1 + k(m0+m1)
-      val mod = b.rows.map(_.modulus).sum
-      SparseVector[Idx](vec,c,Map.empty,mod)
+      SparseVector[Idx](vec,c,Map.empty)
     }
   }
 

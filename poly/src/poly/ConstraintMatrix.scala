@@ -33,7 +33,7 @@ case class ConstraintMatrix[K](rows: Set[SparseConstraint[K]], hasDomain: Boolea
 
   override def toString: String = {
     val header = this.keys.toSeq
-    val rowStrs = rows.toSeq.map{row => row.tp.toString +: header.map{k => row(k).toString } :+ row.modulus.toString :+ row.c.toString }
+    val rowStrs = rows.toSeq.map{row => row.tp.toString +: header.map{k => row(k).toString } :+ row.mod.toString :+ row.c.toString }
     val entries = (" " +: header.map(_.toString) :+ "mod" :+ "c") +: rowStrs
     val maxCol = entries.flatMap(_.map(_.length)).maxOrElse(0)
     entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n")

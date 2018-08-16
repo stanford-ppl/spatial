@@ -199,16 +199,24 @@ case class AffineProduct(a: Sum, i: Idx) {
   * The offset is represented as a separate sum of products, where each sum is a multiplier for some
   * symbol.
   *
-  * e.g. for x(32*i + m*i + 15*j + 2*x + 13), this is represented as:
+  * e.g. for (32*i + m*i + 15*j + 2*x + 13), this is represented as:
   *  comps = AffineProduct(Sum(Prod(32), Prod(m)), i), AffineProduct(Sum(Prod(15)), j)
   *  ofs   = Sum(Prod(2,x),Prod(13))
   *
   * @param comps A list of sum of products multipliers for distinct loop indices
   * @param ofs   A sum of products representing the symbolic offset
-  * @param lastIters Mapping from symbol to the innermost iterator it varies with, None if it is entirely loop invariant
+  * @param lastIters Mapping from symbol to the innermost iterator it varies with, None if it is
+  *                  entirely loop invariant
+  * @param last TODO
+  * @param iterStarts The starting values for each iterator TODO: Why are these tracked here?
   */
-case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Idx,Option[Idx]], last: Option[Idx], iterStarts: Map[Idx,Ind[_]], modulus: Int) {
-
+case class AddressPattern(
+    comps: Seq[AffineProduct],
+    ofs:   Sum,
+    lastIters: Map[Idx,Option[Idx]],
+    last: Option[Idx],
+    iterStarts: Map[Idx,Ind[_]])
+{
 
   /** Convert this to a sparse vector representation if it is representable as an affine equation with
     * constant multipliers. If some of the comps are affine, make a sparse vector of these and group the rest as
@@ -216,7 +224,7 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
     */
   @stateful def getSparseVector: Option[SparseVector[Idx]] = {
     val is = comps.map(_.i)
-    val starts = is.collect{case x if (iterStarts.contains(x)) => iterStarts(x)}.filter(!_.isConst)
+    val starts = is.collect{case x if iterStarts.contains(x) => iterStarts(x)}.filter(!_.isConst)
     val as = comps.map{_.a.partialEval{case Expect(c) => c}}
     val bx = ofs.partialEval{case Expect(c) => c}
 
@@ -228,26 +236,25 @@ case class AddressPattern(comps: Seq[AffineProduct], ofs: Sum, lastIters: Map[Id
       val rand: Seq[(Idx, Int)] = if (others.nonEmpty) Seq((boundVar[I32],1)) else Nil
       val xs_all: Seq[Idx] = affine_comps.map(_._2) ++ rs.map(_._1) ++ starts ++ rand.map(_._1)
       val as_all: Seq[Int] = affine_comps.map(_._1.b) ++ rs.map(_._2) ++ starts.indices.map{_ => 1} ++ rand.map(_._2)
-      if (rand.isEmpty) Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters, modulus) )
-      else Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters ++ Map[Idx, Option[Idx]]((rand.head._1 -> last)), modulus) )
+      if (rand.isEmpty) Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters) )
+      else Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters ++ Map[Idx, Option[Idx]](rand.head._1 -> last)) )
     }
     else None
   }
 
-  /**
-    * Convert this to a sparse vector representation if it is representable as an affine equation with
-    * constant multipliers. Falls back to a representation of 1*x + 0 otherwise.
+  /** Convert this to a sparse vector representation if it is representable as an affine equation
+    * with constant multipliers. Falls back to a representation of 1*x + 0 otherwise.
     */
-  @stateful def toSparseVector(x: () => (Idx, Int)): SparseVector[Idx] = {
+  @stateful def toSparseVector(x: () => Idx): SparseVector[Idx] = {
     getSparseVector.getOrElse{
-      val info = x()
-      val y = info._1
-      val m = info._2
-      SparseVector(Map(y -> 1), 0, Map(y -> last), m)
+      val y = x()
+      SparseVector(Map(y -> 1), 0, Map(y -> last))
     }
   }
 
-  override def toString: String = comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs + {if (modulus != 0) s" mod $modulus" else ""}
+  override def toString: String = {
+    comps.mkString(" + ") + (if (comps.isEmpty) "" else " + ") + ofs
+  }
 }
 
 /** Access pattern metadata for memory accesses.

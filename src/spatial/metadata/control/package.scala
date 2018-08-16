@@ -297,10 +297,7 @@ package object control {
       * occur in any of the children.
       */
     @stateful def getChildContaining(x: Sym[_]): Option[Ctrl.Node] = {
-      dbgs(s"Looking for child of $toCtrl which contains $x")
       val path = x.ancestors
-      dbgs(s"  Ancestors of $x: ${path.mkString(", ")}")
-      dbgs(s"  Children of $toCtrl: ${children.mkString(", ")}")
       children.find{c => path.contains(c) }
     }
 
@@ -316,11 +313,8 @@ package object control {
       * This is currently trivially true for inner controllers.
       */
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
-      dbgs(s"Checking if $toCtrl is lockstep with respect to $iters (reference: $reference)")
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      dbgs(s"Reference child: $child")
       val ctrls = child.map{c => childrenPriorTo(c) }.getOrElse(children)
-      dbgs(s"Children prior to reference: ${ctrls.mkString(", ")}")
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
     }

@@ -167,8 +167,8 @@ trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
   }
 
   final override def toString: String = this.rhs match {
-    case Def.Const(c)    => s"Const(${escapeConst(c)}: ${c.getClass})"
-    case Def.Param(id,c) => s"p$id (${escapeConst(c)}: ${c.getClass})"
+    case Def.Const(c)    => s"Const(${escapeConst(c)})"
+    case Def.Param(id,c) => s"p$id (${escapeConst(c)})"
     case Def.Node(id,_)  => s"x$id"
     case Def.Bound(id)   => s"b$id"
     case Def.Error(_,_)  => s"<error>"

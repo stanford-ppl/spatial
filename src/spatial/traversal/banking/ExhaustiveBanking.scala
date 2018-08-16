@@ -79,7 +79,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   def Alphas(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
     // Prime factors of number, for shortcircuiting the brute force alphas
     def factorize(number: Int, list: List[Int] = List()): List[Int] = {
-      for(n <- 2 to number if (number % n == 0)) {
+      for(n <- 2 to number if number % n == 0) {
         return factorize(number / n, list :+ n)
       }
       list
@@ -90,7 +90,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                 Seq(0,1) ++ 
                 Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product) ++ 
                 Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N) ++ 
-                (0 to 2*N).filter(isPow2(_))
+                (0 to 2*N).filter(isPow2)
                ).uniqueModN(N)
     def Alphas2(dim: Int, prev: Seq[Int]): Iterator[Seq[Int]] = {
       if (dim < rank) {
@@ -110,11 +110,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
       else (0 to 2*N).uniqueModN(N).iterator.map{aR => prev :+ aR }.filterNot(_.forall(x => isPow2(x) || x == 1))
     }
-    val pow2As = Alphas2(1, Nil).filterNot(_.forall(_ == 0))
-    val likelyAs = AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2(_))}
-    val xAs = AlphasX(1, Nil).filterNot(_.forall(_ == 0))
-    if (pow2As.size + likelyAs.size >= maxAttempts) pow2As ++ likelyAs
-    else pow2As ++ likelyAs ++ xAs.take(maxAttempts - pow2As.size - likelyAs.size)
+    val pow2As   = Alphas2(1, Nil).filterNot(_.forall(_ == 0))
+    val likelyAs = AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2)}
+    val xAs      = AlphasX(1, Nil).filterNot(_.forall(_ == 0))
     pow2As ++ likelyAs ++ xAs
   }
 

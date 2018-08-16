@@ -264,7 +264,7 @@ object modeling {
 
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
-      val instances = mem.duplicates.length
+      val instances = if (mem.getDuplicates.isDefined) mem.duplicates.length else 0
       (0 to instances-1).map{id =>
         val accs = accesses.filter(_.dispatches.values.exists(_.contains(id)))
 

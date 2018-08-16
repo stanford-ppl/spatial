@@ -70,6 +70,8 @@ trait Spatial extends Compiler {
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
     lazy val memoryAllocator    = MemoryAllocator(state)
     lazy val rewriteAnalyzer    = RewriteAnalyzer(state)
+    lazy val bufferRecompute       = BufferRecompute(state)
+    lazy val retimingAnalyzer   = RetimingAnalyzer(state)
     lazy val iterationDiffAnalyzer = IterationDiffAnalyzer(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
     lazy val accumAnalyzer      = AccumAnalyzer(state)
@@ -86,7 +88,6 @@ trait Spatial extends Compiler {
     lazy val memoryDealiasing      = MemoryDealiasing(state)
     lazy val pipeInserter          = PipeInserter(state)
     lazy val transientCleanup      = TransientCleanup(state)
-    lazy val bufferRecompute       = BufferRecompute(state)
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
@@ -118,6 +119,7 @@ trait Spatial extends Compiler {
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Memory analysis */
+        retimingAnalyzer    ==>
         accessAnalyzer      ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>

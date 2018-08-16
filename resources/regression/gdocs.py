@@ -173,7 +173,7 @@ def isPerf(title):
 
 
 
-def report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args):
+def report_regression_results(branch, appname, passed, cycles, hash, apphash, spatialcompile, vcscompile, csv, args):
 	sh = getDoc(branch)
 	row = getRow(sh, hash, apphash)
 
@@ -190,7 +190,17 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, cs
 	write(worksheet, row,col,  cycles)
 	write(worksheet, row,col+1,passed)
 
-	# Page 2 - Properties
+	# Page 2 - Spatial compile time
+	worksheet = sh.worksheet_by_title('SpatialCompile')
+	col = getColOrAppend(worksheet, appname)
+	write(worksheet, row, col, spatialcompile)
+
+	# Page 3 - VCS compile time
+	worksheet = sh.worksheet_by_title('VCSCompile')
+	col = getColOrAppend(worksheet, appname)
+	write(worksheet, row, col, vcscompile)
+
+	# Page 4 - Properties
 	worksheet = sh.worksheet_by_title('Properties')
 	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row,col,passed)
@@ -540,8 +550,8 @@ def merge_apps_columns(old_appname, new_appname, backend):
 
 
 if (sys.argv[1] == "report_regression_results"):
-	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_regression_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]))
-	report_regression_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9])
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_regression_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11]))
+	report_regression_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11])
 elif (sys.argv[1] == "report_board_runtime"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_board_runtime('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10]))
 	report_board_runtime(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10])

@@ -157,7 +157,7 @@ aws-F1-hw:
 
 # Build the bitstream
 aws-F1-afi:   aws-F1-hw
-	echo "$$(date +%s)" >> start.log
+	echo "$$(date +%s)" > start.log
 	$(eval app_name=$(notdir $(shell pwd)))
 	# ----------------------------------------------------------------------------
 	# Step 1: Run synthesis
@@ -276,7 +276,7 @@ zynq-clean:
 arria10: arria10-hw arria10-sw
 
 arria10-hw:
-	echo "$$(date +%s)" >> start.log
+	echo "$$(date +%s)" > start.log
 	@echo "alterad license: $(ALTERAD_LICENSE_FILE)"
 	@echo "quartus version: $(USING_THIS_QUARTUS)"
 	sbt "runMain top.Instantiator --verilog --testArgs arria10"
@@ -313,7 +313,7 @@ zcu-sw:
 	tar -czf $(APPNAME).tar.gz -C ${ZCU_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C fringeZynq/utils set_perms setClocks.sh run.sh
 
 zcu-hw:
-	echo "$$(date +%s)" >> start.log
+	echo "$$(date +%s)" > start.log
 	# Some hacks that really need to be fixed in a way better than sed
 	# sed -i "s/val bug239_hack = .*/val bug239_hack = true/g" chisel/template-level/fringeHW/Fringe.scala
 	# sed -i "s/#define FRINGE_MEM_BASEADDR.*/#define FRINGE_MEM_BASEADDR  0x40000000/g" cpp/fringeZynq/ZynqAddressMap.h
@@ -383,7 +383,7 @@ vcs-sw:
 	ln -sf cpp/Top .
 
 vcs-hw:
-	echo "$$(date +%s)" >> start.log
+	echo "$$(date +%s)" > start.log
 	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" chisel/template-level/fringeVCS/Top-harness.sv; fi 
 	# sed -i "s/val bug239_hack = .*/val bug239_hack = false/g" chisel/template-level/fringeHW/Fringe.scala
 	sbt "runMain top.Instantiator --verilog --testArgs vcs"

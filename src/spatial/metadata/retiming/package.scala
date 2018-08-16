@@ -11,6 +11,7 @@ package object retiming {
     def reduceCycle: Cycle = metadata[Cycle](s).getOrElse{ throw new Exception(s"No cycle known for $s") }
     def reduceCycle_=(cycle: Cycle): Unit = metadata.add(s, cycle)
 
+    def delayDefined: Boolean = metadata[FullDelay](s).map(_.latency).isDefined
     def fullDelay: Double = metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
     def fullDelay_=(d: Double): Unit = metadata.add(s, FullDelay(d))
 

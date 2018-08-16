@@ -10,6 +10,7 @@ import spatial.issues.UnbankableGroup
 import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
+import spatial.metadata.retiming._
 import spatial.metadata.memory._
 import spatial.util.spatialConfig
 
@@ -218,6 +219,7 @@ import scala.collection.mutable.ArrayBuffer
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       ((lca.isOuterPipeLoop || lca.isOuterStreamLoop) && !isWrittenIn(lca)) ||
+      (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
       lca.isParallel
   }
 

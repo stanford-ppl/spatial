@@ -40,9 +40,9 @@ object Arguments {
     (1, 4.0, 3.0, true, 16, 0, 0.0)
   )
   val FF = List(
-    (16, XMap((0,0) -> (1, None))),
-    (32, XMap((0,0) -> (1, None))),
-    (64, XMap((0,0) -> (1, None)))
+    (16, XMap((0,0,0) -> (1, None))),
+    (32, XMap((0,0,0) -> (1, None))),
+    (64, XMap((0,0,0) -> (1, None)))
   )
   val TFF = List(
     "null"
@@ -51,13 +51,13 @@ object Arguments {
     "null"
   )
   val FIFO = List(
-    (List(80), 16, List(1), XMap((0,0) -> (1, None)),XMap((0,0) -> (1, None))),
-    (List(80), 16, List(5), XMap((0,0) -> (1, None)),XMap((0,0) -> (5, None))),
-    (List(80), 16, List(8), XMap((0,0) -> (1, None)),XMap((0,0) -> (8, None))),
-    (List(80), 16, List(2), XMap((0,0) -> (2, None)),XMap((0,0) -> (1, None))),
-    (List(80), 16, List(5), XMap((0,0) -> (5, None)),XMap((0,0) -> (1, None))),
-    (List(80), 16, List(6), XMap((0,0) -> (6, None)),XMap((0,0) -> (3, None))),
-    (List(80), 16, List(2), XMap((0,0) -> (1, None)),XMap((0,0) -> (2, None)))
+    (List(80), 16, List(1), XMap((0,0,0) -> (1, None)),XMap((0,0,0) -> (1, None))),
+    (List(80), 16, List(5), XMap((0,0,0) -> (1, None)),XMap((0,0,0) -> (5, None))),
+    (List(80), 16, List(8), XMap((0,0,0) -> (1, None)),XMap((0,0,0) -> (8, None))),
+    (List(80), 16, List(2), XMap((0,0,0) -> (2, None)),XMap((0,0,0) -> (1, None))),
+    (List(80), 16, List(5), XMap((0,0,0) -> (5, None)),XMap((0,0,0) -> (1, None))),
+    (List(80), 16, List(6), XMap((0,0,0) -> (6, None)),XMap((0,0,0) -> (3, None))),
+    (List(80), 16, List(2), XMap((0,0,0) -> (1, None)),XMap((0,0,0) -> (2, None)))
   )
   val SingleCounter = List(
     (1,None, None, None, None, 8),(3,None, None, None, None, 9)
@@ -106,11 +106,11 @@ object Arguments {
   )
   val ShiftRegFile = List(
            ( List(16,16), 32, 
-             XMap((0,0) -> (1,None)), XMap((0,0) -> (1,None)),
+             XMap((0,0,0) -> (1,None)), XMap((0,0,0) -> (1,None)),
              DMap(),  DMap()
            ),
            ( List(6,10), 32, 
-             XMap((0,0) -> (1,Some(1))), XMap((0,0) -> (1,Some(1))),
+             XMap((0,0,0) -> (1,Some(1))), XMap((0,0,0) -> (1,Some(1))),
              DMap(),  DMap()
            )
         )
@@ -118,43 +118,43 @@ object Arguments {
            ( List(1,16), 32, 
              List(1,1), List(1,1),
              XMap(), XMap(),
-             DMap((0,0) -> (List(Banks(0,0)),None)),  DMap((0,0) -> (List(Banks(0,0)),None)),
+             DMap((0,0,0) -> (List(Banks(0,0)),None)),  DMap((0,0,0) -> (List(Banks(0,0)),None)),
              BankedMemory ),
            ( List(1,32), 32, 
              List(1,2), List(1,1),
              XMap(), XMap(),
-             DMap((0,0) -> (List(Banks(0,0), Banks(0,1)),None)),  DMap((0,0) -> (List(Banks(0,0),Banks(0,1)),None)),
+             DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1)),None)),  DMap((0,0,0) -> (List(Banks(0,0),Banks(0,1)),None)),
              BankedMemory ),
            ( List(32,32), 32, 
              List(2,2), List(1,1),
              XMap(), XMap(),
-             DMap((0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None)),  DMap((0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None)),
+             DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None)),  DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None)),
              BankedMemory )
         )
   val NBufMem = List( 
            ( SRAMType, List(8,12), 2, 32, 
              List(1,2), List(1,1),
              NBufXMap(), NBufXMap(),
-             NBufDMap(0 -> DMap((0,0) -> (List(Banks(0,0),Banks(0,1)),None))),  NBufDMap(1 -> DMap((0,0) -> (List(Banks(0,0),Banks(0,1)),None))),
-             XMap((0,0) -> (1, None)), XMap(),
+             NBufDMap(0 -> DMap((0,0,0) -> (List(Banks(0,0),Banks(0,1)),None))),  NBufDMap(1 -> DMap((0,0,0) -> (List(Banks(0,0),Banks(0,1)),None))),
+             XMap((0,0,0) -> (1, None)), XMap(),
              BankedMemory),
            ( SRAMType, List(8,12), 5, 32, 
              List(2,2), List(1,1),
              NBufXMap(), NBufXMap(),
-             NBufDMap(0 -> DMap((0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None))),  NBufDMap(4 -> DMap((0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None))),
-             XMap((0,0) -> (1,None)), XMap(),
+             NBufDMap(0 -> DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None))),  NBufDMap(4 -> DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None))),
+             XMap((0,0,0) -> (1,None)), XMap(),
              BankedMemory),
            ( FFType, List(1), 2, 32, 
              List(1), List(1),
-             NBufXMap(0 -> XMap((0,0) -> (1, None))), NBufXMap(1 -> XMap((0,0) -> (1, None))),
+             NBufXMap(0 -> XMap((0,0,0) -> (1, None))), NBufXMap(1 -> XMap((0,0,0) -> (1, None))),
              NBufDMap(), NBufDMap(),
-             XMap((0,0) -> (1,None)), XMap(),
+             XMap((0,0,0) -> (1,None)), XMap(),
              BankedMemory),
            ( ShiftRegFileType, List(16,16), 4, 32, 
              List(16,16), List(1),
-             NBufXMap(0 -> XMap((0,0) -> (1, None))), NBufXMap(3 -> XMap((0,0) -> (1, None))),
+             NBufXMap(0 -> XMap((0,0,0) -> (1, None))), NBufXMap(3 -> XMap((0,0,0) -> (1, None))),
              NBufDMap(), NBufDMap(),
-             XMap((0,0) -> (1, None)), XMap(),
+             XMap((0,0,0) -> (1, None)), XMap(),
              BankedMemory)
         )
   val SystolicArray2D = List(
@@ -189,7 +189,7 @@ object Launcher {
   // Start launcher
   templates = templates ++ Arguments.FixFMAAccum.zipWithIndex.map{ case(arg,i) => 
     (s"FixFMAAccum$i" -> { (backendName: String) =>
-    	Driver(() => new FixFMAAccum(arg), "verilator") {
+      Driver(() => new FixFMAAccum(arg), "verilator") {
           (c) => new FixFMAAccumTests(c)
         }
       }) 
@@ -197,7 +197,7 @@ object Launcher {
 
   templates = templates ++ Arguments.FF.zipWithIndex.map{ case(arg,i) => 
     (s"FF$i" -> { (backendName: String) =>
-    	Driver(() => new FF(arg), "verilator") {
+      Driver(() => new FF(arg), "verilator") {
           (c) => new FFTests(c)
         }
       }) 
@@ -205,7 +205,7 @@ object Launcher {
 
   templates = templates ++ Arguments.TFF.zipWithIndex.map{ case(arg,i) => 
     (s"TFF$i" -> { (backendName: String) =>
-    	Driver(() => new TFF(arg), "verilator") {
+      Driver(() => new TFF(arg), "verilator") {
           (c) => new TFFTests(c)
         }
       }) 
@@ -213,7 +213,7 @@ object Launcher {
 
   templates = templates ++ Arguments.SRFF.zipWithIndex.map{ case(arg,i) => 
     (s"SRFF$i" -> { (backendName: String) =>
-    	Driver(() => new SRFF(arg), "verilator") {
+      Driver(() => new SRFF(arg), "verilator") {
           (c) => new SRFFTests(c)
         }
       }) 
@@ -221,7 +221,7 @@ object Launcher {
 
   templates = templates ++ Arguments.FIFO.zipWithIndex.map{ case(arg,i) => 
     (s"FIFO$i" -> { (backendName: String) =>
-    	Driver(() => new FIFO(arg), "verilator") {
+      Driver(() => new FIFO(arg), "verilator") {
           (c) => new FIFOTests(c)
         }
       }) 
@@ -229,7 +229,7 @@ object Launcher {
 
   templates = templates ++ Arguments.SingleCounter.zipWithIndex.map{ case(arg,i) => 
     (s"SingleCounter$i" -> { (backendName: String) =>
-    	Driver(() => new SingleCounter(arg), "verilator") {
+      Driver(() => new SingleCounter(arg), "verilator") {
           (c) => new SingleCounterTests(c)
         }
       }) 
@@ -237,7 +237,7 @@ object Launcher {
 
   templates = templates ++ Arguments.CompactingCounter.zipWithIndex.map{ case(arg,i) => 
     (s"CompactingCounter$i" -> { (backendName: String) =>
-    	Driver(() => new CompactingCounter(arg), "verilator") {
+      Driver(() => new CompactingCounter(arg), "verilator") {
           (c) => new CompactingCounterTests(c)
         }
       }) 
@@ -245,7 +245,7 @@ object Launcher {
 
   templates = templates ++ Arguments.FixedPointTester.zipWithIndex.map{ case(arg,i) => 
     (s"FixedPointTester$i" -> { (backendName: String) =>
-    	Driver(() => new FixedPointTester(arg), "verilator") {
+      Driver(() => new FixedPointTester(arg), "verilator") {
           (c) => new FixedPointTesterTests(c)
         }
       }) 
@@ -253,7 +253,7 @@ object Launcher {
 
   templates = templates ++ Arguments.Counter.zipWithIndex.map{ case(arg,i) => 
     (s"Counter$i" -> { (backendName: String) =>
-    	Driver(() => new Counter(arg), "verilator") {
+      Driver(() => new Counter(arg), "verilator") {
           (c) => new CounterTests(c)
         }
       }) 
@@ -261,7 +261,7 @@ object Launcher {
 
   templates = templates ++ Arguments.OuterControl.zipWithIndex.map{ case(arg,i) => 
     (s"OuterControl$i" -> { (backendName: String) =>
-    	Driver(() => new OuterControl(arg), "verilator") {
+      Driver(() => new OuterControl(arg), "verilator") {
           (c) => new OuterControlTests(c)
         }
       }) 
@@ -269,7 +269,7 @@ object Launcher {
 
   templates = templates ++ Arguments.InnerControl.zipWithIndex.map{ case(arg,i) => 
     (s"InnerControl$i" -> { (backendName: String) =>
-    	Driver(() => new InnerControl(arg), "verilator") {
+      Driver(() => new InnerControl(arg), "verilator") {
           (c) => new InnerControlTests(c)
         }
       }) 
@@ -277,7 +277,7 @@ object Launcher {
 
   templates = templates ++ Arguments.PRNG.zipWithIndex.map{ case(arg,i) => 
     (s"PRNG$i" -> { (backendName: String) =>
-    	Driver(() => new PRNG(arg), "verilator") {
+      Driver(() => new PRNG(arg), "verilator") {
           (c) => new PRNGTests(c)
         }
       }) 
@@ -285,7 +285,7 @@ object Launcher {
 
   templates = templates ++ Arguments.Mem1D.zipWithIndex.map{ case(arg,i) => 
     (s"Mem1D$i" -> { (backendName: String) =>
-    	Driver(() => new Mem1D(arg), "verilator") {
+      Driver(() => new Mem1D(arg), "verilator") {
           (c) => new Mem1DTests(c)
         }
       }) 
@@ -293,7 +293,7 @@ object Launcher {
 
   templates = templates ++ Arguments.ShiftRegFile.zipWithIndex.map{ case(arg,i) => 
     (s"ShiftRegFile$i" -> { (backendName: String) =>
-    	Driver(() => new ShiftRegFile(arg), "verilator") {
+      Driver(() => new ShiftRegFile(arg), "verilator") {
           (c) => new ShiftRegFileTests(c)
         }
       }) 
@@ -301,7 +301,7 @@ object Launcher {
 
   templates = templates ++ Arguments.SRAM.zipWithIndex.map{ case(arg,i) => 
     (s"SRAM$i" -> { (backendName: String) =>
-    	Driver(() => new SRAM(arg), "verilator") {
+      Driver(() => new SRAM(arg), "verilator") {
           (c) => new SRAMTests(c)
         }
       }) 
@@ -309,7 +309,7 @@ object Launcher {
 
   templates = templates ++ Arguments.NBufMem.zipWithIndex.map{ case(arg,i) => 
     (s"NBufMem$i" -> { (backendName: String) =>
-    	Driver(() => new NBufMem(arg), "verilator") {
+      Driver(() => new NBufMem(arg), "verilator") {
           (c) => new NBufMemTests(c)
         }
       }) 
@@ -317,7 +317,7 @@ object Launcher {
 
   templates = templates ++ Arguments.SystolicArray2D.zipWithIndex.map{ case(arg,i) => 
     (s"SystolicArray2D$i" -> { (backendName: String) =>
-    	Driver(() => new SystolicArray2D(arg), "verilator") {
+      Driver(() => new SystolicArray2D(arg), "verilator") {
           (c) => new SystolicArray2DTests(c)
         }
       }) 
@@ -325,7 +325,7 @@ object Launcher {
 
   templates = templates ++ Arguments.LineBuffer.zipWithIndex.map{ case(arg,i) => 
     (s"LineBuffer$i" -> { (backendName: String) =>
-    	Driver(() => new LineBuffer(arg), "verilator") {
+      Driver(() => new LineBuffer(arg), "verilator") {
           (c) => new LineBufferTests(c)
         }
       }) 

@@ -1790,15 +1790,16 @@ import spatial.targets._
       def hist(exp: I32, s: SRAM1[Int]): Unit = {
         Foreach(NUM_BLOCKS by 1) { blockID => 
           Sequential.Foreach(4 by 1) {i => 
-            val a_indx = blockID.to[I32] * EL_PER_BLOCK + i.to[I32]
+            val a_indx = blockID * EL_PER_BLOCK + i
             // val a_indx = Reg[Int](0)
             // a_indx := blockID * EL_PER_BLOCK + i
             val shifted = Reg[Int](0)
             shifted := s(a_indx) // TODO: Allow just s(a_indx) >> exp syntax
             // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
             Foreach(exp by 1) { k => shifted := shifted.value >> 1}
-            val bucket_indx = (shifted.value & 0x3.to[Int])*NUM_BLOCKS.to[Int] + blockID.to[I32] + 1.to[Int]
+            val bucket_indx = (shifted.value & 0x03)*NUM_BLOCKS + blockID + 1
             // println(" hist bucket(" + bucket_indx + ") = " + bucket_sram(bucket_indx) + " + 1")
+            // println(r"shifted started with ${s(a_indx)} (from ${a_indx}), now is ${shifted.value}, + $blockID")
             if (bucket_indx < 2048) {bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1}
           }
         }
@@ -1807,28 +1808,31 @@ import spatial.targets._
       def local_scan(): Unit = {
         Foreach(SCAN_RADIX by 1) { radixID => 
           Sequential.Foreach(1 until SCAN_BLOCK by 1) { i => // Loop carry dependency
-            val bucket_indx = radixID.to[I32]*SCAN_BLOCK.to[Int] + i.to[I32]
+            val bucket_indx = radixID*SCAN_BLOCK.to[Int] + i
             val prev_val = Reg[Int](0)
-            Pipe{ prev_val := bucket_sram(bucket_indx.to[I32] - 1) }
+            Pipe{ prev_val := bucket_sram(bucket_indx - 1) }
             Pipe{ bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + prev_val }
+            // println(r"local_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${prev_val}")
           }
         }
       }
 
       def sum_scan(): Unit = {
         sum_sram(0) = 0
-        Pipe.II(3).Foreach(1 until SCAN_RADIX by 1) { radixID => // Remove manual II when bug #207 (or #151?) is fixed
+        Pipe.Foreach(1 until SCAN_RADIX by 1) { radixID => // Remove manual II when bug #207 (or #151?) is fixed
         // Pipe.Foreach(1 until SCAN_RADIX by 1) { radixID => 
-          val bucket_indx = radixID.to[I32]*SCAN_BLOCK - 1
-          sum_sram(radixID) = sum_sram(radixID.to[I32]-1) + bucket_sram(bucket_indx)
+          val bucket_indx = radixID*SCAN_BLOCK - 1
+          sum_sram(radixID) = sum_sram(radixID-1) + bucket_sram(bucket_indx)
+          // println(r"sum_scan: sum_sram(${radixID}) = ${sum_sram(radixID-1)} + ${bucket_sram(bucket_indx)}")
         }
       }
 
       def last_step_scan(): Unit = {
         Foreach(SCAN_RADIX by 1) { radixID => 
           Foreach(SCAN_BLOCK by 1) { i => 
-            val bucket_indx = radixID.to[I32] * SCAN_BLOCK + i.to[I32]
+            val bucket_indx = radixID * SCAN_BLOCK + i
             bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + sum_sram(radixID)
+            // println(r"last_step_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${sum_sram(radixID)}")
           }
         }
       }
@@ -1838,15 +1842,14 @@ import spatial.targets._
         Foreach(NUM_BLOCKS by 1) { blockID => 
           Sequential.Foreach(4 by 1) { i => 
             val shifted = Reg[Int](0)
-            shifted := s1(blockID.to[I32]*EL_PER_BLOCK + i.to[I32]) // TODO: Allow just s(a_indx) >> exp syntax
+            shifted := s1(blockID*EL_PER_BLOCK + i) // TODO: Allow just s(a_indx) >> exp syntax
             // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
             Foreach(exp by 1) { k => shifted := shifted >> 1}
-            val bucket_indx = (shifted & 0x3.to[Int])*NUM_BLOCKS + blockID.to[I32]
-            val a_indx = blockID.to[I32] * EL_PER_BLOCK + i.to[I32]
-            // println("s2(" + bucket_sram(bucket_indx) + ") = " + s1(a_indx) + " (addr " + a_indx + ")")
+            val bucket_indx = (shifted & 0x3)*NUM_BLOCKS + blockID
+            val a_indx = blockID * EL_PER_BLOCK + i
             s2(bucket_sram(bucket_indx)) = s1(a_indx)
-            // println("bucket " + bucket_indx + " = " + {bucket_sram(bucket_indx) + 1})
             bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1
+            // println(r"update: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + 1")
           }
         }
       }
@@ -1856,9 +1859,9 @@ import spatial.targets._
         Foreach(BUCKET_SIZE by 1) { i => bucket_sram(i) = 0 }
   
         if (valid_buffer == a) {
-          Pipe{hist(exp.to[I32], a_sram)}
+          Pipe{hist(exp, a_sram)}
         } else {
-          Pipe{hist(exp.to[I32], b_sram)}
+          Pipe{hist(exp, b_sram)}
         }
 
         local_scan()
@@ -1868,13 +1871,13 @@ import spatial.targets._
         if (valid_buffer == a) {
           // println("s1 = a, s2 = b")
           Sequential{
-            Pipe{update(exp.to[I32], a_sram, b_sram)}
+            Pipe{update(exp, a_sram, b_sram)}
             Pipe{valid_buffer := b}
           }
         } else {
           // println("s1 = b, s2 = a")
           Sequential{
-            Pipe{update(exp.to[I32], b_sram, a_sram)}
+            Pipe{update(exp, b_sram, a_sram)}
             Pipe{valid_buffer := a}
           }
         }

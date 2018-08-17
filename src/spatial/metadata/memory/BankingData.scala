@@ -56,7 +56,6 @@ object ModBanking {
   *            |   Buffer 0   |   Buffer 1   |
   *            |--------------|--------------|
   * bufferPort         0              1           The buffer port (None for access outside pipeline)
-  * muxSize            3              3           Width of a single time multiplexed vector
   *                 |x x x|        |x x x|
   *
   *                /       \      /       \
@@ -68,7 +67,13 @@ object ModBanking {
   * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
   *
   */
-case class Port(bufferPort: Option[Int], muxPort: Int, muxSize: Int, muxOfs: Int, broadcast: Int)
+case class Port(
+  bufferPort: Option[Int],  // The ID for a buffered access (None if time-multiplexed with buffer)
+  muxPort: Int,             // The ID on the multiplexed mux for a single port
+  muxOfs:  Int,             // The offset of the first element of this access within a mux port
+  castgroup: Seq[Int],      // The broadcast group(s) the access belongs to within this port
+  broadcast: Seq[Int]       // The broadcast index of this group (0 = broadcasting, >0 = receiving)
+)
 
 
 /** Used during memory analysis to track intermediate results. */
@@ -95,9 +100,7 @@ case class Instance(
       val accesses = grps.flatten.toSeq
                          .filter{a => ports(a).bufferPort == port }    // All accesses on this port
 
-      val muxSize: Int = accesses.map{a => ports(a).muxSize }.maxOrElse(0)
-
-      val head = s"${port.getOrElse("M")} [Type:$tp, Width:$muxSize]:"
+      val head = s"${port.getOrElse("M")} [Type:$tp]:"
       val lines: Seq[String] = Seq(head) ++ {
         accesses.groupBy{a => ports(a).muxPort }.toSeq.sortBy(_._1).flatMap{case (muxPort, matrices) =>
           Seq(s" - Mux Port #$muxPort: ") ++

@@ -149,7 +149,7 @@ trait ImplicitsPriority1 extends ImplicitsPriority2 { this: Implicits =>
 
 trait Implicits extends ImplicitsPriority1 {
   implicit def box[A:Type](x: A): Top[A] = Type[A].boxed(x).asInstanceOf[Top[A]]
-  implicit class BoxSym[A:Type](x: A) extends argon.static.ExpMiscOps[Any,A](x)
+  implicit class BoxSym[A:Type](x: A) extends ExpMiscOps[Any,A](x)
 
   // Ways to lift type U to type S:
   //   1. Implicit conversions:

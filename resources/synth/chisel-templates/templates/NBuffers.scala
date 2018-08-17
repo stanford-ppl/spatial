@@ -331,7 +331,7 @@ class NBufMem(val mem: MemType,
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
       fifo.io.flow := io.flow
       combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
-        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
+        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
         (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
       }
       io.full := fifo.io.asInstanceOf[FIFOInterface].full
@@ -470,7 +470,7 @@ class NBufMem(val mem: MemType,
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
       fifo.io.flow := io.flow
       combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
-        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
+        val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
         (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
       }
       io.full := fifo.io.asInstanceOf[FIFOInterface].full
@@ -481,91 +481,106 @@ class NBufMem(val mem: MemType,
   }
 
 
-  var usedMuxPorts = List[(String,(Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr is taken for this connection style (xBar or direct)
+  var usedMuxPorts = List[(String,(Int,Int,Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr, lane, castgrp is taken for this connection style (xBar or direct)
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)): Unit = {
     assert(hasXBarW)
-    assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr) twice!")
-    usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2))
+    assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2,0,0))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr) twice!")
+    usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2,0,0))
     val bufferBase = xBarWMux.accessParsBelowBufferPort(bufferPort).length
-    val muxBase = xBarWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).length
+    val muxBase = xBarWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2,0).length
     io.xBarW(bufferBase + muxBase) := wBundle
   }
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int)): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), flow: Bool): Seq[UInt] = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
     assert(hasXBarR)
-    assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,muxAddr._2))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
-    usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,muxAddr._2))
-    val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).length
-    val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).length
-    val outputBufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum
-    val outputMuxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
-    io.xBarR(bufferBase + muxBase) := rBundle    
-    io.flow(bufferBase + muxBase) := flow
-    rBundle.port_width.indices[UInt]{vecId => io.output.data(outputBufferBase + outputMuxBase + vecId)}
+    castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
+      val castgrp = if (ignoreCastInfo) 0 else cg
+      val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).length
+      val muxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2,castgrp).length
+      val outputBufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum
+      val outputMuxBase = xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2,castgrp).sum
+      val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
+      if (bid == 0) {
+        if (ignoreCastInfo && i == 0) {
+          assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,muxAddr._2,i,0))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
+          usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,muxAddr._2,i,0))
+        } else if (!ignoreCastInfo) {
+          assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,muxAddr._2,i,castgrp))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
+          usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,muxAddr._2,i,castgrp))
+        }
+        io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle)
+        io.flow(bufferBase + muxBase) := flow        
+      }
+      io.output.data(outputBufferBase + outputMuxBase + vecId)
+    }
   }
 
   def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int)): Unit = {
-    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).length
+    val muxBase = broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2,0).length
     io.broadcastW(muxBase) := wBundle
   }
 
-  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int)): Seq[UInt] = {connectBroadcastRPort(rBundle, muxAddr, true.B)}
-  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), flow: Bool): Seq[UInt] = {
-    val muxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).length
-    val xBarRBase = xBarRMux.accessPars.length
-    val directRBase = directRMux.accessPars.length
-    val outputXBarRBase = xBarRMux.accessPars.sum
-    val outputDirectRBase = directRMux.accessPars.sum
-    val outputMuxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
-    io.broadcastR(muxBase) := rBundle
-    io.flow(xBarRBase + directRBase + muxBase) := flow
-    rBundle.port_width.indices[UInt]{vecId => io.output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)}
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectBroadcastRPort(rBundle, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+    castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
+      val castgrp = if (ignoreCastInfo) 0 else cg
+      val muxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2,castgrp).length
+      val xBarRBase = xBarRMux.accessPars.length
+      val directRBase = directRMux.accessPars.length
+      val outputXBarRBase = xBarRMux.accessPars.sum
+      val outputDirectRBase = directRMux.accessPars.sum
+      val outputMuxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2,castgrp).sum
+      val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
+      if (bid == 0) {
+        io.broadcastR(muxBase).connectLane(vecId,i,rBundle)
+        io.flow(xBarRBase + directRBase + muxBase) := flow
+      }
+      io.output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
+    }
   }
 
   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int)): Unit = {
     assert(hasDirectW)
-    assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2))), s"Attempted to connect to directW port ($bufferPort,$muxAddr) twice!")
-    usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2))
+    assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2,0,0))), s"Attempted to connect to directW port ($bufferPort,$muxAddr) twice!")
+    usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2,0,0))
     val bufferBase = directWMux.accessParsBelowBufferPort(bufferPort).length 
-    val muxBase = directWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).length
+    val muxBase = directWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2, 0).length
     io.directW(bufferBase + muxBase) := wBundle
   }
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int)): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, true.B)}
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), flow: Bool): Seq[UInt] = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
     assert(hasDirectR)
-    assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,muxAddr._2))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
-    usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,muxAddr._2))
-    val bufferBase = directRMux.accessParsBelowBufferPort(bufferPort).length
-    val xBarRBase = xBarRMux.accessPars.length
-    val muxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).length
-    val outputBufferBase = directRMux.accessParsBelowBufferPort(bufferPort).sum
-    val outputXBarRBase = xBarRMux.accessPars.sum
-    val outputMuxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2).sum
-    io.directR(bufferBase + muxBase) := rBundle    
-    io.flow(xBarRBase + bufferBase + muxBase) := flow
-    rBundle.port_width.indices[UInt]{vecId => io.output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)}
+    castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
+      val castgrp = if (ignoreCastInfo) 0 else cg
+      val bufferBase = directRMux.accessParsBelowBufferPort(bufferPort).length
+      val xBarRBase = xBarRMux.accessPars.length
+      val muxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2,castgrp).length
+      val outputBufferBase = directRMux.accessParsBelowBufferPort(bufferPort).sum
+      val outputXBarRBase = xBarRMux.accessPars.sum
+      val outputMuxBase = directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2,castgrp).sum
+      val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
+      if (bid == 0) {
+        if (ignoreCastInfo && i == 0) {
+          assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,muxAddr._2,i,0))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
+          usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,muxAddr._2,i,0))
+        } else if (!ignoreCastInfo) {
+          assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,muxAddr._2,i,castgrp))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
+          usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,muxAddr._2,i,castgrp))
+        }
+        io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle)
+        io.flow(xBarRBase + bufferBase + muxBase) := flow        
+      }
+      io.output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
+    }
   }
 
   def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {
     io.sEn(port) := en
     io.sDone(port) := done
   }
- 
-  // def connectUntouchedPorts(ports: List[Int]) {
-  //   ports.foreach{ port => 
-  //     io.sEn(port) := false.B
-  //     io.sDone(port) := false.B
-  //   }
-  // }
-
-  // def connectDummyBroadcast() {
-  //   (0 until bPar.reduce{_+_}).foreach { i =>
-  //     io.broadcast(i).en := false.B
-  //   }
-  // }
 
 }
 
@@ -596,9 +611,9 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     }
   })
 
-  val wMap = NBufXMap(0 -> XMap((0,0) -> (1, None)))
+  val wMap = NBufXMap(0 -> XMap((0,0,0) -> (1, None)))
   val rMap = NBufXMap((0 until numBufs).map{i => 
-    (i -> XMap((0,0) -> (1, None)))
+    (i -> XMap((0,0,0) -> (1, None)))
   }.toArray:_*)
 
   val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), 

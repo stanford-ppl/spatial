@@ -63,7 +63,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
 
     case RegWrite(reg, v, en) if reg.isHostIO =>
-      val id = lhs.ports(0).values.head.muxPort
+      val id = lhs.port.muxPort
       emitt(src"val $id = $id")
       v.tp match {
         case FixPtType(s,d,f) =>
@@ -84,7 +84,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(src"${swap(controllerStack.head, DatapathEn)} & ${swap(controllerStack.head, IIDone)}", lhs.fullDelay)}""")
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
-      val id = lhs.ports(0).values.head.muxPort
+      val id = lhs.port.muxPort
       emitt(src"val $id = $id")
       val padded = v.tp match {
         case FixPtType(s,d,f) if s && (64 > d + f) =>

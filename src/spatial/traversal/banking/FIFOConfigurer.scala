@@ -24,17 +24,16 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
   }
 
   private def computePorts(groups: Set[Set[AccessMatrix]]): Map[AccessMatrix,Port] = {
-    val muxSize = groups.map(_.size).maxOrElse(0)
-
     groups.zipWithIndex.flatMap{case (group,muxPort) =>
+      // TODO: Broadcast possible for FIFOs?
       import scala.math.Ordering.Implicits._
       group.toSeq.sortBy(_.unroll).zipWithIndex.map{case (matrix,muxOfs) =>
         val port = Port(
           bufferPort = Some(0),
           muxPort    = muxPort,
-          muxSize    = muxSize,
           muxOfs     = muxOfs,
-          broadcast  = 0
+          castgroup  = Seq(0),
+          broadcast  = Seq(0)
         )
         matrix -> port
       }
@@ -45,7 +44,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
     g1 != g2 && g1.cross(g2).exists{case (a,b) => requireConcurrentPortAccess(a,b) }
   }
 
-  override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Either[Issue,Instance] = {
+  override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
     val haveConcurrentReads = groupsAreConcurrent(rdGroups)
     val haveConcurrentWrites = groupsAreConcurrent(wrGroups)
 

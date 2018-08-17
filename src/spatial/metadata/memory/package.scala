@@ -52,6 +52,8 @@ package object memory {
     def getInstance: Option[Memory] = getDuplicates.flatMap(_.headOption)
     def instance: Memory = getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
+
+    def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {
@@ -79,6 +81,9 @@ package object memory {
 
     def getPort(dispatch: Int, uid: Seq[Int]): Option[Port] = getPorts(dispatch).flatMap(_.get(uid))
     def port(dispatch: Int, uid: Seq[Int]): Port = getPort(dispatch, uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }
+
+    /** Returns the final port after unrolling. For use after unrolling only. */
+    def port: Port = getPorts(0).flatMap(_.values.headOption).getOrElse{ throw new Exception(s"No final port defined for $s") }
   }
 
 
@@ -208,6 +213,10 @@ package object memory {
 
     def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
     def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
+
+    def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
+    def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
+    def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
   }
 
 

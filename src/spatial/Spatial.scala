@@ -2,7 +2,6 @@ package spatial
 
 import argon._
 import argon.passes.IRPrinter
-import pir.codegen.dot._
 import poly.{ConstraintMatrix, ISL}
 import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
@@ -98,7 +97,6 @@ trait Spatial extends Compiler {
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
     lazy val cppCodegen    = CppGen(state)
-    lazy val irDotCodegen  = IRDotCodegen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
 
@@ -159,8 +157,7 @@ trait Spatial extends Compiler {
         treeCodegen         ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen)    ==>
-        (spatialConfig.enableDot ? irDotCodegen)
+        (spatialConfig.enableSynth ? cppCodegen)
     }
 
     isl.shutdown(100)

@@ -9,11 +9,11 @@ case class UnbankableGroup(mem: Sym[_], reads: Set[AccessMatrix], writes: Set[Ac
     error(mem.ctx, s"Could not bank the following reads and writes for memory $mem")
     error(mem.ctx)
     reads.foreach{read =>
-      error(read.access.ctx, s"  ${stm(read.access)}", noError = true)
+      error(read.access.ctx, s"  ${stm(read.access)} {${read.unroll.mkString(",")}}", noError = true)
       error(read.access.ctx)
     }
     writes.foreach{write =>
-      error(write.access.ctx, s"  ${stm(write.access)}", noError = true)
+      error(write.access.ctx, s"  ${stm(write.access)} {${write.unroll.mkString(",")}}", noError = true)
       error(write.access.ctx)
     }
   }

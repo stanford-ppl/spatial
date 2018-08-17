@@ -1,11 +1,10 @@
-package argon
-package static
+package argon.static
 
 import argon.schedule._
 import forge.tags._
 import utils.tags.instrument
 
-trait Scoping {
+trait Scoping { this: Printing =>
 
   @stateful @inline private def reify[R](block: => R): R = {
     if (state.isStaging) state.logTab += 1

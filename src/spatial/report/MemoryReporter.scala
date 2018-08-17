@@ -68,16 +68,16 @@ case class MemoryReporter(IR: State) extends Pass {
                 .flatMap{a => a.ports(id).filter(_._2.bufferPort == port).map{case (unroll,pt) => (a,unroll,pt) } }
             }
 
-            // Find the maximum width of this buffer port
-            val muxSize: Int = accesses.map{case (a,uid,pt) => pt.muxSize }.maxOrElse(0)
-
-            emit(s"$prefix  $p [Type:$tp, Width:$muxSize]:")
-            accesses.groupBy(_._3.muxPort).foreach{case (muxPort, accs) =>
+            emit(s"$prefix  $p [Type:$tp]:")
+            accesses.groupBy(_._3.muxPort).toSeq.sortBy(_._1).foreach{case (muxPort, muxAccs) =>
               emit(s"$prefix    - Mux Port #$muxPort: ")
-              accs.foreach{case (a,uid,pt) =>
+              muxAccs.foreach{case (a,uid,pt) =>
                 val line = a.ctx.content.map(_.trim).getOrElse(stm(a))
-                emit(s"$prefix      [Ofs: ${pt.muxOfs}] ${stm(a)} {${uid.mkString(",")}} [Direct: ${a.isDirectlyBanked}]")
-                emit(s"$prefix      [Ofs: ${pt.muxOfs}] $line (${a.ctx})")
+                emit(s"$prefix      ${stm(a)} {${uid.mkString(",")}}")
+                emit(s"$prefix      $line (${a.ctx})")
+                emit(s"$prefix        Directly Banked: ${a.isDirectlyBanked}")
+                emit(s"$prefix        Port: <offset: ${pt.muxOfs}, castgroup: (${pt.castgroup.mkString(",")}), broadcast: (${pt.broadcast.mkString(",")})>")
+                emit("")
               }
             }
           }

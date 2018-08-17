@@ -18,13 +18,13 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def increment(key: K, value: Int): SparseMatrix[K] = {
     val rows2 = this.rows.map{r => 
       val cols2 = r.cols.map{case (k,v) => k -> (if (k == key) {v + v*value} else v) }
-      SparseVector[K](cols2, r.c, r.lastIters, r.mod)
+      SparseVector[K](cols2, r.c, r.lastIters)
     }
     SparseMatrix[K](rows2)
   }
   def incrementConst(value: Int): SparseMatrix[K] = {
     val rows2 = this.rows.map{r => 
-      SparseVector[K](r.cols, r.c + value, r.lastIters, r.mod)
+      SparseVector[K](r.cols, r.c + value, r.lastIters)
     }
     SparseMatrix[K](rows2)
   }
@@ -34,20 +34,18 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   }
   private def allLoops(maxes: Seq[Int], steps: Seq[Int], iterators: Seq[Int]): Seq[Int] = maxes match {
     case Nil => Nil
-    case h::tail if tail.nonEmpty => (0 to h-1).map{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}.flatten
-    case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
+    case h::tail if tail.nonEmpty => (0 until h).flatMap{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}
+    case h::tail if tail.isEmpty => (0 until h).map{i => i*steps.head + iterators.sum}
   }
   private def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
   def expand: Seq[SparseMatrix[K]] = {
     val rowOptions = rows.map{row => 
       if (row.mod != 0) {
-        val a = row.cols.map(_._2).filter(_ != 0)
+        val a = row.cols.values.filter(_ != 0)
         val p = a.map{x => row.mod/gcd(row.mod,x)}
         val possible = if (p.toSeq.contains(row.mod)) Seq.tabulate(row.mod){i => i} else allLoops(p.toSeq,a.toSeq,Nil).map(_%row.mod).sorted.distinct
-        if (possible.size == 0) List(SparseVector[K](row.cols,row.c,row.lastIters,0))
-        else possible.map{ i =>
-               row.empty(i)
-             }.toList  
+        if (possible.isEmpty) List(SparseVector[K](row.cols,row.c,row.lastIters))
+        else possible.map{i => row.empty(i) }.toList
       }
       else {
         List(row)
@@ -58,14 +56,14 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   }
   def asConstraintEqlZero = ConstraintMatrix(rows.map(_.asConstraintEqlZero).toSet)
   def asConstraintGeqZero = ConstraintMatrix(rows.map(_.asConstraintGeqZero).toSet)
-  def collapse: Seq[Int] = rows.map{r => r.cols.map(_._2).reduce{_+_} + r.c}
+  def collapse: Seq[Int] = rows.map{r => r.cols.values.sum + r.c}
 
   def >==(b: Int): ConstraintMatrix[K] = ConstraintMatrix(rows.map(_ >== b).toSet)
   def ===(b: Int): ConstraintMatrix[K] = ConstraintMatrix(rows.map(_ === b).toSet)
 
   override def toString: String = {
     val header = this.keys.toSeq
-    val rowStrs = rows.map{row => header.map{k => row(k).toString } :+ row.c.toString :+ row.modulus.toString}
+    val rowStrs = rows.map{row => header.map{k => row(k).toString } :+ row.c.toString :+ row.mod.toString}
     val entries = (header.map(_.toString) :+ "c" :+ "mod") +: rowStrs
     val maxCol = entries.flatMap(_.map(_.length)).maxOrElse(0)
     entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n")

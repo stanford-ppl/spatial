@@ -73,6 +73,7 @@ trait Spatial extends Compiler {
     lazy val iterationDiffAnalyzer = IterationDiffAnalyzer(state)
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
     lazy val accumAnalyzer      = AccumAnalyzer(state)
+    lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
@@ -92,6 +93,7 @@ trait Spatial extends Compiler {
     lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
     lazy val accumTransformer      = AccumTransformer(state)
+    lazy val regReadCSE            = RegReadCSE(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -114,7 +116,9 @@ trait Spatial extends Compiler {
         memoryDealiasing    ==> printer ==> transformerChecks ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
-        /** Dead code cleanup */
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Memory analysis */
@@ -125,8 +129,12 @@ trait Spatial extends Compiler {
         iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
         useAnalyzer         ==>
-        transientCleanup    ==> 
+        transientCleanup    ==>
+        /** Update buffer depths */
         bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
@@ -139,6 +147,8 @@ trait Spatial extends Compiler {
         /** Retiming */
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>
+        /** Broadcast cleanup */
+        broadcastCleanup    ==> printer ==>
         /** Schedule finalization */
         initiationAnalyzer  ==>
         /** Reports */
@@ -207,7 +217,7 @@ trait Spatial extends Compiler {
     cli.note("")
     cli.note("Experimental:")
 
-    cli.opt[Unit]("broadcast").action{(_,_) => spatialConfig.enableBroadcast = true }.text("Enable broadcast reads")
+    cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")
 

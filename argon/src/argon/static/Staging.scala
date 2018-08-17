@@ -1,5 +1,4 @@
-package argon
-package static
+package argon.static
 
 import forge.tags._
 import utils.implicits.collections._
@@ -107,7 +106,7 @@ trait Staging { this: Printing =>
         val sAliases = op.shallowAliases
         val dAliases = op.deepAliases
 
-        val effects = allEffects(op)
+        val effects = computeEffects(op)
         val mayCSE = effects.mayCSE
 
         // 2. Check for CSE opportunities
@@ -228,7 +227,7 @@ trait Staging { this: Printing =>
     }
   }
 
-  @rig final def allEffects(d: Op[_]): Effects = {
+  @rig final def computeEffects(d: Op[_]): Effects = {
     val effects = propagateWrites(d.effects) andAlso Effects.Reads(d.mutableInputs)
     val deps = effectDependencies(effects)
     effects.copy(antiDeps = deps)

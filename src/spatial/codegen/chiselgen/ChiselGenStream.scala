@@ -92,8 +92,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
-      val muxPort = lhs.ports(0).values.head.muxPort
-      val base = stream.writers.filter(_.ports(0).values.head.muxPort < muxPort).map(_.accessWidth).sum
+      val muxPort = lhs.port.muxPort
+      val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       val maskingLogic = getAllReadyLogic(parent.toCtrl).mkString(" && ")
       ens.zipWithIndex.foreach{case(e,i) =>
@@ -108,8 +108,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 
 
     case StreamInBankedRead(strm, ens) =>
-      val muxPort = lhs.ports(0).values.head.muxPort
-      val base = strm.readers.filter(_.ports(0).values.head.muxPort < muxPort).map(_.accessWidth).sum
+      val muxPort = lhs.port.muxPort
+      val base = strm.readers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)}

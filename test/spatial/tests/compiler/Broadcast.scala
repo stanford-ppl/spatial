@@ -17,8 +17,8 @@ import spatial.dsl._
     val dram1 = DRAM[Int](M,K)
     val dram2 = DRAM[Int](K, N)
     val dram3 = DRAM[Int](M,N)
-    val data1 = (0::M,0::K){(i,j) => i*K + j}//random[Int](32) }
-    val data2 = (0::K,0::N){(i,j) => i*N + j}//random[Int](32) }
+    val data1 = (0::M,0::K){(i,j) => random[Int](32) }
+    val data2 = (0::K,0::N){(i,j) => random[Int](32) }
 
     setMem(dram1, data1)
     setMem(dram2, data2)

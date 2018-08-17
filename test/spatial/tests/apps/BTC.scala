@@ -174,7 +174,7 @@ import spatial.dsl._
 
         // Final
         val pad_stop = if (datalen.value < 56) 56 else 64
-        Foreach(datalen until pad_stop by 1){i => data(i) = if (i.to[I32] == datalen) 0x80.to[UInt8] else 0.to[UInt8]}
+        Foreach(datalen until pad_stop by 1){i => data(i) = if (i == datalen) 0x80.to[UInt8] else 0.to[UInt8]}
         if (datalen.value >= 56) {
           sha_transform()
           Foreach(56 by 1){i => data(i) = 0}

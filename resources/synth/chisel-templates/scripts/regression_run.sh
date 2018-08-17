@@ -25,6 +25,21 @@ if [[ $GDOCS -eq 1 ]]; then
 		runtime=$runtime_string
 	fi
 
+	# Get synthtime
+	if [[ -f `pwd`/end.log ]]; then
+	  endtime=`cat \`pwd\`/end.log`
+	else
+	  endtime=1
+	fi
+	if [[ -f `pwd`/start.log ]]; then
+	  starttime=`cat \`pwd\`/start.log`
+	else
+	  starttime=0
+	fi
+	synthtime=$((endtime-starttime))
+
+	spatialtime=0 # TODO: Spatial compile time
+
 	# Hacky go back until $SPATIAL_HOME
 	hash=`cat ${basepath}/reghash`
 	branchname=`cat ${basepath}/branchname`
@@ -38,7 +53,7 @@ if [[ $GDOCS -eq 1 ]]; then
 	appname=$fullname
 	properties=`cat chisel/IOModule_1.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
 
-	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $branchname "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
+	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $branchname $spatialtime $synthtime "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
 
 fi
 

@@ -16,14 +16,15 @@ import spatial.util.spatialConfig
 
 import scala.collection.mutable.ArrayBuffer
 
-@instrument class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected val rank: Int = mem.seqRank.length
-  protected val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
+class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
+  protected lazy val rank: Int = mem.seqRank.length
+  protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
   // TODO: This may need to be tweaked based on the fix for issue #23
-  final val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
-  final val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
-  val dimGrps: Seq[Seq[Seq[Int]]] = if (rank > 1) Seq(FLAT_BANKS, NEST_BANKS) else Seq(FLAT_BANKS)
+  final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
+  final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
+  lazy val dimGrps: Seq[Seq[Seq[Int]]] = if (rank > 1) Seq(FLAT_BANKS, NEST_BANKS) else Seq(FLAT_BANKS)
+
 
   def configure(): Unit = {
     dbg(s"---------------------------------------------------------------------")
@@ -41,8 +42,7 @@ import scala.collection.mutable.ArrayBuffer
     val readMatrices = readers.flatMap{rd => rd.affineMatrices }
     val writeMatrices = writers.flatMap{wr => wr.affineMatrices }
 
-    val forceNoBuf = mem.isNonBuffer
-    val instances = bank(readMatrices, writeMatrices, forceNoBuf)
+    val instances = bank(readMatrices, writeMatrices)
 
     summarize(instances)
     finalize(instances)
@@ -103,10 +103,12 @@ import scala.collection.mutable.ArrayBuffer
     val used = instances.flatMap(_.accesses).toSet
     val unused = mem.accesses diff used
     unused.foreach{access =>
-      val msg = if (access.isReader) s"Read of ${mem.nameOr("memory")} was unused. Read will be removed."
-                else s"Write to memory ${mem.nameOr("memory")} is never used. Write will be removed."
-      warn(access.ctx, msg)
-      warn(access.ctx)
+      if (mem.name.isDefined) {
+        val msg = if (access.isReader) s"Read of memory ${mem.name.get} was unused. Read will be removed."
+                  else s"Write to memory ${mem.name.get} is never used. Write will be removed."
+        warn(access.ctx, msg)
+        warn(access.ctx)
+      }
 
       access.isUnusedAccess = true
 
@@ -136,7 +138,7 @@ import scala.collection.mutable.ArrayBuffer
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && outermost.isLockstepAcross(itersDiffer, Some(a.access))
+        spatialConfig.enableBroadcast && outermost.parent.isLockstepAcross(itersDiffer, Some(a.access))
       }
     }
     else true
@@ -224,11 +226,11 @@ import scala.collection.mutable.ArrayBuffer
   }
 
 
-  protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix], forceNoBuf: Boolean): Seq[Instance] = {
+  protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix]): Seq[Instance] = {
     val rdGroups = groupAccesses(readers)
     val wrGroups = groupAccesses(writers)
-    if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups, forceNoBuf)
-    else if (writers.nonEmpty) mergeWriteGroups(wrGroups, forceNoBuf)
+    if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups)
+    else if (writers.nonEmpty) mergeWriteGroups(wrGroups)
     else Seq(Instance.Unit(rank))
   }
 
@@ -244,7 +246,6 @@ import scala.collection.mutable.ArrayBuffer
     *            |   Buffer 0   |   Buffer 1   |
     *            |--------------|--------------|
     * bufferPort         0              1           The buffer port (None for access outside pipeline)
-    * muxSize            3              3           Width of a single time multiplexed vector
     *                 |x x x|        |x x x|
     *
     *                /       \      /       \
@@ -254,6 +255,10 @@ import scala.collection.mutable.ArrayBuffer
     *
     *              |( ) O|O O|    |(   )|( ) O|
     * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
+    *
+    *
+    * broadcast    | A  B |
+    *
     *
     */
   protected def computePorts(groups: Set[Set[AccessMatrix]], bufPorts: Map[Sym[_],Option[Int]]): Map[AccessMatrix,Port] = {
@@ -272,22 +277,45 @@ import scala.collection.mutable.ArrayBuffer
       }
 
       val muxPorts: Map[Int,Set[AccessMatrix]] = grps.flatten.groupBy{m => muxPortMap(m) }
-      val muxSize: Int = muxPorts.values.map(_.size).maxOrElse(0)
 
       muxPorts.foreach{case (muxPort, matrices) =>
         var muxOfs: Int = 0
+
+        var nGroups: Int = -1
+        var broadcastGroups: Map[Int,Set[AccessMatrix]] = Map.empty
+        def checkBroadcast(m1: AccessMatrix): (Int,Int,Int) = {
+          val group = broadcastGroups.find{case (_,mats) =>
+            mats.exists{m2 => canBroadcast(m1, m2) }
+          }
+          val (groupID, muxOffset) = group match {
+            case Some((bID,mats)) =>
+              broadcastGroups += bID -> (mats + m1)
+              (bID, ports(mats.head).muxOfs)
+            case None =>
+              nGroups += 1
+              broadcastGroups += nGroups -> Set(m1)
+              (nGroups, muxOfs)
+          }
+          // Broadcast ID is the number of accesses in that group - 1
+          (groupID, broadcastGroups(groupID).size - 1, muxOffset)
+        }
+
+        // Assign mux offsets per access
         matrices.groupBy(_.access).values.foreach{mats =>
+          // And assign mux offsets in unroll order
           import scala.math.Ordering.Implicits._
           mats.toSeq.sortBy(_.unroll).foreach{m =>
+            val (castgroup, broadcast, muxOffset) = checkBroadcast(m)
+
             val port = Port(
               bufferPort = bufferPort,
               muxPort    = muxPort,
-              muxSize    = muxSize,
-              muxOfs     = muxOfs,
-              broadcast  = 0
+              muxOfs     = muxOffset,
+              castgroup  = Seq(castgroup),
+              broadcast  = Seq(broadcast)
             )
             ports += m -> port
-            muxOfs += 1
+            if (broadcast == 0) muxOfs += 1
           }
         }
       }
@@ -301,51 +329,39 @@ import scala.collection.mutable.ArrayBuffer
     * Also calculates whether the associated memory should be considered a "buffer accumulator";
     * this occurs if at least one read and write occur in the same controller within a buffer.
     */
-  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Either[Issue,Instance] = {
+  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
     val reads = rdGroups.flatten
     val ctrls = reads.map(_.parent)
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     val bankings = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, dimGrps)
-    if (bankings.nonEmpty) {
-      val (metapipe, bufPorts, issue) = findMetaPipe(mem, reads.map(_.access), writes.map(_.access))
+    val result = if (bankings.nonEmpty) {
+      val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
 
       if (issue.isEmpty) {
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
 
-        val depth = if (forceNoBuf) 1 else bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
+        val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val bankingCosts = bankings.map{b => b -> cost(b,depth) }
         val (banking, bankCost) = bankingCosts.minBy(_._2)
         // TODO[5]: Assumption: All memories are at least simple dual port
-        val truePorts = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
-        val ports = if (forceNoBuf) truePorts.map{case (am, port) => 
-          val port2 = port match {case Port(bufferPort, muxPort, muxSize, muxOfs, broadcast) => 
-            val portsBelowBuffer = truePorts.map(_._2).collect{case Port(bp,_,_,_,_) => bp}.size
-            Port(None, muxPort + portsBelowBuffer, muxSize, muxOfs, broadcast)
-          }
-          (am -> port2)
-        }
-        else truePorts
+        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
         val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
-        val instance = Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp)
-
-        dbgs(s"  Reads:")
-        rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
-        dbgs(s"  Writes:")
-        reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
-        dbgs(s"  Instance: ")
-        dbgss("  ", instance)
-
-        Right(instance)
+        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp))
       }
       else Left(issue.get)
     }
-    else {
-      Left(UnbankableGroup(mem, reads, writes))
-    }
+    else Left(UnbankableGroup(mem, reads, writes))
+
+    dbgs(s"  Reads:")
+    rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+    dbgs(s"  Writes:")
+    reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+    dbgs(s"  Result: $result")
+    result
   }
 
   // TODO: Some code duplication here with groupAccesses
@@ -405,7 +421,7 @@ import scala.collection.mutable.ArrayBuffer
   }
 
   /** Greedily banks and merges groups of readers into memory instances. */
-  protected def mergeReadGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Seq[Instance] = {
+  protected def mergeReadGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
     dbgs("\n\n")
     dbgs(s"Merging memory instance groups:")
     val instances = ArrayBuffer[Instance]()
@@ -413,7 +429,7 @@ import scala.collection.mutable.ArrayBuffer
     rdGroups.zipWithIndex.foreach{case (grp,grpId) =>
       dbgs(s"Group #$grpId: ")
       state.logTab += 1
-      bankGroups(Set(grp),wrGroups,forceNoBuf) match {
+      bankGroups(Set(grp),wrGroups) match {
         case Right(i1) =>
           var instIdx = 0
           var merged = false
@@ -424,7 +440,7 @@ import scala.collection.mutable.ArrayBuffer
 
             val err = getMergeAttemptError(i1, i2)
             if (err.isEmpty) {
-              bankGroups(i1.reads ++ i2.reads, wrGroups,forceNoBuf) match {
+              bankGroups(i1.reads ++ i2.reads, wrGroups) match {
                 case Right(i3) =>
                   val err = getMergeError(i1, i2, i3)
                   if (err.isEmpty) {
@@ -459,9 +475,9 @@ import scala.collection.mutable.ArrayBuffer
   /** Greedily banks and merges groups of writers into memory instances.
     * Only used if the memory has no readers.
     */
-  protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]], forceNoBuf: Boolean): Seq[Instance] = {
+  protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
     // Assumes that all writers reach some unknown reader external to Accel.
-    bankGroups(Set.empty, wrGroups, forceNoBuf) match {
+    bankGroups(Set.empty, wrGroups) match {
       case Right(instance) => Seq(instance)
       case Left(issue)     => raiseIssue(issue); Nil
     }

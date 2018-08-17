@@ -40,7 +40,7 @@ import spatial.dsl._
               fifo.enq(-1)
             }
           }
-        } { filler => mux(fifo.isFull, 1, 0) }
+        }{filler => mux(fifo.isFull, 1, 0) }
 
         // Store back
         out(i :: i + tileSize par 2) store fifo

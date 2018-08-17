@@ -19,6 +19,9 @@ import argon.Block
     }
 
     printMatrix(getMatrix(d), "result: ")
+    val gold = (0::16,0::16){(i,j) => i * j}
+    printMatrix(gold, "gold: ")
+    assert(gold == getMatrix(d))
 
   }
   override def checkIR(block: Block[_]): Result = {

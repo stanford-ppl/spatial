@@ -573,7 +573,6 @@ object Utils {
   *            |   Buffer 0   |   Buffer 1   |
   *            |--------------|--------------|
   * bufferPort         0              1           The buffer port (None for access outside pipeline)
-  * muxSize            3              3           Width of a single time multiplexed vector
   *                 |x x x|        |x x x|
   *
   *                /       \      /       \
@@ -590,40 +589,40 @@ object Utils {
   import scala.collection.immutable.ListMap
   type Banks = List[Int]
   def Banks(xs: Int*) = List(xs:_*)
-  /* Map from (muxPort, muxOfs) to (width of muxPort, isShift) */
-  type XMap = ListMap[(Int, Int), (Int, Option[Int])]
+  /* Map from (muxPort, muxOfs, castgroup) to (width of muxPort, isShift) */
+  type XMap = ListMap[(Int, Int, Int), (Int, Option[Int])]
   implicit class XMapOps(x: XMap) {
-    def muxAddrs: Seq[(Int,Int)] = x.keys.toSeq
+    def muxAddrs: Seq[(Int,Int,Int)] = x.keys.toSeq
     def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
-    def sortByMuxPortAndOfs: XMap = XMap(x.toSeq.sortBy(r => (r._1._1, r._1._2))) // Order the map by (muxPort, muxOfs)
-    def sortByMuxPortAndCombine: XMap = XMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).sum, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2))) // Combine entries so that every muxOfs = 0, then sort
-    def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
+    def sortByMuxPortAndOfs: XMap = XMap(x.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._2))) // Order the map by (muxPort, muxOfs)
+    def sortByMuxPortAndCombine: XMap = XMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0, 0) -> (entries.sortBy(x => (x._1._1, x._1._2, x._1._3)).map(_._2._1).sum, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._3))) // Combine entries so that every muxOfs = 0, then sort
+    def accessParsBelowMuxPort(mport: Int, mofs: Int, castgrp: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs) | (p._1._1 == mport & p._1._2 == mofs & p._1._3 < castgrp)}.accessPars
     def merge(y: XMap): XMap = {
       if (y.nonEmpty) {
         ListMap( (x ++ ListMap(y.map{case (k,v) => 
                                 val base = x.toList.length
-                                (({base + k._1}, 0) -> v)
+                                (({base + k._1}, 0, 0) -> v)
                               }.toArray:_*)).toArray:_*)
       } else x
     }
   }
-  def XMap(xs:((Int, Int), (Int, Option[Int]))*) = ListMap[(Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
+  def XMap(xs:((Int, Int, Int), (Int, Option[Int]))*) = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
   // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
-  def XMap(xs: => Seq[((Int,Int), (Int,Option[Int]))]) = ListMap[(Int,Int),(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  def XMap(xs: => Seq[((Int,Int,Int), (Int,Option[Int]))]) = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
   /* Map from muxPort to (Banks, isShift) */
-  type DMap = ListMap[(Int,Int), (List[Banks],Option[Int])]
+  type DMap = ListMap[(Int,Int,Int), (List[Banks],Option[Int])]
   implicit class DMapOps(x: DMap) {
-    def muxAddrs: Seq[(Int,Int)] = x.keys.toSeq
+    def muxAddrs: Seq[(Int,Int,Int)] = x.keys.toSeq
     def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1.length).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
-    def sortByMuxPortAndOfs: DMap = DMap(x.toSeq.sortBy(r => (r._1._1, r._1._2)))
-    def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0) -> (entries.sortBy(x => (x._1._1, x._1._2)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2))) // Combine entries so that every muxOfs = 0, then sort
-    def accessParsBelowMuxPort(mport: Int, mofs: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs)}.accessPars
+    def sortByMuxPortAndOfs: DMap = DMap(x.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._3)))
+    def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0, 0) -> (entries.sortBy(x => (x._1._1, x._1._2, x._1._3)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._3))) // Combine entries so that every muxOfs = 0, then sort
+    def accessParsBelowMuxPort(mport: Int, mofs: Int, castgrp: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs) | (p._1._1 == mport & p._1._2 == mofs & p._1._3 < castgrp)}.accessPars
   }
-  def DMap(xs:((Int,Int),(List[Banks], Option[Int]))*) = ListMap[(Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
+  def DMap(xs:((Int,Int,Int),(List[Banks], Option[Int]))*) = ListMap[(Int,Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
   // Example: val b = DMap((0,0) -> List(Banks(0,0), Banks(0,1)), (0,2) -> List(Banks(0,2),Banks(0,3)), (1,0) -> List(Banks(0,0),Banks(1,0)))
-  def DMap(xs: => Seq[((Int,Int), (List[Banks],Option[Int]))]) = ListMap[(Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  def DMap(xs: => Seq[((Int,Int,Int), (List[Banks],Option[Int]))]) = ListMap[(Int,Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
   type NBufXMap = ListMap[Int, XMap]
   def NBufXMap(xs:(Int, XMap)*) = ListMap[Int,XMap](xs:_*)
   def NBufXMap(xs: => Seq[(Int, XMap)]) = ListMap[Int,XMap](xs:_*)
@@ -631,7 +630,7 @@ object Utils {
     def mergeXMaps: XMap = {
       ListMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, par) => (({muxport._1 + base}, muxport._2) -> par)} 
+        map.map{case (muxport, par) => (({muxport._1 + base}, muxport._2, muxport._3) -> par)} 
       }.flatten.toArray:_*) 
     }
     def accessPars: Seq[Int] = x.mergeXMaps.accessPars
@@ -645,7 +644,7 @@ object Utils {
     def mergeDMaps: DMap = {
       ListMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, banks) => (({muxport._1 + base}, muxport._2) -> banks)} 
+        map.map{case (muxport, banks) => (({muxport._1 + base}, muxport._2, muxport._3) -> banks)} 
       }.flatten.toArray:_*)
     }
     def accessPars: Seq[Int] = x.mergeDMaps.accessPars

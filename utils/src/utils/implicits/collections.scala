@@ -8,6 +8,16 @@ import scala.reflect.ClassTag
   */
 object collections {
 
+  implicit class IntSeqHelpers(x: Seq[Int]) {
+    /** Returns seq containing only elements who are unique in mod N. */
+    def uniqueModN(N: Int): Seq[Int] = {
+      val map = scala.collection.mutable.ListMap[Int,Int]()
+      x.foreach{i => map.getOrElseUpdate(i % N, i) }
+      map.values.toList.sorted
+    }
+
+  }
+
   implicit class SeqHelpers[A](x: Seq[A]) {
     def get(i: Int): Option[A] = if (i >= 0 && i < x.length) Some(x(i)) else None
     def indexOrElse(i: Int, els: => A): A = if (i >= 0 && i < x.length) x(i) else els
@@ -31,20 +41,6 @@ object collections {
       * Equivalent to (but faster than) x.length == len
       */
     def lengthIs(len: Int): Boolean = x.lengthCompare(len) == 0
-
-    /** Returns seq containing only elements who are unique in mod N
-      */
-    def uniqueModN(N: Int): Seq[A] = {
-      var map = scala.collection.mutable.ListMap[Int,Int]()
-      x.foreach{e => 
-        e match {
-          case i: Int => 
-            map.getOrElseUpdate(i % N, i)
-          case _ => throw new Exception(s"Cannot get uniqueModN values on seq ${e}")
-        } 
-      }
-      map.values.toList.sorted.map(_.asInstanceOf[A]).toSeq
-    }
 
     /** Returns true if length of x is less than len, false otherwise.
       * Equivalent to (but faster than) x.length < len

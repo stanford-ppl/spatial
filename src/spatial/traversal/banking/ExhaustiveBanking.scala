@@ -38,23 +38,42 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         val banking = strategy.map{dims =>
           val selGrps = grps.map{grp => 
             val sliceCompPairs = grp.map{mat => (mat.sliceDims(dims), mat.sliceDims(fullStrategy.diff(dims)))} 
-            var firstInstances: Seq[SparseMatrix[Idx]] = Seq()
-            Seq(sliceCompPairs.indices.collect{case i if (
-                          sliceCompPairs.patch(i,Nil,1).filter(_._1 == sliceCompPairs(i)._1).isEmpty ||  // If this slice is unique
-                          sliceCompPairs.patch(i,Nil,1).filter(_._1 == sliceCompPairs(i)._1).exists(_._2 == sliceCompPairs(i)._2) || // Or if it is not unique but its compliment collides
-                          !firstInstances.contains(sliceCompPairs(i)._1) // Or if it is the first time we are seeing this slice
-                        ) =>  // then add it to the group
-                          firstInstances = firstInstances ++ Seq(sliceCompPairs(i)._1)
-                          sliceCompPairs(i)._1
+            var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
+
+            /** True if the sliced matrix at the given index should be kept
+              *   - If this slice is unique
+              *   - If it is not unique but its compliment collides
+              *   - If it is the first time we are seeing this slice
+              */
+            def isUniqueSlice(i: Int): Boolean = {
+              val current = sliceCompPairs(i)
+              val pairsExceptCurrent = sliceCompPairs.patch(i,Nil,1)
+
+              val isUnique           = !pairsExceptCurrent.exists{case (keep, _) => keep == current._1 }
+              val complimentCollides = pairsExceptCurrent.exists{case (keep,drop) => keep == current._1 && drop == current._2 }
+              val firstTime          = !firstInstances.contains(current._1)
+
+              isUnique || complimentCollides || firstTime
+            }
+
+            Seq(sliceCompPairs.zipWithIndex.collect{case (current,i) if isUniqueSlice(i) =>
+              firstInstances += current._1
+              current._1
             }:_*)
           }
           val stagedDims = dims.map(mem.stagedDims.map(_.toInt))
+          selGrps.zipWithIndex.foreach{case (grp,i) =>
+            dbgs(s"Banking accesses:")
+            dbgs(s"  Group #$i:")
+            grp.foreach{matrix => dbgss("    ", matrix.toString) }
+          }
           findBanking(selGrps, dims, stagedDims)
         }
         if (isValidBanking(banking,grps)) {
-          if (!mem.getPadding.isDefined) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.map(_.Ps).flatten).map{case(d,p) => (p - d%p) % p}
+          if (mem.getPadding.isEmpty) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
           Some(banking)
-        } else None
+        }
+        else None
       }
     }
   }
@@ -117,7 +136,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   }
 
   private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int]): Seq[Int] = {
-    /* Offset correction not mentioned in p199-wang
+    /* Offset correction not mentioned in Wang et. al., FPGA '14
        0. Equations in paper must be wrong.  Example 
            ex-     alpha = 1,2    N = 4     B = 1
                         
@@ -165,24 +184,24 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
     def allLoops(maxes: Seq[Int], steps: Seq[Int], iterators: Seq[Int]): Seq[Int] = maxes match {
       case Nil => Nil
-      case h::tail if tail.nonEmpty => (0 to h-1).map{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}.flatten
+      case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}
       case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
     }
     def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int): Boolean = {
       allLoops(p,a,Nil).map(_%N).sorted.distinct.length == N
     }
     def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
-    def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if (x % i == 0) => i}
+    def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
     try {
       val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
       val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ List(stagedDims(i))}
-      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == n*b).collect{case p if (spansAllBanks(p,alpha,n*b)) => p}
+      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == n*b).collect{case p if spansAllBanks(p,alpha,n*b) => p}
       val PandCost = options.map{option => 
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product
         (option,volume)
       }
-      PandCost.sortBy(_._2).head._1
+      PandCost.minBy(_._2)._1
     }
     catch { case t:Throwable =>
       bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha")
@@ -196,11 +215,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = stagedDims.product max Nmin
     val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= Ncap).partition{i => isPow2(i) }
-    val n2Head = if ((n2.isEmpty && nx.isEmpty) || (!n2.isEmpty && n2.head.toDouble/Nmin > MAGIC_CUTOFF_N)) Seq(Nmin) else Nil
-    val Ns = (n2Head ++ n2 ++ nx).iterator
+    val n2Head = if ((n2.isEmpty && nx.isEmpty) || (n2.nonEmpty && n2.head.toDouble/Nmin > MAGIC_CUTOFF_N)) Seq(Nmin) else Nil
+    val Ns_raw = n2Head ++ n2 ++ nx
+    val Ns = Ns_raw.iterator
 
     var banking: Option[ModBanking] = None
     var attempts = 0
+
+    dbgs(s"Attempting Ns: ${Ns_raw.take(10).mkString(", ")}, ...")
 
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
@@ -208,16 +230,16 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
         if (attempts < 200) dbgs(s"     Checking N=$N and alpha=$alpha")
-        else if (attempts == 200) dbgs(s"    ...")
-        else if (!As.hasNext) dbgs(s"    Could not find banking scheme after $attempts attempts!  Giving up...")
         attempts = attempts + 1
         if (checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val P = computeP(N,1,alpha,stagedDims)
           banking = Some(ModBanking(N,1,alpha,dims,P))
-        } else {
-          val B = Bs.find{b => val x = checkBlockCyclic(N,b,alpha,grps); if (x) dbgs(s"     Success on N=$N, alpha=$alpha, B=$b"); x}
-          banking = B.map{b => 
+        }
+        else {
+          val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          banking = B.map{b =>
+            dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims)
             ModBanking(N, b, alpha, dims, P) 
           }
@@ -232,9 +254,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     def *(b: SparseMatrix[Idx]): SparseVector[Idx] = {
       val vec = b.keys.mapping{k => b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i(k)*a_i }.sum }
       val c = b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i.c*a_i}.sum
-      // Combined modulus is sum of moduli: a0*dim0 mod m0 + a1*dim1 mod m1 = a0*dim0 + a1*dim1 + k(m0+m1)
-      val mod = b.rows.map(_.modulus).sum
-      SparseVector[Idx](vec,c,Map.empty,mod)
+      SparseVector[Idx](vec,c,Map.empty)
     }
   }
 

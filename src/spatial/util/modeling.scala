@@ -281,12 +281,10 @@ object modeling {
         val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
         var writeStage = 0.0
         orderedMuxPairs.foreach{pairs =>
-          // Filter out accesses that are already retimed to different cycles
-          val conflictPairs = pairs.collect{case x if (pairs.map(_._2).count(_ == x._2) > 1) => x}
-          val dlys = conflictPairs.map(_._2) :+ writeStage
+          val dlys = pairs.map(_._2) :+ writeStage
           val writeDelay = dlys.max
           writeStage = writeDelay + 1
-          conflictPairs.foreach{case (access, dly, _) =>
+          pairs.foreach{case (access, dly, _) =>
             val oldPath = paths(access)
             paths(access) = writeDelay
             debugs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")

@@ -284,7 +284,8 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
       io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
       io.ctrInc := active.io.output.data & io.enable
     }
-    io.done := Utils.risingEdge(Utils.getRetimed(done.io.output.data, latency, io.flow))
+    val doneLag = if (cases > 1) 0 else latency
+    io.done := Utils.risingEdge(Utils.getRetimed(done.io.output.data, doneLag, io.flow))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner

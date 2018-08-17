@@ -187,15 +187,16 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}
       case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
     }
-    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int): Boolean = {
-      allLoops(p,a,Nil).map(_%N).sorted.distinct.length == N
+    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, allPossible: Seq[Int]): Boolean = {
+      allLoops(p,a,Nil).map(_%N).sorted.distinct == allPossible
     }
     def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
     try {
       val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
+      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, Nil).map(_%(n*b)).sorted.distinct
       val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ List(stagedDims(i))}
-      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == n*b).collect{case p if spansAllBanks(p,alpha,n*b) => p}
+      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == allBanksAccessible.length).collect{case p if spansAllBanks(p,alpha,n*b,allBanksAccessible) => p}
       val PandCost = options.map{option => 
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product

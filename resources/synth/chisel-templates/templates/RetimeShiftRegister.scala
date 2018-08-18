@@ -31,7 +31,7 @@ class RetimeWrapperWithReset(val width: Int, val delay: Int, val init: Long) ext
   })
 
     if (delay > 0) {
-      val sr = Module(new RetimeShiftRegister(width, delay, 0))
+      val sr = Module(new RetimeShiftRegister(width, delay, init))
       sr.io.clock := clock
       sr.io.reset := reset.toBool | io.rst
       sr.io.flow := io.flow

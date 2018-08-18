@@ -224,8 +224,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
       }
       // Temp fix for merged readers not recomputing port info
       val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
-      val xBarRBase = p.xBarRMux.accessPars.sum
-      io.output.data(xBarRBase + outBase + vecId)
+      io.output.data(p.xBarOutputs + outBase + vecId)
     }
   }
 }
@@ -338,7 +337,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
-    if (p.xBarRMux.toList.length > 0 && i < p.xBarRMux.sortByMuxPortAndCombine.accessPars.max) {
+    if (p.xBarRMux.toList.length > 0 && i < p.xBarOutputs) {
       // Figure out which read port was active in xBar
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
       val xBarCandidatesEns = xBarIds.map(io.xBarR.map(_.en).flatten.toList(_))
@@ -672,7 +671,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
 
   // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
-    if (p.xBarRMux.toList.length > 0 && i < p.xBarRMux.sortByMuxPortAndCombine.accessPars.max) {
+    if (p.xBarRMux.toList.length > 0 && i < p.xBarOutputs) {
       // Figure out which read port was active in xBar
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
       val xBarCandidatesEns = xBarIds.map(io.xBarR.map(_.en).flatten.toList(_))
@@ -733,7 +732,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
 
   // Connect read data to output
   io.output.data.zipWithIndex.foreach { case (wire,i) => 
-    if (p.xBarRMux.toList.length > 0 && i < p.xBarRMux.sortByMuxPortAndCombine.accessPars.max) {
+    if (p.xBarRMux.toList.length > 0 && i < p.xBarOutputs) {
       // Figure out which read port was active in xBar
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
       val xBarCandidatesEns = xBarIds.map(io.xBarR.map(_.en).flatten.toList(_))

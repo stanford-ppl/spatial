@@ -266,7 +266,7 @@ object modeling {
       // unless the common parent is a Switch
       val instances = if (mem.getDuplicates.isDefined) mem.duplicates.length else 0
       (0 to instances-1).map{id =>
-        val accs = accesses.filter(_.dispatches.values.exists(_.contains(id)))
+        val accs = accesses.filter(_.dispatches.values.exists(_.contains(id))).filter(!_.op.get.isInstanceOf[FIFOPeek[_]])
 
         val muxPairs = accs.map{access =>
           val muxes = access.ports(0).values.map(_.muxPort)

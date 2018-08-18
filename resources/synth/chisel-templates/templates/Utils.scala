@@ -864,7 +864,7 @@ object Utils {
     import ops._
     if (retime.toInt > 0) {
       val done_catch = Module(new SRFF())
-      val sr = Module(new RetimeWrapperWithReset(1, retime - 1))
+      val sr = Module(new RetimeWrapperWithReset(1, retime - 1, 0))
       sr.io.in := done_catch.io.output.data & ready
       sr.io.flow := ready
       done_catch.io.input.asyn_reset := reset
@@ -1063,7 +1063,7 @@ object Utils {
     ff.io.out
   }
 
-  def getRetimed[T<:chisel3.core.Data](sig: T, delay: Int, en: Bool = true.B): T = {
+  def getRetimed[T<:chisel3.core.Data](sig: T, delay: Int, en: Bool = true.B, init: Long = 0): T = {
     if (delay == 0) {
       sig
     }
@@ -1071,7 +1071,7 @@ object Utils {
       if (regression_testing == "1") { // Major hack until someone helps me include the sv file in Driver (https://groups.google.com/forum/#!topic/chisel-users/_wawG_guQgE)
         chisel3.util.ShiftRegister(sig, delay, en)
       } else {
-        val sr = Module(new RetimeWrapper(sig.getWidth, delay))
+        val sr = Module(new RetimeWrapper(sig.getWidth, delay, init))
         sr.io.in := sig.asUInt
         sr.io.flow := en
         sr.io.out.asTypeOf(sig)

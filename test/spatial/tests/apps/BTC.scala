@@ -97,16 +97,16 @@ import spatial.dsl._
       def sha_transform(): Unit = {
         val m = SRAM[ULong](64)
         Foreach(0 until 64 by 1){i =>
-          if ( i.to[I32] < 16 ) {
-            val j = 4*i.to[I32]
+          if ( i < 16 ) {
+            val j = 4*i
             // println(" m(" + i + ") = " + {(data(j).as[ULong] << 24) | (data(j+1).as[ULong] << 16) | (data(j+2).as[ULong] << 8) | (data(j+3).as[ULong])})
             m(i) = (data(j).as[ULong] << 24) | (data(j+1).as[ULong] << 16) | (data(j+2).as[ULong] << 8) | (data(j+3).as[ULong])
           } else {
             // println(" m(" + i + ") = " + SIG1(m(i-2)) + " " + m(i-7) + " " + SIG0(m(i-15)) + " " + m(i-16))
             m(i) = SIG1(m(i-2)) + m(i-7) + SIG0(m(i-15)) + m(i-16)
           }
-          // val j = 4*i.to[I32]
-          // m(i) = if (i.to[I32] < 16) {(data(j).as[ULong] << 24) | (data(j+1).as[ULong] << 16) | (data(j+2).as[ULong] << 8) | (data(j+3).as[ULong])}
+          // val j = 4*i
+          // m(i) = if (i < 16) {(data(j).as[ULong] << 24) | (data(j+1).as[ULong] << 16) | (data(j+2).as[ULong] << 8) | (data(j+3).as[ULong])}
           //        else {SIG1(m(i-2)) + m(i-7) + SIG0(m(i-15)) + m(i-16)}
         }
         val A = Reg[ULong]
@@ -137,8 +137,8 @@ import spatial.dsl._
         }
 
         Foreach(8 by 1 par 8){i =>
-          state(i) = state(i) + mux(i.to[I32] == 0, A, mux(i.to[I32] == 1, B, mux(i.to[I32] == 2, C, mux(i.to[I32] == 3, D,
-            mux(i.to[I32] == 4, E, mux(i.to[I32] == 5, F, mux(i.to[I32] == 6, G, H)))))))
+          state(i) = state(i) + mux(i == 0, A, mux(i == 1, B, mux(i == 2, C, mux(i == 3, D,
+            mux(i == 4, E, mux(i == 5, F, mux(i == 6, G, H)))))))
         }
 
       }
@@ -174,7 +174,7 @@ import spatial.dsl._
 
         // Final
         val pad_stop = if (datalen.value < 56) 56 else 64
-        Foreach(datalen until pad_stop by 1){i => data(i) = if (i == datalen) 0x80.to[UInt8] else 0.to[UInt8]}
+        Foreach(datalen until pad_stop by 1){i => data(i) = if (i == datalen.value) 0x80.to[UInt8] else 0.to[UInt8]}
         if (datalen.value >= 56) {
           sha_transform()
           Foreach(56 by 1){i => data(i) = 0}
@@ -194,21 +194,21 @@ import spatial.dsl._
         // Foreach(8 by 1){i => println(" " + state(i))}
 
         Sequential.Foreach(4 by 1){ i =>
-          hash(i)    = (SHFR(state(0), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+4)  = (SHFR(state(1), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+8)  = (SHFR(state(2), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+12) = (SHFR(state(3), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+16) = (SHFR(state(4), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+20) = (SHFR(state(5), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+24) = (SHFR(state(6), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
-          hash(i+28) = (SHFR(state(7), (24-i.to[I32]*8))).bits(7::0).as[UInt8]
+          hash(i)    = (SHFR(state(0), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+4)  = (SHFR(state(1), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+8)  = (SHFR(state(2), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+12) = (SHFR(state(3), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+16) = (SHFR(state(4), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+20) = (SHFR(state(5), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+24) = (SHFR(state(6), (24-i*8))).bits(7::0).as[UInt8]
+          hash(i+28) = (SHFR(state(7), (24-i*8))).bits(7::0).as[UInt8]
         }
 
       }
 
       Sequential.Foreach(2 by 1){i =>
         Pipe{SHA256()}
-        if (i.to[I32] == 0) {
+        if (i == 0) {
           text_dram(0::32) store hash
           len := 32
         }

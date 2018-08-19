@@ -5,7 +5,7 @@ import spatial.dsl._
 
 
 @spatial class BFS extends SpatialTest {
-  override def runtimeArgs: Args = "6 10"
+  override def runtimeArgs: Args = "3 5"
 
   val tileSize = 8000
   val edges_per_node = 6 // Will make this random later

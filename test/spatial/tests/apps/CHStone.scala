@@ -286,7 +286,8 @@ import spatial.targets._
 
       def next_marker(): UInt8 = {
         val potential_marker = Reg[UInt8](0)
-        potential_marker.reset
+        // potential_marker.reset
+        potential_marker := 0
         FSM(0)(whilst => whilst != -1.to[Int]){whilst =>
           if (read_byte() == 255.to[UInt8]) {
             potential_marker := read_byte()
@@ -397,7 +398,8 @@ import spatial.targets._
           }
 
           val count = Reg[Int](0)
-          count.reset
+          // count.reset
+          count := 0
           Sequential.Foreach(1 until 17 by 1){ i => 
             val tmp = Reg[UInt8](0)
             Pipe{tmp := read_byte()}
@@ -686,7 +688,8 @@ import spatial.targets._
         val size = Reg[UInt16](0)
         Pipe{size := huffsize(0)}
         val pp = Reg[Int](0)
-        Pipe{ code.reset() }
+        // Pipe{ code.reset() }
+        Pipe{ code := 0 }
 
 
         FSM(0)(whilst1 => whilst1 != -1) { whilst1 =>
@@ -716,7 +719,8 @@ import spatial.targets._
         println("exit fsm!")
         val p_dhtbl_ml = Reg[Int](1)
         val ppp = Reg[Int](0)
-        Pipe{p_dhtbl_ml.reset}
+        // Pipe{p_dhtbl_ml.reset}
+        Pipe{p_dhtbl_ml := 1}
         Sequential.Foreach(1 until 17 by 1){l => 
           if (p_xhtbl_bits(idx, l) == 0.to[UInt8]) {
             Pipe{p_dhtbl_maxcode(idx, l) = 65535.to[UInt16]} // Signifies skip
@@ -1090,7 +1094,8 @@ import spatial.targets._
       def buf_getv(n: UInt8): UInt8 = {
         val ret = Reg[UInt8](0)
         val done = Reg[Boolean](false)
-        done.reset()
+        // done.reset()
+        done := false
         val p = Reg[Int8]
         p := n.as[Int8] - read_position_idx.value.as[Int8] - 1.to[Int8]
         // println("p just got " + p.value + " from " + n + " - " + read_position_idx.value)
@@ -1139,9 +1144,11 @@ import spatial.targets._
         code := buf_getb().as[Int16]
         // println("entering fsm, code " + code.value)
         val l = Reg[Int](1)
-        Pipe{l.reset}
+        // Pipe{l.reset}
+        Pipe{l := 1}
         val max_decode = Reg[Int16](0)
-        Pipe{max_decode.reset}
+        // Pipe{max_decode.reset}
+        Pipe{max_decode := 0}
         // Foreach(5 by 1) {i => println("   maxcode " + i + " is " + p_jinfo_dc_dhuff_tbl_maxcode(tbl_no, i))}
         FSM(0)(whilst => whilst != -1.to[Int]){whilst =>
           val tmp = buf_getb().as[Int16]
@@ -1193,7 +1200,8 @@ import spatial.targets._
         val action = Reg[UInt2](0)
         val r = Reg[UInt8](0)
         val k = Reg[I32](1)
-        k.reset
+        // k.reset
+        k := 1
         FSM(0)(whilst => whilst != -1){whilst =>
           println("decoding huff on ac @ " + k.value)
             Pipe{r := DecodeHuffman(tbl_no.to[I32], false)}

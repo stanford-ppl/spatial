@@ -72,6 +72,13 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     result
   }
 
+  private def blkOfUser(x: Sym[_], block: Blk): Blk = {
+    x match {
+      case s if (s.isControl) => Blk.Node(s,-1)
+      case s if ((s.isCounter || s.isCounterChain) && s.getOwner.isDefined) => Blk.Node(s.owner,-1)
+      case _ => block
+    }
+  }
 
   private def checkUses(lhs: Sym[_], rhs: Op[_]): Unit = {
     dbgs(s"  Pending: ${PendingUses.all.mkString(", ")}")
@@ -97,16 +104,20 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     */
   private def addUse(user: Sym[_], used: Set[Sym[_]], block: Blk): Unit = {
     dbgs(s"  Uses [Block: $block]:")
+    dbgs(s"    user $user")
+    dbgs(s"    used $used")
+    dbgs(s"    ")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
     // Bound symbols should always be the result of a block if they are defined elsewhere
     (used diff boundSyms).foreach{use =>
-      use.users += User(user, block)
+      use.users += User(user, blkOfUser(user, block))
+      dbgs(s"  Adding direct ($user ${blkOfUser(user, block)}) to uses for $use")
 
       // Also add stateless nodes that this node uses
       (PendingUses(use) - use).foreach{pend =>
-        dbgs(s"  Adding ($use, $block) to uses for $pend")
-        pend.users += User(use, block)
+        dbgs(s"  Adding pending ($use ${blkOfUser(user, block)}) to uses for $pend")
+        pend.users += User(use, blkOfUser(user, block))
       }
     }
   }

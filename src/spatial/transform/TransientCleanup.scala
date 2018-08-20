@@ -39,14 +39,6 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
     }
   }
 
-  private def blkOfUser(x: User): Blk = {
-    x.sym match {
-      case s if (s.isControl) => Blk.Node(s,-1)
-      case s if (s.isCounter && s.getOwner.isDefined) => Blk.Node(s.owner,-1)
-      case _ => x.blk
-    }
-  }
-
   /* Gets rid of cases where the user has already been visited,
      such as an OpForeach's block 0 may return a value who is considered
      to be used by the OpForeach's block -1
@@ -61,7 +53,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   def requiresMoveOrDuplication[A](lhs: Sym[A], rhs: Op[A]): Boolean = rhs match {
     case node:Primitive[_] =>
       // Duplicate stateless nodes when they have users across control or not the current block
-      val blks = lhs.users.filterNot(priorUser).map(blkOfUser)
+      val blks = lhs.users.filterNot(priorUser).map(_.blk)
       node.isTransient && (blks.size > 1 || blks.exists(_ != blk))
 
     case _ => false
@@ -76,7 +68,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
 
       // For all uses within a single control node, create a single copy of this node
       // Then associate all uses within that control with that copy
-      val users = lhs.users.filterNot(priorUser).groupBy(blkOfUser)
+      val users = lhs.users.filterNot(priorUser).groupBy(_.blk)
 
       users.foreach{case (block, uses) =>
         val read = delayedMirror(lhs, rhs, block)
@@ -141,7 +133,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
 
   private def updateWithContext[T](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     dbgs(s"${stm(lhs)} [$blk]")
-    // statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
+    statelessSubstRules.keys.foreach{k => dbgs(s"  $k") }
     if ( statelessSubstRules.contains((lhs,blk)) ) {
       dbgs("")
       dbgs(s"$lhs = $rhs [external user, blk = $blk]: Subst Rule ${statelessSubstRules((lhs,blk))}")

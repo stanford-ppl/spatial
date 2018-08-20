@@ -38,7 +38,14 @@ if [[ $GDOCS -eq 1 ]]; then
 	fi
 	synthtime=$((endtime-starttime))
 
-	spatialtime=0 # TODO: Spatial compile time
+    # Get compile time
+    logpath=`echo $curpath | sed "s/\/gen\//\/logs\//g"`
+    if [[ -f $logpath/9999_Timing.log ]]; then
+            spatialtime=`cat $logpath/9999_Timing.log | grep "compile:" | sed "s/.*compile: //g" | sed "s/s .*//g"`
+    else
+            spatialtime=0
+    fi
+
 
 	# Hacky go back until $SPATIAL_HOME
 	hash=`cat ${basepath}/reghash`

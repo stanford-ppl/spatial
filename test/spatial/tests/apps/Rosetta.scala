@@ -210,8 +210,8 @@ import spatial.targets._
 		val input_num = input_reg.value
 
 		val num_triangles = 3192 
-		val tris_to_do = ArgIn[Int]
-		setArg(tris_to_do, args(2).to[Int])
+		// val tris_to_do = ArgIn[Int]
+		// setArg(tris_to_do, args(2).to[Int])
 
 		val run_on_board = false // args(1).to[Int] > 0.to[Int]  
 		val input_file_name = s"$DATA/rosetta/3drendering_input_triangles.csv"
@@ -259,9 +259,9 @@ import spatial.targets._
 				frame_buffer(i,j) = 0.to[UInt8]
 			}
 			
-			Foreach(tris_to_do by vec_sram_len) { i =>
+			Foreach(num_triangles by vec_sram_len) { i =>
 
-				val load_len = min(vec_sram_len.to[Int], tris_to_do - i)
+				val load_len = min(vec_sram_len.to[Int], num_triangles - i)
 				val triangle3D_vector_sram = SRAM[triangle3D](vec_sram_len)
 
 				triangle3D_vector_sram load triangle3D_vector_dram(i :: i + load_len par 4) 

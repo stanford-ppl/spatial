@@ -73,6 +73,7 @@ object DenseTransfer {
     val p = pars.last
     val requestLength: I32 = lens.last
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
+    p match {case Expect(p) => assert(p.toInt*A.nbits <= target.burstSize, s"Cannot parallelize by more than the burst size! (par ${p.toInt} * ${A.nbits} > ${target.burstSize}"); case _ =>}
 
     val outerLoopCounters = counters.dropRight(1)
     if (outerLoopCounters.nonEmpty) {

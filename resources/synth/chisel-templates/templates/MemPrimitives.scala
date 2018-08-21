@@ -127,7 +127,7 @@ abstract class MemInterface(p: MemParams) extends Bundle {
   var directR = HVec(Array.tabulate(1 max p.numDirectRPorts){i => 
     Input(new R_Direct(p.directRMux.accessPars.getOr1(i), p.ofsWidth, if (p.hasDirectR) p.directRMux.sortByMuxPortAndOfs.values.map(_._1).flatten.flatten.toList.grouped(p.banks.length).toList else p.defaultDirect))
   })
-  var flow = Vec(1 max (p.numXBarRPorts + p.numDirectRPorts), Input(Bool()))
+  var flow = Vec(1 max p.totalOutputs, Input(Bool()))
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
   }
@@ -172,6 +172,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
       val castgrp = if (ignoreCastInfo) 0 else cg
       val base = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).size
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
+      val outBase = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
       if (bid == 0) {
         if (ignoreCastInfo && i == 0) {
           assert(p.xBarRMux.contains((muxAddr._1, muxAddr._2, 0)))
@@ -183,10 +184,9 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           usedMuxPorts ::= ("XBarR", (muxAddr._1,muxAddr._2, i, castgrp))
         }
         io.xBarR(base).connectLane(vecId, i, rBundle)
-        io.flow(base) := flow
+        io.flow(outBase + vecId) := flow
       }
       // Temp fix for merged readers not recomputing port info
-      val outBase = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
       io.output.data(outBase + vecId)
     }
     
@@ -209,6 +209,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
       val castgrp = if (ignoreCastInfo) 0 else cg
       val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2, castgrp).size
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
+      val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
       if (bid == 0) {
         if (ignoreCastInfo && i == 0) {
           assert(p.directRMux.contains((muxAddr._1, muxAddr._2, 0)))
@@ -220,10 +221,9 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           usedMuxPorts ::= ("DirectR", (muxAddr._1,muxAddr._2, i, castgrp))
         }
         io.directR(base).connectLane(vecId, i, rBundle)
-        io.flow(base + p.numXBarR) := flow
+        io.flow(p.xBarOutputs + outBase + vecId) := flow
       }
       // Temp fix for merged readers not recomputing port info
-      val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
       io.output.data(p.xBarOutputs + outBase + vecId)
     }
   }

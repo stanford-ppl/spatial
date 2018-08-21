@@ -32,7 +32,7 @@ import spatial.dsl._
     Accel {
       val xx = SRAM[T](N)
       val yy = SRAM[T](N)
-      xx load x(0 :: N par 16)
+      xx load x(0 :: N par 8)
       Foreach(N by 1) { i =>
         yy(i) = xx(i) * s
       }
@@ -66,7 +66,7 @@ import spatial.dsl._
       expo_dram store expo
       sqroot_dram store sqroot
 
-      y(0 :: N par 16) store yy
+      y(0 :: N par 8) store yy
     }
 
 

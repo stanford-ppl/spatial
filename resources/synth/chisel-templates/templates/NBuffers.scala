@@ -224,13 +224,13 @@ class NBufMem(val mem: MemType,
             val k_base = portMapping.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
+              f.io.flow(outputBufferBase + (k_base + m)) := io.flow(outputBufferBase + (k_base + m)) // Dangerous move here
               io.output.data(outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en.map(_ & rMask)
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
             f.io.xBarR(bufferBase + k).banks.zip(io.xBarR(bufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-            f.io.flow(k + bufferBase) := io.flow(k + bufferBase) // Dangerous move here
           }
         }
 
@@ -248,13 +248,13 @@ class NBufMem(val mem: MemType,
             val k_base = portMapping.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
+              f.io.flow(outputXBarRBase + outputBufferBase + (k_base + m)) := io.flow(outputXBarRBase + outputBufferBase + (k_base + m)) // Dangerous move here
               io.output.data(outputXBarRBase + outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
 
             f.io.directR(bufferBase + k).en := io.directR(bufferBase + k).en.map(_ & rMask)
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(bufferBase + k).ofs
-            f.io.flow(k + bufferBase + numXBarR) := io.flow(k + bufferBase + numXBarR) // Dangerous move here
           }
         }
 
@@ -270,6 +270,7 @@ class NBufMem(val mem: MemType,
           val port_width = broadcastRMux.accessPars(k)
           val k_base = broadcastRMux.accessPars.take(k).sum
           (0 until port_width).foreach{m => 
+            f.io.flow(outputXBarRBase + outputDirectRBase + (k_base+m)) := io.flow(outputXBarRBase + outputDirectRBase + (k_base+m)) // Dangerous move here
             io.output.data(outputXBarRBase + outputDirectRBase + (k_base+m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data((k_base+m))})
           }
          
@@ -277,7 +278,6 @@ class NBufMem(val mem: MemType,
           // f.io.xBarR(xBarRBase + k).data := io.xBarR(xBarRBase + k).data
           f.io.xBarR(xBarRBase + k).ofs := io.broadcastR( k).ofs
           f.io.xBarR(xBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-          f.io.flow(xBarRBase + k) := io.flow(xBarRBase + directRBase + k) // Dangerous move here
         }
 
       }
@@ -510,7 +510,7 @@ class NBufMem(val mem: MemType,
           usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,muxAddr._2,i,castgrp))
         }
         io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle)
-        io.flow(bufferBase + muxBase) := flow        
+        io.flow(outputBufferBase + outputMuxBase + vecId) := flow        
       }
       io.output.data(outputBufferBase + outputMuxBase + vecId)
     }
@@ -534,7 +534,7 @@ class NBufMem(val mem: MemType,
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
       if (bid == 0) {
         io.broadcastR(muxBase).connectLane(vecId,i,rBundle)
-        io.flow(xBarRBase + directRBase + muxBase) := flow
+        io.flow(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId) := flow
       }
       io.output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
     }
@@ -571,7 +571,7 @@ class NBufMem(val mem: MemType,
           usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,muxAddr._2,i,castgrp))
         }
         io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle)
-        io.flow(xBarRBase + bufferBase + muxBase) := flow        
+        io.flow(outputXBarRBase + outputBufferBase + outputMuxBase + vecId) := flow        
       }
       io.output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
     }

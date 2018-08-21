@@ -42,7 +42,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       // If child is UnitPipe, inline its contents with parent
       val childInputs = child.s.get.op.get.inputs
       val parentNeeded = lhs.op.get.blocks.exists{block => block.stms.exists(childInputs.contains)}
-      if (child.isUnitPipe & !parentNeeded){
+      if (child.isUnitPipe & !parentNeeded && !lhs.isStreamControl){
         ctrl.bodies.foreach{body => 
           body.blocks.foreach{case (_,block) => 
             val saveMerge = deleteChild
@@ -55,7 +55,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
         super.transform(lhs,rhs)
       } 
       // If parent is UnitPipe, delete it
-      else if (lhs.isUnitPipe & !parentNeeded) {
+      else if (lhs.isUnitPipe & !parentNeeded && !lhs.isStreamControl) {
         ctrl.bodies.foreach{body => 
           body.blocks.foreach{case (_,block) => 
             val block2 = f(block)
@@ -86,13 +86,13 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
 
     case ctrl: Control[_] if deleteChild =>
       dbgs(s"Deleting $lhs and inlining body with parent")
-      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe)) deleteChild = false
+      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.isStreamControl)) deleteChild = false
       ctrl.bodies.foreach{body => 
         body.blocks.foreach{case (_,block) => 
           inlineBlock(block)
         }
       }
-      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe)) deleteChild = true
+      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.isStreamControl)) deleteChild = true
       void.asInstanceOf[Sym[A]]
 
     case _:Switch[_]  => super.transform(lhs,rhs)

@@ -157,7 +157,6 @@ class NBufMem(val mem: MemType,
   mem match {
     case SRAMType => 
       val srams = (0 until numBufs).map{ i => 
-        Console.println(s"create sram with read $combinedXBarRMux, I have ${io.flow.size}")
         Module(new SRAM(logicalDims, bitWidth, 
                         banks, strides, 
                         combinedXBarWMux, combinedXBarRMux,

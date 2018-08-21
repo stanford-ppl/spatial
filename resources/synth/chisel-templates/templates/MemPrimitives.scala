@@ -170,18 +170,19 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     assert(p.hasXBarR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
-      val base = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).size
+      val effectiveOfs = if (ignoreCastInfo) muxAddr._2 else muxAddr._2 + i
+      val base = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,effectiveOfs,castgrp).size
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
-      val outBase = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
+      val outBase = p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,effectiveOfs,castgrp).sum - p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
       if (bid == 0) {
         if (ignoreCastInfo && i == 0) {
-          assert(p.xBarRMux.contains((muxAddr._1, muxAddr._2, 0)))
-          assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,muxAddr._2, i, 0))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
-          usedMuxPorts ::= ("XBarR", (muxAddr._1,muxAddr._2, i, 0))
+          assert(p.xBarRMux.contains((muxAddr._1, effectiveOfs, 0)))
+          assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,effectiveOfs, i, 0))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
+          usedMuxPorts ::= ("XBarR", (muxAddr._1,effectiveOfs, i, 0))
         } else if (!ignoreCastInfo) {
-          assert(p.xBarRMux.contains((muxAddr._1, muxAddr._2, castgrp)))
-          assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,muxAddr._2, i, castgrp))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
-          usedMuxPorts ::= ("XBarR", (muxAddr._1,muxAddr._2, i, castgrp))
+          assert(p.xBarRMux.contains((muxAddr._1, effectiveOfs, castgrp)))
+          assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
+          usedMuxPorts ::= ("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
         io.xBarR(base).connectLane(vecId, i, rBundle)
         io.flow(outBase + vecId) := flow
@@ -207,18 +208,19 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     assert(p.hasDirectR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
-      val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2, castgrp).size
+      val effectiveOfs = if (ignoreCastInfo) muxAddr._2 else muxAddr._2 + i
+      val base = p.directRMux.accessParsBelowMuxPort(muxAddr._1,effectiveOfs, castgrp).size
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
-      val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,castgrp).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
+      val outBase = p.directRMux.accessParsBelowMuxPort(muxAddr._1,effectiveOfs,castgrp).sum - p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum
       if (bid == 0) {
         if (ignoreCastInfo && i == 0) {
-          assert(p.directRMux.contains((muxAddr._1, muxAddr._2, 0)))
-          assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,muxAddr._2, i, 0))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
-          usedMuxPorts ::= ("DirectR", (muxAddr._1,muxAddr._2, i, 0))
+          assert(p.directRMux.contains((muxAddr._1, effectiveOfs, 0)))
+          assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,effectiveOfs, i, 0))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
+          usedMuxPorts ::= ("DirectR", (muxAddr._1,effectiveOfs, i, 0))
         } else if (!ignoreCastInfo) {
-          assert(p.directRMux.contains((muxAddr._1, muxAddr._2, castgrp)))
-          assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,muxAddr._2, i, castgrp))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
-          usedMuxPorts ::= ("DirectR", (muxAddr._1,muxAddr._2, i, castgrp))
+          assert(p.directRMux.contains((muxAddr._1, effectiveOfs, castgrp)))
+          assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
+          usedMuxPorts ::= ("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
         io.directR(base).connectLane(vecId, i, rBundle)
         io.flow(p.xBarOutputs + outBase + vecId) := flow

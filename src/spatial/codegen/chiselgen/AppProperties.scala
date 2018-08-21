@@ -20,3 +20,5 @@ object HasVariableCtrBounds extends AppProperties
 object HasVariableCtrStride extends AppProperties
 object HasFloats extends AppProperties
 object HasVariableCtrSyms extends AppProperties
+object HasBroadcastRead extends AppProperties
+object HasAccumSegmentation extends AppProperties

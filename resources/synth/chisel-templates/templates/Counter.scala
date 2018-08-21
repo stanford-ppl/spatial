@@ -249,7 +249,9 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
     bases.zipWithIndex.foreach{ case (b,i) => 
       b.io.xBarW(0).init.head := inits(i).asUInt
-      b.io.xBarW(0).reset.head := io.input.reset | {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}}
+      b.io.xBarW(0).reset.head := io.input.reset | 
+                                  {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}} | 
+                                  {if (start.isDefined) false.B else {!locked && (Utils.getRetimed(io.input.start,1) =/= io.input.start)}}
       b.io.xBarW(0).en.head := io.input.enable
     }
 
@@ -284,48 +286,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     io.output.done := io.input.enable & isMax
     io.output.saturated := io.input.saturate & isMax
     io.output.extendedDone := (io.input.enable | wasEnabled) & (isMax | wasMax)
-
-    // val base = Module(new FF((width)))
-    // val init = if (start.isDefined) start.get.S(width.W) else io.input.start
-    // base.io.xBarW(0).init := init.asUInt
-    // base.io.xBarW(0).reset := io.input.reset
-    // base.io.xBarW(0).enable := io.input.enable
-
-    // val count = base.io.output.data.asSInt
-    // val delta = if (stride.isDefined & gap.isDefined) { (stride.get*par+gap.get).S((width.W)) }
-    //             else if (stride.isDefined) { (stride.get*par).S((width.W)) + io.input.gap}
-    //             else if (gap.isDefined) { io.input.stride * par.S((width.W)) + gap.get.S(width.W)}
-    //             else { io.input.stride * par.S((width.W)) + io.input.gap}
-    // val newval = count + delta
-    // val isMax = Mux(io.input.stride >= 0.S((width).W), 
-    //   newval >= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}, 
-    //   newval <= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}
-    // )
-    // // io.output.debug1 := newval
-    // // io.output.debug2 := io.input.stride >= 0.S((width).W)
-    // // io.output.debug3 := newval >= io.input.stop
-    // // io.output.debug4 := io.input.stop
-    // val wasMax = RegNext(isMax, false.B)
-    // val wasEnabled = RegNext(io.input.enable, false.B)
-    // val next = Mux(isMax, Mux(io.input.saturate, count, init), newval)
-    // base.io.xBarW(0).data := Mux(io.input.reset, init.asUInt, next.asUInt)
-
-    // if(stride.isDefined) {
-    //   (0 until par).foreach { i => 
-    //     io.output.count(i) := count + (i*stride.get).S((width).W)
-    //     io.output.countWithoutWrap(i) := Mux(count === 0.S((width).W), if(stop.isDefined) stop.get.S(width.W) else io.input.stop, count) + (i*stride.get).S((width).W)
-    //   }
-    // } else {
-    //   (0 until par).foreach { i => 
-    //     io.output.count(i) := count + i.S((width).W)*-*io.input.stride
-    //     io.output.countWithoutWrap(i) := Mux(count === 0.S((width).W), if(stop.isDefined) stop.get.S(width.W) else io.input.stop, count) + i.S((width).W)*-*io.input.stride
-    //   }      
-    // }
-    
-    // io.output.done := io.input.enable & isMax
-    // io.output.saturated := io.input.saturate & isMax
-    // io.output.extendedDone := (io.input.enable | wasEnabled) & (isMax | wasMax)
-  } else { // Forever21 counter
+  } else { // Forever counter
     io.output.count(0) := 0.S(width.W)
     io.output.saturated := false.B
     io.output.extendedDone := false.B

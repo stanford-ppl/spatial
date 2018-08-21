@@ -21,9 +21,9 @@ import spatial.dsl._
 
     Accel {
       val accum = SRAM[T](tileSize)
-      MemReduce(accum)(sizeIn by tileSize par p){ i  =>
+      MemReduce(accum)(-sizeIn until 0 by tileSize par p){ i  =>
         val tile = SRAM[T](tileSize)
-        tile load srcFPGA(i::i+tileSize par 16)
+        tile load srcFPGA(i+sizeIn::i+sizeIn+tileSize par 16)
         tile
       }{_+_}
       dstFPGA(0::tileSize par 16) store accum

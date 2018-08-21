@@ -21,11 +21,11 @@ import spatial.dsl._
     Accel {
       val xx = SRAM[Q32](N)
       val yy = SRAM[Q32](N)
-      xx load x(0::N par 16)
+      xx load x(0::N par 8)
       Foreach(0 until N par 16){i =>
         yy(i) = xx(i) * q
       }
-      y(0::N par 16) store yy
+      y(0::N par 8) store yy
     }
 
     val result = getMem(y)

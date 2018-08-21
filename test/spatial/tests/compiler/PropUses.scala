@@ -4,7 +4,7 @@ import argon.Block
 import spatial.dsl._
 
 @spatial class PropUses extends SpatialTest {
-
+  override def runtimeArgs: Args = "16"
   def main(args: Array[String]): Unit = {
     val x = ArgIn[I8]
     val n = args(0).to[I8]

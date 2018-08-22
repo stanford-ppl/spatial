@@ -14,6 +14,23 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
 
+  val zipThreshold = 100 // Max number of characters before deciding to split line into many
+  private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
+    val totalPayload = payload.mkString(src"List[$tp](", ",", ")")
+    if (totalPayload.length < zipThreshold) {
+      val rdPayload = totalPayload + suffix
+      emitt(src"""${swap(src"${lhs}_port", Blank)}.$port.zip($rdPayload).foreach{case (left, right) => left.r := right}""")
+    }
+    else {
+      val groupSize = (payload.length / (totalPayload.length / zipThreshold)).toInt
+      val groups = payload.grouped(groupSize).toList
+      groups.zipWithIndex.foreach{case (group, i) => 
+        val rdPayload = group.mkString(src"List[$tp](",",",")") + suffix
+        emitt(src"""${swap(src"${lhs}_port", Blank)}.$port.drop(${i*groupSize}).take(${group.size}).zip($rdPayload).foreach{case (left, right) => left.r := right}""")
+      }
+    }
+  }
+
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
     val rPar = lhs.accessWidth
@@ -43,21 +60,20 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList))") 
       emitt(src"""${lhs}.toSeq.zip(${mem}.connectDirectRPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else if (isBroadcast) {
-      val bankString = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+      val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
       emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-      emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+      zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emitt(src"""${lhs}.toSeq.zip(${mem}.connectBroadcastRPort(${swap(src"${lhs}_port", Blank)}, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else {
-      val bankString = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+      val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
       emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}))") 
-      emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+      zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emitt(src"""${lhs}.toSeq.zip(${mem}.connectXBarRPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     }
     val commonEns = ens.head.collect{case e if (ens.forall(_.contains(e)) && !e.isBroadcastAddr) => e}
-    val ensString = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}.mkString("List(",",",")")
-    emitt(src"""${swap(src"${lhs}_port", Blank)}.en.zip(${ensString}.toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})).foreach{case (left, right) => left := right}""")
-    if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_port", Blank)}.ofs.zip(${ofs.filter(!_.isBroadcastAddr).map(quote(_) + ".r").mkString("List[UInt](",",",")")}.toSeq.map(_.rd)).foreach{case (left, right) => left.r := right}""")
-    
+    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
+    zipAndConnect(lhs, mem, "en", "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})")
+    if (ofs.nonEmpty) zipAndConnect(lhs, mem, "ofs", "UInt", ofs.filter(!_.isBroadcastAddr).map(quote(_) + ".r"), ".toSeq.map(_.rd)")
   }
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {
@@ -80,21 +96,21 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width))") 
       emitt(src"""${mem}.connectDirectWPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, (${muxPort}, $muxOfs))""")
     } else if (isBroadcast) {
-      val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+      val banklist = bank.flatten.map(quote(_) + ".r")
       emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-      emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+      zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emitt(src"""${mem}.connectBroadcastWPort(${swap(src"${lhs}_port", Blank)}, ($muxPort, $muxOfs))""")        
     } else {
-      val bankString = bank.flatten.map(quote(_) + ".r").mkString("List[UInt](", ",", ")")
+      val banklist = bank.flatten.map(quote(_) + ".r")
       emitGlobalWireMap(src"""${lhs}_port""", s"Wire(new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width))") 
-      emitt(src"""${swap(src"${lhs}_port", Blank)}.banks.zip($bankString.map(_.rd)).foreach{case (left, right) => left.r := right}""")
+      zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emitt(src"""${mem}.connectXBarWPort(${swap(src"${lhs}_port", Blank)}, $bufferPort, (${muxPort}, $muxOfs))""")
     }
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
-    val ensString = ens.map{e => and(e.filter(!commonEns.contains(_)))}.mkString("List(",",",")")
-    emitt(src"""${swap(src"${lhs}_port", Blank)}.$enport.zip(${ensString}.toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})).foreach{case (left, right) => left := right}""")
-    if (ofs.nonEmpty) emitt(src"""${swap(src"${lhs}_port", Blank)}.ofs.zip(${ofs.map(quote(_) + ".r").mkString("List[UInt](",",",")")}.toSeq.map(_.rd)).foreach{case (left, right) => left.r := right}""")
-    emitt(src"""${swap(src"${lhs}_port", Blank)}.data.zip(${data.map(quote(_) + ".r").mkString("List[UInt](",",",")")}).foreach{case (left, right) => left.r := right}""")
+    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)))}
+    zipAndConnect(lhs, mem, enport, "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})")
+    if (ofs.nonEmpty) zipAndConnect(lhs, mem, "ofs", "UInt", ofs.map(quote(_) + ".r"), ".toSeq.map(_.rd)")
+    zipAndConnect(lhs, mem, "data", "UInt", data.map(quote(_) + ".r"), "")
   }
 
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {

@@ -220,11 +220,12 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramXBarRPorts).foreach {k => 
-            val port_width = portMapping.accessPars(k)
-            val k_base = portMapping.accessPars.take(k).sum
+            val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
+            val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
+            val flow_correction = portMapping.sortByMuxPortAndCombine.accessParsBelowMuxPort(portMapping.sortByMuxPortAndOfs.toList(k)._1._1,0,0).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              f.io.flow((k_base + m)) := io.flow(outputBufferBase + (k_base + m)) // Dangerous move here
+              f.io.flow((k_base - flow_correction + m)) := io.flow(outputBufferBase + (k_base + m)) // Dangerous move here
               io.output.data(outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en.map(_ & rMask)
@@ -244,11 +245,12 @@ class NBufMem(val mem: MemType,
           val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
           val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
           (0 until sramDirectRPorts).foreach {k => 
-            val port_width = portMapping.accessPars(k)
-            val k_base = portMapping.accessPars.take(k).sum
+            val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
+            val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
+            val flow_correction = portMapping.sortByMuxPortAndCombine.accessParsBelowMuxPort(portMapping.sortByMuxPortAndOfs.toList(k)._1._1,0,0).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              f.io.flow(outputXBarRBase + (k_base + m)) := io.flow(outputXBarRBase + outputBufferBase + (k_base + m)) // Dangerous move here
+              f.io.flow(outputXBarRBase + (k_base - flow_correction + m)) := io.flow(outputXBarRBase + outputBufferBase + (k_base + m)) // Dangerous move here
               io.output.data(outputXBarRBase + outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
 

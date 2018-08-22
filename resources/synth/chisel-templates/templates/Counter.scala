@@ -302,7 +302,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     defs match {
       case 0x7 | 0x6 => io.output.noop := (start.get            == stop.get).B
       case 0x5 | 0x4 => io.output.noop := start.get.S(width.W) === io.input.stop
-      case 0x3 | 0x2 => io.output.noop := io.input.start       === start.get.S(width.W)
+      case 0x3 | 0x2 => io.output.noop := io.input.start       === stop.get.S(width.W)
       case 0x1 | 0x0 => io.output.noop := io.input.start       === io.input.stop
     }
     io.output.saturated := io.input.saturate & isMax

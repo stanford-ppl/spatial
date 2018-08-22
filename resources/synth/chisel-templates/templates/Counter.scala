@@ -221,13 +221,9 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
     val output = new Bundle {
       val count      = Vec(1 max par, Output(SInt((width).W)))
-      val countWithoutWrap = Vec(1 max par, Output(SInt((width).W))) // Rough estimate of next val without wrap, used in FIFO
+      val oobs        = Vec(1 max par, Output(Bool()))
+      val noop   = Output(Bool())
       val done   = Output(Bool())
-      val extendedDone = Output(Bool())
-      // val debug1 = Output(SInt((width).W))
-      // val debug2 = Output(Bool())
-      // val debug3 = Output(Bool())
-      // val debug4 = Output(SInt((width).W))
       val saturated = Output(Bool())
     }
   })
@@ -274,23 +270,48 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     if(stride.isDefined) {
       (0 until par).foreach { i => 
         io.output.count(i) := counts(i)
-        io.output.countWithoutWrap(i) := Mux(counts(i) === 0.S((width).W), if(stop.isDefined) stop.get.S(width.W) else io.input.stop, counts(i))
       }
     } else {
       (0 until par).foreach { i => 
         io.output.count(i) := counts(i)
-        io.output.countWithoutWrap(i) := Mux(counts(i) === 0.S((width).W), if(stop.isDefined) stop.get.S(width.W) else io.input.stop, counts(i))
       }      
     }
-    
+
+    // Connect oobies (Out Of Bound-ies)
+    val defs = {if (start.isDefined) 0x4 else 0x0} | {if (stop.isDefined) 0x2 else 0x0} | {if (stride.isDefined) 0x1 else 0x0}
+    (0 until par).foreach{ i => 
+      // Changing start and resetting counts(i) takes a cycle, so forward the init value if required
+      val c = defs match {
+        case 0x7 | 0x6 | 0x5 | 0x4 => counts(i)
+        case 0x3 | 0x2 | 0x1 | 0x0 => Mux(!locked && (Utils.getRetimed(io.input.start,1) =/= io.input.start), inits(i), counts(i))
+      }
+      // Connections are a mouthful but it is historically unsafe to trust that chisel will optimize constants properly
+      defs match {
+        case 0x7 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < start.get.S(width.W) || c >= stop.get.S(width.W) else io.output.oobs(i) := c > start.get.S(width.W) || c <= stop.get.S(width.W)   
+        case 0x6 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= stop.get.S(width.W),                          c > start.get.S(width.W) || c <= stop.get.S(width.W))
+        case 0x5 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < start.get.S(width.W) || c >= io.input.stop       else io.output.oobs(i) := c > start.get.S(width.W) || c <= io.input.stop   
+        case 0x4 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= io.input.stop,                                c > start.get.S(width.W) || c <= io.input.stop)
+        case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= stop.get.S(width.W) else io.output.oobs(i) := c > io.input.start       || c <= stop.get.S(width.W)
+        case 0x2 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
+        case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= io.input.stop       else io.output.oobs(i) := c > io.input.start       || c <= io.input.stop
+        case 0x0 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
+      }
+    }
+
     io.output.done := io.input.enable & isMax
+    defs match {
+      case 0x7 | 0x6 => io.output.noop := (start.get            == stop.get).B
+      case 0x5 | 0x4 => io.output.noop := start.get.S(width.W) === io.input.stop
+      case 0x3 | 0x2 => io.output.noop := io.input.start       === start.get.S(width.W)
+      case 0x1 | 0x0 => io.output.noop := io.input.start       === io.input.stop
+    }
     io.output.saturated := io.input.saturate & isMax
-    io.output.extendedDone := (io.input.enable | wasEnabled) & (isMax | wasMax)
   } else { // Forever counter
     io.output.count(0) := 0.S(width.W)
     io.output.saturated := false.B
-    io.output.extendedDone := false.B
+    io.output.noop := false.B
     io.output.done := false.B
+
   }
 }
 
@@ -314,13 +335,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     }
     val output = new Bundle { 
       val count      = Vec(par, Output(SInt((width).W)))
-      val countWithoutWrap = Vec(par, Output(SInt((width).W))) // Rough estimate of next val without wrap, used in FIFO
       val done   = Output(Bool())
-      val extendedDone = Output(Bool())
-      // val debug1 = Output(SInt((width).W))
-      // val debug2 = Output(Bool())
-      // val debug3 = Output(Bool())
-      // val debug4 = Output(SInt((width).W))
       val saturated = Output(Bool())
     }
   })
@@ -343,15 +358,10 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     base.io.xBarW(0).data.head := Mux(io.input.reset, init.asUInt, next.asUInt)
 
     (0 until par).foreach { i => io.output.count(i) := count + i.S((width).W)*io.input.stride } // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
-    (0 until par).foreach { i => 
-      io.output.countWithoutWrap(i) := Mux(count === 0.S((width).W), io.input.stop, count) + i.S((width).W)*io.input.stride // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
-    }
     io.output.done := io.input.enable & (isMax | isMin)
     io.output.saturated := io.input.saturate & ( isMax | isMin )
-    io.output.extendedDone := (io.input.enable | wasEnabled) & ((isMax | wasMax) | (isMin | wasMin))
-  } else { // Forever21 counter
+  } else { // Forever
     io.output.saturated := false.B
-    io.output.extendedDone := false.B
     io.output.done := false.B
   }
 }
@@ -374,13 +384,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     }
     val output = new Bundle { 
       val count      = Vec(par, Output(SInt((width).W)))
-      val countWithoutWrap = Vec(par, Output(SInt((width).W))) // Rough estimate of next val without wrap, used in FIFO
       val done   = Output(Bool())
-      val extendedDone = Output(Bool())
-      // val debug1 = Output(SInt((width).W))
-      // val debug2 = Output(Bool())
-      // val debug3 = Output(Bool())
-      // val debug4 = Output(SInt((width).W))
       val saturated = Output(Bool())
     }
   })
@@ -405,15 +409,10 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     base.io.xBarW(0).data.head := Mux(io.input.reset, init.asUInt, next.asUInt)
 
     (0 until par).foreach { i => io.output.count(i) := Mux(io.input.dir, count + (i*strideUp).S((width).W), count + (i*strideDown).S((width).W)) }
-    (0 until par).foreach { i => 
-      io.output.countWithoutWrap(i) := Mux(count === 0.S((width).W), stop.asSInt, count) + Mux(io.input.dir, (i*strideUp).S((width).W), (i*strideDown).S((width).W))
-    }
     io.output.done := io.input.enable & ((isMax & io.input.dir) | (isMin & ~io.input.dir))
     io.output.saturated := io.input.saturate & ( (isMax & io.input.dir) | (isMin & ~io.input.dir) )
-    io.output.extendedDone := (io.input.enable | wasEnabled) & (((isMax & io.input.dir) | (wasMax & io.input.dir)) | ((isMin & ~io.input.dir) | (wasMin & ~io.input.dir)))
-  } else { // Forever21 counter
+  } else { // Forever
     io.output.saturated := false.B
-    io.output.extendedDone := false.B
     io.output.done := false.B
   }
 }
@@ -458,9 +457,8 @@ class Counter(val par: List[Int], val starts: List[Option[Int]], val stops: List
     val output = new Bundle {
       val counts      = HVec.tabulate(numWires){i => Output(SInt((widths(ctrMapping.filter(_ <= i).length - 1)).W))}
       val oobs        = Vec(numWires, Output(Bool()))
-      // val counts      = HVec.tabulate(numWires){i => Output(SInt(32.W))}
+      val noop   = Output(Bool())
       val done   = Output(Bool())
-      val extendedDone   = Output(Bool()) // Tool for ensuring done signal is stable for one rising edge
       val saturated = Output(Bool())
     }
   })
@@ -493,7 +491,10 @@ class Counter(val par: List[Int], val starts: List[Option[Int]], val stops: List
   // Wire up the outputs
   par.zipWithIndex.foreach { case (p, i) => 
     val addr = par.take(i+1).reduce{_+_} - par(i) // i+1 to avoid reducing empty list
-    (0 until p).foreach { k => io.output.counts(addr+k) := ctrs(i).io.output.count(k) }
+    (0 until p).foreach { k => 
+      io.output.counts(addr+k) := ctrs(i).io.output.count(k) 
+      io.output.oobs(addr+k) := ctrs(i).io.output.oobs(k)
+    }
   }
 
   // // Wire up countBases for easy debugging
@@ -506,15 +507,10 @@ class Counter(val par: List[Int], val starts: List[Option[Int]], val stops: List
   val wasDone = RegNext(isDone, false.B)
   val isSaturated = ctrs.map{_.io.output.saturated}.reduce{_&_}
   val wasWasDone = RegNext(wasDone, false.B)
+  io.output.noop := ctrs.map(_.io.output.noop).reduce{_&&_}
   io.output.done := Mux(io.input.isStream, true.B, io.input.enable) & isDone & ~wasDone
-  io.output.extendedDone := io.input.enable & isDone & ~wasWasDone
   io.output.saturated := io.input.saturate & isSaturated
 
-  // Set oobs (to replace emitValids in codegen)
-  // (0 until numWires).foreach{i => 
-  //   val j = widths(ctrMapping.filter(_ <= i).length - 1)
-  //   Mux(io.input.strides(j) >= 0.S(widths(j)), ctrs(i).io.output.count()  )
-  // }
 
 }
 

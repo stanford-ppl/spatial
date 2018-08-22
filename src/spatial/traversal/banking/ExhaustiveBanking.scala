@@ -70,7 +70,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           findBanking(selGrps, dims, stagedDims)
         }
         if (isValidBanking(banking,grps)) {
-          if (mem.getPadding.isEmpty) mem.padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
           Some(banking)
         }
         else None

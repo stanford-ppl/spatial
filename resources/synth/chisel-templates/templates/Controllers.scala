@@ -134,7 +134,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       for (i <- 0 until depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i).D(1) & io.enable)
+        iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i) & io.enable)
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 

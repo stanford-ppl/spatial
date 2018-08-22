@@ -146,14 +146,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (streamCopyWatchlist.contains(cchain)) emitt(src"""${cchain}.io.input.isStream := true.B""")
       else emitt(src"""${cchain}.io.input.isStream := false.B""")      
       emitt(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
-      cchain.counters.zipWithIndex.foreach { case (c, i) =>
-        val x = c.ctrPar.toInt
-        if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
-        else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
-        val base = cchain.counters.take(i).map(_.ctrPar.toInt).sum
-        emitt(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($base + j) }""")
-      }
-
     }
   }
 

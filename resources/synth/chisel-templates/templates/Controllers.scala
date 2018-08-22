@@ -84,12 +84,12 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Configure synchronization
       val anydone = iterDone.map(_.io.output.data).reduce(_|_)
-      synchronize := (active,iterDone,io.maskIn).zipped.map{case (a, id, mask) => a.io.output.data === id.io.output.data | (anydone & (a.io.output.data === ~mask))}.reduce{_&&_} // TODO: Retime tree
+      synchronize := (active,iterDone,io.maskIn).zipped.map{case (a, id, mask) => a.io.output.data === id.io.output.data | (anydone & (a.io.output.data === ~mask.D(1)))}.reduce{_&&_} // TODO: Retime tree
 
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable
       active(0).io.input.reset := io.ctrDone | io.parentAck
-      iterDone(0).io.input.set := (io.doneIn(0)) | (~io.maskIn(0) & io.enable)
+      iterDone(0).io.input.set := (io.doneIn(0)) | (~io.maskIn(0).D(1) & io.enable)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
@@ -104,22 +104,22 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     
     case Sequenced => 
       // Define rule for when ctr increments
-      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable)
 
       // Configure synchronization
-      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable)
       
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
-      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
+      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0).D(1) & io.enable)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
         active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable)) & ~synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)) & ~synchronize
+        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i).D(1) & io.enable)) & ~synchronize
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
@@ -134,7 +134,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       for (i <- 0 until depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i) & io.enable)
+        iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i).D(1) & io.enable)
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
@@ -149,9 +149,9 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       for (i <- 0 until depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & ~io.ctrCopyDone(i)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i)) & io.enable
+        iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i).D(1)) & io.enable
         iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
-        done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i) & io.enable)
+        done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i).D(1) & io.enable)
         done(i).io.input.reset := io.parentAck // Override done reset
       }
 
@@ -173,22 +173,22 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
     case _ => // FSM, do sequential
       // Define rule for when ctr increments
-      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable)
 
       // Configure synchronization
-      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable)
       
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
-      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
+      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0).D(1) & io.enable)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
         active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable)) & ~synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)) & ~synchronize
+        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i).D(1) & io.enable)) & ~synchronize
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 

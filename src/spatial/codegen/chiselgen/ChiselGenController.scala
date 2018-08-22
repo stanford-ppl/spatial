@@ -121,7 +121,7 @@ trait ChiselGenController extends ChiselGenCommon {
   private final def emitRegChains(lhs: Sym[_]) = {
     if (lhs.isOuterPipeControl) {
       val stages = lhs.children.filter(_.s.get != lhs).toList.map(_.s.get)
-      val Op(CounterChainNew(counters)) = lhs.cchains.head
+      val counters = lhs.cchains.head.counters
       val par = lhs.cchains.head.pars
       val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
       lhs.toScope.iters.toList.zipWithIndex.foreach { case (idx,index) =>
@@ -141,22 +141,11 @@ trait ChiselGenController extends ChiselGenCommon {
   }
 
   final private def emitValids(lhs: Sym[_], cchain: Sym[CounterChain], iters: Seq[Seq[Sym[_]]], valids: Seq[Seq[Sym[_]]]): Unit = {
-    // Need to recompute ctr data because of multifile 5
-    val Op(CounterChainNew(ctrs)) = cchain
-    val counter_data = ctrs.map{ ctr => ctr match {
-      case Op(CounterNew(start, end, step, par)) => 
-        val w = bitWidth(ctr.typeArgs.head)
-        (start,end) match { 
-          case (Final(s), Final(e)) => (src"${s}.FP(true, $w, 0)", src"${e}.FP(true, $w, 0)", src"$step", {src"$par"}.split('.').take(1)(0), src"$w")
-          case _ => (src"$start", src"$end", src"$step", {src"$par"}.split('.').take(1)(0), src"$w")
-        }
-      case Op(ForeverNew()) => 
-        ("0.S", "999.S", "1.S", "1", "32") 
-    }}
-
-    valids.zip(iters).zipWithIndex.foreach{ case ((layer,count), i) =>
-      layer.zip(count).foreach{ case (v, c) =>
-        emitt(src"${swap(src"${v}", Blank)} := Mux(${counter_data(i)._3} >= 0.S, ${swap(src"${c}", Blank)} < ${counter_data(i)._2}, ${swap(src"${c}", Blank)} > ${counter_data(i)._2}) // TODO: Generate these inside counter")
+    val Op(CounterChainNew(counters)) = cchain
+    valids.zipWithIndex.foreach{ case (vs,id) =>
+      val base = counters.take(id).map(_.ctrPar.toInt).sum
+      vs.zipWithIndex.foreach{ case(v,i) =>
+        emitt(src"${swap(src"${v}", Blank)} := ~${cchain}.io.output.oobs(${base} + $i)")
         if (lhs.isOuterPipeControl) {
           emitGlobalModuleMap(src"""${swap(src"${swap(src"${v}", Blank)}", Chain)}""",src"""Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1))""")
           lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModule(src"""${swap(src"${swap(src"${v}", Blank)}_chain_read_$i", Blank)} := ${swap(src"${swap(src"${v}", Blank)}", Chain)}.read(${i}) === 1.U(1.W)""")}
@@ -177,7 +166,7 @@ trait ChiselGenController extends ChiselGenCommon {
   protected def connectMask(ctr: Option[Sym[_]]): Unit = {
     if (ctr.isDefined) {
       val ctrl = ctr.get.owner
-      emitt(src"""${swap(ctrl, Mask)} := ${ctr.get}_stops.zip(${ctr.get}_starts).map{case (stop,start) => (stop =/= start)}.reduce{_&&_} & ${and(controllerStack.head.enables)}""")
+      emitt(src"""${swap(ctrl, Mask)} := ~${ctr.get}.io.output.noop & ${and(controllerStack.head.enables)}""")
     } else {
       emitt(src"""${swap(controllerStack.head, Mask)} := ${and(controllerStack.head.enables)}""")     
     }
@@ -216,9 +205,10 @@ trait ChiselGenController extends ChiselGenCommon {
 
   final private def emitIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
     val Op(CounterChainNew(counters)) = cchain
-    iters.zipWithIndex.foreach{ case (is, i) =>
+    iters.zipWithIndex.foreach{ case (is, id) =>
+      val base = counters.take(id).map(_.ctrPar.toInt).sum
       is.zipWithIndex.foreach{ case (iter, j) =>
-        emitt(src"${swap(src"${iter}", Blank)}.raw := ${counters(i)}($j).r")
+        emitt(src"${swap(src"${iter}", Blank)}.r := ${cchain}.io.output.counts($base + $j).r")
       }
     }
   }

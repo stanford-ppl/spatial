@@ -3,7 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 import spatial.targets._
 
-@test class AES extends SpatialTest {
+@spatial class AES extends SpatialTest {
   override def runtimeArgs: Args = "50"
 
   /*
@@ -409,9 +409,7 @@ import spatial.targets._
 }
 
 
-@test class Viterbi extends SpatialTest { // Regression (Dense) // Args: none
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class Viterbi extends SpatialTest {
   /*
 
                     ←       N_OBS            →
@@ -476,8 +474,8 @@ import spatial.targets._
                          40,6,46,24,47,2,2,53,41,0,55,38,5,57,57,57,57,14,57,34,37,
                          57,30,30,5,1,5,62,25,59,5,2,43,30,26,38,38)
 
-    val raw_transitions = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/viterbi/viterbi_transition.csv", "\n")
-    val raw_emissions = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/viterbi/viterbi_emission.csv", "\n")
+    val raw_transitions = loadCSV1D[T](s"$DATA/viterbi/viterbi_transition.csv", "\n")
+    val raw_emissions = loadCSV1D[T](s"$DATA/viterbi/viterbi_emission.csv", "\n")
     val transitions = raw_transitions.reshape(N_STATES, N_STATES)
     val emissions = raw_emissions.reshape(N_STATES, N_TOKENS)
 
@@ -568,10 +566,7 @@ import spatial.targets._
 }
 
 
-// @test class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
-
+// @spatial class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
 //   /*
 //            ←    COLS     →   
 //          ___________________             ___________________                         
@@ -602,7 +597,7 @@ import spatial.targets._
 //     val par_lb_load = 4
 
 //     // Setup data
-//     val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil2d_data.csv", "\n")
+//     val raw_data = loadCSV1D[Int](s"$DATA/stencil/stencil2d_data.csv", "\n")
 //     val data = raw_data.reshape(ROWS, COLS)
 
 //     // Setup DRAMs
@@ -636,7 +631,7 @@ import spatial.targets._
 
 //     // Get results
 //     val result_data = getMatrix(result_dram)
-//     val raw_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil2d_gold.csv", "\n")
+//     val raw_gold = loadCSV1D[Int](s"$DATA/stencil/stencil2d_gold.csv", "\n")
 //     val gold = raw_gold.reshape(ROWS,COLS)
 
 //     // Printers
@@ -650,10 +645,7 @@ import spatial.targets._
 // }
 
 
-// @test class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
-//   override def runtimeArgs: Args = NoArgs
-
-
+// @spatial class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
 //  /*
                                                                                                                              
 //  H   ↗        ___________________                  ___________________                                                                  
@@ -695,7 +687,7 @@ import spatial.targets._
 //     val filter_size = 3*3*3
 
 //     // Setup data
-//     val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil3d_data.csv", "\n")
+//     val raw_data = loadCSV1D[Int](s"$DATA/stencil/stencil3d_data.csv", "\n")
 //     val data = raw_data.reshape(HEIGHT, COLS, ROWS)
 
 //     // Setup DRAMs
@@ -757,7 +749,7 @@ import spatial.targets._
 
 //     // Get results
 //     val result_data = getTensor3(result_dram)
-//     val raw_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/stencil/stencil3d_gold.csv", "\n")
+//     val raw_gold = loadCSV1D[Int](s"$DATA/stencil/stencil3d_gold.csv", "\n")
 //     val gold = raw_gold.reshape(HEIGHT,COLS,ROWS)
 
 //     // Printers
@@ -771,7 +763,7 @@ import spatial.targets._
 // }
 
 
-@test class NW extends SpatialTest {
+@spatial class NW_alg extends SpatialTest { // NW conflicts with something in spade
   override def runtimeArgs: Args = {
     "tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
   }
@@ -914,8 +906,8 @@ import spatial.targets._
       }
 
       Parallel{
-        seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned
-        seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned
+        Sequential{seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned}
+        Sequential{seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned}
       }
 
     }
@@ -939,8 +931,7 @@ import spatial.targets._
 }
 
 
-@test class MD_KNN extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MD_KNN extends SpatialTest {
 
  /*
   
@@ -976,10 +967,10 @@ import spatial.targets._
     val N_NEIGHBORS = 16 
     val lj1 = 1.5.to[T]
     val lj2 = 2.to[T]
-    val raw_xpos = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_x.csv", "\n")
-    val raw_ypos = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_y.csv", "\n")
-    val raw_zpos = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_z.csv", "\n")
-    val raw_interactions_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_interactions.csv", "\n")
+    val raw_xpos = loadCSV1D[T](s"$DATA/MD/knn_x.csv", "\n")
+    val raw_ypos = loadCSV1D[T](s"$DATA/MD/knn_y.csv", "\n")
+    val raw_zpos = loadCSV1D[T](s"$DATA/MD/knn_z.csv", "\n")
+    val raw_interactions_data = loadCSV1D[Int](s"$DATA/MD/knn_interactions.csv", "\n")
     val raw_interactions = raw_interactions_data.reshape(N_ATOMS, N_NEIGHBORS)
 
     val xpos_dram = DRAM[T](N_ATOMS)
@@ -1036,9 +1027,9 @@ import spatial.targets._
     val xforce_received = getMem(xforce_dram)
     val yforce_received = getMem(yforce_dram)
     val zforce_received = getMem(zforce_dram)
-    val xforce_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_x_gold.csv", "\n")
-    val yforce_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_y_gold.csv", "\n")
-    val zforce_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/knn_z_gold.csv", "\n")
+    val xforce_gold = loadCSV1D[T](s"$DATA/MD/knn_x_gold.csv", "\n")
+    val yforce_gold = loadCSV1D[T](s"$DATA/MD/knn_y_gold.csv", "\n")
+    val zforce_gold = loadCSV1D[T](s"$DATA/MD/knn_z_gold.csv", "\n")
 
     printArray(xforce_gold, "Gold x:")
     printArray(xforce_received, "Received x:")
@@ -1057,9 +1048,7 @@ import spatial.targets._
   }
 }      
 
-@test class MD_Grid extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MD_Grid extends SpatialTest {
  /*
   
   Moleckaler Dynamics via the grid, a digital frontier
@@ -1128,7 +1117,7 @@ import spatial.targets._
                                  2,1,7,1,3,7,6,3,3,4,3,4,5,5,6,4,2,5,7,6,5,4,3,3,5,4,4,4,3,2,3,2,7,5)
     val npoints_data = raw_npoints.reshape(BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE)
 
-    val raw_dvec = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/grid_dvec.csv", "\n")
+    val raw_dvec = loadCSV1D[T](s"$DATA/MD/grid_dvec.csv", "\n")
     // Strip x,y,z vectors from raw_dvec
     val dvec_x_data = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_dvec(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l)}
     val dvec_y_data = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_dvec(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l+1)}
@@ -1224,7 +1213,7 @@ import spatial.targets._
     val force_x_received = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => force_x_received_aligned(i,j,k,l)}
     val force_y_received = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => force_y_received_aligned(i,j,k,l)}
     val force_z_received = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => force_z_received_aligned(i,j,k,l)}
-    val raw_force_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/MD/grid_gold.csv", "\n")
+    val raw_force_gold = loadCSV1D[T](s"$DATA/MD/grid_gold.csv", "\n")
     val force_x_gold = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_force_gold(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l)}
     val force_y_gold = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_force_gold(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l+1)}
     val force_z_gold = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_force_gold(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l+2)}
@@ -1248,7 +1237,7 @@ import spatial.targets._
   }
 }      
 
-@test class KMP extends SpatialTest {
+@spatial class KMP extends SpatialTest {
   override def runtimeArgs: Args = "the"
 
  /*
@@ -1264,7 +1253,7 @@ import spatial.targets._
 
 
   def main(args: Array[String]): Unit = {
-    val raw_string_data = loadCSV1D[String](sys.env("SPATIAL_HOME") + "/apps/data/kmp/kmp_string.csv", "\n")
+    val raw_string_data = loadCSV1D[String](s"$DATA/kmp/kmp_string.csv", "\n")
     val raw_string_pattern = args(0)      //"bull"//Array[Int](98,117,108,108)
     val raw_string = raw_string_data(0).map{c => c.to[Int8] }
     val raw_pattern = raw_string_pattern.map{c => c.to[Int8] }
@@ -1305,7 +1294,7 @@ import spatial.targets._
       // Scan string portions
       val global_matches = Sequential.Reduce(Reg[Int](0))(STRING_SIZE by (STRING_SIZE/outer_par) by STRING_SIZE/outer_par par outer_par) {chunk => 
         val num_matches = Reg[Int](0)
-        num_matches.reset
+        Pipe{num_matches := 0}
         val string_sram = SRAM[Int8](32411) // Conveniently sized
         string_sram load string_dram(chunk::chunk + (STRING_SIZE/outer_par) + (PATTERN_SIZE-1) par par_load)
         val q = Reg[Int](0)
@@ -1350,18 +1339,15 @@ import spatial.targets._
 }      
 
 
-@test class GEMM_NCubed extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class GEMM_NCubed extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
 
     val dim = 64
 
-    val a_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/gemm/gemm_a.csv", "\n").reshape(dim,dim)
-    val b_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/gemm/gemm_b.csv", "\n").reshape(dim,dim)
+    val a_data = loadCSV1D[T](s"$DATA/gemm/gemm_a.csv", "\n").reshape(dim,dim)
+    val b_data = loadCSV1D[T](s"$DATA/gemm/gemm_b.csv", "\n").reshape(dim,dim)
 
     val a_dram = DRAM[T](dim,dim)
     val b_dram = DRAM[T](dim,dim)
@@ -1389,7 +1375,7 @@ import spatial.targets._
       c_dram store c_sram
     }
 
-    val c_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/gemm/gemm_gold.csv", "\n").reshape(dim,dim)
+    val c_gold = loadCSV1D[T](s"$DATA/gemm/gemm_gold.csv", "\n").reshape(dim,dim)
     val c_result = getMatrix(c_dram)
 
     printMatrix(c_gold, "C Gold: ")
@@ -1402,7 +1388,7 @@ import spatial.targets._
   }
 }      
 
-@test class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+@spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
   override def runtimeArgs: Args = "128"
                                                                                                   
                                                                                                   
@@ -1612,8 +1598,8 @@ import spatial.targets._
     val reduce_col = 1 (1 -> 1 -> 16)
     val reduce_tmp = 1 (1 -> 1 -> 16)
 
-    // val a_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/gemm/gemm_a.csv", "\n").reshape(dim,dim)
-    // val b_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/gemm/gemm_b.csv", "\n").reshape(dim,dim)
+    // val a_data = loadCSV1D[T](s"$DATA/gemm/gemm_a.csv", "\n").reshape(dim,dim)
+    // val b_data = loadCSV1D[T](s"$DATA/gemm/gemm_b.csv", "\n").reshape(dim,dim)
     val a_data = (0::dim_arg,0::dim_arg){(i,j) => random[T](5)}
     val b_data = (0::dim_arg,0::dim_arg){(i,j) => random[T](5)}
     val c_init = (0::dim_arg, 0::dim_arg){(i,j) => 0.to[T]}
@@ -1630,7 +1616,7 @@ import spatial.targets._
       Foreach(dim by i_tileSize par loop_ii) { ii => // this loop defenitilely cant be parallelized right now
         Foreach(dim by tileSize par loop_jj) { jj => 
           val c_col = SRAM[T](i_tileSize,tileSize)
-          MemReduce(c_col par reduce_col)(dim by tileSize par loop_kk) { kk => 
+          MemReduce(c_col(0::i_tileSize, 0::tileSize par reduce_col))(dim by tileSize par loop_kk) { kk => 
             val c_col_partial = SRAM[T](i_tileSize,tileSize)
             val b_sram = SRAM[T](tileSize,tileSize)
             b_sram load b_dram(kk::kk.to[I32]+tileSize, jj::jj.to[I32]+tileSize par par_load)
@@ -1655,7 +1641,7 @@ import spatial.targets._
       }
     }
 
-    // val c_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/gemm/gemm_gold.csv", "\n").reshape(dim,dim)
+    // val c_gold = loadCSV1D[T](s"$DATA/gemm/gemm_gold.csv", "\n").reshape(dim,dim)
     val c_gold = (0::dim_arg,0::dim_arg){(i,j) => 
       Array.tabulate(dim_arg){k => a_data(i,k) * b_data(k,j)}.reduce{_+_}
     }
@@ -1671,10 +1657,7 @@ import spatial.targets._
   }
 }
 
-@test class Sort_Merge extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class Sort_Merge extends SpatialTest {
  /*                                                                                                  
                               |     |                                                                                                                                                                                        
                      |        |     |                                      |     |                                                                                                                                                                                     
@@ -1715,7 +1698,7 @@ import spatial.targets._
     val par_load = 8
     val par_store = 8
 
-    val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/sort/sort_data.csv", "\n")
+    val raw_data = loadCSV1D[Int](s"$DATA/sort/sort_data.csv", "\n")
 
     val data_dram = DRAM[Int](numel)
     // val sorted_dram = DRAM[Int](numel)
@@ -1754,7 +1737,7 @@ import spatial.targets._
       data_dram(0::numel par par_store) store data_sram
     }
 
-    val sorted_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/sort/sort_gold.csv", "\n")
+    val sorted_gold = loadCSV1D[Int](s"$DATA/sort/sort_gold.csv", "\n")
     val sorted_result = getMem(data_dram)
 
     printArray(sorted_gold, "Sorted Gold: ")
@@ -1769,10 +1752,7 @@ import spatial.targets._
 }
 
 
-@test class Sort_Radix extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class Sort_Radix extends SpatialTest {
  /*                                                                                                  
     TODO: Cartoon of what this is doing                                                         
                                                                                                                                                                                                                        
@@ -1792,7 +1772,7 @@ import spatial.targets._
     val a = false.to[Bit]
     val b = true.to[Bit]
 
-    val raw_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/sort/sort_data.csv", "\n")
+    val raw_data = loadCSV1D[Int](s"$DATA/sort/sort_data.csv", "\n")
 
     val data_dram = DRAM[Int](numel)
 
@@ -1810,15 +1790,16 @@ import spatial.targets._
       def hist(exp: I32, s: SRAM1[Int]): Unit = {
         Foreach(NUM_BLOCKS by 1) { blockID => 
           Sequential.Foreach(4 by 1) {i => 
-            val a_indx = blockID.to[I32] * EL_PER_BLOCK + i.to[I32]
+            val a_indx = blockID * EL_PER_BLOCK + i
             // val a_indx = Reg[Int](0)
             // a_indx := blockID * EL_PER_BLOCK + i
             val shifted = Reg[Int](0)
             shifted := s(a_indx) // TODO: Allow just s(a_indx) >> exp syntax
             // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
             Foreach(exp by 1) { k => shifted := shifted.value >> 1}
-            val bucket_indx = (shifted.value & 0x3.to[Int])*NUM_BLOCKS.to[Int] + blockID.to[I32] + 1.to[Int]
+            val bucket_indx = (shifted.value & 0x03)*NUM_BLOCKS + blockID + 1
             // println(" hist bucket(" + bucket_indx + ") = " + bucket_sram(bucket_indx) + " + 1")
+            // println(r"shifted started with ${s(a_indx)} (from ${a_indx}), now is ${shifted.value}, + $blockID")
             if (bucket_indx < 2048) {bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1}
           }
         }
@@ -1827,28 +1808,31 @@ import spatial.targets._
       def local_scan(): Unit = {
         Foreach(SCAN_RADIX by 1) { radixID => 
           Sequential.Foreach(1 until SCAN_BLOCK by 1) { i => // Loop carry dependency
-            val bucket_indx = radixID.to[I32]*SCAN_BLOCK.to[Int] + i.to[I32]
+            val bucket_indx = radixID*SCAN_BLOCK.to[Int] + i
             val prev_val = Reg[Int](0)
-            Pipe{ prev_val := bucket_sram(bucket_indx.to[I32] - 1) }
+            Pipe{ prev_val := bucket_sram(bucket_indx - 1) }
             Pipe{ bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + prev_val }
+            // println(r"local_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${prev_val}")
           }
         }
       }
 
       def sum_scan(): Unit = {
         sum_sram(0) = 0
-        Pipe.II(3).Foreach(1 until SCAN_RADIX by 1) { radixID => // Remove manual II when bug #207 (or #151?) is fixed
+        Pipe.Foreach(1 until SCAN_RADIX by 1) { radixID => // Remove manual II when bug #207 (or #151?) is fixed
         // Pipe.Foreach(1 until SCAN_RADIX by 1) { radixID => 
-          val bucket_indx = radixID.to[I32]*SCAN_BLOCK - 1
-          sum_sram(radixID) = sum_sram(radixID.to[I32]-1) + bucket_sram(bucket_indx)
+          val bucket_indx = radixID*SCAN_BLOCK - 1
+          sum_sram(radixID) = sum_sram(radixID-1) + bucket_sram(bucket_indx)
+          // println(r"sum_scan: sum_sram(${radixID}) = ${sum_sram(radixID-1)} + ${bucket_sram(bucket_indx)}")
         }
       }
 
       def last_step_scan(): Unit = {
         Foreach(SCAN_RADIX by 1) { radixID => 
           Foreach(SCAN_BLOCK by 1) { i => 
-            val bucket_indx = radixID.to[I32] * SCAN_BLOCK + i.to[I32]
+            val bucket_indx = radixID * SCAN_BLOCK + i
             bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + sum_sram(radixID)
+            // println(r"last_step_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${sum_sram(radixID)}")
           }
         }
       }
@@ -1858,15 +1842,14 @@ import spatial.targets._
         Foreach(NUM_BLOCKS by 1) { blockID => 
           Sequential.Foreach(4 by 1) { i => 
             val shifted = Reg[Int](0)
-            shifted := s1(blockID.to[I32]*EL_PER_BLOCK + i.to[I32]) // TODO: Allow just s(a_indx) >> exp syntax
+            shifted := s1(blockID*EL_PER_BLOCK + i) // TODO: Allow just s(a_indx) >> exp syntax
             // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
             Foreach(exp by 1) { k => shifted := shifted >> 1}
-            val bucket_indx = (shifted & 0x3.to[Int])*NUM_BLOCKS + blockID.to[I32]
-            val a_indx = blockID.to[I32] * EL_PER_BLOCK + i.to[I32]
-            // println("s2(" + bucket_sram(bucket_indx) + ") = " + s1(a_indx) + " (addr " + a_indx + ")")
+            val bucket_indx = (shifted & 0x3)*NUM_BLOCKS + blockID
+            val a_indx = blockID * EL_PER_BLOCK + i
             s2(bucket_sram(bucket_indx)) = s1(a_indx)
-            // println("bucket " + bucket_indx + " = " + {bucket_sram(bucket_indx) + 1})
             bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1
+            // println(r"update: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + 1")
           }
         }
       }
@@ -1876,9 +1859,9 @@ import spatial.targets._
         Foreach(BUCKET_SIZE by 1) { i => bucket_sram(i) = 0 }
   
         if (valid_buffer == a) {
-          Pipe{hist(exp.to[I32], a_sram)}
+          Pipe{hist(exp, a_sram)}
         } else {
-          Pipe{hist(exp.to[I32], b_sram)}
+          Pipe{hist(exp, b_sram)}
         }
 
         local_scan()
@@ -1888,13 +1871,13 @@ import spatial.targets._
         if (valid_buffer == a) {
           // println("s1 = a, s2 = b")
           Sequential{
-            Pipe{update(exp.to[I32], a_sram, b_sram)}
+            Pipe{update(exp, a_sram, b_sram)}
             Pipe{valid_buffer := b}
           }
         } else {
           // println("s1 = b, s2 = a")
           Sequential{
-            Pipe{update(exp.to[I32], b_sram, a_sram)}
+            Pipe{update(exp, b_sram, a_sram)}
             Pipe{valid_buffer := a}
           }
         }
@@ -1911,7 +1894,7 @@ import spatial.targets._
 
     }
 
-    val sorted_gold = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/sort/sort_gold.csv", "\n")
+    val sorted_gold = loadCSV1D[Int](s"$DATA/sort/sort_gold.csv", "\n")
     val sorted_result = getMem(data_dram)
 
     printArray(sorted_gold, "Sorted Gold: ")
@@ -1928,10 +1911,7 @@ import spatial.targets._
 }
 
 
-@test class SPMV_CRS extends SpatialTest { // Regression (Sparse) // Args: none
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class SPMV_CRS extends SpatialTest {
  /*                                                                                                  
    Sparse Matrix is the IEEE 494 bus interconnect matrix from UF Sparse Datasets   
 
@@ -1961,10 +1941,10 @@ import spatial.targets._
     val N = 494
     val tileSize = 494
 
-    val raw_values = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/crs_values.csv", "\n")
-    val raw_cols = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/crs_cols.csv", "\n")
-    val raw_rowid = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/crs_rowid.csv", "\n")
-    val raw_vec = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/crs_vec.csv", "\n")
+    val raw_values = loadCSV1D[T](s"$DATA/SPMV/crs_values.csv", "\n")
+    val raw_cols = loadCSV1D[Int](s"$DATA/SPMV/crs_cols.csv", "\n")
+    val raw_rowid = loadCSV1D[Int](s"$DATA/SPMV/crs_rowid.csv", "\n")
+    val raw_vec = loadCSV1D[T](s"$DATA/SPMV/crs_vec.csv", "\n")
 
     val values_dram = DRAM[T](NNZ) 
     val cols_dram = DRAM[Int](NNZ) 
@@ -2001,7 +1981,7 @@ import spatial.targets._
             cols_sram load cols_dram(start_id :: stop_id par par_segment_load)
             values_sram load values_dram(start_id :: stop_id par par_segment_load)
           }
-          vec_sram gather vec_dram(cols_sram) //vec_sram gather vec_dram(cols_sram, stop_id - start_id)
+          vec_sram gather vec_dram(cols_sram, stop_id - start_id)
           println("row " + {i + tile})
           val element = Reduce(Reg[T](0))(stop_id - start_id by 1 par red_par) { j => 
             // println(" partial from " + j + " = " + {values_sram(j) * vec_sram(j)})
@@ -2013,7 +1993,7 @@ import spatial.targets._
       }
     }
 
-    val data_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/crs_gold.csv", "\n")
+    val data_gold = loadCSV1D[T](s"$DATA/SPMV/crs_gold.csv", "\n")
     val data_result = getMem(result_dram)
 
     printArray(data_gold, "Gold: ")
@@ -2027,10 +2007,7 @@ import spatial.targets._
   }
 }
 
-@test class SPMV_ELL extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class SPMV_ELL extends SpatialTest {
  /*                                                                                                  
    Sparse Matrix is the IEEE 494 bus interconnect matrix from UF Sparse Datasets   
 
@@ -2058,9 +2035,9 @@ import spatial.targets._
     val L = 10    
     val tileSize = N
 
-    val raw_values = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/ell_values.csv", "\n").reshape(N,L)
-    val raw_cols = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/ell_cols.csv", "\n").reshape(N,L)
-    val raw_vec = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/ell_vec.csv", "\n")
+    val raw_values = loadCSV1D[T](s"$DATA/SPMV/ell_values.csv", "\n").reshape(N,L)
+    val raw_cols = loadCSV1D[Int](s"$DATA/SPMV/ell_cols.csv", "\n").reshape(N,L)
+    val raw_vec = loadCSV1D[T](s"$DATA/SPMV/ell_vec.csv", "\n")
 
     val values_dram = DRAM[T](N,L) 
     val cols_dram = DRAM[Int](N,L) 
@@ -2094,7 +2071,7 @@ import spatial.targets._
       }
     }
 
-    val data_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/SPMV/ell_gold.csv", "\n")
+    val data_gold = loadCSV1D[T](s"$DATA/SPMV/ell_gold.csv", "\n")
     val data_result = getMem(result_dram)
 
     printArray(data_gold, "Gold: ")
@@ -2110,7 +2087,7 @@ import spatial.targets._
 }
 
 
-@test class Backprop extends SpatialTest {
+@spatial class Backprop extends SpatialTest {
   override def runtimeArgs: Args = "5"
 
  /*                                                                                                  
@@ -2171,14 +2148,14 @@ import spatial.targets._
     val ud_weight3_norm = 2 (1 -> 1 -> 16)
     val ud_bias3_norm   = 2 (1 -> 1 -> 16)
 
-    val weights1_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights1.csv").reshape(input_dimension, nodes_per_layer)
-    val weights2_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights2.csv").reshape(nodes_per_layer, nodes_per_layer)
-    val weights3_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights3.csv")//.reshape(nodes_per_layer, possible_outputs)
-    val biases1_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias1.csv")
-    val biases2_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias2.csv")
+    val weights1_data = loadCSV1D[T](s"$DATA/backprop/backprop_weights1.csv").reshape(input_dimension, nodes_per_layer)
+    val weights2_data = loadCSV1D[T](s"$DATA/backprop/backprop_weights2.csv").reshape(nodes_per_layer, nodes_per_layer)
+    val weights3_data = loadCSV1D[T](s"$DATA/backprop/backprop_weights3.csv")//.reshape(nodes_per_layer, possible_outputs)
+    val biases1_data = loadCSV1D[T](s"$DATA/backprop/backprop_bias1.csv")
+    val biases2_data = loadCSV1D[T](s"$DATA/backprop/backprop_bias2.csv")
     val biases3_data = Array[T](0.255050659180.to[T],0.018173217773.to[T],-0.353927612305.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T],0.to[T])
-    val training_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_training_data.csv")//.reshape(training_sets, input_dimension)
-    val training_targets_data = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_training_targets.csv")//.reshape(training_sets, possible_outputs)
+    val training_data = loadCSV1D[T](s"$DATA/backprop/backprop_training_data.csv")//.reshape(training_sets, input_dimension)
+    val training_targets_data = loadCSV1D[T](s"$DATA/backprop/backprop_training_targets.csv")//.reshape(training_sets, possible_outputs)
 
     val weights1_dram = DRAM[T](input_dimension, nodes_per_layer)
     val weights2_dram = DRAM[T](nodes_per_layer, nodes_per_layer)
@@ -2482,19 +2459,19 @@ import spatial.targets._
     val biases3_result = Array.tabulate(possible_outputs){ i => biases3_result_aligned(i) }
 
     // // Store these results as gold - USE AT YOUR OWN RISK
-    // writeCSV1D[T](weights1_result.flatten, sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights1_gold.csv", "\n")
-    // writeCSV1D[T](weights2_result.flatten, sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights2_gold.csv", "\n")
-    // writeCSV1D[T](weights3_result.flatten, sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights3_gold.csv", "\n")
-    // writeCSV1D[T](biases1_result, sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias1_gold.csv", "\n")
-    // writeCSV1D[T](biases2_result, sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias2_gold.csv", "\n")
-    // writeCSV1D[T](biases3_result, sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias3_gold.csv", "\n")
+    // writeCSV1D[T](weights1_result.flatten, s"$DATA/backprop/backprop_weights1_gold.csv", "\n")
+    // writeCSV1D[T](weights2_result.flatten, s"$DATA/backprop/backprop_weights2_gold.csv", "\n")
+    // writeCSV1D[T](weights3_result.flatten, s"$DATA/backprop/backprop_weights3_gold.csv", "\n")
+    // writeCSV1D[T](biases1_result, s"$DATA/backprop/backprop_bias1_gold.csv", "\n")
+    // writeCSV1D[T](biases2_result, s"$DATA/backprop/backprop_bias2_gold.csv", "\n")
+    // writeCSV1D[T](biases3_result, s"$DATA/backprop/backprop_bias3_gold.csv", "\n")
 
-    val weights1_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights1_gold.csv", "\n").reshape(input_dimension, nodes_per_layer)
-    val weights2_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights2_gold.csv", "\n").reshape(nodes_per_layer, nodes_per_layer)
-    val weights3_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_weights3_gold.csv", "\n").reshape(nodes_per_layer, possible_outputs)
-    val biases1_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias1_gold.csv")
-    val biases2_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias2_gold.csv")
-    val biases3_gold = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/backprop/backprop_bias3_gold.csv")
+    val weights1_gold = loadCSV1D[T](s"$DATA/backprop/backprop_weights1_gold.csv", "\n").reshape(input_dimension, nodes_per_layer)
+    val weights2_gold = loadCSV1D[T](s"$DATA/backprop/backprop_weights2_gold.csv", "\n").reshape(nodes_per_layer, nodes_per_layer)
+    val weights3_gold = loadCSV1D[T](s"$DATA/backprop/backprop_weights3_gold.csv", "\n").reshape(nodes_per_layer, possible_outputs)
+    val biases1_gold = loadCSV1D[T](s"$DATA/backprop/backprop_bias1_gold.csv")
+    val biases2_gold = loadCSV1D[T](s"$DATA/backprop/backprop_bias2_gold.csv")
+    val biases3_gold = loadCSV1D[T](s"$DATA/backprop/backprop_bias3_gold.csv")
 
     printMatrix(weights1_gold, "Gold weights 1:")
     printMatrix(weights1_result, "Result weights 1:")
@@ -2543,9 +2520,7 @@ import spatial.targets._
 }
 
 
-@test class FFT_Strided extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-  override def backends: Seq[Backend] = DISABLED // TODO: Producing huge logs during run, disabling for now
+@spatial class FFT_Strided extends SpatialTest {
 
  /*                                                                                                  
 
@@ -2560,10 +2535,10 @@ import spatial.targets._
     val FFT_SIZE = 1024
     val numiter = (scala.math.log(FFT_SIZE) / scala.math.log(2)).to[Int]
 
-    val data_real = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_strided_real.csv", "\n")
-    val data_img = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_strided_img.csv", "\n")
-    val data_twid_real = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_strided_twidreal.csv", "\n")
-    val data_twid_img = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_strided_twidimg.csv", "\n")
+    val data_real = loadCSV1D[T](s"$DATA/fft/fft_strided_real.csv", "\n")
+    val data_img = loadCSV1D[T](s"$DATA/fft/fft_strided_img.csv", "\n")
+    val data_twid_real = loadCSV1D[T](s"$DATA/fft/fft_strided_twidreal.csv", "\n")
+    val data_twid_img = loadCSV1D[T](s"$DATA/fft/fft_strided_twidimg.csv", "\n")
 
     val data_real_dram = DRAM[T](FFT_SIZE)
     val data_img_dram = DRAM[T](FFT_SIZE)
@@ -2622,8 +2597,8 @@ import spatial.targets._
 
     val result_real = getMem(result_real_dram)
     val result_img = getMem(result_img_dram)
-    val gold_real = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_strided_real_gold.csv", "\n")
-    val gold_img = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_strided_img_gold.csv", "\n")
+    val gold_real = loadCSV1D[T](s"$DATA/fft/fft_strided_real_gold.csv", "\n")
+    val gold_img = loadCSV1D[T](s"$DATA/fft/fft_strided_img_gold.csv", "\n")
 
     printArray(gold_real, "Gold real: ")
     printArray(result_real, "Result real: ")
@@ -2639,9 +2614,7 @@ import spatial.targets._
   }
 }
 
-@test class FFT_Transpose extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FFT_Transpose extends SpatialTest {
  /*                                                                                                  
     Concerns: Not sure why machsuite makes a data_x and DATA_x when they only dump values from one row of DATA_x to data_x and back
               Also, is their algorithm even correct?!  It's very suspicion and I can even comment out some of their code and it still passes....
@@ -2657,8 +2630,8 @@ import spatial.targets._
     val M_SQRT1_2 = 0.70710678118654752440.to[T]
     val TWOPI = 6.28318530717959.to[T]
 
-    val data_x = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_transpose_x.csv", "\n").reshape(8,stride)
-    val data_y = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_transpose_y.csv", "\n").reshape(8,stride)
+    val data_x = loadCSV1D[T](s"$DATA/fft/fft_transpose_x.csv", "\n").reshape(8,stride)
+    val data_y = loadCSV1D[T](s"$DATA/fft/fft_transpose_y.csv", "\n").reshape(8,stride)
 
     val work_x_dram = DRAM[T](8,stride)
     val work_y_dram = DRAM[T](8,stride)
@@ -2854,7 +2827,7 @@ import spatial.targets._
       // Loop 11
       Sequential.Foreach(THREADS by 1) { tid => 
         FFT8(tid)
-        // Do the indirect "reversing"
+        // Do the indirect "reversing" (LUT = 0,4,2,6,1,5,3,7)
         val tmem_x = SRAM[T](8)
         val tmem_y = SRAM[T](8)
         Foreach(8 by 1) { i => 
@@ -2873,10 +2846,10 @@ import spatial.targets._
 
     val result_x = getMatrix(result_x_dram)
     val result_y = getMatrix(result_y_dram)
-    // val gold_x = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_transpose_x_gold.csv", "\n").reshape(8,stride)
-    // val gold_y = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_transpose_y_gold.csv", "\n").reshape(8,stride)
-    val gold_x = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_transpose_x_gold.csv", "\n").reshape(8,stride)
-    val gold_y = loadCSV1D[T](sys.env("SPATIAL_HOME") + "/apps/data/fft/fft_transpose_y_gold.csv", "\n").reshape(8,stride)
+    // val gold_x = loadCSV1D[T](s"$DATA/fft/fft_transpose_x_gold.csv", "\n").reshape(8,stride)
+    // val gold_y = loadCSV1D[T](s"$DATA/fft/fft_transpose_y_gold.csv", "\n").reshape(8,stride)
+    val gold_x = loadCSV1D[T](s"$DATA/fft/fft_transpose_x_gold.csv", "\n").reshape(8,stride)
+    val gold_y = loadCSV1D[T](s"$DATA/fft/fft_transpose_y_gold.csv", "\n").reshape(8,stride)
 
     printMatrix(gold_x, "Gold x: ")
     println("")
@@ -2900,10 +2873,7 @@ import spatial.targets._
 }
 
 
-@test class BFS_Bulk extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-
+@spatial class BFS_Bulk extends SpatialTest {
  /*                                                                                                  
 
        * Scan levels straight through, and index into nodes if it matches current horizon
@@ -2937,8 +2907,8 @@ import spatial.targets._
     val unvisited = -1
     val start_id = 38
 
-    val nodes_raw = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/bfs/bfs_nodes.csv", "\n")
-    val edges_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/bfs/bfs_edges.csv", "\n")
+    val nodes_raw = loadCSV1D[Int](s"$DATA/bfs/bfs_nodes.csv", "\n")
+    val edges_data = loadCSV1D[Int](s"$DATA/bfs/bfs_edges.csv", "\n")
 
     val node_starts_data = Array.tabulate[Int](N_NODES){i => nodes_raw(2*i)}
     val node_ends_data = Array.tabulate[Int](N_NODES){i => nodes_raw(2*i+1)}
@@ -2967,10 +2937,12 @@ import spatial.targets._
       Foreach(16 by 1) {i => widths_sram(i) = if ( i == 0) 1 else 0}
       val level_width = Reg[Int](0)
       FSM(0)(horizon => horizon < N_LEVELS) { horizon =>
-        level_width.reset
+        // level_width.reset
+        level_width := 0
         Sequential.Reduce(level_width)(N_NODES by 1) { n => 
           val node_width = Reg[Int](0)
-          node_width.reset
+          // node_width.reset
+          node_width := 0
           if (levels_sram(n) == horizon) {
             Pipe{
               val start = node_starts_sram(n)
@@ -3007,9 +2979,7 @@ import spatial.targets._
 }
 
 
-@test class BFS_Queue extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class BFS_Queue extends SpatialTest {
  /*                                                                                                  
           ________________
     Q:   |          x x x |
@@ -3044,8 +3014,8 @@ import spatial.targets._
     val unvisited = -1
     val start_id = 38
 
-    val nodes_raw = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/bfs/bfs_nodes.csv", "\n")
-    val edges_data = loadCSV1D[Int](sys.env("SPATIAL_HOME") + "/apps/data/bfs/bfs_edges.csv", "\n")
+    val nodes_raw = loadCSV1D[Int](s"$DATA/bfs/bfs_nodes.csv", "\n")
+    val edges_data = loadCSV1D[Int](s"$DATA/bfs/bfs_edges.csv", "\n")
 
     val node_starts_data = Array.tabulate[Int](N_NODES){i => nodes_raw(2*i)}
     val node_ends_data = Array.tabulate[Int](N_NODES){i => nodes_raw(2*i+1)}

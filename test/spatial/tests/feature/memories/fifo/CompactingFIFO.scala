@@ -2,7 +2,7 @@ package spatial.tests.feature.memories.fifo
 
 import spatial.dsl._
 
-@test class CompactingFIFO extends SpatialTest {
+@spatial class CompactingFIFO extends SpatialTest {
   override def runtimeArgs: Args = "640"
 
   val tileSize = 64
@@ -40,7 +40,7 @@ import spatial.dsl._
               fifo.enq(-1)
             }
           }
-        } { filler => mux(fifo.isFull, 1, 0) }
+        }{filler => mux(fifo.isFull, 1, 0) }
 
         // Store back
         out(i :: i + tileSize par 2) store fifo

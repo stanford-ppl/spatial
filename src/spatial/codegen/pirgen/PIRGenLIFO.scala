@@ -2,9 +2,8 @@ package spatial.codegen.pirgen
 
 import argon._
 import spatial.lang._
-import spatial.data._
+import spatial.metadata.memory._
 import spatial.node._
-import spatial.util._
 
 import utils.implicits.collections._
 
@@ -18,13 +17,13 @@ trait PIRGenLIFO extends PIRGenMemories {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@LIFONew(size)    => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Stack[${op.A}]") }
     case LIFOIsEmpty(lifo,_) => emit(src"val $lhs = $lifo.isEmpty")
-    case LIFOIsFull(lifo,_)  => emit(src"val $lhs = $lifo.size >= ${sizeOf(lifo)} ")
+    case LIFOIsFull(lifo,_)  => emit(src"val $lhs = $lifo.size >= ${lifo.stagedSize} ")
     case LIFOIsAlmostEmpty(lifo,_) =>
-      val rPar = readWidths(lifo).maxOrElse(1)
+      val rPar = lifo.readWidths.maxOrElse(1)
       emit(src"val $lhs = $lifo.size === $rPar")
     case LIFOIsAlmostFull(lifo,_) =>
-      val wPar = writeWidths(lifo).maxOrElse(1)
-      emit(src"val $lhs = $lifo.size === ${sizeOf(lifo)} - $wPar")
+      val wPar = lifo.writeWidths.maxOrElse(1)
+      emit(src"val $lhs = $lifo.size === ${lifo.stagedSize} - $wPar")
 
     case op@LIFOPeek(lifo,_) => emit(src"val $lhs = if ($lifo.nonEmpty) $lifo.head else ${invalid(op.A)}")
     case LIFONumel(lifo,_) => emit(src"val $lhs = $lifo.size")

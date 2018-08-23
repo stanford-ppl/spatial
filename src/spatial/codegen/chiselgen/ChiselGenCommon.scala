@@ -1,20 +1,28 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
-import emul.FloatPoint
-import emul.FixedPoint
-import utils.escapeString
-import spatial.internal.{spatialConfig => cfg}
+import spatial.metadata.bounds._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.retiming._
+import spatial.metadata.types._
+import spatial.util.spatialConfig
 
 trait ChiselGenCommon extends ChiselCodegen { 
 
+  /* Set of controllers that we've already emitted control signals for.  Sometimes a RegRead
+   * can sit in an outer controller and be used by a controller that is a descendent of the 
+   * other controllers in this outer controller 
+  **/
+  private var initializedControllers = Set.empty[Sym[_]]
+
+
   // Statistics counters
   var pipeChainPassMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
+  var pipeChainPassMapBug41Hack = new scala.collection.mutable.HashMap[Sym[_], Sym[_]]
   var streamCopyWatchlist = List[Sym[_]]()
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var validPassMap = new scala.collection.mutable.HashMap[Sym[_], Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
@@ -32,24 +40,10 @@ trait ChiselGenCommon extends ChiselCodegen {
   /* List of break or exit nodes */
   var earlyExits: List[Sym[_]] = List()
 
-  def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getReadStreams).toSet ++
-    localMems.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
-                 .filter{mem => mem.isStreamIn || mem.isFIFO }
-                 // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
-  }
-
-  def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getWriteStreams).toSet ++
-    localMems.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
-                 .filter{mem => mem.isStreamOut || mem.isFIFO }
-                 // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
-  }
-
   def latencyOption(op: String, b: Option[Int]): Double = {
-    if (cfg.enableRetiming) {
-      if (b.isDefined) {cfg.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
-      else cfg.target.latencyModel.model(op)()("LatencyOf") 
+    if (spatialConfig.enableRetiming) {
+      if (b.isDefined) {spatialConfig.target.latencyModel.exactModel(op)("b" -> b.get)("LatencyOf")}
+      else spatialConfig.target.latencyModel.exactModel(op)()("LatencyOf")
     } else {
       0.0
     }
@@ -75,11 +69,11 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   final protected def quoteAsScala(x: Sym[_]): String = {
     x.rhs match {
-      case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("false.B","0").replaceAll("true.B","1")
+      case Def.Const(c) => quoteConst(x.tp, c).replaceAll("\\.F.*","").replaceAll("\\.U(.*)","").replaceAll("\\.S(.*)","").replaceAll("false.B","0").replaceAll("true.B","1")
       case Def.Node(id,_) => x match {
         case Op(SimpleStruct(fields)) => 
           var shift = 0
-          fields.reverse.map{f => 
+          fields.map{f => // Used to be .reversed but not sure now
             val x = src"(${quoteAsScala(f._2)} << $shift).toDouble"
             shift = shift + bitWidth(f._2.tp)
             x
@@ -100,24 +94,39 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
+  protected def emitControlSignals(lhs: Sym[_]): Unit = {
+    if (!initializedControllers.contains(lhs)) {
+      emitGlobalWireMap(src"""${swap(lhs, Done)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, BaseEn)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, IIDone)}""", """Wire(Bool())""")
+      // emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${lhs}_ctr_trivial""", """Wire(Bool())""")
+      initializedControllers += lhs
+    }
+  }
+
   def emitCounterChain(lhs: Sym[_]): Unit = {
-    if (!lhs.cchains.isEmpty) {
+    if (lhs.cchains.nonEmpty) {
       val cchain = lhs.cchains.head
       var isForever = cchain.isForever
       val w = bitWidth(cchain.counters.head.typeArgs.head)
-      val counter_data = cchain.counters.map{ ctr => ctr match {
+      val counter_data = cchain.counters.map{
         case Op(CounterNew(start, end, step, par)) => 
           val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
           val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
           val (stride_wire, stride_constr) = step match {case Final(st) => (src"${st}.FP(true, $w, 0)", src"Some($st)"); case _ => (quote(step), "None")}
-          val par_wire = {src"$par"}.split('.').take(1)(0) // TODO: What is this doing?
+          val par_wire = {src"$par"}.split('.').take(1)(0).replaceAll("L","") // TODO: What is this doing?
           (start_wire, end_wire, stride_wire, par_wire, start_constr, end_constr, stride_constr, "Some(0)")
         case Op(ForeverNew()) => 
           isForever = true
           ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
-      }}
+      }
       emitGlobalWireMap(src"""${cchain}_done""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""") // Dangerous but whatever
+      emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${cchain}_resetter""", """Wire(Bool())""")
       emitGlobalModule(src"""val ${cchain}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
       emitGlobalModule(src"""val ${cchain}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
@@ -126,29 +135,30 @@ trait ChiselGenCommon extends ChiselCodegen {
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
                        src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
-      emit(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
-      emit(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
-      emit(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
-      emit(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
-      emit(src"""${cchain}.io.input.saturate := true.B""")
-      emit(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
-      emit(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
-      emit(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
-      if (streamCopyWatchlist.contains(cchain)) emit(src"""${cchain}.io.input.isStream := true.B""")
-      else emit(src"""${cchain}.io.input.isStream := false.B""")      
-      emit(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
+      emitt(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
+      emitt(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
+      emitt(src"""${cchain}.io.input.saturate := true.B""")
+      emitt(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
+      emitt(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
+      emitt(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
+      if (streamCopyWatchlist.contains(cchain)) emitt(src"""${cchain}.io.input.isStream := true.B""")
+      else emitt(src"""${cchain}.io.input.isStream := false.B""")      
+      emitt(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
       cchain.counters.zipWithIndex.foreach { case (c, i) =>
         val x = c.ctrPar.toInt
         if (streamCopyWatchlist.contains(cchain)) {emitGlobalWireMap(s"""${quote(c)}""", src"""Wire(Vec($x, SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)))""")}
         else {emitGlobalWire(s"""val ${quote(c)} = (0 until $x).map{ j => Wire(SInt(${bitWidth(cchain.counters(i).typeArgs.head)}.W)) }""")}
-        emit(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($i + j) }""")
+        val base = cchain.counters.take(i).map(_.ctrPar.toInt).sum
+        emitt(s"""(0 until $x).map{ j => ${quote(c)}(j) := ${quote(cchain)}.io.output.counts($base + j) }""")
       }
 
     }
   }
 
   def latencyOptionString(op: String, b: Option[Int]): String = {
-    if (cfg.enableRetiming) {
+    if (spatialConfig.enableRetiming) {
       val latency = latencyOption(op, b)
       if (b.isDefined) {
         s"""Some(${latency})"""
@@ -173,47 +183,9 @@ trait ChiselGenCommon extends ChiselCodegen {
     //   case _ => throw new Exception(s"Node enable $en not yet handled in partial retiming")
     // }
     // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
-    if (cfg.enableRetiming) lhs.fullDelay else 0.0
+    if (spatialConfig.enableRetiming) lhs.fullDelay else 0.0
   }
 
-
-  protected def emitInhibitor(lhs: Sym[_], fsm: Option[Sym[_]] = None, switch: Option[Sym[_]]): Unit = {
-    if (cfg.enableRetiming) {
-      emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())") // Used to be global module?
-      if (fsm.isDefined) {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(~${fsm.get})")  
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${DL(swap(lhs, Done), src"1 + ${swap(lhs, Latency)}", true)}")
-          /* or'ed  back in because of BasicCondFSM!! */
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${fsm.get}*/ // Really want inhibit to turn on at last enabled cycle")        
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-      } else if (switch.isDefined) {
-        emit(src"${swap(lhs, Inhibitor)} := ${swap(switch.get, Inhibitor)}")
-      } else {
-        if (lhs.cchains.nonEmpty) {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := ${lhs.cchains.head}.io.output.done")  
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data /*| ${lhs.cchains.head}.io.output.done*/ // Correction not needed because _done should mask dp anyway")
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := ${swap(lhs, Done)}")
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-        } else {
-          emitGlobalModuleMap(src"${lhs}_inhibit", "Module(new SRFF())")
-          emit(src"${swap(lhs, Inhibit)}.io.input.set := Utils.risingEdge(${swap(lhs, Done)} /*${lhs}_sm.io.output.ctr_inc*/)")
-          val rster = if (lhs.isInnerControl & getReadStreams(lhs.toCtrl).nonEmpty) {src"${DL(src"Utils.risingEdge(${swap(lhs, Done)})", src"1 + ${swap(lhs, Latency)}", true)} // Ugly hack, do not try at home"} else src"${DL(swap(lhs, Done), 1, true)}"
-          emit(src"${swap(lhs, Inhibit)}.io.input.reset := $rster")
-          emit(src"${swap(lhs, Inhibitor)} := ${swap(lhs, Inhibit)}.io.output.data")
-          emit(src"${swap(lhs, Inhibit)}.io.input.asyn_reset := reset")
-        }        
-      }
-    } else {
-      emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())");emit(src"${swap(lhs, Inhibitor)} := false.B // Maybe connect to ${swap(lhs, Done)}?  ")
-    }
-  }
-
-  override protected def remap(tp: Type[_]): String = tp match {
-    case s: Struct[_] => s"UInt(${bitWidth(tp)}.W)"
-    case _ => super.remap(tp)
-  }
 
   def remappedEns(node: Sym[_], ens: List[Sym[_]]): String = {
     var previousLevel: Sym[_] = node
@@ -247,84 +219,94 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def getStreamEnablers(c: Sym[_]): String = {
-      // If we are inside a stream pipe, the following may be set
-      // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
+    // If we are inside a stream pipe, the following may be set
+    // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
 
+    if (c.hasStreamAncestor) {
       // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
-      val lat = 0 //bodyLatency.sum(c) // FIXME
-      val readiers = getReadStreams(c.toCtrl).map{
+      val lat = c.bodyLatency.sum
+      val readsFrom = getReadStreams(c.toCtrl).map{
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
           fifo.readers.head match {
-            case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+            case Op(FIFOPeek(_,_)) => src""
           }
-        // case fifo @ Op(FILONew(size)) => src"${DL(src"~$fifo.io.empty", lat + 1, true)}"
         case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-        case fifo => src"${fifo}_en" // parent node
-      }.filter(_ != "").mkString(" & ")
+      }
 
-      val holders = getWriteStreams(c.toCtrl).map{
+      val writesTo = getWriteStreams(c.toCtrl).map{
         case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
           fifo.writers.head match {
-            case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+            // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+            case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
           }
         case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-        // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
-      }.filter(_ != "").mkString(" & ")
+        // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
+      }
 
-      val hasHolders = if (holders != "") "&" else ""
-      val hasReadiers = if (readiers != "") "&" else ""
+      {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
+    } else {""}
+  }
 
-      src"${hasHolders} ${holders} ${hasReadiers} ${readiers}"
+  def getStreamAdvancement(c: Sym[_]): String = { 
+    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
+      case x @ Op(StreamInNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
+      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
+    }.mkString(" & ")
+  }
 
+  def getStreamHalfAdvancement(c: Sym[_]): String = {  // Only valid for streamins and ready for streamouts
+    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
+      case x @ Op(StreamInNew(bus)) => src"${swap(x, Valid)}"
+      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)}"
+    }.mkString(" & ")
   }
 
   def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-      // If we are inside a stream pipe, the following may be set
-      val readiers = getReadStreams(c.toCtrl).map {
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
-        case _ => ""
-      }.mkString(" & ")
-      val hasReadiers = if (readiers != "") "&" else ""
-      if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    // If we are inside a stream pipe, the following may be set
+    val readiers = getReadStreams(c.toCtrl).collect {
+      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
+    }
+    val hasReadiers = if (readiers.size > 0) "&" else ""
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
   }
 
   def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-      // If we are inside a stream pipe, the following may be set
-      val readiers = getWriteStreams(c.toCtrl).map {
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Ready)}"
-        case _ => ""
-      }.mkString(" & ")
-      val hasReadiers = if (readiers != "") "&" else ""
-      if (cfg.enableRetiming) src"${hasReadiers} ${readiers}" else " "
+    // If we are inside a stream pipe, the following may be set
+    val readiers = getWriteStreams(c.toCtrl).collect {
+      case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
+    }
+    val hasReadiers = if (readiers.size > 0) "&" else ""
+    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
   }
 
   def getFifoReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).map{ pt => pt match {
-        case fifo @ Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
-        case _ => ""
-    }}.toList.filter(_ != "")
+    getWriteStreams(sym).collect{
+      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+    }.toList
   }
 
   def getAllReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).map{ pt => pt match {
-        case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-        case fifo @ Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.full"
-        case _ => ""
-    }}.toList.filter(_ != "")
+    getWriteStreams(sym).collect{
+      case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
+      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+    }.toList
   }
 
-  def DLTrace(lhs: Sym[_]): Option[String] = {
-    lhs match {
-      case Op(DelayLine(_, data)) => DLTrace(data)
-      case _ => lhs.rhs match {case Def.Const(c) => Some(quote(lhs)); case Def.Param(_,c) => Some(quote(lhs)); case _ => None}
-    }
+  def DLTrace(lhs: Sym[_]): Option[String] = lhs match {
+    case Op(DelayLine(_, data)) => DLTrace(data)
+    case Const(_) => Some(quote(lhs))
+    case Param(_) => Some(quote(lhs))
+    case _ => None
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val streamOuts = if (!controllerStack.isEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
+    val streamOuts = if (controllerStack.nonEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
     latency match {
       case lat: Int => 
-        if (!controllerStack.isEmpty) {
+        if (controllerStack.nonEmpty) {
           if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
@@ -337,7 +319,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           else src"Utils.getRetimed($name, $latency)"                    
         }
       case lat: Double => 
-        if (!controllerStack.isEmpty) {
+        if (controllerStack.nonEmpty) {
           if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
@@ -350,7 +332,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           else src"Utils.getRetimed($name, ${lat.toInt})"
         }
       case lat: String => 
-        if (!controllerStack.isEmpty) {
+        if (controllerStack.nonEmpty) {
           if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
             if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
             else src"Utils.getRetimed($name, $latency, ${streamOuts})"
@@ -365,55 +347,15 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
-  // Stream helpers
-  // def getStreamEnablers(c: Sym[Any]): String = {
-  //     // If we are inside a stream pipe, the following may be set
-  //     // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
-  //     val lat = bodyLatency.sum(c)
-  //     val readiers = listensTo(c).distinct.map{ pt => pt.memory match {
-  //       case fifo @ Def(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         pt.access match {
-  //           case Def(FIFODeq(_,en)) => src"(${DL(src"~$fifo.io.empty", lat+1, true)} | ~${remappedEns(pt.access,List(en))})"
-  //           case Def(ParFIFODeq(_,ens)) => src"""(${DL(src"~$fifo.io.empty", lat+1, true)} | ~(${remappedEns(pt.access, ens.toList)}))"""
-  //         }
-  //       case fifo @ Def(FILONew(size)) => src"${DL(src"~$fifo.io.empty", lat + 1, true)}"
-  //       case fifo @ Def(StreamInNew(bus)) => bus match {
-  //         case SliderSwitch => ""
-  //         case _ => src"${swap(fifo, Valid)}"
-  //       }
-  //       case fifo => src"${fifo}_en" // parent node
-  //     }}.filter(_ != "").mkString(" & ")
-  //     val holders = pushesTo(c).distinct.map { pt => pt.memory match {
-  //       case fifo @ Def(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         pt.access match {
-  //           case Def(FIFOEnq(_,_,en)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(pt.access,List(en))})"
-  //           case Def(ParFIFOEnq(_,_,ens)) => src"""(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~(${remappedEns(pt.access, ens.toList)}))"""
-  //         }
-  //       case fifo @ Def(FILONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         pt.access match {
-  //           case Def(FILOPush(_,_,en)) => src"(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~${remappedEns(pt.access,List(en))})"
-  //           case Def(ParFILOPush(_,_,ens)) => src"""(${DL(src"~$fifo.io.full", /*lat + 1*/1, true)} | ~(${remappedEns(pt.access, ens.toList)}))"""
-  //         }
-  //       case fifo @ Def(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-  //       case fifo @ Def(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"        
-  //     }}.filter(_ != "").mkString(" & ")
-
-  //     val hasHolders = if (holders != "") "&" else ""
-  //     val hasReadiers = if (readiers != "") "&" else ""
-
-  //     src"${hasHolders} ${holders} ${hasReadiers} ${readiers}"
-
-  // }
 
   protected def bitWidth(tp: Type[_]): Int = tp match {
-    case FixPtType(s,d,f) => d+f; 
-    case FltPtType(g,e) => g+e; 
-    case BitType() => 1
-    case t: Vec[_] => t.width * bitWidth(t.typeArgs.head)
-    case st: Struct[_] => st.fields.map{case (name, typ) => bitWidth(typ)}.sum
+    case Bits(bT) => bT.nbits
     case _ => -1
   }
-  protected def fracBits(tp: Type[_]) = tp match {case FixPtType(s,d,f) => f; case _ => 0}
+  protected def fracBits(tp: Type[_]): Int = tp match {
+    case FixPtType(s,d,f) => f
+    case _ => 0
+  }
 
   final protected def appendChainPass(s: Sym[_], rawname: String): (String, Boolean) = {
     var result = rawname
@@ -426,6 +368,11 @@ trait ChiselGenCommon extends ChiselCodegen {
           if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
           modified = true
           nextLevel = None
+        }
+        else if (pipeChainPassMapBug41Hack.contains(s) && pipeChainPassMapBug41Hack(s) == nextLevel.get) {
+          result = result + s"_chain_read_${siblings.length-1}"
+          modified = true
+          nextLevel = None
         } else {
           nextLevel = nextLevel.get.parent.s
         }
@@ -435,7 +382,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   final protected def getCtrSuffix(ctrl: Sym[_]): String = {
-    if (ctrl.parent != Host) {
+    if (ctrl.parent != Ctrl.Host) {
       if (ctrl.parent.isStreamControl) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}
     } else {
       throw new Exception(s"Could not find LCA stream schedule for a bound sym that is definitely in a stream controller.  This error should be impossibru!")
@@ -449,109 +396,60 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   override protected def quote(s: Sym[_]): String = s.rhs match {
     case Def.Bound(id)  => 
-      val base = super.quote(s)
+      val base = wireMap(super.quote(s) + alphaconv.getOrElse(super.quote(s), ""))
       val (pipelineRemap, pmod) = appendChainPass(s, base)
       val (streamRemap, smod) = appendStreamSuffix(s, base)
       if (pmod & smod) throw new Exception(s"ERROR: Seemingly impossible bound sym that is both part of a pipeline and a stream pipe!")
-      if (smod) streamRemap
-      else if (pmod) pipelineRemap
+      if (smod) wireMap(streamRemap)
+      else if (pmod) wireMap(pipelineRemap)
       else base
     case Def.Node(_,_) => // Specifically places suffix on ctrchains
-      val base = super.quote(s)
+      val base = wireMap(super.quote(s) + alphaconv.getOrElse(super.quote(s), ""))
       val (streamRemap, smod) = appendStreamSuffix(s, base)
-      if (smod) streamRemap
+      if (smod) wireMap(streamRemap)
       else DLTrace(s).getOrElse(base)
     case _ => super.quote(s)
   }
 
+  def and(ens: Set[Bit]): String = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" & ")
+  def or(ens: Set[Bit]): String = if (ens.isEmpty) "false.B" else ens.map(quote).mkString(" | ")
+    
+  def swap(tup: (Sym[_], RemapSignal)): String = swap(tup._1, tup._2)
+  def swap(lhs: Sym[_], s: RemapSignal): String = swap(src"$lhs", s)
+  def swap(lhs: Ctrl, s: RemapSignal): String = swap(src"${lhs.s.get}", s)
 
-  def swap(tup: (Sym[_], RemapSignal)): String = { swap(tup._1, tup._2) }
-
-  def swap(lhs: Sym[_], s: RemapSignal): String = { swap(src"$lhs", s) }
-  def swap(lhs: Ctrl, s: RemapSignal): String = { swap(src"${lhs.s.get}", s) }
-
-  def swap(lhs: => String, s: RemapSignal): String = {
-    s match {
-      case En => wireMap(src"${lhs}_en")
-      case Done => wireMap(src"${lhs}_done")
-      case BaseEn => wireMap(src"${lhs}_base_en")
-      case Mask => wireMap(src"${lhs}_mask")
-      case Resetter => wireMap(src"${lhs}_resetter")
-      case DatapathEn => wireMap(src"${lhs}_datapath_en")
-      case CtrTrivial => wireMap(src"${lhs}_ctr_trivial")
-      case IIDone => wireMap(src"${lhs}_II_done")
-      case RstEn => wireMap(src"${lhs}_rst_en")
-      case CtrEn => wireMap(src"${lhs}_ctr_en")
-      case Ready => wireMap(src"${lhs}_ready")
-      case Valid => wireMap(src"${lhs}_valid")
-      case NowValid => wireMap(src"${lhs}_now_valid")
-      case Inhibitor => wireMap(src"${lhs}_inhibitor")
-      case Wren => wireMap(src"${lhs}_wren")
-      case Chain => wireMap(src"${lhs}_chain")
-      case Blank => wireMap(src"${lhs}")
-      case DataOptions => wireMap(src"${lhs}_data_options")
-      case ValidOptions => wireMap(src"${lhs}_valid_options")
-      case ReadyOptions => wireMap(src"${lhs}_ready_options")
-      case EnOptions => wireMap(src"${lhs}_en_options")
-      case RVec => wireMap(src"${lhs}_rVec")
-      case WVec => wireMap(src"${lhs}_wVec")
-      case Latency => wireMap(src"${lhs}_latency")
-      case II => wireMap(src"${lhs}_ii")
-      case SM => wireMap(src"${lhs}_sm")
-      case Inhibit => wireMap(src"${lhs}_inhibit")
-    }
+  def swap(lhs: => String, s: RemapSignal): String = s match {
+    case En           => wireMap(src"${lhs}_en")
+    case Done         => wireMap(src"${lhs}_done")
+    case BaseEn       => wireMap(src"${lhs}_base_en")
+    case Mask         => wireMap(src"${lhs}_mask")
+    case Resetter     => wireMap(src"${lhs}_resetter")
+    case DatapathEn   => wireMap(src"${lhs}_datapath_en")
+    case CtrTrivial   => wireMap(src"${lhs}_ctr_trivial")
+    case IIDone       => wireMap(src"${lhs}_II_done")
+    case RstEn        => wireMap(src"${lhs}_rst_en")
+    case CtrEn        => wireMap(src"${lhs}_ctr_en")
+    case Ready        => wireMap(src"${lhs}_ready")
+    case Valid        => wireMap(src"${lhs}_valid")
+    case NowValid     => wireMap(src"${lhs}_now_valid")
+    case Inhibitor    => wireMap(src"${lhs}_inhibitor")
+    case Wren         => wireMap(src"${lhs}_wren")
+    case Chain        => wireMap(src"${lhs}_chain")
+    case Blank        => wireMap(src"$lhs")
+    case DataOptions  => wireMap(src"${lhs}_data_options")
+    case ValidOptions => wireMap(src"${lhs}_valid_options")
+    case ReadyOptions => wireMap(src"${lhs}_ready_options")
+    case EnOptions    => wireMap(src"${lhs}_en_options")
+    case RVec         => wireMap(src"${lhs}_rVec")
+    case WVec         => wireMap(src"${lhs}_wVec")
+    case Latency      => wireMap(src"${lhs}_latency")
+    case II           => wireMap(src"${lhs}_ii")
+    case SM           => wireMap(src"${lhs}_sm")
+    case Inhibit      => wireMap(src"${lhs}_inhibit")
   }
 
 }
 
-sealed trait RemapSignal
-// "Standard" Signals
-object En extends RemapSignal
-object Done extends RemapSignal
-object BaseEn extends RemapSignal
-object Mask extends RemapSignal
-object Resetter extends RemapSignal
-object DatapathEn extends RemapSignal
-object CtrTrivial extends RemapSignal
-// A few non-canonical signals
-object IIDone extends RemapSignal
-object RstEn extends RemapSignal
-object CtrEn extends RemapSignal
-object Ready extends RemapSignal
-object Valid extends RemapSignal
-object NowValid extends RemapSignal
-object Inhibitor extends RemapSignal
-object Wren extends RemapSignal
-object Chain extends RemapSignal
-object Blank extends RemapSignal
-object DataOptions extends RemapSignal
-object ValidOptions extends RemapSignal
-object ReadyOptions extends RemapSignal
-object EnOptions extends RemapSignal
-object RVec extends RemapSignal
-object WVec extends RemapSignal
-object Latency extends RemapSignal
-object II extends RemapSignal
-object SM extends RemapSignal
-object Inhibit extends RemapSignal
 
-sealed trait AppProperties
-object HasLineBuffer extends AppProperties
-object HasNBufSRAM extends AppProperties
-object HasNBufRegFile extends AppProperties
-object HasGeneralFifo extends AppProperties
-object HasTileStore extends AppProperties
-object HasTileLoad extends AppProperties
-object HasGather extends AppProperties
-object HasScatter extends AppProperties
-object HasLUT extends AppProperties
-object HasBreakpoint extends AppProperties
-object HasAlignedLoad extends AppProperties
-object HasAlignedStore extends AppProperties
-object HasUnalignedLoad extends AppProperties
-object HasUnalignedStore extends AppProperties
-object HasStaticCtr extends AppProperties
-object HasVariableCtrBounds extends AppProperties
-object HasVariableCtrStride extends AppProperties
-object HasFloats extends AppProperties
-object HasVariableCtrSyms extends AppProperties
+
+

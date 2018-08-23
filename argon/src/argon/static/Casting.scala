@@ -1,5 +1,4 @@
-package argon
-package static
+package argon.static
 
 import forge.tags.rig
 
@@ -30,6 +29,15 @@ trait Casting {
     @rig def uncheckedLeft(b: B): Option[A] = c match {
       case Left(cast)  => cast.get(b)
       case Right(cast) => cast.uncheckedGetLeft(b)
+    }
+
+    def rightType: Type[B] = c match {
+      case Left(cast)  => cast.tA
+      case Right(cast) => cast.tB
+    }
+    def leftType: Option[Type[A]] = c match {
+      case Left(cast)  => Some(cast.tB)
+      case Right(cast) => None
     }
   }
 

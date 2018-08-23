@@ -60,7 +60,7 @@ abstract class LazyModule
 
   private val index = { LazyModule.index = LazyModule.index + 1; LazyModule.index }
 
-  private def nodesGraphML(buf: StringBuilder, pad: String) {
+  private def nodesGraphML(buf: StringBuilder, pad: String): Unit = {
     buf ++= s"""${pad}<node id=\"${index}\">\n"""
     buf ++= s"""${pad}  <data key=\"n\"><y:ShapeNode><y:NodeLabel modelName=\"sides\" modelPosition=\"w\" fontSize=\"10\" borderDistance=\"1.0\" rotationAngle=\"270.0\">${module.name}</y:NodeLabel></y:ShapeNode></data>\n"""
     buf ++= s"""${pad}  <graph id=\"${index}::\" edgedefault=\"directed\">\n"""
@@ -71,7 +71,7 @@ abstract class LazyModule
     buf ++= s"""${pad}  </graph>\n"""
     buf ++= s"""${pad}</node>\n"""
   }
-  private def edgesGraphML(buf: StringBuilder, pad: String) {
+  private def edgesGraphML(buf: StringBuilder, pad: String): Unit = {
     nodes.filter(!_.omitGraphML) foreach { n => n.outputs.filter(!_.omitGraphML).foreach { o =>
       buf ++= pad
       buf ++= "<edge"

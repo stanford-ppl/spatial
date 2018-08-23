@@ -33,7 +33,8 @@ abstract class CastFunc[A,B:Type] {
   * val b' = cast.apply(a)
   * val a' = cast.applyLeft(b)
   */
-abstract class Cast2Way[A,B:Type] extends CastFunc[A,B] {
+abstract class Cast2Way[A:Type,B:Type] extends CastFunc[A,B] {
+  def tA: Type[A] = Type[A]
   @rig def apply(a: A): B
   @rig def applyLeft(b: B): A
   @rig override def getLeft(b: B): Option[A] = Some(applyLeft(b))

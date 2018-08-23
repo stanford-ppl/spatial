@@ -1,13 +1,11 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
-import host._
-
+import spatial.metadata.control._
+import spatial.metadata.types._
 
 trait CppGenArray extends CppGenCommon {
 
@@ -26,6 +24,14 @@ trait CppGenArray extends CppGenCommon {
     case _ => 0
   }
 
+  private def zeroElement(tp: Type[_]): String = tp match {
+    case tp: Tup2[_,_] => src"*(new $tp(${zeroElement(tp.A)},${zeroElement(tp.B)}));"
+    case tp: Struct[_] => src"*(new $tp(${tp.fields.map{field => zeroElement(field._2)}.mkString(",")}));"
+    case _ => "0"
+  }
+
+  protected def ptr(tp: Type[_]): String = if (isArrayType(tp)) "*" else ""
+  protected def amp(tp: Type[_]): String = if (isArrayType(tp)) "&" else ""
   protected def isArrayType(tp: Type[_]): Boolean = tp match {
     case tp: Vec[_] => tp.typeArgs.head match {
       case tp: Vec[_] => println("EXCEPTION: Probably can't handle nested array types in ifthenelse"); true
@@ -86,6 +92,17 @@ trait CppGenArray extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments()       => emit(src"${lhs.tp}* $lhs = args;")
+
+    case ArrayApply(array @ Def(InputArguments()), i) =>
+      // Note this doesn't match if we map over the input arguments and then apply, for example.
+      emit(src"${lhs.tp} $lhs;")
+      open(src"try {")
+        emit(src"$lhs = (*$array).at($i);")
+      close("}")
+      open(src"catch (std::out_of_range& e) {")
+        emit(src"printHelp();")
+      close("}")
+
     case ArrayApply(array, i)   => 
       val (ast,amp) = if (lhs.tp match {case _:Vec[_] => true; case _:host.Array[_] => true; case _ => false}) ("*","&") else ("","")
       emit(src"${lhs.tp}${ast} $lhs = ${amp}(*${array})[$i];")  
@@ -111,16 +128,16 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
-            st.foreach{f => emit(src"${f._2.tp}* ${f._1};")}
-            open(src"${struct}(${st.map{f => src"${f._2.tp}* ${f._1}_in"}.mkString(",")}){ /* Normal Constructor */")
-              st.foreach{f => emit(src"set${f._1}(*${f._1}_in);")}
+            st.foreach{f => emit(src"${f._2.tp}${ptr(f._2.tp)} ${f._1};")}
+            open(src"${struct}(${st.map{f => src"${f._2.tp}${ptr(f._2.tp)} ${f._1}_in"}.mkString(",")}){ /* Normal Constructor */")
+              st.foreach{f => emit(src"set${f._1}(${ptr(f._2.tp)}${f._1}_in);")}
             close("}")
             emit(src"${struct}(){} /* For creating empty array */")
             open(src"std::string toString(){")
-              val all = st.map{f => src""" "${f._1}: " + std::to_string(*${f._1}) """}.mkString("+ \", \" + ")
+              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${f._1}) """}.mkString("+ \", \" + ")
               emit(src"return $all;")
             close("}")
-            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = &x; }")}
+            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = ${amp(f._2.tp)}x; }")}
 
           try {
             val rawtp = asIntType(lhs.tp)
@@ -135,6 +152,10 @@ trait CppGenArray extends CppGenCommon {
               }
               emit(src"return result;")
             close("}")
+            position = 0
+            open(src"${struct}(int128_t bits){ /* Constructor from raw bits */")
+              st.foreach{f => emit(src"set${f._1}((${f._2.tp}) (bits >> $position));"); position = position + bitWidth(f._2.tp)}
+            close("}")
             close(" ")
           } catch { case _:Throwable => }
 
@@ -143,44 +164,14 @@ trait CppGenArray extends CppGenCommon {
 
         }
       }
-      val fields = st.zipWithIndex.map{case (f,i) => 
-        if (f._2.isConst) {
-          emit(src"${f._2.tp} ${lhs}_$i = ${f._2};")
-          src"&${lhs}_$i"
-        } else if (isArrayType(f._2.tp) | f._2.tp.typePrefix == "Array") src"${f._2}"
-        else src"&${f._2}"
-      }
+      val fields = st.zipWithIndex.map{case (f,i) => src"${f._2}"}
       emit(src"${struct} $lhs = ${struct}(${fields.mkString(",")});")
 
     case FieldApply(struct, field) => 
       if (isArrayType(lhs.tp)) emit(src"""${lhs.tp}* $lhs = ${struct}.$field;""")
-      else emit(src"""${lhs.tp} $lhs = *${struct}.$field;""")
+      else emit(src"""${lhs.tp} $lhs = ${struct}.$field;""")
 
-    case SetMem(dram, data) => 
-      val rawtp = asIntType(dram.tp.typeArgs.head)
-      val f = fracBits(dram.tp.typeArgs.head)
-      if (f > 0) {
-        emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
-        open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
-          emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
-        close("}")
-        emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
-      } else {
-        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
-      }
-    case GetMem(dram, data) => 
-      val rawtp = asIntType(dram.tp.typeArgs.head)
-      val f = fracBits(dram.tp.typeArgs.head)
-      if (f > 0) {
-        emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
-        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
-        open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
-          emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
-          emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
-        close("}")
-      } else {
-        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
-      }
+
 
     case VecAlloc(elems)     => emit(src"${lhs.tp} $lhs = ${lhs.tp}($elems)")
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
@@ -196,8 +187,9 @@ trait CppGenArray extends CppGenCommon {
         case _ => emit(src"${lhs}.push_back($e);")
       }}
 
-    case MapIndices(size, func)   =>
-      emitNewArray(lhs, lhs.tp, src"$size")
+    case op @ MapIndices(size, func)   =>
+      val isVoid = op.A.isVoid
+      if (!isVoid) emitNewArray(lhs, lhs.tp, src"$size")
       open(src"for (int ${func.input} = 0; ${func.input} < $size; ${func.input}++) {")
       visitBlock(func)
       if (isArrayType(func.result.tp)) {
@@ -207,13 +199,32 @@ trait CppGenArray extends CppGenCommon {
           emit(src"(*$lhs)[${func.input}][${func.result}_copier] = (*${func.result})[${func.result}_copier];")
         close("}")
       } else {
-        emit(src"(*$lhs)[${func.input}] = ${func.result};")  
+        if (!isVoid) emit(src"(*$lhs)[${func.input}] = ${func.result};")
       }
       close("}")
 
     case SeriesForeach(start,end,step,func) =>
       open(src"for (int ${func.input} = $start; ${func.input} < ${end}; ${func.input} = ${func.input} + $step) {")
         visitBlock(func)
+      close("}")
+
+    case ArrayMkString(array,start,delim,end) =>
+      emit(src"""${lhs.tp} $lhs = $start;""")
+      open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i++){ ")
+        emit(src"${lhs} = string_plus(string_plus(${lhs}, ${delim}), std::to_string((*${array})[${lhs}_i]));")
+      close("}")
+      emit(src"""$lhs = string_plus($lhs, $end);""")
+
+    case op @ IfThenElse(cond, thenp, elsep) =>
+      val star = lhs.tp match {case _: host.Array[_] => "*"; case _ => ""}
+      if (!op.R.isVoid) emit(src"${lhs.tp}${star} $lhs;")
+      open(src"if ($cond) { ")
+        visitBlock(thenp)
+        if (!op.R.isVoid) emit(src"${lhs} = ${thenp.result};")
+      close("}")
+      open("else {")
+        visitBlock(elsep)
+        if (!op.R.isVoid) emit(src"${lhs} = ${elsep.result};")
       close("}")
 
     case ArrayFilter(array, apply, cond) =>
@@ -233,7 +244,7 @@ trait CppGenArray extends CppGenCommon {
       close("}")
 
     case op@ArrayFromSeq(seq)   => 
-      emitNewArray(lhs, lhs.tp, getSize(lhs))
+      emitNewArray(lhs, lhs.tp, s"${seq.length}")
       seq.zipWithIndex.foreach{case (s,i) => 
         emit(src"(*${lhs})[$i] = $s;")
       }
@@ -262,7 +273,9 @@ trait CppGenArray extends CppGenCommon {
       emitUpdate(lhs, func.result, src"${applyA.inputB}", func.result.tp)
       close("}")
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) => 
+    case ArrayUpdate(arr, id, data) => emitUpdate(arr, data, src"${id}", data.tp)
+
+    case UnrolledForeach(ens,cchain,func,iters,valids) if (!inHw) => 
       val starts = cchain.counters.map(_.start)
       val ends = cchain.counters.map(_.end)
       val steps = cchain.counters.map(_.step)
@@ -273,7 +286,19 @@ trait CppGenArray extends CppGenCommon {
       visitBlock(func)
       iters.foreach{_ => close("}")}
 
-      // 
+    case ArrayFold(array,init,apply,reduce) => 
+      if (isArrayType(lhs.tp)) {
+        throw new Exception(s"Codegen for ArrayFold onto an Array needs to be implemented!")
+      }
+      emit(src"${lhs.tp} $lhs = $init;")
+
+      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
+        emitApply(reduce.inputA, array, src"${apply.inputB}")
+        emit(src"""${reduce.inputB.tp}${if (isArrayType(reduce.inputB.tp)) "*" else ""} ${reduce.inputB} = $lhs;""")
+        visitBlock(reduce)
+        emit(src"$lhs = ${reduce.result};")
+      close("}")
+
     case ArrayReduce(array, apply, reduce) =>
       if (isArrayType(lhs.tp)) {
         emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""") 
@@ -284,7 +309,7 @@ trait CppGenArray extends CppGenCommon {
         emitApply(lhs, array, "0", false)
       close("}")
       open("else {")
-        emit(src"$lhs = 0;")
+        emit(src"$lhs = ${zeroElement(lhs.tp)};")
       close("}")
 
       open(src"for (int ${apply.inputB} = 1; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
@@ -294,7 +319,7 @@ trait CppGenArray extends CppGenCommon {
         emit(src"$lhs = ${reduce.result};")
       close("}")
 
-    case op@Switch(selects,block) =>
+    case op@Switch(selects,block) if !inHw =>
 
       emit(src"/** BEGIN SWITCH $lhs **/")
       if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
@@ -306,7 +331,7 @@ trait CppGenArray extends CppGenCommon {
       }
       emit(src"/** END SWITCH $lhs **/")
 
-    case SwitchCase(body) => // Controlled by Switch
+    case SwitchCase(body) if !inHw => // Controlled by Switch
 
     // case ArrayFilter(array, apply, cond) =>
     //   open(src"val $lhs = $array.filter{${apply.result} => ")

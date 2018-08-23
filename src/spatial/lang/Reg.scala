@@ -3,8 +3,8 @@ package spatial.lang
 import argon._
 import forge.Ptr
 import forge.tags._
-import spatial.data._
 import spatial.node._
+import spatial.metadata.memory._
 
 @ref class Reg[A:Bits] extends LocalMem0[A,Reg] with StagedVarLike[A] with Ref[Ptr[Any],Reg[A]] {
   val A: Bits[A] = Bits[A]
@@ -18,6 +18,7 @@ import spatial.node._
   @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))
 
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
+  def nonbuffer: Reg[A] = { this.isNonBuffer = true; me }
 
   // --- Typeclass Methods
   @rig def __sread(): A = Reg.read(this)

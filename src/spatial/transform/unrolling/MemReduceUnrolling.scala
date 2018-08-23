@@ -1,11 +1,11 @@
 package spatial.transform.unrolling
 
 import argon._
-import spatial.data._
+import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.internal.spatialConfig
+import spatial.util.spatialConfig
 import utils.tags.instrument
 
 trait MemReduceUnrolling extends ReduceUnrolling {
@@ -140,7 +140,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
           logs(s"[Accum-fold $lhs] Unrolling accumulator store")
           // Use a default substitution for the reduction result to satisfy the block scheduler
-          inReduce(redType,false){ isolate(){
+          inReduce(redType,false){ isolateSubst(){
             register(storeAcc.inputA -> accum)
             register(reduce.result -> results.head)
             unroll(storeAcc, reduceLanes)
@@ -152,7 +152,9 @@ trait MemReduceUnrolling extends ReduceUnrolling {
       }
     }
 
-    val lhs2 = stage(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs))
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs)){lhs2 =>
+      transferData(lhs,lhs2)
+    }
     //accumulatesTo(lhs2) = accum
 
     logs(s"[Accum-fold] Created reduce ${stm(lhs2)}")

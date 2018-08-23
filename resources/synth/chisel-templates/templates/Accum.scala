@@ -3,111 +3,183 @@ package templates
 import ops._
 import chisel3._
 import types._
+import scala.math.log
+import chisel3.util.Mux1H
 
-class UIntAccum(val w: Int, val lambda: String) extends Module {
-  def this(tuple: (Int, String)) = this(tuple._1, tuple._2)
+sealed abstract class Accum
+object Accum {
+  case object Add extends Accum
+  case object Mul extends Accum
+  case object Min extends Accum
+  case object Max extends Accum
+}
 
+
+class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency: Double, val s: Boolean, val d: Int, val f: Int, init: Double) extends Module {
+  def this(tup: (Int, Double, Double, Boolean, Int, Int, Double)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6, tup._7)
+
+  val cw = Utils.log2Up(cycleLatency) + 2
+  val initBits = (init*scala.math.pow(2,f)).toLong.S((d+f).W).asUInt
   val io = IO(new Bundle{
-    val next = Input(UInt(w.W))
-    val enable = Input(Bool())
-    val reset = Input(Bool())
-    val init = Input(UInt(w.W))
-    val output = Output(UInt(w.W))
+    val input1 = Vec(numWriters, Input(UInt((d+f).W)))
+    val input2 = Vec(numWriters, Input(UInt((d+f).W)))
+    val enable = Vec(numWriters, Input(Bool()))
+    val reset = Vec(numWriters, Input(Bool()))
+    val last = Vec(numWriters, Input(Bool()))
+    val first = Vec(numWriters, Input(Bool()))
+    val output = Output(UInt((d+f).W))
   })
 
-  val current = RegInit(io.init)
-  val asyncCurrent = Mux(io.reset, io.init, current)
-  val update = lambda match { 
-    case "add" => asyncCurrent + io.next
-    case "max" => Mux(asyncCurrent > io.next, asyncCurrent, io.next)
-    case "min" => Mux(asyncCurrent < io.next, asyncCurrent, io.next)
-    case _ => asyncCurrent
-  }
-  current := Mux(io.enable, update, asyncCurrent)
+  val activeIn1 = Mux1H(io.enable, io.input1)
+  val activeIn2 = Mux1H(io.enable, io.input2)
+  val activeEn  = io.enable.reduce{_|_}
+  val activeLast = Mux1H(io.enable, io.last)
+  val activeReset = io.reset.reduce{_|_}
+  val activeFirst = io.first.reduce{_|_}
 
-  io.output := asyncCurrent
+  val fixin1 = Wire(new FixedPoint(s,d,f))
+  fixin1.r := activeIn1
+  val fixin2 = Wire(new FixedPoint(s,d,f))
+  fixin2.r := activeIn2
 
-  def read(port: Int) = {
-    io.output
+  // Use log2Down to be consistent with latency model that truncates
+  val drain_latency = (log(cycleLatency)/log(2)).toInt
+
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
+  laneCtr.io.input.enable := activeEn
+  laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
+  laneCtr.io.input.saturate := false.B
+
+  val firstRound = Module(new SRFF())
+  firstRound.io.input.set := activeFirst & ~laneCtr.io.output.done
+  firstRound.io.input.asyn_reset := false.B
+  firstRound.io.input.reset := laneCtr.io.output.done | activeReset
+  val isFirstRound = firstRound.io.output.data
+
+  val drainState = Module(new SRFF())
+  drainState.io.input.set := activeLast
+  drainState.io.input.asyn_reset := false.B
+  drainState.io.input.reset := activeLast.D(drain_latency + fmaLatency)
+  val isDrainState = drainState.io.output.data
+
+  val dispatchLane = laneCtr.io.output.count(0).asUInt
+  val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
+  accums.foreach{case (acc, lane) => 
+    val fixadd = Wire(new FixedPoint(s,d,f))
+    fixadd.r := Mux(isFirstRound, 0.U, acc.io.output.data(0))
+    val result = Wire(new FixedPoint(s,d,f))
+    Utils.FixFMA(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).cast(result)
+    acc.io.xBarW(0).data(0) := result.r
+    acc.io.xBarW(0).en(0) := Utils.getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
+    acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + fmaLatency)
+    acc.io.xBarW(0).init(0) := initBits
   }
+
+  io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong).r // TODO: Please build tree and retime appropriately
+
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {Seq(io.output)}
 
 }
 
-// latency = lanes for accumulation
+class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, val opLatency: Double, val s: Boolean, val d: Int, val f: Int, init: Double) extends Module {
+  def this(tup: (Accum, Int, Double, Double, Boolean, Int, Int, Double)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6, tup._7, tup._8)
 
-class SpecialAccum(val latency: Int, val lambda: String, val typ: String, val params: List[Int]) extends Module {
-  def this(tuple: (Int, String, String, List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4)
-
-  val w = if (typ == "FixedPoint") params.drop(1).reduce{_+_} else params.reduce{_+_}
-
+  val cw = Utils.log2Up(cycleLatency) + 2
+  val initBits = (init*scala.math.pow(2,f)).toLong.S((d+f).W).asUInt
   val io = IO(new Bundle{
-    val input = new Bundle{
-      val next = Input(UInt(w.W))
-      val enable = Input(Bool())
-      val direct_enable = Input(Bool())
-      val direct_data = Input(UInt(w.W))
-      val reset = Input(Bool())
-      val init = Input(UInt(w.W))      
-    }
-    val output = Output(UInt(w.W))
+    val input1 = Vec(numWriters, Input(UInt((d+f).W)))
+    val enable = Vec(numWriters, Input(Bool()))
+    val reset = Vec(numWriters, Input(Bool()))
+    val last = Vec(numWriters, Input(Bool()))
+    val first = Vec(numWriters, Input(Bool()))
+    val output = Output(UInt((d+f).W))
   })
 
+  val activeIn1 = Mux1H(io.enable, io.input1)
+  val activeEn  = io.enable.reduce{_|_}
+  val activeLast = Mux1H(io.enable, io.last)
+  val activeReset = io.reset.reduce{_|_}
+  val activeFirst = io.first.reduce{_|_}
 
-  typ match { // Reinterpret "io.next" bits
-    case "UInt" => 
-      val current = RegInit(io.input.init)
-      val asyncCurrent = Mux(io.input.reset, io.input.init, current)
-      val update = lambda match { 
-        case "add" => asyncCurrent + io.input.next
-        case "max" => Mux(asyncCurrent > io.input.next, asyncCurrent, io.input.next)
-        case "min" => Mux(asyncCurrent < io.input.next, asyncCurrent, io.input.next)
-        case _ => asyncCurrent
-      }
-      current := Mux(io.input.direct_enable, io.input.direct_data, Mux(io.input.enable, update, asyncCurrent))
-      io.output := asyncCurrent
-    case "FixedPoint" => 
-      val current = RegInit(io.input.init)
-      val asyncCurrent = Mux(io.input.reset, io.input.init, current)
+  val fixin1 = Wire(new FixedPoint(s,d,f))
+  fixin1.r := activeIn1
 
-      val fixnext = Wire(new types.FixedPoint(params(0), params(1), params(2)))
-      val fixcurrent = Wire(new types.FixedPoint(params(0), params(1), params(2))) 
-      val fixasync = Wire(new types.FixedPoint(params(0), params(1), params(2))) 
-      fixnext.number := io.input.next
-      fixcurrent.number := current
-      fixasync.number := asyncCurrent
-      val update = lambda match { 
-        case "add" => fixcurrent + fixnext
-        case "max" => Mux(fixasync > fixnext, fixasync, fixnext)
-        case "min" => Mux(fixasync < fixnext, fixasync, fixnext)
-        case _ => fixasync
-      }
-      current := Mux(io.input.direct_enable, io.input.direct_data, Mux(io.input.enable, update.number, fixasync.number))
+  // Use log2Down to be consistent with latency model that truncates
+  val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
 
-      io.output := asyncCurrent
-    case "FloatingPoint" => // Not implemented
-      val current = RegInit(io.input.init)
-      val asyncCurrent = Mux(io.input.reset, io.input.init, current)
-      val update = lambda match { 
-        case "add" => asyncCurrent + io.input.next
-        case "max" => Mux(asyncCurrent > io.input.next, asyncCurrent, io.input.next)
-        case "min" => Mux(asyncCurrent < io.input.next, asyncCurrent, io.input.next)
-        case _ => asyncCurrent
-      }
-      current := Mux(io.input.direct_enable, io.input.direct_data, Mux(io.input.enable, update, asyncCurrent))
-      io.output := asyncCurrent  }
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
+  laneCtr.io.input.enable := activeEn
+  laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + opLatency)
+  laneCtr.io.input.saturate := false.B
 
-  def write[T](data: T, en: Bool, reset: Bool, port: List[Int]) = {
-    io.input.direct_enable := en
-    data match {
-      case d: UInt =>
-        io.input.direct_data := d
-      case d: types.FixedPoint =>
-        io.input.direct_data := d.number
+  val firstRound = Module(new SRFF())
+  firstRound.io.input.set := activeFirst & ~laneCtr.io.output.done
+  firstRound.io.input.asyn_reset := false.B
+  firstRound.io.input.reset := laneCtr.io.output.done | activeReset
+  val isFirstRound = firstRound.io.output.data
+
+  val drainState = Module(new SRFF())
+  drainState.io.input.set := activeLast
+  drainState.io.input.asyn_reset := false.B
+  drainState.io.input.reset := activeLast.D(drain_latency + opLatency)
+  val isDrainState = drainState.io.output.data
+
+  val dispatchLane = laneCtr.io.output.count(0).asUInt
+  val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
+  accums.foreach{case (acc, lane) => 
+    val fixadd = Wire(new FixedPoint(s,d,f))
+    fixadd.r := acc.io.output.data(0)
+    val result = Wire(new FixedPoint(s,d,f))
+    t match {
+      case Accum.Add => result.r := Mux(isFirstRound.D(opLatency.toInt), Utils.getRetimed(fixin1.r, opLatency.toInt), (Utils.getRetimed(fixin1 + fixadd, opLatency.toInt)).r)
+      case Accum.Mul => result.r := Mux(isFirstRound.D(opLatency.toInt), Utils.getRetimed(fixin1.r, opLatency.toInt), (fixin1.*-*(fixadd, Some(opLatency), true.B)).r)
+      case Accum.Min => result.r := Mux(isFirstRound.D(opLatency.toInt), Utils.getRetimed(fixin1.r, opLatency.toInt), Utils.getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
+      case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), Utils.getRetimed(fixin1.r, opLatency.toInt), Utils.getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
+
     }
+    acc.io.xBarW(0).data(0) := result.r
+    acc.io.xBarW(0).en(0) := Utils.getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
+    acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + opLatency)
+    acc.io.xBarW(0).init(0) := initBits
   }
 
-  def read(port: Int) = {
-    io.output
-  }
+    t match {
+      case Accum.Add => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
+        val t1 = Wire(new FixedPoint(s,d,f))
+        val t2 = Wire(new FixedPoint(s,d,f))
+        t1.r := a
+        t2.r := b
+        (t1+t2).r
+        // Utils.getRetimed(t1 + t2, opLatency.toInt).r
+      }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
+      case Accum.Mul => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) => 
+        val t1 = Wire(new FixedPoint(s,d,f))
+        val t2 = Wire(new FixedPoint(s,d,f))
+        t1.r := a
+        t2.r := b
+        (t1.*-*(t2, Some(0), true.B)).r
+      }, drain_latency, isDrainState, init = (init*scala.math.pow(2,f)).toLong)
+      case Accum.Min => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
+        val t1 = Wire(new FixedPoint(s,d,f))
+        val t2 = Wire(new FixedPoint(s,d,f))
+        t1.r := a
+        t2.r := b
+        Mux(t1 < t2, t1.r, t2.r)
+        // Utils.getRetimed(Mux(t1 < t2, t1.r,t2.r), opLatency.toInt)
+      }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
+      case Accum.Max => io.output := Utils.getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) => 
+        val t1 = Wire(new FixedPoint(s,d,f))
+        val t2 = Wire(new FixedPoint(s,d,f))
+        t1.r := a
+        t2.r := b
+        Mux(t1 > t2, t1.r,t2.r)
+        // Utils.getRetimed(Mux(t1 > t2, t1.r,t2.r), opLatency.toInt)
+      }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
+    }
+
+
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {Seq(io.output)}
 
 }

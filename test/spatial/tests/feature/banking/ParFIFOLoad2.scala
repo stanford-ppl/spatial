@@ -4,7 +4,7 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 
-@test class ParFIFOLoad2 extends SpatialTest {
+@spatial class ParFIFOLoad2 extends SpatialTest {
   override def runtimeArgs: Args = "384"
 
   val tileSize = 64

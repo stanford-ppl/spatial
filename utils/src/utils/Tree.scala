@@ -22,19 +22,29 @@ object Tree {
     * Also returns the paths from the least common ancestor to each node.
     */
   def LCAWithPaths[T](x: T, y: T)(parent: T => T): (T, Seq[T], Seq[T]) = {
+    getLCAWithPaths(x,y)(parent).getOrElse{
+      throw new Exception(s"""No LCA for $x (${parent(x)}) and $y (${parent(y)})""")
+    }
+  }
+
+  def getLCAWithPaths[T](x: T, y: T)(parent: T => T): Option[(T, Seq[T], Seq[T])] = {
     val pathX = ancestors(x)(parent)
     val pathY = ancestors(y)(parent)
-
-    // Choose last node where paths are the same
     val lca = pathX.zip(pathY).reverse.find{case (a,b) => a == b}.map(_._1)
-                              .getOrElse{throw new Exception(s"""No common parent for $x (${parent(x)}) and $y (${parent(y)})
-                                                                 |X ancestors: ${pathX.mkString(", ")}
-                                                                 |Y ancestors: ${pathY.mkString(", ")}""".stripMargin) }
-    val pathToX = pathX.drop(pathX.indexOf(lca))
-    val pathToY = pathY.drop(pathY.indexOf(lca))
-    (lca,pathToX,pathToY)
+
+    lca match {
+      case Some(ctrl) =>
+        // Choose last node where paths are the same
+        val pathToX = pathX.drop(pathX.indexOf(ctrl))
+        val pathToY = pathY.drop(pathY.indexOf(ctrl))
+        Some(ctrl,pathToX,pathToY)
+
+      case None => None
+    }
   }
 
   def LCA[T](x: T, y: T)(parent: T => T): T = LCAWithPaths(x,y)(parent)._1
+
+  def getLCA[T](x: T, y: T)(parent: T => T): Option[T] = getLCAWithPaths(x,y)(parent).map(_._1)
 
 }

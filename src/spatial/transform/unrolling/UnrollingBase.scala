@@ -1,14 +1,18 @@
 package spatial.transform.unrolling
 
 import argon._
+import argon.node.Enabled
 import argon.transform.MutateTransformer
-import utils.tags.instrument
-import spatial.data._
+
 import spatial.lang._
 import spatial.node._
-import spatial.util._
-import spatial.internal.spatialConfig
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.types._
+import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
+
+import utils.tags.instrument
 
 /** Options when transforming a statement:
   *   0. Remove it: s -> Nil. Statement will not appear in resulting graph.
@@ -87,10 +91,12 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
   }
 
-  /** Duplicate the given controller based on the global Unroller helper instance lanes. */
-  final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A]): List[Sym[_]] = {
+  /** Duplicate the given controller based on the global Unroller helper instance lanes.
+    * For parallelization greater than 1, this adds a Parallel node around the control copies.
+    */
+  final def duplicateController[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     dbgs(s"Duplicating controller $lhs = $rhs")
-    def duplicate() = transferMetadataIfNew(lhs){ unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]] }._1
+    def duplicate(): Sym[A] = unrollCtrl(lhs,rhs).asInstanceOf[Sym[A]]
     if (lanes.size > 1) {
       val block = stageBlock {
         lanes.foreach{p =>
@@ -122,10 +128,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
 
-  def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = duringMirror{e =>
+  def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = withFlow("inReduce",{e =>
     if (spatialConfig.noInnerLoopUnroll && !isInner) e.reduceType = None
     else e.reduceType = red
-  }{ blk }
+  }){ blk }
 
 
   override protected def inlineBlock[T](block: Block[T]): Sym[T] = {
@@ -144,8 +150,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     case _ => super.updateNode(node)
   }
 
-  override def isolateIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
-    super.isolateIf(cond, escape){ lanes.isolateIf(cond, escape){ block } }
+  override def isolateSubstIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
+    super.isolateSubstIf(cond, escape){ lanes.isolateIf(cond, escape){ block } }
   }
 
   override def usedRemovedSymbol[T](x: T): Nothing = {

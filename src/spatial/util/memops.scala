@@ -2,49 +2,58 @@ package spatial.util
 
 import argon._
 import forge.tags._
-import spatial.data._
+
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.memory._
 
 import utils.implicits.collections._
 
 object memops {
 
-  implicit class AliasOps[A](x: Sym[A]) {
-    def rank: Int = rankOf(x)
-
+  implicit class AliasOps[A](mem: Sym[A]) {
     @rig def starts(): Seq[I32] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get starts of sparse alias")
-      Seq.tabulate(rank){i => stage(MemStart(x, i)) }
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get starts of sparse alias")
+      Seq.tabulate(mem.seqRank.length){i => stage(MemStart(mem, mem.seqRank(i))) }
     }
     @rig def steps(): Seq[I32] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get steps of sparse alias")
-      Seq.tabulate(rank){i => stage(MemStep(x, i)) }
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get steps of sparse alias")
+      Seq.tabulate(mem.seqRank.length){i => stage(MemStep(mem, mem.seqRank(i))) }
     }
     @rig def ends(): Seq[I32] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get ends of sparse alias")
-      Seq.tabulate(rank){i => stage(MemEnd(x, i)) }
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get ends of sparse alias")
+      Seq.tabulate(mem.seqRank.length){i => stage(MemEnd(mem, mem.seqRank(i))) }
     }
     @rig def pars(): Seq[I32] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get pars of sparse alias")
-      Seq.tabulate(rank){i => stage(MemPar(x, i)) }
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get pars of sparse alias")
+      Seq.tabulate(mem.seqRank.length){i => stage(MemPar(mem, mem.seqRank(i))) }
     }
     @rig def lens(): Seq[I32] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get lens of sparse alias")
-      Seq.tabulate(rank){i => stage(MemLen(x, i)) }
+      Seq.tabulate(mem.seqRank.length){i => stage(MemLen(mem, mem.seqRank(i))) }
     }
+
+    @rig def rawStarts(): Seq[I32] = {
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get rawStarts of sparse alias")
+      Seq.tabulate(mem.rawRank.length){i => stage(MemStart(mem, mem.rawRank(i))) }
+    }
+
+    @rig def rawDims(): Seq[I32] = {
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get rawDims of sparse alias")
+      Seq.tabulate(mem.rawRank.length){i => stage(MemDim(mem, mem.rawRank(i))) }
+    }
+
     @rig def series(): Seq[Series[I32]] = {
-      if (x.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
-      Seq.tabulate(rank){i =>
-        val start = stage(MemStart(x, i))
-        val end   = stage(MemEnd(x, i))
-        val step  = stage(MemStep(x, i))
-        val par   = stage(MemPar(x, i))
+      if (mem.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
+      Seq.tabulate(mem.seqRank.length){i =>
+        val start = stage(MemStart(mem, mem.seqRank(i)))
+        val end   = stage(MemEnd(mem, mem.seqRank(i)))
+        val step  = stage(MemStep(mem, mem.seqRank(i)))
+        val par   = stage(MemPar(mem, mem.seqRank(i)))
         Series(start, end, step, par)
       }
     }
 
-    @rig def addrs() = x match {
+    @rig def addrs() = mem match {
       case Op(op: MemSparseAlias[_,_,_,_]) =>
         def addrAlias[Addr[T]](implicit Addr: Type[Addr[I32]]) = {
           val addr = op.addr.map{mem => mem.asInstanceOf[Addr[I32]]}
@@ -57,7 +66,7 @@ object memops {
         }
         addrAlias(op.Addr).asInstanceOf[LocalMem[I32,C forSome{type C[_]}]]
 
-      case _ => throw new Exception(s"No sparse addresses available for $x")
+      case _ => throw new Exception(s"No sparse addresses available for $mem")
     }
 
 

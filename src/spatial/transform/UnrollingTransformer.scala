@@ -8,3 +8,4 @@ case class UnrollingTransformer(IR: State) extends UnrollingBase
   with ReduceUnrolling
   with MemReduceUnrolling
   with MemoryUnrolling
+  with SwitchUnrolling

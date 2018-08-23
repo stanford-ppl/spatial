@@ -2,9 +2,7 @@ package spatial.tests.syntax
 
 import spatial.dsl._
 
-@test class LiftBoolean extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftBoolean extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -36,9 +34,7 @@ import spatial.dsl._
   }
 }
 
-@test class LiftByte extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftByte extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -70,9 +66,7 @@ import spatial.dsl._
   }
 }
 
-@test class LiftShort extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftShort extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -104,9 +98,7 @@ import spatial.dsl._
   }
 }
 
-@test class LiftInt extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftInt extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -138,9 +130,7 @@ import spatial.dsl._
   }
 }
 
-@test class LiftLong extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftLong extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -172,9 +162,7 @@ import spatial.dsl._
   }
 }
 
-@test class LiftFloat extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftFloat extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 
@@ -206,9 +194,7 @@ import spatial.dsl._
   }
 }
 
-@test class LiftDouble extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class LiftDouble extends SpatialTest {
   type MyFix = FixPt[TRUE,_16,_16]
   type MyFlt = FltPt[_32,_32]
 

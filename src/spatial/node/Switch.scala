@@ -36,8 +36,7 @@ object SwitchScheduler extends argon.schedule.Scheduler {
 @op case class SwitchCase[R:Type](body: Block[R]) extends Control[R] {
   def iters = Nil
   def cchains = Nil
-  def bodies = Seq(Nil -> Seq(body))
-  def mayBeOuterBlock(i: Int): Boolean = true
+  def bodies = Seq(PseudoStage(Nil -> body))
 }
 
 /** A (nestable) hardware case matching statement
@@ -47,8 +46,7 @@ object SwitchScheduler extends argon.schedule.Scheduler {
 @op case class Switch[R:Type](selects: Seq[Bit], body: Block[R]) extends Control[R] {
   def iters = Nil
   def cchains = Nil
-  def bodies = Seq(Nil -> Seq(body))
-  def mayBeOuterBlock(i: Int): Boolean = true
+  def bodies = Seq(PseudoStage(Nil -> body))
 
   override def aliases = syms(cases.map(_.body.result))
 
@@ -57,4 +55,16 @@ object SwitchScheduler extends argon.schedule.Scheduler {
   }
 
   override def inputs = syms(selects).toSeq ++ syms(body)
+}
+
+
+
+object Switch {
+  @rig def op_case[R:Type](body: Block[R]): R = stage(SwitchCase(body))
+
+  @rig def op_switch[R:Type](selects: Seq[Bit], cases: Seq[() => R]): R = {
+    val options = BlockOptions(sched = Some(SwitchScheduler))
+    val block = stageScope(Nil,options){ cases.map{c => c() }.last }
+    stage(Switch(selects, block))
+  }
 }

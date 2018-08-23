@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class ForeachSimple extends SpatialTest {
+@spatial class ForeachSimple extends SpatialTest {
   override def runtimeArgs: Args = "16 16"
 
   def simpleSeq(xIn: Int, yIn: Int): Int = {

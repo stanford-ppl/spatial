@@ -13,11 +13,9 @@ trait PIRGenCounter extends PIRCodegen {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case CounterNew(start,end,step,par) => 
-      emitc(src"val $lhs = Counter(min=$start, max=$end, step=$step, par=$par)", rhs)
-    case CounterChainNew(ctrs)          => 
-      emitc(lhs, src"CounterChain(List(${ctrs.map(quote).mkString(",")}))", rhs)
-    case ForeverNew()                   => emit(src"val $lhs = Forever()") //TODO
+    case CounterNew(start,end,step,par) => emit(src"val $lhs = Counter($start, $end, $step, $par)")
+    case CounterChainNew(ctrs)          => emit(src"val $lhs = Array[Counterlike]($ctrs)")
+    case ForeverNew()                   => emit(src"val $lhs = Forever()")
     case _ => super.gen(lhs, rhs)
   }
 

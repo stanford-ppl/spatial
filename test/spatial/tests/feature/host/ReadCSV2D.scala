@@ -1,19 +1,14 @@
 package spatial.tests.feature.host
 
-
 import spatial.dsl._
 
-
-@test class ReadCSV2D extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class ReadCSV2D extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE, _16, _16]
     val rowtile = 2
     val coltile = 16
-    val data = loadCSV2D[T]("/remote/regression/data/2d.csv", ",", "\n")
-    writeCSV2D[T](data, "/remote/regression/data/2d_store.csv", ",", "\n")
+    val data = loadCSV2D[T](s"$DATA/csv/2d.csv", ",", "\n")
     val memrows = ArgIn[Int]
     val memcols = ArgIn[Int]
     setArg(memrows, data.rows.to[Int])

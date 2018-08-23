@@ -1,11 +1,8 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
-@test class MemReduceTiny extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MemReduceTiny extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](32,32)
@@ -21,8 +18,10 @@ import spatial.dsl._
       dram store accum
     }
 
-    val result = getMem(dram)
-    val golden = Matrix.tabulate(32,32){(j,k) => j + k }.map{e => e * 32 }
+    val result = getMatrix(dram)
+    val golden = Matrix.tabulate(32,32){(j,k) => (j + k)*32 }
+    printMatrix(golden, "Wanted:")
+    printMatrix(result, "Got:")
     assert(result == golden)
   }
 }

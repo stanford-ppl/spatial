@@ -2,7 +2,7 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-@test class FixBasics3 extends SpatialTest {
+@spatial class FixBasics3 extends SpatialTest {
   override def runtimeArgs: Args = "5.25 2.125"
 
   type T = FixPt[TRUE,_32,_32]
@@ -29,7 +29,7 @@ import spatial.dsl._
     Accel {
       val xx = SRAM[T](N)
       val yy = SRAM[T](N)
-      xx load x(0 :: N par 16)
+      xx load x(0 :: N par 8)
       Foreach(N by 1) { i =>
         yy(i) = xx(i) * s
       }
@@ -63,7 +63,7 @@ import spatial.dsl._
       expo_dram store expo
       sqroot_dram store sqroot
 
-      y(0 :: N par 16) store yy
+      y(0 :: N par 8) store yy
     }
 
 

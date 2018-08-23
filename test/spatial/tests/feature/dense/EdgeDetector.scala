@@ -2,18 +2,14 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
-@test class EdgeDetector extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class EdgeDetector extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
-
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE,_16,_16]
     val rowtile = 16
     val coltile = 64
-    val data = loadCSV2D[T]("/remote/regression/data/slacsample2d.csv", ",", "\n")
+    val data = loadCSV2D[T](s"$DATA/slac/slacsample2d.csv", ",", "\n")
     val memrows = ArgIn[Int]
     val memcols = ArgIn[Int]
     setArg(memrows, data.rows.to[Int])
@@ -56,7 +52,7 @@ import spatial.dsl._
 
     // Extract results from accelerator
     val results = getMem(risingEdges)
-    val gold = loadCSV1D[Int]("/remote/regression/data/edge_gold.csv", ",")
+    val gold = loadCSV1D[Int](s"$DATA/slac/edge_gold.csv", ",")
     val margin = 2.to[Int]
 
     // Create validation checks and debug code
@@ -64,5 +60,6 @@ import spatial.dsl._
 
     val cksum = results.zip(gold) {case (a,b) => a < b + margin && a > b - margin}.reduce{_&&_}
     println("PASS: " + cksum + " (EdgeDetector)")
+    assert(cksum)
   }
 }

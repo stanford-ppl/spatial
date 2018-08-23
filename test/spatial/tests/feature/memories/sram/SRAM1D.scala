@@ -1,12 +1,9 @@
 package spatial.tests.feature.memories.sram
 
-
 import spatial.dsl._
 
-
-@test class SRAM1D extends SpatialTest {
+@spatial class SRAM1D extends SpatialTest {
   override def runtimeArgs: Args = "7"
-
 
   def main(args: Array[String]): Unit = {
 

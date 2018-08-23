@@ -4,7 +4,7 @@ package spatial.tests.apps
 import spatial.dsl._
 
 
-@test class SW extends SpatialTest {
+@spatial class SW_alg extends SpatialTest { // Name SW conflicts with something in spade
   override def runtimeArgs: Args = {
     "tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
   }
@@ -152,8 +152,8 @@ import spatial.dsl._
       }
 
       Parallel{
-        seqa_dram_aligned(0::seqa_fifo_aligned.numel par par_store) store seqa_fifo_aligned
-        seqb_dram_aligned(0::seqb_fifo_aligned.numel par par_store) store seqb_fifo_aligned
+        Sequential{seqa_dram_aligned(0::seqa_fifo_aligned.numel par par_store) store seqa_fifo_aligned}
+        Sequential{seqb_dram_aligned(0::seqb_fifo_aligned.numel par par_store) store seqb_fifo_aligned}
       }
 
     }

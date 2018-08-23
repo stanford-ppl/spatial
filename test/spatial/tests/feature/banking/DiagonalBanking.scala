@@ -1,14 +1,9 @@
 package spatial.tests.feature.banking
 
-
 import spatial.dsl._
 
-
-@test class DiagonalBanking extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class DiagonalBanking extends SpatialTest {
   type T = Int
-
 
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals

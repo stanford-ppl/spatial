@@ -228,6 +228,9 @@ class MacroUtils[Ctx <: blackbox.Context](val __c: Ctx) {
     }
 
     def asCaseClass: ClassDef = ClassDef(mods.withCase,cls.name,tparams,template)
+
+    def isTrait: Boolean = mods.hasFlag(Flag.TRAIT)
+    def isAbstract: Boolean = mods.hasFlag(Flag.ABSTRACT)
   }
 
   implicit class ModuleOps(val cls: ModuleDef) extends Templated[ModuleDef] with NamedOps {

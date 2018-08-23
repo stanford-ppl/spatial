@@ -2,8 +2,7 @@ package spatial.tests.feature.unit
 
 import spatial.dsl._
 
-@test class MixedIO extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MixedIO extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val cst1 = 32

@@ -10,6 +10,11 @@ object FSM {
     fsm(init.unbox, notDone, action, next)
   }
 
+  @api def apply[A](init: Bits[A])(notDone: A => Bit)(action: A => Void)(next: A => A): Void = {
+    implicit val A: Bits[A] = init.selfType
+    fsm(init.unbox, notDone, action, next)
+  }
+
   @rig def fsm[A:Bits](start: A, notDone: A => Bit, action: A => Void, nextState: A => A): Void = {
     val cur = boundVar[A]
     val dBlk = stageLambda1(cur){ notDone(cur) }

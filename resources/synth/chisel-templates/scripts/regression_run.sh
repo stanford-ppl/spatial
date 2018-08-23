@@ -5,6 +5,8 @@
 bash run.sh $2 $3 $4 $5 $6 $7 $8 $9 | tee log
 
 if [[ $GDOCS -eq 1 ]]; then
+	curpath=`pwd`
+	basepath=`echo $curpath | sed "s/\/spatial\/.*/\/spatial\//g"`
 
 	pass_line=`cat log | grep "Assertion" | wc -l`
 
@@ -23,25 +25,42 @@ if [[ $GDOCS -eq 1 ]]; then
 		runtime=$runtime_string
 	fi
 
-	# Hacky go back until $SPATIAL_HOME
-	hash=`git rev-parse HEAD`
-	ahash=nova-spatial
-	appname=`basename \`pwd\``
-	properties=`cat chisel/IOModule.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
-
-	if [[ $1 = "Zynq" ]]; then
-		REGRESSION_HOME="/home/mattfel/regression/synth/zynq"
-	elif [[ $1 = "ZCU" ]]; then
-		REGRESSION_HOME="/home/mattfel/regression/synth/zcu"
-	elif [[ $1 = "AWS" ]]; then
-		REGRESSION_HOME="/home/mattfel/regression/synth/aws"
-	elif [[ $1 = "Arria10" ]]; then
-		REGRESSION_HOME="/home/mattfel/regression/synth/arria10"
+	# Get synthtime
+	if [[ -f `pwd`/end.log ]]; then
+	  endtime=`cat \`pwd\`/end.log`
+	else
+	  endtime=1
 	fi
+	if [[ -f `pwd`/start.log ]]; then
+	  starttime=`cat \`pwd\`/start.log`
+	else
+	  starttime=0
+	fi
+	synthtime=$((endtime-starttime))
 
-	curpath=`pwd`
-	basepath=`echo $curpath | sed "s/\/spatial\/.*/\/spatial\//g"`
-	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $ahash "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
+    # Get compile time
+    logpath=`echo $curpath | sed "s/\/gen\//\/logs\//g"`
+    if [[ -f $logpath/9999_Timing.log ]]; then
+            spatialtime=`cat $logpath/9999_Timing.log | grep "compile:" | sed "s/.*compile: //g" | sed "s/s .*//g"`
+    else
+            spatialtime=0
+    fi
+
+
+	# Hacky go back until $SPATIAL_HOME
+	hash=`cat ${basepath}/reghash`
+	branchname=`cat ${basepath}/branchname`
+	#appname=`basename \`pwd\``
+	fullname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`
+	testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
+	testdirsarray=($testdirs)
+	for t in "${testdirsarray[@]}"; do
+		fullname=`echo $fullname | sed "s/${t}_//g"`
+	done
+	appname=$fullname
+	properties=`cat chisel/IOModule_1.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
+
+	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $branchname $spatialtime $synthtime "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
 
 fi
 

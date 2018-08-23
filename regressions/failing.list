@@ -1,0 +1,4 @@
+spatial.tests.feature.dense.DotProduct 
+spatial.tests.feature.control.Scan_filter
+spatial.tests.feature.control.Scan_filter_wait
+spatial.tests.feature.control.OuterSwitch

@@ -1,10 +1,8 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
-@test class ReduceArbitraryLambda extends SpatialTest {
+@spatial class ReduceArbitraryLambda extends SpatialTest {
   override def runtimeArgs: Args = "8"
 
 
@@ -47,7 +45,7 @@ import spatial.dsl._
     println("Reduce XOR: ")
     println("  expected: " + gold_reduce_xor)
     println("  result: " + reduce_xor_result)
-    println("Reduce XOR: ")
+    println("Fold XOR: ")
     println("  expected: " + gold_fold_xor)
     println("  result: " + fold_xor_result)
 

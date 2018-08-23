@@ -4,7 +4,7 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 
-@test class FoldSimple2 extends SpatialTest {
+@spatial class FoldSimple2 extends SpatialTest {
   override def runtimeArgs: Args = "1920"
   val constTileSize = 96
 

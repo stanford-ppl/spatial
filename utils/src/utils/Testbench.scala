@@ -5,6 +5,7 @@ import org.scalatest.{FlatSpecLike,Matchers}
 trait Testbench extends FlatSpecLike with Matchers {
   type Result = utils.Result
   type Error = Result.Error
+  implicit def resultToBoolean(x: Boolean): Result = if (x) Pass else Fail
   lazy val Pass: Result = Result.Pass
   lazy val Fail: Result = Result.Fail
   lazy val Unknown: Result = Result.Unknown

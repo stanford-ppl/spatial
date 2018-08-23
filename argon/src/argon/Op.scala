@@ -1,10 +1,8 @@
 package argon
 
 import Freq._
-import Filters._
-import argon.transform.Transformer
+import argon.transform.TransformerInterface
 import forge.tags.rig
-import utils.recursive
 
 /** Any staged operation.
   *
@@ -13,13 +11,14 @@ import utils.recursive
   * NOTE: Op is NOT covariant with R - strange things happen with pattern matching if it is.
   */
 abstract class Op[R:Type] extends Serializable with Product {
-  final type Tx = Transformer
+  final type Tx = TransformerInterface
   val R: Type[R] = Type[R]
   def name: String = productPrefix
 
   def expInputs: Seq[Sym[_]] = exps(productIterator).toSeq
   def blockInputs: Seq[Sym[_]] = exps(blocks).toSeq
-  def nonBlockInputs: Seq[Sym[_]] = expInputs diff blockInputs
+  def nonBlockExpInputs: Seq[Sym[_]] = expInputs diff blockInputs
+  def nonBlockSymInputs: Seq[Sym[_]] = inputs diff blockInputs
 
   /** Scheduling dependencies -- used to calculate schedule for IR based on dependencies */
   // Inputs: symbol dataflow dependencies for this Def.
@@ -37,7 +36,7 @@ abstract class Op[R:Type] extends Serializable with Product {
 
   // Scopes: scopes associated with this Def
   // Default: All blocks and lambdas in the Def's case class constructor
-  def blocks: Seq[Block[_]] = recursive.collectSeq{case b: Block[_] => b}(productIterator)
+  def blocks: Seq[Block[_]] = collectBlocks(productIterator)
 
   // Binds: symbols "bound" by this Def
   // Bound symbols define the start of scopes. Effectful symbols in a scope typically must be bound.

@@ -6,7 +6,7 @@ import utils.tags.instrument
 /**
   * Single traversal of the IR with pre- and post- processing
   */
-@instrument trait Traversal extends Pass { self =>
+trait Traversal extends Pass { self =>
   object Recurse extends Enumeration {
     type Recurse = Value
     // TODO[5]: Breadth-first recursive search mode

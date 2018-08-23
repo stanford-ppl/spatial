@@ -1,7 +1,7 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.internal.spatialConfig
+import spatial.util.spatialConfig
 import spatial.lang._
 import spatial.node._
 
@@ -22,7 +22,7 @@ trait ScalaGenDRAM extends ScalaGenMemories {
       emit(src"$lhs.initMem($size,$zero)")
 
     case GetDRAMAddress(dram) =>
-      emit(src"val $lhs = 0")
+      emit(src"val $lhs = FixedPoint.fromInt(0)")
 
     case op@SetMem(dram, data) =>
       open(src"val $lhs = {")

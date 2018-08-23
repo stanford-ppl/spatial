@@ -1,12 +1,12 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
-import spatial.data._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.memory._
+import spatial.metadata.control._
+import spatial.metadata.retiming._
 
 trait ChiselGenStream extends ChiselGenCommon {
   var streamIns: List[Sym[Reg[_]]] = List()
@@ -92,12 +92,13 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
-      val muxPort = lhs.ports.values.head.muxPort
-      val base = stream.writers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val muxPort = lhs.port.muxPort
+      val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
+      val maskingLogic = getAllReadyLogic(parent.toCtrl).mkString(" && ")
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${lhs.fullDelay}.toInt", true)} & $en """)
+        emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
 
       // emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${muxPort}) := ${swap(parent, Done)} // Should be delayed by body latency + ready-off bubbles""")
@@ -107,8 +108,8 @@ trait ChiselGenStream extends ChiselGenCommon {
 
 
     case StreamInBankedRead(strm, ens) =>
-      val muxPort = lhs.ports.values.head.muxPort
-      val base = strm.readers.filter(_.ports.values.head.muxPort < muxPort).map(accessWidth(_)).sum
+      val muxPort = lhs.port.muxPort
+      val base = strm.readers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${swap(strm, ReadyOptions)}($base + $i) := $en & (${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}) // Do not delay ready because datapath includes a delayed _valid already """)}

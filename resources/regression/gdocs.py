@@ -1,5 +1,6 @@
 # This is called by regression_run.sh / scrape.sh / regression_functions.sh / receive.sh / synth_launcher.sh / synth_regression.sh
 
+import re
 import gspread
 import pygsheets
 import sys
@@ -25,7 +26,7 @@ def readAllVals(wksh):
 		print("WARN: pygsheets failed readAllVals... -_-")
 		exit()
 
-def getCol(wksh, appname):
+def getColOrAppend(wksh, appname):
 	try: 
 		lol = readAllVals(wksh)
 		if (appname in lol[0]):
@@ -35,7 +36,16 @@ def getCol(wksh, appname):
 			write(wksh,1,col,appname)	
 		return col
 	except:
-		print("ERROR: pygsheets failed getCol... -_-")	
+		print("ERROR: pygsheets failed getColOrAppend... -_-")	
+		exit()
+
+def getCols(wksh, appname):
+	try: 
+		lol = readAllVals(wksh)
+		cols = [i+1 for i,x in enumerate(lol[0]) if (re.match("^"+appname+"$",x))]
+		return cols
+	except:
+		print("ERROR: pygsheets failed getCols... -_-")	
 		exit()
 
 def getRuntimeCol(wksh, appname):
@@ -50,6 +60,18 @@ def getRuntimeCol(wksh, appname):
 	except:
 		print("ERROR: pygsheets failed getRuntimeCol... -_-")	
 		exit()
+
+def deleteRows(wksh, id):
+	try:
+		wksh.delete_rows(id)
+	except:
+		print("ERROR: pygsheets could not delete row %d" % id)
+
+def deleteCols(wksh, id):
+	try:
+		wksh.delete_cols(id)
+	except:
+		print("ERROR: pygsheets could not delete row %d" % id)
 
 def getDoc(title):
 	# # gspread auth
@@ -151,14 +173,14 @@ def isPerf(title):
 
 
 
-def report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args):
+def report_regression_results(branch, appname, passed, cycles, hash, apphash, spatialcompile, vcscompile, csv, args):
 	sh = getDoc(branch)
 	row = getRow(sh, hash, apphash)
 
 	# Page 0 - Timestamps
 	stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 	worksheet = sh.worksheet_by_title('Timestamps')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row,col, stamp)
 
 	# Page 1 - Runtime
@@ -168,9 +190,19 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, cs
 	write(worksheet, row,col,  cycles)
 	write(worksheet, row,col+1,passed)
 
-	# Page 2 - Properties
+	# Page 2 - Spatial compile time
+	worksheet = sh.worksheet_by_title('SpatialCompile')
+	col = getColOrAppend(worksheet, appname)
+	write(worksheet, row, col, spatialcompile)
+
+	# Page 3 - VCS compile time
+	worksheet = sh.worksheet_by_title('VCSCompile')
+	col = getColOrAppend(worksheet, appname)
+	write(worksheet, row, col, vcscompile)
+
+	# Page 4 - Properties
 	worksheet = sh.worksheet_by_title('Properties')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row,col,passed)
 	lol = readAllVals(worksheet)
 	for prop in csv.split(","):
@@ -197,7 +229,7 @@ def report_board_runtime(appname, timeout, runtime, passed, args, backend, locke
 
 	# Page 10 - Results
 	worksheet = sh.worksheet_by_title("Runtime")
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	if (timeout == "1"):
 		write(worksheet, row,col, args + "\nTimed Out!\nFAILED")
 	elif (locked_board == "0"):
@@ -214,53 +246,53 @@ def report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time
 	stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 	worksheet = sh.worksheet_by_title('Timestamps')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col, stamp)
 
 	# Page 1 - Slice LUT
 	worksheet = sh.worksheet_by_title(word + ' LUTs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,lut)
 
 	# Page 2 - Slice Reg
 	worksheet = sh.worksheet_by_title(word + ' Regs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,reg)
 
 	# Page 3 - Mem
 	worksheet = sh.worksheet_by_title('BRAMs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,ram)
 
 	if (backend == "AWS"):
 		# Page 4 - URAM
 		worksheet = sh.worksheet_by_title('URAMs')
-		col = getCol(worksheet, appname)
+		col = getColOrAppend(worksheet, appname)
 		write(worksheet,row,col,uram)
 
 	# Page 5 - DSP
 	worksheet = sh.worksheet_by_title('DSPs')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,dsp)
 
 	# Page 6 - LUT as Logic
 	worksheet = sh.worksheet_by_title('LUT as Logic')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,lal)
 
 	# Page 7 - LUT as Memory
 	worksheet = sh.worksheet_by_title('LUT as Memory')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,lam)
 
 	# Page 8 - Synth time
 	worksheet = sh.worksheet_by_title('Synth Time')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,float(synth_time) / 3600.)
 
 	# Page 9 - Timing met
 	worksheet = sh.worksheet_by_title('Timing Met')
-	col = getCol(worksheet, appname)
+	col = getColOrAppend(worksheet, appname)
 	write(worksheet,row,col,timing_met)
 
 	# Tell last update
@@ -276,18 +308,30 @@ def dev(arg1, arg2, backend):
 	t=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 	worksheet = sh.worksheet_by_title("Timestamps")
-	
-	# Some nonsense to write
-	numsheets = len(sh.worksheets())
-	for x in range(0,numsheets):
-		# worksheet = sh.get_worksheet(x)
-		worksheet = sh.worksheet('index', x)
-		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
-			worksheet.insert_rows(row = 2, values = [arg1, arg2, t])
-			worksheet.delete_rows(75)
-		if (worksheet.title == "Properties" and perf):
-			worksheet.update_cells('B3:DQ3', [[' ']*120]) # Clear old pass bitmask
-	sys.stdout.write(str(3))
+	lol = worksheet.get_all_values()
+	lolhash = [x[0] for x in lol if x[0] != '']
+	# id = len(lolhash) + 1
+	freq = os.environ['CLOCK_FREQ_MHZ']
+	if ("hash" in lol[1]):
+		hcol=lol[1].index("hash")
+	if ("app hash" in lol[1]):
+		acol=lol[1].index("app hash")
+	if ("test timestamp" in lol[1]):
+		ttcol=lol[1].index("test timestamp")
+
+	if (len(lol) < 3): 
+		lasthash="NA"
+		lastapphash="NA"
+		lasttime="2000-01-08 21:15:36"
+	else:
+		lasthash=lol[2][hcol]
+		lastapphash=lol[2][acol]
+		lasttime=lol[2][ttcol]
+
+	if (len(lol) >= 74 and len(lol[73]) >= 6 and lol[73][5] == "KEEP"):
+		keep_row_75 = True
+	else:
+		keep_row_75 = False
 
 def prepare_sheet(hash, apphash, timestamp, backend):
 	sh = getDoc(backend)
@@ -316,6 +360,11 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		lastapphash=lol[2][acol]
 		lasttime=lol[2][ttcol]
 
+	if (len(lol) >= 74 and len(lol[73]) >= 6 and lol[73][5] == "KEEP"):
+		keep_row_75 = True
+	else:
+		keep_row_75 = False
+
 	if (perf):
 		new_entry=True
 	else:
@@ -329,7 +378,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			worksheet = sh.worksheet('index', x)
 			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
-				worksheet.delete_rows(75)
+				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
 				# worksheet.update_cell(id,2, alink)
 				# worksheet.update_cell(id,3, t)
@@ -352,7 +401,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 				worksheet = sh.worksheet('index', x)
 				if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
 					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
-					worksheet.delete_rows(75)
+					if (not keep_row_75): deleteRows(worksheet, 75)
 					# worksheet.update_cell(id,1, link)
 					# worksheet.update_cell(id,2, alink)
 					# worksheet.update_cell(id,3, t)
@@ -376,41 +425,165 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
+
+def report_changes(backend):
+	sh = getDoc(backend)
+
+	worksheet = sh.worksheet_by_title("Runtime")
+	lol = worksheet.get_all_values()
+	start = getCols(worksheet, "Test:")[0]
+	tests = list(filter(None, lol[0][start:]))
+	pass_list = []
+	fail_list = []
+	nocompile_list = []
+	improved_list = []
+	worsened_list = []
+	for t in tests:
+		col = lol[0].index(t) + 1
+		if (len(lol[0]) > col): 
+			now_pass = lol[2][col] == '1'
+			now_fail = lol[2][col] == '0'
+			now_nocompile = lol[2][col] == ''
+			b4_pass = lol[3][col] == '1'
+			b4_fail = lol[3][col] == '0'
+			b4_nocompile = lol[3][col] == ''
+			if (now_pass): pass_list.append(t)
+			if (now_fail): fail_list.append(t)
+			if (now_nocompile): nocompile_list.append(t)
+			if (now_pass and (not b4_pass)): improved_list.append(t)
+			if ((not now_pass) and b4_pass): worsened_list.append(t)
+	print("SUMMARY FOR %s" % backend)
+	print("-------")
+	print("Improved: %d" % len(improved_list))
+	print("Worsened: %d" % len(worsened_list))
+	print("Total # Passing: %d" % len(pass_list))
+	print("Total # Failing: %d" % len(fail_list))
+	print("Total # Not Compiling: %d" % len(nocompile_list))
+	print("BREAKDOWN")
+	print("---------")
+	print("Passing:")
+	print(sorted(pass_list))
+	print("Failing:")
+	print(sorted(fail_list))
+	print("Not Compiling:")
+	print(sorted(nocompile_list))
+	print("Improved:")
+	print(sorted(improved_list))
+	print("Worsened:")
+	print(sorted(worsened_list))
+
+
 # ofs = 0 means start deleting from spreadsheet "row 3" and down
 def delete_n_rows(n, ofs, backend):
 	sh = getDoc(backend)
-	perf = isPerf(backend)
 
 	numsheets = len(sh.worksheets())
 	for x in range(0,numsheets):
 		# worksheet = sh.get_worksheet(x)
 		worksheet = sh.worksheet('index', x)
 		if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+			print("Scrubbing page %s" % worksheet.title)
 			for i in range(0,int(n)):
-				worksheet.delete_rows(3 + int(ofs))
+				deleteRows(worksheet, 3 + int(ofs))
+
+def delete_app_column(appname, backend):
+	sh = getDoc(backend)
+	perf = isPerf(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		worksheet = sh.worksheet('index', x)
+		cols = sorted(getCols(worksheet, appname), reverse=True)
+		for col in cols: 			
+			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+				if (col == max(cols)): print("Scrubbing page %s" % worksheet.title)
+				if (col >= 0):
+					deleteCols(worksheet, col)
+					if (perf and worksheet.title == "Runtime"):
+						# Delete the bit column also
+						deleteCols(worksheet, col)
+				else:
+					print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
+
+# This will take rows from new_appname column 0 until the last row with data and paste it into old_appname column
+def merge_apps_columns(old_appname, new_appname, backend):
+	sh = getDoc(backend)
+	perf = isPerf(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		worksheet = sh.worksheet('index', x)
+		lol = readAllVals(worksheet)
+		old_col_in_sheet = getCols(worksheet, old_appname)
+		new_col_in_sheet = getCols(worksheet, new_appname)
+		if (len(old_col_in_sheet) != 1):
+			print("ERROR: %s not found on sheet %s" % (old_appname, worksheet.title))
+		elif (len(new_col_in_sheet) != 1):
+			print("ERROR: %s not found on sheet %s" % (new_appname, worksheet.title))
+		else:
+			new_col = lol[0].index(new_appname)
+
+			if (perf and worksheet.title == "Runtime"):
+				data = [x[new_col] for x in lol]
+				passes = [x[new_col+1] for x in lol]
+				for i in range(0,len(data)):
+					if (data[i] != ''):
+						write(worksheet, i+1, old_col_in_sheet[0], data[i])
+						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
+					if (passes[i] != ''):
+						write(worksheet, i+1, old_col_in_sheet[0]+1, passes[i])
+						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0]+1, passes[i]))
+				deleteCols(worksheet, new_col_in_sheet[0]+1)
+				deleteCols(worksheet, new_col_in_sheet[0])
+			else:
+				data = [x[new_col] for x in lol]
+				for i in range(0,len(data)):
+					if (data[i] != ''):
+						write(worksheet, i+1, old_col_in_sheet[0], data[i])
+						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
+				deleteCols(worksheet, new_col_in_sheet[0])
+
+			# print("delete app column")
 
 
 
 
 
 if (sys.argv[1] == "report_regression_results"):
-	print("report_regression_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]))
-	report_regression_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9])
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_regression_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11]))
+	report_regression_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11])
 elif (sys.argv[1] == "report_board_runtime"):
-	print("report_board_runtime('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10]))
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_board_runtime('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10]))
 	report_board_runtime(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10])
 elif (sys.argv[1] == "report_synth_results"):
-	print("report_synth_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11], sys.argv[12], sys.argv[13], sys.argv[14]))
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_synth_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11], sys.argv[12], sys.argv[13], sys.argv[14]))
 	report_synth_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11], sys.argv[12], sys.argv[13], sys.argv[14])
 elif (sys.argv[1] == "prepare_sheet"):
-	print("prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
 	prepare_sheet(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+elif (sys.argv[1] == "report_changes"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s')" % (sys.argv[2]))
+	report_changes(sys.argv[2])
 elif (sys.argv[1] == "delete_n_rows"):
-	print("delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "delete_app_column"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_app_column('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	delete_app_column(sys.argv[2], sys.argv[3])
+elif (sys.argv[1] == "merge_apps_columns"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! merge_apps_columns('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	merge_apps_columns(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "dev"):
-	print("dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
-	dev(sys.argv[2], sys.argv[3])
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
+	dev(sys.argv[2], sys.argv[3], sys.argv[4])
 else:
-	print("ERROR: Not a valid spreadsheet interaction! %s" % sys.argv[1])
+	print("Commands:")
+	print(" - report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args)")
+	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
+	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
+	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
+	print(" - report_changes(backend)")
+	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - merge_apps_columns(old appname, new appname, backend)")
 	exit()

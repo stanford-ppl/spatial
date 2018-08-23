@@ -20,6 +20,7 @@ import spatial.lang.host._
 }
 
 @op case class ArrayUpdate[A:Type](array: Array[A], i: I32, data: Sym[A]) extends Op[Void] {
+  override def effects: Effects = Effects.Writes(array)
   override def contains = syms(data)
 }
 
@@ -29,6 +30,7 @@ import spatial.lang.host._
   extends Op2[A,Array[A]] {
 
   override def aliases: Set[Sym[_]] = Nul
+  override def binds = super.binds + func.input
 }
 
 @op case class ArrayForeach[A:Type](
@@ -43,6 +45,7 @@ import spatial.lang.host._
     func:  Lambda1[A,B])
   extends Op3[A,B,Array[B]] {
   override def aliases = Nul
+  override def binds = super.binds + apply.inputB
 }
 
 @op case class ArrayZip[A:Type,B:Type,C:Type](
@@ -53,6 +56,7 @@ import spatial.lang.host._
     func:   Lambda2[A,B,C])
   extends Op4[A,B,C,Array[C]] {
   override def aliases = Nul
+  override def binds = super.binds + applyA.inputB
 }
 
 @op case class ArrayReduce[A:Type](
@@ -62,6 +66,7 @@ import spatial.lang.host._
   extends Op[A] {
 
   override def aliases: Set[Sym[_]] = Nul
+  override def binds = super.binds ++ Set(apply.inputB,reduce.inputA,reduce.inputB)
 }
 
 @op case class ArrayFold[A:Type](
@@ -72,6 +77,7 @@ import spatial.lang.host._
   extends Op[A] {
 
   override def aliases: Set[Sym[_]] = Nul
+  override def binds = super.binds + apply.inputB
 }
 
 @op case class ArrayFilter[A:Type](
@@ -80,6 +86,7 @@ import spatial.lang.host._
     cond:  Lambda1[A,Bit])
   extends Op2[A,Array[A]] {
   override def aliases = Nul
+  override def binds = super.binds + apply.inputB
 }
 
 @op case class ArrayFlatMap[A:Type,B:Type](
@@ -88,6 +95,7 @@ import spatial.lang.host._
     func:  Lambda1[A,Array[B]])
   extends Op3[A,B,Array[B]] {
   override def aliases = Nul
+  override def binds = super.binds + apply.inputB
 }
 
 @op case class ArrayMkString[A:Type](

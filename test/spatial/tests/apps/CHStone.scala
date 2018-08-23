@@ -3,9 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 import spatial.targets._
 
-@test class SHA1 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class SHA1 extends SpatialTest {
   type ULong = FixPt[FALSE, _32, _0]
   @struct case class byte_pack(a: Int8, b: Int8, c: Int8, d: Int8)
 
@@ -22,12 +20,12 @@ import spatial.targets._
     val CONST3 = 0x8f1bbcdcL
     val CONST4 = 0xca62c1d6L
 
-    val raw_text = loadCSV1D[String]("/remote/regression/data/machsuite/sha_txt.csv", "\n").apply(0)
+    val raw_text = loadCSV1D[String](s"$DATA/sha/sha_txt.csv", "\n").apply(0)
     val data_text = raw_text.map{c => c.to[Int8] }
     val len = ArgIn[Int]
     setArg(len, data_text.length)
     val text_dram = DRAM[Int8](len)
-    val hash_dram = DRAM[ULong](16)//(5)
+    val hash_dram = DRAM[ULong](5)
 
     // println("Hashing: " + charArrayToString(data_text) + " (len: " + data_text.length + ")")
     println("Hashing: " + raw_text + " (len: " + data_text.length + ")")
@@ -63,6 +61,7 @@ import spatial.targets._
         C := sha_digest(2)
         D := sha_digest(3)
         E := sha_digest(4)
+        Pipe{println(r"A = $A, B = $B, C = $C, D = $D, E = $E")}
 
         Foreach(20 by 1) { i => 
           val temp = ((A << 5) | (A >> (32 - 5))) + E + W(i) + CONST1 + ((B & C) | (~B & D))
@@ -82,7 +81,6 @@ import spatial.targets._
         }
 
         Pipe{sha_digest(0) = sha_digest(0) + A}
-        // Pipe{println("sha_digest 0 is " + sha_digest(0))}
         Pipe{sha_digest(1) = sha_digest(1) + B}
         Pipe{sha_digest(2) = sha_digest(2) + C}
         Pipe{sha_digest(3) = sha_digest(3) + D}
@@ -147,20 +145,18 @@ import spatial.targets._
     }
 
     val hashed_result = getMem(hash_dram)
-    val hashed_gold = Array[ULong](1754467640L,1633762310L,3755791939L,3062269980L,2187536409L,0,0,0,0,0,0,0,0,0,0,0)
+    val hashed_gold = Array[ULong](1754467640L,1633762310L,3755791939L,3062269980L,2187536409L)
     printArray(hashed_gold, "Expected: ")
     printArray(hashed_result, "Got: ")
 
     val cksum = hashed_gold == hashed_result
     println("PASS: " + cksum + " (SHA1)")
-
+    assert(cksum)
   }
 }
 
 
-@test class JPEG_Markers extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class JPEG_Markers extends SpatialTest {
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
   type UInt16 = FixPt[FALSE, _16, _0]
@@ -199,7 +195,7 @@ import spatial.targets._
     val out_p_jinfo_image_width_get_sof = 90
     val out_p_jinfo_num_components_get_sof = 3
 
-    val jpg_data = loadCSV1D[UInt8]("/remote/regression/data/machsuite/jpeg_input.csv", ",")
+    val jpg_data = loadCSV1D[UInt8](s"$DATA/jpeg/jpeg_input.csv", ",")
     val numel = jpg_data.length
     assert(!(jpg_data(0) != 255.to[UInt8] || jpg_data(1) != M_SOI.to[UInt8]), "Not a jpeg file!")
 
@@ -290,7 +286,8 @@ import spatial.targets._
 
       def next_marker(): UInt8 = {
         val potential_marker = Reg[UInt8](0)
-        potential_marker.reset
+        // potential_marker.reset
+        potential_marker := 0
         FSM(0)(whilst => whilst != -1.to[Int]){whilst =>
           if (read_byte() == 255.to[UInt8]) {
             potential_marker := read_byte()
@@ -401,7 +398,8 @@ import spatial.targets._
           }
 
           val count = Reg[Int](0)
-          count.reset
+          // count.reset
+          count := 0
           Sequential.Foreach(1 until 17 by 1){ i => 
             val tmp = Reg[UInt8](0)
             Pipe{tmp := read_byte()}
@@ -521,12 +519,12 @@ import spatial.targets._
     // Get gold checks
     val jpeg_data_start_gold = 623
     val smp_fact_gold = 2
-    val quant_tbl_quantval_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_tbl_quantval.csv", " ", "\n")
-    val dc_xhuff_tbl_bits_gold = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_dc_xhuff_tbl_bits.csv", " ", "\n")
-    val dc_xhuff_tbl_huffval_gold = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_dc_xhuff_tbl_huffval.csv", " ", "\n")
-    val ac_xhuff_tbl_bits_gold = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_ac_xhuff_tbl_bits.csv", " ", "\n")
-    val ac_xhuff_tbl_huffval_gold = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_ac_xhuff_tbl_huffval.csv", " ", "\n")
-    // val component_acdc_gold = loadCSV1D[comp_struct]("/remote/regression/data/machsuite/jpeg_acdc.csv", "\n")
+    val quant_tbl_quantval_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_tbl_quantval.csv", " ", "\n")
+    val dc_xhuff_tbl_bits_gold = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_dc_xhuff_tbl_bits.csv", " ", "\n")
+    val dc_xhuff_tbl_huffval_gold = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_dc_xhuff_tbl_huffval.csv", " ", "\n")
+    val ac_xhuff_tbl_bits_gold = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_ac_xhuff_tbl_bits.csv", " ", "\n")
+    val ac_xhuff_tbl_huffval_gold = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_ac_xhuff_tbl_huffval.csv", " ", "\n")
+    // val component_acdc_gold = loadCSV1D[comp_struct](s"$DATA/jpeg/jpeg_acdc.csv", "\n")
 
     // Do checks
     println("\nRESULTS: ")
@@ -557,9 +555,7 @@ import spatial.targets._
   }
 }
 
-@test class JPEG_Decompress extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class JPEG_Decompress extends SpatialTest {
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
   type UInt16 = FixPt[FALSE, _16, _0]
@@ -598,7 +594,7 @@ import spatial.targets._
     val out_p_jinfo_image_width_get_sof = 90
     val out_p_jinfo_num_components_get_sof = 3
 
-    val jpg_data = loadCSV1D[UInt8]("/remote/regression/data/machsuite/jpeg_input.csv", ",")
+    val jpg_data = loadCSV1D[UInt8](s"$DATA/jpeg/jpeg_input.csv", ",")
     val numel = jpg_data.length
     assert(!(jpg_data(0) != 255.to[UInt8] || jpg_data(1) != M_SOI.to[UInt8]), "Not a jpeg file!")
 
@@ -608,10 +604,10 @@ import spatial.targets._
     // setMem(jpg_dram, jpg_data)
 
     // Get temp results
-    val dc_xhuff_tbl_bits_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_dc_xhuff_tbl_bits.csv", " ", "\n")
-    val dc_xhuff_tbl_huffval_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_dc_xhuff_tbl_huffval.csv", " ", "\n")
-    val ac_xhuff_tbl_bits_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_ac_xhuff_tbl_bits.csv", " ", "\n")
-    val ac_xhuff_tbl_huffval_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_ac_xhuff_tbl_huffval.csv", " ", "\n")
+    val dc_xhuff_tbl_bits_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_dc_xhuff_tbl_bits.csv", " ", "\n")
+    val dc_xhuff_tbl_huffval_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_dc_xhuff_tbl_huffval.csv", " ", "\n")
+    val ac_xhuff_tbl_bits_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_ac_xhuff_tbl_bits.csv", " ", "\n")
+    val ac_xhuff_tbl_huffval_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_ac_xhuff_tbl_huffval.csv", " ", "\n")
 
     val smp_fact = ArgIn[UInt2]
     val dc_xhuff_tbl_bits = DRAM[UInt8](NUM_HUFF_TBLS,36) // 36)
@@ -692,7 +688,8 @@ import spatial.targets._
         val size = Reg[UInt16](0)
         Pipe{size := huffsize(0)}
         val pp = Reg[Int](0)
-        Pipe{ code.reset() }
+        // Pipe{ code.reset() }
+        Pipe{ code := 0 }
 
 
         FSM(0)(whilst1 => whilst1 != -1) { whilst1 =>
@@ -722,7 +719,8 @@ import spatial.targets._
         println("exit fsm!")
         val p_dhtbl_ml = Reg[Int](1)
         val ppp = Reg[Int](0)
-        Pipe{p_dhtbl_ml.reset}
+        // Pipe{p_dhtbl_ml.reset}
+        Pipe{p_dhtbl_ml := 1}
         Sequential.Foreach(1 until 17 by 1){l => 
           if (p_xhtbl_bits(idx, l) == 0.to[UInt8]) {
             Pipe{p_dhtbl_maxcode(idx, l) = 65535.to[UInt16]} // Signifies skip
@@ -811,13 +809,13 @@ import spatial.targets._
 
     // Get gold checks
     val dc_dhuff_tbl_ml_gold = Array[UInt16](9,11)
-    val dc_dhuff_tbl_maxcode_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_dc_dhuff_tbl_maxcode.csv", " ", "\n")
-    val dc_dhuff_tbl_mincode_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_dc_dhuff_tbl_mincode.csv", " ", "\n")
-    val dc_dhuff_tbl_valptr_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_dc_dhuff_tbl_valptr.csv", " ", "\n")
+    val dc_dhuff_tbl_maxcode_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_dc_dhuff_tbl_maxcode.csv", " ", "\n")
+    val dc_dhuff_tbl_mincode_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_dc_dhuff_tbl_mincode.csv", " ", "\n")
+    val dc_dhuff_tbl_valptr_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_dc_dhuff_tbl_valptr.csv", " ", "\n")
     val ac_dhuff_tbl_ml_gold = Array[UInt16](16,16)
-    val ac_dhuff_tbl_maxcode_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_ac_dhuff_tbl_maxcode.csv", " ", "\n")
-    val ac_dhuff_tbl_mincode_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_ac_dhuff_tbl_mincode.csv", " ", "\n")
-    val ac_dhuff_tbl_valptr_gold = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_ac_dhuff_tbl_valptr.csv", " ", "\n")
+    val ac_dhuff_tbl_maxcode_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_ac_dhuff_tbl_maxcode.csv", " ", "\n")
+    val ac_dhuff_tbl_mincode_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_ac_dhuff_tbl_mincode.csv", " ", "\n")
+    val ac_dhuff_tbl_valptr_gold = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_ac_dhuff_tbl_valptr.csv", " ", "\n")
 
     // Do checks
     println("\nRESULTS: ")
@@ -846,8 +844,7 @@ import spatial.targets._
   }
 }
 
-@test class JPEG_Decode extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class JPEG_Decode extends SpatialTest {
   override def backends = DISABLED
   type UInt8 = FixPt[FALSE, _8, _0]
   type UInt2 = FixPt[FALSE, _2, _0]
@@ -887,7 +884,7 @@ import spatial.targets._
     val out_p_jinfo_image_width_get_sof = 90
     val out_p_jinfo_num_components_get_sof = 3
 
-    val jpg_data = loadCSV1D[UInt8]("/remote/regression/data/machsuite/jpeg_input.csv", ",")
+    val jpg_data = loadCSV1D[UInt8](s"$DATA/jpeg/jpeg_input.csv", ",")
     val numel = jpg_data.length
     assert(!(jpg_data(0) != 255.to[UInt8] || jpg_data(1) != M_SOI.to[UInt8]), "Not a jpeg file!")
 
@@ -921,17 +918,17 @@ import spatial.targets._
     val ac_dhuff_tbl_mincode = DRAM[UInt16](NUM_HUFF_TBLS, 36)
     val ac_dhuff_tbl_valptr = DRAM[UInt16](NUM_HUFF_TBLS, 36)
 
-    val dc_xhuff_tbl_bits_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_dc_xhuff_tbl_bits.csv", " ", "\n")
-    val dc_xhuff_tbl_huffval_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_dc_xhuff_tbl_huffval.csv", " ", "\n")
-    val dc_dhuff_tbl_maxcode_data = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_dc_dhuff_tbl_maxcode.csv", " ", "\n")
-    val dc_dhuff_tbl_mincode_data = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_dc_dhuff_tbl_mincode.csv", " ", "\n")
-    val dc_dhuff_tbl_valptr_data = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_dc_dhuff_tbl_valptr.csv", " ", "\n")
+    val dc_xhuff_tbl_bits_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_dc_xhuff_tbl_bits.csv", " ", "\n")
+    val dc_xhuff_tbl_huffval_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_dc_xhuff_tbl_huffval.csv", " ", "\n")
+    val dc_dhuff_tbl_maxcode_data = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_dc_dhuff_tbl_maxcode.csv", " ", "\n")
+    val dc_dhuff_tbl_mincode_data = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_dc_dhuff_tbl_mincode.csv", " ", "\n")
+    val dc_dhuff_tbl_valptr_data = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_dc_dhuff_tbl_valptr.csv", " ", "\n")
     val ac_dhuff_tbl_ml_data = Array[UInt16](16,16)
-    val ac_xhuff_tbl_bits_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_ac_xhuff_tbl_bits.csv", " ", "\n")
-    val ac_xhuff_tbl_huffval_data = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_ac_xhuff_tbl_huffval.csv", " ", "\n")
-    val ac_dhuff_tbl_maxcode_data = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_ac_dhuff_tbl_maxcode.csv", " ", "\n")
-    val ac_dhuff_tbl_mincode_data = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_ac_dhuff_tbl_mincode.csv", " ", "\n")
-    val ac_dhuff_tbl_valptr_data = loadCSV2D[UInt16]("/remote/regression/data/machsuite/jpeg_ac_dhuff_tbl_valptr.csv", " ", "\n")
+    val ac_xhuff_tbl_bits_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_ac_xhuff_tbl_bits.csv", " ", "\n")
+    val ac_xhuff_tbl_huffval_data = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_ac_xhuff_tbl_huffval.csv", " ", "\n")
+    val ac_dhuff_tbl_maxcode_data = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_ac_dhuff_tbl_maxcode.csv", " ", "\n")
+    val ac_dhuff_tbl_mincode_data = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_ac_dhuff_tbl_mincode.csv", " ", "\n")
+    val ac_dhuff_tbl_valptr_data = loadCSV2D[UInt16](s"$DATA/jpeg/jpeg_ac_dhuff_tbl_valptr.csv", " ", "\n")
 
     setMem(dc_xhuff_tbl_bits, dc_xhuff_tbl_bits_data)
     setMem(dc_xhuff_tbl_huffval, dc_xhuff_tbl_huffval_data)
@@ -1097,7 +1094,8 @@ import spatial.targets._
       def buf_getv(n: UInt8): UInt8 = {
         val ret = Reg[UInt8](0)
         val done = Reg[Boolean](false)
-        done.reset()
+        // done.reset()
+        done := false
         val p = Reg[Int8]
         p := n.as[Int8] - read_position_idx.value.as[Int8] - 1.to[Int8]
         // println("p just got " + p.value + " from " + n + " - " + read_position_idx.value)
@@ -1146,9 +1144,11 @@ import spatial.targets._
         code := buf_getb().as[Int16]
         // println("entering fsm, code " + code.value)
         val l = Reg[Int](1)
-        Pipe{l.reset}
+        // Pipe{l.reset}
+        Pipe{l := 1}
         val max_decode = Reg[Int16](0)
-        Pipe{max_decode.reset}
+        // Pipe{max_decode.reset}
+        Pipe{max_decode := 0}
         // Foreach(5 by 1) {i => println("   maxcode " + i + " is " + p_jinfo_dc_dhuff_tbl_maxcode(tbl_no, i))}
         FSM(0)(whilst => whilst != -1.to[Int]){whilst =>
           val tmp = buf_getb().as[Int16]
@@ -1200,7 +1200,8 @@ import spatial.targets._
         val action = Reg[UInt2](0)
         val r = Reg[UInt8](0)
         val k = Reg[I32](1)
-        k.reset
+        // k.reset
+        k := 1
         FSM(0)(whilst => whilst != -1){whilst =>
           println("decoding huff on ac @ " + k.value)
             Pipe{r := DecodeHuffman(tbl_no.to[I32], false)}
@@ -1264,14 +1265,13 @@ import spatial.targets._
       }
     }
 
-    val gold_bmp = loadCSV2D[UInt8]("/remote/regression/data/machsuite/jpeg_input.csv", ",", "\n")
+    val gold_bmp = loadCSV2D[UInt8](s"$DATA/jpeg/jpeg_input.csv", ",", "\n")
     // printMatrix(gold_bmp, "gold")
   }
 }
 
 
-@test class MPEG2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MPEG2 extends SpatialTest {
   override def backends = DISABLED
 
   type UInt8 = FixPt[FALSE, _8, _0]
@@ -1286,7 +1286,7 @@ import spatial.targets._
     val mvscale = 1
     val MV_FIELD = 0
     val ERROR = 255
-    val inRdBfr_data = loadCSV1D[UInt8]("/remote/regression/data/machsuite/mpeg2_inRdBfr.csv", ",")
+    val inRdBfr_data = loadCSV1D[UInt8](s"$DATA/machsuite/mpeg2_inRdBfr.csv", ",")
     val inRdBfr_dram = DRAM[UInt8](NUMEL)
     setMem(inRdBfr_dram, inRdBfr_data)
 

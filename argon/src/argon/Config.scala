@@ -56,6 +56,7 @@ class Config {
   var repDir: String = files.cwd + files.sep + "reports"
 
   /** Testing */
+  var stop: Int = -1
   var test: Boolean = false
 
   /** Enable memory usage logging */

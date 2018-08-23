@@ -1,44 +1,22 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
-import spatial.internal.{spatialConfig => cfg}
-
+import spatial.util.spatialConfig
 
 trait ChiselFileGen extends ChiselCodegen {
-
   backend = "accel"
 
   override def emitHeader(): Unit = {
     inAccel { // Guarantee prints for the following
-      inGen(out, "controller_tree.html") {
-        emit("""<!DOCTYPE html>
-  <html>
-  <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
-  <script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
-  <script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
-  </head><body>
-
-    <div data-role="main" class="ui-content" style="overflow-x:scroll;">
-      <h2>Controller Diagram for """)
-        emit(cfg.name)
-        if (!cfg.enableAsyncMem) {emit(" syncMem")}
-        else if (cfg.enableRetiming) {emit(" retimed")}
-        emit("""</h2>
-  <TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">""")
-
-      }
 
       inGenn(out, "IOModule", ext) {
         emit ("package accel")
-  	  emit ("import chisel3._")
-  	  emit ("import templates._")
-  	  emit ("import templates.ops._")
-  	  emit ("import chisel3.util._")
-  	  emit ("import fringe._")
-  	  emit ("import types._")
+        emit ("import chisel3._")
+        emit ("import templates._")
+        emit ("import templates.ops._")
+        emit ("import chisel3.util._")
+        emit ("import fringe._")
+        emit ("import types._")
         open("trait IOModule_1 extends Module {")
   	    emit ("""val io_w = if (FringeGlobals.target == "vcs" || FringeGlobals.target == "asic") 8 else 32 // TODO: How to generate these properly?""")
   	    emit ("""val io_v = if (FringeGlobals.target == "vcs" || FringeGlobals.target == "asic") 64 else 16 // TODO: How to generate these properly?""")
@@ -80,24 +58,24 @@ trait ChiselFileGen extends ChiselCodegen {
 
       inGenn(out, "GlobalModules", ext) {
         emitt(s"""package accel""")
-  	  emitt("import templates._")
-  	  emitt("import templates.ops._")
-  	  emitt("import chisel3._")
-      emitt("import chisel3.util._")
-      emitt("import Utils._")    
-  	  emitt("import types._")
-      emitt("import scala.collection.immutable._")
+  	    emitt("import templates._")
+        emitt("import templates.ops._")
+  	    emitt("import chisel3._")
+        emitt("import chisel3.util._")
+        emitt("import Utils._")
+  	    emitt("import types._")
+        emitt("import scala.collection.immutable._")
 
         open(s"""trait GlobalModules_1 extends GlobalWiresMixer {""")
       }
 
       inGenn(out, "Instrumentation", ext) {
         emitt(s"""package accel""")
-  	  emitt("import templates._")
-  	  emitt("import templates.ops._")
-  	  emitt("import chisel3._")
-  	  emitt("import chisel3.util._")
-  	  emitt("import types._")
+  	    emitt("import templates._")
+  	    emitt("import templates.ops._")
+  	    emitt("import chisel3._")
+  	    emitt("import chisel3.util._")
+  	    emitt("import types._")
         open(s"""trait Instrumentation_1 extends GlobalModulesMixer {""")
       }
 
@@ -144,22 +122,17 @@ trait ChiselFileGen extends ChiselCodegen {
 
   override def emitFooter(): Unit = {
     inAccel {// Guarantee prints for this section
-      inGen(out, "controller_tree.html") {
-        emit (s"""  </TABLE>
-  </body>
-  </html>""")
-      }
 
       inGen(out, "Instantiator.scala") {
-            emit ("""val w = if (target == "zcu") 32 else if (target == "vcs" || target == "asic") 8 else 32""")
-            emit ("val numArgIns = numArgIns_mem  + numArgIns_reg + numArgIOs_reg")
-            emit ("val numArgOuts = numArgOuts_reg + numArgIOs_reg + numArgOuts_instr + numArgOuts_breakpts")
-            emit ("val numArgIOs = numArgIOs_reg")
-            emit ("val numArgInstrs = numArgOuts_instr")
-            emit ("val numArgBreakpts = numArgOuts_breakpts")
-            emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, target)")
-          close("}")
-          emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
+        emit ("""val w = if (target == "zcu") 32 else if (target == "vcs" || target == "asic") 8 else 32""")
+        emit ("val numArgIns = numArgIns_mem  + numArgIns_reg + numArgIOs_reg")
+        emit ("val numArgOuts = numArgOuts_reg + numArgIOs_reg + numArgOuts_instr + numArgOuts_breakpts")
+        emit ("val numArgIOs = numArgIOs_reg")
+        emit ("val numArgInstrs = numArgOuts_instr")
+        emit ("val numArgBreakpts = numArgOuts_breakpts")
+        emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, target)")
+        close("}")
+        emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
         close("}")
       }
 
@@ -243,13 +216,13 @@ trait ChiselFileGen extends ChiselCodegen {
   //	      emit ("val gpo2_streamout_write      = Output(UInt(1.W))")
           emit ("")
         close("})")
-        emit ("var outArgMuxMap: scala.collection.mutable.Map[Int, Int] = scala.collection.mutable.Map[Int,Int]()")
-        emit ("(0 until io_numArgOuts).foreach{ i => outArgMuxMap += (i -> 0) }")
-        open("def getArgOutLane(id: Int): Int = {")
-          emit ("val lane = outArgMuxMap(id)")
-          emit ("outArgMuxMap += (id -> {lane + 1})")
-          emit ("lane")
-        close("}")
+        // emit ("var outArgMuxMap: scala.collection.mutable.Map[Int, Int] = scala.collection.mutable.Map[Int,Int]()")
+        // emit ("(0 until io_numArgOuts).foreach{ i => outArgMuxMap += (i -> 0) }")
+        // open("def getArgOutLane(id: Int): Int = {")
+        //   emit ("val lane = outArgMuxMap(id)")
+        //   emit ("outArgMuxMap += (id -> {lane + 1})")
+        //   emit ("lane")
+        // close("}")
         emit ("var outStreamMuxMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map[String,Int]()")
         open("def getStreamOutLane(id: String): Int = {")
           emit ("val lane = outStreamMuxMap.getOrElse(id, 0)")
@@ -293,35 +266,35 @@ trait ChiselFileGen extends ChiselCodegen {
 
       inGen(out, s"GlobalWiresMixer.$ext") {
         emit(s"package accel")
-  	  emit("import templates._")
-  	  emit("import fringe._")
-  	  emit("import chisel3._")
-  	  emit("import chisel3.util._")
-  	  val traits = List.tabulate(streamExtensions("GlobalWires")){i => "GlobalWires_" + {i+1}}
-  	  emit(s"trait GlobalWiresMixer extends ${traits.mkString("\n with ")}")
+        emit("import templates._")
+        emit("import fringe._")
+        emit("import chisel3._")
+        emit("import chisel3.util._")
+        val traits = List.tabulate(streamExtensions("GlobalWires")){i => "GlobalWires_" + {i+1}}
+        emit(s"trait GlobalWiresMixer extends ${traits.mkString("\n with ")}")
       }
 
       inGen(out, s"GlobalModulesMixer.$ext") {
         emit(s"package accel")
-  	  emit("import templates._")
-  	  emit("import fringe._")
-  	  emit("import chisel3._")
-  	  emit("import chisel3.util._")
-  	  val traits = List.tabulate(streamExtensions("GlobalModules")){i => "GlobalModules_" + {i+1}}
-  	  emit(s"trait GlobalModulesMixer extends ${traits.mkString("\n with ")}")
+        emit("import templates._")
+        emit("import fringe._")
+        emit("import chisel3._")
+        emit("import chisel3.util._")
+        val traits = List.tabulate(streamExtensions("GlobalModules")){i => "GlobalModules_" + {i+1}}
+        emit(s"trait GlobalModulesMixer extends ${traits.mkString("\n with ")}")
       }
 
       inGen(out, s"InstrumentationMixer.$ext") {
         emit(s"package accel")
-  	  emit("import templates._")
-  	  emit("import fringe._")
-  	  emit("import chisel3._")
-  	  emit("import chisel3.util._")
-  	  val traits = List.tabulate(streamExtensions("Instrumentation")){i => "Instrumentation_" + {i+1}}
-  	  emit(s"trait InstrumentationMixer extends ${traits.mkString("\n with ")}")
+        emit("import templates._")
+        emit("import fringe._")
+        emit("import chisel3._")
+        emit("import chisel3.util._")
+        val traits = List.tabulate(streamExtensions("Instrumentation")){i => "Instrumentation_" + {i+1}}
+        emit(s"trait InstrumentationMixer extends ${traits.mkString("\n with ")}")
       }
 
-      if (cfg.compressWires == 2) {
+      if (spatialConfig.compressWires == 2) {
   //       var methodList = scala.collection.mutable.ListBuffer[String]()
   //       val methodized_trait_pattern = "^x[0-9]+".r
   //       val traits = (streamMapReverse.keySet.toSet.map{
@@ -369,7 +342,7 @@ trait ChiselFileGen extends ChiselCodegen {
   //   // TODO: Figure out better way to pass constructor args to IOModule.  Currently just recreate args inside IOModule redundantly
   // }""")
   //       }
-      } else if (cfg.compressWires == 0) {
+      } else if (spatialConfig.compressWires == 0 | spatialConfig.compressWires == 1) {
         val allTraits = streamExtensions.flatMap{s => List.tabulate(s._2){i => src"${s._1}_${i+1}"}}.toList
                                         .filterNot{a => a.contains("Instantiator") | a.contains("AccelTop") | a.contains("Mapping")}
 

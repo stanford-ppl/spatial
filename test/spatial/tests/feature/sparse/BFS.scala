@@ -4,8 +4,8 @@ package spatial.tests.feature.sparse
 import spatial.dsl._
 
 
-@test class BFS extends SpatialTest {
-  override def runtimeArgs: Args = "6 10"
+@spatial class BFS extends SpatialTest {
+  override def runtimeArgs: Args = "3 5"
 
   val tileSize = 8000
   val edges_per_node = 6 // Will make this random later
@@ -108,10 +108,14 @@ import spatial.dsl._
     val OCnodes = Array.tabulate(N) {i => 0.to[Int]}
     val OCedges = Array.tabulate(ed){ i => i*2 % N}
     val OCids = Array.tabulate(N)( i => average_nodes_per_edge*average_nodes_per_edge*i+1 % E)
-    val OCcounts = Array.tabulate(N){ i => random[Int](average_nodes_per_edge-1)*2+1}
+    val OCcounts = Array.tabulate(N){ i => average_nodes_per_edge}// random[Int](average_nodes_per_edge-1)*2+1}
 
     val result = bfs(OCnodes, OCedges, OCcounts, OCids, N, E, average_nodes_per_edge)
-    val gold = (6*1) + (16*2) + (22*3) + (5*4)
+    val gold = Array.tabulate(args(1).to[Int] + 1){i => 
+      val numnodes = if (i == 0) 1 else Array.tabulate(i){j => average_nodes_per_edge}.reduce{_*_}
+      numnodes * i
+    }.reduce{_+_}
+    // val gold = (6*1) + (16*2) + (22*3) + (5*4)
     // println("Cksum: " + gold + " == " + result.reduce{_+_})
 
     val cksum = gold == result.reduce{_+_}

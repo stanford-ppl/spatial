@@ -1,8 +1,8 @@
 package spatial.lang
 package control
 
-import forge.tags._
 import argon._
+import forge.tags._
 import spatial.node._
 
 class ForeachClass(opt: CtrlOpt) {
@@ -25,7 +25,7 @@ class ForeachClass(opt: CtrlOpt) {
   @rig def apply(ctrs: Seq[Counter[I32]])(func: Seq[I32] => Any): Void = {
     val iters  = ctrs.map{_ => boundVar[I32] }
     val cchain = CounterChain(ctrs)
-    stageWithData(OpForeach(Set.empty, cchain, stageBlock{ func(iters); void }, iters)){pipe =>
+    stageWithFlow(OpForeach(Set.empty, cchain, stageBlock{ func(iters); void }, iters)){pipe =>
       opt.set(pipe)
     }
   }

@@ -14,9 +14,17 @@ elif [[ $1 = "AWS" ]]; then
 fi
 
 hash=`cat ${REGRESSION_HOME}/current-spatial/spatial/hash`
-ahash=`cat ${REGRESSION_HOME}/current-spatial/spatial/ahash`
+branchname=`cat ${REGRESSION_HOME}/current-spatial/spatial/branchname`
 
-appname=`basename \`pwd\``
+#appname=`basename \`pwd\``
+fullname=`cat chisel/IOModule_1.scala | grep "Root controller for app" | sed "s/.*: //g"`
+aws_dir_name=`basename \`pwd\``
+testdirs=`find ${REGRESSION_HOME}/current-spatial/spatial/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
+testdirsarray=($testdirs)
+for t in "${testdirsarray[@]}"; do
+	fullname=`echo $fullname | sed "s/${t}_//g"`
+done
+appname=$fullname
 if [[ $1 = "Zynq" ]]; then
 	par_util=`pwd`/verilog-zynq/par_utilization.rpt
 	if [[ ! -f ${par_util} ]]; then par_util=`pwd`/verilog-zynq/synth_utilization.rpt; fi
@@ -40,8 +48,8 @@ elif [[ $1 = "Arria10" ]]; then
     f1=3                                                # TODO: Tian     
     f2=6                                                # TODO: Tian    
 elif [[ $1 = "AWS" ]]; then
-	par_util=/home/mattfel/aws-fpga/hdk/cl/examples/$appname/build/reports/utilization_route_design.rpt
-	par_tmg=/home/mattfel/aws-fpga/hdk/cl/examples/$appname/build/reports/timing_summary_route_design.rpt
+	par_util=/home/mattfel/aws-fpga/hdk/cl/examples/${aws_dir_name}/build/reports/utilization_route_design.rpt
+	par_tmg=/home/mattfel/aws-fpga/hdk/cl/examples/${aws_dir_name}/build/reports/timing_summary_route_design.rpt
 	word="CLB"
 	f1=5
 	f2=8
@@ -105,7 +113,7 @@ fi
 synthtime=$((endtime-starttime))
 
 echo "LUT: $lutraw (${lutpcnt}%) Regs: $regraw (${regpcnt}%) BRAM: $ramraw (${rampcnt}%) URAM: $uramraw (${urampcnt}%) DSP: $dspraw (${dsppcnt}%) LaL: $lalraw (${lalpcnt}%) LaM: $lamraw (${lampcnt}%) Synthtime: $synthtime Tmg_Met: $tmg $1"
-python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_synth_results" $appname "$lutraw (${lutpcnt}%)" "$regraw (${regpcnt}%)" "$ramraw (${rampcnt}%)" "$uramraw (${urampcnt}%)" "$dspraw (${dsppcnt}%)" "$lalraw (${lalpcnt}%)" "$lamraw (${lampcnt}%)" "$synthtime" "$tmg" "$1" "$hash" "$ahash"
+python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_synth_results" $appname "$lutraw (${lutpcnt}%)" "$regraw (${regpcnt}%)" "$ramraw (${rampcnt}%)" "$uramraw (${urampcnt}%)" "$dspraw (${dsppcnt}%)" "$lalraw (${lalpcnt}%)" "$lamraw (${lampcnt}%)" "$synthtime" "$tmg" "$1" "$hash" "$branchname"
 
 
 # Run on board
@@ -135,7 +143,7 @@ if [[ $1 = "Zynq" ]]; then
     runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
     pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
-    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$ahash"
+    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"
 elif [[ $1 = "ZCU" ]]; then
 	APP=$(basename $(pwd))
 	scp $(basename $(pwd)).tar.gz root@holodeck-zcu102:
@@ -162,7 +170,7 @@ elif [[ $1 = "ZCU" ]]; then
     runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
     pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
-    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$ahash"	
+    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"	
 elif [[ $1 = "Arria10" ]]; then
 	APP=$(basename $(pwd))
 	scp $(basename $(pwd)).tar.gz root@arria10:   # TODO: Tian (fill in whatever you need to scp and execute the app on the board)
@@ -185,7 +193,7 @@ elif [[ $1 = "Arria10" ]]; then
     runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
     pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
-    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$ahash"	
+    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"	
 fi
 
 # Fake out regression

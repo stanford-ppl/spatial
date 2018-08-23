@@ -3,10 +3,6 @@ package host
 
 import argon._
 import forge.tags._
-import spatial.node._
-import spatial.internal._
-import utils.Overloads._
-import utils.implicits.Readable._
 
 /** A two-dimensional matrix on the host */
 @ref class Matrix[A:Type] extends Struct[Matrix[A]] with Ref[scala.Array[Any],Matrix[A]] {

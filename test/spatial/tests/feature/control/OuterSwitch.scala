@@ -2,7 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class OuterSwitch extends SpatialTest {
+@spatial class OuterSwitch extends SpatialTest {
   override def runtimeArgs: Args = "20" and "30"
 
   def main(args: Array[String]): Unit = {
@@ -15,6 +15,7 @@ import spatial.dsl._
 
     Accel {
       val data = SRAM[Int](32)
+      Sequential.Foreach(32 by 1){i => data(i) = 0}
       if (in.value <= 28) {
         Sequential.Foreach((in.value+4) by 1){ i => data(i) = i }
       }

@@ -1,10 +1,8 @@
 package spatial.tests.feature.control
 
-
 import spatial.dsl._
 
-
-@test class ParLaneMask extends SpatialTest {
+@spatial class ParLaneMask extends SpatialTest {
   override def runtimeArgs: Args = "13"
   /*
     This app is for testing the valids that get passed to each child of a metapipe,
@@ -12,13 +10,13 @@ import spatial.dsl._
     based on the current counter value for stage 0
   */
 
-
   def main(args: Array[String]): Unit = {
 
     val x = ArgIn[Int] // Should NOT be multiple of 2
     val y = ArgOut[Int]
     val ymem = DRAM[Int](4,16)
     setArg(x, args(0).to[Int])
+    assert(args(0).to[Int]%2 != 0)
 
     Accel {
       val s = SRAM[Int](64)

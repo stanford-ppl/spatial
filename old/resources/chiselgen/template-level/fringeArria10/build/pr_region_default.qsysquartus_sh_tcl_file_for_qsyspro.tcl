@@ -1,5 +1,0 @@
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_clock_in.ip
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_sysid_qsys_0.ip
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_Top_0.ip
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_mm_bridge_0.ip
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_reset_in.ip

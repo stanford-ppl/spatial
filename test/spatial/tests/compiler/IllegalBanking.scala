@@ -1,11 +1,8 @@
 package spatial.tests.compiler
 
-
 import spatial.dsl._
 
-
-@test class IllegalFIFOParallelization extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class IllegalFIFOParallelization extends SpatialTest {
   override def backends = RequireErrors(1)
 
   def main(args: Array[String]): Unit = {

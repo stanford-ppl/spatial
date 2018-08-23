@@ -4,7 +4,7 @@ package spatial.tests.feature.math
 import spatial.dsl._
 
 
-@test class FloatBasics extends SpatialTest { // Regression (Unit) // Args: 3.2752 -283.70
+@spatial class FloatBasics extends SpatialTest { // Regression (Unit) // Args: 3.2752 -283.70
   override def runtimeArgs: Args = "3.2752 -283.70"
 
   type T = Float

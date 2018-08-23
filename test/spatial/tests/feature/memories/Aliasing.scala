@@ -2,9 +2,7 @@ package spatial.tests.feature.memories
 
 import spatial.dsl._
 
-
-@test class NestedAlias extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class NestedAlias extends SpatialTest {
 
   def main(args: Array[String]): Void = {
     Accel {

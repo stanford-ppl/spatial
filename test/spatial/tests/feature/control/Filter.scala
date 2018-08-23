@@ -3,8 +3,8 @@ package spatial.tests.feature.control
 import spatial.dsl._
 import spatial.lib._
 
-@test class Scan_fifofull extends SpatialTest {
-  override def runtimeArgs: Args = "128"
+@spatial class Scan_fifofull extends SpatialTest {
+  override def runtimeArgs: Args = "256"
 
   def main(args: Array[String]): Unit = {
 
@@ -14,7 +14,7 @@ import spatial.lib._
     val length = ArgIn[Int]
     setArg(length, N)
 
-    val data1        = Array.tabulate(N){i => i * 3} 
+    val data1        = Array.tabulate(N){i => i * 3}
     val data2        = Array.tabulate(N){i => i % 2}
 
     val dram1        = DRAM[Int](length)
@@ -44,23 +44,24 @@ import spatial.lib._
         }
 
         Pipe.Foreach (0 until tileSize) { j=>
-
-          if (fifo.isFull) {
-            outram(stores.value::stores.value+tileSize) store fifo
-            stores := stores.value + tileSize
+          Sequential{
+            if (fifo.isFull) {
+              outram(stores.value::stores.value+tileSize) store fifo
+              stores := stores.value + tileSize
+            }
           }
 
           val fromsram1 = sram1(j)
           val fromsram2 = sram2(j)
 
           if (fromsram2 == 1) {
-             fifo.enq(fromsram1)
+            fifo.enq(fromsram1)
           }
         }
       }
-        
-      out_fifofull := mux(fifo.isFull,1,0)
-      out_fifoempty := mux(fifo.isEmpty,1,0)
+
+      out_fifofull := mux(fifo.isFull, 1,0)
+      out_fifoempty := mux(fifo.isEmpty, 1,0)
       out_store_loc := stores.value
 
       if (!fifo.isEmpty) {
@@ -74,10 +75,11 @@ import spatial.lib._
     val result = getMem(outram)
 
     for (i <- 0 until golden.length) {
-      assert(result(i) == golden(i), r"Mismatch on $i: ${result(i)} != ${golden(i)}")
+      assert(result(i) == golden(i), "Mismatch " + i + ": " + result(i) + " != " + golden(i))
     }
 
     printArray(result, "Result : ")
+    printArray(golden, "Gold : ")
     println("fifofull:"  + getArg(out_fifofull))
     println("fifoempty:"  + getArg(out_fifoempty))
     println("store_loc:"  + getArg(out_store_loc))
@@ -87,19 +89,18 @@ import spatial.lib._
 
 
 // Working
-@test class Scan_fillfifo extends SpatialTest {
+@spatial class Scan_fillfifo extends SpatialTest {
   override def runtimeArgs: Args = "128"
 
 
   def main(args: Array[String]): Unit = {
-
     val tileSize = 64
     val N = args(0).to[Int]
 
     val length = ArgIn[Int]
     setArg(length, N)
 
-    val data1        = Array.tabulate(N){i => i * 3} 
+    val data1        = Array.tabulate(N){i => i * 3}
     val data2        = Array.tabulate(N){i => i % 2}
 
     val dram1        = DRAM[Int](length)
@@ -131,12 +132,12 @@ import spatial.lib._
           }
         }
 
-          // Fill remainder with 0s
-//          FSM(0)(filler => filler != 1){filler =>
-//            if (!fifo.isFull) {
-//                Pipe{fifo.enq(-1)}
-//            }
-//          }{ filler => mux(fifo.isFull, 1, 0)}
+        // Fill remainder with 0s
+        //          FSM(0)(filler => filler != 1){filler =>
+        //            if (!fifo.full()) {
+        //                Pipe{fifo.enq(-1)}
+        //            }
+        //          }{ filler => mux(fifo.full(), 1, 0)}
 
         val words = fifo.numel
         outram(memptr::memptr+words) store fifo
@@ -149,12 +150,12 @@ import spatial.lib._
     printArray(result, "Result : ")
 
     for (i <- 0 until golden.length) {
-      assert(result(i) == golden(i), r"Mismatch on $i: ${result(i)} != ${golden(i)}")
+      assert(result(i) == golden(i), "Mismatch " + i + ": " + result(i) + " != " + golden(i))
     }
   }
 }
 
-@test class Scan_filter extends SpatialTest {
+@spatial class Scan_filter extends SpatialTest {
   override def runtimeArgs: Args = "128"
 
 
@@ -167,7 +168,7 @@ import spatial.lib._
     Console.out.println(s"tileSize: $tileSize, par: $parN")
     setArg(length, N)
 
-    val data        = Array.tabulate(N){i => i%16 } 
+    val data        = Array.tabulate(N){i => i%16 }
     val dram        = DRAM[Int](length)
     val outram      = DRAM[Int](length)
     setMem(dram, data)
@@ -182,18 +183,19 @@ import spatial.lib._
         outram(i::i+tileSize) store sramY
       }
     }
-    val golden = data.filter{e => e >= 8 }
+    val golden = Array.tabulate(N){i => if(data(i) >= 8) 1.to[Int] else 0.to[Int]}
     val result = getMem(outram)
     printArray(getMem(dram), " Input : ")
     printArray(getMem(outram), "Output : ")
+    printArray(golden, "Golden : ")
 
     for (i <- 0 until golden.length){
-      assert(golden(i) == result(i), r"Mismatch $i: ${result(i)} != ${golden(i)}")
+      assert(golden(i) == result(i), "Mismatch " + i + ": " + result(i) + " != " + golden(i))
     }
   }
 }
 
-@test class Scan_filter_wait extends SpatialTest {
+@spatial class Scan_filter_wait extends SpatialTest {
   override def runtimeArgs: Args = "128 16"
 
 
@@ -208,7 +210,7 @@ import spatial.lib._
     setArg(length, N)
     setArg(wait, K)
 
-    val data        = Array.tabulate(N){i => i%16 } 
+    val data        = Array.tabulate(N){i => i%16 }
     val dram        = DRAM[Int](length)
     val outram      = DRAM[Int](length)
     setMem(dram, data)
@@ -220,22 +222,22 @@ import spatial.lib._
         sramX load dram(i::i+tileSize)
         filter(sramY,
           {e: Int=>
-          val tmp = Reg[Int]
-          'Wait.Foreach (0 until wait) { i => tmp := i+1}
-          (e>=8)
-        },
-        sramX)
+            val tmp = Reg[Int]
+            'Wait.Foreach (0 until wait) { i => tmp := i+1}
+            (e>=8)
+          },
+          sramX)
         outram(i::i+tileSize) store sramY
       }
     }
-    val golden = data.filter{e => e >= 8 }
+    val golden = Array.tabulate(N){i => if(data(i) >= 8) 1.to[Int] else 0.to[Int]}
     val result = getMem(outram)
     printArray(getMem(dram), " Input : ")
     printArray(result, "Output : ")
     printArray(golden, "Golden : ")
 
     for (i <- 0 until golden.length){
-      assert(golden(i) == result(i), r"Mismatch $i: ${result(i)} != ${golden(i)}")
+      assert(golden(i) == result(i), "Mismatch " + i + ": " + result(i) + " != " + golden(i))
     }
   }
 }

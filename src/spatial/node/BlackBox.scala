@@ -5,9 +5,7 @@ import forge.tags._
 
 import spatial.lang._
 
-abstract class BlackBox[R:Type] extends Control[R] {
-  def mayBeOuterBlock(i: Int): Boolean = false
-}
+abstract class BlackBox[R:Type] extends Control[R]
 
 /** Black box which must be expanded early in compiler (after initial analyses). */
 abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
@@ -32,7 +30,7 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
   iters: Seq[I32]
 ) extends BlackBox[Void] {
   override def cchains = Seq(cchain -> iters)
-  override def bodies = Seq(iters -> Nil)
+  override def bodies = Nil
   override def effects: Effects = Effects.Writes(y)
 }
 

@@ -4,8 +4,8 @@ import argon._
 import argon.passes.Pass
 import models._
 
-import spatial.data._
-import spatial.util._
+import spatial.metadata.memory._
+import spatial.util.modeling.{target, areaModel}
 import spatial.targets.MemoryResource
 
 case class MemoryAllocator(IR: State) extends Pass {
@@ -22,14 +22,20 @@ case class MemoryAllocator(IR: State) extends Pass {
 
   def allocate(): Unit = {
 
+    case class Instance(mem: Sym[_], memory: Memory, idx: Int)
+    case class ProfiledInstance(inst: Instance, rawCount: Double, area: Area)
+
+
     def areaMetric(mem: Sym[_], inst: Memory, resource: MemoryResource): Double = {
-      -resource.summary(areaModel.rawMemoryArea(mem, inst, resource)) // sortBy: smallest to largest
+      resource.summary(areaModel.rawMemoryArea(mem, inst, resource)) // sortBy: smallest to largest
     }
 
     // Memories which can use more specialized memory resources
-    val (sramAble,nonSRAM) = localMems.all.partition(canSRAM)
+    val (sramAble,nonSRAM) = LocalMemories.all.partition(canSRAM)
 
-    var unassigned: Set[(Sym[_],Memory,Int)] = sramAble.flatMap{mem => mem.duplicates.zipWithIndex.map{case (d,i) => (mem,d,i) }}
+    var unassigned: Set[Instance] = sramAble.flatMap{mem =>
+      mem.duplicates.zipWithIndex.map{case (d,i) => Instance(mem,d,i) }
+    }
 
     dbg(s"\n\n")
     dbg("Allocating Memory Resources")
@@ -51,50 +57,47 @@ case class MemoryAllocator(IR: State) extends Pass {
     resources.dropRight(1).foreach{resource =>
       dbg(s"Allocating ${resource.name}: ")
       // Sort by the expected resource utilization of this memory
-      val costs = unassigned.map{case (mem,dup,i) =>
-        val area = areaMetric(mem,dup,resource)
-        val raw: Area  = Area(resource.name -> -area)
-        //dbg(s"  ${str(mem)} [#$i]: ${-area}")
-        (mem, dup, i, area, raw)
+      val costs = unassigned.toSeq.map{case inst @ Instance(mem,dup,idx) =>
+        val count = areaMetric(mem,dup,resource)      // Raw count of this memory type
+        val area  = Area(resource.name -> count)      // Count as an area model map
+        ProfiledInstance(inst, count, area)
       }
 
-      var idx: Int = 0
-      var assigned: Set[Int] = Set.empty
+      var assigned: Set[Instance] = Set.empty
 
       // Terminate early if no memory can fit
       if (costs.isEmpty) {
         dbg(s"  Skipping ${resource.name} - all memories have been assigned!")
       }
-      else if (costs.forall{t => t._5 > capacity }) {
+      else if (costs.forall{t => t.area > capacity }) {
         dbg(s"  Skipping ${resource.name} - not enough resources remaining")
       }
       else {
-        val sortedInsts = costs.toSeq.sortBy(_._4)
+        val sortedInsts = costs.sortBy{p => -p.rawCount}.iterator
 
-        while (capacity(resource.name) > 0 && idx < sortedInsts.length) {
-          val (mem, dup, d, _, area) = sortedInsts(idx)
-          val size = areaModel.memoryBankDepth(mem,dup)
+        while (capacity(resource.name) > 0 && sortedInsts.hasNext) {
+          val ProfiledInstance(inst, _, area) = sortedInsts.next()
+          val Instance(mem, dup, idx) = inst
+          val depth = areaModel.memoryBankDepth(mem, dup)
 
-          if (area <= capacity && size >= resource.minDepth) {
-            dbg(s"  Assigned $mem#$d to ${resource.name} (uses $area)")
+          if (area <= capacity && depth >= resource.minDepth) {
+            dbg(s"  Assigned $mem#$idx to ${resource.name} (area: $area (<= $capacity), depth: $depth (>= ${resource.minDepth}))")
             dup.resourceType = Some(resource)
             capacity -= area
-            assigned += idx
+            assigned += inst
           }
           else if (area > capacity) {
-            dbg(s"  Skipped $mem#$d - too few resources (Needed: $area, Remaining: $capacity)")
+            dbg(s"  Skipped $mem#$idx - too few resources (Needed: $area, Remaining: $capacity)")
           }
           else {
-            dbg(s"  Skipped $mem#$d - did not meet depth threshold (Depth: $size, Threshold: ${resource.minDepth})")
+            dbg(s"  Skipped $mem#$idx - did not meet depth threshold (Depth: $depth, Threshold: ${resource.minDepth})")
           }
-
-          idx += 1
         }
       }
-      unassigned = unassigned.filterNot{case (mem,d,i) => assigned.contains(i) }
+      unassigned = unassigned diff assigned
     }
 
-    unassigned.foreach{case (mem,dup,_) => dup.resourceType = Some(resources.last) }
+    unassigned.foreach{inst => inst.memory.resourceType = Some(resources.last) }
     nonSRAM.foreach{mem => mem.duplicates.foreach{dup => dup.resourceType = Some(resources.last) }}
   }
 

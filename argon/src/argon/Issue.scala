@@ -8,6 +8,7 @@ import forge.tags._
   * Not resolving a raised Issue by the end of the pass after it was raised results in an error.
   */
 abstract class Issue { this: Product =>
+  def name: String = this.productPrefix
 
   /**
     * Method called when this issue remains unresolved.

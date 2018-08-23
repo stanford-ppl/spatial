@@ -8,6 +8,16 @@ import scala.reflect.ClassTag
   */
 object collections {
 
+  implicit class IntSeqHelpers(x: Seq[Int]) {
+    /** Returns seq containing only elements who are unique in mod N. */
+    def uniqueModN(N: Int): Seq[Int] = {
+      val map = scala.collection.mutable.ListMap[Int,Int]()
+      x.foreach{i => map.getOrElseUpdate(i % N, i) }
+      map.values.toList.sorted
+    }
+
+  }
+
   implicit class SeqHelpers[A](x: Seq[A]) {
     def get(i: Int): Option[A] = if (i >= 0 && i < x.length) Some(x(i)) else None
     def indexOrElse(i: Int, els: => A): A = if (i >= 0 && i < x.length) x(i) else els
@@ -76,9 +86,33 @@ object collections {
       * Returns an iterator over all combinations of 2 from this iterable collection.
       * Assumes that either the collection has (functionally) distinct elements.
       */
-    def pairs: Iterator[(A,A)] = x match {
-      case m0 :: y => y.iterator.map{m1 => (m0,m1) } ++ y.pairs
-      case _ => Iterator.empty
+    // abstract type pattern Coll is unchecked since it is eliminated by erasure?
+    // def pairs: Iterator[(A,A)] = x match {
+    //   case m0 +: y => y.iterator.map{m1 => (m0,m1) } ++ y.pairs
+    //   case _ => Iterator.empty
+    // }
+    def pairs: Iterator[(A,A)] = {
+      if (x.size >= 2) (x.tail.iterator.map{m1 => (x.head,m1) } ++ x.tail.pairs) else Iterator.empty
+    }
+
+    def mapFind[B](func: A => Option[B]): Option[B] = {
+      var res: Option[B] = None
+      val iter = x.iterator
+      while (res.isEmpty && iter.hasNext) {
+        res = func(iter.next())
+      }
+      res
+    }
+  }
+
+  implicit class IteratorHelpers[A](x: Iterator[A]) {
+    def mapFind[B](func: A => Option[B]): Option[B] = {
+      var res: Option[B] = None
+      val iter = x
+      while (res.isEmpty && iter.hasNext) {
+        res = func(iter.next())
+      }
+      res
     }
   }
 

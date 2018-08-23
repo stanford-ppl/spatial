@@ -76,7 +76,7 @@ import scala.reflect.macros.blackbox
 class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroUtils[Ctx](__c) {
   import __c.universe._
 
-  def virt(t: Tree): List[Tree] = VirtualizationTransformer(t)
+  def runVirtualizer(t: Tree): List[Tree] = VirtualizationTransformer(t)
 
   private object VirtualizationTransformer {
     def apply(tree: Tree) = new VirtualizationTransformer().apply(tree)
@@ -115,10 +115,12 @@ class Virtualizer[Ctx <: blackbox.Context](override val __c: Ctx) extends MacroU
           */
         tpt match {
           case TypeTree() =>
-            __c.error(tree.pos, "Type annotation required for var declaration.")
-            List(tree)
+            __c.info(tree.pos, "Type annotation recommended for var declaration.", force = true)
+            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), Nil)).asVar
+            val regv = methodCall(None, "__valName", List(List(Ident(term), Literal(Constant(name)))),Nil)
+            List(vdef, regv)
           case _ =>
-            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), List(tpt))).asVal
+            val vdef = ValDef(mods, term, TypeTree(), call(None, "__newVar", List(rhs), List(tpt))).asVar
             val regv = methodCall(None, "__valName", List(List(Ident(term), Literal(Constant(name)))),Nil)
             List(vdef, regv)
         }

@@ -1,46 +1,39 @@
 package spatial
 
-trait SpatialDSL extends lang.static.FrontendStatics
+import argon.tags.StagedStructsMacro
 
-object libview extends SpatialDSL {
+trait SpatialDSL extends lang.api.StaticAPI_Frontend
+
+/** A "library" view of the Spatial DSL without any Scala name shadowing. */
+object libdsl extends SpatialDSL {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
   import forge.tags.AppTag
 
-  /** Annotation class for @test macro annotation. */
+  /** Annotation class for @spatial macro annotation. */
   final class spatial extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro spatial.impl
   }
   private object spatial extends AppTag("spatial", "SpatialApp")
 
   final class struct extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl
+    def macroTransform(annottees: Any*): Any = macro StagedStructsMacro.impl
   }
 }
 
-object dsl extends SpatialDSL with lang.static.ShadowingStatics {
+/** A full view of the Spatial DSL, including shadowing of Scala names. */
+object dsl extends SpatialDSL with lang.api.StaticAPI_Shadowing {
   import language.experimental.macros
   import scala.annotation.StaticAnnotation
-  import forge.tags.{AppTag,TestTag}
+  import forge.tags.AppTag
 
-  /** Annotation class for @test macro annotation. */
+  /** Annotation class for @spatial macro annotation. */
   final class spatial extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro spatial.impl
   }
   private object spatial extends AppTag("spatial", "SpatialApp")
 
-  final class test extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro test.impl
-  }
-  private object test extends TestTag("spatial", "SpatialTest", "SpatialApp")
-
-  // Used for debugging virtualization macros
-  final class testv extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro testv.impl
-  }
-  private object testv extends TestTag("spatial", "SpatialTest", "SpatialApp", verbose = true)
-
   final class struct extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro tags.StagedStructsMacro.impl
+    def macroTransform(annottees: Any*): Any = macro StagedStructsMacro.impl
   }
 }

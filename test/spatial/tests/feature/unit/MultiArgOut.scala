@@ -4,7 +4,7 @@ package spatial.tests.feature.unit
 import spatial.dsl._
 
 
-@test class MultiArgOut extends SpatialTest {
+@spatial class MultiArgOut extends SpatialTest {
   override def runtimeArgs: Args = "32 16"
   type T = Int
 

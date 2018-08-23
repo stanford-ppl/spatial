@@ -1,6 +1,6 @@
 package argon
 
-import java.io.{File, PrintStream}
+import java.io.PrintStream
 
 import utils.process.Subprocess
 import utils.{Args, Testbench}
@@ -12,16 +12,72 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
   // Testing Arguments //
   //-------------------//
 
+  /** Override to supply list(s) of input arguments to the compiler to compile the application with.
+    * The test is compiled multiple times for each backend if multiple lists are given.
+    *
+    * Suggested argument syntax is:
+    *   override def compileArgs: Args = "arg00 arg01 arg02" and "arg10 arg11 arg12"
+    *   OR, e.g.
+    *   override def compileArgs = Args(Seq.tabulate(N){i => s"$i ${i+1}" })
+    *
+    *   Use the first version for a small number of diverse arguments.
+    *   Use the second version to generate a large number of runtime arguments using some pattern.
+    */
   def compileArgs: Args = NoArgs
+
+  /** Override to supply list(s) of input arguments to run the test with for each backend.
+    * The backend is run multiple times if multiple lists are given.
+    * The number of runs for each backend is C*R, (C: # of compile lists, R: # of runtime lists)
+    *
+    * Suggested argument syntax is:
+    *   override def runtimeArgs: Args = "arg00 arg01 arg02" and "arg10 arg11 arg12"
+    *   OR, e.g.
+    *   override def runtimeArgs = Args(Seq.tabulate(N){i => s"$i ${i+1}" })
+    *
+    *   Use the first version for a small number of diverse arguments.
+    *   Use the second version to generate a large number of runtime arguments using some pattern.
+    */
   def runtimeArgs: Args
+  lazy val DATA = sys.env("TEST_DATA_HOME")
+
+  //-------------------//
+  //     Assertions    //
+  //-------------------//
+  // These provide staged versions of assert that shadow the native Scala and scalatest versions.
+  // These assertions will be checked at application runtime (after backend code generation)
+  // Use 'require' methods for unstaged assertions
+  import argon.lang.{Bit,Text,Void}
+  import argon.node.AssertIf
+
+  /** Staged (application runtime) assertion.
+    * This version is not recommended - give explicit failure message if possible.
+    */
+  def assert(cond: Bit)(implicit ctx: SrcCtx): Void = stage(AssertIf(Set.empty, cond, None))
+
+  /** Staged (application runtime) assertion with failure message. */
+  def assert(cond: Bit, msg: Text)(implicit ctx: SrcCtx): Void = stage(AssertIf(Set.empty, cond, Some(msg)))
+
+  /** Unstaged (application staging) assertion.
+    * This version is not recommended - give explicit failure message if possible.
+    */
+  def require(cond: Boolean)(implicit ctx: SrcCtx): Unit = {
+    if (!cond) throw RequirementFailure(ctx,"")
+  }
+  /** Unstaged (application staging) assertion  with failure message. */
+  def require(cond: Boolean, msg: String)(implicit ctx: SrcCtx): Unit = {
+    if (!cond) throw RequirementFailure(ctx, msg)
+  }
 
   //-------------------//
   //      Backends     //
   //-------------------//
 
   def backends: Seq[Backend]
-  def enable(str: String): Boolean = sys.props.get(str).exists(v => v.trim.toLowerCase == "true")
+  def property(str: String): Option[String] = sys.props.get(str)
+  def checkFlag(str: String): Boolean = property(str).exists(v => v.trim.toLowerCase == "true")
   lazy val DISABLED: Seq[Backend] = Seq(IGNORE_TEST)
+
+  def commandLine: Boolean = checkFlag("ci")
 
   /** A backend which can compile and run a given application.
     *
@@ -83,12 +139,14 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
             compileProgram(args)
           }}
           Await.result(f, duration.Duration(backend.makeTimeout, "sec"))
+          complete(None)
           Unknown
         }
         catch {
-          case e: Throwable =>
-            onException(e)
-            Error(e)
+          case t: Throwable =>
+            val failure = handleException(t)
+            complete(failure)
+            Error(t)
         }
       }}
     }
@@ -117,7 +175,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
         lines.foreach{ll => val l = ll.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(l); cmdLog.println(l) } // replaceAll to prevent JUnit crash
         errs.foreach{ee => val e = ee.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(e); cmdLog.println(e) } // replaceAll to prevent JUnit crash
         if (code != 0) cause = cause.orElse(Error(s"Non-zero exit code during backend $pass: $code.\n${errs.take(4).mkString("\n")}"))
-        if (code == 0) cause = Unknown
+        if (pass == "make" && code == 0) cause = Unknown // Don't report an error for zero exit codes in make phase
       }
       catch {
         case e: Throwable =>
@@ -175,12 +233,35 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     override def runBackend(): Unit = ignore should "compile, run, and verify" in { () }
   }
 
+  /** Override this method to provide custom IR checking after compilation has completed. */
+  protected def checkIR(block: argon.Block[_]): Result = Unknown
+
+  /** Postprocessing phase after compilation has completed. Only the last block is passed. */
+  override def postprocess(block: argon.Block[_]): Unit = {
+    import argon.node.AssertIf
+    super.postprocess(block)
+
+    if (config.test) {
+      val stms = block.nestedStms
+      val hasAssert = stms.exists{case Op(_: AssertIf) => true; case _ => false }
+      if (!hasAssert) throw Indeterminate
+      checkIR(block)
+    }
+  }
+
 
   private val tests = backends.filter(_.shouldRun)
-  if (tests.isEmpty) {
+  if (commandLine) {
+    // If running from a non-testing script, run the standard compiler flow
+    val args = sys.env.get("TEST_ARGS").map(_.split(" ")).getOrElse(Array.empty)
+    System.out.println(s"Running standard compilation flow for test with args: ${args.mkString(" ")}")
+    name should "compile" in { compile(args); sys.exit(0) }
+  }
+  else if (tests.isEmpty) {
     ignore should "...nothing? (No backends enabled. Enable using -D<backend>=true)" in { () }
   }
   else {
+    // Otherwise run all the backend tests (if there are any enabled)
     tests.foreach{backend => backend.runBackend() }
   }
 

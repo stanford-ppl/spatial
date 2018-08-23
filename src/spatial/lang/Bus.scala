@@ -1,8 +1,8 @@
 package spatial.lang
 
 import argon.Mirrorable
+import argon.tags.struct
 import forge.tags._
-import spatial.tags._
 
 case class Pin(name: String) {
   override def toString: String = name

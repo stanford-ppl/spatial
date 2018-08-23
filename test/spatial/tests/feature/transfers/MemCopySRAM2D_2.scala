@@ -1,12 +1,8 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class MemCopySRAM2D_2 extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class MemCopySRAM2D_2 extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val m     = 16.to[Int]

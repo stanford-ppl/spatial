@@ -1,12 +1,13 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
-import spatial.data._
-import spatial.util._
 import spatial.lang._
 import spatial.node._
-import spatial.internal._
+import spatial.metadata.control._
+import spatial.metadata.types._
+import spatial.util.spatialConfig
 import spatial.traversal.BlkTraversal
 
 import scala.collection.mutable.ArrayBuffer
@@ -45,33 +46,42 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
     case switch @ Switch(F(selects), _) if lhs.isOuterControl && inHw =>
       val res: Option[Either[Reg[A],Var[A]]] = if (Type[A].isVoid) None else Some(resFrom(lhs))
 
-      val cases = switch.cases.zip(selects).map { case (SwitchCase(body), sel) =>
-        val controllers = lhs.children
+      val cases = (switch.cases,selects,lhs.children).zipped.map { case (SwitchCase(body), sel, swcase) =>
+        val controllers = swcase.children
         val primitives = body.stms.collect{case Primitive(s) => s }
-        val requiresWrap = controllers.length > 1 || (primitives.nonEmpty && controllers.nonEmpty)
+        val requiresWrap = primitives.nonEmpty && controllers.nonEmpty
 
         () => withEnable(sel) {
           val body2: Block[Void] = {
             if (requiresWrap) wrapSwitchCase(body, res)
             else stageScope(f(body.inputs),body.options){ insertPipes(body, res, scoped = false).right.get }
           }
-          op_case(body2)
+          Switch.op_case(body2)
         }
       }
-      val switch2: Void = op_switch(selects, cases)
-      transferMetadata(lhs -> switch2)
+      val switch2: Void = transferDataToAllNew(lhs){ Switch.op_switch(selects, cases) }
+
       res match {
         case Some(r) => resRead(r)                    // non-void
         case None    => switch2.asInstanceOf[Sym[A]]  // Void case
       }
 
-    case _ if lhs.isControl =>
-      withCtrl(lhs) {
+    case ctrl:Control[_] =>
+      inCtrl(lhs) {
         if (lhs.isOuterControl && inHw) {
           dbgs(s"$lhs = $rhs")
-          rhs.blocks.zipWithIndex.foreach { case (block, id) =>
-            dbgs(s"  block #$id [" + (if (Controller(lhs, id).isOuterBlock) "Outer]" else "Inner]"))
-            if (Controller(lhs, id).isOuterBlock) register(block -> insertPipes(block).left.get)
+          ctrl.bodies.zipWithIndex.foreach { case (body, id) =>
+            val stage = Ctrl.Node(lhs, id)
+            dbgs(s"  $lhs Body #$id: ")
+            body.blocks.zipWithIndex.foreach{case ((_,block),bid) =>
+              dbgs(s"    $lhs body #$id block #$bid [" + (if (stage.mayBeOuterBlock) "Outer]" else "Inner]"))
+              state.logTab += 1
+              // Register substitutions for outer control blocks
+              if (stage.mayBeOuterBlock) {
+                register(block -> insertPipes(block).left.get)
+              }
+              state.logTab -= 1
+            }
           }
         }
       }
@@ -104,9 +114,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
       block.stms.foreach{
         case Transient(s) =>
-          val i = stages.lastIndexWhere{stage =>
-            (stage.nodes intersect s.inputs).nonEmpty
-          }
+          val i = stages.lastIndexWhere{stage => (stage.nodes intersect s.inputs).nonEmpty }
           val stage = if (i >= 0) stages(i) else stages.head
           stage.nodes += s
 
@@ -136,7 +144,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
           implicit val ctx: SrcCtx = SrcCtx.empty
           Pipe {
-            isolate() {
+            isolateSubst() {
               stg.nodes.foreach(visit)
               escaping.zip(escapingHolders).foreach{case (s, r) => resWrite(r,s) }
             }
@@ -211,6 +219,13 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
   def varWrite[A](x: Var[A], data: Sym[A]): Unit = {
     implicit val tA: Type[A] = x.A
     Var.assign(x,data.unbox)
+  }
+
+
+  override def postprocess[R](block: Block[R]): Block[R] = {
+    // Not allowed to have mixed control and primitives after unit pipe insertion
+    spatialConfig.allowPrimitivesInOuterControl = false
+    super.postprocess(block)
   }
 
 }

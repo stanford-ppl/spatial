@@ -3,7 +3,7 @@ package control
 
 import argon._
 import forge.tags._
-import spatial.data._
+import spatial.metadata.control._
 import spatial.node._
 
 class Directives(options: CtrlOpt) {
@@ -15,7 +15,7 @@ class Directives(options: CtrlOpt) {
 
   @rig protected def unit_pipe(func: => Any, ens: Set[Bit] = Set.empty): Void = {
     val block = stageBlock{ func; void }
-    stageWithData(UnitPipe(Set.empty, block)){pipe => options.set(pipe) }
+    stageWithFlow(UnitPipe(Set.empty, block)){pipe => options.set(pipe) }
   }
 }
 

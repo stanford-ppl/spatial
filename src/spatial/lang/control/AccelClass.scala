@@ -1,8 +1,8 @@
 package spatial.lang
 package control
 
-import forge.tags._
 import argon._
+import forge.tags._
 import spatial.node._
 
 protected class AccelClass(name: Option[String]) {
@@ -15,6 +15,6 @@ protected class AccelClass(name: Option[String]) {
   }
 
   @api def apply(scope: => Any): Void = {
-    stageWithData(AccelScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
+    stageWithFlow(AccelScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
   }
 }

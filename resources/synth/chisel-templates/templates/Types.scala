@@ -44,6 +44,8 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	def apply(msb:Int, lsb:Int): UInt = this.number(msb,lsb)
 	def apply(bit:Int): Bool = this.number(bit)
 
+    def toSeq: Seq[FixedPoint] = Seq(this)
+
 	// Properties
 	val number = UInt((d + f).W)
 	val debug_overflow = Bool()
@@ -58,110 +60,115 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 
 	def msb():Bool = number(d+f-1)
 
-	def cast(dst: FixedPoint, rounding: LSBCasting = Truncate, saturating: MSBCasting = Lazy, sign_extend: scala.Boolean = true, expect_neg: Bool = false.B, expect_pos: Bool = false.B): Unit = {
-		val has_frac = dst.f > 0
-		val has_dec = dst.d > 0
-		val up_frac = dst.f max 1
-		val up_dec = dst.d max 1
-		val tmp_frac = Wire(UInt(up_frac.W))
-		val new_frac = Wire(UInt(up_frac.W))
-		val new_dec = Wire(UInt(up_dec.W))
-		if (!has_frac) { tmp_frac := 0.U(1.W) }
-		if (!has_frac) { new_frac := 0.U(1.W) }
-		if (!has_dec) { new_dec := 0.U(1.W) }
 
-		// Compute new frac part
-		// val new_frac = Wire(UInt(dst.f.W))
-		val shave_f = f - dst.f
-		val shave_d = d - dst.d
-		if (has_frac) {
-			if (dst.f < f) { // shrink decimals
-				rounding match {
-					case Truncate => 
-						tmp_frac := number(shave_f + dst.f - 1, shave_f)
-						// (0 until dst.f).map{ i => number(shave_f + i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-					case Unbiased => 
-						val prng = Module(new PRNG(scala.math.abs(scala.util.Random.nextInt)))
-						prng.io.en := true.B
-						val salted = number + prng.io.output(shave_f-1,0)
-						tmp_frac := salted(shave_f + dst.f -1, shave_f)
-					// case "biased" =>
-					// 	Mux(number(shave_f-1), number + 1.U(shave_f.W) << (shave_f-1), number(shave_f + dst.f - 1, shave_f)) // NOT TESTED!!
-					case _ =>
-						tmp_frac := 0.U(dst.f.W)
-						// TODO: throw error
+	def cast[T](dest: T, rounding: LSBCasting = Truncate, saturating: MSBCasting = Lazy, sign_extend: scala.Boolean = true, expect_neg: Bool = false.B, expect_pos: Bool = false.B): Unit = {
+		dest match { 
+			case dst: FixedPoint => 
+				val has_frac = dst.f > 0
+				val has_dec = dst.d > 0
+				val up_frac = dst.f max 1
+				val up_dec = dst.d max 1
+				val tmp_frac = Wire(UInt(up_frac.W))
+				val new_frac = Wire(UInt(up_frac.W))
+				val new_dec = Wire(UInt(up_dec.W))
+				if (!has_frac) { tmp_frac := 0.U(1.W) }
+				if (!has_frac) { new_frac := 0.U(1.W) }
+				if (!has_dec) { new_dec := 0.U(1.W) }
+
+				// Compute new frac part
+				// val new_frac = Wire(UInt(dst.f.W))
+				val shave_f = f - dst.f
+				val shave_d = d - dst.d
+				if (has_frac) {
+					if (dst.f < f) { // shrink decimals
+						rounding match {
+							case Truncate => 
+								tmp_frac := number(shave_f + dst.f - 1, shave_f)
+								// (0 until dst.f).map{ i => number(shave_f + i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
+							case Unbiased => 
+								val prng = Module(new PRNG(scala.math.abs(scala.util.Random.nextInt)))
+								prng.io.en := true.B
+								val salted = number + prng.io.output(shave_f-1,0)
+								tmp_frac := salted(shave_f + dst.f -1, shave_f)
+							// case "biased" =>
+							// 	Mux(number(shave_f-1), number + 1.U(shave_f.W) << (shave_f-1), number(shave_f + dst.f - 1, shave_f)) // NOT TESTED!!
+							case _ =>
+								tmp_frac := 0.U(dst.f.W)
+								// TODO: throw error
+						}
+					} else if (dst.f > f) { // expand decimals
+						val expand = dst.f - f
+						if (f > 0) { tmp_frac := util.Cat(number(f-1,0), 0.U(expand.W))} else {tmp_frac := 0.U(expand.W)}
+						// (0 until dst.f).map{ i => if (i < expand) {0.U} else {number(i - expand)*scala.math.pow(2,i).toInt.U}}.reduce{_+_}
+					} else { // keep same
+						tmp_frac := number(dst.f-1,0)
+						// (0 until dst.f).map{ i => number(i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
+					}
 				}
-			} else if (dst.f > f) { // expand decimals
-				val expand = dst.f - f
-				if (f > 0) { tmp_frac := util.Cat(number(f-1,0), 0.U(expand.W))} else {tmp_frac := 0.U(expand.W)}
-				// (0 until dst.f).map{ i => if (i < expand) {0.U} else {number(i - expand)*scala.math.pow(2,i).toInt.U}}.reduce{_+_}
-			} else { // keep same
-				tmp_frac := number(dst.f-1,0)
-				// (0 until dst.f).map{ i => number(i)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-			}
-		}
 
-		// Compute new dec part (concatenated with frac part from before)
-		if (has_dec) {
-			if (dst.d < d) { // shrink decimals
-				saturating match { 
-					case Lazy =>
-						dst.debug_overflow := (0 until shave_d).map{i => number(d + f - 1 - i)}.reduce{_||_}
+				// Compute new dec part (concatenated with frac part from before)
+				if (has_dec) {
+					if (dst.d < d) { // shrink decimals
+						saturating match { 
+							case Lazy =>
+								dst.debug_overflow := (0 until shave_d).map{i => number(d + f - 1 - i)}.reduce{_||_}
+								new_frac := tmp_frac
+								new_dec := number(dst.d + f - 1, f)
+								// (0 until dst.d).map{i => number(f + i) * scala.math.pow(2,i).toInt.U}.reduce{_+_}
+							case Saturation =>
+								val sign = number.msb
+								val overflow = ((sign & expect_pos) | (~sign & expect_neg)) 
+							  	val not_saturated = ( number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) ) | ( ~number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) )
+
+							  	val saturated_frac = Mux(expect_pos, 
+							  			util.Cat(util.Fill(up_frac, true.B)), 
+							  			Mux(expect_neg, 0.U(up_frac.W), 0.U(up_frac.W)))
+							  	val saturated_dec = Mux(expect_pos, 
+							  			util.Cat(~(dst.s | s).B, util.Fill(up_dec-1, true.B)), 
+							  			Mux(expect_neg, 1.U((dst.d).W) << (dst.d-1), 1.U((dst.d).W) << (dst.d-1))) 
+
+							  	new_frac := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, tmp_frac, saturated_frac))
+							  	new_dec := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, number(dst.d + f - 1, f), saturated_dec))
+							case _ =>
+								new_frac := tmp_frac
+								new_dec := 0.U(dst.d.W)
+						}
+					} else if (dst.d > d) { // expand decimals
+						val expand = dst.d - d
+						val sgn_extend = if (s & sign_extend) { number(d+f-1) } else {0.U(1.W)}
 						new_frac := tmp_frac
-						new_dec := number(dst.d + f - 1, f)
-						// (0 until dst.d).map{i => number(f + i) * scala.math.pow(2,i).toInt.U}.reduce{_+_}
-					case Saturation =>
-						val sign = number.msb
-						val overflow = ((sign & expect_pos) | (~sign & expect_neg)) 
-					  	val not_saturated = ( number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) ) | ( ~number(f+d-1,f+d-1-shave_d) === 0.U(shave_d.W) )
-
-					  	val saturated_frac = Mux(expect_pos, 
-					  			util.Cat(util.Fill(up_frac, true.B)), 
-					  			Mux(expect_neg, 0.U(up_frac.W), 0.U(up_frac.W)))
-					  	val saturated_dec = Mux(expect_pos, 
-					  			util.Cat(~(dst.s | s).B, util.Fill(up_dec-1, true.B)), 
-					  			Mux(expect_neg, 1.U((dst.d).W) << (dst.d-1), 1.U((dst.d).W) << (dst.d-1))) 
-
-					  	new_frac := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, tmp_frac, saturated_frac))
-					  	new_dec := Mux(number === 0.U, 0.U, Mux(not_saturated & ~overflow, number(dst.d + f - 1, f), saturated_dec))
-					case _ =>
+						new_dec := util.Cat(util.Fill(expand, sgn_extend), number(f+d-1, f))
+						// (0 until dst.d).map{ i => if (i >= dst.d - expand) {sgn_extend*scala.math.pow(2,i).toInt.U} else {number(i+f)*scala.math.pow(2,i).toInt.U }}.reduce{_+_}
+					} else { // keep same
 						new_frac := tmp_frac
-						new_dec := 0.U(dst.d.W)
+						new_dec := number(f+d-1, f)
+						// (0 until dst.d).map{ i => number(i + f)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
+					}
+
 				}
-			} else if (dst.d > d) { // expand decimals
-				val expand = dst.d - d
-				val sgn_extend = if (s & sign_extend) { number(d+f-1) } else {0.U(1.W)}
-				new_frac := tmp_frac
-				new_dec := util.Cat(util.Fill(expand, sgn_extend), number(f+d-1, f))
-				// (0 until dst.d).map{ i => if (i >= dst.d - expand) {sgn_extend*scala.math.pow(2,i).toInt.U} else {number(i+f)*scala.math.pow(2,i).toInt.U }}.reduce{_+_}
-			} else { // keep same
-				new_frac := tmp_frac
-				new_dec := number(f+d-1, f)
-				// (0 until dst.d).map{ i => number(i + f)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-			}
 
+				if (has_dec & has_frac) {
+					dst.number := chisel3.util.Cat(new_dec, new_frac)	
+				} else if (has_dec & !has_frac) {
+					dst.number := new_dec		
+				} else if (!has_dec & has_frac) {
+					dst.number := tmp_frac
+				}
+				
+				
+				// dst.number := util.Cat(new_dec, new_frac) //new_frac + new_dec*(scala.math.pow(2,dst.f).toInt.U)
+			case dst: UInt => 
+				val result = Wire(new FixedPoint(true, dst.getWidth, 0))
+				this.cast(result, rounding, saturating, sign_extend, expect_neg, expect_pos)
+				dst := result.r
 		}
-
-		if (has_dec & has_frac) {
-			dst.number := chisel3.util.Cat(new_dec, new_frac)	
-		} else if (has_dec & !has_frac) {
-			dst.number := new_dec		
-		} else if (!has_dec & has_frac) {
-			dst.number := tmp_frac
-		}
-		
-		
-		// dst.number := util.Cat(new_dec, new_frac) //new_frac + new_dec*(scala.math.pow(2,dst.f).toInt.U)
-
 	}
 	
 
-	def raw_dec[T]: UInt = {
-		this.number(d+f-1, f)
-	}
-	def raw_frac[T]: UInt = {
-		this.number(f, 0)
-	}
+	def raw_dec[T]: UInt = this.number(d+f-1, f)
+	def rd[T]: UInt = this.number(d+f-1, f)
+	def raw_frac[T]: UInt = this.number(f, 0)
+	def rf[T]: UInt = this.number(f, 0)
 
 	// Arithmetic
 	override def connect (rawop: Data)(implicit sourceInfo: SourceInfo, connectionCompileOptions: chisel3.core.CompileOptions): Unit = {
@@ -234,30 +241,34 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	}
 	def <->[T] (rawop: T): FixedPoint = {this.-(rawop, saturating = Saturation)}
 
-	def *-*[T] (rawop: T): FixedPoint = {this.*-*(rawop, None)}
-	def *-*[T] (rawop: T, delay: Option[Double], rounding:LSBCasting = Truncate, saturating:MSBCasting = Lazy): FixedPoint = {
+	def *-*[T] (rawop: T): FixedPoint = {this.*-*(rawop, None, true.B)}
+
+	def *-*[T] (rawop: T, delay: Option[Double], flow: Bool, rounding:LSBCasting = Truncate, saturating:MSBCasting = Lazy): FixedPoint = {
 		rawop match { 
 			case op: FixedPoint => 
-				val op_latency = if (Utils.retime) { 
+				val op_latency = if (Utils.retime | delay.isDefined) { 
 					if (delay.isDefined) delay.get.toDouble
 					else (Utils.fixmul_latency * op.getWidth).toDouble
 				} else 0
 
 				// Compute upcasted type and return type
-				val upcasted_type = if (rounding == Truncate && saturating == Lazy) (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
+				val upcasted_type = if (rounding == Truncate && saturating == Lazy && (op.f == 0 | f == 0)) (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
 									else (op.s | s, op.d + d, op.f + f)
 				val return_type = (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
 				// Get upcasted operators
 				val full_result = Wire(new FixedPoint(upcasted_type))
 				// Do upcasted operation
-				if (rounding == Truncate && saturating == Lazy) {
-					val expanded_self = if (op.f != 0) util.Cat(util.Fill(op.f, this.msb), this.number) else this.number
-					val expanded_op = if (f != 0) util.Cat(util.Fill(f, op.msb), op.number) else op.number
-					full_result.number := (expanded_self.*-*(expanded_op, Some(op_latency))) >> scala.math.max(op.f, f)
+				if (rounding == Truncate && saturating == Lazy && (op.f == 0 | f == 0)) {
+					// val expanded_self = if (op.f != 0) util.Cat(util.Fill(op.f, this.msb), this.number) else this.number
+					// val expanded_op = if (f != 0) util.Cat(util.Fill(f, op.msb), op.number) else op.number
+					val rhs_bits = op.f - f
+					val expanded_self = if (rhs_bits > 0) util.Cat(this.number, util.Fill(rhs_bits, false.B)) else this.number
+					val expanded_op = if (rhs_bits < 0) util.Cat(op.number, util.Fill(-rhs_bits, false.B)) else op.number
+					full_result.number := (expanded_self.*-*(expanded_op, Some(op_latency), flow)) >> scala.math.max(op.f, f)
 				} else {
 					val expanded_self = util.Cat(util.Fill(op.d+op.f, this.msb), this.number)
 					val expanded_op = util.Cat(util.Fill(d+f, op.msb), op.number)
-					full_result.number := expanded_self.*-*(expanded_op, Some(op_latency))
+					full_result.number := expanded_self.*-*(expanded_op, Some(op_latency), flow)
 				}
 
 				// Downcast to result
@@ -268,31 +279,28 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				result
 			case op: UInt => 
 				val op_cast = Utils.FixedPoint(this.s, op.getWidth max this.d, this.f, op)
-				this.*-*(op_cast, delay)
+				this.*-*(op_cast, delay, flow)
 			case op: SInt => 
 				val op_cast = Utils.FixedPoint(this.s, op.getWidth max this.d, this.f, op.asUInt)
-				number.*-*(op_cast, delay)
+				number.*-*(op_cast, delay, flow)
 
 			}
 	}
-	def *&[T] (rawop: T): FixedPoint = {this.*-*(rawop, None, rounding = Unbiased)}
-	def <*&>[T] (rawop: T): FixedPoint = {this.*-*(rawop, None, rounding = Unbiased, saturating = Saturation)}
-	def <*>[T] (rawop: T): FixedPoint = {this.*-*(rawop, None, saturating = Saturation)}
 
-	def /-/[T] (rawop: T): FixedPoint = {this./-/(rawop, None)}
-	def /-/[T] (rawop: T, delay: Option[Double], rounding:LSBCasting = Truncate, saturating:MSBCasting = Lazy): FixedPoint = {
+	def /-/[T] (rawop: T): FixedPoint = {this./-/(rawop, None, true.B)}
+	def /-/[T] (rawop: T, delay: Option[Double], flow: Bool, rounding:LSBCasting = Truncate, saturating:MSBCasting = Lazy): FixedPoint = {
 		rawop match { 
 			case op: FixedPoint => 
-				val op_latency = if (Utils.retime) { 
+				val op_latency = if (Utils.retime | !delay.isDefined) { 
 					if (delay.isDefined) delay.get.toDouble
 					else (Utils.fixdiv_latency * op.getWidth).toDouble
 				} else 0
 
 				if (op.f + f == 0) {
 					if (op.s | s) {
-						(this.number.asSInt./-/(op.number.asSInt, Some(op_latency))).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
+						(this.number.asSInt./-/(op.number.asSInt, Some(op_latency), flow)).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
 					} else {
-						(this.number./-/(op.number, Some(op_latency))).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
+						(this.number./-/(op.number, Some(op_latency), flow)).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
 					}
 				} else {
 					// Compute upcasted type and return type
@@ -306,11 +314,11 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 					if (op.s | s) {
 						val numerator = util.Cat(this.number, 0.U(upcasted_type._3.W)).asSInt
 						val denominator = op.number.asSInt
-						full_result.number := (numerator./-/(denominator, Some(op_latency))).asUInt
+						full_result.number := (numerator./-/(denominator, Some(op_latency), flow)).asUInt
 					} else {
 						val numerator = util.Cat(this.number, 0.U(upcasted_type._3.W))
 						val denominator = op.number
-						full_result.number := (numerator./-/(denominator, Some(op_latency))) // Not sure why we need the +1 in pow2
+						full_result.number := (numerator./-/(denominator, Some(op_latency), flow)) // Not sure why we need the +1 in pow2
 					}
 					// Downcast to result
 					val result = Wire(new FixedPoint(return_type))
@@ -321,19 +329,16 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				}
 			case op: UInt => 
 				val op_cast = Utils.FixedPoint(this.s, op.getWidth max this.d, this.f, op)
-				this./-/(op_cast, delay)
+				this./-/(op_cast, delay, flow)
 			case op: SInt => 
 				val op_cast = Utils.FixedPoint(this.s, op.getWidth max this.d, this.f, op.asUInt)
-				number./-/(op_cast, delay)
+				number./-/(op_cast, delay, flow)
 
 		}
 	}
-	def /&[T] (rawop: T): FixedPoint = {this./-/(rawop, None, rounding = Unbiased)}
-	def </&>[T] (rawop: T): FixedPoint = {this./-/(rawop, None, rounding = Unbiased, saturating = Saturation)}
-	def </>[T] (rawop: T): FixedPoint = {this./-/(rawop, None, saturating = Saturation)}
 
-	def %-%[T] (rawop: T): FixedPoint = {this.%-%(rawop, None)}
-	def %-%[T] (rawop: T, delay: Option[Double]): FixedPoint = {
+	def %-%[T] (rawop: T): FixedPoint = {this.%-%(rawop, None, true.B)}
+	def %-%[T] (rawop: T, delay: Option[Double], flow: Bool): FixedPoint = {
 		rawop match { 
 			case op: FixedPoint => 
 				// Compute upcasted type and return type
@@ -343,14 +348,14 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				// Get upcasted operators
 				val full_result = Wire(new FixedPoint(upcasted_type))
 				// Do upcasted operation
-				full_result.number := this.number.%-%(op.number, delay) // Not sure why we need the +1 in pow2
+				full_result.number := this.number.%-%(op.number, delay, flow) // Not sure why we need the +1 in pow2
 				// Downcast to result
 				val result = Wire(new FixedPoint(return_type))
 				full_result.cast(result)
 				result
 			case op: UInt =>
 				val op_cast = Utils.FixedPoint(this.s, op.getWidth max this.d, this.f, op)
-				this.%-%(op_cast, delay)
+				this.%-%(op_cast, delay, flow)
 
 		}
 	}

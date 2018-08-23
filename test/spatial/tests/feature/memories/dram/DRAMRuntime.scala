@@ -1,13 +1,9 @@
 package spatial.tests.feature.memories.dram
 
-
 import spatial.dsl._
 
-
-
-@test class DRAMRuntime extends SpatialTest {
+@spatial class DRAMRuntime extends SpatialTest {
   override def runtimeArgs: Args = "0 1 2 3 4 5 6 7 8 9"
-
 
   def main(args: Array[String]): Unit = {
     val arr = args.map{ a => a.to[Int] }

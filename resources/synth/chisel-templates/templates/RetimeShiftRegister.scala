@@ -6,22 +6,23 @@ import chisel3.core.IntParam
 
 // This wrapper is needed because we need to wire reset as an input,
 // and reset is accessible only from within Modules in Chisel
-class RetimeWrapper(val width: Int, val delay: Int) extends Module {
+class RetimeWrapper(val width: Int, val delay: Int, val init: Long) extends Module {
   val io = IO(new Bundle {
     val flow = Input(Bool())
     val in = Input(UInt(width.W))
     val out = Output(UInt(width.W))
   })
 
-    val sr = Module(new RetimeShiftRegister(width, delay))
+    val sr = Module(new RetimeShiftRegister(width, delay, init))
     sr.io.clock := clock
     sr.io.reset := reset.toBool
     sr.io.flow := io.flow
+    sr.io.init := init.U
     sr.io.in := io.in
     io.out := sr.io.out
 }
 
-class RetimeWrapperWithReset(val width: Int, val delay: Int) extends Module {
+class RetimeWrapperWithReset(val width: Int, val delay: Int, val init: Long) extends Module {
   val io = IO(new Bundle {
     val flow = Input(Bool())
     val rst = Input(Bool())
@@ -30,10 +31,11 @@ class RetimeWrapperWithReset(val width: Int, val delay: Int) extends Module {
   })
 
     if (delay > 0) {
-      val sr = Module(new RetimeShiftRegister(width, delay))
+      val sr = Module(new RetimeShiftRegister(width, delay, init))
       sr.io.clock := clock
       sr.io.reset := reset.toBool | io.rst
       sr.io.flow := io.flow
+      sr.io.init := init.U
       sr.io.in := io.in
       io.out := sr.io.out      
     } else {
@@ -41,7 +43,7 @@ class RetimeWrapperWithReset(val width: Int, val delay: Int) extends Module {
     }
 }
 
-class RetimeShiftRegister(val width: Int, val delay: Int) extends BlackBox(
+class RetimeShiftRegister(val width: Int, val delay: Int, val init: Long) extends BlackBox(
   Map(
     "WIDTH" -> IntParam(width),
     "STAGES" -> IntParam(delay)
@@ -51,6 +53,7 @@ class RetimeShiftRegister(val width: Int, val delay: Int) extends BlackBox(
     val clock = Input(Clock())
     val reset = Input(Bool())
     val flow = Input(Bool())
+    val init = Input(UInt(width.W))
     val in = Input(UInt(width.W))
     val out = Output(UInt(width.W))
   })

@@ -2,8 +2,7 @@ package spatial.tests.feature.memories.sram
 
 import spatial.dsl._
 
-@test class SRAMTiny extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class SRAMTiny extends SpatialTest {
   override def backends = super.backends.filterNot{be => (be == VCS_noretime)}
 
   def main(args: Array[String]): Unit = {

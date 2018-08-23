@@ -1,20 +1,20 @@
 package spatial.tests.feature.memories.reg
 
-
 import spatial.dsl._
 
-
-@test class StructReg extends SpatialTest {
-  override def runtimeArgs: Args = "32"
+@spatial class StructReg extends SpatialTest {
+  override def runtimeArgs: Args = "32, 8"
 
   def main(args: Array[String]): Unit = {
     type Tup = Tup2[Int16, Int16]
 
+    val a = args(0).to[Int16]
+    val b = args(1).to[Int16]
     val in1 = ArgIn[Int16]
     val in2 = ArgIn[Int16]
     val out = ArgOut[Tup]
-    setArg(in1, args(0).to[Int16])
-    setArg(in2, args(1).to[Int16])
+    setArg(in1, a)
+    setArg(in2, b)
 
     Accel {
       val reg = Reg[Tup](pack(2.to[Int16],3.to[Int16]))
@@ -25,7 +25,10 @@ import spatial.dsl._
       out := pack(x,y)
     }
 
-    assert(getArg(out)._1 == args(0).to[Int16] + 2)
-    assert(getArg(out)._2 == args(1).to[Int16] + 3)
+    println(r"_1 = ${getArg(out)._1}, expected ${a + 2}")
+    println(r"_2 = ${getArg(out)._2}, expected ${b + 3}")
+
+    assert(getArg(out)._1 == a + 2)
+    assert(getArg(out)._2 == b + 3)
   }
 }

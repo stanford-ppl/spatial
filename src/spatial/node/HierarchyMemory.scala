@@ -1,17 +1,9 @@
 package spatial.node
 
 import argon._
+import argon.node._
 import forge.tags._
 import spatial.lang._
-
-/** Allocation of any black box */
-abstract class Alloc[T:Type] extends AccelOp[T]
-object Alloc {
-  def unapply(x: Sym[_]): Option[Sym[_]] = x match {
-    case Op(_: Alloc[_]) => Some(x)
-    case _ => None
-  }
-}
 
 /** Memory allocation */
 abstract class MemAlloc[A:Bits,C[T]](
@@ -22,7 +14,7 @@ abstract class MemAlloc[A:Bits,C[T]](
   val A: Bits[A] = Bits[A]
 
   def dims: Seq[I32]
-  def rank: Int = dims.length
+  def rank: Seq[Int] = Seq.tabulate(dims.length){i => i}
   override def effects: Effects = if (mutable) Effects.Mutable else super.effects
 }
 object MemAlloc {
@@ -34,7 +26,8 @@ object MemAlloc {
 
 abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) extends Alloc[Alias[A]] {
   def mem: Seq[Src[A]]
-  def rank: Int
+  def rank: Seq[Int]
+  def rawRank: Seq[Int]
   def mutable: Boolean
   def A: Type[A]
   def Src: Type[Src[A]]
@@ -59,7 +52,8 @@ abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) ext
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
 
-  def rank: Int = ranges.head.count(r => !r.isUnit)
+  def rank: Seq[Int] = ranges.head.zipWithIndex.collect{case(r,i) if !r.isUnit => i}
+  def rawRank: Seq[Int] = Seq.tabulate(ranges.head.length){i => i}
   val mutable = true
 
   override def aliases: Set[Sym[_]] = syms(mem)
@@ -92,7 +86,8 @@ object MemDenseAlias {
     val Src:   Type[Src[A]],
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
-  def rank: Int = 1
+  def rank: Seq[Int] = Seq(0)
+  def rawRank: Seq[Int] = Seq(0)
   val mutable = true
 
   override def aliases: Set[Sym[_]] = syms(mem)

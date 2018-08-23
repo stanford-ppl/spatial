@@ -4,7 +4,8 @@ import argon._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.util._
+import spatial.metadata.memory._
+import spatial.util.IntLike
 
 import utils.implicits.collections._
 
@@ -107,16 +108,25 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)
 
-    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank)
-    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank)
+    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank.length)
+    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank.length)
+
+    case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
+    case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes))), _) => oneHotMux(conds,sizes)
+
+    case MemPar(Op(MemDenseAlias(_,_,F(ranges))), d)          => fieldsRanges(ranges, d)(_.par).head
+    case MemPar(Op(MemSparseAlias(F(conds),_,F(addrs),_)), _) =>
+      val pars = addrs.map(_.asInstanceOf[Sym[_]]).map{
+        case Def(MemPar(Op(MemDenseAlias(_,_,F(ranges))), d)) => fieldsRanges(ranges, d)(_.par).head
+        case _ => I32(1)
+      }
+      oneHotMux(conds,pars)
 
     // --- The remaining operations are currently disallowed for SparseAlias:
 
     case MemStart(Op(MemDenseAlias(F(conds),_,F(ranges))), d) => dealiasRanges(conds, ranges, d)(_.start)
     case MemEnd(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.end)
     case MemStep(Op(MemDenseAlias(F(conds),_,F(ranges))), d)  => dealiasRanges(conds, ranges, d)(_.step)
-    case MemPar(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => fieldsRanges(ranges, d)(_.par).head
-    case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
 
     case op: Reader[_,_] if op.mem.isDenseAlias =>
       val Reader(Op(MemDenseAlias(F(conds),F(mems),F(ranges))), addr, F(ens)) = op
@@ -137,8 +147,8 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       val StatusReader(mem @ Op(MemDenseAlias(F(conds),F(mems),_)), F(ens)) = op
 
       val reads = conds.zip(mems).map{case (c,mem2) =>
-        isolateWith(escape=Nil, mem -> mem2.asInstanceOf[Sym[_]]){
-          transferMetadataIfNew(lhs){ stage(op.mirrorEn(f, Set(c))).asInstanceOf[Sym[A]] }._1
+        isolateSubstWith(escape=Nil, mem -> mem2.asInstanceOf[Sym[_]]){
+          stageWithFlow(op.mirrorEn(f, Set(c))){lhs2 => transferData(lhs,lhs2) }.asInstanceOf[Sym[A]]
         }
       }
       implicit val A: Bits[A] = op.R.asInstanceOf[Bits[A]]

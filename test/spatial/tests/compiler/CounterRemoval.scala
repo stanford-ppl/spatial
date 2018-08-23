@@ -3,8 +3,7 @@ package spatial.tests.compiler
 import argon.Block
 import spatial.dsl._
 
-@test class CounterRemovalOnRewrite extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class CounterRemovalOnRewrite extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val x = ArgOut[Int]
@@ -25,20 +24,22 @@ import spatial.dsl._
 
 }
 
-@test class CounterRemovalOnUnroll extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class CounterRemovalOnUnroll extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](16)
+    val x = ArgIn[Int]
+    val y = ArgOut[Int]
+    setArg(x, 15)
     Accel {
       val sram = SRAM[Int](16)
 
       Foreach(16 par 16){i => sram(i) = i }
 
-      dram store sram
+      y := sram(x)
     }
-    val gold = Array.tabulate(16){i => i }
-    assert(getMem(dram) == gold)
+    
+    assert(getArg(y) == 15)
   }
 
 

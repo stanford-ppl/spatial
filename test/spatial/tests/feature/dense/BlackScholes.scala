@@ -2,7 +2,7 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class BlackScholes extends SpatialTest {
+@spatial class BlackScholes extends SpatialTest {
   override def runtimeArgs: Args = "10000"
 
   val margin = 0.5f // Validates true if within +/- margin

@@ -1,10 +1,8 @@
 package spatial.tests.feature.memories.lut
 
-
-
 import spatial.dsl._
 
-@test class LUTSimple extends SpatialTest {
+@spatial class LUTSimple extends SpatialTest {
   override def runtimeArgs: Args = "2"
 
   type T = FixPt[TRUE,_32,_32]

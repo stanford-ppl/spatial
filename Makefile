@@ -1,19 +1,47 @@
-.PHONY: nova all resources apps test
+.PHONY: all resources apps test
 all: apps
 
+###-----------------------------------###
+## Update local numeric emulation lib. ##
+###-----------------------------------###
 install: 
+	bash bin/make_poly.sh
 	sbt "; project emul; publishLocal"
+	sbt "; project templateResources; publishLocal"
 
+###-----------------------------------###
+## Make all apps (but not tests).      ##
+###-----------------------------------###
 apps:  
-	sbt "; project apps; compile"
+	bash bin/make_poly.sh
 	sbt "; project emul; publishLocal"
+	sbt "; project templateResources; publishLocal"
+	sbt "; project apps; compile"
 
-nova:
-	sbt compile
+app: apps
 
+###-----------------------------------###
+## Make all tests and apps.            ##
+###-----------------------------------###
+tests:
+	bash bin/make_poly.sh
+	sbt "; project emul; publishLocal"
+	sbt "; project templateResources; publishLocal"
+	sbt "; project apps; compile"
+	sbt test:compile
+
+test: tests
+
+###-----------------------------------###
+## Update the files_list for Java jar. ##
+###-----------------------------------###
 resources:
 	bash bin/update_resources.sh
+	sbt "; project templateResources; publishLocal"
 
+###-----------------------------------###
+## Remove all generated files.	       ##
+###-----------------------------------###
 clear: 
 	rm -f *.log	
 	rm -f *.sim
@@ -21,12 +49,11 @@ clear:
 	rm -rf gen
 	rm -rf reports
 
-test:
-	sbt test:compile
-
+###-----------------------------------###
+## Clean all compiled Scala projects   ##
+###-----------------------------------###
 clean:
-	sbt "; forge/clean; argon/clean; nova/clean"
+	sbt "; forge/clean; argon/clean; spatial/clean"
 	sbt clean
 
-tests:
-	sbt test:compile
+

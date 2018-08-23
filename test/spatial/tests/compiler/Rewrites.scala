@@ -1,8 +1,7 @@
 package spatial.tests.compiler
 
-import spatial.node.FixInv
+import argon.node._
 import spatial.dsl._
-import spatial.SpatialTestbench
 
 class BasicRewriteChecks extends SpatialTestbench {
   val b = random[Bit]
@@ -68,7 +67,7 @@ class BasicRewriteChecks extends SpatialTestbench {
 
   req(0 / x, z, "Left absorber rewrite failed for FixDiv")
   req(x / 1, x, "Right identity rewrite failed for FixDiv")
-  reqOp[FixInv[_,_,_]](1 / x, "Inverse rewrite failed for FixDiv")
+  reqOp[FixRecip[_,_,_]](1 / x, "Inverse rewrite failed for FixDiv")
   reqWarn(x / 0, "division by 0", "Warning on division by zero failed for FixDiv")
   req(y / k, 2.to[I32], "Constant prop. failed for FixDiv")
 

@@ -2,10 +2,9 @@ package spatial.tests.feature.memories.sram
 
 import spatial.dsl._
 
-@test class SRAMMaskedWrite extends SpatialTest {
+@spatial class SRAMMaskedWrite extends SpatialTest {
   override def runtimeArgs: Args = "2"
   type T = Int
-
 
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals

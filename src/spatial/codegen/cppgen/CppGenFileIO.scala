@@ -1,17 +1,13 @@
 package spatial.codegen.cppgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.data._
-import spatial.util._
-
 
 trait CppGenFileIO extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-      case OpenBinaryFile(filename, isWr) =>
+    case OpenBinaryFile(filename, isWr) =>
       val dir = if (isWr) "o" else "i"
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")
       emit(src"""assert(${lhs}.good() && "File ${s"$filename".replace("\"","")} does not exist"); """)
@@ -56,8 +52,8 @@ trait CppGenFileIO extends CppGenCommon {
 
       close("}")
       
-    case CloseBinaryFile(file) => // Anything for this?
-      emit(src"${file}.close();")
+    case CloseBinaryFile(file) =>
+      emit(src"$file.close();")
 
 
     case OpenCSVFile(filename, isWr) => 
@@ -103,11 +99,6 @@ trait CppGenFileIO extends CppGenCommon {
           emit(src"""${file}_file << ${chardelim};""")
         close("}")
       close("}")
-
-    // case OpenBinaryFile(filename: Exp[MString], write: Boolean)
-    // case CloseBinaryFile(file: Exp[MBinaryFile])
-    // case ReadBinaryFile[T:Type:Num](file: Exp[MBinaryFile])
-    // case WriteBinaryFile[T:Type:Num](file:  Exp[MBinaryFile],len:   Exp[Index],value: Lambda1[Index, T],index: Bound[Index])
 
     case _ => super.gen(lhs, rhs)
   }

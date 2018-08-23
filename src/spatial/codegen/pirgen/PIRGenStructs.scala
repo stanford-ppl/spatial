@@ -2,8 +2,9 @@ package spatial.codegen
 package pirgen
 
 import argon._
+import argon.codegen.StructCodegen
+import argon.node._
 import spatial.lang._
-import spatial.node._
 
 trait PIRGenStructs extends PIRCodegen with StructCodegen with PIRGenBits {
 
@@ -16,7 +17,7 @@ trait PIRGenStructs extends PIRCodegen with StructCodegen with PIRGenBits {
 
   protected def emitStructDeclaration(name: String, tp: Struct[_]): Unit = {
     open(src"case class $name(")
-      tp.fields.foreach{case (field,t) => emit(src"var $field: $t") }
+      tp.fields.foreach{case (field,t) => emit(src"var $field: $t,") }
     close(") {")
     open("")
       emit("override def productPrefix = \"" + tp.typeName + "\"")
@@ -24,11 +25,13 @@ trait PIRGenStructs extends PIRCodegen with StructCodegen with PIRGenBits {
   }
 
   protected def emitDataStructures(): Unit = if (encounteredStructs.nonEmpty) {
-    inGen(getOrCreateStream(out, "Structs")) {
+    inGen(getOrCreateStream(out, "Structs.scala")) {
+      emitHeader()
       for ((tp, name) <- encounteredStructs) {
         emitStructDeclaration(name, tp)
         emit("")
       }
+      emitFooter()
     }
   }
   

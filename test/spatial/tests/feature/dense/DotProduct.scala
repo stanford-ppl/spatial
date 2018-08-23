@@ -4,14 +4,13 @@ import spatial.dsl._
 
 
 
-@test class DotProduct extends SpatialTest {
+@spatial class DotProduct extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 
   val innerPar = 4
   val outerPar = 1
   val tileSize = 32
-
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     val B  = tileSize (32 -> 64 -> 19200)
@@ -68,14 +67,14 @@ import spatial.dsl._
   }
 }
 
-@test class DotProductFlt extends SpatialTest {
+@spatial class DotProductFlt extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = Float //FixPt[TRUE,_32,_0]
 
   val innerPar = 4
   val outerPar = 1
   val tileSize = 32
-
+  val margin = 0.3f
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     val B  = tileSize (32 -> 64 -> 19200)
@@ -126,7 +125,7 @@ import spatial.dsl._
     println("expected: " + gold)
     println("result: " + result)
 
-    val cksum = gold == result
+    val cksum = abs(gold - result) < margin
     println("PASS: " + cksum + " (DotProduct)")
     assert(cksum)
   }

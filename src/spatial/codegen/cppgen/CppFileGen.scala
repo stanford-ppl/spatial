@@ -2,7 +2,7 @@ package spatial.codegen.cppgen
 
 import argon._
 
-import spatial.data._
+import spatial.metadata.CLIArgs
 
 trait CppFileGen extends CppCodegen {
 
@@ -85,6 +85,8 @@ trait CppFileGen extends CppCodegen {
       emit("""typedef __int128 int128_t;""")
       emit("""#endif""")
       emit("")
+      emit("void printHelp(); ")
+      emit("")
       open(s"void Application(int numThreads, vector<string> * args) {")
       emit("// Create an execution context.")
       emit("""FringeContext *c1 = new FringeContext("./verilog/accel.bit.bin");""")
@@ -110,10 +112,14 @@ trait CppFileGen extends CppCodegen {
       close("}")
       emit("")
       open("void printHelp() {")
-        val argsList = CLIArgs.listNames.mkString(" ")
+        val argsList = CLIArgs.listNames
+        val examples: Iterator[Seq[String]] = if (argsList.nonEmpty) IR.runtimeArgs.grouped(argsList.size) else Iterator(Seq(""))
         emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
-  	    emit(s"""fprintf(stderr, "  -- bash run.sh ${argsList}\\n\\n");""")
-  	    emit(s"""exit(0);""")
+        emit(s"""fprintf(stderr, "  -- Args:    ${argsList.mkString(" ")}\\n");""")
+        while(examples.hasNext) {
+          emit(s"""fprintf(stderr, "    -- Example: bash run.sh ${examples.next.mkString(" ")}\\n");""")  
+        }
+  	    emit(s"""exit(1);""")
       close("}")
 
       emit("")

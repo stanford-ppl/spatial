@@ -4,8 +4,7 @@ import spatial.dsl._
 
 import scala.collection.mutable.ArrayBuffer
 
-@test class BitTest extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class BitTest extends SpatialTest {
   override def backends = DISABLED
 
   // Returns a random number in [min,max)

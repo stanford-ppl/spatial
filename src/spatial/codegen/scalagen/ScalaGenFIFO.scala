@@ -1,10 +1,9 @@
 package spatial.codegen.scalagen
 
 import argon._
-import spatial.data._
+import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import spatial.util._
 
 import utils.implicits.collections._
 
@@ -18,15 +17,15 @@ trait ScalaGenFIFO extends ScalaGenMemories {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FIFONew(size)    => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Queue[${op.A}]") }
     case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.isEmpty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.size >= ${sizeOf(fifo)} ")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.size >= ${fifo.stagedSize} ")
 
     case FIFOIsAlmostEmpty(fifo,_) =>
-      val rPar = readWidths(fifo).maxOrElse(1)
+      val rPar = fifo.readWidths.maxOrElse(1)
       emit(src"val $lhs = $fifo.size <= $rPar")
 
     case FIFOIsAlmostFull(fifo,_) =>
-      val wPar = writeWidths(fifo).maxOrElse(1)
-      emit(src"val $lhs = $fifo.size === ${sizeOf(fifo)} - $wPar")
+      val wPar = fifo.writeWidths.maxOrElse(1)
+      emit(src"val $lhs = $fifo.size === ${fifo.stagedSize} - $wPar")
 
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = if ($fifo.nonEmpty) $fifo.head else ${invalid(op.A)}")
     case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.size")

@@ -1,12 +1,10 @@
 package spatial.codegen.chiselgen
 
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.internal.{spatialConfig => cfg}
-import spatial.data._
-import spatial.util._
+import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 
 trait ChiselGenDelay extends ChiselGenCommon {
@@ -27,8 +25,8 @@ trait ChiselGenDelay extends ChiselGenCommon {
           alphaconv_register(src"$lhs")
           emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
           lhs.tp match {
-            case a:Vec[_] => emit(src"(0 until ${a.width}).foreach{i => ${lhs}(i).r := ${DL(src"${data}(i).r", delay)}}")
-            case _ =>        emit(src"""${lhs}.r := ${DL(src"${data}.r", delay, false)}""")
+            case a:Vec[_] => emitt(src"(0 until ${a.width}).foreach{i => ${lhs}(i).r := ${DL(src"${data}(i).r", delay)}}")
+            case _ =>        emitt(src"""${lhs}.r := ${DL(src"${data}.r", delay, false)}""")
           }
       }
 

@@ -4,8 +4,6 @@ package host
 import argon._
 import forge.tags._
 import spatial.node._
-import spatial.internal._
-import utils.Overloads._
 import utils.implicits.Readable._
 
 /** A one-dimensional array on the host. */
@@ -61,6 +59,8 @@ import utils.implicits.Readable._
 
   @api def sum(implicit aA: Num[A]): A = this.fold(aA.zero){(a,b) => a + b }
   @api def product(implicit aA: Num[A]): A = this.fold(aA.one){(a,b) => a * b }
+  @api def min(implicit aA: Num[A]): A = this.reduce{(a,b) => aA.min(a,b) }
+  @api def max(implicit aA: Num[A]): A = this.reduce{(a,b) => aA.max(a,b) }
 
   /**
     * Reduces the elements in this Array and the given initial value into a single element
@@ -93,6 +93,8 @@ import utils.implicits.Readable._
 
   @api def forall(func: A => Bit): Bit = this.map(func).reduce{_&&_}
   @api def exists(func: A => Bit): Bit = this.map(func).reduce{_||_}
+  @virtualize
+  @api def indexOf(x: A): I32 = Array.tabulate(this.length){i => if(this(i) == x) i else -1}.filter(_ >= 0).min
 
   /** Returns a string representation using the given `delimeter`. */
   @api def mkString(delimeter: Text): Text = this.mkString("", delimeter, "")

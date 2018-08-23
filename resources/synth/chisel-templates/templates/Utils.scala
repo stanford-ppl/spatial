@@ -6,12 +6,13 @@ import chisel3.internal.sourceinfo._
 import types._
 import fringe._
 // import emul._
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.ListMap
 import scala.math._
 
 sealed trait DeviceTarget
 object Default extends DeviceTarget
 object Zynq extends DeviceTarget
+object ZCU extends DeviceTarget
 object DE1 extends DeviceTarget // Do not use this one
 object de1soc extends DeviceTarget
 object AWS_F1 extends DeviceTarget
@@ -21,35 +22,36 @@ object ops {
 
 
   implicit class ArrayOps[T](val b:Array[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
+  implicit class SeqIntOps[T](val b:Seq[Int]) {
+    def getOr1(idx: Int): Int = if (b.size > idx) b(idx) else 1
+  }
+  implicit class SeqBoolOps[T](val b:Seq[Bool]) {
+    def or = if (b.size == 0) false.B else b.reduce{_||_}
+    def and = if (b.size == 0) true.B else b.reduce{_&&_}
+  }
   implicit class ArrayBoolOps[T](val b:Array[Bool]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def or = if (b.size == 0) false.B else b.reduce{_||_}
+    def and = if (b.size == 0) true.B else b.reduce{_&&_}
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
 
   implicit class IndexedSeqOps[T](val b:scala.collection.immutable.IndexedSeq[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
   }
 
   implicit class VecOps[T](val b:chisel3.core.Vec[types.FixedPoint]) {
-    def raw = {
-      chisel3.util.Cat(b.map{_.raw})
-    }
+    def raw = chisel3.util.Cat(b.map{_.raw})
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = {
       chisel3.util.Cat(b.map{_.raw}).FP(s, d, f)
     }
@@ -57,6 +59,8 @@ object ops {
   }
 
   implicit class BoolOps(val b:Bool) {
+    def toSeq: Seq[Bool] = Seq(b)
+
     def D(delay: Int, retime_released: Bool): Bool = {
 //      Mux(retime_released, chisel3.util.ShiftRegister(b, delay, false.B, true.B), false.B)
       Mux(retime_released, Utils.getRetimed(b, delay), false.B)
@@ -87,28 +91,22 @@ object ops {
   }
   
   // implicit class DspRealOps(val b:DspReal) {
-  //   def raw = {
-  //     b.node
-  //   }
+  //   def raw = //     b.node/   }
   //   def number = {
   //     b.node
   //   }
-  //   def r = {
-  //     b.node
-  //   }
+  //   def r = //     b.node
   // }
 
   implicit class UIntOps(val b:UInt) {
+    def toSeq: Seq[UInt] = Seq(b)
     // Define number so that we can be compatible with FixedPoint type
     def number = {
       b
     }
-    def raw = {
-      b
-    }
-    def r = {
-      b
-    }
+    def raw = b
+    def rd = b
+    def r = b
     def msb = {
       b(b.getWidth-1)
     }
@@ -166,22 +164,25 @@ object ops {
       Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) <+> c      
     }
 
-    def *-* (c: FixedPoint): FixedPoint = {this.*-*(c, None)}
-    def *-* (c: SInt): SInt = {this.*-*(c, None)}
-    def *-* (c: UInt): UInt = {this.*-*(c, None)}
+    def *-* (c: FixedPoint): FixedPoint = {this.*-*(c, None, true.B)}
+    def *-* (c: SInt): SInt = {this.*-*(c, None, true.B)}
+    def *-* (c: UInt): UInt = {this.*-*(c, None, true.B)}
 
-    def *-* (c: FixedPoint, delay: Option[Double]): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).*-*(c, delay)
+    def *-* (c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).*-*(c, delay, flow)
     }
 
-    def *-* (c: UInt, delay: Option[Double]): UInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def *-* (c: UInt, delay: Option[Double], flow: Bool): UInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c, delay.get.toInt)
-        else FringeGlobals.bigIP.multiply(b, c, (Utils.fixmul_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.multiply(b, c, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b*c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b*c // Raghu's box
           case Zynq => b*c // Raghu's box
+          case ZCU => b*c // Raghu's box
           case DE1 => b*c // Raghu's box
           case `de1soc` => b*c // Raghu's box
           case Default => b*c
@@ -189,14 +190,17 @@ object ops {
       }
     }
 
-    def *-* (c: SInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def *-* (c: SInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.multiply(b.asSInt, c, delay.get.toInt)
-        else FringeGlobals.bigIP.multiply(b.asSInt, c, (Utils.fixmul_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.multiply(b.asSInt, c, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.multiply(b.asSInt, c, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b.asSInt*c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b.asSInt*c // Raghu's box
           case Zynq => b.asSInt*c // Raghu's box
+          case ZCU => b.asSInt*c // Raghu's box
           case DE1 => b.asSInt*c // Raghu's box
           case `de1soc` => b.asSInt*c // Raghu's box
           case Default => b.asSInt*c
@@ -204,30 +208,21 @@ object ops {
       }
     }
 
-    def <*> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) <*> c      
+    def /-/ (c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b)./-/(c, delay, flow)
     }
 
-    def *& (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) *& c      
-    }
-
-    def <*&> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) <*&> c      
-    }
-
-    def /-/ (c: FixedPoint, delay: Option[Double]): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b)./-/(c, delay)
-    }
-
-    def /-/ (c: UInt, delay: Option[Double]): UInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def /-/ (c: UInt, delay: Option[Double], flow: Bool): UInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.divide(b, c, delay.get.toInt) 
-        else FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt) 
+        if (delay.isDefined) FringeGlobals.bigIP.divide(b, c, delay.get.toInt, flow) 
+        else FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b/c, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b/c // Raghu's box
-         case Zynq => FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt) 
+         case Zynq => FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
+        case ZCU => FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
          case DE1 => b/c // Raghu's box
         case `de1soc` => b/c // Raghu's box
          case Default => b/c
@@ -235,14 +230,17 @@ object ops {
      }
     }
 
-    def /-/ (c: SInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def /-/ (c: SInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.divide(b.asSInt, c, delay.get.toInt) 
-        else FringeGlobals.bigIP.divide(b.asSInt, c, (Utils.fixdiv_latency * b.getWidth).toInt) 
+        if (delay.isDefined) FringeGlobals.bigIP.divide(b.asSInt, c, delay.get.toInt, flow) 
+        else FringeGlobals.bigIP.divide(b.asSInt, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) 
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b.asSInt/c, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b.asSInt/c // Raghu's box
          case Zynq => b.asSInt/c // Raghu's box
+        case ZCU => b.asSInt/c // Raghu's box
          case DE1 => b.asSInt/c // Raghu's box
          case `de1soc` => b.asSInt/c // Raghu's box
          case Default => b.asSInt/c
@@ -250,35 +248,26 @@ object ops {
      }
     }
 
-    def </> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) </> c      
-    }
-
-    def /& (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) /& c      
-    }
-
-    def </&> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) </&> c      
-    }
-
     def % (c: FixedPoint): FixedPoint = {
       Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) %-% c      
     }
 
-    def %-% (c: FixedPoint): FixedPoint = {this.%-%(c, None)}
-    def %-% (c: FixedPoint, delay: Option[Double]): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).%-%(c,None)      
+    def %-% (c: FixedPoint): FixedPoint = {this.%-%(c, None, true.B)}
+    def %-% (c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).%-%(c,delay, flow)
     }
-    def %-% (c: UInt): UInt = {b.%-%(c,None)} // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
-    def %-% (c: UInt, delay: Option[Double]): UInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def %-% (c: UInt): UInt = {b.%-%(c,None,true.B)} // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def %-% (c: UInt, delay: Option[Double], flow: Bool): UInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.mod(b, c, delay.get.toInt)
-        else FringeGlobals.bigIP.mod(b, c, (Utils.fixmod_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.mod(b, c, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.mod(b, c, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b%c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b%c // Raghu's box
           case Zynq => b%c // Raghu's box
+          case ZCU => b%c // Raghu's box
           case DE1 => b%c // Raghu's box
           case `de1soc` => b%c // Raghu's box
           case Default => b%c
@@ -286,15 +275,18 @@ object ops {
       }
     }
 
-    def %-% (c: SInt): SInt = {b.%-%(c, None)}
-    def %-% (c: SInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def %-% (c: SInt): SInt = {b.%-%(c, None, true.B)}
+    def %-% (c: SInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.mod(b.asSInt, c, delay.get.toInt)
-        else FringeGlobals.bigIP.mod(b.asSInt, c, (Utils.fixmod_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.mod(b.asSInt, c, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.mod(b.asSInt, c, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b.asSInt%c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b.asSInt%c // Raghu's box
           case Zynq => b.asSInt%c // Raghu's box
+          case ZCU => b.asSInt%c // Raghu's box
           case DE1 => b.asSInt%c // Raghu's box
           case `de1soc` => b.asSInt%c // Raghu's box
           case Default => b.asSInt%c
@@ -309,20 +301,21 @@ object ops {
     def cast(c: FixedPoint, sign_extend: scala.Boolean = false): Unit = {
       c.r := Utils.FixedPoint(c.s,c.d,c.f,b, sign_extend).r
     }
+    def cast(c: => UInt): Unit = {
+      c.r := b.r
+    }
 
   }
 
   implicit class SIntOps(val b:SInt) {
+    def toSeq: Seq[SInt] = Seq(b)
     // Define number so that we can be compatible with FixedPoint type
     def number = {
       b.asUInt
     }
-    def raw = {
-      b.asUInt
-    }
-    def r = {
-      b.asUInt
-    }
+    def raw = b.asUInt
+    def rd = b.asUInt
+    def r = b.asUInt
     def msb = {
       b(b.getWidth-1)
     }
@@ -380,22 +373,25 @@ object ops {
       Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) <+> c      
     }
 
-    def *-* (c: FixedPoint): FixedPoint = {this.*-*(c, None)}
-    def *-* (c: SInt): SInt = {this.*-*(c, None)}
-    def *-* (c: UInt): SInt = {this.*-*(c, None)}
+    def *-* (c: FixedPoint): FixedPoint = {this.*-*(c, None,true.B)}
+    def *-* (c: SInt): SInt = {this.*-*(c, None,true.B)}
+    def *-* (c: UInt): SInt = {this.*-*(c, None,true.B)}
 
-    def *-* (c: FixedPoint, delay: Option[Double]): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).*-*(c,None)      
+    def *-* (c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).*-*(c,delay,flow)      
     }
 
-    def *-* (c: UInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def *-* (c: UInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c.asSInt, delay.get.toInt)
-        else FringeGlobals.bigIP.multiply(b, c.asSInt, (Utils.fixmul_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c.asSInt, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.multiply(b, c.asSInt, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b*c.asSInt, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b*c.asSInt // Raghu's box
           case Zynq => b*c.asSInt // Raghu's box
+          case ZCU => b*c.asSInt // Raghu's box
           case DE1 => b*c.asSInt // Raghu's box
           case `de1soc` => b*c.asSInt // Raghu's box
           case Default => b*c.asSInt
@@ -403,14 +399,17 @@ object ops {
       }
     }
 
-    def *-* (c: SInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def *-* (c: SInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c, delay.get.toInt)
-        else FringeGlobals.bigIP.multiply(b, c, (Utils.fixmul_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.multiply(b, c, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.multiply(b, c, (Utils.fixmul_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b*c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b*c // Raghu's box
           case Zynq => b*c // Raghu's box
+          case ZCU => b*c // Raghu's box
           case DE1 => b*c // Raghu's box
           case `de1soc` => b*c // Raghu's box
           case Default => b*c
@@ -418,32 +417,23 @@ object ops {
       }
     }
 
-    def <*> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) <*> c      
+    def /-/ (c: FixedPoint): FixedPoint = {this./-/(c,None, true.B)}
+
+    def /-/ (c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b)./-/(c, delay, flow)
     }
 
-    def *& (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) *& c      
-    }
-
-    def <*&> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) <*&> c      
-    }
-
-    def /-/ (c: FixedPoint): FixedPoint = {this./-/(c,None)}
-
-    def /-/ (c: FixedPoint, delay: Option[Double]): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b)./-/(c, delay)
-    }
-
-    def /-/ (c: UInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def /-/ (c: UInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.divide(b, c.asSInt, delay.get.toInt)
-        else FringeGlobals.bigIP.divide(b, c.asSInt, (Utils.fixdiv_latency * b.getWidth).toInt) // Raghu's box. Divide latency set to 16.
+        if (delay.isDefined) FringeGlobals.bigIP.divide(b, c.asSInt, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.divide(b, c.asSInt, (Utils.fixdiv_latency * b.getWidth).toInt, flow) // Raghu's box. Divide latency set to 16.
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b/c.asSInt, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b/c.asSInt // Raghu's box
          case Zynq => b/c.asSInt // Raghu's box
+        case ZCU => b/c.asSInt // Raghu's box
          case DE1 => b/c.asSInt // Raghu's box
          case `de1soc` => b/c.asSInt // Raghu's box
          case Default => b/c.asSInt
@@ -451,14 +441,17 @@ object ops {
      }
     }
 
-    def /-/ (c: SInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def /-/ (c: SInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.divide(b, c, delay.get.toInt) // Raghu's box. Divide latency set to 16.
-        else FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt) // Raghu's box. Divide latency set to 16.
+        if (delay.isDefined) FringeGlobals.bigIP.divide(b, c, delay.get.toInt, flow) // Raghu's box. Divide latency set to 16.
+        else FringeGlobals.bigIP.divide(b, c, (Utils.fixdiv_latency * b.getWidth).toInt, flow) // Raghu's box. Divide latency set to 16.
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b/c, delay.getOrElse(0.0).toInt)
       } else {
        Utils.target match {
          case AWS_F1 => b/c // Raghu's box
          case Zynq => b/c // Raghu's box
+        case ZCU => b/c // Raghu's box
          case DE1 => b/c // Raghu's box
          case `de1soc` => b/c // Raghu's box
          case Default => b/c
@@ -466,34 +459,25 @@ object ops {
      }
     }
 
-    def </> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) </> c      
-    }
-
-    def /& (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) /& c      
-    }
-
-    def </&> (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b) </&> c      
-    }
-
     def %-% (c: FixedPoint): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).%-%(c,None)
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).%-%(c,None,true.B)
     }
 
-    def %-% (c: FixedPoint, delay: Option[Double]): FixedPoint = {
-      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).%-%(c,delay)
+    def %-% (c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+      Utils.FixedPoint(c.s, b.getWidth max c.d, c.f, b).%-%(c,delay, flow)
     }
 
-    def %-% (c: UInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def %-% (c: UInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.mod(b, c.asSInt, delay.get.toInt)
-        else FringeGlobals.bigIP.mod(b, c.asSInt, (Utils.fixmod_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.mod(b, c.asSInt, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.mod(b, c.asSInt, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b%c.asSInt, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b%c.asSInt // Raghu's box
           case Zynq => b%c.asSInt // Raghu's box
+          case ZCU => b%c.asSInt // Raghu's box
           case DE1 => b%c.asSInt // Raghu's box
           case `de1soc` => b%c.asSInt // Raghu's box
           case Default => b%c.asSInt
@@ -501,14 +485,17 @@ object ops {
       }
     }
 
-    def %-% (c: SInt, delay: Option[Double]): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
+    def %-% (c: SInt, delay: Option[Double], flow: Bool): SInt = { // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
       if (Utils.retime) {
-        if (delay.isDefined) FringeGlobals.bigIP.mod(b, c, delay.get.toInt)
-        else FringeGlobals.bigIP.mod(b, c, (Utils.fixmod_latency * b.getWidth).toInt)
+        if (delay.isDefined) FringeGlobals.bigIP.mod(b, c, delay.get.toInt, flow)
+        else FringeGlobals.bigIP.mod(b, c, (Utils.fixmod_latency * b.getWidth).toInt, flow)
+      } else if (Utils.regression_testing == "1") {
+        Utils.getRetimed(b%c, delay.getOrElse(0.0).toInt)
       } else {
         Utils.target match {
           case AWS_F1 => b%c // Raghu's box
           case Zynq => b%c // Raghu's box
+          case ZCU => b%c // Raghu's box
           case DE1 => b%c // Raghu's box
           case `de1soc` => b%c // Raghu's box
           case Default => b%c
@@ -550,6 +537,9 @@ object ops {
     def *-*(x: Long): Long = {b*x}
     def /-/(x: Long): Long = {b/x}
     def %-%(x: Long): Long = {b%x}
+    def indices[T](func: Int => T): Seq[T] = {
+      (0 until b).map{ i => func(i) }.toSeq
+    }
   }
 
   implicit class DoubleOps(val b: Double) {
@@ -576,63 +566,85 @@ object ops {
 
 object Utils {
 
+
+/** Info that comes from the compiler:
+  *
+  *            |--------------|--------------|
+  *            |   Buffer 0   |   Buffer 1   |
+  *            |--------------|--------------|
+  * bufferPort         0              1           The buffer port (None for access outside pipeline)
+  *                 |x x x|        |x x x|
+  *
+  *                /       \      /       \
+  *
+  *              |x x x|x x|     |x x x|x x x|
+  * muxPort         0    1          0     1       The ID for the given time multiplexed vector
+  *
+  *              |( ) O|O O|    |(   )|( ) O|
+  * muxOfs        0   2 0 1        0    0  2      Start offset into the time multiplexed vector
+  *
+  */
+
   /* List of bank addresses, for direct accesses */
+  import scala.collection.immutable.ListMap
   type Banks = List[Int]
   def Banks(xs: Int*) = List(xs:_*)
-  /* Map from muxPort to (parallelization of access, isShift) */
-  type XMap = HashMap[Int, (Int, Option[Int])]
+  /* Map from (muxPort, muxOfs, castgroup) to (width of muxPort, isShift) */
+  type XMap = ListMap[(Int, Int, Int), (Int, Option[Int])]
   implicit class XMapOps(x: XMap) {
-    def muxPorts: Seq[Int] = x.keys.toSeq
-    def accessPars: Seq[Int] = x.sortByMuxPort.values.map(_._1).toSeq
+    def muxAddrs: Seq[(Int,Int,Int)] = x.keys.toSeq
+    def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
-    def sortByMuxPort: XMap = XMap(x.toSeq.sortBy(_._1))
-    def accessParsBelowMuxPort(f: Int): Seq[Int] = x.sortByMuxPort.filter(_._1 < f).accessPars
+    def sortByMuxPortAndOfs: XMap = XMap(x.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._2))) // Order the map by (muxPort, muxOfs)
+    def sortByMuxPortAndCombine: XMap = XMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0, 0) -> (entries.sortBy(x => (x._1._1, x._1._2, x._1._3)).map(_._2._1).sum, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._3))) // Combine entries so that every muxOfs = 0, then sort
+    def accessParsBelowMuxPort(mport: Int, mofs: Int, castgrp: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs) | (p._1._1 == mport & p._1._2 == mofs & p._1._3 < castgrp)}.accessPars
     def merge(y: XMap): XMap = {
       if (y.nonEmpty) {
-        HashMap( (x ++ HashMap(y.map{case (k,v) => 
+        ListMap( (x ++ ListMap(y.map{case (k,v) => 
                                 val base = x.toList.length
-                                ({base + k} -> v)
+                                (({base + k._1}, 0, 0) -> v)
                               }.toArray:_*)).toArray:_*)
       } else x
     }
   }
-  def XMap(xs:(Int, Int)*) = HashMap[Int,(Int,Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
-  def XMap(xs: => Seq[(Int, (Int,Option[Int]))]) = HashMap[Int,(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftXMap(axis: Int, xs:(Int,Int)*) = HashMap[Int, (Int,Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
+  def XMap(xs:((Int, Int, Int), (Int, Option[Int]))*) = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
+  // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
+  def XMap(xs: => Seq[((Int,Int,Int), (Int,Option[Int]))]) = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
   /* Map from muxPort to (Banks, isShift) */
-  type DMap = HashMap[Int, (List[Banks],Option[Int])]
+  type DMap = ListMap[(Int,Int,Int), (List[Banks],Option[Int])]
   implicit class DMapOps(x: DMap) {
-    def muxPorts: Seq[Int] = x.keys.toSeq
-    def accessPars: Seq[Int] = x.sortByMuxPort.values.map(_._1.length).toSeq
+    def muxAddrs: Seq[(Int,Int,Int)] = x.keys.toSeq
+    def accessPars: Seq[Int] = x.sortByMuxPortAndOfs.values.map(_._1.length).toSeq
     def shiftAxis: Option[Int] = x.values.head._2
-    def sortByMuxPort: DMap = DMap(x.toSeq.sortBy(_._1))
-    def accessParsBelowMuxPort(f: Int): Seq[Int] = x.sortByMuxPort.filter(_._1 < f).accessPars
+    def sortByMuxPortAndOfs: DMap = DMap(x.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._3)))
+    def sortByMuxPortAndCombine: DMap = DMap(x.toSeq.groupBy(_._1._1).map{case (muxP, entries) => (muxP, 0, 0) -> (entries.sortBy(x => (x._1._1, x._1._2, x._1._3)).map(_._2._1).flatten.toList, entries.head._2._2)}.toSeq.sortBy(r => (r._1._1, r._1._2, r._1._3))) // Combine entries so that every muxOfs = 0, then sort
+    def accessParsBelowMuxPort(mport: Int, mofs: Int, castgrp: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs) | (p._1._1 == mport & p._1._2 == mofs & p._1._3 < castgrp)}.accessPars
   }
-  def DMap(xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, None))}:_*)
-  def DMap(xs: => Seq[(Int, (List[Banks],Option[Int]))]) = HashMap[Int,(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
-  def ShiftDMap(axis: Int, xs:(Int,List[Banks])*) = HashMap[Int, (List[Banks],Option[Int])](xs.map{x => (x._1 -> (x._2, Some(axis)))}:_*)
-  type NBufXMap = HashMap[Int, XMap]
-  def NBufXMap(xs:(Int, XMap)*) = HashMap[Int,XMap](xs:_*)
-  def NBufXMap(xs: => Seq[(Int, XMap)]) = HashMap[Int,XMap](xs:_*)
+  def DMap(xs:((Int,Int,Int),(List[Banks], Option[Int]))*) = ListMap[(Int,Int,Int), (List[Banks],Option[Int])](xs.map{x => (x._1 -> x._2)}:_*)
+  // Example: val b = DMap((0,0) -> List(Banks(0,0), Banks(0,1)), (0,2) -> List(Banks(0,2),Banks(0,3)), (1,0) -> List(Banks(0,0),Banks(1,0)))
+  def DMap(xs: => Seq[((Int,Int,Int), (List[Banks],Option[Int]))]) = ListMap[(Int,Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => (k -> v)}:_*)
+  type NBufXMap = ListMap[Int, XMap]
+  def NBufXMap(xs:(Int, XMap)*) = ListMap[Int,XMap](xs:_*)
+  def NBufXMap(xs: => Seq[(Int, XMap)]) = ListMap[Int,XMap](xs:_*)
   implicit class NBufXMapOps(x: NBufXMap) {
     def mergeXMaps: XMap = {
-      HashMap(x.sortByBufferPort.map{case (buf,map) => 
+      ListMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, par) => ({muxport + base} -> par)} 
+        map.map{case (muxport, par) => (({muxport._1 + base}, muxport._2, muxport._3) -> par)} 
       }.flatten.toArray:_*) 
     }
     def accessPars: Seq[Int] = x.mergeXMaps.accessPars
     def accessParsBelowBufferPort(f: Int): Seq[Int] = x.sortByBufferPort.filter(_._1 < f).mergeXMaps.accessPars
     def sortByBufferPort: NBufXMap = NBufXMap(x.toSeq.sortBy(_._1))
   }
-  type NBufDMap = HashMap[Int, DMap]
-  def NBufDMap(xs:(Int,DMap)*) = HashMap[Int, DMap](xs:_*)
-  def NBufDMap(xs: => Seq[(Int, DMap)]) = HashMap[Int,DMap](xs:_*)
+  type NBufDMap = ListMap[Int, DMap]
+  def NBufDMap(xs:(Int,DMap)*) = ListMap[Int, DMap](xs:_*)
+  def NBufDMap(xs: => Seq[(Int, DMap)]) = ListMap[Int,DMap](xs:_*)
   implicit class NBufDMapOps(x: NBufDMap) {
     def mergeDMaps: DMap = {
-      HashMap(x.sortByBufferPort.map{case (buf,map) => 
+      ListMap(x.sortByBufferPort.map{case (buf,map) => 
         val base = x.filter(_._1 < buf).values.toList.flatten.map(_._1).length
-        map.map{case (muxport, banks) => ({muxport + base} -> banks)} 
+        map.map{case (muxport, banks) => (({muxport._1 + base}, muxport._2, muxport._3) -> banks)} 
       }.flatten.toArray:_*)
     }
     def accessPars: Seq[Int] = x.mergeDMaps.accessPars
@@ -836,9 +848,10 @@ object Utils {
       result
   }
 
-  def fixrand(seed: Int, bits: Int): FixedPoint = {
+  def fixrand(seed: Int, bits: Int, en: Bool): FixedPoint = {
     val prng = Module(new PRNG(seed, bits))
     val result = Wire(new FixedPoint(false, bits, 0))
+    prng.io.en := en
     result := prng.io.output
     result
   }
@@ -851,7 +864,7 @@ object Utils {
     import ops._
     if (retime.toInt > 0) {
       val done_catch = Module(new SRFF())
-      val sr = Module(new RetimeWrapperWithReset(1, retime - 1))
+      val sr = Module(new RetimeWrapperWithReset(1, retime - 1, 0))
       sr.io.in := done_catch.io.output.data & ready
       sr.io.flow := ready
       done_catch.io.input.asyn_reset := reset
@@ -1043,14 +1056,14 @@ object Utils {
   }
 
   def getFF[T<: chisel3.core.Data](sig: T, en: UInt) = {
-    val ff = Module(new fringe.FF(sig))
+    val ff = Module(new fringe.FringeFF(sig))
     ff.io.init := 0.U(sig.getWidth.W).asTypeOf(sig)
     ff.io.in := sig
     ff.io.enable := en
     ff.io.out
   }
 
-  def getRetimed[T<:chisel3.core.Data](sig: T, delay: Int, en: Bool = true.B): T = {
+  def getRetimed[T<:chisel3.core.Data](sig: T, delay: Int, en: Bool = true.B, init: Long = 0): T = {
     if (delay == 0) {
       sig
     }
@@ -1058,11 +1071,22 @@ object Utils {
       if (regression_testing == "1") { // Major hack until someone helps me include the sv file in Driver (https://groups.google.com/forum/#!topic/chisel-users/_wawG_guQgE)
         chisel3.util.ShiftRegister(sig, delay, en)
       } else {
-        val sr = Module(new RetimeWrapper(sig.getWidth, delay))
+        val sr = Module(new RetimeWrapper(sig.getWidth, delay, init))
         sr.io.in := sig.asUInt
         sr.io.flow := en
-        sig.cloneType.fromBits(sr.io.out)
+        sr.io.out.asTypeOf(sig)
       }
+    }
+  }
+
+  def FixFMA(mul1: FixedPoint, mul2: FixedPoint, add: FixedPoint, delay: Int, flow: Bool): FixedPoint = {
+    if (delay == 0) {
+      mul1 *-* mul2 + add
+    }
+    else {
+      // TODO: Use IP 
+      mul1.*-*(mul2, Some(delay), flow) + Utils.getRetimed(add, delay, flow)
+      // sig.cloneType.fromBits(sr.io.out)
     }
   }
 

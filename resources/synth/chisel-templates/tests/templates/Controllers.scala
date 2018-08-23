@@ -25,7 +25,7 @@ class OuterControlTests(c: OuterControl) extends PeekPokeTester(c) {
     step(50)
     poke(c.io.enable, 1)
 
-    def executeStage(s: Int) {
+    def executeStage(s: Int): Unit = {
       val numCycles = latencies(s)
       stageCounts(s) += 1
       if (stageCounts(s) > latencies(s)) {
@@ -37,7 +37,7 @@ class OuterControlTests(c: OuterControl) extends PeekPokeTester(c) {
       }
     }
 
-    def handleStageEnables = {
+    def handleStageEnables: Unit = {
       (0 until c.depth).foreach { i => 
         val stageEn = peek(c.io.enableOut(i)).toInt
         if (stageEn == 1) {
@@ -89,7 +89,7 @@ class InnerControlTests(c: InnerControl) extends PeekPokeTester(c) {
   maxes.map { a => println("max of ctr = " + a) }
   var cnts = Array.tabulate(2) { i => 0 }
 
-  def handleStep {
+  def handleStep: Unit = {
     val cnt_en = peek(c.io.ctrInc).toInt
     if (cnt_en == 1) {
       cnts(0) += 1

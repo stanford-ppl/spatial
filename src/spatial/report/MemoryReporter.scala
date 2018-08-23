@@ -2,8 +2,11 @@ package spatial.report
 
 import argon._
 import argon.passes.Pass
-import spatial.data._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.modeling._
+import utils.implicits.collections._
 
 case class MemoryReporter(IR: State) extends Pass {
   override def shouldRun: Boolean = config.enInfo
@@ -13,7 +16,7 @@ case class MemoryReporter(IR: State) extends Pass {
   def run(): Unit = {
     import scala.language.existentials
 
-    val mems = localMems.all.map{case Stm(s,d) =>
+    val mems = LocalMemories.all.map{case Stm(s,d) =>
       val area = areaModel.areaOf(s, d, inHwScope = true, inReduce = false)
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)
@@ -44,32 +47,54 @@ case class MemoryReporter(IR: State) extends Pass {
         val writers = mem.writers
         emit("\n")
         emit(s"Instance Summary: ")
-        duplicates.zipWithIndex.foreach{case (inst,i) =>
+        duplicates.zipWithIndex.foreach{case (inst,id) =>
           val Memory(banking,depth,isAccum) = inst
           val banks  = banking.map(_.nBanks).mkString(", ")
           val format = if (banks.length == 1) "Flat" else "Hierarchical"
-          emit(s"  #$i: Banked")
+          emit(s"  #$id: Banked")
           emit(s"     Resource: ${inst.resource.name}")
           emit(s"     Depth:    $depth")
           emit(s"     Accum:    $isAccum")
           emit(s"     Banks:    $banks <$format>")
           banking.foreach{grp => emit(s"       $grp") }
           emit(s"     Ports: ")
-          def portStr(port: Option[Int], as: Iterable[Sym[_]], tp: String): Iterator[String] = {
-            as.iterator.filter{a => a.dispatches.values.exists(_.contains(i)) }
-                       .filter{a => a.ports.values.exists(_.bufferPort == port) }
-                       .map{a => s"  ${port.map(_.toString).getOrElse("M")}: [$tp] ${a.ctx.content.map(_.trim).getOrElse(stm(a)) } [${a.ctx}]"}
+
+          def portStr(prefix: String, port: Option[Int], as: Iterable[Sym[_]], tp: String): Unit = {
+            val p = port.map(_.toString).getOrElse("M")
+
+            // Find all accesses connected to this buffer port
+            val accesses: Iterable[(Sym[_],Seq[Int],Port)] = {
+              as.filter{a => a.dispatches.values.exists(_.contains(id)) }
+                .flatMap{a => a.ports(id).filter(_._2.bufferPort == port).map{case (unroll,pt) => (a,unroll,pt) } }
+            }
+
+            emit(s"$prefix  $p [Type:$tp]:")
+            accesses.groupBy(_._3.muxPort).toSeq.sortBy(_._1).foreach{case (muxPort, muxAccs) =>
+              emit(s"$prefix    - Mux Port #$muxPort: ")
+              muxAccs.foreach{case (a,uid,pt) =>
+                val line = a.ctx.content.map(_.trim).getOrElse(stm(a))
+                emit(s"$prefix      ${stm(a)} {${uid.mkString(",")}}")
+                emit(s"$prefix      $line (${a.ctx})")
+                emit(s"$prefix        Directly Banked: ${a.isDirectlyBanked}")
+                emit(s"$prefix        Port: <offset: ${pt.muxOfs}, castgroup: (${pt.castgroup.mkString(",")}), broadcast: (${pt.broadcast.mkString(",")})>")
+                emit("")
+              }
+            }
           }
 
           (0 until inst.depth).foreach{p =>
-            val lines = portStr(Some(p), writers,"WR") ++ portStr(Some(p), readers,"RD")
-            lines.foreach{line => emit(s"       $line")}
+            portStr("       ", Some(p), writers,"WR")
+            portStr("       ", Some(p), readers,"RD")
           }
           if (inst.depth > 1) {
-            val lines = portStr(None, writers, "WR") ++ portStr(None, readers, "RD")
-            lines.foreach { line => emit(s"       $line") }
+            portStr("       ", None, writers,"WR")
+            portStr("       ", None, readers,"RD")
           }
         }
+
+        emit("\n\n")
+        emit(s"Control Tree: ")
+        ctrlTree(readers ++ writers, None).foreach{x => emit(x) }
 
         emit(s"---------------------------------------------------------------------")
         emit("\n\n\n")

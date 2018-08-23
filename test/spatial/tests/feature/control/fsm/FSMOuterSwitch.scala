@@ -1,12 +1,8 @@
 package spatial.tests.feature.control.fsm
 
-
 import spatial.dsl._
 
-
-@test class FSMOuterSwitch extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FSMOuterSwitch extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     val vectorA = Array.fill(128){ random[Int](10) }

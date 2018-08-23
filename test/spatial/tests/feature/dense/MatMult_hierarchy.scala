@@ -2,8 +2,6 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-
-
 /*
 
   Sketch of this GEMM:
@@ -136,10 +134,8 @@ import spatial.dsl._
 
 */
 
-@test class MatMult_hierarchy extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class MatMult_hierarchy extends SpatialTest {
   type T = Int
-
 
   def main(args: Array[String]): Unit = {
     val m = 64
@@ -234,9 +230,7 @@ import spatial.dsl._
 
     printMatrix(gold, "Gold:")
     printMatrix(result, "Result:")
-
-    val cksum = gold.zip(result){_==_}.reduce{_&&_}
-    assert(cksum)
+    assert(gold == result)
   }
 }
 

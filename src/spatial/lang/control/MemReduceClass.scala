@@ -4,6 +4,7 @@ package control
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.metadata.memory._
 import spatial.util.memops._
 
 protected class MemReduceAccum[A,C[T]](
@@ -36,15 +37,15 @@ protected class MemReduceAccum[A,C[T]](
     val strides = acc.steps()
     val ends    = acc.ends()
     val pars    = acc.pars()
-    val ctrsRed = (0 to acc.rank-1).map{i =>
-        Counter[I32](start = starts(i), step = strides(i), end = ends(i), par = pars(i))
+    val ctrsRed = (0 to acc.seqRank.length-1).map{i =>
+        Counter[I32](start = 0, step = strides(acc.seqRank(i)), end = ends(acc.seqRank(i)) - starts(acc.seqRank(i)), par = pars(acc.seqRank(i)))
       }
     val cchainRed = CounterChain(ctrsRed)
 
-    //logs(s"Creating MemReduce on accumulator of rank ${acc.rank}")
+    //logs(s"Creating MemReduce on accumulator of rank ${acc.seqRank.length}")
 
     val itersMap = List.fill(domain.length){ boundVar[I32] }
-    val itersRed = List.fill(acc.rank){ boundVar[I32] }
+    val itersRed = List.fill(acc.seqRank.length){ boundVar[I32] }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")
@@ -56,7 +57,7 @@ protected class MemReduceAccum[A,C[T]](
     val resLd:  Lambda1[C[A],A] = stageLambda1(mapBlk.result){ C.evMem(mapBlk.result.unbox).__read(itersRed, Set.empty) }
     val accLd:  Lambda1[C[A],A] = stageLambda1(acc){ acc.__read(itersRed, Set.empty) }
     val accSt:  Lambda2[C[A],A,Void] = stageLambda2(acc, redBlk.result){ acc.__write(redBlk.result.unbox,itersRed,Set.empty) }
-    stageWithData(OpMemReduce[A,C](
+    stageWithFlow(OpMemReduce[A,C](
       ens = Set.empty,
       cchainMap,
       cchainRed,

@@ -1,14 +1,12 @@
 package spatial.codegen.pirgen
 
 import argon._
-import spatial.codegen.naming.NamedCodegen
 
 case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenArray
   with PIRGenBit
   with PIRGenFixPt
   with PIRGenFltPt
-  with PIRGenIfThenElse
   with PIRGenStructs
   with PIRGenText
   with PIRGenVoid
@@ -19,23 +17,21 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenCounter
   with PIRGenDRAM
   with PIRGenFIFO
-  with PIRGenArgs
   with PIRGenReg
+  with PIRGenSeries
   with PIRGenSRAM
-  with PIRGenUnrolled
   with PIRGenVec
   with PIRGenStream
   with PIRGenRegFile
-  with PIRGenStateMachine
   with PIRGenFileIO
   with PIRGenDelays
-  with PIRGenLUTs
-  with PIRGenSwitch
-  with PIRGenOp
-  with NamedCodegen {
+  with PIRGenLUTs {
 
-  //override def copyDependencies(out: String): Unit = {
-    //dependencies ::= FileDep("pirgen", "Makefile", "../")
-    //super.copyDependencies(out)
-  //}
+  override def copyDependencies(out: String): Unit = {
+    dependencies ::= FileDep("pirgen", "Makefile", "../")
+    dependencies ::= FileDep("pirgen", "run.sh", "../")
+    dependencies ::= FileDep("pirgen", "build.sbt", "../")
+    dependencies ::= FileDep("pirgen/project", "build.properties", "../project/")
+    super.copyDependencies(out)
+  }
 }

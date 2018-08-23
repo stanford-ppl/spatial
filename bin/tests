@@ -1,82 +1,135 @@
-#!/bin/bash
+#!/usr/bin/env python
 
-# Set data environment variable for running this test
-# export TEST_DATA_HOME="$PWD/../data/"
+import os
+import datetime
+import subprocess
+from argparse import ArgumentParser
+now = datetime.datetime.now()
 
-type=$1
-numthreads=$2
-file_or_tests=$3
+class bcolors:
+    HEAD = '\033[95m'
+    INFO = '\033[94m'
+    GOOD = '\033[92m'
+    WARN = '\033[93m'
+    FAIL = '\033[91m'
+    BOLD = '\033[1m'
+    LINE = '\033[4m'
+    RESET = '\033[0m'
 
-if [[ $file_or_tests == "" ]]; then
-   tests="spatial.tests.*" 
-elif [ -f $file_or_tests ]; then
-   tests=""
-   while read LINE 
-   do  
-      if [[ $LINE == spatial.tests.* ]]; then 
-         tests="$tests $LINE"
-        echo "$LINE"
-      else 
-        tests="$tests spatial.tests.$LINE"
-        echo "spatial.tests.$LINE"
-      fi
-   done <  $file_or_tests
-elif [[ $file_or_tests == spatial.tests.* ]]; then
-   tests="$file_or_tests"
-else 
-   tests="spatial.tests.$file_or_tests"
-fi
+class TestArgumentParser(ArgumentParser):
+    def print_help(self, file=None):
+        print("""
+Testing script
+Usage: python tests <type> [tests] [--gdocs] [spatial args]
 
-if [[ $numthreads == "" ]]; then
-  threads=1
-else
-  threads=$numthreads
-fi
+Supported types:
+  sim          - Scala function simulation"
+  vcs 	       - Cycle accurate simulation with VCS"
+  vcs-gdocs    - Cycle accurate simulation with VCS (+google docs)"
+  vcs-noretime - Cycle accurate simulation with VCS (no retiming)" 
+  zynq         - Target the ZC706 board"
+  aws	       - Target the AWS F1 board"
+  zcu	       - Target the ZCU board"
+  arria10      - Target the Arria 10 board"
+  
+Test-specific Arguments:
+  --gdocs      - Enable google docs generation
+""")
 
-fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"
-echo "Running tests $tests"
-echo "Logging tests to $fileout"
+def process(cmd):
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    p.wait()
+    lines = []
+    while True:
+        line = p.stdout.readline().rstrip()
+        if line == b'': break
+        else:
+            lines.append(line)
+    return lines
 
+def process_last(cmd):
+    lines = process(cmd)
+    return lines[-1]
 
-# Basic tests
-if [[ $type == "sim" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "vcs" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "vcs-noretime" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
+def main():
+    info  = "[" + bcolors.INFO + "info" + bcolors.RESET + "] "
+    warn  = "[" + bcolors.WARN + "warn" + bcolors.RESET + "] "
+    error = "[" + bcolors.FAIL + "error" + bcolors.RESET + "] "
 
-# Synthesis tests
-elif [[ $type == "zynq" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "aws" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.AWS=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "zcu" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "arria10" ]]; then
-  sbt -Dmaxthreads=$threads -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
+    parser = TestArgumentParser()
+    parser.add_argument('set', type=str, help='Type of tests to run')
+    parser.add_argument('tests', type=str, help='Tests to run', default='spatial.tests.*')
+    parser.add_argument('gdocs', type=bool, help='Enable google docs generation')
 
-# Verilog tests that report to gdocs (https://docs.google.com/spreadsheets/d/1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM/edit#gid=1748974351)
-elif [[ $type == "vcs-gdocs" ]]; then
-  export GDOCS=1
-  hash=`git rev-parse HEAD`
-  export timestamp=`git show -s --format=%ci`
-  curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  echo "python3 ${curpath}/../resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"nova-spatial\" \"$timestamp\" \"vcs\""
-  python3 ${curpath}/../resources/regression/gdocs.py "prepare_sheet" "$hash" "nova-spatial" "$timestamp" "vcs"
-  sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
-elif [[ $type == "vcs-noretime-gdocs" ]]; then
-  export GDOCS=1
-  hash=`git rev-parse HEAD`
-  export timestamp=`git show -s --format=%ci`
-  curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  python3 ${curpath}/../resources/regression/gdocs.py "prepare_sheet" "$hash" "nova-spatial" "$timestamp" "vcs-noretime"
-  sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
-else
-  echo "Test type '$type' not recognized" 
-  echo "Supported types: [sim | vcs(-gdocs) | vcs-noretime(-gdocs) | zynq | aws | zcu | arria10]"
-  exit 1
-fi
+    (opts, args) = parser.parse_known_args()
 
-sbtExitCode=${PIPESTATUS[0]}
-exit $sbtExitCode
+    ## Set the test type
+    set = opts.set
+    if   set == "sim":  set = "-Dtest.Scala=true"
+    elif set == "vcs":  set = "-Dtest.VCS=true"
+    elif set == "zynq": set = "-Dtest.Zynq=true"
+    elif set == "aws":  set = "-Dtest.AWS=true"
+    elif set == "zcu":  set = "-Dtest.ZCU=true"
+    elif set == "arria10": set = "-Dtest.Arria10=true"
+    else:
+        print(error + "Test type " + set + " was not recognized.")
+        parser.print_help()
+        exit(1)
+
+    ## Set the tests
+    tests = ""
+    if os.path.isfile(opts.tests):
+        with open(opts.tests) as file:
+            for line in file:
+                line = line.rstrip()
+                if not line.startswith("spatial.tests."):
+                    line = "spatial.tests." + line
+                tests = tests + " " + line
+                print(line)
+    else:
+        tests = opts.tests
+        if not tests.startswith("spatial.tests."):
+            tests = "spatial.tests." + tests
+
+    ## Set the number of threads
+    threads = os.environ.get('NUM_THREADS')
+    try:
+        if threads is not None: threads = int(threads)
+    except ValueError:
+        threads = None
+
+    if threads is None:
+        threads = 4
+        print(warn + "Defaulting to 4 threads.")
+        print(warn + "Set NUM_THREADS environment variable to change threads.")
+    else:
+        print(info + "Using " + str(threads) + " threads")
+
+    ## Set the data directory
+    testdata = os.environ.get('TEST_DATA_HOME')
+    if testdata is None:
+        print(warn + "TEST_DATA_HOME is not set.")
+        print(warn + "Set TEST_DATA_HOME for data-dependent tests to pass.")
+    else:
+        print(info + "Test data directory: " + testdata)
+
+    ## Set the output file
+    fileout = "test_ " + now.strftime("%m_%d_%Y_%H_%M_%S") + ".log"
+    print(info + "Running tests " + tests)
+    print(info + "Logging tests to " + fileout)
+
+    if opts.gdocs:
+        hash = process_last("git rev-parse HEAD")
+        timestamp = process_last("git show -s --format=%ci")
+        curpath = process_last('$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )')
+        ## TODO: Finish this
+        os.environ["GDOCS"] = "1"
+        os.environ["timestamp"] = timestamp
+
+    os.environ["TEST_ARGS"] = ' '.join(args)
+
+    cmd = "nice -n 20 sbt -Dmaxthreads=" + threads + " " + set + " testOnly " + tests + " 2>&1 | tee " + fileout
+    ecode = os.system(cmd)
+
+if __name__ == "__main__":
+    main()

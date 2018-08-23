@@ -1,11 +1,11 @@
 package spatial.transform
 
 import argon._
+import argon.node._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.internal._
-import spatial.util.shouldMotion
+import spatial.util.shouldMotionFromConditional
 import spatial.traversal.AccelTraversal
 
 /** Converts IfThenElse nodes into nested Switch/SwitchCase nodes within Accel scopes.
@@ -43,7 +43,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
 
   private def createCase[T:Type](cond: Bit, body: Block[T])(implicit ctx: SrcCtx) = () => {
     dbgs(s"Creating SwitchCase from cond $cond and body $body")
-    val c = withEn(cond){ op_case(f(body) )}
+    val c = withEn(cond){ Switch.op_case(f(body) )}
     dbgs(s"  ${stm(c)}")
     c
   }
@@ -56,7 +56,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
     cases:    Seq[() => T]
   )(implicit ctx: SrcCtx): (Seq[Bit], Seq[() => T]) = block.result match {
     // Flatten switch only if there are no enabled primitives or controllers
-    case Op(IfThenElse(cond,thenBlk,elseBlk)) if shouldMotion(block.stms,inHw) =>
+    case Op(IfThenElse(cond,thenBlk,elseBlk)) if shouldMotionFromConditional(block.stms,inHw) =>
       // Move all statements except the result out of the case
       withEn(prevCond){ block.stms.dropRight(1).foreach(visit) }
       val cond2 = f(cond)
@@ -73,13 +73,14 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
-    case IfThenElse(cond,thenBlk,elseBlk) =>
+    case IfThenElse(cond,thenBlk,elseBlk) if inHw =>
+      dbgs(s"Transforming $lhs ($cond ? $thenBlk : $elseBlk")
       val cond2 = f(cond)
       val elseCond = !cond2
       val thenCase = createCase(cond2, thenBlk)
       val (selects, cases) = extractSwitches(elseBlk, elseCond, Seq(cond2), Seq(thenCase))
 
-      val switch = op_switch(selects, cases)
+      val switch = Switch.op_switch(selects, cases)
       switch
 
     case _ => super.transform(lhs,rhs)

@@ -27,14 +27,14 @@ trait PIRGenFileIO extends PIRCodegen {
 
     case ReadTokens(file, delim) =>
       open(src"val $lhs = {")
-      emit(src"val scanner = new java.util.Scanner($file)")
-      emit(src"val tokens = new scala.collection.mutable.ArrayBuffer[String]() ")
-      emit(src"""scanner.useDelimiter("\\s*" + $delim + "\\s*|\\s*\n\\s*")""")
-      open(src"while (scanner.hasNext) {")
-      emit(src"tokens += scanner.next.trim")
-      close("}")
-      emit(src"scanner.close()")
-      emit(src"tokens.toArray")
+        emit(src"val scanner = new java.util.Scanner($file)")
+        emit(src"val tokens = new scala.collection.mutable.ArrayBuffer[String]() ")
+        emit(src"""scanner.useDelimiter("\\s*" + $delim + "\\s*|\\s*\n\\s*")""")
+        open(src"while (scanner.hasNext) {")
+          emit(src"tokens += scanner.next.trim")
+        close("}")
+        emit(src"scanner.close()")
+        emit(src"tokens.toArray")
       close("}")
 
     case WriteTokens(file, delim, len, token) =>
@@ -71,10 +71,10 @@ trait PIRGenFileIO extends PIRCodegen {
 
     case op @ WriteBinaryFile(file, len, value) =>
       open(src"val $lhs = {")
-        emit(src"var ${value.input} = FixedPoint(0)")
+        emit(src"var ${value.input} = FixedPoint.fromInt(0)")
         emit(src"val stream = new java.io.DataOutputStream(new java.io.FileOutputStream($file))")
         open(src"while (${value.input} < $len) {")
-          visitBlock(value)
+          gen(value)
           emit(src"val value = ${value.result}")
           op.A match {
             case FixPtType(_,_,_) => emit(src"value.toByteArray.foreach{byte => stream.writeByte(byte) }")

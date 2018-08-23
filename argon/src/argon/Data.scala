@@ -1,7 +1,7 @@
 package argon
 
 import forge.tags._
-import argon.transform.Transformer
+import argon.transform.TransformerInterface
 
 import scala.collection.mutable
 
@@ -33,27 +33,35 @@ object GlobalData {
   case object Analysis extends SetBy { override def toString: String = "GlobalData.Analysis" }
 }
 
+/** Transfer determines how metadata is transferred across Transformers.
+  * Symbol metadata:
+  *   Mirror - Metadata is mirrored (using its mirror rule) and explicitly transferred
+  *   Remove - Metadata is dropped (explicitly removed) during symbol transformation
+  *   Ignore - Nothing is explicitly done (metadata is dropped if not set by some external rule)
+  *
+  * Global metadata:
+  *   Mirror - Nothing is explicitly done (metadata is assumed to be stable or  updated explicitly)
+  *   Remove - Metadata is dropped (explicitly removed) prior to transformation
+  *   Ignore - Nothing is explicitly done (metadata is assumed to be stable or  updated explicitly)
+  */
 object Transfer extends Enumeration {
   type Transfer = Value
-  val Remove, Ignore, Mirror = Value
+  val Remove, Mirror, Ignore = Value
 
   def apply(src: SetBy): Transfer = src match {
-    case SetBy.User          => Mirror
-    case SetBy.Flow.Self     => Ignore
-    case SetBy.Flow.Consumer => Remove
-    case SetBy.Analysis.Self => Mirror
+    case SetBy.User              => Mirror
+    case SetBy.Flow.Self         => Mirror
+    case SetBy.Flow.Consumer     => Remove
+    case SetBy.Analysis.Self     => Mirror
     case SetBy.Analysis.Consumer => Remove
-    case GlobalData.User       => Ignore
-    case GlobalData.Flow       => Remove
-    case GlobalData.Analysis   => Remove
+    case GlobalData.User         => Mirror
+    case GlobalData.Flow         => Remove
+    case GlobalData.Analysis     => Remove
   }
 }
 
 /** Any kind of IR graph metadata.
-  * Transfer determines how metadata is transferred across Transformers.
-  *   Ignore - Nothing is explicitly done. Metadata is assumed to be updated by a @flow or else dropped
-  *   Mirror - Metadata is mirrored (using its mirror rule) and explicitly transferred
-  *   Remove - Metadata is dropped (explicitly removed) during symbol transformation
+
   *
   * For consistency, global analysis data is dropped before transformers are run if it is Mirror or Remove.
   *
@@ -61,7 +69,7 @@ object Transfer extends Enumeration {
   * metadata is created.
   */
 abstract class Data[T](val transfer: Transfer.Transfer) { self =>
-  final type Tx = Transformer
+  final type Tx = TransformerInterface
 
   type Transfer = Transfer.Transfer
 
@@ -70,7 +78,7 @@ abstract class Data[T](val transfer: Transfer.Transfer) { self =>
   /** Defines how to copy metadata during mirroring/updating. */
   def mirror(f: Tx): T = this.asInstanceOf[T]
 
-  final def key: Class[_] = self.getClass
+  def key: Class[_] = self.getClass
   override final def hashCode(): Int = key.hashCode()
 }
 

@@ -10,8 +10,5 @@ package object argon extends static.Core {
     def m[A,B](tp: Type[A]): Type[B] = tp.asInstanceOf[Type[B]]
   }
 
-  def syms(a: Any*): Set[Sym[_]] = argon.Filters.syms(a:_*)
-  def exps(a: Any*): Set[Sym[_]] = argon.Filters.exps(a:_*)
-
   def proto[A](exp: Exp[_,A]): A = { exp._rhs = Def.TypeRef; exp.asInstanceOf[A] }
 }

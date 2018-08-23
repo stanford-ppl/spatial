@@ -1,13 +1,14 @@
 package spatial.report
 
 import argon._
-import spatial.data._
+import spatial.metadata.retiming._
 import spatial.node._
 import spatial.traversal.AccelTraversal
-import spatial.util._
+import spatial.util.spatialConfig
+import spatial.util.modeling._
 
 case class RetimeReporter(IR: State) extends AccelTraversal {
-  override def shouldRun: Boolean = config.enInfo
+  override def shouldRun: Boolean = config.enInfo && spatialConfig.enableRetiming
 
   override def process[R](block: Block[R]): Block[R] = {
     inGen(config.repDir, "Retime.report"){ super.process(block) }
@@ -35,18 +36,18 @@ case class RetimeReporter(IR: State) extends AccelTraversal {
     if (rhs.blocks.nonEmpty) emit(s"$lhs = $rhs {")
     else                     emit(s"$lhs = $rhs")
     lhs.name.foreach{name => emit(s" - Name: $name") }
-    val cycle = lhs.reduceCycle
-    val inReduce = cycle.nonEmpty
     emit(s" - Type: ${lhs.tp}")
-    if (cycle.isEmpty) {
+    val inCycle = lhs.isInCycle
+    if (!inCycle) {
       emit(s" - Cycle: <no cycle>")
     }
     else {
-      emit(s" - Cycle: " + cycle.mkString(", "))
+      val cycle = lhs.getReduceCycle
+      emit(s" - Cycle: " + cycle.get.symbols.mkString(", "))
     }
-    emit(s" - Latency:          ${latencyModel.latencyOf(lhs,inReduce)}")
-    emit(s" - Reduce Latency:   ${latencyModel.latencyOf(lhs,inReduce)}")
-    emit(s" - Requires Regs:    ${latencyModel.requiresRegisters(lhs,inReduce)}")
+    emit(s" - Latency:          ${latencyModel.latencyOf(lhs,inCycle)}")
+    emit(s" - Reduce Latency:   ${latencyModel.latencyOf(lhs,inCycle)}")
+    emit(s" - Requires Regs:    ${latencyModel.requiresRegisters(lhs,inCycle)}")
     emit(s" - Built-In Latency: ${latencyModel.builtInLatencyOfNode(lhs)}")
     val delays = findDelays(lhs).toSeq.sortBy(_._1)
     if (delays.isEmpty) {

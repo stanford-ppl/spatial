@@ -1,17 +1,13 @@
 package spatial.tests.feature.host
 
-
 import spatial.dsl._
 
-
-@test class ReadSSV1D extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class ReadSSV1D extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE, _16, _16]
     val tilesize = 16
-    val data = loadCSV1D[T]("/remote/regression/data/1d.ssv", " ")
+    val data = loadCSV1D[T](s"$DATA/ssv/1d.ssv", " ")
     val memsize = ArgIn[Int]
     setArg(memsize, data.length.to[Int])
     val srcmem = DRAM[T](memsize)

@@ -4,8 +4,11 @@ import argon._
 import forge.tags._
 
 import spatial.lang._
-import spatial.data._
-import spatial.util._
+import spatial.metadata.access._
+import spatial.metadata.bounds._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.util.modeling.target
 import spatial.util.memops._
 
 /** A dense transfer between on-chip and off-chip memory
@@ -57,30 +60,39 @@ object DenseTransfer {
     Dram:  Type[Dram[A]]
   ): Void = {
 
+    // Special case if dram is a DenseAlias with the last dimension slashed
+    val normalCounting: Boolean = dram.rawRank.last == dram.seqRank.last
     val dramOffsets: Seq[I32] = dram.starts()
-    val lens: Seq[I32] = dram.lens()
-    val dims: Seq[I32] = dram.dims
+    val rawDramOffsets: Seq[I32] = dram.rawStarts()
+    val lens: Seq[I32] = dram.lens() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
+    val rawDims: Seq[I32] = dram.rawDims()
     val strides: Seq[I32] = dram.steps()
-    val pars: Seq[I32] = dram.pars()
+    val pars: Seq[I32] = dram.pars() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
     val counters: Seq[() => Counter[I32]] = lens.zip(pars).map{case (d,p) => () => Counter[I32](start = 0, end = d, par = p) }
 
     val p = pars.last
     val requestLength: I32 = lens.last
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
+    p match {case Expect(p) => assert(p.toInt*A.nbits <= target.burstSize, s"Cannot parallelize by more than the burst size! Please shrink par (par ${p.toInt} * ${A.nbits} > ${target.burstSize})"); case _ =>}
 
-    if (counters.length > 1) {
-      Stream.Foreach(counters.dropRight(1).map{ctr => ctr()}){ is =>
+    val outerLoopCounters = counters.dropRight(1)
+    if (outerLoopCounters.nonEmpty) {
+      Stream.Foreach(outerLoopCounters.map{ctr => ctr()}){ is =>
         val indices = is :+ 0.to[I32]
 
-        val dramAddr = () => flatIndex((dramOffsets,indices,strides).zipped.map{case (ofs,i,s) => ofs + i*s }, dims)
-        val localAddr = {i: I32 => is :+ i }
+        // Pad indices, strides with 0's against rawDramOffsets
+        val indicesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) indices(dram.seqRank.indexOf(i)) else 0.to[I32]}
+        val stridesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) strides(dram.seqRank.indexOf(i)) else 1.to[I32]}
+
+        val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
+        val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}
         if (isLoad) load(dramAddr, localAddr)
         else        store(dramAddr, localAddr)
       }
     }
     else {
       Stream {
-        val dramAddr = () => flatIndex(dramOffsets, dims)
+        val dramAddr = () => flatIndex(rawDramOffsets, rawDims)
         val localAddr = {i: I32 => Seq(i) }
         if (isLoad) load(dramAddr, localAddr)
         else        store(dramAddr, localAddr)
@@ -103,7 +115,7 @@ object DenseTransfer {
         dbg(s"$dram => $local: Using aligned load ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         alignedLoad(dramAddr, localAddr)
       case Expect(c) =>
-        dbg(s"$dram => $local: Using unaligned load ($c * ${A.nbits} % ${target.burstSize}* ${c*A.nbits % target.burstSize})")
+        dbg(s"$dram => $local: Using unaligned load ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         unalignedLoad(dramAddr, localAddr)
       case _ =>
         dbg(s"$dram => $local: Using unaligned load (request length is statically unknown ($requestLength))")

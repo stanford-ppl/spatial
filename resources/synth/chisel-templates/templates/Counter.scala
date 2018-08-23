@@ -170,18 +170,18 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
   })
 
   val base = Module(new FF((width)))
-  base.io.input(0).init := 0.U(width.W)
-  base.io.input(0).reset := io.input.reset
-  base.io.input(0).en := io.input.enables.reduce{_|_}
+  base.io.xBarW(0).init.head := 0.U(width.W)
+  base.io.xBarW(0).reset.head := io.input.reset
+  base.io.xBarW(0).en.head := io.input.enables.reduce{_|_}
 
-  val count = base.io.output.data.asSInt
+  val count = base.io.output.data(0).asSInt
   val num_enabled = io.input.enables.map{e => Mux(e, 1.S(width.W), 0.S(width.W))}.reduce{_+_}
   val newval = count + Mux(io.input.dir, num_enabled, -num_enabled)
   val isMax = Mux(io.input.dir, newval >= depth.S, newval <= 0.S)
   val next = Mux(isMax, newval - depth.S(width.W), newval)
-  base.io.input(0).data := Mux(io.input.reset, 0.asUInt, next.asUInt)
+  base.io.xBarW(0).data.head := Mux(io.input.reset, 0.asUInt, next.asUInt)
 
-  io.output.count := base.io.output.data.asSInt
+  io.output.count := base.io.output.data(0).asSInt
   io.output.done := io.input.enables.reduce{_|_} & isMax
 }
 
@@ -233,6 +233,11 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
   })
 
   if (par > 0) {
+    val lock = Module(new SRFF())
+    lock.io.input.set := io.input.enable  & ~io.input.reset
+    lock.io.input.reset := io.input.reset || io.output.done
+    lock.io.input.asyn_reset := false.B
+    val locked = lock.io.output.data | io.input.enable
     val bases = List.tabulate(par){i => Module(new FF((width)))}
     val inits = List.tabulate(par){i => 
       Utils.getRetimed(
@@ -243,12 +248,14 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
         ,0) // Maybe delay by 1 cycle just in case this is a critical path.  Init should never change during execution
     }
     bases.zipWithIndex.foreach{ case (b,i) => 
-      b.io.input(0).init := inits(i).asUInt
-      b.io.input(0).reset := io.input.reset
-      b.io.input(0).en := io.input.enable
+      b.io.xBarW(0).init.head := inits(i).asUInt
+      b.io.xBarW(0).reset.head := io.input.reset | 
+                                  {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}} | 
+                                  {if (start.isDefined) false.B else {!locked && (Utils.getRetimed(io.input.start,1) =/= io.input.start)}}
+      b.io.xBarW(0).en.head := io.input.enable
     }
 
-    val counts = bases.map(_.io.output.data.asSInt)
+    val counts = bases.map(_.io.output.data(0).asSInt)
     val delta = if (stride.isDefined & gap.isDefined) { (stride.get*par+gap.get).S((width.W)) }
                 else if (stride.isDefined) { (stride.get*par).S((width.W)) + io.input.gap}
                 else if (gap.isDefined) { io.input.stride * par.S((width.W)) + gap.get.S(width.W)}
@@ -258,14 +265,10 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       newvals(0) >= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}, 
       newvals(0) <= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}
     )
-    // io.output.debug1 := newval
-    // io.output.debug2 := io.input.stride >= 0.S((width).W)
-    // io.output.debug3 := newval >= io.input.stop
-    // io.output.debug4 := io.input.stop
     val wasMax = RegNext(isMax, false.B)
     val wasEnabled = RegNext(io.input.enable, false.B)
     bases.zipWithIndex.foreach {case (b,i) => 
-      b.io.input(0).data := Mux(io.input.reset, inits(i).asUInt, Mux(isMax, Mux(io.input.saturate, counts(i).asUInt, inits(i).asUInt), newvals(i).asUInt))
+      b.io.xBarW(0).data.head := Mux(io.input.reset, inits(i).asUInt, Mux(isMax, Mux(io.input.saturate, counts(i).asUInt, inits(i).asUInt), newvals(i).asUInt))
     }
 
     if(stride.isDefined) {
@@ -283,48 +286,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     io.output.done := io.input.enable & isMax
     io.output.saturated := io.input.saturate & isMax
     io.output.extendedDone := (io.input.enable | wasEnabled) & (isMax | wasMax)
-
-    // val base = Module(new FF((width)))
-    // val init = if (start.isDefined) start.get.S(width.W) else io.input.start
-    // base.io.input(0).init := init.asUInt
-    // base.io.input(0).reset := io.input.reset
-    // base.io.input(0).enable := io.input.enable
-
-    // val count = base.io.output.data.asSInt
-    // val delta = if (stride.isDefined & gap.isDefined) { (stride.get*par+gap.get).S((width.W)) }
-    //             else if (stride.isDefined) { (stride.get*par).S((width.W)) + io.input.gap}
-    //             else if (gap.isDefined) { io.input.stride * par.S((width.W)) + gap.get.S(width.W)}
-    //             else { io.input.stride * par.S((width.W)) + io.input.gap}
-    // val newval = count + delta
-    // val isMax = Mux(io.input.stride >= 0.S((width).W), 
-    //   newval >= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}, 
-    //   newval <= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}
-    // )
-    // // io.output.debug1 := newval
-    // // io.output.debug2 := io.input.stride >= 0.S((width).W)
-    // // io.output.debug3 := newval >= io.input.stop
-    // // io.output.debug4 := io.input.stop
-    // val wasMax = RegNext(isMax, false.B)
-    // val wasEnabled = RegNext(io.input.enable, false.B)
-    // val next = Mux(isMax, Mux(io.input.saturate, count, init), newval)
-    // base.io.input(0).data := Mux(io.input.reset, init.asUInt, next.asUInt)
-
-    // if(stride.isDefined) {
-    //   (0 until par).foreach { i => 
-    //     io.output.count(i) := count + (i*stride.get).S((width).W)
-    //     io.output.countWithoutWrap(i) := Mux(count === 0.S((width).W), if(stop.isDefined) stop.get.S(width.W) else io.input.stop, count) + (i*stride.get).S((width).W)
-    //   }
-    // } else {
-    //   (0 until par).foreach { i => 
-    //     io.output.count(i) := count + i.S((width).W)*-*io.input.stride
-    //     io.output.countWithoutWrap(i) := Mux(count === 0.S((width).W), if(stop.isDefined) stop.get.S(width.W) else io.input.stop, count) + i.S((width).W)*-*io.input.stride
-    //   }      
-    // }
-    
-    // io.output.done := io.input.enable & isMax
-    // io.output.saturated := io.input.saturate & isMax
-    // io.output.extendedDone := (io.input.enable | wasEnabled) & (isMax | wasMax)
-  } else { // Forever21 counter
+  } else { // Forever counter
     io.output.count(0) := 0.S(width.W)
     io.output.saturated := false.B
     io.output.extendedDone := false.B
@@ -366,11 +328,11 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
   if (par > 0) {
     val base = Module(new FF((width)))
     val init = io.input.start
-    base.io.input(0).init := init.asUInt
-    base.io.input(0).reset := io.input.reset
-    base.io.input(0).en := io.input.reset | io.input.enable
+    base.io.xBarW(0).init.head := init.asUInt
+    base.io.xBarW(0).reset.head := io.input.reset
+    base.io.xBarW(0).en.head := io.input.reset | io.input.enable
 
-    val count = base.io.output.data.asSInt
+    val count = base.io.output.data(0).asSInt
     val newval = count + (io.input.stride * par.S((width).W)) + io.input.gap // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
     val isMax = newval >= io.input.stop
     val wasMax = RegNext(isMax, false.B)
@@ -378,7 +340,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     val wasMin = RegNext(isMin, false.B)
     val wasEnabled = RegNext(io.input.enable, false.B)
     val next = Mux(isMax, Mux(io.input.saturate, count, init), Mux(isMin, io.input.stop + io.input.stride, newval))
-    base.io.input(0).data := Mux(io.input.reset, init.asUInt, next.asUInt)
+    base.io.xBarW(0).data.head := Mux(io.input.reset, init.asUInt, next.asUInt)
 
     (0 until par).foreach { i => io.output.count(i) := count + i.S((width).W)*io.input.stride } // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
     (0 until par).foreach { i => 
@@ -426,11 +388,11 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
   if (par > 0) {
     val base = Module(new FF((width)))
     val init = start.asSInt
-    base.io.input(0).init := init.asUInt
-    base.io.input(0).reset := io.input.reset
-    base.io.input(0).en := io.input.reset | io.input.enable
+    base.io.xBarW(0).init.head := init.asUInt
+    base.io.xBarW(0).reset.head := io.input.reset
+    base.io.xBarW(0).en.head := io.input.enable
 
-    val count = base.io.output.data.asSInt
+    val count = base.io.output.data(0).asSInt
     val newval_up = count + ((strideUp * par + gap).S((width).W))
     val newval_down = count + ((strideDown * par + gap).S((width).W))
     val isMax = newval_up >= stop.asSInt
@@ -440,7 +402,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     val wasEnabled = RegNext(io.input.enable, false.B)
     // TODO: stop + strideDown in line below.. correct?
     val next = Mux(isMax & io.input.dir, Mux(io.input.saturate, count, init), Mux(isMin & ~io.input.dir & ~io.input.reset , (stop + strideDown).asSInt, Mux(io.input.dir, newval_up, newval_down)))
-    base.io.input(0).data := Mux(io.input.reset, init.asUInt, next.asUInt)
+    base.io.xBarW(0).data.head := Mux(io.input.reset, init.asUInt, next.asUInt)
 
     (0 until par).foreach { i => io.output.count(i) := Mux(io.input.dir, count + (i*strideUp).S((width).W), count + (i*strideDown).S((width).W)) }
     (0 until par).foreach { i => 

@@ -9,12 +9,12 @@ abstract class BigIP {
     case _ => None
   }
 
-  def divide(dividend: UInt, divisor: UInt, latency: Int): UInt
-  def divide(dividend: SInt, divisor: SInt, latency: Int): SInt
-  def mod(dividend: UInt, divisor: UInt, latency: Int): UInt
-  def mod(dividend: SInt, divisor: SInt, latency: Int): SInt
-  def multiply(a: UInt, b: UInt, latency: Int): UInt
-  def multiply(a: SInt, b: SInt, latency: Int): SInt
+  def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt
+  def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt
+  def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt
+  def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt
+  def multiply(a: UInt, b: UInt, latency: Int, flow: Bool): UInt
+  def multiply(a: SInt, b: SInt, latency: Int, flow: Bool): SInt
   def sqrt(a: UInt, latency: Int): UInt = {
     throw new Exception("sqrt not implemented!")
   }

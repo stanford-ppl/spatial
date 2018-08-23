@@ -4,71 +4,71 @@ package templates
 import chisel3.iotesters.{PeekPokeTester, Driver, ChiselFlatSpec}
 
 
-class FFNoInitTests(c: FFNoInit) extends PeekPokeTester(c) {
-  step(1)
-  reset(1)
+// class FFNoInitTests(c: FFNoInit) extends PeekPokeTester(c) {
+//   step(1)
+//   reset(1)
 
-  // overwrite init
-  poke(c.io.input.data, 0)
-  poke(c.io.input.enable, 1)
-  step(1)
-  expect(c.io.output.data, 0)
-  step(1)
+//   // overwrite init
+//   poke(c.io.input.data, 0)
+//   poke(c.io.input.enable, 1)
+//   step(1)
+//   expect(c.io.output.data, 0)
+//   step(1)
 
-  val numCycles = 15
-  for (i <- 0 until numCycles) {
-    val newenable = rnd.nextInt(2)
-    val oldout = peek(c.io.output.data)
-    poke(c.io.input.data, i)
-    poke(c.io.input.enable, newenable)
-    step(1)
-    if (newenable == 1) expect(c.io.output.data, i) else expect(c.io.output.data, oldout)
-  }
-}
+//   val numCycles = 15
+//   for (i <- 0 until numCycles) {
+//     val newenable = rnd.nextInt(2)
+//     val oldout = peek(c.io.output.data)
+//     poke(c.io.input.data, i)
+//     poke(c.io.input.enable, newenable)
+//     step(1)
+//     if (newenable == 1) expect(c.io.output.data, i) else expect(c.io.output.data, oldout)
+//   }
+// }
 
-class FFNoInitNoResetTests(c: FFNoInitNoReset) extends PeekPokeTester(c) {
-  step(1)
-  reset(1)
+// class FFNoInitNoResetTests(c: FFNoInitNoReset) extends PeekPokeTester(c) {
+//   step(1)
+//   reset(1)
 
-  // overwrite init
-  poke(c.io.input.data, 0)
-  poke(c.io.input.enable, 1)
-  step(1)
-  expect(c.io.output.data, 0)
-  step(1)
+//   // overwrite init
+//   poke(c.io.input.data, 0)
+//   poke(c.io.input.enable, 1)
+//   step(1)
+//   expect(c.io.output.data, 0)
+//   step(1)
 
-  val numCycles = 15
-  for (i <- 0 until numCycles) {
-    val newenable = rnd.nextInt(2)
-    val oldout = peek(c.io.output.data)
-    poke(c.io.input.data, i)
-    poke(c.io.input.enable, newenable)
-    step(1)
-    if (newenable == 1) expect(c.io.output.data, i) else expect(c.io.output.data, oldout)
-  }
-}
+//   val numCycles = 15
+//   for (i <- 0 until numCycles) {
+//     val newenable = rnd.nextInt(2)
+//     val oldout = peek(c.io.output.data)
+//     poke(c.io.input.data, i)
+//     poke(c.io.input.enable, newenable)
+//     step(1)
+//     if (newenable == 1) expect(c.io.output.data, i) else expect(c.io.output.data, oldout)
+//   }
+// }
 
-class FFNoResetTests(c: FFNoReset) extends PeekPokeTester(c) {
-  step(1)
-  reset(1)
+// class FFNoResetTests(c: FFNoReset) extends PeekPokeTester(c) {
+//   step(1)
+//   reset(1)
 
-  // overwrite init
-  poke(c.io.input.data, 0)
-  poke(c.io.input.enable, 1)
-  step(1)
-  expect(c.io.output.data, 0)
-  step(1)
+//   // overwrite init
+//   poke(c.io.input.data, 0)
+//   poke(c.io.input.enable, 1)
+//   step(1)
+//   expect(c.io.output.data, 0)
+//   step(1)
 
-  val numCycles = 15
-  for (i <- 0 until numCycles) {
-    val newenable = rnd.nextInt(2)
-    val oldout = peek(c.io.output.data)
-    poke(c.io.input.data, i)
-    poke(c.io.input.enable, newenable)
-    step(1)
-    if (newenable == 1) expect(c.io.output.data, i) else expect(c.io.output.data, oldout)
-  }
-}
+//   val numCycles = 15
+//   for (i <- 0 until numCycles) {
+//     val newenable = rnd.nextInt(2)
+//     val oldout = peek(c.io.output.data)
+//     poke(c.io.input.data, i)
+//     poke(c.io.input.enable, newenable)
+//     step(1)
+//     if (newenable == 1) expect(c.io.output.data, i) else expect(c.io.output.data, oldout)
+//   }
+// }
 
 class TFFTests(c: TFF) extends PeekPokeTester(c) {
   step(1)

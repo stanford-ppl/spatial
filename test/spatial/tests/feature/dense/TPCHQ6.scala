@@ -2,7 +2,7 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class TPCHQ6 extends SpatialTest {
+@spatial class TPCHQ6 extends SpatialTest {
   override def runtimeArgs: Args = "3840"
 
   type FT = Int
@@ -13,7 +13,7 @@ import spatial.dsl._
   val MAX_DISC = 9999
   val margin = 1
 
-  val innerPar = 16
+  val innerPar = 2
   val outerPar = 2
 
   val tileSize = 384

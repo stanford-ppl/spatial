@@ -1,15 +1,10 @@
 package spatial.tests.feature.transfers
 
-
 import spatial.dsl._
 
-
-@test class UniqueParallelLoad extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
-  val dim0 = 144//144
+@spatial class UniqueParallelLoad extends SpatialTest {
+  val dim0 = 144
   val dim1 = 96
-
 
   def awkwardload[T:Num](src1: Array[T], src2: Array[T]): T = {
     val mat = DRAM[T](dim0, dim1)

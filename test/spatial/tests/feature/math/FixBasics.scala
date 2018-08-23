@@ -4,9 +4,7 @@ import spatial.dsl._
 
 import scala.reflect.ClassTag
 
-@test class FixBasics extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FixBasics extends SpatialTest {
   type Q16 = FixPt[TRUE,_16,_16]
   val N: scala.Int = 20
 

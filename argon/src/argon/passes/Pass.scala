@@ -11,7 +11,7 @@ import utils.tags.instrument
   * Extend this trait directly if you don't need to traverse the graph.
   * Otherwise, extend Traversal.
   */
-@instrument trait Pass { self =>
+trait Pass { self =>
   val IR: State
   final implicit def __IR: State = IR
   def name: String = r"${self.getClass}".split('.').last

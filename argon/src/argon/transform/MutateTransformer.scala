@@ -3,7 +3,7 @@ package transform
 
 import utils.tags.instrument
 
-@instrument abstract class MutateTransformer extends ForwardTransformer {
+abstract class MutateTransformer extends ForwardTransformer {
   override val recurse = Recurse.Default
 
   /** Determines whether the default transform rule is to mirror (copy) or update nodes. */
@@ -32,7 +32,7 @@ import utils.tags.instrument
   }
 
   final override protected def blockToFunction0[R](b: Block[R]): () => R = {
-    () => isolate(){
+    () => isolateSubst(){
       inCopyMode(copy = true){ inlineBlock(b).unbox }
     }
   }
@@ -40,13 +40,9 @@ import utils.tags.instrument
   /** Mutate this symbol's node with the current substitution rules. */
   final def update[A](lhs: Sym[A], rhs: Op[A]): Sym[A] = if (copyMode) mirror(lhs,rhs) else {
     implicit val ctx: SrcCtx = lhs.ctx
-    //logs(s"$lhs = $rhs [Update]")
     try {
       updateNode(rhs)
-      val lhs2 = restage(lhs)
-      // TODO[5]: Small inefficiency where metadata created through flows is immediately mirrored
-      if (lhs2 == lhs) transferMetadata(lhs -> lhs2)
-      lhs2
+      restageWithFlow(lhs){lhs2 => transferDataIfNew(lhs, lhs2) }
     }
     catch {case t: Throwable =>
       bug("Encountered exception while updating node")

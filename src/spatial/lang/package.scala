@@ -1,4 +1,4 @@
 package spatial
 
-package object lang extends spatial.lang.static.InternalStatics
+package object lang extends spatial.lang.api.StaticAPI_Internal
 

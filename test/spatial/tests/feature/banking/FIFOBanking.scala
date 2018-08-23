@@ -1,12 +1,8 @@
 package spatial.tests.feature.banking
 
-
 import spatial.dsl._
 
-
-@test class FIFOBanking extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
-
+@spatial class FIFOBanking extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
 

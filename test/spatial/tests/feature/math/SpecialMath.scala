@@ -4,7 +4,7 @@ package spatial.tests.feature.math
 import spatial.dsl._
 
 
-@test class SpecialMath extends SpatialTest {
+@spatial class SpecialMath extends SpatialTest {
   override def runtimeArgs: Args = "0.125 5.625 14 1.875 -3.4375 -5"
 
   type USGN = FixPt[FALSE,_4,_4]

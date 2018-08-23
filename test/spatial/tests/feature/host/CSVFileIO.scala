@@ -2,7 +2,7 @@ package spatial.tests.feature.host
 
 import spatial.dsl._
 
-@test class CSVFileIO extends SpatialTest {
+@spatial class CSVFileIO extends SpatialTest {
   override def runtimeArgs = "32"
 
   def main(args: Array[String]): Unit = {
@@ -19,7 +19,12 @@ import spatial.dsl._
 
     val matrix_2 = loadCSV2D[Float]("matrix.csv")
 
-    assert(array == array_2)
-    assert(matrix == matrix_2)
+    printArray(array, "Array In:")
+    printArray(array_2, "Array Out:")
+    printMatrix(matrix, "Matrix In:")
+    printMatrix(matrix_2, "Matrix Out:")
+
+    assert(array.zip(array_2){case (a,b) => abs(a-b) < 0.00001}.reduce{_&&_})
+    assert(matrix.zip(matrix_2){case (a,b) => abs(a-b) < 0.00001}.reduce{_&&_})
   }
 }

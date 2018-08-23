@@ -1,20 +1,17 @@
 package argon
 
 import argon.passes.Pass
-import argon.transform.Transformer
 import utils.io.files
 import utils._
 import utils.implicits.terminal._
 
-trait Compiler { self =>
-  protected[argon] var IR: State = new State
-  final protected implicit def __IR: State = IR
+trait Compiler extends DSLRunnable { self =>
+
   private val instrument = new Instrument()
   private val memWatch = new MemoryLogger()
 
   val script: String
   val desc: String
-  var name: String = self.getClass.getName.replace("class ", "").replace('.','_').replace("$","")
 
   var directives: Map[String,String] = Map.empty
   def define[T](name: String, default: T)(implicit ctx: SrcCtx): T = directives.get(name.toLowerCase) match {
@@ -80,6 +77,8 @@ trait Compiler { self =>
   def runPasses[R](b: Block[R]): Block[R]
 
   final def runPass[R](t: Pass, block: Block[R]): Block[R] = instrument(t.name){
+    if (config.stop > -1 && state.pass >= config.stop) throw EarlyStop(t.name)
+
     val issuesBefore = state.issues
 
     if (config.enMemLog) memWatch.note(t.name)
@@ -116,6 +115,8 @@ trait Compiler { self =>
   }
 
   final def compileProgram(args: Array[String]): Unit = instrument("compile"){
+    checkBugs("staging")
+    checkErrors("staging")
     info(s"Compiling ${config.name} to ${config.genDir}")
     if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
     if (config.test) info("Running in testbench mode")
@@ -123,7 +124,6 @@ trait Compiler { self =>
     files.deleteExts(IR.config.logDir, "log")
 
     val block = stageProgram(args)
-    if (config.enLog) info(s"Symbols: ${IR.maxId}")
     val result = runPasses(block)
     postprocess(result)
   }
@@ -145,19 +145,20 @@ trait Compiler { self =>
     cli.opt[Unit]("nonaming").action{(_,_) => config.naming = false }.text("Disable verbose naming")
 
     cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.").hidden()
+    cli.opt[Int]("stop").action{(i,_) =>
+      config.stop = i
+      warn(s"Compiler will stop after pass $i")
+    }.text("Stop compilation at the given compiler pass.").hidden()
     cli.help("X").hidden()
   }
 
   /** Called after initial command-line argument parsing has finished. */
   def settings(): Unit = { }
 
-  /** Override to create a custom Config instance */
-  def initConfig(): Config = new Config
   def flows(): Unit = { }
   def rewrites(): Unit = { }
 
   final def init(args: Array[String]): Unit = instrument("init"){
-    IR = new State                 // Create a new, empty state
     IR.config = initConfig()
     IR.config.name = name          // Set the default program name
     directives = Map.empty
@@ -185,11 +186,11 @@ trait Compiler { self =>
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
     flows()
     rewrites()
+    if (config.enMemLog) memWatch.start(config.logDir)
   }
 
   def execute(args: Array[String]): Unit = instrument("compiler"){
     init(args)
-    if (config.enMemLog) memWatch.start(config.logDir)
     compileProgram(args)
   }
 
@@ -201,31 +202,27 @@ trait Compiler { self =>
     def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
   }
 
-  /**
-    * The "real" entry point for the application
-    */
-  def compile(args: Array[String]): Unit = {
-    instrument.reset()
-    var failure: Option[Throwable] = None
-    try {
-      execute(args)
-    }
-    catch {
-      case t: CompilerBugs =>
-        onException(t)
-        failure = Some(t)
+  final protected def handleException(t: Throwable): Option[Throwable] = t match {
+    case t: CompilerBugs =>
+      onException(t)
+      Some(t)
 
-      case t @ CompilerErrors(stage,n) =>
-        error(s"${IR.errors} ${plural(n,"error")} found during $stage")
-        failure = Some(t)
+    case t @ CompilerErrors(stage,n) =>
+      error(s"${IR.errors} ${plural(n,"error")} found during $stage")
+      Some(t)
 
-      case t: Throwable =>
-        onException(t)
-        val except = UnhandledException(t)
-        except.setStackTrace(t.getStackTrace)
-        failure = Some(except)
-    }
+    case t @ RequirementFailure(ctx, msg) =>
+      error(ctx, "Requirement failed: " + msg)
+      Some(t)
 
+    case t: Throwable =>
+      onException(t)
+      val except = UnhandledException(t)
+      except.setStackTrace(t.getStackTrace)
+      Some(except)
+  }
+
+  protected def complete(failure: Option[Throwable]): Unit = {
     checkWarnings()
     val tag = {
       if (IR.hadBugs || IR.hadErrors || failure.nonEmpty) s"[${Console.RED}failed${Console.RESET}]"
@@ -235,17 +232,25 @@ trait Compiler { self =>
     if (config.enMemLog) memWatch.finish()
     if (config.enDbg) {
       instrument.dump("Nova Profiling Report", getOrCreateStream(config.logDir,"9999_Timing.log"))
-      Instrumented.set.foreach{i =>
-        val log = i.fullName.replace('.','_')
+
+      Instrumented.set.groupBy(_.fullName).foreach{case (fullName, is) =>
+        // Combine instruments with the same name
+        val i = is.head
+        is.drop(1).foreach{i2 => i.instrument.add(i2.instrument) }
+
+        // Log results
+        val log = fullName.replace('.','_')
         val heading = s"${i.instrumentName}: ${i.toString} (${i.hashCode()})"
         val stream = getOrCreateStream(config.logDir,log + ".log")
         i.dumpInstrument(heading, stream)
         stream.println("\n")
         i.dumpAllInstrument(stream)
         stream.println("\n")
+        stream.close()
+        info(s"Profiling results for $fullName dumped to ${config.logDir}$log.log")
 
-        info(s"Profiling results for ${i.fullName} dumped to ${config.logDir}$log.log")
-        i.resetInstrument()
+        // Reset instruments
+        is.foreach(_.resetInstrument())
       }
 
       val heading = s"@flow analyses"
@@ -253,14 +258,39 @@ trait Compiler { self =>
       IR.flows.instrument.dump(heading,stream)
       stream.println("\n")
       IR.flows.instrument.dumpAll(stream)
+      stream.close()
+
+      OutlierFinder.set.foreach{f =>
+        val log = f.finderName + ".log"
+        val stream = getOrCreateStream(config.logDir, log)
+        f.report(stream)
+        stream.close()
+        info(s"Outlier profiling results for ${f.finderName} dumped to ${config.logDir}$log")
+      }
     }
 
     val time = instrument.totalTime
     msg(s"$tag Total time: " + "%.4f".format(time/1000.0f) + " seconds")
 
     IR.streams.values.foreach{stream => stream.close() }
+    IR.streams.clear()
 
     if (config.test && failure.nonEmpty) throw failure.get
     else if (failure.nonEmpty || IR.hadBugs || IR.hadErrors) sys.exit(1)
+  }
+
+
+  /**
+    * The "real" entry point for the application
+    */
+  def compile(args: Array[String]): Unit = {
+    instrument.reset()
+    var failure: Option[Throwable] = None
+    try {
+      execute(args)
+    }
+    catch {case t: Throwable => failure = handleException(t) }
+
+    complete(failure)
   }
 }

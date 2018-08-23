@@ -2,7 +2,7 @@ package spatial.tests.feature.unit
 
 import spatial.dsl._
 
-@test class ArgInOut extends SpatialTest {
+@spatial class ArgInOut extends SpatialTest {
   override def runtimeArgs: Args = "7"
 
   def main(args: Array[String]): Unit = {

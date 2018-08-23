@@ -1,6 +1,7 @@
 package spatial.codegen.pirgen
 
 import argon._
+import argon.node._
 import spatial.lang._
 import spatial.node._
 
@@ -25,19 +26,24 @@ trait PIRGenBits extends PIRCodegen {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    //case Mux(sel, a, b) => 
+    case Mux(sel, a, b) => emit(src"val $lhs = if ($sel) $a else $b")
     case op @ OneHotMux(selects,datas) =>
-      error(s"Plasticine not support OneHotMux yet")
+      open(src"val $lhs = {")
+      selects.indices.foreach { i =>
+        emit(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) { ${datas(i)} }""")
+      }
+      emit(src"else { ${invalid(op.R)} }")
+      close("}")
 
     case e@DataAsBits(a) => a.tp match {
-      case FltPtType(_,_)   => emit(src"val $lhs = $a")
-      case FixPtType(_,_,_) => emit(src"val $lhs = $a")
-      case BitType()        => emit(src"val $lhs = $a")
+      case FltPtType(_,_)   => emit(src"val $lhs = $a.bits")
+      case FixPtType(_,_,_) => emit(src"val $lhs = $a.bits")
+      case BitType()        => emit(src"val $lhs = Array[Bool]($a)")
     }
 
     case BitsAsData(v,a) => a match {
-      case FltPtType(g,e)   => emit(src"val $lhs = FloatPoint.fromBits($v, FltFormat(${g-1},$e))") //TODO
-      case FixPtType(s,i,f) => emit(src"val $lhs = FixedPoint.fromBits($v, FixFormat($s,$i,$f))") //TODO
+      case FltPtType(g,e)   => emit(src"val $lhs = FloatPoint.fromBits($v, FltFormat(${g-1},$e))")
+      case FixPtType(s,i,f) => emit(src"val $lhs = FixedPoint.fromBits($v, FixFormat($s,$i,$f))")
       case BitType()        => emit(src"val $lhs = $v.head")
     }
 

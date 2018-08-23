@@ -2,7 +2,7 @@ package spatial.tests.feature.math
 
 import spatial.dsl._
 
-@test class FloatBasics_buggy_boolean extends SpatialTest {
+@spatial class FloatBasics_buggy_boolean extends SpatialTest {
   override def runtimeArgs: Args = "3.2752 -283.70"
   override def backends: Seq[Backend] = DISABLED
 

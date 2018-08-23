@@ -2,8 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 
-@test class ReduceStruct extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class ReduceStruct extends SpatialTest {
 
   @struct case class MinMax(min: Float, max: Float)
 
@@ -38,7 +37,7 @@ import spatial.dsl._
       }
 
       setArg(outA, omm.value.min)
-      setArg(outB, omm.value.min)
+      setArg(outB, omm.value.max)
     }
 
     val a = getArg(outA)

@@ -13,6 +13,7 @@ trait ZynqBlackBoxes {
     val io = IO(new Bundle {
       val dividend = Input(UInt(dividendWidth.W))
       val divisor = Input(UInt(divisorWidth.W))
+      val flow = Input(Bool())
       val out = Output(UInt(dividendWidth.W))
     })
 
@@ -24,6 +25,7 @@ trait ZynqBlackBoxes {
     m.io.s_axis_dividend_tdata := io.dividend
     m.io.s_axis_divisor_tvalid := true.B
     m.io.s_axis_divisor_tdata := io.divisor
+    m.io.aclken := io.flow
     io.out := m.io.m_axis_dout_tdata(dividendWidth-1, fractionBits)
   }
 
@@ -31,6 +33,7 @@ trait ZynqBlackBoxes {
     val io = IO(new Bundle {
       val dividend = Input(UInt(dividendWidth.W))
       val divisor = Input(UInt(divisorWidth.W))
+      val flow = Input(Bool())
       val out = Output(UInt(dividendWidth.W))
     })
 
@@ -42,12 +45,14 @@ trait ZynqBlackBoxes {
     m.io.s_axis_dividend_tdata := io.dividend
     m.io.s_axis_divisor_tvalid := true.B
     m.io.s_axis_divisor_tdata := io.divisor
+    m.io.aclken := io.flow
     io.out := m.io.m_axis_dout_tdata
   }
 
   class DivModBBox(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val isMod: Boolean, val fractionBits: Int, val latency: Int) extends BlackBox {
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_dividend_tvalid = Input(Bool())
       val s_axis_dividend_tdata = Input(UInt(dividendWidth.W))
       val s_axis_divisor_tvalid = Input(Bool())
@@ -67,7 +72,7 @@ trait ZynqBlackBoxes {
 s"""
 ## Integer Divider
 create_ip -name div_gen -vendor xilinx.com -library ip -version 5.1 -module_name $moduleName
-set_property -dict [list CONFIG.latency_configuration {Manual} CONFIG.latency {$latency}] [get_ips $moduleName]
+set_property -dict [list CONFIG.latency_configuration {Manual} CONFIG.latency {$latency} CONFIG.aclken {true}] [get_ips $moduleName]
 set_property -dict [list CONFIG.dividend_and_quotient_width {$dividendWidth} CONFIG.divisor_width {$divisorWidth} CONFIG.remainder_type {$modString} CONFIG.clocks_per_division {1} CONFIG.fractional_width {$fractionBits} CONFIG.operand_sign {$signedString}] [get_ips $moduleName]
 set_property -dict [list CONFIG.ACLK_INTF.FREQ_HZ $$CLOCK_FREQ_HZ] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
@@ -84,13 +89,16 @@ generate_target {all} [get_ips $moduleName]
     val io = IO(new Bundle {
       val a = Input(UInt(aWidth.W))
       val b = Input(UInt(bWidth.W))
+      val flow = Input(Bool())
       val out = Output(UInt(outWidth.W))
     })
 
+    assert(latency > 0, "ERROR: Latency must be > 0 to use Multiplier IP")
     val m = Module(new MultiplierBBox(aWidth, bWidth, outWidth, signed, latency))
     m.io.CLK := clock
     m.io.A := io.a
     m.io.B := io.b
+    m.io.CE := io.flow
     io.out := m.io.P
   }
 
@@ -98,6 +106,7 @@ generate_target {all} [get_ips $moduleName]
   class MultiplierBBox(val aWidth: Int, val bWidth: Int, val outWidth: Int, val signed: Boolean, val latency: Int) extends BlackBox {
     val io = IO(new Bundle {
       val CLK = Input(Clock())
+      val CE = Input(Bool())
       val A = Input(UInt(aWidth.W))
       val B = Input(UInt(bWidth.W))
       val P = Output(UInt(outWidth.W))
@@ -122,7 +131,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## Integer Multiplier
 create_ip -name mult_gen -vendor xilinx.com -library ip -version 12.0 -module_name $moduleName
-set_property -dict [list CONFIG.MultType {Parallel_Multiplier} CONFIG.PortAType {$signedString}  CONFIG.PortAWidth {$aWidth} CONFIG.PortBType {$signedString} CONFIG.PortBWidth {$bWidth} CONFIG.Multiplier_Construction {$multConstruction} CONFIG.OptGoal {Speed} CONFIG.Use_Custom_Output_Width {true} CONFIG.OutputWidthHigh {$outWidth} CONFIG.PipeStages {$latency}] [get_ips $moduleName]
+set_property -dict [list CONFIG.MultType {Parallel_Multiplier} CONFIG.PortAType {$signedString}  CONFIG.PortAWidth {$aWidth} CONFIG.PortBType {$signedString} CONFIG.PortBWidth {$bWidth} CONFIG.Multiplier_Construction {$multConstruction} CONFIG.OptGoal {Speed} CONFIG.Use_Custom_Output_Width {true} CONFIG.OutputWidthHigh {$outWidth} CONFIG.PipeStages {$latency} CONFIG.ClockEnable {true}] [get_ips $moduleName]
 set_property -dict [list CONFIG.clk_intf.FREQ_HZ $$CLOCK_FREQ_HZ] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]

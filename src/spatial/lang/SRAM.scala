@@ -2,10 +2,10 @@ package spatial.lang
 
 import argon._
 import forge.tags._
-import spatial.data._
 import utils.implicits.collections._
 import spatial.node._
 import spatial.lang.types._
+import spatial.metadata.memory._
 
 abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends LocalMem[A,C] {
   val A: Bits[A] = Bits[A]
@@ -60,6 +60,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   }
 
   def buffer: C[A] = { this.isWriteBuffer = true; me }
+  def nonbuffer: C[A] = { this.isNonBuffer = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)

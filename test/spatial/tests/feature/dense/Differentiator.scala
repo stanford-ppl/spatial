@@ -2,14 +2,13 @@ package spatial.tests.feature.dense
 
 import spatial.dsl._
 
-@test class Differentiator extends SpatialTest {
-  override def runtimeArgs: Args = NoArgs
+@spatial class Differentiator extends SpatialTest {
   type T = FixPt[TRUE,_16,_16]
 
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE,_16,_16]
     val coltile = 64
-    val data = loadCSV1D[T]("/remote/regression/data/slacsample1d.csv", ",")
+    val data = loadCSV1D[T](s"$DATA/slac/slacsample1d.csv", ",")
     val memcols = ArgIn[Int]
     setArg(memcols, data.length.to[Int])
     val srcmem = DRAM[T](memcols)
@@ -45,9 +44,9 @@ import spatial.dsl._
     val results = getMem(dstmem)
 
     // // Write answer for first time
-    // writeCSV1D(results, "/remote/regression/data/deriv_gold.csv", ",")
+    // writeCSV1D(results, s"$DATA/slac/deriv_gold.csv", ",")
     // Read answer
-    val gold = loadCSV1D[T]("/remote/regression/data/deriv_gold.csv", ",")
+    val gold = loadCSV1D[T](s"$DATA/slac/deriv_gold.csv", ",")
 
     // Create validation checks and debug code
     printArray(results, "Results:")

@@ -314,7 +314,8 @@ package object control {
       */
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val ctrls = child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      dbgs(s"for $iters $reference, checking $ctrls lockstep")
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
     }

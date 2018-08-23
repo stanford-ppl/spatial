@@ -140,7 +140,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && outermost.parent.isLockstepAcross(itersDiffer, Some(a.access))
+        val x = spatialConfig.enableBroadcast && outermost.parent.s.get.isLockstepAcross(itersDiffer, Some(a.access))
+        if (x) dbgs(s"   checking lockstep for $outermost, ${outermost.parent.s.get}, on iters $itersDiffer (all iters $iters) for ${a.access}/${b.access}")
+        x
       }
     }
     else true

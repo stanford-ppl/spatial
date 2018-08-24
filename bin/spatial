@@ -49,6 +49,7 @@ Backends:
   --sim                 Enables codegen to Scala (disables retiming by default) [false]
   --synth               Enables codegen to chisel + cpp (Synthesis) [true]
   --dot                 Enables dot graph generation
+  --pymodel             Enables python runtime/area model generation
   --retime              Force retiming for --sim
   --noretime            Disables retiming for all targets
   --multifile <value>   Sets file splitting [4]:

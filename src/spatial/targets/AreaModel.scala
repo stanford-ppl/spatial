@@ -129,7 +129,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
                                   .map(_._1)
 
     val addrSize = dims.map{d => log2(d) + (if (isPow2(d)) 1 else 0) }.max
-    val multiplier = model("FixMulBig")("b"->18) //if (addrSize < DSP_CUTOFF) model("FixMulSmall")("b"->addrSize) else model("FixMulBig")("b"->addrSize)
+    val multiplier = model("FixMulBig")("b"->18)
     val adder = model("FixAdd")("b"->addrSize)
     val mod   = model("FixMod")("b"->addrSize)
     val flattenCost = dims.indices.map{i => multiplier*i }.fold(NoArea){_+_} + adder*(dims.length - 1)
@@ -159,14 +159,14 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
   @stateful def areaInReduce(e: Sym[_], d: Op[_]): Area = areaOfNode(e, d)
 
-  // TODO[5]: Update controller area models
-  @stateful private def areaOfControl(ctrl: Sym[_]): Area = {
-    if (ctrl.isInnerControl) NoArea
-    //else if (isSeqPipe(ctrl)) model("Sequential")("n" -> nStages(ctrl))
-    //else if (isMetaPipe(ctrl)) model("MetaPipe")("n" -> nStages(ctrl))
-    //else if (isStreamPipe(ctrl)) model("Stream")("n" -> nStages(ctrl))
-    else NoArea
-  }
+  //  // TODO[5]: Update controller area models
+  //  @stateful private def areaOfControl(ctrl: Sym[_]): Area = {
+  //    if (ctrl.isInnerControl) NoArea
+  //    else if (ctrl.isSeqControl) model("Sequential")("n" -> nStages(ctrl))
+  //    else if (ctrl.isOuterPipeControl model("MetaPipe")("n" -> nStages(ctrl))
+  //    else if (ctrl.isStreamControl) model("Stream")("n" -> nStages(ctrl))
+  //    else NoArea
+  //  }
 
   @stateful def areaOfNode(lhs: Sym[_], rhs: Op[_]): Area = rhs match {
     /** Non-synthesizable nodes */
@@ -188,18 +188,19 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
     case DelayLine(size,data) => areaOfDelayLine(size,nbits(data),1)
 
-//    case tx:DenseTransfer[_,_] if tx.isStore =>
-//      val d = if (tx.lens.length == 1) "1" else "2"
-//      val p = boundOf(tx.p).toInt
-//      val w = tx.bT.length
+//    case tx:DenseTransfer[_,_,_] if tx.isStore =>
+//      import spatial.util.memops._
+//
+//      val p = tx.dram.parsImm.last
+//      val w = tx.A.nbits
 //      tx.lens.last match {
 //        case Exact(c) if (c.toInt*tx.bT.length) % target.burstSize == 0 => model("AlignedStore"+d)("p"->p,"w"->w)
 //        case _ => model("UnalignedStore"+d)("p"->p,"w"->w)
 //      }
-//    case tx: DenseTransfer[_,_] if tx.isLoad =>
+//    case tx: DenseTransfer[_,_,_] if tx.isLoad =>
 //      val d = if (tx.lens.length == 1) "1" else "2"
 //      val p = boundOf(tx.p).toInt
-//      val w = tx.bT.length
+//      val w = tx.A.nbits
 //      tx.lens.last match {
 //        case Exact(c) if (c.toInt*tx.bT.length) % target.burstSize == 0 => model("AlignedLoad"+d)("p"->p,"w"->w)
 //        case _ => model("UnalignedLoad"+d)("p"->p,"w"->w)

@@ -13,8 +13,8 @@ case object Fork extends CtrlSchedule
 
 /** Control node level. */
 sealed abstract class CtrlLevel
-case object Inner extends CtrlLevel { override def toString = "InnerControl" }
-case object Outer extends CtrlLevel { override def toString = "OuterControl" }
+case object Inner extends CtrlLevel
+case object Outer extends CtrlLevel
 
 /** Control node looping. */
 sealed abstract class CtrlLooping

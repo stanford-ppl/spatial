@@ -42,6 +42,12 @@ object memops {
       Seq.tabulate(mem.rawRank.length){i => stage(MemDim(mem, mem.rawRank(i))) }
     }
 
+    def parsImm: Seq[I32] = mem match {
+      case Op(MemDenseAlias(_,_,ranges)) => ranges.map(_.head.par)
+      case Op(alloc: MemAlloc[_,_])      => Seq.fill(alloc.rank.length){ I32(1) }
+      case _ => Nil
+    }
+
     @rig def series(): Seq[Series[I32]] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
       Seq.tabulate(mem.seqRank.length){i =>

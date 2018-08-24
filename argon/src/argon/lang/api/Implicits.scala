@@ -104,8 +104,8 @@ trait ImplicitsPriority3 { this: Implicits =>
   @rig implicit def liftShort(b: Short): Lift[I16] = new Lift[I16](b,b.to[I16])
   @rig implicit def liftInt(b: Int): Lift[I32] = new Lift[I32](b,b.to[I32])
   @rig implicit def liftLong(b: Long): Lift[I64] = new Lift[I64](b,b.to[I64])
-  @rig implicit def liftFloat(b: Float): Lift[F32] = new Lift[F32](b,b.to[F32])
-  @rig implicit def liftDouble(b: Double): Lift[F64] = new Lift[F64](b,b.to[F64])
+  @rig implicit def liftFloat(b: Float): Lift[FP32] = new Lift[FP32](b,b.to[FP32])
+  @rig implicit def liftDouble(b: Double): Lift[FP64] = new Lift[FP64](b,b.to[FP64])
 
   //@rig implicit def liftBoolean(b: Boolean): Lift[Bit] = new Lift(b,b.to[Bit])
   //@rig implicit def liftString(b: String): Lift[Text] = new Lift[Text](b, Text(b))

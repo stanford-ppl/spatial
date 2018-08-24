@@ -66,7 +66,7 @@ trait ScalaGenMemories extends ScalaGenBits {
 
   def emitBankedInitMem(mem: Sym[_], init: Option[Seq[Sym[_]]], tp: ExpType[_,_]): Unit = {
     val inst = mem.instance
-    val dims = mem.constDims
+    val dims = mem.constDims.zip(mem.padding).map{case(a,b) => a+b}
     val size = dims.product
     implicit val ctx: SrcCtx = mem.ctx
 

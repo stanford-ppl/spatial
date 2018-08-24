@@ -83,9 +83,9 @@ trait InternalAliases extends CustomBitWidths {
   type UInt2  = U2
 
   type FltPt[M,E] = argon.lang.Flt[M,E]
-  type F64 = FltPt[_53,_11]
-  type F32 = FltPt[_24,_8]
-  type F16 = FltPt[_11,_5]
+  type FP64 = FltPt[_53,_11]
+  type FP32 = FltPt[_24,_8]
+  type FP16 = FltPt[_11,_5]
 
   type Arith[T] = argon.lang.types.Arith[T]
   lazy val Arith = argon.lang.types.Arith

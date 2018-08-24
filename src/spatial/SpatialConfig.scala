@@ -24,6 +24,7 @@ class SpatialConfig extends Config {
   var enableSynth: Boolean = true
   var enableTree: Boolean = true
   var enableDot: Boolean = false
+  var enablePythonModel = false
 
   var enableInstrumentation: Boolean = false
   var enableTightControl: Boolean = false
@@ -48,4 +49,6 @@ class SpatialConfig extends Config {
   def ignoreParEdgeCases: Boolean = false
   def noInnerLoopUnroll: Boolean = false
   def enableBufferCoalescing: Boolean = true
+
+
 }

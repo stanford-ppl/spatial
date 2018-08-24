@@ -42,8 +42,8 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def latencyOption(op: String, b: Option[Int]): Double = {
     if (spatialConfig.enableRetiming) {
-      if (b.isDefined) {spatialConfig.target.latencyModel.exactModel(op)("b" -> b.get)("LatencyOf")}
-      else spatialConfig.target.latencyModel.exactModel(op)()("LatencyOf")
+      if (b.isDefined) {spatialConfig.target.latencyModel.model(op)("b" -> b.get)("LatencyOf")}
+      else spatialConfig.target.latencyModel.model(op)()("LatencyOf")
     } else {
       0.0
     }

@@ -7,19 +7,17 @@ import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
-
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
 import spatial.metadata.access._
 import spatial.targets.HardwareTarget
-
 import spatial.dse._
 import spatial.transform._
 import spatial.traversal._
 import spatial.report._
 import spatial.flows.SpatialFlowRules
+import spatial.model.PythonModelGenerator
 import spatial.rewrites.SpatialRewriteRules
-
 import spatial.util.spatialConfig
 
 
@@ -84,7 +82,8 @@ trait Spatial extends Compiler {
     lazy val friendlyTransformer   = FriendlyTransformer(state)
     lazy val switchTransformer     = SwitchTransformer(state)
     lazy val switchOptimizer       = SwitchOptimizer(state)
-    lazy val blackboxLowering      = BlackboxLowering(state)
+    lazy val blackboxLowering1     = BlackboxLowering(state, lowerTransfers = false)
+    lazy val blackboxLowering2     = BlackboxLowering(state, lowerTransfers = true)
     lazy val memoryDealiasing      = MemoryDealiasing(state)
     lazy val pipeInserter          = PipeInserter(state)
     lazy val transientCleanup      = TransientCleanup(state)
@@ -100,6 +99,7 @@ trait Spatial extends Compiler {
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
+    lazy val pythonModelGen = PythonModelGenerator(state)
 
     val result = {
       block ==> printer     ==>
@@ -109,7 +109,11 @@ trait Spatial extends Compiler {
         /** Black box lowering */
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
-        blackboxLowering    ==> printer ==> transformerChecks ==>
+        blackboxLowering1   ==> printer ==> transformerChecks ==>
+        /** Optional python model generator */
+        (spatialConfig.enablePythonModel ? pythonModelGen) ==>
+        /** More black box lowering */
+        blackboxLowering2   ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
@@ -126,7 +130,7 @@ trait Spatial extends Compiler {
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
         /** Iteration difference analysis */
-        iterationDiffAnalyzer   ==>
+        iterationDiffAnalyzer ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */
@@ -201,6 +205,10 @@ trait Spatial extends Compiler {
     cli.opt[Unit]("dot").action( (_,_) =>
       spatialConfig.enableDot = true
     ).text("Enable dot graph generation [false]")
+
+    cli.opt[Unit]("pymodel").action( (_,_) =>
+      spatialConfig.enablePythonModel = true
+    )
 
     cli.opt[Unit]("retime").action{ (_,_) =>
       spatialConfig.enableRetiming = true

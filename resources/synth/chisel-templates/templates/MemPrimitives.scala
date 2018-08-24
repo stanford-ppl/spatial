@@ -241,13 +241,13 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Get info on physical dims
   // TODO: Upcast dims to evenly bank
-  val bankDim = p.bankingMode match {
-    case DiagonalMemory => math.ceil(p.depth.toDouble / p.banks.product.toDouble).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
-    case BankedMemory => math.ceil(p.depth.toDouble / p.banks.product.toDouble).toInt
-  }
   val numMems = p.bankingMode match {
     case DiagonalMemory => p.banks.head
     case BankedMemory => p.banks.product
+  }
+  val bankDim = p.bankingMode match {
+    case DiagonalMemory => math.ceil(p.depth.toDouble / numMems.toDouble).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
+    case BankedMemory => math.ceil(p.depth.toDouble / numMems.toDouble).toInt
   }
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)

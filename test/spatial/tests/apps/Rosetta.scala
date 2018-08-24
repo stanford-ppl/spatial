@@ -4,7 +4,7 @@ import spatial.dsl._
 import spatial.targets._
 
 @spatial class Rendering3D extends SpatialTest {
-	override def runtimeArgs = "1 0"
+	override def runtimeArgs = "1 0 3192"
 	//override val target = Zynq
 	// struct size of power of 2
 	@struct case class triangle3D(x0 : UInt8, y0 : UInt8, z0 : UInt8, 
@@ -148,6 +148,8 @@ import spatial.targets._
 				Pipe { max_min(4) = max_x - min_x }
 				Pipe { max_index := (max_x.to[Int] - min_x.to[Int]) * (max_y.to[Int] - min_y.to[Int]) }
 			}
+			println(r"bounds are ${min_x} - ${max_x} x ${min_y} - ${max_y}, area = ${max_index}")
+
 			//Pipe { max_min(4) = max_min(1) - max_min(0) }
 			//Pipe { max_index := (max_min(1).to[Int] - max_min(0).to[Int]) * (max_min(3).to[Int] - max_min(2).to[Int]) }
 		}
@@ -210,8 +212,10 @@ import spatial.targets._
 		val input_num = input_reg.value
 
 		val num_triangles = 3192 
-		// val tris_to_do = ArgIn[Int]
-		// setArg(tris_to_do, args(2).to[Int])
+		val tri_start = ArgIn[Int]
+		setArg(tri_start, args(1).to[Int])
+		val tri_stop = ArgIn[Int]
+		setArg(tri_stop, args(2).to[Int])
 
 		val run_on_board = false // args(1).to[Int] > 0.to[Int]  
 		val input_file_name = s"$DATA/rosetta/3drendering_input_triangles.csv"
@@ -259,9 +263,9 @@ import spatial.targets._
 				frame_buffer(i,j) = 0.to[UInt8]
 			}
 			
-			Foreach(num_triangles by vec_sram_len) { i =>
+			Foreach(tri_start until tri_stop by vec_sram_len) { i =>
 
-				val load_len = min(vec_sram_len.to[Int], num_triangles - i)
+				val load_len = min(vec_sram_len.to[Int], tri_stop - i)
 				val triangle3D_vector_sram = SRAM[triangle3D](vec_sram_len)
 
 				triangle3D_vector_sram load triangle3D_vector_dram(i :: i + load_len par 4) 
@@ -269,6 +273,7 @@ import spatial.targets._
 				Foreach(load_len by 1) { c =>
 
 					val curr_triangle3D = triangle3D_vector_sram(c)
+					println(r"3d tri $c: ${curr_triangle3D}")
 					val tri2D = Reg[triangle2D].buffer
 
 					val max_min	= RegFile[UInt8](5)
@@ -282,11 +287,12 @@ import spatial.targets._
 
 					val fragment = SRAM[CandidatePixel](500)
 
-					Pipe { projection(curr_triangle3D, tri2D, angle) }
-					Pipe { flag := rasterization1(tri2D, max_min, max_index) }
-					Pipe { size_fragment := rasterization2(flag.value, max_min, max_index, tri2D, fragment) }
-					Pipe { size_pixels := zculling(fragment, size_fragment.value, pixels, z_buffer) }
-					Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
+					'PROJECTION.Pipe { projection(curr_triangle3D, tri2D, angle) }
+					'RASTER1.Pipe { flag := rasterization1(tri2D, max_min, max_index) }
+					println(r"triangle $c, max_index = ${max_index}")
+					'RASTER2.Pipe { size_fragment := rasterization2(flag.value, max_min, max_index, tri2D, fragment) }
+					'ZCULL.Pipe { size_pixels := zculling(fragment, size_fragment.value, pixels, z_buffer) }
+					'COLOR.Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
 
 				}
 

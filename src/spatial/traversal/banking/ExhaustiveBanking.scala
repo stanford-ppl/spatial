@@ -30,7 +30,23 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     dimGrps: Seq[Seq[Seq[Int]]]
   ): Seq[Seq[Banking]] = {
 
-    val grps = (reads ++ writes).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
+    val readIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = reads.map{grp => grp.map{a => 
+      grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
+    }.flatten}.flatten.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
+    val writeIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = writes.map{grp => grp.map{a => 
+      grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
+    }.flatten}.flatten.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
+    val newReads = reads.map{grp => grp.map{a => 
+      val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
+            .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> readIterSubsts((iter,a.unroll.take(i))))}.toMap
+      a.randomizeKeys(keyRules)
+    }.toSet}.toSet
+    val newWrites = writes.map{grp => grp.map{a => 
+      val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
+            .zipWithIndex.collect{case(iter,i) if (writeIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> writeIterSubsts((iter,a.unroll.take(i))))}.toMap
+      a.randomizeKeys(keyRules)
+    }.toSet}.toSet
+    val grps = (newReads ++ newWrites).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
     val fullStrategy = Seq.tabulate(rank){i => i}
     if (grps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
     else {

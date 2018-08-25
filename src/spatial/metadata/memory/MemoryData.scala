@@ -37,3 +37,12 @@ case class Resetters(resetters: Set[Sym[_]]) extends Data[Resetters](SetBy.Flow.
   * Default: false
   */
 case class UnusedMemory(flag: Boolean) extends Data[UnusedMemory](SetBy.Analysis.Consumer)
+
+
+/** Set of accesses with iterators that were treated as random due to lockstep dephasing
+  *
+  * Getter:  sym.dephasedAccesses
+  * Setter:  sym.dephasedAccesses = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class DephasedAccess(accesses: Set[Sym[_]]) extends Data[DephasedAccess](SetBy.Analysis.Self)

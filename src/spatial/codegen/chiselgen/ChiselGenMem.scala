@@ -114,6 +114,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
+    if (mem.dephasedAccesses.nonEmpty) appPropertyStats += HasDephasedAccess
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
     val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))

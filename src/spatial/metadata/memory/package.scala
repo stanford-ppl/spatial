@@ -211,6 +211,9 @@ package object memory {
     def resetters: Set[Sym[_]] = metadata[Resetters](s).map(_.resetters).getOrElse(Set.empty)
     def resetters_=(rst: Set[Sym[_]]): Unit = metadata.add(s, Resetters(rst))
 
+    def dephasedAccesses: Set[Sym[_]] = metadata[DephasedAccess](s).map(_.accesses).getOrElse(Set.empty)
+    def addDephasedAccess(access: Sym[_]): Unit = metadata.add(s, DephasedAccess(Set(access) ++ s.dephasedAccesses))
+
     def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
     def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
 

@@ -344,6 +344,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	lolhash = [x[0] for x in lol if x[0] != '']
 	# id = len(lolhash) + 1
 	freq = os.environ['CLOCK_FREQ_MHZ']
+	numthreads = os.environ['NUM_THREADS']
 	if ("hash" in lol[1]):
 		hcol=lol[1].index("hash")
 	if ("app hash" in lol[1]):
@@ -377,7 +378,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			# worksheet = sh.get_worksheet(x)
 			worksheet = sh.worksheet('index', x)
 			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
-				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
+				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
 				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
 				# worksheet.update_cell(id,2, alink)
@@ -473,6 +474,51 @@ def report_changes(backend):
 	print(sorted(worsened_list))
 
 
+def report_slowdowns(prop, backend):
+	sh = getDoc(backend)
+
+	if (prop == "runtime"):
+		worksheet = sh.worksheet_by_title("Runtime")
+	elif (prop == "spatial"):
+		worksheet = sh.worksheet_by_title("SpatialCompile")
+	else:
+		worksheet = sh.worksheet_by_title("VCSCompile")
+
+	lol = worksheet.get_all_values()
+	start = getCols(worksheet, "Test:")[0]
+	tests = list(filter(None, lol[0][start:]))
+	better_apps = []
+	better_change = []
+	worse_apps = []
+	worse_change = []
+	for t in tests:
+		col = lol[0].index(t)
+		if (len(lol[0]) > col and lol[2][col] != "" and lol[3][col] != ""): 
+			nowtime = float(lol[2][col])
+			lasttime = float(lol[3][col])
+			percent_change = ((nowtime - lasttime) / lasttime) * 100
+			if (percent_change < -2):
+				better_apps.append(t)
+				better_change.append(percent_change)
+			elif (percent_change > 2):
+				worse_apps.append(t)
+				worse_change.append(percent_change)
+
+	print("SUMMARY FOR %s: %s" % (backend, prop))
+	print("-------")
+	better_apps_s = [x for _,x in sorted(zip(better_change,better_apps))]
+	better_change_s = sorted(better_change)
+	for i in range(0,len(better_apps)):
+		print("    %-30s: %.1f%% faster " % (better_apps_s[i], -better_change_s[i]))
+	print("-----------------------------------------")
+	worse_apps_s = [x for _,x in sorted(zip(worse_change,worse_apps))]
+	worse_change_s = sorted(worse_change)
+	for i in range(0,len(worse_apps)):
+		print("    %-30s: %.1f%% slower" % (worse_apps_s[i], worse_change_s[i]))
+	print("Improved: %d" % len(better_apps))
+	print("Worsened: %d" % len(worse_apps))
+
+
 # ofs = 0 means start deleting from spreadsheet "row 3" and down
 def delete_n_rows(n, ofs, backend):
 	sh = getDoc(backend)
@@ -564,6 +610,9 @@ elif (sys.argv[1] == "prepare_sheet"):
 elif (sys.argv[1] == "report_changes"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s')" % (sys.argv[2]))
 	report_changes(sys.argv[2])
+elif (sys.argv[1] == "report_slowdowns"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_slowdowns('%s', '%s')" % (sys.argv[2], sys.argv[3]))
+	report_slowdowns(sys.argv[2], sys.argv[3])
 elif (sys.argv[1] == "delete_n_rows"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
@@ -583,6 +632,7 @@ else:
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - report_changes(backend)")
+	print(" - report_slowdowns(property (runtime, spatial, vcs), backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
 	print(" - merge_apps_columns(old appname, new appname, backend)")

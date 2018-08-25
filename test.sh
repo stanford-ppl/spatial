@@ -81,6 +81,7 @@ elif [[ $type == "vcs-gdocs" ]]; then
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs"
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs"
+  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs"
 elif [[ $type == "vcs-noretime-gdocs" ]]; then
   export GDOCS=1
   hash=`git rev-parse HEAD`
@@ -92,6 +93,7 @@ elif [[ $type == "vcs-noretime-gdocs" ]]; then
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs-noretime"
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.VCS_noretime=true "testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs-noretime"
+  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs-noretime"
 else
   echo -e "$FAIL Usage: test_all.sh <test type> [test(s)]"
   echo -e "$FAIL Test type '$test_type' was not recognized"

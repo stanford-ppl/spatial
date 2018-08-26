@@ -86,9 +86,10 @@ case class Instance(
   depth:    Int,                    // Depth of n-buffer
   cost:     Int,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
+  padding:  Seq[Int],               // Padding for memory based on banking
   accType:  AccumType               // Type of accumulator for instance
 ) {
-  def toMemory: Memory = Memory(banking, depth, accType)
+  def toMemory: Memory = Memory(banking, depth, padding, accType)
 
   def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
   def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
@@ -130,6 +131,7 @@ case class Instance(
 
     s"""<Banked>
        |Depth:    $depth
+       |Padding:  $padding
        |Accum:    $accType
        |Banking:  $banking <$format>
        |Pipeline: ${metapipe.map(_.toString).getOrElse("---")}
@@ -139,7 +141,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,Seq.fill(rank)(0),AccumType.None)
 }
 
 
@@ -149,12 +151,13 @@ object Instance {
 case class Memory(
   banking: Seq[Banking],  // Banking information
   depth:   Int,           // Buffer depth
+  padding: Seq[Int],      // Padding on each dim
   accType: AccumType      // Flags whether this instance is an accumulator
 ) {
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
-  def updateDepth(d: Int): Memory = Memory(banking, d, accType)
+  def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
@@ -172,7 +175,7 @@ case class Memory(
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
-    val w = mem.stagedDims.map(_.toInt).zip(mem.getPadding.getOrElse(Seq.fill(mem.stagedDims.size)(0))).map{case(x,y) => x+y}
+    val w = mem.stagedDims.map(_.toInt).zip(padding).map{case(x,y) => x+y}
     val D = mem.seqRank.length
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
@@ -216,7 +219,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, Seq.fill(rank)(0), AccumType.None)
 }
 
 

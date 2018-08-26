@@ -488,8 +488,10 @@ def report_slowdowns(prop, backend):
 	start = getCols(worksheet, "Test:")[0]
 	tests = list(filter(None, lol[0][start:]))
 	better_apps = []
+	better_raw = []
 	better_change = []
 	worse_apps = []
+	worse_raw = []
 	worse_change = []
 	for t in tests:
 		col = lol[0].index(t)
@@ -499,22 +501,26 @@ def report_slowdowns(prop, backend):
 			percent_change = ((nowtime - lasttime) / lasttime) * 100
 			if (percent_change < -2):
 				better_apps.append(t)
+				better_raw.append(nowtime)
 				better_change.append(percent_change)
 			elif (percent_change > 2):
 				worse_apps.append(t)
+				worse_raw.append(nowtime)
 				worse_change.append(percent_change)
 
 	print("SUMMARY FOR %s: %s" % (backend, prop))
 	print("-------")
 	better_apps_s = [x for _,x in sorted(zip(better_change,better_apps))]
+	better_raw_s = [x for _,x in sorted(zip(better_change,better_raw))]
 	better_change_s = sorted(better_change)
 	for i in range(0,len(better_apps)):
-		print("    %-30s: %.1f%% faster " % (better_apps_s[i], -better_change_s[i]))
+		print("    %-30s: %.1f%% faster (now %.1f)" % (better_apps_s[i], -better_change_s[i], better_raw_s[i]))
 	print("-----------------------------------------")
 	worse_apps_s = [x for _,x in sorted(zip(worse_change,worse_apps))]
+	worse_raw_s = [x for _,x in sorted(zip(worse_change,worse_raw))]
 	worse_change_s = sorted(worse_change)
 	for i in range(0,len(worse_apps)):
-		print("    %-30s: %.1f%% slower" % (worse_apps_s[i], worse_change_s[i]))
+		print("    %-30s: %.1f%% slower (now %.1f)" % (worse_apps_s[i], worse_change_s[i], worse_raw_s[i]))
 	print("Improved: %d" % len(better_apps))
 	print("Worsened: %d" % len(worse_apps))
 

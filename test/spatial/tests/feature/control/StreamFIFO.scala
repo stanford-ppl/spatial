@@ -8,7 +8,7 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
     type T = I32
 
-    val n = 30
+    val n = 90
     val p = 16
     val mem = DRAM[T](n)
     val mem2 = DRAM[T](n)
@@ -32,7 +32,6 @@ import spatial.dsl._
 
     val result = getMem(mem)
     val result2 = getMem(mem2)
-    val result3 = getMem(mem3)
 
     printArray(result, "Result: ")
     printArray(result2, "Result: ")

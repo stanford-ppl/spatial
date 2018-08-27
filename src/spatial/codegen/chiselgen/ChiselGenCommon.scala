@@ -210,59 +210,62 @@ trait ChiselGenCommon extends ChiselCodegen {
     result.mkString("&")
   }
 
-  def getStreamEnablers(c: Sym[_]): String = {
-    // If we are inside a stream pipe, the following may be set
-    // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
+  // def getStreamEnablers(c: Sym[_]): String = {
+  //   // If we are inside a stream pipe, the following may be set
+  //   // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
 
-    if (c.hasStreamAncestor) {
-      // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
-      val lat = c.bodyLatency.sum
-      val readsFrom = getReadStreams(c.toCtrl).map{
-        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          fifo.readers.head match {
-            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            case Op(FIFOPeek(_,_)) => src""
-          }
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-      }
+  //   if (c.hasStreamAncestor) {
+  //     // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
+  //     val lat = c.bodyLatency.sum
+  //     val readsFrom = getReadStreams(c.toCtrl).map{
+  //       case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+  //         fifo.readers.head match {
+  //           // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+  //           // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+  //           case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+  //           case Op(FIFOPeek(_,_)) => src""
+  //         }
+  //       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+  //     }
 
-      val writesTo = getWriteStreams(c.toCtrl).map{
-        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          fifo.writers.head match {
-            // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-            case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-          }
-        case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-        // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
-      }
+  //     val writesTo = getWriteStreams(c.toCtrl).map{
+  //       case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+  //         fifo.writers.head match {
+  //           // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+  //           case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+  //         }
+  //       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
+  //       // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
+  //     }
 
-      {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
-    } else {""}
+  //     {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
+  //   } else {""}
+  // }
+
+  def getStreamForwardPressure(c: Sym[_]): String = { 
+    and(getReadStreams(c.toCtrl).collect {
+      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+    })
   }
 
-  def getStreamForwardpressure(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-    // If we are inside a stream pipe, the following may be set
-    val readiers = getReadStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
-    }
-    and(readiers)
-  }
-
-  def getStreamBackpressure(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-    // If we are inside a stream pipe, the following may be set
-    val readiers = getWriteStreams(c.toCtrl).collect {
+  def getStreamBackPressure(c: Sym[_]): String = { 
+    and(getWriteStreams(c.toCtrl).collect {
       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-    }
-    and(readiers)
+    })
   }
 
-  def getBackpressure(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).collect{
+  def getForwardPressure(sym: Ctrl): String = {
+    and(getReadStreams(sym).collect{
+      case fifo@Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+      case fifo@Op(FIFONew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].empty"
+    })
+  }
+  def getBackPressure(sym: Ctrl): String = {
+    and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-    }.toList
+      // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+      case fifo@Op(FIFONew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+    })
   }
 
   def DLTrace(lhs: Sym[_]): Option[String] = lhs match {
@@ -353,6 +356,8 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def and(ens: Set[Bit]): String = and(ens.map(quote).toSeq)
   def or(ens: Set[Bit]): String = or(ens.map(quote).toSeq)
+  def and(ens: => Set[String]): String = and(ens.toSeq)
+  def or(ens: => Set[String]): String = or(ens.toSeq)
   def and(ens: Seq[String]): String = if (ens.isEmpty) "true.B" else ens.mkString(" & ")
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
     

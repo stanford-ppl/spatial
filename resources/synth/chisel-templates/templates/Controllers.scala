@@ -80,23 +80,23 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
   sched match {
     case Pipelined if (!isFSM) => 
       // Define rule for when ctr increments
-      io.ctrInc := iterDone(0).io.output.data & synchronize
+      io.ctrInc := iterDone(0).io.output.data & synchronize & io.flow
 
       // Configure synchronization
       val anydone = iterDone.map(_.io.output.data).reduce(_|_)
       synchronize := (active,iterDone,io.maskIn).zipped.map{case (a, id, mask) => a.io.output.data === id.io.output.data | (anydone & (a.io.output.data === ~mask.D(1)))}.reduce{_&&_} // TODO: Retime tree
 
       // Define logic for first stage
-      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & io.flow
       active(0).io.input.reset := io.ctrDone | io.parentAck
-      iterDone(0).io.input.set := (io.doneIn(0)) | (~io.maskIn(0).D(1) & io.enable)
+      iterDone(0).io.input.set := (io.doneIn(0)) | (~io.maskIn(0).D(1) & io.enable & io.flow)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
         val extension = if (latency == 0) (synchronize & iterDone(i-1).io.output.data).D(1) else false.B // Hack for when retiming is turned off, in case mask turns on at the same time as the next iter should begin
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
-        active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable
+        active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable & io.flow
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i))
         done(i).io.input.set := done(i-1).io.output.data & synchronize & ~io.rst
@@ -104,37 +104,37 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
     
     case Sequenced => 
       // Define rule for when ctr increments
-      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last & iterDone.last.io.output.data & io.enable & io.flow)
 
       // Configure synchronization
-      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable)
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last & iterDone.last.io.output.data & io.enable & io.flow)
       
       // Define logic for first stage
-      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & io.flow & ~iterDone(0).io.output.data & ~io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
-      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable)
+      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0) & io.enable & io.flow)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
-        active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable)) & ~synchronize
+        active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable & io.flow)) & ~synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable)) & ~synchronize
+        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i) & io.enable & io.flow)) & ~synchronize
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
     case ForkJoin => 
       // Define rule for when ctr increments
-      io.ctrInc := synchronize
+      io.ctrInc := synchronize & io.flow
 
       // Configure synchronization
       synchronize := iterDone.map(_.io.output.data).reduce{_&_}
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.flow
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i) & io.enable)
+        iterDone(i).io.input.set := io.doneIn(i) | (~io.maskIn(i) & io.enable & io.flow)
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
@@ -147,24 +147,24 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & ~io.ctrCopyDone(i)
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.flow & ~io.ctrCopyDone(i)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i).D(1)) & io.enable
+        iterDone(i).io.input.set := (io.doneIn(i) | ~io.maskIn(i).D(1)) & io.enable & io.flow
         iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
-        done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i).D(1) & io.enable)
+        done(i).io.input.set := (io.ctrCopyDone(i) & ~io.rst) | (~io.maskIn(i).D(1) & io.enable & io.flow)
         done(i).io.input.reset := io.parentAck // Override done reset
       }
 
     case Fork => 
       // Define rule for when ctr increments
-      io.ctrInc := synchronize
+      io.ctrInc := synchronize & io.flow
 
       // Configure synchronization
       synchronize := io.doneIn.reduce{_|_}
 
       // Define logic for all stages
       for (i <- 0 until depth) {
-        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.selectsIn(i) & ~io.done
+        active(i).io.input.set := ~iterDone(i).io.output.data & ~io.doneIn(i) & !done(i).io.output.data & ~io.ctrDone & io.enable & io.flow & io.selectsIn(i) & ~io.done
         active(i).io.input.reset := io.doneIn(i) | io.rst
         iterDone(i).io.input.set := io.doneIn(i)
         iterDone(i).io.input.reset := done(i).io.output.data
@@ -173,22 +173,22 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
     case _ => // FSM, do sequential
       // Define rule for when ctr increments
-      io.ctrInc := io.doneIn.last | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable)
+      io.ctrInc := io.doneIn.last | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable & io.flow)
 
       // Configure synchronization
-      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable)
+      synchronize := io.doneIn.last.D(1) | (~io.maskIn.last.D(1) & iterDone.last.io.output.data & io.enable & io.flow)
       
       // Define logic for first stage
-      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & ~iterDone(0).io.output.data & ~io.doneIn(0)
+      active(0).io.input.set := !done(0).io.output.data & ~io.ctrDone & io.enable & io.flow & ~iterDone(0).io.output.data & ~io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
-      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0).D(1) & io.enable)
+      iterDone(0).io.input.set := (io.doneIn(0) & ~synchronize) | (~io.maskIn(0).D(1) & io.enable & io.flow)
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
       for (i <- 1 until depth) {
-        active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable)) & ~synchronize
+        active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable & io.flow)) & ~synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i).D(1) & io.enable)) & ~synchronize
+        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i).D(1) & io.enable & io.flow)) & ~synchronize
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
@@ -277,15 +277,15 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
     if (isPassthrough) { // pass through signals
-      io.datapathEn := io.enable // & ~io.done & ~io.parentAck
-      io.ctrInc := io.enable
+      io.datapathEn := io.enable  & io.flow// & ~io.done & ~io.parentAck
+      io.ctrInc := io.enable & io.flow
     }
     else {
-      io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable
-      io.ctrInc := active.io.output.data & io.enable
+      io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable & io.flow
+      io.ctrInc := active.io.output.data & io.enable & io.flow
     }
     val doneLag = if (cases > 1) 0 else latency
-    io.done := Utils.risingEdge(Utils.getRetimed(done.io.output.data, doneLag, io.flow))
+    io.done := Utils.risingEdge(Utils.getRetimed(done.io.output.data, doneLag, true.B))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner
@@ -311,9 +311,9 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable
     doneReg.io.input.asyn_reset := false.B
-    io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
-    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone
-    io.done := Utils.risingEdge(Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable), latency + 1, true.B))
+    io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone & io.flow
+    io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone & io.flow
+    io.done := Utils.risingEdge(Utils.getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable & io.flow), latency + 1, true.B))
 
   }
 }

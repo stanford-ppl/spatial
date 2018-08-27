@@ -1162,9 +1162,11 @@ import spatial.targets._
         val b1z_end = min(BLOCK_SIDE.to[Int], b0z+2.to[Int])
         // Iterate over points in b0
         val p_range = npoints_sram(b0x, b0y, b0z)
+        println(r"\npt $b0x $b0y $b0z, atom2bounds ${b1x_start}-${b1x_end}, ${b1y_start}-${b1y_end}, ${b1z_start}-${b1z_end}")
         'ATOM2LOOP.MemReduce(b0_cube_forces)(b1x_start until b1x_end by 1, b1y_start until b1y_end by 1, b1z_start until b1z_end by 1 par loop_grid1_z) { (b1x, b1y, b1z) => 
           val b1_cube_contributions = SRAM[XYZ](density).buffer
           val q_range = npoints_sram(b1x, b1y, b1z)
+          println(r"  p_range/q_range for $b0x $b0y $b0z - $b1x $b1y $b1z = ${p_range} ${q_range}")
           'PLOOP.Foreach(0 until p_range par loop_p) { p_idx =>
             val px = dvec_x_sram(b0x, b0y, b0z, p_idx)
             val py = dvec_y_sram(b0x, b0y, b0z, p_idx)
@@ -1175,6 +1177,7 @@ import spatial.targets._
               val qy = dvec_y_sram(b1x, b1y, b1z, q_idx)
               val qz = dvec_z_sram(b1x, b1y, b1z, q_idx)
               val tmp = if ( !(b0x == b1x && b0y == b1y && b0z == b1z && p_idx == q_idx) ) { // Skip self
+                println(r"    $b1x $b1y $b1z ${q_idx} = $qx $qy $qz")
                 val delta = XYZ(px - qx, py - qy, pz - qz)
                 val r2inv = 1.0.to[T]/( delta.x*delta.x + delta.y*delta.y + delta.z*delta.z );
                 // Assume no cutoff and aways account for all nodes in area
@@ -1187,7 +1190,7 @@ import spatial.targets._
               }
               tmp
             }{(a,b) => XYZ(a.x + b.x, a.y + b.y, a.z + b.z)}
-            println(r"$b0x $b0y $b0z ${p_idx}: contribution of $b1x $b1y $b1z = ${q_sum}")
+            println(r"    $b0x $b0y $b0z ${p_idx}: contribution of $b1x $b1y $b1z = ${q_sum}")
             b1_cube_contributions(p_idx) = q_sum
           }
           Foreach(p_range until density) { i => b1_cube_contributions(i) = XYZ(0.to[T], 0.to[T], 0.to[T]) } // Zero out untouched interactions          
@@ -1195,6 +1198,7 @@ import spatial.targets._
         }{(a,b) => XYZ(a.x + b.x, a.y + b.y, a.z + b.z)}
 
         Foreach(0 until density) { i => 
+          println(r"total contribution @ $b0x $b0y $b0z $i = ${b0_cube_forces(i)}")
           force_x_sram(b0x,b0y,b0z,i) = b0_cube_forces(i).x
           force_y_sram(b0x,b0y,b0z,i) = b0_cube_forces(i).y
           force_z_sram(b0x,b0y,b0z,i) = b0_cube_forces(i).z
@@ -1225,8 +1229,8 @@ import spatial.targets._
 
 
     val margin = 0.001.to[T]
-    val validateX = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => if (abs(force_x_gold(i,j,k,l) - force_x_received(i,j,k,l)) < margin) 1 else 0}
-    printTensor4(validateX, "X matchup")
+    val validateZ = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => if (abs(force_z_gold(i,j,k,l) - force_z_received(i,j,k,l)) < margin) 1 else 0}
+    printTensor4(validateZ, "Z matchup")
     val cksumx = force_x_gold.zip(force_x_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}
     val cksumy = force_y_gold.zip(force_y_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}
     val cksumz = force_z_gold.zip(force_z_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}

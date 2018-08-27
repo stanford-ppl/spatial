@@ -33,14 +33,15 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
+    val name = if (mem.isInstanceOf[RegNew[_]]) "FF" else ""
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get 
     emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val flowEnable = if (getAllReadyLogic(parent.toCtrl).nonEmpty) src""",${getAllReadyLogic(parent.toCtrl).mkString(" & ")}""" else ""
-    val ofsWidth = Math.max(1, Math.ceil(scala.math.log(mem.constDims.product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
-    val banksWidths = if (mem.isRegFile || mem.isLUT) mem.constDims.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+    val ofsWidth = Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
+    val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
     val isBroadcast = lhs.port.bufferPort.isEmpty & mem.instance.depth > 1
@@ -78,12 +79,13 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
+    val name = if (mem.isInstanceOf[RegNew[_]]) "FF" else ""
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get)
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-    val ofsWidth = 1 max Math.ceil(scala.math.log(mem.constDims.product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
-    val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) mem.constDims.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+    val ofsWidth = 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
+    val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
     val isBroadcast = lhs.port.bufferPort.isEmpty & mem.instance.depth > 1
@@ -113,11 +115,17 @@ trait ChiselGenMem extends ChiselGenCommon {
     zipAndConnect(lhs, mem, "data", "UInt", data.map(quote(_) + ".r"), "")
   }
 
+  private def paddedDims(mem: Sym[_], name: String): Seq[Int] = {
+    val dims = if (name == "FF") List(1) else mem.constDims
+    val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    dims.zip(padding).map{case (d:Int,p:Int) => d+p}
+  }
+
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     if (mem.dephasedAccesses.nonEmpty) appPropertyStats += HasDephasedAccess
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
-    val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    // val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
     val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
     val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
 
@@ -197,7 +205,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val BXBarW = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastWrites.mkString(",") + ")," else ""
     val BXBarR = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastReads.mkString(",") + ")," else ""
 
-    val dimensions = dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
+    val dimensions = paddedDims(mem, name).mkString("List[Int](", ",", ")") //dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
     val strides = numBanks // TODO: What to do with strides
     val bankingMode = "BankedMemory" // TODO: Find correct one

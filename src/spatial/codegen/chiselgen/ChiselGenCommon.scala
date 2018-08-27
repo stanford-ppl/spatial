@@ -242,45 +242,23 @@ trait ChiselGenCommon extends ChiselCodegen {
     } else {""}
   }
 
-  def getStreamAdvancement(c: Sym[_]): String = { 
-    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
-      case x @ Op(StreamInNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
-      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
-    }.mkString(" & ")
-  }
-
-  def getStreamHalfAdvancement(c: Sym[_]): String = {  // Only valid for streamins and ready for streamouts
-    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
-      case x @ Op(StreamInNew(bus)) => src"${swap(x, Valid)}"
-      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)}"
-    }.mkString(" & ")
-  }
-
-  def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
+  def getStreamForwardpressure(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
     // If we are inside a stream pipe, the following may be set
     val readiers = getReadStreams(c.toCtrl).collect {
       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
     }
-    val hasReadiers = if (readiers.size > 0) "&" else ""
-    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
+    and(readiers)
   }
 
-  def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
+  def getStreamBackpressure(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
     // If we are inside a stream pipe, the following may be set
     val readiers = getWriteStreams(c.toCtrl).collect {
       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
     }
-    val hasReadiers = if (readiers.size > 0) "&" else ""
-    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
+    and(readiers)
   }
 
-  def getFifoReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).collect{
-      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-    }.toList
-  }
-
-  def getAllReadyLogic(sym: Ctrl): List[String] = {
+  def getBackpressure(sym: Ctrl): List[String] = {
     getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
       case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
@@ -295,47 +273,17 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val streamOuts = if (controllerStack.nonEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
+    val backpressure = if (controllerStack.nonEmpty) swap(controllerStack.head, SM) + ".io.flow" else "true.B"
     latency match {
       case lat: Int => 
-        if (controllerStack.nonEmpty) {
-          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
-            if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, $latency, ${streamOuts})"
-          } else {
-            if (isBit) src"(${name}).D($latency, rr)"
-            else src"Utils.getRetimed($name, $latency)"          
-          }
-        } else {
-          if (isBit) src"(${name}).D($latency, rr)"
-          else src"Utils.getRetimed($name, $latency)"                    
-        }
+        if (isBit) src"(${name}).DS($latency, rr, $backpressure)"
+        else src"Utils.getRetimed($name, $latency, $backpressure)"
       case lat: Double => 
-        if (controllerStack.nonEmpty) {
-          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
-            if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
-          } else {
-            if (isBit) src"(${name}).D(${lat.toInt}, rr)"
-            else src"Utils.getRetimed($name, ${lat.toInt})"
-          }
-        } else {
-          if (isBit) src"(${name}).D(${lat.toInt}, rr)"
-          else src"Utils.getRetimed($name, ${lat.toInt})"
-        }
+        if (isBit) src"(${name}).DS(${lat.toInt}, rr, $backpressure)"
+        else src"Utils.getRetimed($name, ${lat.toInt}, $backpressure)"
       case lat: String => 
-        if (controllerStack.nonEmpty) {
-          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
-            if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, $latency, ${streamOuts})"
-          } else {
-            if (isBit) src"(${name}).D(${latency}.toInt, rr)"
-            else src"Utils.getRetimed($name, $latency)"
-          }
-        } else {
-          if (isBit) src"(${name}).D(${latency}.toInt, rr)"
-          else src"Utils.getRetimed($name, $latency)"
-        }
+        if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+        else src"Utils.getRetimed($name, $latency, $backpressure)"
     }
   }
 
@@ -403,8 +351,10 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => super.quote(s)
   }
 
-  def and(ens: Set[Bit]): String = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" & ")
-  def or(ens: Set[Bit]): String = if (ens.isEmpty) "false.B" else ens.map(quote).mkString(" | ")
+  def and(ens: Set[Bit]): String = and(ens.map(quote).toSeq)
+  def or(ens: Set[Bit]): String = or(ens.map(quote).toSeq)
+  def and(ens: Seq[String]): String = if (ens.isEmpty) "true.B" else ens.mkString(" & ")
+  def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
     
   def swap(tup: (Sym[_], RemapSignal)): String = swap(tup._1, tup._2)
   def swap(lhs: Sym[_], s: RemapSignal): String = swap(src"$lhs", s)

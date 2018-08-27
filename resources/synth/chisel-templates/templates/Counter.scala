@@ -177,7 +177,7 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
   val count = base.io.output.data(0).asSInt
   val num_enabled = io.input.enables.map{e => Mux(e, 1.S(width.W), 0.S(width.W))}.reduce{_+_}
   val newval = count + Mux(io.input.dir, num_enabled, -num_enabled)
-  val isMax = Mux(io.input.dir, newval >= depth.S, newval <= 0.S)
+  val isMax = Mux(io.input.dir, newval > depth.S, newval <= 0.S)
   val next = Mux(isMax, newval - depth.S(width.W), newval)
   base.io.xBarW(0).data.head := Mux(io.input.reset, 0.asUInt, next.asUInt)
 

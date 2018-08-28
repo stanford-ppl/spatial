@@ -7,5 +7,4 @@ ctags --exclude=log --languages=scala,java -f .tags -R \
   models/src \
   forge/src \
   poly/src \
-  argon/src \
-  spatialTags/src
+  argon/src

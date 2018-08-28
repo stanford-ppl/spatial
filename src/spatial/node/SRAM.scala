@@ -41,7 +41,7 @@ import spatial.lang._
 
 /** A banked read of a vector of elements from an SRAM.
   * @param mem the SRAM being read
-  * @param bank the (optionally multi-dimensional) bank address(es) for each vector element
+  * @param bank the (optionally multi-dimensional) bank address(es) for each vector element. Vecor[Duplicate[]]
   * @param ofs the bank offset for each vector element
   * @param enss the set of enables for each vector element
   */
@@ -56,7 +56,7 @@ import spatial.lang._
 /** A banked write of a vector of elements to an SRAM.
   * @param mem the SRAM being written
   * @param data the vector of data being written to the SRAM
-  * @param bank the (optionally multi-dimensional) bank address(es) for each vector element
+  * @param bank the (optionally multi-dimensional) bank address(es) for each vector element. Vecor[Duplicate[]]
   * @param ofs the bank offset for each vector element
   * @param enss the set of enables for each vector element
   */

@@ -124,7 +124,6 @@ class NBufMem(val mem: MemType,
       })
     val broadcastW = HVec(Array.tabulate(1 max numBroadcastWPorts){i => Input(new W_XBar(broadcastWMux.accessPars.getOr1(i), ofsWidth, banksWidths, bitWidth))})
     val broadcastR = HVec(Array.tabulate(1 max numBroadcastRPorts){i => Input(new R_XBar(broadcastRMux.accessPars.getOr1(i), ofsWidth, banksWidths))})
-    val flow = Vec(1 max totalOutputs, Input(Bool()))
 
     // FIFO Specific
     val full = Output(Bool())
@@ -222,13 +221,12 @@ class NBufMem(val mem: MemType,
           (0 until sramXBarRPorts).foreach {k => 
             val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
             val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
-            val flow_correction = portMapping.sortByMuxPortAndCombine.accessParsBelowMuxPort(portMapping.sortByMuxPortAndOfs.toList(k)._1._1,0,0).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              f.io.flow((k_base - flow_correction + m)) := io.flow(outputBufferBase + (k_base + m)) // Dangerous move here
               io.output.data(outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en.map(_ & rMask)
+            f.io.xBarR(bufferBase + k).flow := io.xBarR(bufferBase + k).flow
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
             f.io.xBarR(bufferBase + k).banks.zip(io.xBarR(bufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
@@ -247,14 +245,13 @@ class NBufMem(val mem: MemType,
           (0 until sramDirectRPorts).foreach {k => 
             val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
             val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
-            val flow_correction = portMapping.sortByMuxPortAndCombine.accessParsBelowMuxPort(portMapping.sortByMuxPortAndOfs.toList(k)._1._1,0,0).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              f.io.flow(outputXBarRBase + (k_base - flow_correction + m)) := io.flow(outputXBarRBase + outputBufferBase + (k_base + m)) // Dangerous move here
               io.output.data(outputXBarRBase + outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
 
             f.io.directR(bufferBase + k).en := io.directR(bufferBase + k).en.map(_ & rMask)
+            f.io.directR(bufferBase + k).flow := io.directR(bufferBase + k).flow
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(bufferBase + k).ofs
           }
@@ -272,12 +269,12 @@ class NBufMem(val mem: MemType,
           val port_width = broadcastRMux.accessPars(k)
           val k_base = broadcastRMux.accessPars.take(k).sum
           (0 until port_width).foreach{m => 
-            f.io.flow(outputXBarRBase + outputDirectRBase + (k_base+m)) := io.flow(outputXBarRBase + outputDirectRBase + (k_base+m)) // Dangerous move here
             io.output.data(outputXBarRBase + outputDirectRBase + (k_base+m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data((k_base+m))})
           }
          
           f.io.xBarR(xBarRBase + k).en := io.broadcastR( k).en
           // f.io.xBarR(xBarRBase + k).data := io.xBarR(xBarRBase + k).data
+          f.io.xBarR(xBarRBase + k).flow := io.broadcastR( k).flow
           f.io.xBarR(xBarRBase + k).ofs := io.broadcastR( k).ofs
           f.io.xBarR(xBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
         }
@@ -331,7 +328,6 @@ class NBufMem(val mem: MemType,
 
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
-      fifo.io.flow := io.flow
       combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
         val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
         (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
@@ -470,7 +466,6 @@ class NBufMem(val mem: MemType,
 
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
-      fifo.io.flow := io.flow
       combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
         val base = combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
         (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
@@ -512,8 +507,7 @@ class NBufMem(val mem: MemType,
           assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
           usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))
         }
-        io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle)
-        io.flow(outputBufferBase + outputMuxBase + vecId) := flow        
+        io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle, flow)
       }
       io.output.data(outputBufferBase + outputMuxBase + vecId)
     }
@@ -537,8 +531,7 @@ class NBufMem(val mem: MemType,
       val outputMuxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).sum
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
       if (bid == 0) {
-        io.broadcastR(muxBase).connectLane(vecId,i,rBundle)
-        io.flow(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId) := flow
+        io.broadcastR(muxBase).connectLane(vecId,i,rBundle, flow)
       }
       io.output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
     }
@@ -575,8 +568,7 @@ class NBufMem(val mem: MemType,
           assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
           usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))
         }
-        io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle)
-        io.flow(outputXBarRBase + outputBufferBase + outputMuxBase + vecId) := flow        
+        io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle, flow)
       }
       io.output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
     }
@@ -602,7 +594,6 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     val directR = HVec(Array.tabulate(1){i => Input(new R_Direct(1, 1, List(List(1))))})
     val broadcastW = HVec(Array.tabulate(1){i => Input(new W_XBar(1, 1, List(1), bitWidth))})
     val broadcastR = HVec(Array.tabulate(1){i => Input(new R_XBar(1, 1, List(1)))})
-    val flow = Vec(numBufs, Input(Bool()))
 
     // FIFO Specific
     val full = Output(Bool())

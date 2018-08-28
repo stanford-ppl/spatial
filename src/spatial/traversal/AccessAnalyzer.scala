@@ -261,7 +261,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
     case Enqueuer(mem,_,adr,_) if adr.isEmpty => 
       lhs match {
-        case Op(RegWrite(reg, data, _)) =>
+        case Op(RegWrite(reg, data, _)) if lhs.accumType == AccumType.Unknown =>
           dbgs(s"adding recent write of $data to $reg")
           mostRecentWrite += reg -> data
         case _ =>

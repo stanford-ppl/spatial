@@ -241,7 +241,7 @@ trait ChiselGenController extends ChiselGenCommon {
       forEachChild(sym) { case (c, idx) =>
 
         val base_delay = if (spatialConfig.enableTightControl) 0 else 1
-        emitt(src"""${swap(c, BaseEn)} := ${DL(src"${swap(sym, SM)}.io.enableOut(${idx})", base_delay, true)} & ${DL(src"~${swap(c, Done)}", 1, true)} & ${and(c.enables)}""")  
+        emitt(src"""${swap(c, BaseEn)} := ${DLo(src"${swap(sym, SM)}.io.enableOut(${idx})", base_delay, true)} & ${DLo(src"~${swap(c, Done)}", 1, true)} & ${and(c.enables)}""")  
         emitt(src"""${swap(c, En)} := ${swap(c, BaseEn)} & ${getForwardPressure(c.toCtrl)}""")  
 
         // If this is a stream controller, need to set up counter copy for children
@@ -249,14 +249,14 @@ trait ChiselGenController extends ChiselGenCommon {
           emitt(src"""// ${swap(sym, SM)}.io.parentAck := ${swap(src"${sym.cchains.head}", Done)} // Not sure why this used to be connected, since it can cause an extra command issued""")
           emitGlobalWireMap(src"""${swap(src"${sym.cchains.head}", En)}""", """Wire(Bool())""") 
           emitt(src"""${swap(src"${sym.cchains.head}", En)} := ${swap(c,Done)}""")
-          emitt(src"""${swap(src"${sym.cchains.head}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
+          emitt(src"""${swap(src"${sym.cchains.head}", Resetter)} := ${DLo(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
           emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(src"${sym.cchains.head}",Done)}""")
         } else if (sym.isOuterStreamControl) {
           emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(c, Done)}""")
         }
         emitt(src"""${swap(sym, SM)}.io.doneIn(${idx}) := ${swap(c, Done)};""")
-        if (c match { case Op(_: StateMachine[_]) => true; case _ => false}) emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)} | ${DL(swap(c, Done), 1, true)}""") //changed on 12/13 // If this is an fsm, we want it to reset with each iteration, not with the reset of the parent
-        else emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")   //changed on 12/13
+        if (c match { case Op(_: StateMachine[_]) => true; case _ => false}) emitt(src"""${swap(c, Resetter)} := ${DLo(src"${swap(sym, SM)}.io.ctrRst", 1, true)} | ${DLo(swap(c, Done), 1, true)}""") //changed on 12/13 // If this is an fsm, we want it to reset with each iteration, not with the reset of the parent
+        else emitt(src"""${swap(c, Resetter)} := ${DLo(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")   //changed on 12/13
         
       }
     }

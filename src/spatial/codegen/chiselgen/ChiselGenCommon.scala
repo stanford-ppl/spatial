@@ -243,29 +243,29 @@ trait ChiselGenCommon extends ChiselCodegen {
   // }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
-    and(getReadStreams(c.toCtrl).collect {
+    if (c.hasStreamAncestor) and(getReadStreams(c.toCtrl).collect {
       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-    })
+    }) else "true.B"
   }
 
   def getStreamBackPressure(c: Sym[_]): String = { 
-    and(getWriteStreams(c.toCtrl).collect {
+    if (c.hasStreamAncestor) and(getWriteStreams(c.toCtrl).collect {
       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-    })
+    }) else "true.B"
   }
 
   def getForwardPressure(sym: Ctrl): String = {
-    and(getReadStreams(sym).collect{
+    if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
       case fifo@Op(FIFONew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].empty"
-    })
+    }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
-    and(getWriteStreams(sym).collect{
+    if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
       case fifo@Op(FIFONew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-    })
+    }) else "true.B"
   }
 
   def DLTrace(lhs: Sym[_]): Option[String] = lhs match {
@@ -277,17 +277,15 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
     val backpressure = if (controllerStack.nonEmpty) swap(controllerStack.head, SM) + ".io.flow" else "true.B"
-    latency match {
-      case lat: Int => 
-        if (isBit) src"(${name}).DS($latency, rr, $backpressure)"
-        else src"Utils.getRetimed($name, $latency, $backpressure)"
-      case lat: Double => 
-        if (isBit) src"(${name}).DS(${lat.toInt}, rr, $backpressure)"
-        else src"Utils.getRetimed($name, ${lat.toInt}, $backpressure)"
-      case lat: String => 
-        if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
-        else src"Utils.getRetimed($name, $latency, $backpressure)"
-    }
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+    else src"Utils.getRetimed($name, ${latency}.toInt, $backpressure)"
+  }
+
+  // DL for when we are visiting children but emitting DL on signals that belong to parent
+  def DLo[T](name: String, latency: T, isBit: Boolean = false): String = {
+    val backpressure = "true.B"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+    else src"Utils.getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
 

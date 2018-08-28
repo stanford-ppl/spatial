@@ -39,7 +39,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val parent = lhs.parent.s.get 
     emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-    val flowEnable = if (getAllReadyLogic(parent.toCtrl).nonEmpty) src""",${getAllReadyLogic(parent.toCtrl).mkString(" & ")}""" else ""
+    val flowEnable = src",${swap(parent,SM)}.io.flow"
     val ofsWidth = Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -82,8 +82,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val name = if (mem.isInstanceOf[RegNew[_]]) "FF" else ""
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get //switchCaseLookaheadHack(lhs.parent.s.get)
-    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+    val parent = lhs.parent.s.get
+    val flowEnable = src"${swap(parent,SM)}.io.flow"
+    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
     val ofsWidth = 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}

@@ -95,7 +95,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val muxPort = lhs.port.muxPort
       val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
-      val maskingLogic = getAllReadyLogic(parent.toCtrl).mkString(" && ")
+      val maskingLogic = src"${swap(parent,SM)}.io.flow" 
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
         emit(src"""${swap(stream, ValidOptions)}($base + $i) := ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")

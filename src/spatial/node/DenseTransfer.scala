@@ -226,12 +226,13 @@ object DenseTransfer {
               val data = local.__read(localAddr(i - startBound), Set(en))
               val numPad = length.value - endBound
               local.__write(data, localAddr(i - startBound), Set(i < numPad))
+              dataStream := pack(data,en)
             }
             else {
               val en = i >= startBound && i < endBound
               val data = local.__read(localAddr(i - startBound), Set(en))
+              dataStream := pack(data,en)
             }
-            dataStream := pack(data,en)
           }
         }
         // Fringe

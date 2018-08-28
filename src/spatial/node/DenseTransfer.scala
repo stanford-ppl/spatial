@@ -221,6 +221,12 @@ object DenseTransfer {
           Foreach(length.value par p){i =>
             val en = i >= startBound && i < endBound
             val data = local.__read(localAddr(i - startBound), Set(en))
+            // If we are reading data from FIFO and the FIFO has only enough elements to supply this command's data
+            //   then we must pad up to endBound or else the controller will stall
+            if (local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) {
+              val numPad = length.value - endBound
+              local.__write(data, localAddr(i - startBound), Set(i < numPad))
+            }
             dataStream := pack(data,en)
           }
         }
@@ -269,6 +275,10 @@ object DenseTransfer {
       cmdStream.isAligned = false
       val issueQueue = FIFO[IssuedCmd](16)  // TODO: Size of issued queue?
       val dataStream = StreamIn[A](BurstDataBus[A]())
+      // Save complicated streaming control logic by padding FIFO by 1 here, so that the 
+      //   controller doesn't see backpressure while the fifo is full but more data is 
+      //   waiting to be drained on the input data stream
+      if (local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) local.padding = Seq(1)
 
       // Command
       Pipe {

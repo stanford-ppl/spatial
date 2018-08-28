@@ -30,7 +30,7 @@ import spatial.targets._
 		}
 	}
 
-	def zculling(fragments 	: SRAM1[CandidatePixel],
+	def zculling(fragments 	: FIFO[CandidatePixel],
 				 size_fragment : Int,
 				 pixels 	: SRAM1[Pixel],
 				 z_buffer 	: SRAM2[UInt8]) : Int = {
@@ -39,12 +39,12 @@ import spatial.targets._
 		Pipe { pixel_cntr := 0 }
 
 		Foreach(size_fragment by 1) { p =>
-			if (fragments(p).z < z_buffer(fragments(p).y.to[I32], fragments(p).x.to[I32])) {
-				Pipe { pixels(pixel_cntr.value.to[I32]) = Pixel(fragments(p).x, fragments(p).y, fragments(p).color) }
-				Pipe { pixel_cntr := pixel_cntr + 1 }
-				z_buffer(fragments(p).y.to[I32], fragments(p).x.to[I32]) = fragments(p).z
+			val curr_fragment = fragments.deq()
+			if (curr_fragment.z < z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32])) {
+				Pipe { pixels(pixel_cntr.value.to[I32]) = Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color) 
+					   pixel_cntr := pixel_cntr + 1 }
+				z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32]) = curr_fragment.z
 			}
-
 		}
 
 		pixel_cntr.value
@@ -52,60 +52,71 @@ import spatial.targets._
 
 	def rasterization2(flag			: Boolean,
 					   max_min		: RegFile1[UInt8],
-					   max_index	: Reg[Int], 
+					   xmax_index	: Reg[Int], 
+					   ymax_index	: Reg[Int], 
 					   sample_triangle2D : triangle2D, 
-					   fragment 	: SRAM1[CandidatePixel]) : Int = {
+					   fragments 	: FIFO[CandidatePixel]) : Int = {
 
 		def pixel_in_triangle(x : Int, y : Int, tri2D : triangle2D) : Boolean = {
 
-			val pi0 = Reg[Int]
-			val pi1 = Reg[Int]
-			val pi2 = Reg[Int]
-
-			Parallel {
-				pi0 := (x - tri2D.x0.to[Int]) * (tri2D.y1.to[Int] - tri2D.y0.to[Int]) -
+			val pi0 = (x - tri2D.x0.to[Int]) * (tri2D.y1.to[Int] - tri2D.y0.to[Int]) -
 					   (y - tri2D.y0.to[Int]) * (tri2D.x1.to[Int] - tri2D.x0.to[Int])
-				pi1 := (x - tri2D.x1.to[Int]) * (tri2D.y2.to[Int] - tri2D.y1.to[Int]) - 
+			val pi1 = (x - tri2D.x1.to[Int]) * (tri2D.y2.to[Int] - tri2D.y1.to[Int]) - 
 					   (y - tri2D.y1.to[Int]) * (tri2D.x2.to[Int] - tri2D.x1.to[Int])
-				pi2 := (x - tri2D.x2.to[Int]) * (tri2D.y0.to[Int] - tri2D.y2.to[Int]) -
+			val pi2 = (x - tri2D.x2.to[Int]) * (tri2D.y0.to[Int] - tri2D.y2.to[Int]) -
 					   (y - tri2D.y2.to[Int]) * (tri2D.x0.to[Int] - tri2D.x2.to[Int])
-			}
 			
-			(pi0.value >= 0.to[Int] && pi1.value >= 0.to[Int] && pi2.value >= 0.to[Int])
+			(pi0 >= 0.to[Int] && pi1 >= 0.to[Int] && pi2 >= 0.to[Int])
 
 		}
 
 		val color = 100.to[UInt8]
-		val i = Reg[Int](0.to[Int]) 
-		Pipe { i := 0 }
-		if ( (!flag) ) {
-			Foreach(max_index.value by 1) { k =>
-				val x = max_min(0).to[Int] + k.to[Int] % max_min(4).to[Int]
-				val y = max_min(2).to[Int] + k.to[Int] / max_min(4).to[Int]
+		val x_max = xmax_index.value //(max_min(1).to[I32] - max_min(0).to[I32]).to[I32]
+		val y_max = ymax_index.value //(max_min(3).to[I32] - max_min(2).to[I32]).to[I32]
+
+		if ( (!flag) ) { 
+		   	Foreach(x_max by 1, y_max by 1 par 1){ (x_t, y_t) =>
+				val x = max_min(0).to[Int] + x_t.to[Int]
+				val y = max_min(2).to[Int] + y_t.to[Int]
 
 
-				val in_triangle = Reg[Boolean](false).buffer
-				Pipe { in_triangle := pixel_in_triangle(x, y, sample_triangle2D) }
+				val in_triangle = pixel_in_triangle(x, y, sample_triangle2D) 
 
 				val frag_x = x.to[UInt8]
 				val frag_y = y.to[UInt8]
 				val frag_z = sample_triangle2D.z
 				val frag_color = color 
 
-				if (in_triangle.value == true) {
-					Pipe { fragment(i.value.to[I32]) = CandidatePixel(frag_x, frag_y, frag_z, frag_color) }
-					Pipe { i := i + 1 }
-				}
-			
-			}
+				Pipe { fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color), in_triangle == true)	}
+				//if (in_triangle == true) {
+				//	Pipe { fragment(i.value.to[I32]) = CandidatePixel(frag_x, frag_y, frag_z, frag_color) 
+				//	       i := i + 1 }
+			//	}
+			   
+			} /*
+			Foreach(max_index.value.to[I32] by 1 par 4) { k =>
+			 	val x = max_min(0).to[Int] + k.to[Int] % max_min(4).to[Int]
+			  	val y = max_min(2).to[Int] + k.to[Int] / max_min(4).to[Int]
+
+			  	val in_triangle = pixel_in_triangle(x, y, sample_triangle2D) 
+
+				val frag_x = x.to[UInt8]
+				val frag_y = y.to[UInt8]
+			   	val frag_z = sample_triangle2D.z
+				val frag_color = color 
+	     	//	if  (in_triangle == true) {
+    			Pipe { fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color), in_triangle == true)	}									
+		    //    }
+		    } */
 		}
-		mux(flag, 0.to[Int], i.value) /* if (flag) 0 else i */
+		mux(flag, 0.to[Int], fragments.numel.to[Int]) /* if (flag) 0 else i */
 	}
 
 	/* calculate bounding box for 2D triangle */
 	def rasterization1(sample_triangle2D : Reg[triangle2D], 
 					   max_min			 : RegFile1[UInt8],
-					   max_index		 : Reg[Int]) : Boolean = {
+					   xmax_index		 : Reg[Int], 
+					   ymax_index 		 : Reg[Int]) : Boolean = {
 
 		def check_clockwise(tri2D : triangle2D) : Int = {
 			(tri2D.x2.to[Int] - tri2D.x0.to[Int]) * (tri2D.y1.to[Int] - tri2D.y0.to[Int]) - (tri2D.y2.to[Int] - tri2D.y0.to[Int]) * (tri2D.x1.to[Int] - tri2D.x0.to[Int])
@@ -145,11 +156,9 @@ import spatial.targets._
 				Pipe { max_min(1) = max_x }
 				Pipe { max_min(2) = min_y }
 				Pipe { max_min(3) = max_y }
-				Pipe { max_min(4) = max_x - min_x }
-				Pipe { max_index := (max_x.to[Int] - min_x.to[Int]) * (max_y.to[Int] - min_y.to[Int]) }
+				Pipe { ymax_index := (max_y - min_y).to[Int] } //Pipe { max_min(4) = max_x - min_x }
+				Pipe { xmax_index := (max_x - min_x).to[Int] }
 			}
-			//Pipe { max_min(4) = max_min(1) - max_min(0) }
-			//Pipe { max_index := (max_min(1).to[Int] - max_min(0).to[Int]) * (max_min(3).to[Int] - max_min(2).to[Int]) }
 		}
 
 		(this_check.value == 0.to[Int])
@@ -210,12 +219,14 @@ import spatial.targets._
 		val input_num = input_reg.value
 
 		val num_triangles = 3192 
+		val do_triangles = input_num
+
 		// val tris_to_do = ArgIn[Int]
 		// setArg(tris_to_do, args(2).to[Int])
 
-		val run_on_board = false // args(1).to[Int] > 0.to[Int]  
-		val input_file_name = s"$DATA/rosetta/3drendering_input_triangles.csv"
-		val output_file_name = s"$DATA/rosetta/3drendering_sw_output.csv"
+		val run_on_board = args(1).to[Int] > 0.to[Int]  
+		val input_file_name = if (run_on_board) "/home/jcamach2/Rendering3D/input_triangles.csv" else s"$DATA/rosetta/3drendering_input_triangles.csv"
+		val output_file_name = if (run_on_board) "/home/jcamach2/Rendering3D/sw_output.csv" else s"$DATA/rosetta/3drendering_sw_output.csv"
 		val input_trianges_csv = loadCSV2D[T](input_file_name, ",", "\n")
 
 		val output_image = DRAM[UInt8](img_y_size, img_x_size)
@@ -245,7 +256,7 @@ import spatial.targets._
 		val host_z_buffer = DRAM[UInt8](img_y_size, img_x_size)
 		val host_frame_buffer = DRAM[UInt8](img_y_size, img_x_size)
 
-		val vec_sram_len = 24 //um_triangles //24
+		val vec_sram_len = num_triangles
 
 		Accel {
 			val angle = 0.to[Int]
@@ -259,9 +270,9 @@ import spatial.targets._
 				frame_buffer(i,j) = 0.to[UInt8]
 			}
 			
-			Foreach(num_triangles by vec_sram_len) { i =>
+			Foreach(do_triangles by vec_sram_len) { i =>
 
-				val load_len = min(vec_sram_len.to[Int], num_triangles - i)
+				val load_len = min(vec_sram_len.to[Int], do_triangles - i)
 				val triangle3D_vector_sram = SRAM[triangle3D](vec_sram_len)
 
 				triangle3D_vector_sram load triangle3D_vector_dram(i :: i + load_len par 4) 
@@ -272,19 +283,20 @@ import spatial.targets._
 					val tri2D = Reg[triangle2D].buffer
 
 					val max_min	= RegFile[UInt8](5)
-					val max_index = Reg[Int](0)
-						
+					val xmax_index = Reg[Int](0)
+					val ymax_index = Reg[Int](0)
+
 					val pixels = SRAM[Pixel](500)
 	
 					val flag = Reg[Boolean](false)
 					val size_fragment = Reg[Int](0.to[Int])
 					val size_pixels = Reg[Int](0.to[Int])
 
-					val fragment = SRAM[CandidatePixel](500)
+					val fragment = FIFO[CandidatePixel](500)
 
 					Pipe { projection(curr_triangle3D, tri2D, angle) }
-					Pipe { flag := rasterization1(tri2D, max_min, max_index) }
-					Pipe { size_fragment := rasterization2(flag.value, max_min, max_index, tri2D, fragment) }
+					Pipe { flag := rasterization1(tri2D, max_min, xmax_index, ymax_index) }
+					Pipe { size_fragment := rasterization2(flag.value, max_min, xmax_index, ymax_index, tri2D, fragment) }
 					Pipe { size_pixels := zculling(fragment, size_fragment.value, pixels, z_buffer) }
 					Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
 

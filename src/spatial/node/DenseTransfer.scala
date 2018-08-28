@@ -219,13 +219,17 @@ object DenseTransfer {
             length := aligned.size
           }
           Foreach(length.value par p){i =>
-            val en = i >= startBound && i < endBound
-            val data = local.__read(localAddr(i - startBound), Set(en))
             // If we are reading data from FIFO and the FIFO has only enough elements to supply this command's data
             //   then we must pad up to endBound or else the controller will stall
             if (local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) {
+              val en = i >= startBound
+              val data = local.__read(localAddr(i - startBound), Set(en))
               val numPad = length.value - endBound
               local.__write(data, localAddr(i - startBound), Set(i < numPad))
+            }
+            else {
+              val en = i >= startBound && i < endBound
+              val data = local.__read(localAddr(i - startBound), Set(en))
             }
             dataStream := pack(data,en)
           }

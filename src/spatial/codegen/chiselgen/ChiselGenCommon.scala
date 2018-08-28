@@ -210,81 +210,73 @@ trait ChiselGenCommon extends ChiselCodegen {
     result.mkString("&")
   }
 
-  def getStreamEnablers(c: Sym[_]): String = {
-    // If we are inside a stream pipe, the following may be set
-    // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
+  // def getStreamEnablers(c: Sym[_]): String = {
+  //   // If we are inside a stream pipe, the following may be set
+  //   // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
 
-    if (c.hasStreamAncestor) {
-      // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
-      val lat = c.bodyLatency.sum
-      val readsFrom = getReadStreams(c.toCtrl).map{
-        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          fifo.readers.head match {
-            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-            case Op(FIFOPeek(_,_)) => src""
-          }
-        case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-      }
+  //   if (c.hasStreamAncestor) {
+  //     // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
+  //     val lat = c.bodyLatency.sum
+  //     val readsFrom = getReadStreams(c.toCtrl).map{
+  //       case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+  //         fifo.readers.head match {
+  //           // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+  //           // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+  //           case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
+  //           case Op(FIFOPeek(_,_)) => src""
+  //         }
+  //       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+  //     }
 
-      val writesTo = getWriteStreams(c.toCtrl).map{
-        case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-          fifo.writers.head match {
-            // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-            case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-          }
-        case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-        // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
-      }
+  //     val writesTo = getWriteStreams(c.toCtrl).map{
+  //       case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
+  //         fifo.writers.head match {
+  //           // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+  //           case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
+  //         }
+  //       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
+  //       // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
+  //     }
 
-      {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
-    } else {""}
+  //     {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
+  //   } else {""}
+  // }
+
+  // Hack for gather/scatter/unaligned load/store, we want the controller to keep running
+  //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
+  //   not trying to enqueue
+  def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
+    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
-  def getStreamAdvancement(c: Sym[_]): String = { 
-    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
-      case x @ Op(StreamInNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
-      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)} & ${swap(x, Valid)}"
-    }.mkString(" & ")
+  def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
+    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
-  def getStreamHalfAdvancement(c: Sym[_]): String = {  // Only valid for streamins and ready for streamouts
-    (getReadStreams(c.toCtrl) ++ getWriteStreams(c.toCtrl)).collect {
-      case x @ Op(StreamInNew(bus)) => src"${swap(x, Valid)}"
-      case x @ Op(StreamOutNew(bus)) => src"${swap(x, Ready)}"
-    }.mkString(" & ")
+  def getStreamForwardPressure(c: Sym[_]): String = { 
+    if (c.hasStreamAncestor) and(getReadStreams(c.toCtrl).collect {
+      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+    }) else "true.B"
   }
 
-  def getNowValidLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-    // If we are inside a stream pipe, the following may be set
-    val readiers = getReadStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, NowValid)}" //& ${fifo}_ready"
-    }
-    val hasReadiers = if (readiers.size > 0) "&" else ""
-    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
-  }
-
-  def getStreamReadyLogic(c: Sym[_]): String = { // Because of retiming, the _ready for streamins and _valid for streamins needs to get factored into datapath_en
-    // If we are inside a stream pipe, the following may be set
-    val readiers = getWriteStreams(c.toCtrl).collect {
+  def getStreamBackPressure(c: Sym[_]): String = { 
+    if (c.hasStreamAncestor) and(getWriteStreams(c.toCtrl).collect {
       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-    }
-    val hasReadiers = if (readiers.size > 0) "&" else ""
-    if (spatialConfig.enableRetiming) src"${hasReadiers} ${readiers.mkString(" & ")}" else " "
+    }) else "true.B"
   }
 
-  def getFifoReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).collect{
-      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-    }.toList
+  def getForwardPressure(sym: Ctrl): String = {
+    if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
+      case fifo@Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
+    }) else "true.B"
   }
-
-  def getAllReadyLogic(sym: Ctrl): List[String] = {
-    getWriteStreams(sym).collect{
+  def getBackPressure(sym: Ctrl): String = {
+    if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
-      case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-    }.toList
+      // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].full | (~${FIFOBackwardActive(sym, fifo)}))"
+    }) else "true.B"
   }
 
   def DLTrace(lhs: Sym[_]): Option[String] = lhs match {
@@ -295,48 +287,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val streamOuts = if (controllerStack.nonEmpty) {getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")} else { "" }
-    latency match {
-      case lat: Int => 
-        if (controllerStack.nonEmpty) {
-          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
-            if (isBit) src"(${name}).DS($latency, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, $latency, ${streamOuts})"
-          } else {
-            if (isBit) src"(${name}).D($latency, rr)"
-            else src"Utils.getRetimed($name, $latency)"          
-          }
-        } else {
-          if (isBit) src"(${name}).D($latency, rr)"
-          else src"Utils.getRetimed($name, $latency)"                    
-        }
-      case lat: Double => 
-        if (controllerStack.nonEmpty) {
-          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
-            if (isBit) src"(${name}).DS(${lat.toInt}, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, ${lat.toInt}, ${streamOuts})"
-          } else {
-            if (isBit) src"(${name}).D(${lat.toInt}, rr)"
-            else src"Utils.getRetimed($name, ${lat.toInt})"
-          }
-        } else {
-          if (isBit) src"(${name}).D(${lat.toInt}, rr)"
-          else src"Utils.getRetimed($name, ${lat.toInt})"
-        }
-      case lat: String => 
-        if (controllerStack.nonEmpty) {
-          if (controllerStack.head.hasStreamAncestor & streamOuts != "") {
-            if (isBit) src"(${name}).DS(${latency}.toInt, rr, ${streamOuts})"
-            else src"Utils.getRetimed($name, $latency, ${streamOuts})"
-          } else {
-            if (isBit) src"(${name}).D(${latency}.toInt, rr)"
-            else src"Utils.getRetimed($name, $latency)"
-          }
-        } else {
-          if (isBit) src"(${name}).D(${latency}.toInt, rr)"
-          else src"Utils.getRetimed($name, $latency)"
-        }
-    }
+    val backpressure = if (controllerStack.nonEmpty) swap(controllerStack.head, SM) + ".io.flow" else "true.B"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+    else src"Utils.getRetimed($name, ${latency}.toInt, $backpressure)"
+  }
+
+  // DL for when we are visiting children but emitting DL on signals that belong to parent
+  def DLo[T](name: String, latency: T, isBit: Boolean = false): String = {
+    val backpressure = "true.B"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+    else src"Utils.getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
 
@@ -403,8 +363,12 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => super.quote(s)
   }
 
-  def and(ens: Set[Bit]): String = if (ens.isEmpty) "true.B" else ens.map(quote).mkString(" & ")
-  def or(ens: Set[Bit]): String = if (ens.isEmpty) "false.B" else ens.map(quote).mkString(" | ")
+  def and(ens: Set[Bit]): String = and(ens.map(quote).toSeq)
+  def or(ens: Set[Bit]): String = or(ens.map(quote).toSeq)
+  def and(ens: => Set[String]): String = and(ens.toSeq)
+  def or(ens: => Set[String]): String = or(ens.toSeq)
+  def and(ens: Seq[String]): String = if (ens.isEmpty) "true.B" else ens.mkString(" & ")
+  def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
     
   def swap(tup: (Sym[_], RemapSignal)): String = swap(tup._1, tup._2)
   def swap(lhs: Sym[_], s: RemapSignal): String = swap(src"$lhs", s)

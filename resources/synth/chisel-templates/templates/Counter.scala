@@ -233,7 +233,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     lock.io.input.set := io.input.enable  & ~io.input.reset
     lock.io.input.reset := io.input.reset || io.output.done
     lock.io.input.asyn_reset := false.B
-    val locked = lock.io.output.data | io.input.enable
+    val locked = lock.io.output.data// | io.input.enable
     val bases = List.tabulate(par){i => Module(new FF((width)))}
     val inits = List.tabulate(par){i => 
       Utils.getRetimed(
@@ -247,7 +247,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       b.io.xBarW(0).init.head := inits(i).asUInt
       b.io.xBarW(0).reset.head := io.input.reset | 
                                   {if (stride.isDefined) false.B else {Utils.getRetimed(io.input.stride,1) =/= io.input.stride}} | 
-                                  {if (start.isDefined) false.B else {!locked && (Utils.getRetimed(io.input.start,1) =/= io.input.start)}}
+                                  {if (start.isDefined) false.B else {!(locked | io.input.enable) && (Utils.getRetimed(io.input.start,1) =/= io.input.start)}}
       b.io.xBarW(0).en.head := io.input.enable
     }
 

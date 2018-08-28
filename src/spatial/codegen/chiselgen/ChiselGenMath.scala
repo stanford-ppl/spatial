@@ -15,51 +15,19 @@ trait ChiselGenMath extends ChiselGenCommon {
   private def MathDL(lhs: Sym[_], rhs: Op[_], lat: String): Unit = {
     emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
 
-    if (controllerStack.nonEmpty) {
-      val streamOuts = getAllReadyLogic(controllerStack.head.toCtrl).mkString(" && ")
-      if (controllerStack.head.hasStreamAncestor & streamOuts.replace(" ","") != "" & lat != "None") {
-        rhs match {
-          case FixMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $streamOuts)).r")
-          case UnbMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $streamOuts, rounding = Unbiased)).r")
-          case SatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $streamOuts, saturating = Saturation)).r")
-          case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $streamOuts, saturating = Saturation, rounding = Unbiased)).r")
-          case FixDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $streamOuts)).r")
-          case UnbDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $streamOuts, rounding = Unbiased)).r")
-          case SatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $streamOuts, saturating = Saturation)).r")
-          case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $streamOuts, saturating = Saturation, rounding = Unbiased)).r")
-          case FixMod(a,b) => emitt(src"$lhs.r := ($a.%-%($b, $lat, $streamOuts)).r")
-          case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one./-/($a, $lat, $streamOuts)).r")
-          case FixFMA(x,y,z) => emitt(src"Utils.FixFMA($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt, $streamOuts).cast($lhs)")
-        }
-      } else {
-        rhs match {
-          case FixMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B)).r")
-          case UnbMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B, rounding = Unbiased)).r")
-          case SatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B, saturating = Saturation)).r")
-          case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B, saturating = Saturation, rounding = Unbiased)).r")
-          case FixDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B)).r")
-          case UnbDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B, rounding = Unbiased)).r")
-          case SatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B, saturating = Saturation)).r")
-          case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B, saturating = Saturation, rounding = Unbiased)).r")
-          case FixMod(a,b) => emitt(src"$lhs.r := ($a.%-%($b, $lat, true.B)).r")
-          case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one./-/($a, $lat, true.B)).r")
-          case FixFMA(x,y,z) => emitt(src"Utils.FixFMA($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt, true.B).cast($lhs)")
-        }
-      }
-    } else {
-      rhs match {
-        case FixMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B)).r")
-        case UnbMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B, rounding = Unbiased)).r")
-        case SatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B, saturating = Saturation)).r")
-        case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, true.B, saturating = Saturation, rounding = Unbiased)).r")
-        case FixDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B)).r")
-        case UnbDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B, rounding = Unbiased)).r")
-        case SatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B, saturating = Saturation)).r")
-        case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, true.B, saturating = Saturation, rounding = Unbiased)).r")
-        case FixMod(a,b) => emitt(src"$lhs.r := ($a.%-%($b, $lat, true.B)).r")
-        case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one./-/($a, $lat, true.B)).r")
-        case FixFMA(x,y,z) => emitt(src"Utils.FixFMA($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt, true.B).cast($lhs)")
-      }
+    val backpressure = if (controllerStack.nonEmpty) getBackPressure(controllerStack.head.toCtrl) else "true.B"
+    rhs match {
+      case FixMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $backpressure)).r")
+      case UnbMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $backpressure, rounding = Unbiased)).r")
+      case SatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $backpressure, saturating = Saturation)).r")
+      case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.*-*($b, $lat, $backpressure, saturating = Saturation, rounding = Unbiased)).r")
+      case FixDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $backpressure)).r")
+      case UnbDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $backpressure, rounding = Unbiased)).r")
+      case SatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $backpressure, saturating = Saturation)).r")
+      case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a./-/($b, $lat, $backpressure, saturating = Saturation, rounding = Unbiased)).r")
+      case FixMod(a,b) => emitt(src"$lhs.r := ($a.%-%($b, $lat, $backpressure)).r")
+      case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one./-/($a, $lat, $backpressure)).r")
+      case FixFMA(x,y,z) => emitt(src"Utils.FixFMA($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt, $backpressure).cast($lhs)")
     }
   }
 

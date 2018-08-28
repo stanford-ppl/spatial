@@ -45,9 +45,9 @@ class SpatialConfig extends Config {
   // Internal flag used to mark whether unit pipe transformer has been run or not
   var allowPrimitivesInOuterControl = true
 
-  def ignoreParEdgeCases: Boolean = false
-  def noInnerLoopUnroll: Boolean = false
-  def enableBufferCoalescing: Boolean = true
+  var ignoreParEdgeCases: Boolean = false
+  var noInnerLoopUnroll: Boolean = false
+  var enableBufferCoalescing: Boolean = true
 
   var enablePIR = false
 }

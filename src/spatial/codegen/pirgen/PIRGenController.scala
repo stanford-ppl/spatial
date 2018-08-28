@@ -87,34 +87,9 @@ trait PIRGenController extends PIRGenControl with PIRGenStream with PIRGenMemori
     }
   }
 
+  //inGen(kernel(lhs)){ // open another file
+  //}
   private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
-    val ins    = func.flatMap(_.nestedInputs)
-    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Set.empty).toSeq
-    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).filterNot(_.isMem).distinct diff binds
-
-    dbgs(s"${stm(lhs)}")
-    inputs.foreach{in => dbgs(s" - ${stm(in)}") }
-    val gate = if (ens.nonEmpty) src"if (${and(ens)})" else ""
-    val els  = if (ens.nonEmpty) src"else null.asInstanceOf[${lhs.tp}]" else ""
-
-    val used = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
-    scoped --= used.map(_._1)
-
-    inGen(kernel(lhs)){
-      emitHeader()
-      emit(src"/** BEGIN ${lhs.op.get.name} $lhs **/")
-      open(src"object ${lhs}_kernel {")
-        open(src"def run(")
-          inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
-        closeopen(src"): ${lhs.tp} = $gate{")
-          contents
-        close(s"} $els")
-      close("}")
-      emit(src"/** END ${lhs.op.get.name} $lhs **/")
-      emitFooter()
-    }
-    scoped ++= used
-    emit(src"val $lhs = ${lhs}_kernel.run($inputs)")
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

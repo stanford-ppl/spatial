@@ -72,4 +72,4 @@ lazy val apps = project.settings(common).dependsOn(spatial)
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
 
-addCommandAlias("make", "; project apps; compile")
+addCommandAlias("make", "; project spatial; test:compile")

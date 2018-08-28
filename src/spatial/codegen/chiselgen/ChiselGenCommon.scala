@@ -242,6 +242,17 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   } else {""}
   // }
 
+  // Hack for gather/scatter/unaligned load/store, we want the controller to keep running
+  //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
+  //   not trying to enqueue
+  def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
+    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+  }
+
+  def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
+    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+  }
+
   def getStreamForwardPressure(c: Sym[_]): String = { 
     if (c.hasStreamAncestor) and(getReadStreams(c.toCtrl).collect {
       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
@@ -257,14 +268,14 @@ trait ChiselGenCommon extends ChiselCodegen {
   def getForwardPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-      case fifo@Op(FIFONew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].empty"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-      case fifo@Op(FIFONew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].full | (~${FIFOBackwardActive(sym, fifo)}))"
     }) else "true.B"
   }
 

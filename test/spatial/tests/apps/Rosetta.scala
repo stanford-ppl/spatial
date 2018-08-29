@@ -22,32 +22,29 @@ import spatial.targets._
 	@struct case class Pixel(x : UInt8, y : UInt8, color : UInt8)
 
 	def coloringFB(size_pixels 		: Int,
-				   pixels 			: SRAM1[Pixel],
+				   pixels 			: FIFO[Pixel],
 				   frame_buffer		: SRAM2[UInt8]) : Unit = {
 
 		Foreach(size_pixels by 1){ i =>
-			frame_buffer(pixels(i).y.to[I32], pixels(i).x.to[I32]) = pixels(i).color
+			val curr_pixel = pixels.deq()
+			frame_buffer(curr_pixel.y.to[I32], curr_pixel.x.to[I32]) = curr_pixel.color
 		}
 	}
 
 	def zculling(fragments 	: FIFO[CandidatePixel],
 				 size_fragment : Int,
-				 pixels 	: SRAM1[Pixel],
+				 pixels 	: FIFO[Pixel],
 				 z_buffer 	: SRAM2[UInt8]) : Int = {
-
-		val pixel_cntr = Reg[Int](0) 
-		Pipe { pixel_cntr := 0 }
 
 		Foreach(size_fragment by 1) { p =>
 			val curr_fragment = fragments.deq()
 			if (curr_fragment.z < z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32])) {
-				Pipe { pixels(pixel_cntr.value.to[I32]) = Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color) 
-					   pixel_cntr := pixel_cntr + 1 }
+				pixels.enq(Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color))
 				z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32]) = curr_fragment.z
 			}
 		}
 
-		pixel_cntr.value
+		pixels.numel.to[Int]
 	}
 
 	def rasterization2(flag			: Boolean,
@@ -75,10 +72,9 @@ import spatial.targets._
 		val y_max = ymax_index.value //(max_min(3).to[I32] - max_min(2).to[I32]).to[I32]
 
 		if ( (!flag) ) { 
-		   	Foreach(x_max by 1, y_max by 1 par 1){ (x_t, y_t) =>
+		   	Foreach(x_max by 1, y_max by 1 par 8){ (x_t, y_t) =>
 				val x = max_min(0).to[Int] + x_t.to[Int]
 				val y = max_min(2).to[Int] + y_t.to[Int]
-
 
 				val in_triangle = pixel_in_triangle(x, y, sample_triangle2D) 
 
@@ -87,12 +83,7 @@ import spatial.targets._
 				val frag_z = sample_triangle2D.z
 				val frag_color = color 
 
-				Pipe { fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color), in_triangle == true)	}
-				//if (in_triangle == true) {
-				//	Pipe { fragment(i.value.to[I32]) = CandidatePixel(frag_x, frag_y, frag_z, frag_color) 
-				//	       i := i + 1 }
-			//	}
-			   
+				Pipe { fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color), in_triangle == true)	}			   
 			} /*
 			Foreach(max_index.value.to[I32] by 1 par 4) { k =>
 			 	val x = max_min(0).to[Int] + k.to[Int] % max_min(4).to[Int]
@@ -286,7 +277,7 @@ import spatial.targets._
 					val xmax_index = Reg[Int](0)
 					val ymax_index = Reg[Int](0)
 
-					val pixels = SRAM[Pixel](500)
+					val pixels = FIFO[Pixel](500)
 	
 					val flag = Reg[Boolean](false)
 					val size_fragment = Reg[Int](0.to[Int])

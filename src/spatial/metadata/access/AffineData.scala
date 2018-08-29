@@ -23,6 +23,10 @@ case class AccessMatrix(
 ) {
   def keys: Set[Idx] = matrix.keys
   @stateful def parent: Ctrl = access.parent
+  def randomizeKeys(keySwap: Map[Idx,Idx]): AccessMatrix = {
+    val matrix2 = matrix.replaceKeys(keySwap) 
+    AccessMatrix(access, matrix2, unroll)
+  }
 
   /** True if there exists a reachable multi-dimensional index I such that a(I) = b(I).
     * True if all given dimensions may intersect.

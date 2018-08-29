@@ -72,5 +72,5 @@ else
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
 	make install
-	./tests.sh $1 ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
+	./test.sh $1 ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
 fi

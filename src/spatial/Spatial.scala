@@ -100,7 +100,8 @@ trait Spatial extends Compiler {
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
-    lazy val dotCodegen    = DotGenSpatial(state)
+    lazy val dotFlatGen    = DotFlatGenSpatial(state)
+    lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
     val result = {
       block ==> printer     ==>
@@ -155,10 +156,11 @@ trait Spatial extends Compiler {
         /** Reports */
         memoryReporter      ==>
         finalIRPrinter      ==>
-        dotCodegen          ==>
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen)

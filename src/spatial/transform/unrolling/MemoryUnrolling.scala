@@ -71,6 +71,7 @@ trait MemoryUnrolling extends UnrollingBase {
       val mem2 = mirror(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
       mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
+      mem2.padding = inst.padding
       dbgs(s"  ${stm(mem2)}")
       strMeta(mem2)
       (mem2,d)

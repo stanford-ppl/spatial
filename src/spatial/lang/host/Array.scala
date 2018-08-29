@@ -155,7 +155,10 @@ import utils.implicits.Readable._
     Matrix(data, out_rows, out_cols)
   }
 
-
+  /** Concatenates two Arrays. **/
+  @api def ++(that: Array[A]): Array[A] = {
+    Array.tabulate(this.length + that.length){i => ifThenElse(i < this.length, () => this.apply(i), () => that.apply(i-this.length))}
+  }
 
   /** Returns true if this Array and `that` contain the same elements, false otherwise. */
   @api override def neql(that: Array[A]): Bit = this.zip(that){(x,y) => x !== y }.exists(x => x)

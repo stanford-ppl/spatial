@@ -89,7 +89,8 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
 
   private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     // Find everything that is used in this scope
-    val used: Set[Sym[_]] = lhs.op.map(_.inputs).getOrElse(Nil).toSet ++ func.flatMap{block => block.nestedInputs }
+    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
+    val used: Set[Sym[_]] = lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
     val inputs: Seq[Sym[_]] = (used diff made).filterNot(_.isMem).toSeq
 

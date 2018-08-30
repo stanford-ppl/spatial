@@ -14,6 +14,7 @@ package object access {
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
     def isParEnq: Boolean = op match {
+      // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true
       case _:LIFOBankedPush[_] => true
       case _:SRAMBankedWrite[_,_] => true
@@ -43,6 +44,7 @@ package object access {
       case _:StreamOutBankedWrite[_] => true
       case _ => false
     }
+
   }
 
   implicit class UsageOps(s: Sym[_]) {
@@ -93,6 +95,11 @@ package object access {
 
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
+
+    def isPeek: Boolean = a match {
+      case Op(_:FIFOPeek[_]) => true
+      case _ => false
+    }
 
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {

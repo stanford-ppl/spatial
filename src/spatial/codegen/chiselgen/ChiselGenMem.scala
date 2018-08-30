@@ -130,8 +130,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
     val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
 
-    val templateName = if (inst.depth == 1) s"${name}("
-                       else {appPropertyStats += HasNBufSRAM; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
+    val templateName = if (inst.depth == 1 || name != "LineBuffer") s"${name}("
+                       else {{if (name == "SRAM") appPropertyStats += HasNBufSRAM}; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
     if (mem.broadcastsAnyRead) appPropertyStats += HasBroadcastRead
 
     val depth = if (inst.depth > 1) s"${inst.depth}," else ""
@@ -311,6 +311,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileVectorRead(rf,addr,ens)       => emitRead(lhs,rf,addr,addr.map{_ => I32(0) },ens)
     case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
+    // // LineBuffers
+    // case LineBufferNew(rows, cols) => emitMem(lhs, "LineBuffer", None)
+    
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
     case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")

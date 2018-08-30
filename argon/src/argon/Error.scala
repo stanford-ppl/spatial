@@ -26,3 +26,11 @@ case class RequirementFailure(ctx: SrcCtx, msg: String)
 case class MissingDataFolder()
    extends Exception("The TEST_DATA_HOME environment variable was required for this test but was unset.")
       with NoStackTrace
+
+case class CompilerTimeout(time: String)
+   extends Exception(s"DSL compilation timed out after $time. (Indeterminate result)")
+      with NoStackTrace
+
+case class BackendTimeout(pass: String, time: String)
+   extends Exception(s"Backend $pass timed out after $time. (Indeterminate result)")
+      with NoStackTrace

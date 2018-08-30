@@ -28,7 +28,7 @@ trait ScalaGenFIFO extends ScalaGenMemories {
       emit(src"val $lhs = $fifo.size === ${fifo.stagedSize} - $wPar")
 
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = if ($fifo.nonEmpty) $fifo.head else ${invalid(op.A)}")
-    case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.size")
+    case FIFONumel(fifo,_)   => emit(src"val $lhs = FixedPoint($fifo.size,FixFormat(true,32,0))")
 
     case op@FIFOBankedDeq(fifo, ens) =>
       open(src"val $lhs = {")

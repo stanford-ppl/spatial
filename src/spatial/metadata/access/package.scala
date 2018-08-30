@@ -276,6 +276,17 @@ package object access {
     reachingWrites
   }
 
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+    val preceding = writes.filter{write => write.mayPrecede(read)}
+    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
+
+    val reachingBefore = before.filterNot{wr => (before - wr).exists{w => w.mustFollow(wr, read)}}
+    val reachingAfter  = after.filterNot{wr => ((after - wr) ++ before).exists{w => w.mustFollow(wr, read)}}
+    val reaching = reachingBefore ++ reachingAfter
+
+    reaching
+  }
+
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {
     val strides = List.tabulate(dims.length){d => dims.drop(d+1).prodTree }
     indices.zip(strides).map{case (a,b) => a.to[I32] * b }.sumTree

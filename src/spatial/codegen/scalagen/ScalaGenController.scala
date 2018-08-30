@@ -92,7 +92,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
     val used: Set[Sym[_]] = lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
-    val inputs: Seq[Sym[_]] = (used diff made).filterNot(_.isMem).toSeq
+    val inputs: Seq[Sym[_]] = (used diff made).filterNot{s => s.isMem || s.isValue }.toSeq
 
     dbgs(s"${stm(lhs)}")
     inputs.foreach{in => dbgs(s" - ${stm(in)}") }

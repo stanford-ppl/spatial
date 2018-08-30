@@ -22,3 +22,7 @@ case class CompilerBugs(stage: String, n: Int)
 case class RequirementFailure(ctx: SrcCtx, msg: String)
    extends Exception("Requirement failure: " + msg)
       with NoStackTrace
+
+case class MissingDataFolder()
+   extends Exception("The TEST_DATA_HOME environment variable was required for this test but was unset.")
+      with NoStackTrace

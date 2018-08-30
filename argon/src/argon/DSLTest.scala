@@ -38,7 +38,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     *   Use the second version to generate a large number of runtime arguments using some pattern.
     */
   def runtimeArgs: Args
-  lazy val DATA = sys.env("TEST_DATA_HOME")
+  lazy val DATA = sys.env.getOrElse("TEST_DATA_HOME", { throw MissingDataFolder() })
 
   //-------------------//
   //     Assertions    //

@@ -352,8 +352,9 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.filter(_.s.get != sym).head.s.get, Done)}""")
-      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${swap(sym, II)}) // extremely screwy logic?""")
+      } else if (sym match {case Op(x:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
+        val x = sym match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${x.fullDelay})""")
       } else {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)""")
       }

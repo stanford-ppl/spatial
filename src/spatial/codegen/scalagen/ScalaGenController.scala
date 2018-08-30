@@ -88,17 +88,18 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
   }
 
   private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
-    val ins    = func.flatMap(_.nestedInputs)
-    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Set.empty).toSeq
-    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).filterNot(_.isMem).distinct diff binds
+    // Find everything that is used in this scope
+    val used: Set[Sym[_]] = lhs.op.map(_.inputs).getOrElse(Nil).toSet ++ func.flatMap{block => block.nestedInputs }
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
+    val inputs: Seq[Sym[_]] = (used diff made).filterNot(_.isMem).toSeq
 
     dbgs(s"${stm(lhs)}")
     inputs.foreach{in => dbgs(s" - ${stm(in)}") }
     val gate = if (ens.nonEmpty) src"if (${and(ens)})" else ""
     val els  = if (ens.nonEmpty) src"else null.asInstanceOf[${lhs.tp}]" else ""
 
-    val used = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
-    scoped --= used.map(_._1)
+    val useMap = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
+    scoped --= useMap.map(_._1)
 
     inGen(kernel(lhs)){
       emitHeader()
@@ -113,7 +114,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
       emitFooter()
     }
-    scoped ++= used
+    scoped ++= useMap
     emit(src"val $lhs = ${lhs}_kernel.run($inputs)")
   }
 

@@ -20,8 +20,11 @@ sealed class Block[R](
 
   def nestedStmsAndInputs: (Set[Sym[_]], Set[Sym[_]]) = {
     val stms = this.nestedStms.toSet
-    val used = stms.flatMap(_.inputs) ++ inputs
+    // Get everything used within this nested scope: All inputs to all statements, all block results, and this result
+    val used = stms.flatMap{stm => stm.inputs ++ stm.blocks.map(_.result) } ++ inputs ++ syms(result)
+    // Get everything created within this nested scope: All symbols' bind symbols and the symbol itself
     val made = stms.flatMap{s => s.op.map(_.binds).getOrElse(Set.empty) + s }
+    // Inputs are everything used but not created in this nested scope.
     val ins  = (used diff made).filterNot(_.isValue)
     (stms, ins)
   }

@@ -130,7 +130,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
     val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
 
-    val templateName = if (inst.depth == 1 || name != "LineBuffer") s"${name}("
+    val templateName = if (inst.depth == 1 && name != "LineBuffer") s"${name}("
                        else {{if (name == "SRAM") appPropertyStats += HasNBufSRAM}; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
     if (mem.broadcastsAnyRead) appPropertyStats += HasBroadcastRead
 

@@ -219,7 +219,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val aIters = accessIterators(a.access, mem)
     val bIters = accessIterators(b.access, mem)
     val isPeek = a.access.isPeek || b.access.isPeek
-    isPeek || (lca.isOuterControl && lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true})
+    isPeek || lca.isInnerControl || lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true}
   }
 
   /** True if accesses a and b may occur concurrently and to the same buffer port.

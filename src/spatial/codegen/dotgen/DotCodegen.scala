@@ -27,36 +27,14 @@ trait DotCodegen extends argon.codegen.Codegen {
     super.postprocess(b)
   }
 
-  //override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
-    //if (blocks(lhs).nonEmpty) {
-      //emit(src"subgraph cluster_${lhs} {")
-      //emit(src"""${graphAttr(lhs).map { case (k,v) => s"$k=$v" }.mkString(" ")}""")
-      //strMeta(lhs)
+  final def emitNode(lhs:Sym[_]):Unit = emitNode(lhs, nodeAttr(lhs))
 
-      //if (inputs(lhs).nonEmpty) emitNode(lhs)
-
-      //rhs.binds.filter(_.isBound).foreach{ b =>
-        //emitNode(b)
-        //emitEdge(lhs, b)
-        //nodes += b
-      //}
-
-      //rhs.blocks.foreach(ret)
-
-      //emit(src"}")
-    //} else {
-      //emitNode(lhs)
-    //}
-  //}
-
-  def emitNode(lhs:Sym[_]):Unit = {
-    val at = nodeAttr(lhs)
-    emit(src"""$lhs [ ${at.map { case (k,v) => s"$k=$v" }.mkString(" ")} ]""")
+  def emitNode(lhs:Sym[_], nodeAttr:Map[String, String]):Unit = {
+    emit(src"""$lhs [ ${nodeAttr.map { case (k,v) => s"$k=$v" }.mkString(" ")} ]""")
     inputGroups(lhs).foreach { case (name, inputs) =>
       emit(src""" ${lhs}_${name} [ label="$name" shape=invhouse]""")
       emit(src"${lhs}_${name} -> $lhs")
     }
-    nodes += lhs
   }
 
   def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = Map.empty
@@ -75,7 +53,7 @@ trait DotCodegen extends argon.codegen.Codegen {
     lhs.op.fold {
       s"$lhs"
     } { rhs =>
-      s"$lhs\n${rhs.getClass.getSimpleName}"
+      s"$lhs\\n${rhs.getClass.getSimpleName}"
     }
   }
 
@@ -98,23 +76,28 @@ trait DotCodegen extends argon.codegen.Codegen {
     at
   }
 
-  def emitEdge(from:Sym[_], to:Sym[_]):Unit = {
+  def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
     val at = edgeAttr(from, to)
-    emit(src"$from -> $to [ ${at.map { case (k,v) => s"$k=$v" }.mkString(" ")} ]")
+    emit(src"$fromAlias -> $toAlias [ ${at.map { case (k,v) => s"$k=$v" }.mkString(" ")} ]")
   }
 
   def emitInputs(lhs:Sym[_]) = {
     val groups = inputGroups(lhs)
     groups.foreach { case (name, inputs) => 
       inputs.foreach { in =>
-        if (nodes.contains(in)) emit(src"""$in -> ${lhs}_${name}""")
+        if (nodes.contains(in)) emitEdge(in, lhs, src"$in", src"${lhs}_${name}")
       }
     }
     (inputs(lhs) diff groups.values.flatten.toSeq).foreach { in => 
-      if (nodes.contains(in)) emitEdge(in, lhs)
+      if (nodes.contains(in)) emitEdge(in, lhs, src"$in", src"$lhs")
     }
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
+
+  override protected def quoteOrRemap(arg: Any): String = arg match {
+    case arg:SrcCtx => s"$arg"
+    case _ => super.quoteOrRemap(arg)
+  }
 
 }

@@ -2,6 +2,7 @@ package spatial.codegen.dotgen
 
 import argon._
 import spatial.metadata.memory._
+import spatial.metadata.access._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata._
@@ -10,14 +11,11 @@ import spatial.util.spatialConfig
 
 trait DotGenSpatial extends DotCodegen {
 
-  override def emitEdge(from:Sym[_], to:Sym[_]) = (from.op, to.op) match {
-    case (Some(_:SRAMNew[_,_]), Some(_:SRAMBankedWrite[_,_])) => super.emitEdge(to, from)
-    case (Some(_:StreamOutNew[_]), Some(_:StreamOutBankedWrite[_])) => super.emitEdge(to, from)
-    case (Some(_:StreamInNew[_]), Some(_:FringeDenseLoad[_,_])) => super.emitEdge(to, from)
-    case (Some(_:RegNew[_]), Some(_:RegWrite[_])) => super.emitEdge(to, from)
-    case (Some(_:DRAMNew[_,_]), Some(_:SetMem[_,_])) => super.emitEdge(to, from)
+  override def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = (from, to) match {
+    case (from, to) if from.isMem && to.isWriter && !to.isReader => super.emitEdge(from, to, toAlias, fromAlias)
+    case (from, to) if from.isStreamIn && to.isStreamLoad => super.emitEdge(from, to, toAlias, fromAlias)
     case (_, _) if from.isDRAM => 
-    case (_, _) => super.emitEdge(from, to)
+    case (_, _) => super.emitEdge(from, to, fromAlias, toAlias)
   }
 
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = super.nodeAttr(lhs) ++ (lhs.op match {
@@ -31,7 +29,9 @@ trait DotGenSpatial extends DotCodegen {
   })
 
   override def label(lhs:Sym[_]) = lhs.op match {
-    case Some(rhs) if lhs.isMem => super.label(lhs) + s"\n${lhs.ctx}"
+    case None if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
+    case Some(rhs) if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
+    case Some(rhs) if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"
     case Some(FringeDenseLoad(dram,_,_))   => super.label(lhs) + src"\ndram=${label(dram)}"
     case Some(FringeDenseStore(dram,_,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
     case Some(FringeSparseLoad(dram,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"

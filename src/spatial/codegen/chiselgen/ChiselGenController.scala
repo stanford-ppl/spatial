@@ -503,6 +503,7 @@ trait ChiselGenController extends ChiselGenCommon {
       exitCtrl(lhs)
 
     case StateMachine(ens,start,notDone,action,nextState) =>
+      appPropertyStats += HasFSM
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
@@ -527,8 +528,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
       emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
-      emitt(src"${lhs}_doneCondition := ~${notDone.result}")
-      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
+      emitt(src"${swap(lhs, Blank)}_doneCondition := ~${notDone.result}")
+      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${swap(lhs, Blank)}_doneCondition")
       emitChildrenCxns(lhs, true)
       exitCtrl(lhs)
 

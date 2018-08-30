@@ -460,6 +460,27 @@ class NBufMem(val mem: MemType,
         }
       }
     case LineBufferType => 
+      // val rowstride = strides(0)
+      // val numrows = logicalDims(0) + depth*rowstride
+      // val numcols = logicalDims(1)
+      // val numWriters = combinedXBarWMux.toSeq.size
+      // val lb = Module(new SRAM(List(numrows,numcols), bitWidth,
+      //                          List(numrows,banks(1)), strides,
+      //                          combinedXBarWMux, combinedXBarRMux,
+      //                          flatDirectWMux, flatDirectRMux,
+      //                          bankingMode, inits, syncMem, fracBits))
+  
+      // // Inner counter over row width -- keep track of write address in current row
+      // val writeCol = (0 until numWriters).map{ i =>
+      //   val par = combinedXBarWMux.sortByMuxPortAndOfs.accessPars(i)
+      //   val cnt = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), Some(0)))
+      //   cnt.io.input.enable := io.w. (0 until numWriters).map{j => io.w_en(j*rstride + i)}.reduce{_||_}
+      //   cnt.io.input.reset := io.reset | swap
+      //   cnt.io.input.saturate := false.B
+      //   cnt.io.output.data
+      // }  
+
+
     case LIFOType => 
       val fifo = Module(new LIFO(List(logicalDims.head), bitWidth, 
                                   banks, combinedXBarWMux, combinedXBarRMux))

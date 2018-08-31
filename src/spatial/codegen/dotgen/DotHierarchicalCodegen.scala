@@ -11,59 +11,74 @@ trait DotHierarchicalCodegen extends DotCodegen {
 
   override def entryFile: String = s"Top.$ext"
 
+  override def clearGen = {} // prevent clear flatGen
+
   case class Scope(sym:Option[Sym[_]]) {
     val nodes = mutable.ListBuffer[Sym[_]]()
+    val edges = mutable.Map[(String, String), Map[String,String]]()
     val fileName = sym match {
       case Some(sym) => src"$sym"
       case None => s"Top"
     }
     val svgpath = s"${out}${files.sep}$fileName.svg"
+    def addEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
+      edges += ((fromAlias, toAlias) -> edgeAttr(from, to))
+    }
+
+    // called when enter a new scope
+    def begin(block: => Unit) = {
+      enter {
+        open(src"digraph G {")
+        block
+        nodes.foreach { sym => sym.op.foreach { op => emitInputs(sym) } }
+      }
+    }
+
+    // called when all scopes are done
+    def end = {
+      // Avoid emitint duplicated edges between nodes
+      enter {
+        edges.foreach { case ((from, to), attr) => 
+          emitEdge(from, to, attr)
+        }
+        close(src"}")
+      }
+    }
+
+    def enter(block: => Unit) = {
+      stack.push(this)
+      inGen(out, s"${fileName}.dot") {
+        block
+      }
+      stack.pop
+    }
   }
 
   val stack = mutable.Stack[Scope]()
   def currScope = stack.head
   def nodes = currScope.nodes
-  val scopes = mutable.ListBuffer[Scope]()
-
-  override def clearGen = {} // prevent clear flatGen
+  val scopes = mutable.Map[Option[Sym[_]],Scope]()
+  def scope(sym:Option[Sym[_]]) = scopes.getOrElseUpdate(sym, Scope(sym))
 
   override protected def emitEntry(block: Block[_]): Unit = {
-    withScope(None) {
+    scope(None).begin {
       gen(block)
     }
-    scopes.foreach { scope =>
-      inGen(out, s"${scope.fileName}.dot") {
-        close(src"}")
-      }
-    }
-    scopes.clear
-  }
-
-  def withScope(sym:Option[Sym[_]])(block: => Unit) = {
-    val scope = Scope(sym)
-    inGen(out, s"${scope.fileName}.dot") {
-      open(src"digraph G {")
-        stack.push(scope)
-        block
-        nodes.foreach { sym => sym.op.foreach { op => emitInputs(sym) } }
-        scopes += stack.pop
-    }
+    scopes.values.foreach { scope => scope.end }
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     nodes += lhs
     emitNode(lhs)
     if (blocks(lhs).nonEmpty) {
-      withScope(Some(lhs)) {
+      scope(Some(lhs)).begin {
         open(src"subgraph cluster_${lhs} {")
           emit(src"""${graphAttr(lhs).map { case (k,v) => s"$k=$v" }.mkString(" ")}""")
           //strMeta(lhs)
           val bounds = rhs.binds.filter(_.isBound)
-          //if (bounds.nonEmpty) emitNode(lhs)
           bounds.foreach{ b =>
             nodes += b
             emitNode(b)
-            //emitEdge(lhs, b, src"$lhs", src"$b")
           }
           rhs.blocks.foreach(ret)
         close(src"}")
@@ -93,52 +108,48 @@ trait DotHierarchicalCodegen extends DotCodegen {
     (shared, branchA.filterNot(shared.contains(_)), branchB.filterNot(shared.contains(_)))
   }
 
-  def emitEscapeEdge(in:Sym[_], lhs:Sym[_]) = {
-    if (!nodes.contains(in)) dbgblk(src"emitEscapeEdge($in, $lhs):"){
-      val (shared, branchIn, branchLhs) = ancestryBetween(in, lhs)
-      dbgs(src"in=$in")
-      dbgs(src"lhs=$lhs")
+  override def emitEscapeEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String) = {
+    if (!nodes.contains(from)) dbgblk(src"emitEscapeEdge($from, $to):"){
+      val (shared, fromBranch, toBranch) = ancestryBetween(from, to)
+      dbgs(src"from=$from")
+      dbgs(src"to=$to")
       dbgs(src"shared=$shared")
-      dbgs(src"branchIn=$branchIn")
-      dbgs(src"branchLhs=$branchLhs")
-      emitNode(in)
-      branchLhs.filterNot{ sym => sym == lhs || currScope.sym.fold(false){ _ == sym } }.foreach { ancestor =>
-        inGen(out, s"${Scope(Some(ancestor)).fileName}.dot") {
-          emitNode(in)
-          emitEdge(in, lhs, src"$in", src"${branchLhs(branchLhs.indexOf(ancestor)-1)}")
+      dbgs(src"fromBranch=$fromBranch")
+      dbgs(src"toBranch=$toBranch")
+      toBranch.filterNot{ sym => sym == to }.foreach { ancestor =>
+        scope(Some(ancestor)).enter {
+          emitNode(from)
+          emitEdge(from, to, src"$from", src"${toBranch(toBranch.indexOf(ancestor)-1)}")
         }
       }
-      val lca = shared.headOption
-      inGen(out, s"${Scope(lca).fileName}.dot") {
-        emitEdge(in, lhs, src"${branchIn.last}", src"${branchLhs.last}")
+      fromBranch.filterNot{ sym => sym == from }.foreach { ancestor =>
+        scope(Some(ancestor)).enter {
+          emitNode(to)
+          emitEdge(from, to, src"${fromBranch(fromBranch.indexOf(ancestor)-1)}", src"$to")
+        }
       }
+      scope(shared.headOption).enter {
+        emitEdge(from, to, src"${fromBranch.last}", src"${toBranch.last}")
+      }
+    } else {
+      emitEdge(from, to, fromAlias, toAlias)
     }
   }
 
-  override def emitInputs(lhs:Sym[_]) = {
-    val groups = inputGroups(lhs)
-    groups.foreach { case (name, inputs) => 
-      inputs.foreach { in =>
-        emitEscapeEdge(in, lhs)
-        emit(src"""$in -> ${lhs}_${name}""")
-      }
-    }
-    (inputs(lhs) diff groups.values.flatten.toSeq).foreach { in => 
-      emitEscapeEdge(in, lhs)
-      emitEdge(in, lhs, src"$in", src"$lhs")
-    }
+  override def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
+    currScope.addEdge(from, to, fromAlias, toAlias)
   }
 
   override def graphAttr(lhs:Sym[_]):Map[String,String] = lhs match {
     case lhs if blocks(lhs).nonEmpty => 
       // navigate back to parent graph, or flat dot graph if already at top level
-      super.graphAttr(lhs) + ("URL" -> s""""file:///${Scope(lhs.blk.s).svgpath}"""")
+      super.graphAttr(lhs) + ("URL" -> s""""file:///${scope(lhs.blk.s).svgpath}"""")
     case lhs => super.graphAttr(lhs)
   }
 
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = lhs match {
     case lhs if blocks(lhs).nonEmpty => 
-      super.nodeAttr(lhs) + ("URL" -> s""""file:///${Scope(Some(lhs)).svgpath}"""")
+      super.nodeAttr(lhs) + ("URL" -> s""""file:///${scope(Some(lhs)).svgpath}"""")
     case lhs => super.nodeAttr(lhs)
   }
 

@@ -161,7 +161,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
         }
       }
 
-    case _ => // Nothin'
+    case _ =>
+      // Set blk for nodes outside Accel
+      op.blocks.zipWithIndex.foreach{case (block,bId) =>
+        block.stms.foreach{lhs =>
+          lhs.blk = Blk.Node(s, bId)
+        }
+      }
   }
 
   /** Set the control schedule of controllers based on the following ordered rules:

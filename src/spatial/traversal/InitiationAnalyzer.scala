@@ -84,6 +84,10 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
       lhs.II = lhs.userII.getOrElse(interval)
       lhs.bodyLatency = Seq(latNotDone, latNextState)
 
+    case _: Switch[_] if lhs.isInnerControl =>
+      visitControl(lhs, rhs)
+      lhs.children.foreach{c => c.s.get.bodyLatency = lhs.bodyLatency; c.s.get.II = lhs.II}
+
     case _ if lhs.isControl => visitControl(lhs, rhs)
     case _ => super.visit(lhs, rhs)
   }

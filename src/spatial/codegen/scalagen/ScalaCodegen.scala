@@ -14,7 +14,7 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
   override val ext: String = "scala"
   final val CODE_WINDOW: Int = 75
 
-  def and(ens: Set[Bit]): String = if (ens.isEmpty) "true" else ens.map(quote).mkString(" & ")
+  def and(ens: Set[Bit]): String = if (ens.isEmpty) "TRUE" else ens.map(quote).mkString(" & ")
 
   protected val scoped: mutable.Map[Sym[_],String] = new mutable.HashMap[Sym[_],String]()
   private var globalBlockID: Int = 0

@@ -108,8 +108,8 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)
 
-    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank.length)
-    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank.length)
+    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.sparseRank.length)
+    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.sparseRank.length)
 
     case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
     case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes))), _) => oneHotMux(conds,sizes)

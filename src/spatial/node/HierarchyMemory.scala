@@ -26,7 +26,9 @@ object MemAlloc {
 
 abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) extends Alloc[Alias[A]] {
   def mem: Seq[Src[A]]
-  def rank: Seq[Int]
+  /** Returns a list of dimensions which are not unit (not dropped during loads, for example.) */
+  def sparseRank: Seq[Int]
+  /** Returns a list of all dimensions. */
   def rawRank: Seq[Int]
   def mutable: Boolean
   def A: Type[A]
@@ -52,7 +54,7 @@ abstract class MemAlias[A, Src[T], Alias[T]](implicit Alias: Type[Alias[A]]) ext
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
 
-  def rank: Seq[Int] = ranges.head.zipWithIndex.collect{case(r,i) if !r.isUnit => i}
+  def sparseRank: Seq[Int] = ranges.head.zipWithIndex.collect{case(r,i) if !r.isUnit => i}
   def rawRank: Seq[Int] = Seq.tabulate(ranges.head.length){i => i}
   val mutable = true
 
@@ -86,7 +88,7 @@ object MemDenseAlias {
     val Src:   Type[Src[A]],
     val Alias: Type[Alias[A]])
   extends MemAlias[A,Src,Alias] {
-  def rank: Seq[Int] = Seq(0)
+  def sparseRank: Seq[Int] = Seq(0)
   def rawRank: Seq[Int] = Seq(0)
   val mutable = true
 

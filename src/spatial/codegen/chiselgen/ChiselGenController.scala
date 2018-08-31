@@ -267,7 +267,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) scrubNoise(sym.bodyLatency.sum)
+    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) scrubNoise(sym.bodyLatency.sum) else 0.0
     val ii = scrubNoise(sym.II)
 
     // Construct controller args

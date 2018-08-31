@@ -6,28 +6,28 @@ import types._
 
 class BigIPSim extends BigIP {
   def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) => Utils.getRetimed(dividend / bigNum.U, latency, flow)
       case None => Utils.getRetimed(dividend/divisor, latency, flow)
     }
   }
 
   def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) => Utils.getRetimed(dividend / bigNum.S, latency, flow)
       case None => Utils.getRetimed(dividend/divisor, latency, flow)
     }
   }
 
   def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) => Utils.getRetimed(dividend % bigNum.U, latency, flow)
       case None => Utils.getRetimed(dividend % divisor, latency, flow)
     }
   }
 
   def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) => Utils.getRetimed(dividend % bigNum.S, latency, flow)
       case None => Utils.getRetimed(dividend % divisor, latency, flow)
     }

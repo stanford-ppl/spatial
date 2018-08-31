@@ -8,7 +8,7 @@ import scala.collection.mutable.Set
 
 class BigIPZynq extends BigIP with ZynqBlackBoxes {
   def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
         Utils.getRetimed(dividend / bigNum.U, latency, flow)
       case None =>
@@ -21,7 +21,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
   }
 
   def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
         Utils.getRetimed(dividend / bigNum.S, latency, flow)
       case None =>
@@ -34,7 +34,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
   }
 
   def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
         Utils.getRetimed(dividend % bigNum.U, latency, flow)
       case None =>
@@ -47,7 +47,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
   }
 
   def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
         Utils.getRetimed(dividend % bigNum.S, latency, flow)
       case None =>

@@ -912,8 +912,9 @@ object Utils {
         cst.raw := i.raw
         cst
       case i: Int => 
-        val cst = Wire(new types.FixedPoint(s, d, f, Some(BigInt(i))))
-        cst.raw := (i * scala.math.pow(2,f)).toLong.S((d+f+1).W).asUInt()
+        val rawnum = (i * scala.math.pow(2,f)).toLong
+        val cst = Wire(new types.FixedPoint(s, d, f, Some(BigInt(rawnum))))
+        cst.raw := rawnum.S((d+f+1).W).asUInt()
         cst
     }
   }

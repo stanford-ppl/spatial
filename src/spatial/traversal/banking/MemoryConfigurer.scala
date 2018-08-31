@@ -19,7 +19,7 @@ import scala.collection.mutable.ArrayBuffer
 import spatial.metadata.types._
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected lazy val rank: Int = mem.seqRank.length
+  protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
   // TODO: This may need to be tweaked based on the fix for issue #23

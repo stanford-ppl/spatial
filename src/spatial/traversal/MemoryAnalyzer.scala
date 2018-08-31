@@ -21,7 +21,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
     case m:SRAM[_,_]    => new MemoryConfigurer(m, strategy)
     case m:RegFile[_,_] => new MemoryConfigurer(m, strategy)
     case m:LUT[_,_]     => new MemoryConfigurer(m, strategy)
-    // case m:LineBuffer[_] => new MemoryConfigurer(m, strategy)  // No buffering
+    case m:LineBuffer[_] => new MemoryConfigurer(m, strategy)  // No buffering
     case m:FIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
     case m:LIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
     case m:Reg[_]       => new MemoryConfigurer(m, strategy)

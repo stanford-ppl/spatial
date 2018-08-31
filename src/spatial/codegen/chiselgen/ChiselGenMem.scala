@@ -311,8 +311,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileVectorRead(rf,addr,ens)       => emitRead(lhs,rf,addr,addr.map{_ => I32(0) },ens)
     case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
-    // // LineBuffers
-    // case LineBufferNew(rows, cols) => emitMem(lhs, "LineBuffer", None)
+    // LineBuffers
+    case LineBufferNew(rows, cols) => emitMem(lhs, "LineBuffer", None)
     
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)

@@ -130,8 +130,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
     val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
 
-    val templateName = if (inst.depth == 1) s"${name}("
-                       else {appPropertyStats += HasNBufSRAM; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
+    val templateName = if (inst.depth == 1 && name != "LineBuffer") s"${name}("
+                       else {{if (name == "SRAM") appPropertyStats += HasNBufSRAM}; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
     if (mem.broadcastsAnyRead) appPropertyStats += HasBroadcastRead
 
     val depth = if (inst.depth > 1) s"${inst.depth}," else ""
@@ -311,6 +311,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileVectorRead(rf,addr,ens)       => emitRead(lhs,rf,addr,addr.map{_ => I32(0) },ens)
     case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
+    // // LineBuffers
+    // case LineBufferNew(rows, cols) => emitMem(lhs, "LineBuffer", None)
+    
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
     case FIFOIsEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
@@ -366,9 +369,17 @@ trait ChiselGenMem extends ChiselGenCommon {
     // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
     if (!specialLB && accesses.nonEmpty) {
       val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses)
-      val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
-      val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
-      info.toList
+      if (lca.isParallel){ // Assume memory analysis chose buffering based on lockstep of different bodies within this parallel, and just use one
+        val releventAccesses = accesses.toList.filter(_.ancestors.contains(lca.children.head)).toSet
+        val logickingLca = LCA(releventAccesses)
+        val (basePort, numPorts) = if (logickingLca.s.get.isInnerControl) (0,0) else LCAPortMatchup(releventAccesses.toList, logickingLca)
+        val info = if (logickingLca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => logickingLca.children.toList(port).s.get }
+        info.toList        
+      } else {
+        val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
+        val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
+        info.toList        
+      }
     } else {
       throw new Exception("Implement LB with transient buffering")
       // // Assume write comes before read and there is only one write

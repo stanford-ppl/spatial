@@ -209,6 +209,19 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     mem.writers.exists{write => write.ancestors.contains(ctrl) }
   }
 
+  /** True if the lca of the two accesses is an outer controller and each of 
+      the accesses have different unroll addresses for the iterators that 
+      compose this lca
+    */
+  def willUnrollTogether(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val lca = LCA(a.access, b.access)
+    val lcaIters = lca.scope.iters
+    val aIters = accessIterators(a.access, mem)
+    val bIters = accessIterators(b.access, mem)
+    val isPeek = a.access.isPeek || b.access.isPeek
+    isPeek || lca.isInnerControl || lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true}
+  }
+
   /** True if accesses a and b may occur concurrently and to the same buffer port.
     * This is true when any of the following hold:
     *   0. a and b are two different unrolled parts of the same node
@@ -370,7 +383,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
-    val concurrent  = requireConcurrentPortAccess(a, b)
+    val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
     val trueConflict = concurrent && conflicting
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")

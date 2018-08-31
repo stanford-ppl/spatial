@@ -14,6 +14,7 @@ package object access {
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
     def isParEnq: Boolean = op match {
+      // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true
       case _:LIFOBankedPush[_] => true
       case _:SRAMBankedWrite[_,_] => true
@@ -43,6 +44,7 @@ package object access {
       case _:StreamOutBankedWrite[_] => true
       case _ => false
     }
+
   }
 
   implicit class UsageOps(s: Sym[_]) {
@@ -93,6 +95,11 @@ package object access {
 
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
+
+    def isPeek: Boolean = a match {
+      case Op(_:FIFOPeek[_]) => true
+      case _ => false
+    }
 
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {
@@ -274,6 +281,17 @@ package object access {
       reachingWrites ++= reaching
     }
     reachingWrites
+  }
+
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+    val preceding = writes.filter{write => write.mayPrecede(read)}
+    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
+
+    val reachingBefore = before.filterNot{wr => (before - wr).exists{w => w.mustFollow(wr, read)}}
+    val reachingAfter  = after.filterNot{wr => ((after - wr) ++ before).exists{w => w.mustFollow(wr, read)}}
+    val reaching = reachingBefore ++ reachingAfter
+
+    reaching
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

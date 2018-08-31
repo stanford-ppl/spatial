@@ -259,15 +259,21 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
-    case Enqueuer(mem,_,adr,_) if adr.isEmpty => 
+    case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
+    case Reader(mem,adr,_)   => 
       lhs match {
-        case Op(RegWrite(reg, data, _)) if lhs.accumType == AccumType.Unknown =>
-          dbgs(s"adding recent write of $data to $reg")
-          mostRecentWrite += reg -> data
+        case Op(RegRead(reg)) if !reg.isRemoteMem => 
+          val reachingWrite = reachingWritesToReg(lhs, reg.writers.toSet)
+          if (reachingWrite.size == 1 && reachingWrite.head.accumType == AccumType.Unknown) {
+            dbgs(s"Creating reaching write subst rule for $lhs")
+            val data = reachingWrite.head match {
+              case Op(x: Enqueuer[_]) => x.data
+              case _ => throw new Exception(s"Unexpected write to $reg: ${reachingWrite.head}")
+            }
+            mostRecentWrite += (reg -> data)
+          }
         case _ =>
       }
-      setStreamingPattern(mem, lhs)
-    case Reader(mem,adr,_)   => 
       setAccessPattern(mem, lhs, adr)
     case Writer(mem,_,adr,_) => 
       setAccessPattern(mem, lhs, adr)

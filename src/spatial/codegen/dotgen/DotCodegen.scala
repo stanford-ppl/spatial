@@ -76,8 +76,15 @@ trait DotCodegen extends argon.codegen.Codegen {
     at
   }
 
+  def emitEscapeEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
+    if (nodes.contains(from) && nodes.contains(to)) emitEdge(from, to, fromAlias, toAlias)
+  }
+
   def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
-    val at = edgeAttr(from, to)
+    emitEdge(fromAlias, toAlias, edgeAttr(from, to))
+  }
+
+  def emitEdge(fromAlias:String, toAlias:String, at:Map[String,String]):Unit = {
     emit(src"$fromAlias -> $toAlias [ ${at.map { case (k,v) => s"$k=$v" }.mkString(" ")} ]")
   }
 
@@ -85,11 +92,11 @@ trait DotCodegen extends argon.codegen.Codegen {
     val groups = inputGroups(lhs)
     groups.foreach { case (name, inputs) => 
       inputs.foreach { in =>
-        if (nodes.contains(in)) emitEdge(in, lhs, src"$in", src"${lhs}_${name}")
+        emitEscapeEdge(in, lhs, src"$in", src"${lhs}_${name}")
       }
     }
     (inputs(lhs) diff groups.values.flatten.toSeq).foreach { in => 
-      if (nodes.contains(in)) emitEdge(in, lhs, src"$in", src"$lhs")
+      emitEscapeEdge(in, lhs, src"$in", src"$lhs")
     }
   }
 

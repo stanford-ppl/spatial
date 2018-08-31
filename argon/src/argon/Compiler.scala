@@ -5,6 +5,8 @@ import utils.io.files
 import utils._
 import utils.implicits.terminal._
 
+import scala.concurrent.TimeoutException
+
 trait Compiler extends DSLRunnable { self =>
 
   private val instrument = new Instrument()

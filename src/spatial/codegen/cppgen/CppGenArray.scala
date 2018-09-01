@@ -159,7 +159,7 @@ trait CppGenArray extends CppGenCommon {
             close(" ")
           } catch { case _:Throwable => }
 
-          close("};")
+          close("} __attribute__((packed));")
           // emit(src"typedef $struct ${lhs.tp};")
 
         }

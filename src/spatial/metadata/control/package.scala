@@ -314,7 +314,7 @@ package object control {
       */
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val ctrls = child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
     }
@@ -328,10 +328,10 @@ package object control {
       else {
         // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
         isLockstepAcross(iters, reference) &&
-        cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
+        (!isFSM && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
           case Some(Expect(_)) => true
           case _ => false
-        }}}
+        }}})
       }
     }
 

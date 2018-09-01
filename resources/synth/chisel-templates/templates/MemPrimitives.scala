@@ -75,11 +75,13 @@ class R_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int]) e
   val banks = HVec.tabulate(port_width*bank_width.length){i => UInt(bank_width(i%bank_width.length).W)}
   val ofs = Vec(port_width, UInt(ofs_width.W))
   val en = Vec(port_width, Bool())
+  val flow = Vec(port_width, Bool())
 
-  def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_XBar): Unit = {
+  def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_XBar, f: Bool): Unit = {
     bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     en(lhs_lane) := rhs_port.en(rhs_lane)
+    flow(lhs_lane) := f
   }
 
   override def cloneType = (new R_XBar(port_width, ofs_width, bank_width)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -100,10 +102,12 @@ class W_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int], v
 class R_Direct(val port_width:Int, val ofs_width:Int, val banks:List[List[Int]]) extends Bundle {
   val ofs = Vec(port_width, UInt(ofs_width.W))
   val en = Vec(port_width, Bool())
+  val flow = Vec(port_width, Bool())
 
-  def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_Direct): Unit = {
+  def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_Direct, f: Bool): Unit = {
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     en(lhs_lane) := rhs_port.en(rhs_lane)
+    flow(lhs_lane) := f
   }
 
   override def cloneType = (new R_Direct(port_width, ofs_width, banks)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -127,7 +131,6 @@ abstract class MemInterface(p: MemParams) extends Bundle {
   var directR = HVec(Array.tabulate(1 max p.numDirectRPorts){i => 
     Input(new R_Direct(p.directRMux.accessPars.getOr1(i), p.ofsWidth, if (p.hasDirectR) p.directRMux.sortByMuxPortAndOfs.values.map(_._1).flatten.flatten.toList.grouped(p.banks.length).toList else p.defaultDirect))
   })
-  var flow = Vec(1 max p.totalOutputs, Input(Bool()))
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
   }
@@ -184,8 +187,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
-        io.xBarR(base).connectLane(vecId, i, rBundle)
-        io.flow(outBase + vecId) := flow
+        io.xBarR(base).connectLane(vecId, i, rBundle, flow)
       }
       // Temp fix for merged readers not recomputing port info
       io.output.data(outBase + vecId)
@@ -222,8 +224,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
-        io.directR(base).connectLane(vecId, i, rBundle)
-        io.flow(p.xBarOutputs + outBase + vecId) := flow
+        io.directR(base).connectLane(vecId, i, rBundle, flow)
       }
       // Temp fix for merged readers not recomputing port info
       io.output.data(p.xBarOutputs + outBase + vecId)
@@ -241,13 +242,13 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Get info on physical dims
   // TODO: Upcast dims to evenly bank
-  val bankDim = p.bankingMode match {
-    case DiagonalMemory => math.ceil(p.depth.toDouble / p.banks.product.toDouble).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
-    case BankedMemory => math.ceil(p.depth.toDouble / p.banks.product.toDouble).toInt
-  }
   val numMems = p.bankingMode match {
     case DiagonalMemory => p.banks.head
     case BankedMemory => p.banks.product
+  }
+  val bankDim = p.bankingMode match {
+    case DiagonalMemory => math.ceil(p.depth.toDouble / numMems.toDouble).toInt //logicalDims.zipWithIndex.map { case (dim, i) => if (i == N - 1) math.ceil(dim.toDouble/banks.head).toInt else dim}
+    case BankedMemory => math.ceil(p.depth.toDouble / numMems.toDouble).toInt
   }
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
@@ -310,6 +311,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     // Check all direct r ports against this bank's coords
     val directSelectEns = io.directR.map(_.en).flatten.zip(io.directR.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
     val directSelectOffsets = io.directR.map(_.ofs).flatten.zip(io.directR.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectFlows = io.directR.map(_.flow).flatten.zip(io.directR.map(_.banks.flatten).flatten.grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 
     // Unmask write port if any of the above match
     mem._1.io.rMask := {if (p.hasXBarR) xBarSelect.reduce{_|_} else true.B} & directSelectEns.or
@@ -317,24 +319,27 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     if (directSelectEns.length > 0 & p.hasXBarR) {          // Has direct and x
       mem._1.io.r.ofs.head  := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectOffsets), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.ofs).flatten))
       mem._1.io.r.en.head   := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectEns), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.en).flatten))
+      mem._1.io.flow        := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectFlows), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.flow).flatten))
     } else if (p.hasXBarR && directSelectEns.length == 0) { // Has x only
       mem._1.io.r.ofs.head  := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.ofs).flatten)
-      mem._1.io.r.en.head   := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.ofs).flatten)
+      mem._1.io.r.en.head   := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.en).flatten)
+      mem._1.io.flow         := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.flow).flatten)
     } else if (directSelectEns.length > 0) {                                           // Has direct only
       mem._1.io.r.ofs.head  := chisel3.util.PriorityMux(directSelectEns, directSelectOffsets)
       mem._1.io.r.en.head   := chisel3.util.PriorityMux(directSelectEns, directSelectEns) 
+      mem._1.io.flow         := chisel3.util.PriorityMux(directSelectEns, directSelectFlows) 
     }
-    // Use flow for last active r port
-    val sels = Array.tabulate(directSelectEns.size + xBarSelect.size){i => 
-      val r = Module(new SRFF())
-      if (i < xBarSelect.size) r.io.input.set := xBarSelect(i)
-      else r.io.input.set := directSelectEns(i - xBarSelect.size)
-      r.io.input.reset := false.B
-      if (i < xBarSelect.size) r.io.input.asyn_reset :=  (xBarSelect.patch(i,Nil,1) ++ directSelectEns).foldLeft(false.B)(_|_) 
-      else r.io.input.asyn_reset := (xBarSelect ++ directSelectEns.patch(i-xBarSelect.size, Nil, 1)).foldLeft(false.B)(_|_)
-      r.io.output.data
-    }
-    mem._1.io.flow   := chisel3.util.PriorityMux(sels, io.flow)
+    // // Use flow for last active r port
+    // val sels = Array.tabulate(directSelectEns.size + xBarSelect.size){i => 
+    //   val r = Module(new SRFF())
+    //   if (i < xBarSelect.size) r.io.input.set := xBarSelect(i)
+    //   else r.io.input.set := directSelectEns(i - xBarSelect.size)
+    //   r.io.input.reset := false.B
+    //   if (i < xBarSelect.size) r.io.input.asyn_reset :=  (xBarSelect.patch(i,Nil,1) ++ directSelectEns).foldLeft(false.B)(_|_) 
+    //   else r.io.input.asyn_reset := (xBarSelect ++ directSelectEns.patch(i-xBarSelect.size, Nil, 1)).foldLeft(false.B)(_|_)
+    //   r.io.output.data
+    // }
+    // mem._1.io.flow   := chisel3.util.PriorityMux(sels, io.flow)
   }
 
   // Connect read data to output

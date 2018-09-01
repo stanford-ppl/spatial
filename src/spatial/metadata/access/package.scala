@@ -14,6 +14,7 @@ package object access {
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
     def isParEnq: Boolean = op match {
+      // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true
       case _:LIFOBankedPush[_] => true
       case _:SRAMBankedWrite[_,_] => true
@@ -43,6 +44,7 @@ package object access {
       case _:StreamOutBankedWrite[_] => true
       case _ => false
     }
+
   }
 
   implicit class UsageOps(s: Sym[_]) {
@@ -93,6 +95,11 @@ package object access {
 
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
+
+    def isPeek: Boolean = a match {
+      case Op(_:FIFOPeek[_]) => true
+      case _ => false
+    }
 
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {
@@ -173,6 +180,24 @@ package object access {
       else if (a.banks.head.forall(_.asInstanceOf[Sym[_]].trace.isConst)) true
       else false
     }
+  }
+
+  /** Checks the iters in accesses a and b for those which can dephase due to controllers not running in lockstep.  Returns a Seq of 
+    * iters and Seq of ints that identify the location of each iter relative to a.  We can use this info to create replacement rules
+    * for each iter in each access that may conflict due to lockstep dephasing
+    */
+  @stateful def dephasingIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Set[(Idx,Seq[Int])] = {
+    val aIters = accessIterators(a.access, mem)
+    val bIters = accessIterators(a.access, mem)
+    // For any iters a and b have in common, check if the iterator's owner's parent has children running in lockstep. 
+    //   return false if we find at least one who is not in lockstep
+    val forkLayer = a.unroll.zip(b.unroll).zipWithIndex.collectFirst{case ((u0,u1),i) if (u0 != u1) => i}
+    if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {
+      val forkNode = aIters(forkLayer.get).parent.s.get
+      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access))
+      if (mustClone) aIters.zipWithIndex.collect{case (x,i) if i > forkLayer.get => (x, a.unroll.take(i))}.toSet
+      else Set()
+    } else Set()    
   }
 
 
@@ -256,6 +281,17 @@ package object access {
       reachingWrites ++= reaching
     }
     reachingWrites
+  }
+
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+    val preceding = writes.filter{write => write.mayPrecede(read)}
+    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
+
+    val reachingBefore = before.filterNot{wr => (before - wr).exists{w => w.mustFollow(wr, read)}}
+    val reachingAfter  = after.filterNot{wr => ((after - wr) ++ before).exists{w => w.mustFollow(wr, read)}}
+    val reaching = reachingBefore ++ reachingAfter
+
+    reaching
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

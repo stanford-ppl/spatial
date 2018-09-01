@@ -1,6 +1,7 @@
 package argon
 
 import Freq._
+import forge.tags.api
 
 sealed class Block[R](
   val inputs:  Seq[Sym[_]], // External inputs to this block
@@ -16,13 +17,22 @@ sealed class Block[R](
     s.op.map{o => o.blocks.flatMap(_.nestedStms) }.getOrElse(Nil)
   }
 
-  def nestedInputs: Set[Sym[_]] = nestedStmsAndInputs._2
+  @api def nestedInputs: Set[Sym[_]] = nestedStmsAndInputs._2
 
-  def nestedStmsAndInputs: (Set[Sym[_]], Set[Sym[_]]) = {
+  @api def nestedStmsAndInputs: (Set[Sym[_]], Set[Sym[_]]) = {
     val stms = this.nestedStms.toSet
-    val used = stms.flatMap(_.inputs) ++ inputs
-    val made = stms.flatMap{s => s.op.map(_.binds).getOrElse(Set.empty) + s }
+    // Get everything used within this nested scope: All inputs to all statements, all block results, and this result
+    val used: Set[Sym[_]] = stms.flatMap{stm => stm.inputs ++ stm.blocks.map(_.result) } ++ inputs ++ syms(result)
+    // Get everything created within this nested scope: All symbols' bind symbols and the symbol itself
+    val made: Set[Sym[_]] = stms.flatMap{s => s.op.map(_.binds).getOrElse(Set.empty) + s }
+    // Inputs are everything used but not created in this nested scope.
     val ins  = (used diff made).filterNot(_.isValue)
+
+    dbgs("Stms:")
+    stms.foreach{l => dbgs(s"  ${stm(l)}") }
+    dbgs("Used:")
+    used.foreach{l => dbgs(s"  ${stm(l)} [Made: ${made.contains(l)}]") }
+
     (stms, ins)
   }
 

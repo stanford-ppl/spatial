@@ -16,6 +16,9 @@ import forge.tags._
 
   @rig def data: Array[A] = field[Array[A]]("data")
 
+  /** Returns the dimensions of this Matrix. */
+  @api def dims: Seq[I32] = Seq(field[I32]("rows"), field[I32]("cols"))
+
   /** Returns the number of rows in this Matrix. */
   @api def rows: I32 = field[I32]("rows")
 
@@ -50,6 +53,14 @@ import forge.tags._
 
   /** Returns the transpose of this Matrix. */
   @api def t: Matrix[A] = Matrix.tabulate(cols, rows){(i,j) => apply(j,i) }
+
+  /** Reorders the Matrix based on given ordering (i.e.- reorder(1,0) is the same as transpose) */
+  @api def reorder(ordering: Seq[scala.Int]): Matrix[A] = {
+    (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1))){(a,b) => 
+      val i = List(a,b)
+      apply(i(ordering(0)), i(ordering(1)))
+    }
+  }
 
   /** Returns true if this Matrix and `that` contain the same elements, false otherwise. */
   @api override def neql(that: Matrix[A]): Bit = data !== that.data

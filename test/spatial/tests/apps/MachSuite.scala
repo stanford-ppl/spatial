@@ -1126,9 +1126,9 @@ import spatial.targets._
     val dvec_x_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
     val dvec_y_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
     val dvec_z_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
-    val force_x_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density_aligned)
-    val force_y_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density_aligned)
-    val force_z_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density_aligned)
+    val force_x_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
+    val force_y_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
+    val force_z_dram = DRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
     val npoints_dram = DRAM[Int](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE)
 
     setMem(dvec_x_dram, dvec_x_data)
@@ -1141,9 +1141,9 @@ import spatial.targets._
       val dvec_y_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
       val dvec_z_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
       val npoints_sram = SRAM[Int](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE)
-      val force_x_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density_aligned)
-      val force_y_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density_aligned)
-      val force_z_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density_aligned)
+      val force_x_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
+      val force_y_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
+      val force_z_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
 
       dvec_x_sram load dvec_x_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density par par_load)
       dvec_y_sram load dvec_y_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density par par_load)
@@ -1151,7 +1151,7 @@ import spatial.targets._
       npoints_sram load npoints_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE par par_load)
 
       // Iterate over each block
-      Foreach(BLOCK_SIDE by 1 par loop_grid0_x){b0x => Foreach(BLOCK_SIDE by 1 par loop_grid0_y){b0y => Foreach(BLOCK_SIDE by 1 par loop_grid0_z){b0z => 
+      'ATOM1LOOP.Foreach(BLOCK_SIDE by 1 par loop_grid0_x, BLOCK_SIDE by 1 par loop_grid0_y, BLOCK_SIDE by 1 par loop_grid0_z){(b0x,b0y,b0z) => 
         // Iterate over each point in this block, considering boundaries
         val b0_cube_forces = SRAM[XYZ](density)
         val b1x_start = max(0.to[Int],b0x-1.to[Int])
@@ -1160,21 +1160,24 @@ import spatial.targets._
         val b1y_end = min(BLOCK_SIDE.to[Int], b0y+2.to[Int])
         val b1z_start = max(0.to[Int],b0z-1.to[Int])
         val b1z_end = min(BLOCK_SIDE.to[Int], b0z+2.to[Int])
-        MemReduce(b0_cube_forces)(b1x_start until b1x_end by 1, b1y_start until b1y_end by 1, b1z_start until b1z_end by 1 par loop_grid1_z) { (b1x, b1y, b1z) => 
+        // Iterate over points in b0
+        val p_range = npoints_sram(b0x, b0y, b0z)
+        println(r"\npt $b0x $b0y $b0z, atom2bounds ${b1x_start}-${b1x_end}, ${b1y_start}-${b1y_end}, ${b1z_start}-${b1z_end}")
+        'ATOM2LOOP.MemReduce(b0_cube_forces)(b1x_start until b1x_end by 1, b1y_start until b1y_end by 1, b1z_start until b1z_end by 1 par loop_grid1_z) { (b1x, b1y, b1z) => 
           val b1_cube_contributions = SRAM[XYZ](density).buffer
-          // Iterate over points in b0
-          val p_range = npoints_sram(b0x, b0y, b0z)
           val q_range = npoints_sram(b1x, b1y, b1z)
-          Foreach(0 until p_range par loop_p) { p_idx =>
+          println(r"  p_range/q_range for $b0x $b0y $b0z - $b1x $b1y $b1z = ${p_range} ${q_range}")
+          'PLOOP.Foreach(0 until p_range par loop_p) { p_idx =>
             val px = dvec_x_sram(b0x, b0y, b0z, p_idx)
             val py = dvec_y_sram(b0x, b0y, b0z, p_idx)
             val pz = dvec_z_sram(b0x, b0y, b0z, p_idx)
             val q_sum = Reg[XYZ](XYZ(0.to[T], 0.to[T], 0.to[T]))
-            Reduce(q_sum)(0 until q_range par loop_q) { q_idx => 
+            'QLOOP.Reduce(q_sum)(0 until q_range par loop_q) { q_idx => 
               val qx = dvec_x_sram(b1x, b1y, b1z, q_idx)
               val qy = dvec_y_sram(b1x, b1y, b1z, q_idx)
               val qz = dvec_z_sram(b1x, b1y, b1z, q_idx)
               val tmp = if ( !(b0x == b1x && b0y == b1y && b0z == b1z && p_idx == q_idx) ) { // Skip self
+                println(r"    $b1x $b1y $b1z ${q_idx} = $qx $qy $qz")
                 val delta = XYZ(px - qx, py - qy, pz - qz)
                 val r2inv = 1.0.to[T]/( delta.x*delta.x + delta.y*delta.y + delta.z*delta.z );
                 // Assume no cutoff and aways account for all nodes in area
@@ -1187,7 +1190,7 @@ import spatial.targets._
               }
               tmp
             }{(a,b) => XYZ(a.x + b.x, a.y + b.y, a.z + b.z)}
-            println(" " + b1x + "," + b1y + "," + b1z + " " + b0x + "," + b0y + "," + b0z + " = " + q_sum )
+            println(r"    $b0x $b0y $b0z ${p_idx}: contribution of $b1x $b1y $b1z = ${q_sum}")
             b1_cube_contributions(p_idx) = q_sum
           }
           Foreach(p_range until density) { i => b1_cube_contributions(i) = XYZ(0.to[T], 0.to[T], 0.to[T]) } // Zero out untouched interactions          
@@ -1195,24 +1198,22 @@ import spatial.targets._
         }{(a,b) => XYZ(a.x + b.x, a.y + b.y, a.z + b.z)}
 
         Foreach(0 until density) { i => 
+          println(r"total contribution @ $b0x $b0y $b0z $i = ${b0_cube_forces(i)}")
           force_x_sram(b0x,b0y,b0z,i) = b0_cube_forces(i).x
           force_y_sram(b0x,b0y,b0z,i) = b0_cube_forces(i).y
           force_z_sram(b0x,b0y,b0z,i) = b0_cube_forces(i).z
         }
-      }}}
-      force_x_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density_aligned par par_load) store force_x_sram
-      force_y_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density_aligned par par_load) store force_y_sram
-      force_z_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density_aligned par par_load) store force_z_sram
+      }
+      force_x_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density par par_load) store force_x_sram
+      force_y_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density par par_load) store force_y_sram
+      force_z_dram(0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density par par_load) store force_z_sram
 
     }
 
     // No need to align after bug #195 fixed
-    val force_x_received_aligned = getTensor4(force_x_dram)
-    val force_y_received_aligned = getTensor4(force_y_dram)
-    val force_z_received_aligned = getTensor4(force_z_dram)
-    val force_x_received = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => force_x_received_aligned(i,j,k,l)}
-    val force_y_received = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => force_y_received_aligned(i,j,k,l)}
-    val force_z_received = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => force_z_received_aligned(i,j,k,l)}
+    val force_x_received = getTensor4(force_x_dram)
+    val force_y_received = getTensor4(force_y_dram)
+    val force_z_received = getTensor4(force_z_dram)
     val raw_force_gold = loadCSV1D[T](s"$DATA/MD/grid_gold.csv", "\n")
     val force_x_gold = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_force_gold(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l)}
     val force_y_gold = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => raw_force_gold(i*BLOCK_SIDE*BLOCK_SIDE*density*3 + j*BLOCK_SIDE*density*3 + k*density*3 + 3*l+1)}
@@ -1226,7 +1227,10 @@ import spatial.targets._
     printTensor4(force_z_gold, "Gold z:")
     printTensor4(force_z_received, "Received z:")
 
+
     val margin = 0.001.to[T]
+    val validateZ = (0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::BLOCK_SIDE, 0::density){(i,j,k,l) => if (abs(force_z_gold(i,j,k,l) - force_z_received(i,j,k,l)) < margin) 1 else 0}
+    printTensor4(validateZ, "Z matchup")
     val cksumx = force_x_gold.zip(force_x_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}
     val cksumy = force_y_gold.zip(force_y_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}
     val cksumz = force_z_gold.zip(force_z_received){case (a,b) => abs(a - b) < margin}.reduce{_&&_}
@@ -1259,7 +1263,7 @@ import spatial.targets._
     val raw_pattern = raw_string_pattern.map{c => c.to[Int8] }
     val par_load = 16
     val outer_par = 4 (1 -> 1 -> 16)
-    val STRING_SIZE_NUM = raw_string.length.to[Int]
+    val STRING_SIZE_NUM = raw_string.length.to[Int] + (outer_par - (raw_string.length.to[Int] % outer_par)) // Round it out so that outer_par can evenly divide it
     val PATTERN_SIZE_NUM = raw_pattern.length.to[Int]
     val STRING_SIZE = ArgIn[Int]
     val PATTERN_SIZE = ArgIn[Int]
@@ -1333,7 +1337,7 @@ import spatial.targets._
     println("Found " + computed_nmatches)
 
     val cksum = gold_nmatches.reduce{_+_} == computed_nmatches
-    println("PASS: " + cksum + " (KMP) * Implement string find, string file parser, and string <-> hex <-> dec features once argon refactor is done so we can test any strings")
+    println("PASS: " + cksum + " (KMP)")
     assert(cksum)
   }
 }      
@@ -1722,8 +1726,7 @@ import spatial.targets._
           val upper_tmp = Reg[Int](0)
           Foreach(from until mid+1 by 1){ i => lower_fifo.enq(data_sram(i)) }
           Foreach(mid+1 until to+1 by 1){ j => upper_fifo.enq(data_sram(j)) }
-          Pipe.II(6).Foreach(from until to+1 by 1) { k =>  // Bug # 202
-          // Pipe.Foreach(from until to+1 by 1) { k =>  // Bug # 202
+          Pipe.II(6).Foreach(from until to+1 by 1) { k => 
             data_sram(k) = 
               if (lower_fifo.isEmpty) { upper_fifo.deq() }
               else if (upper_fifo.isEmpty) { lower_fifo.deq() }

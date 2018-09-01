@@ -17,6 +17,8 @@ import forge.tags._
 
   @rig def data: Array[A] = field[Array[A]]("data")
 
+  /** Returns the dimensions of this Tensor3. */
+  @api def dims: Seq[I32] = Seq(field[I32]("dim0"), field[I32]("dim1"), field[I32]("dim2"))
   /** Returns the first dimension of this Tensor3. */
   @api def dim0: I32 = field[I32]("dim0")
   /** Returns the second dimension of this Tensor3. */
@@ -42,6 +44,14 @@ import forge.tags._
   @api def zip[B:Type,C:Type](that: Tensor3[B])(func: (A,B) => C): Tensor3[C] = Tensor3(data.zip(that.data)(func), dim0, dim1, dim2)
   /** Reduces the elements in this Tensor3 into a single element using associative function `rfunc`. */
   @api def reduce(rfunc: (A,A) => A): A = data.reduce(rfunc)
+
+  /** Reorders the Tensor3 based on given ordering (i.e.- reorder(0,1,2) does nothing) */
+  @api def reorder(ordering: Seq[scala.Int]): Tensor3[A] = {
+    (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1)), 0::dims.apply(ordering(2))){(a,b,c) => 
+      val i = List(a,b,c)
+      apply(i(ordering(0)), i(ordering(1)), i(ordering(2)))
+    }
+  }
 
   /** Returns true if this Tensor3 and `that` contain the same elements, false otherwise. */
   @api override def neql(that: Tensor3[A]): Bit = data !== that.data

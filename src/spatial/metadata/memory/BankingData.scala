@@ -86,9 +86,10 @@ case class Instance(
   depth:    Int,                    // Depth of n-buffer
   cost:     Int,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
+  padding:  Seq[Int],               // Padding for memory based on banking
   accType:  AccumType               // Type of accumulator for instance
 ) {
-  def toMemory: Memory = Memory(banking, depth, accType)
+  def toMemory: Memory = Memory(banking, depth, padding, accType)
 
   def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
   def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
@@ -130,6 +131,7 @@ case class Instance(
 
     s"""<Banked>
        |Depth:    $depth
+       |Padding:  $padding
        |Accum:    $accType
        |Banking:  $banking <$format>
        |Pipeline: ${metapipe.map(_.toString).getOrElse("---")}
@@ -139,7 +141,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,Seq.fill(rank)(0),AccumType.None)
 }
 
 
@@ -149,12 +151,13 @@ object Instance {
 case class Memory(
   banking: Seq[Banking],  // Banking information
   depth:   Int,           // Buffer depth
+  padding: Seq[Int],      // Padding on each dim
   accType: AccumType      // Flags whether this instance is an accumulator
 ) {
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
-  def updateDepth(d: Int): Memory = Memory(banking, d, accType)
+  def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
@@ -165,15 +168,15 @@ case class Memory(
   }
 
   @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = {
-    if (banking.lengthIs(mem.seqRank.length)) {
+    if (banking.lengthIs(mem.sparseRank.length)) {
       banking.zip(addr).map{case(a,b) => a.bankSelect(Seq(b))}
     } else banking.map(_.bankSelect(addr))
   }
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
-    val w = mem.stagedDims.map(_.toInt).zip(mem.getPadding.getOrElse(Seq.fill(mem.stagedDims.size)(0))).map{case(x,y) => x+y}
-    val D = mem.seqRank.length
+    val w = mem.stagedDims.map(_.toInt).zip(padding).map{case(x,y) => x+y}
+    val D = mem.sparseRank.length
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride
@@ -187,11 +190,9 @@ case class Memory(
         ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val xt = addr(t)
-        val ofsdim_t = xt % b
-        ofsdim_t * List.fill(D-t-1)(b).product.toInt
-      }.sumTree
-      ofschunk * math.pow(b,D).toInt + intrablockofs
+        addr(t)
+      }.sumTree % b // Appears to be modulo magic but may be wrong
+      ofschunk * b + intrablockofs
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)
@@ -203,11 +204,9 @@ case class Memory(
         ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val xt = addr(t)
-        val ofsdim_t = xt % b(t)
-        ofsdim_t * b.slice(t+1,D).product.toInt
-      }.sumTree
-      ofschunk * b.product.toInt + intrablockofs
+        addr(t) 
+      }.sumTree % b.head.toInt // Appears to be modulo magic but may be wrong 
+      ofschunk * b.head.toInt + intrablockofs
     }
     else {
       // TODO: Bank address for mixed dimension groups
@@ -216,7 +215,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, Seq.fill(rank)(0), AccumType.None)
 }
 
 

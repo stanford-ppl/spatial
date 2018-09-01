@@ -39,7 +39,7 @@ if [[ ! -f ${REGRESSION_HOME}/lock ]]; then
 	git clone git@github.com:stanford-ppl/test-data.git
 	cd spatial
 	export 
-	export branchname=`git rev-parse --abbrev-ref HEAD | sed -i "s/HEAD/unknown/g"`
+	export branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
 	export hash=`git rev-parse HEAD`
 	export timestamp=`git show -s --format=%ci`
 	echo $hash > ${REGRESSION_HOME}/data/hash

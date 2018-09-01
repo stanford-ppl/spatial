@@ -11,12 +11,21 @@ import spatial.util.spatialConfig
 
 trait DotGenSpatial extends DotCodegen {
 
-  override def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = (from.op, to.op) match {
-    case (_, _) if from.isMem && to.isWriter && !to.isReader => super.emitEdge(from, to, toAlias, fromAlias)
-    case (_, _) if from.isStreamIn && to.isTileTransfer => super.emitEdge(from, to, toAlias, fromAlias)
-    case (_, _) if from.isDRAM && to.isTileStore => super.emitEdge(from, to, toAlias, fromAlias)
-    case (_, Some(_:SetMem[_,_])) if from.isDRAM => super.emitEdge(from, to, toAlias, fromAlias)
-    case (_, _) => super.emitEdge(from, to, fromAlias, toAlias)
+  override def inputs(lhs:Sym[_]):Seq[Sym[_]] = lhs match {
+    case Def(_:GetDRAMAddress[_,_]) => Nil
+    case lhs if lhs.isDRAM => 
+      super.inputs(lhs) ++ 
+      lhs.consumers.filter { c => 
+        c.isTileStore || (c match { case Def(SetMem(_,_)) => true; case _ => false })
+      }
+    case lhs if lhs.isStreamIn => super.inputs(lhs) ++ lhs.consumers.filter { _.isTileTransfer } ++ lhs.writers
+    case lhs if lhs.isMem => super.inputs(lhs) ++ lhs.writers
+    case Writer(mem, data, addr, ens) => super.inputs(lhs).filterNot { _ == mem }
+    case BankedWriter(mem, data, bank, ofs, ens) => super.inputs(lhs).filterNot { _ == mem }
+    case Def(SetMem(dram, _)) => super.inputs(lhs).filterNot(_ == dram)
+    case lhs if lhs.isTileStore => super.inputs(lhs).filterNot { i => i.isDRAM || i.isStreamIn }
+    case lhs if lhs.isTileTransfer => super.inputs(lhs).filterNot { _.isStreamIn }
+    case _ => super.inputs(lhs)
   }
 
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = super.nodeAttr(lhs) ++ (lhs match {
@@ -30,17 +39,18 @@ trait DotGenSpatial extends DotCodegen {
     case _ => Nil
   })
 
-  override def label(lhs:Sym[_]) = lhs.op match {
-    case None if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
-    case Some(rhs) if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
-    case Some(rhs) if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"
+  override def label(lhs:Sym[_]) = lhs match {
+    case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
+    case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
+    case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"
+    case Def(GetDRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
     case _ => super.label(lhs)
   }
 
-  override def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = lhs.op match {
-    case Some(SRAMBankedWrite(mem, data, bank, ofs, enss)) => 
+  override def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = lhs match {
+    case Def(SRAMBankedWrite(mem, data, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("data" -> data) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
-    case Some(SRAMBankedRead(mem, bank, ofs, enss)) => 
+    case Def(SRAMBankedRead(mem, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case _ => super.inputGroups(lhs)
   }
@@ -48,18 +58,13 @@ trait DotGenSpatial extends DotCodegen {
 }
 
 case class DotFlatGenSpatial(IR: State) extends DotFlatCodegen with DotGenSpatial {
-  override def label(lhs:Sym[_]) = lhs.op match {
-    case Some(FringeDenseLoad(dram,_,_))   => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Some(FringeDenseStore(dram,_,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Some(FringeSparseLoad(dram,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Some(FringeSparseStore(dram,_,_)) => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Some(GetDRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
+  override def label(lhs:Sym[_]) = lhs match {
+    case Def(FringeDenseLoad(dram,_,_))   => super.label(lhs) + src"\ndram=${label(dram)}"
+    case Def(FringeDenseStore(dram,_,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
+    case Def(FringeSparseLoad(dram,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
+    case Def(FringeSparseStore(dram,_,_)) => super.label(lhs) + src"\ndram=${label(dram)}"
     case _ => super.label(lhs)
   }
-  override def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = (from.op, to.op) match {
-    case (_, Some(GetDRAMAddress(dram))) if from.isDRAM => 
-    case (_, _) => super.emitEdge(from, to, fromAlias, toAlias)
-  }
+
 }
-case class DotHierarchicalGenSpatial(IR: State) extends DotHierarchicalCodegen with DotGenSpatial {
-}
+case class DotHierarchicalGenSpatial(IR: State) extends DotHierarchicalCodegen with DotGenSpatial

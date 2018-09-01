@@ -328,7 +328,7 @@ package object control {
       else {
         // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
         isLockstepAcross(iters, reference) &&
-        (!isFSM && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
+        (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
           case Some(Expect(_)) => true
           case _ => false
         }}})

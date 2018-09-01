@@ -6,6 +6,7 @@ import poly.ISL
 import utils.implicits.collections._
 import utils.tags.instrument
 
+import utils.math.isPow2
 import spatial.issues.UnbankableGroup
 import spatial.lang._
 import spatial.metadata.access._
@@ -251,9 +252,32 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Returns an approximation of the cost for the given banking strategy. */
-  def cost(banking: Seq[Banking], depth: Int): Int = {
+  def cost(banking: Seq[Banking], depth: Int): (Int, Int) = {
+    val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+    
+    val Ns_not_pow2      = banking.map    (_.nBanks).map{x => if (isPow2(x)) 0 else 1}.sum
+    val alphas_not_pow2  = banking.flatMap(_.alphas).map{x => if (isPow2(x)) 0 else 1}.sum
+    val Pss_not_pow2     = banking.flatMap(_.Ps    ).map{x => if (isPow2(x)) 0 else 1}.sum
     val totalBanks = banking.map(_.nBanks).product
-    depth * totalBanks
+    
+    dbg(s"SRAM BANKING INFORMATION:")
+    dbg(s"  depth          = ${depth}")
+    dbg(s"  padding        = ${padding}")
+    dbg(s"  mem.stagedDims = ${mem.stagedDims.map(_.toInt)}")
+    dbg(s"  banking.nBanks = ${banking.map(_.nBanks)}")
+    dbg(s"    `- # not pow 2 = ${Ns_not_pow2}")
+    dbg(s"  banking.alphas = ${banking.map(_.alphas)}")
+    dbg(s"    `- # not pow 2 = ${alphas_not_pow2}")
+    dbg(s"  banking.Ps     = ${banking.map(_.Ps)}")
+    dbg(s"    `- # not pow 2 = ${Pss_not_pow2}")
+    dbg(s"  totalBanks     = ${totalBanks}")
+    
+    // For now I prioritize fewest total banks because usually BRAMs are under-utilized
+    // Later can also consider stagedDims+padding as well as depth
+    val total_not_pow2 = Ns_not_pow2 + alphas_not_pow2 + Pss_not_pow2
+    
+    dbg(s"  TOTAL PENALTY  = (${total_not_pow2}, ${totalBanks})")
+    (total_not_pow2, totalBanks)
   }
 
   /** Computes the Ports for all accesses in all groups
@@ -367,7 +391,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
-        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp))
+        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost._2,ports,padding,accTyp))
       }
       else Left(issue.get)
     }

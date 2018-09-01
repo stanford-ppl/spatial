@@ -918,7 +918,7 @@ import spatial.targets._
     val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
     // Pass if >75% match
-    val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == dash) || (b == dash)) 1 else 0}.reduce{_+_}
+    val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == d) || (b == d)) 1 else 0}.reduce{_+_}
     val cksum = matches.to[Float] > 0.75.to[Float]*measured_length.to[Float]*2
 
     println("Result A: " + seqa_aligned_string)

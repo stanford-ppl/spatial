@@ -89,9 +89,9 @@ package object memory {
 
   implicit class MemoryOps(mem: Sym[_]) {
     /** Returns the statically defined rank (number of dimensions) of the given memory. */
-    def seqRank: Seq[Int] = mem match {
+    def sparseRank: Seq[Int] = mem match {
       case Op(m: MemAlloc[_,_])   => m.rank
-      case Op(m: MemAlias[_,_,_]) => m.rank
+      case Op(m: MemAlias[_,_,_]) => m.sparseRank
       case _ => throw new Exception(s"Could not statically determine the rank of $mem")
     }
 
@@ -182,6 +182,7 @@ package object memory {
       case _: RegFile[_,_] => true
       case _ => false
     }
+    // def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
 

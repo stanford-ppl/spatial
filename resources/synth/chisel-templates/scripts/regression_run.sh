@@ -55,7 +55,7 @@ if [[ $GDOCS -eq 1 ]]; then
 	testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 	testdirsarray=($testdirs)
 	for t in "${testdirsarray[@]}"; do
-		fullname=`echo $fullname | sed "s/${t}_//g"`
+		fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"`
 	done
 	appname=$fullname
 	properties=`cat chisel/IOModule_1.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`

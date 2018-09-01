@@ -37,6 +37,7 @@ val common = Seq(
   scalacOptions += "-Xfuture",                      // Enable "future language features"
   scalacOptions += "-opt:l:method,inline",          // Enable method optimizations, inlining
   scalacOptions += "-opt-warnings:none",            // Disable optimization warnings
+  scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
 
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,

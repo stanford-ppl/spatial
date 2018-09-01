@@ -30,7 +30,29 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     dimGrps: Seq[Seq[Seq[Int]]]
   ): Seq[Seq[Banking]] = {
 
-    val grps = (reads ++ writes).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
+    // Modify access matrices due to lockstep dephasing
+    val readIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = reads.map{grp => grp.map{a => 
+      grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
+    }.flatten}.flatten.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
+    if (readIterSubsts.nonEmpty) dbgs(s"General dephasng rules for $mem: ${readIterSubsts}")
+    val writeIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = writes.map{grp => grp.map{a => 
+      grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
+    }.flatten}.flatten.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
+    if (writeIterSubsts.nonEmpty) dbgs(s"General dephasng rules for $mem: ${writeIterSubsts}")
+    val newReads = reads.map{grp => grp.map{a => 
+      val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
+            .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> readIterSubsts((iter,a.unroll.take(i))))}.toMap
+      if (keyRules.nonEmpty) {mem.addDephasedAccess(a.access); dbgs(s"Substituting due to dephasing: $keyRules")}
+      a.randomizeKeys(keyRules)
+    }.toSet}.toSet
+    val newWrites = writes.map{grp => grp.map{a => 
+      val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
+            .zipWithIndex.collect{case(iter,i) if (writeIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> writeIterSubsts((iter,a.unroll.take(i))))}.toMap
+      if (keyRules.nonEmpty) {mem.addDephasedAccess(a.access); dbgs(s"Substituting due to dephasing: $keyRules")}
+      a.randomizeKeys(keyRules)
+    }.toSet}.toSet
+
+    val grps = (newReads ++ newWrites).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
     val fullStrategy = Seq.tabulate(rank){i => i}
     if (grps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
     else {
@@ -94,7 +116,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     *    (consider something like 96x3x3x96 sram N = 36, want to try things like alpha = 18,1,3,9)
     * Note that the total size is O(N**rank)
     */
-  def Alphas(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
+  def Alphas(rank: Int, N: Int, stagedDims: Seq[Int]): (Iterator[Seq[Int]], Iterator[Seq[Int]]) = {
     // Prime factors of number, for shortcircuiting the brute force alphas
     def factorize(number: Int, list: List[Int] = List()): List[Int] = {
       for(n <- 2 to number if number % n == 0) {
@@ -131,7 +153,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val pow2As   = Alphas2(1, Nil).filterNot(_.forall(_ == 0))
     val likelyAs = AlphasLikely(1, Nil).filterNot{x => x.forall(_ == 0) || x.forall(isPow2)}
     val xAs      = AlphasX(1, Nil).filterNot(_.forall(_ == 0))
-    pow2As ++ likelyAs ++ xAs
+    ((pow2As ++ likelyAs), xAs)
   }
 
   private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int]): Seq[Int] = {
@@ -181,21 +203,22 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         case Nil => List(Nil)
         case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
       }
-    def allLoops(maxes: Seq[Int], steps: Seq[Int], iterators: Seq[Int]): Seq[Int] = maxes match {
+    def allLoops(maxes: Seq[Int], a: Seq[Int], B: Int, iterators: Seq[Int]): Seq[Int] = maxes match {
       case Nil => Nil
-      case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}
-      case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
+      case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}
+      case h::tail if tail.isEmpty => (0 to h-1).map{i => i*a.head/B + iterators.sum}
     }
-    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, allPossible: Seq[Int]): Boolean = {
-      allLoops(p,a,Nil).map(_%N).sorted.distinct == allPossible
+    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int, allPossible: Seq[Int]): Boolean = {
+      val banksInFence = allLoops(p,a,B,Nil).map(_%N)
+      allPossible.forall{b => banksInFence.count(_==b) == B}
     }
     def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
     try {
       val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
-      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, Nil).map(_%(n*b)).sorted.distinct
-      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ List(stagedDims(i))}
-      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == allBanksAccessible.length).collect{case p if spansAllBanks(p,alpha,n*b,allBanksAccessible) => p}
+      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted.distinct
+      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1) List(stagedDims(i)) else List()}}
+      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == allBanksAccessible.length * b).collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible) => p}
       val PandCost = options.map{option => 
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product
@@ -209,43 +232,59 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
   }
 
-
   protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int]): ModBanking = {
     val rank = dims.length
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = stagedDims.product max Nmin
     val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= Ncap).partition{i => isPow2(i) }
     val n2Head = if ((n2.isEmpty && nx.isEmpty) || (n2.nonEmpty && n2.head.toDouble/Nmin > MAGIC_CUTOFF_N)) Seq(Nmin) else Nil
-    val Ns_raw = n2Head ++ n2 ++ nx
-    val Ns = Ns_raw.iterator
 
     var banking: Option[ModBanking] = None
-    var attempts = 0
 
-    dbgs(s"Attempting Ns: ${Ns_raw.take(10).mkString(", ")}, ...")
+    /** For high-dimensional memories, there could be a huge amount of elements in As, so 
+        prioritize searching through all possible Ns before all possible As.
+        Attempt the following to find banking the fastest:
+      *   For all Cheap Ns, For all Cheap or Likely As
+      *   For all Other Ns, For all Cheap or Likely As
+      *   For all Cheap Ns, For all Other As
+      *   For all Other Ns, For all Other As
+      */
+    val Ns_1 = (n2Head ++ n2).iterator
+    val Ns_2 = (nx).iterator
+    val Ns_3 = (n2Head ++ n2).iterator
+    val Ns_4 = (nx).iterator
 
-    while(Ns.hasNext && banking.isEmpty) {
-      val N = Ns.next()
-      val As = Alphas(rank, N, stagedDims)
-      while (As.hasNext && banking.isEmpty) {
-        val alpha = As.next()
-        if (attempts < 200) dbgs(s"     Checking N=$N and alpha=$alpha")
-        attempts = attempts + 1
-        if (checkCyclic(N,alpha,grps)) {
-          dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
-          val P = computeP(N,1,alpha,stagedDims)
-          banking = Some(ModBanking(N,1,alpha,dims,P))
-        }
-        else {
-          val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
-          banking = B.map{b =>
-            dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-            val P = computeP(N, b, alpha, stagedDims)
-            ModBanking(N, b, alpha, dims, P) 
+    def exhaustIterators(Ns: Iterator[Int], cheapAs: Boolean): Unit = {
+      var attempts = 0
+      while(Ns.hasNext && banking.isEmpty) {
+        val N = Ns.next()
+        val allAs = Alphas(rank, N, stagedDims)
+        val As = if (cheapAs) allAs._1 else allAs._2
+        while (As.hasNext && banking.isEmpty) {
+          val alpha = As.next()
+          if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
+          attempts = attempts + 1
+          if (checkCyclic(N,alpha,grps)) {
+            dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
+            val P = computeP(N,1,alpha,stagedDims)
+            banking = Some(ModBanking(N,1,alpha,dims,P))
+          }
+          else {
+            val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+            banking = B.map{b =>
+              dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
+              val P = computeP(N, b, alpha, stagedDims)
+              ModBanking(N, b, alpha, dims, P) 
+            }
           }
         }
       }
     }
+
+    exhaustIterators(Ns_1, true)
+    exhaustIterators(Ns_2, true)
+    exhaustIterators(Ns_3, false)
+    exhaustIterators(Ns_4, false)
 
     banking.getOrElse(ModBanking.Unit(rank))
   }

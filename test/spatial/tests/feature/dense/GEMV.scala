@@ -3,10 +3,12 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 @spatial class GEMV extends SpatialTest {
-
+    override def runtimeArgs: Args = "512 512"
    def main(args: Array[String]): Unit = {
-    val M = 8192
-    val N = 8192
+    val M = ArgIn[Int] //8192
+    setArg(M, args(0).to[Int])
+    val N = ArgIn[Int] //8192
+    setArg(N, args(1).to[Int])
     val B = 64 //(1 -> 1 -> 1024)    // Parameter [1, 1024] with step of 64
     val T = 64 //(1 -> 1 -> 1024)
     val Pblk = 1 //(1 -> 1 -> 32)
@@ -63,5 +65,6 @@ import spatial.dsl._
     assert(gold == outHost, "Gold and out did not match!")
 
     printArray(outHost)
+    println(r"Pass: ${gold == outHost}")
   }
 }

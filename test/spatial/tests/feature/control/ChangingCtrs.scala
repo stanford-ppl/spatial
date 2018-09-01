@@ -88,3 +88,47 @@ import spatial.dsl._
 
   }
 }
+
+@spatial class ChangingCtrBounds extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+
+    val d = DRAM[Int](16,16)
+    val bounds = DRAM[Int](16,2)
+    val boundsData = (0::16,0::2){(i,j) => 
+      if (j == 0) i % 4 + 3
+      else i % 4 + 6
+    }
+    setMem(bounds, boundsData)
+
+    Accel{
+      val s = SRAM[Int](16,16)
+      Foreach(16 by 1, 16 by 1){(i,j) => s(i,j) = 0}
+      val bnds = SRAM[Int](16,2)
+      bnds load bounds
+      Foreach(16 by 1){row => 
+        val lower = bnds(row, 0)
+        val upper = bnds(row, 1)
+        // Glitch occurs when lower of last iter equals upper of this iter
+        Foreach(lower until upper by 1){j => 
+          val reg = Reg[Int](0)
+          Pipe{reg := j}
+          Pipe{s(row,j) = reg.value}
+        }
+      }
+      d store s
+    }
+
+    val gold = (0::16, 0::16){(i,j) => 
+      val lower = boundsData(i,0)
+      val upper = boundsData(i,1)
+      if (j >= lower && j < upper) j
+      else 0
+    }
+
+    val result = getMatrix(d)
+    printMatrix(gold, "gold: ")
+    printMatrix(result, "result: ")
+    assert(result == gold)
+  }
+}

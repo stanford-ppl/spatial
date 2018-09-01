@@ -67,6 +67,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
           depth    = 1,
           cost     = bankingCosts,
           ports    = ports,
+          padding  = mem.getPadding.getOrElse(Seq(0)),
           accType  = AccumType.None
         ))
       }

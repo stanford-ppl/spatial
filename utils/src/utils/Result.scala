@@ -2,11 +2,9 @@ package utils
 
 import scala.util.control.NoStackTrace
 
-case object Indeterminate extends Exception("Indeterminate result. Test had no validation checks.") with NoStackTrace
-case object FailedValidation extends Exception("Test did not pass validation.") with NoStackTrace
 case class BackendError(msg: String) extends Exception(msg) with NoStackTrace
 
-sealed abstract class Result {
+sealed trait Result {
   def ==>(func: => Result): Result
   def orElse(result: => Result): Result
   def resolve(): Unit
@@ -25,29 +23,41 @@ object Result {
     def continues: Boolean = true
   }
 
-  case object Fail extends Result {
+  case object Fail extends Exception("Test did not pass validation.") with Result with NoStackTrace {
     def ==>(func: => Result): Result = this
     def orElse(result: => Result): Result = this
-    def resolve(): Unit = throw FailedValidation
+    def resolve(): Unit = throw this
     def continues: Boolean = false
   }
 
-  case object Unknown extends Result {
+  case object Unknown extends Exception("Test had no validation checks. (Indeterminate result)") with Result with NoStackTrace {
     def ==>(func: => Result): Result = this orElse func
     def orElse(result: => Result): Result = result
-    def resolve(): Unit = throw Indeterminate
+    def resolve(): Unit = throw this
     def continues: Boolean = true
   }
 
-  case class Error(t: Throwable) extends Result {
+  case class CompileError(t: Throwable) extends Result {
     def ==>(func: => Result): Result = this
     def orElse(result: => Result): Result = this
     def resolve(): Unit = throw t
     def continues: Boolean = false
   }
-  object Error {
-    def apply(msg: String): Error = Error(BackendError(msg))
+
+  case class MakeError(msg: String) extends Exception(msg) with Result with NoStackTrace {
+    def ==>(func: => Result): Result = this
+    def orElse(result: => Result): Result = this
+    def resolve(): Unit = throw this
+    def continues: Boolean = false
   }
+
+  case class RunError(msg: String) extends Exception(msg) with Result with NoStackTrace {
+    def ==>(func: => Result): Result = this
+    def orElse(result: => Result): Result = this
+    def resolve(): Unit = throw this
+    def continues: Boolean = false
+  }
+
 }
 
 

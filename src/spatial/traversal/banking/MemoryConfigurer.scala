@@ -19,7 +19,7 @@ import scala.collection.mutable.ArrayBuffer
 import spatial.metadata.types._
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
-  protected lazy val rank: Int = mem.seqRank.length
+  protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
   // TODO: This may need to be tweaked based on the fix for issue #23
@@ -140,7 +140,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && outermost.parent.isLockstepAcross(itersDiffer, Some(a.access))
+        spatialConfig.enableBroadcast && outermost.parent.s.get.isLockstepAcross(itersDiffer, Some(a.access))
       }
     }
     else true
@@ -179,6 +179,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
           val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) }
+          samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")
           if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
@@ -206,6 +207,19 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   /** True if the memory is written in the given controller. */
   def isWrittenIn(ctrl: Ctrl): Boolean = {
     mem.writers.exists{write => write.ancestors.contains(ctrl) }
+  }
+
+  /** True if the lca of the two accesses is an outer controller and each of 
+      the accesses have different unroll addresses for the iterators that 
+      compose this lca
+    */
+  def willUnrollTogether(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val lca = LCA(a.access, b.access)
+    val lcaIters = lca.scope.iters
+    val aIters = accessIterators(a.access, mem)
+    val bIters = accessIterators(b.access, mem)
+    val isPeek = a.access.isPeek || b.access.isPeek
+    isPeek || lca.isInnerControl || lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true}
   }
 
   /** True if accesses a and b may occur concurrently and to the same buffer port.
@@ -346,14 +360,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val bankingCosts = bankings.map{b => b -> cost(b,depth) }
         val (banking, bankCost) = bankingCosts.minBy(_._2)
-        mem.padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+        val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
         // TODO[5]: Assumption: All memories are at least simple dual port
         val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
         val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
-        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,accTyp))
+        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp))
       }
       else Left(issue.get)
     }
@@ -369,7 +383,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
-    val concurrent  = requireConcurrentPortAccess(a, b)
+    val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
     val trueConflict = concurrent && conflicting
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")

@@ -135,14 +135,14 @@ trait Spatial extends Compiler {
         regReadCSE          ==>
         /** Dead code elimination */
         useAnalyzer         ==>
-        transientCleanup    ==>
-        /** Update buffer depths */
-        bufferRecompute     ==> printer ==> transformerChecks ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
-        flatteningTransformer ==> printer ==> transformerChecks ==>
+        flatteningTransformer ==> 
+        /** Update buffer depths */
+        bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Accumulation Specialization **/
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>

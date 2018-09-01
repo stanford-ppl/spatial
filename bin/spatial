@@ -176,9 +176,9 @@ def main():
   java_cmd = ""
   if isTest:
     ciArgs = "export TEST_ARGS=\"--name " + opts.app + " " + ' '.join(args) + "\""
-    java_cmd = ciArgs + "; sbt -batch -Dci=true \"; testOnly " + name + "\""
+    java_cmd = ciArgs + "; sbt -Dci=true \"; testOnly " + name + "\""
   else:
-    java_cmd = "sbt -batch \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
+    java_cmd = "sbt \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
 
   print(java_cmd)
 

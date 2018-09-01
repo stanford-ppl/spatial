@@ -37,7 +37,10 @@ import spatial.lang.host._
     array: Array[A],
     apply: Lambda2[Array[A],I32,A],
     func:  Lambda1[A,Void])
-  extends Op2[A,Void]
+  extends Op2[A,Void] {
+
+  override def binds = super.binds + apply.inputB
+}
 
 @op case class ArrayMap[A:Type,B:Type](
     array: Array[A],

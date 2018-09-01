@@ -22,6 +22,8 @@ trait NamedCodegen extends Codegen {
       case _: CounterNew[_]    => s"${s}_ctr"
       case _: CounterChainNew  => s"${s}_ctrchain"
 
+      case _: IfThenElse[_]    => s"${s}_IfThenElse"
+
       case DRAMNew(_,_) => s"${s}_${s.nameOr("dram")}"
       case ArgInNew(_)  => s"${s}_${s.nameOr("argIn")}"
       case ArgOutNew(_) => s"${s}_${s.nameOr("argOut")}"

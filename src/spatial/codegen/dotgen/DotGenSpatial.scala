@@ -52,19 +52,28 @@ trait DotGenSpatial extends DotCodegen {
       super.inputGroups(lhs) + ("data" -> data) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case Def(SRAMBankedRead(mem, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
+    case Def(StreamInBankedRead(mem, enss)) =>
+      super.inputGroups(lhs) + ("enss" -> enss.flatten)
+    case Def(StreamOutBankedWrite(mem, data, enss)) => 
+      super.inputGroups(lhs) + ("data" -> data) + ("enss" -> enss.flatten)
+    case Def(FIFOBankedDeq(mem, enss)) =>
+      super.inputGroups(lhs) + ("enss" -> enss.flatten)
+    case Def(FIFOBankedEnq(mem, data, enss)) => 
+      super.inputGroups(lhs) + ("data" -> data) + ("enss" -> enss.flatten)
+    case Def(FIFOIsEmpty(mem, enss)) => 
+      super.inputGroups(lhs) + ("enss" -> enss.toSeq)
+    case Def(FIFOIsFull(mem, enss)) => 
+      super.inputGroups(lhs) + ("enss" -> enss.toSeq)
+    case Def(FIFOIsAlmostEmpty(mem, enss)) => 
+      super.inputGroups(lhs) + ("enss" -> enss.toSeq)
+    case Def(FIFOIsAlmostFull(mem, enss)) => 
+      super.inputGroups(lhs) + ("enss" -> enss.toSeq)
+    case Def(FIFONumel(mem, enss)) => 
+      super.inputGroups(lhs) + ("enss" -> enss.toSeq)
     case _ => super.inputGroups(lhs)
   }
 
 }
 
-case class DotFlatGenSpatial(IR: State) extends DotFlatCodegen with DotGenSpatial {
-  override def label(lhs:Sym[_]) = lhs match {
-    case Def(FringeDenseLoad(dram,_,_))   => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Def(FringeDenseStore(dram,_,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Def(FringeSparseLoad(dram,_,_))  => super.label(lhs) + src"\ndram=${label(dram)}"
-    case Def(FringeSparseStore(dram,_,_)) => super.label(lhs) + src"\ndram=${label(dram)}"
-    case _ => super.label(lhs)
-  }
-
-}
+case class DotFlatGenSpatial(IR: State) extends DotFlatCodegen with DotGenSpatial
 case class DotHierarchicalGenSpatial(IR: State) extends DotHierarchicalCodegen with DotGenSpatial

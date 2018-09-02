@@ -388,7 +388,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
       // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
       // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
+      dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
     }
 
 

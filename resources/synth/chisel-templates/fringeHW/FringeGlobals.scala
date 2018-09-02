@@ -43,7 +43,7 @@ object FringeGlobals {
   def enableDebugRegs = _enableDebugRegs
   def enableDebugRegs_= (value: Boolean): Unit = _enableDebugRegs = value
 
-  private var _channelAssignment: ChannelAssignment = ColoredRoundRobin
+  private var _channelAssignment: ChannelAssignment = BasicRoundRobin
   def channelAssignment = _channelAssignment
   def channelAssignment_= (value: ChannelAssignment): Unit = _channelAssignment = value
 

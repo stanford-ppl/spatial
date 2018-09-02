@@ -246,43 +246,43 @@ class Top(
       accel.io.reset := fringe.io.reset
 
 
-    // case "arria10" =>
-    //   val blockingDRAMIssue = false
-    //   val topIO = io.asInstanceOf[Arria10Interface]
-    //   val fringe = Module(new FringeArria10(w, totalArgIns, totalArgOuts,
-    //                                         numArgIOs, numChannels, numArgInstrs, argOutLoopbacksMap,
-    //                                         totalLoadStreamInfo, totalStoreStreamInfo,
-    //                                         streamInsInfo, streamOutsInfo, blockingDRAMIssue,
-    //                                         topIO.axiLiteParams, topIO.axiParams))
-    //   // Fringe <-> Host Connections
-    //   fringe.io.S_AVALON <> topIO.S_AVALON
+    case "arria10" =>
+      val blockingDRAMIssue = false
+      val topIO = io.asInstanceOf[Arria10Interface]
+      val fringe = Module(new FringeArria10(w, totalArgIns, totalArgOuts,
+                                            numArgIOs, numChannels, numArgInstrs, argOutLoopbacksMap,
+                                            totalLoadStreamInfo, totalStoreStreamInfo,
+                                            streamInsInfo, streamOutsInfo, blockingDRAMIssue,
+                                            topIO.axiLiteParams, topIO.axiParams))
+      // Fringe <-> Host Connections
+      fringe.io.S_AVALON <> topIO.S_AVALON
 
-    //   // Fringe <-> DRAM Connections
-    //   topIO.M_AXI <> fringe.io.M_AXI
+      // Fringe <-> DRAM Connections
+      topIO.M_AXI <> fringe.io.M_AXI
 
-    //   // TODO: add memstream connections here
-    //   if (accel.io.argIns.length > 0) {
-    //     accel.io.argIns := fringe.io.argIns
-    //   }
+      // TODO: add memstream connections here
+      if (accel.io.argIns.length > 0) {
+        accel.io.argIns := fringe.io.argIns
+      }
 
-    //   if (accel.io.argOutLoopbacks.length > 0) {
-    //     accel.io.argOutLoopbacks := fringe.io.argOutLoopbacks
-    //   }
+      if (accel.io.argOutLoopbacks.length > 0) {
+        accel.io.argOutLoopbacks := fringe.io.argOutLoopbacks
+      }
 
-    //   if (accel.io.argOuts.length > 0) {
-    //     fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
-    //       fringeArgOut.bits := accelArgOut.bits
-    //       fringeArgOut.valid := accelArgOut.valid
-    //     }
-    //   }
+      if (accel.io.argOuts.length > 0) {
+        fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
+          fringeArgOut.bits := accelArgOut.bits
+          fringeArgOut.valid := accelArgOut.valid
+        }
+      }
 
-    //   // memStream connections
-    //   fringe.io.externalEnable := false.B
-    //   fringe.io.memStreams <> accel.io.memStreams
+      // memStream connections
+      fringe.io.externalEnable := false.B
+      fringe.io.memStreams <> accel.io.memStreams
 
-    //   accel.io.enable := fringe.io.enable
-    //   fringe.io.done := accel.io.done
-    //   accel.reset := reset.toBool | fringe.io.reset
+      accel.io.enable := fringe.io.enable
+      fringe.io.done := accel.io.done
+      accel.reset := reset.toBool | fringe.io.reset
 
 
     // // case "de1soc" =>

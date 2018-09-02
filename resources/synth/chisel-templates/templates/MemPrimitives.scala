@@ -319,15 +319,15 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     if (directSelectEns.length > 0 & p.hasXBarR) {          // Has direct and x
       mem._1.io.r.ofs.head  := Mux(directSelectEns.or, chisel3.util.Mux1H(directSelectEns, directSelectOffsets), chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.ofs).flatten))
       mem._1.io.r.en.head   := Mux(directSelectEns.or, chisel3.util.Mux1H(directSelectEns, directSelectEns), chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.en).flatten))
-      mem._1.io.flow        := Mux(directSelectEns.or, chisel3.util.Mux1H(directSelectEns, directSelectFlows), chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.flow).flatten))
+      mem._1.io.flow        := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectFlows), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.flow).flatten))
     } else if (p.hasXBarR && directSelectEns.length == 0) { // Has x only
       mem._1.io.r.ofs.head  := chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.ofs).flatten)
       mem._1.io.r.en.head   := chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.en).flatten)
-      mem._1.io.flow         := chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.flow).flatten)
+      mem._1.io.flow         := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.flow).flatten)
     } else if (directSelectEns.length > 0) {                                           // Has direct only
       mem._1.io.r.ofs.head  := chisel3.util.Mux1H(directSelectEns, directSelectOffsets)
       mem._1.io.r.en.head   := chisel3.util.Mux1H(directSelectEns, directSelectEns) 
-      mem._1.io.flow         := chisel3.util.Mux1H(directSelectEns, directSelectFlows) 
+      mem._1.io.flow         := chisel3.util.PriorityMux(directSelectEns, directSelectFlows) 
     }
     // // Use flow for last active r port
     // val sels = Array.tabulate(directSelectEns.size + xBarSelect.size){i => 

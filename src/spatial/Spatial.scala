@@ -7,6 +7,7 @@ import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
+import spatial.codegen.dotgen._
 
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
@@ -21,7 +22,6 @@ import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
 
 import spatial.util.spatialConfig
-
 
 trait Spatial extends Compiler {
 
@@ -100,6 +100,8 @@ trait Spatial extends Compiler {
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
+    lazy val dotFlatGen    = DotFlatGenSpatial(state)
+    lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
     val result = {
       block ==> printer     ==>
@@ -157,6 +159,8 @@ trait Spatial extends Compiler {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen)

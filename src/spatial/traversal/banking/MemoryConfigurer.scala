@@ -285,8 +285,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val bankModPenalty = xbar.size * Ns_not_pow2 * modCost //spatialConfig.target.latencyModel.model("FixMod")("b" -> 32))
 
       // Compute penalty from muxes for bank resolution
-      val wmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isWriter).size > 0) depth * muxLayerCost * numBanks * numBanks else 0
-      val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isReader).size > 0) depth * muxLayerCost * numBanks * numBanks else 0
+      val wmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isWriter).size > 0) depth * muxLayerCost * numBanks * xbar.filter(_.access.isWriter).size else 0
+      val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isReader).size > 0) depth * muxLayerCost * numBanks * xbar.filter(_.access.isReader).size else 0
 
       // Compute penalty from volume
       val sizePenalty = depth * w.product * volumePenalty
@@ -440,14 +440,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val bankingCosts = bankings.map{b => b -> cost(b,depth, rdGroups, reachingWrGroups) }
         val duplicationCost = cost(Seq(), depth, rdGroups, reachingWrGroups)
         val (banking, bankCost) = bankingCosts.minBy(_._2)
-        dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost")
-        if (bankCost > duplicationCost) {
+        dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
+        if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking) {
           dbgs(s"Choosing to duplicate $mem for $rdGroups, $wrGroups.  ")
           val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, dimGrps)
           val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}
           val (wrBanking, wrBankCost) = wrBankingsCosts.minBy(_._2)
           Right(Seq.tabulate(reads.size){i => 
-            val padding = Seq.fill(mem.stagedDims.size)(0)
+            val padding = mem.stagedDims.map(_.toInt).zip(wrBbanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
             val ports = computePorts(Set(Set(reads.toSeq(i))),bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
             val isBuffAccum = writes.cross(Set(reads.toSeq(i))).exists{case (wr,rd) => rd.parent == wr.parent }
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None

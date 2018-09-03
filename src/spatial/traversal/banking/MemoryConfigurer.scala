@@ -447,7 +447,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}
           val (wrBanking, wrBankCost) = wrBankingsCosts.minBy(_._2)
           Right(Seq.tabulate(reads.size){i => 
-            val padding = mem.stagedDims.map(_.toInt).zip(wrBbanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+            val padding = mem.stagedDims.map(_.toInt).zip(wrBanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
             val ports = computePorts(Set(Set(reads.toSeq(i))),bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
             val isBuffAccum = writes.cross(Set(reads.toSeq(i))).exists{case (wr,rd) => rd.parent == wr.parent }
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None

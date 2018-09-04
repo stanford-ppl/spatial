@@ -13,9 +13,10 @@ import socket
 
 def write(wksh, row, col, txt):
 	try:
-		if (col > wksh.cols):
-        		wksh.insert_cols(col-1, inherit=True)
-		wksh.update_cell((row,col),txt)
+		if (wksh.title != "Probe"): # Never write to probe
+			if (col > wksh.cols):
+	        		wksh.insert_cols(col-1, inherit=True)
+			wksh.update_cell((row,col),txt)
 	except:
 		print("WARN: pygsheets failed write %s @ %d,%d... -_-" % (txt, row, col))
 
@@ -377,7 +378,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
 			worksheet = sh.worksheet('index', x)
-			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+			if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
 				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
 				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
@@ -400,7 +401,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			for x in range(0,numsheets):
 				# worksheet = sh.get_worksheet(x)
 				worksheet = sh.worksheet('index', x)
-				if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+				if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
 					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)", os.uname()[1] ])
 					if (not keep_row_75): deleteRows(worksheet, 75)
 					# worksheet.update_cell(id,1, link)
@@ -480,7 +481,7 @@ def combine_and_strip_prefixes(backend):
 	for x in range(0,numsheets):
 		# worksheet = sh.get_worksheet(x)
 		worksheet = sh.worksheet('index', x)
-		if (worksheet.title != "STATUS"):
+		if (worksheet.title != "STATUS" and worksheet.title != "Probe"):
 			print("Scrubbing %s" % worksheet.title)
 			lol = worksheet.get_all_values()
 			start = getCols(worksheet, "Test:")[0]

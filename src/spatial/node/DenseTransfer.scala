@@ -83,7 +83,7 @@ object DenseTransfer {
 
         // Pad indices, strides with 0's against rawDramOffsets
         val indicesPadded = dram.rawRank.map{i => if (dram.sparseRank.contains(i)) indices(dram.sparseRank.indexOf(i)) else 0.to[I32]}
-        val stridesPadded = dram.rawRank.map{i => if (dram.sparseRank.contains(i)) strides(dram.sparseRank.indexOf(i)) else 1.to[I32]}
+        val stridesPadded = dram.rawRank.map{i => strides.getOrElse(i, 1.to[I32])}
 
         val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
         val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}

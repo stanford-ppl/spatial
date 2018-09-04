@@ -6,6 +6,7 @@ import poly.ISL
 import utils.implicits.collections._
 import utils.tags.instrument
 
+import utils.math.isPow2
 import spatial.issues.UnbankableGroup
 import spatial.lang._
 import spatial.metadata.access._
@@ -209,6 +210,19 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     mem.writers.exists{write => write.ancestors.contains(ctrl) }
   }
 
+  /** True if the lca of the two accesses is an outer controller and each of 
+      the accesses have different unroll addresses for the iterators that 
+      compose this lca
+    */
+  def willUnrollTogether(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val lca = LCA(a.access, b.access)
+    val lcaIters = lca.scope.iters
+    val aIters = accessIterators(a.access, mem)
+    val bIters = accessIterators(b.access, mem)
+    val isPeek = a.access.isPeek || b.access.isPeek
+    isPeek || lca.isInnerControl || lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true}
+  }
+
   /** True if accesses a and b may occur concurrently and to the same buffer port.
     * This is true when any of the following hold:
     *   0. a and b are two different unrolled parts of the same node
@@ -238,9 +252,32 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Returns an approximation of the cost for the given banking strategy. */
-  def cost(banking: Seq[Banking], depth: Int): Int = {
+  def cost(banking: Seq[Banking], depth: Int): (Int, Int) = {
+    val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+    
+    val Ns_not_pow2      = banking.map    (_.nBanks).map{x => if (isPow2(x)) 0 else 1}.sum
+    val alphas_not_pow2  = banking.flatMap(_.alphas).map{x => if (isPow2(x)) 0 else 1}.sum
+    val Pss_not_pow2     = banking.flatMap(_.Ps    ).map{x => if (isPow2(x)) 0 else 1}.sum
     val totalBanks = banking.map(_.nBanks).product
-    depth * totalBanks
+    
+    dbg(s"SRAM BANKING INFORMATION:")
+    dbg(s"  depth          = ${depth}")
+    dbg(s"  padding        = ${padding}")
+    dbg(s"  mem.stagedDims = ${mem.stagedDims.map(_.toInt)}")
+    dbg(s"  banking.nBanks = ${banking.map(_.nBanks)}")
+    dbg(s"    `- # not pow 2 = ${Ns_not_pow2}")
+    dbg(s"  banking.alphas = ${banking.map(_.alphas)}")
+    dbg(s"    `- # not pow 2 = ${alphas_not_pow2}")
+    dbg(s"  banking.Ps     = ${banking.map(_.Ps)}")
+    dbg(s"    `- # not pow 2 = ${Pss_not_pow2}")
+    dbg(s"  totalBanks     = ${totalBanks}")
+    
+    // For now I prioritize fewest total banks because usually BRAMs are under-utilized
+    // Later can also consider stagedDims+padding as well as depth
+    val total_not_pow2 = Ns_not_pow2 + alphas_not_pow2 + Pss_not_pow2
+    
+    dbg(s"  TOTAL PENALTY  = (${total_not_pow2}, ${totalBanks})")
+    (total_not_pow2, totalBanks)
   }
 
   /** Computes the Ports for all accesses in all groups
@@ -354,7 +391,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
         val accTyp = mem.accumType | accum
 
-        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp))
+        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost._2,ports,padding,accTyp))
       }
       else Left(issue.get)
     }
@@ -370,7 +407,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
-    val concurrent  = requireConcurrentPortAccess(a, b)
+    val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
     val trueConflict = concurrent && conflicting
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")

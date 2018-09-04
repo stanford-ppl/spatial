@@ -267,17 +267,8 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) {
-      sym match {
-          case Op(_: SwitchCase[_]) => scrubNoise(sym.parent.s.get.bodyLatency.sum) // For some reason, inner SwitchCases don't have latency set (issue #83)
-          case _ => scrubNoise(sym.bodyLatency.sum)
-        }
-      }
-      else 0.0
-    val ii = sym match {
-          case Op(_: SwitchCase[_]) => scrubNoise(sym.parent.s.get.II) // For some reason, inner SwitchCases don't have II set (issue #83)
-          case _ => scrubNoise(sym.II)
-        }
+    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) scrubNoise(sym.bodyLatency.sum) else 0.0
+    val ii = scrubNoise(sym.II)
 
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
@@ -352,8 +343,9 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
       } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.filter(_.s.get != sym).head.s.get, Done)}""")
-      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${swap(sym, II)}) // extremely screwy logic?""")
+      } else if (sym match {case Op(x:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
+        val x = sym match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${x.fullDelay})""")
       } else {
         emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)""")
       }
@@ -502,6 +494,7 @@ trait ChiselGenController extends ChiselGenCommon {
       exitCtrl(lhs)
 
     case StateMachine(ens,start,notDone,action,nextState) =>
+      appPropertyStats += HasFSM
       val parent_kernel = enterCtrl(lhs)
       emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
@@ -526,8 +519,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
       emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
-      emitt(src"${lhs}_doneCondition := ~${notDone.result}")
-      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
+      emitt(src"${swap(lhs, Blank)}_doneCondition := ~${notDone.result}")
+      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${swap(lhs, Blank)}_doneCondition")
       emitChildrenCxns(lhs, true)
       exitCtrl(lhs)
 

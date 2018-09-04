@@ -90,4 +90,15 @@ object files {
     in.close()
   }
 
+  def listFiles(dir:String, exts:List[String]=Nil):List[java.io.File] = {
+    val d = new java.io.File(dir)
+    if (d.exists && d.isDirectory) {
+      d.listFiles.filter { file =>
+        file.isFile && exts.exists { ext => file.getName.endsWith(ext) }
+      }.toList
+    } else {
+      Nil
+    }
+  }
+
 }

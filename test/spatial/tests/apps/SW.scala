@@ -112,7 +112,7 @@ import spatial.dsl._
             mux(from_left >= from_top && from_left >= from_diag, sw_tuple(from_left, SKIPB), mux(from_top >= from_diag, sw_tuple(from_top,SKIPA), sw_tuple(from_diag, ALIGN)))
           }
           previous_result := update
-          if ((c == length.value || r == length.value) && possible_entry_point.score < update.score) possible_entry_point := entry_tuple(r, c, update.score)
+          if ((c == length.value | r == length.value) && possible_entry_point.score < update.score) possible_entry_point := entry_tuple(r, c, update.score)
           if (c >= 0) {score_matrix(r,c) = sw_tuple(max(0, update.score),update.ptr)}
           // score_matrix(r,c) = update
         }

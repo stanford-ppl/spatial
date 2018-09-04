@@ -5,23 +5,22 @@ import spatial.dsl._
 
 
 @spatial class TileLoadStoreSimple extends SpatialTest {
-  override def runtimeArgs: Args = "16"
-
-  val N = 192
+  override def runtimeArgs: Args = "16 192"
 
   def simpleLoadStore[T:Num](srcHost: Array[T], value: T): Array[T] = {
     val loadPar  = 1 (1 -> 1)
     val storePar = 1 (1 -> 1)
     val tileSize = 96 (96 -> 96)
 
-    val srcFPGA = DRAM[T](N)
-    val dstFPGA = DRAM[T](N)
+    val N = args(1).to[Int]
+    val size = ArgIn[Int]
+    setArg(size, N)
+    val srcFPGA = DRAM[T](size)
+    val dstFPGA = DRAM[T](size)
     setMem(srcFPGA, srcHost)
 
-    val size = ArgIn[Int]
     val x = ArgIn[T]
     setArg(x, value)
-    setArg(size, N)
     Accel {
       val b1 = SRAM[T](tileSize)
       Sequential.Foreach(size by tileSize) { i =>
@@ -41,7 +40,7 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    val arraySize = N
+    val arraySize = args(1).to[Int]
     val value = args(0).to[Int]
 
     val src = Array.tabulate[Int](arraySize) { i => i }

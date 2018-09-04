@@ -22,7 +22,7 @@ aws_dir_name=`basename \`pwd\``
 testdirs=`find ${REGRESSION_HOME}/current-spatial/spatial/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 testdirsarray=($testdirs)
 for t in "${testdirsarray[@]}"; do
-	fullname=`echo $fullname | sed "s/${t}_//g"`
+	fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"` 
 done
 appname=$fullname
 if [[ $1 = "Zynq" ]]; then

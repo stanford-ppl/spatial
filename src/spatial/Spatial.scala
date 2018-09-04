@@ -7,6 +7,7 @@ import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
+import spatial.codegen.dotgen._
 
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
@@ -21,7 +22,6 @@ import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
 
 import spatial.util.spatialConfig
-
 
 trait Spatial extends Compiler {
 
@@ -100,6 +100,8 @@ trait Spatial extends Compiler {
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
+    lazy val dotFlatGen    = DotFlatGenSpatial(state)
+    lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
     val result = {
       block ==> printer     ==>
@@ -123,10 +125,9 @@ trait Spatial extends Compiler {
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
+        iterationDiffAnalyzer   ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
-        /** Iteration difference analysis */
-        iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */
@@ -157,6 +158,8 @@ trait Spatial extends Compiler {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen)
@@ -233,6 +236,10 @@ trait Spatial extends Compiler {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("forceBanking").action { (_,_) => 
+      spatialConfig.enableForceBanking = true
+    }.text("Ensures that memories will always get banked and compiler will never decide that it is cheaper to duplicate")
 
     cli.opt[Unit]("tightControl").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableTightControl = true

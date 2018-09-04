@@ -33,19 +33,29 @@ protected class MemReduceAccum[A,C[T]](
     val cchainMap = CounterChain(domain)
     val acc = C.evMem(accum)
 
-    val starts  = acc.starts()
-    val strides = acc.steps()
-    val ends    = acc.ends()
-    val pars    = acc.pars()
-    val ctrsRed = (0 to acc.seqRank.length-1).map{i =>
-        Counter[I32](start = 0, step = strides(acc.seqRank(i)), end = ends(acc.seqRank(i)) - starts(acc.seqRank(i)), par = pars(acc.seqRank(i)))
+    val rankSeq: Seq[Int] = acc.sparseRank
+    val starts  = acc.sparseStarts()
+    val strides = acc.sparseSteps()
+    val ends    = acc.sparseEnds()
+    val pars    = acc.sparsePars()
+
+    dbgs(s"Creating MemReduce on accumulator ${acc.fullname}")
+    dbgs(s"  ${stm(acc)}")
+    dbgs(s"  RankSeq: $rankSeq")
+    dbgs(s"  Starts:  $starts")
+    dbgs(s"  Strides: $strides")
+    dbgs(s"  Ends:    $ends")
+    dbgs(s"  Pars:    $pars")
+
+    val ctrsRed = (0 to acc.sparseRank.length-1).map{ i =>
+        Counter[I32](start = 0, step = strides(rankSeq(i)), end = ends(rankSeq(i)) - starts(rankSeq(i)), par = pars(rankSeq(i)))
       }
     val cchainRed = CounterChain(ctrsRed)
 
     //logs(s"Creating MemReduce on accumulator of rank ${acc.seqRank.length}")
 
     val itersMap = List.fill(domain.length){ boundVar[I32] }
-    val itersRed = List.fill(acc.seqRank.length){ boundVar[I32] }
+    val itersRed = List.fill(acc.sparseRank.length){ boundVar[I32] }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")

@@ -2,9 +2,10 @@ package spatial.metadata.access
 
 import forge.tags._
 import argon._
+import utils.implicits.collections._
 import spatial.lang._
 import spatial.metadata.control._
-import poly.{ConstraintMatrix, ISL, SparseMatrix}
+import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
 /** A wrapper class representing a (optionally unrolled) access and its corresponding address space
   * as an affine, sparse matrix.
@@ -45,6 +46,20 @@ case class AccessMatrix(
   }
 
   def short: String = s"$access {${unroll.mkString(",")}}"
+
+  implicit class SeqMath(a: Seq[Int]) {
+    def *(b: SparseMatrix[Idx]): SparseVector[Idx] = {
+      val vec = b.keys.mapping{k => b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i(k)*a_i }.sum }
+      val c = b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i.c*a_i}.sum
+      SparseVector[Idx](vec,c,Map.empty)
+    }
+  }
+
+  /** True if the matrix always resolves to the same bank under banking scheme N, B, alpha */
+  def isDirectlyBanked(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): Boolean = {
+    val bank = alpha*matrix 
+    bank.cols.forall{case (k,v) => (v/B.head /*?*/) % N.head /*?*/ == 0}
+  }
 }
 
 /** The unrolled access patterns of an optionally parallelized memory access represented as affine matrices.

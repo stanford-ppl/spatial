@@ -6,6 +6,7 @@ import poly.ISL
 import utils.implicits.collections._
 import utils.tags.instrument
 
+import utils.math.isPow2
 import spatial.issues.UnbankableGroup
 import spatial.lang._
 import spatial.metadata.access._
@@ -219,7 +220,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val aIters = accessIterators(a.access, mem)
     val bIters = accessIterators(b.access, mem)
     val isPeek = a.access.isPeek || b.access.isPeek
-    isPeek || (lca.isOuterControl && lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true})
+    isPeek || lca.isInnerControl || lcaIters.forall{iter => if (aIters.contains(iter) && bIters.contains(iter)) {a.unroll(aIters.indexOf(iter)) == b.unroll(bIters.indexOf(iter))} else true}
   }
 
   /** True if accesses a and b may occur concurrently and to the same buffer port.
@@ -251,9 +252,87 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Returns an approximation of the cost for the given banking strategy. */
-  def cost(banking: Seq[Banking], depth: Int): Int = {
-    val totalBanks = banking.map(_.nBanks).product
-    depth * totalBanks
+  def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Long = {
+    // Set up penalty model TODO: Make it more accurate
+    val mulCost = 6
+    val divCost = 20
+    val modCost = 20
+    val muxLayerCost = 10
+    val volumePenalty = 1
+
+    if (banking.nonEmpty) {
+      // Get powerOf2 composition
+      val padding          = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+      val w                = mem.stagedDims.map(_.toInt).zip(padding).map{case (a:Int, b:Int) => a + b}
+      val D                = w.size
+      val numBanks         = banking.map    (_.nBanks).product
+      val Ns_not_pow2      = banking.map    (_.nBanks).map{x => if (isPow2(x)) 0 else 1}.sum
+      val alphas_not_pow2  = banking.flatMap(_.alphas).map{x => if (isPow2(x)) 0 else 1}.sum
+      val Ps               = banking.flatMap(_.Ps)
+      val Pss_not_pow2     = Ps.map{x => if (isPow2(x)) 0 else 1}.sum
+      val dimMultipliers   = Seq.tabulate(D){t => (w.slice(t+1,D).zip(Ps.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product)}
+      val mults_not_pow2   = dimMultipliers.map{x => if (isPow2(x)) 0 else 1}.sum
+
+      // Partition based on direct/xbar banking
+      val (direct, xbar) = (rdGroups ++ wrGroups).flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
+
+      // Compute penalty from offset calculation
+      val ofsDivPenalty = (direct.size + xbar.size) * Pss_not_pow2 * divCost //spatialConfig.target.latencyModel.model("FixDiv")("b" -> 32))
+      val ofsMulPenalty = (direct.size + xbar.size) * mults_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
+
+      // Compute penalty from bank calculation
+      val bankMulPenalty = xbar.size * alphas_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
+      val bankModPenalty = xbar.size * Ns_not_pow2 * modCost //spatialConfig.target.latencyModel.model("FixMod")("b" -> 32))
+
+      // Compute penalty from muxes for bank resolution
+      val wmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isWriter).size > 0) depth * muxLayerCost * numBanks * xbar.filter(_.access.isWriter).size else 0
+      val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isReader).size > 0) depth * muxLayerCost * numBanks * xbar.filter(_.access.isReader).size else 0
+
+      // Compute penalty from volume
+      val sizePenalty = depth * w.product * volumePenalty
+      
+      dbgs(s"BANKING COST FOR $mem UNDER $banking:")
+      dbgs(s"  depth            = ${depth}")
+      dbgs(s"  volume           = ${w.product}")
+      dbgs(s"  numBanks         = ${numBanks}")
+      dbgs(s"    `- # not pow 2 = ${Ns_not_pow2}")
+      dbgs(s"  alphas           = ${banking.map(_.alphas)}")
+      dbgs(s"    `- # not pow 2 = ${alphas_not_pow2}")
+      dbgs(s"  Ps               = ${banking.map(_.Ps)}")
+      dbgs(s"    `- # not pow 2 = ${Pss_not_pow2}")
+      dbgs(s"  dim multipliers  = ${dimMultipliers}")
+      dbgs(s"    `- # not pow 2 = ${mults_not_pow2}")
+      dbgs(s"  Directly banked accesses: ${direct.map(_.access)}")
+      dbgs(s"  XBar banked accesses:     ${xbar.map(_.access)}")
+      dbgs(s"")    
+      dbgs(s"  ofsDivPenalty  = ${ofsDivPenalty}")
+      dbgs(s"  ofsMulPenalty  = ${ofsMulPenalty}")
+      dbgs(s"  bankMulPenalty  = ${bankMulPenalty}")
+      dbgs(s"  bankModPenalty  = ${bankModPenalty}")
+      dbgs(s"  wmuxPenalty  = ${wmuxPenalty}")
+      dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
+      dbgs(s"  sizePenalty  = ${sizePenalty}")
+      dbgs(s"")
+
+      val totalCost = (ofsDivPenalty + ofsMulPenalty + bankMulPenalty + bankModPenalty + wmuxPenalty + rmuxPenalty).toLong
+
+      dbgs(s"TOTAL COST: $totalCost")
+
+      totalCost
+    } else {
+      val w                = mem.stagedDims.map(_.toInt)
+      val sizePenalty    = depth * w.product * volumePenalty * rdGroups.flatten.size
+
+      dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
+      dbg(s"  depth            = ${depth}")
+      dbg(s"  volume           = ${w.product}")
+      dbgs(s"")
+
+      dbgs(s"TOTAL COST: $sizePenalty")
+
+      sizePenalty.toLong
+
+    }
   }
 
   /** Computes the Ports for all accesses in all groups
@@ -345,7 +424,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     * Also calculates whether the associated memory should be considered a "buffer accumulator";
     * this occurs if at least one read and write occur in the same controller within a buffer.
     */
-  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
+  protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Seq[Instance]] = {
     val reads = rdGroups.flatten
     val ctrls = reads.map(_.parent)
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
@@ -358,16 +437,33 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
 
         val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
-        val bankingCosts = bankings.map{b => b -> cost(b,depth) }
+        val bankingCosts = bankings.map{b => b -> cost(b,depth, rdGroups, reachingWrGroups) }
+        val duplicationCost = cost(Seq(), depth, rdGroups, reachingWrGroups)
         val (banking, bankCost) = bankingCosts.minBy(_._2)
-        val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
-        // TODO[5]: Assumption: All memories are at least simple dual port
-        val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
-        val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
-        val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
-        val accTyp = mem.accumType | accum
+        dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
+        if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking) {
+          dbgs(s"Choosing to duplicate $mem for $rdGroups, $wrGroups.  ")
+          val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, dimGrps)
+          val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}
+          val (wrBanking, wrBankCost) = wrBankingsCosts.minBy(_._2)
+          Right(Seq.tabulate(reads.size){i => 
+            val padding = mem.stagedDims.map(_.toInt).zip(wrBanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+            val ports = computePorts(Set(Set(reads.toSeq(i))),bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
+            val isBuffAccum = writes.cross(Set(reads.toSeq(i))).exists{case (wr,rd) => rd.parent == wr.parent }
+            val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
+            val accTyp = mem.accumType | accum
+            Instance(Set(Set(reads.toSeq(i))),reachingWrGroups,ctrls,metapipe,wrBanking,depth,wrBankCost,ports,padding,accTyp)
+          })
+        } else {
+          val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+          // TODO[5]: Assumption: All memories are at least simple dual port
+          val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
+          val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+          val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
+          val accTyp = mem.accumType | accum
 
-        Right(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp))
+          Right(Seq(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp)))
+        }
       }
       else Left(issue.get)
     }
@@ -447,24 +543,26 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       dbgs(s"Group #$grpId: ")
       state.logTab += 1
       bankGroups(Set(grp),wrGroups) match {
-        case Right(i1) =>
+        case Right(insts) =>
           var instIdx = 0
           var merged = false
-          while (instIdx < instances.length && !merged) {
+          while (instIdx < instances.length && !merged && insts.length == 1) {
             dbgs(s"Attempting to merge group #$grpId with instance #$instIdx: ")
             state.logTab += 1
             val i2 = instances(instIdx)
 
-            val err = getMergeAttemptError(i1, i2)
+            val err = getMergeAttemptError(insts.head, i2)
             if (err.isEmpty) {
-              bankGroups(i1.reads ++ i2.reads, wrGroups) match {
+              bankGroups(insts.head.reads ++ i2.reads, wrGroups) match {
                 case Right(i3) =>
-                  val err = getMergeError(i1, i2, i3)
-                  if (err.isEmpty) {
-                    instances(instIdx) = i3
-                    merged = true
+                  if (i3.size == 1) {
+                    val err = getMergeError(insts.head, i2, i3.head)
+                    if (err.isEmpty) {
+                      instances(instIdx) = i3.head
+                      merged = true
+                    }
+                    else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
                   }
-                  else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
 
                 case Left(issue) =>
                   dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
@@ -475,7 +573,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             instIdx += 1
           }
           if (!merged) {
-            instances += i1
+            insts.foreach{i1 => instances += i1}
             dbgs(s"Result: Created instance #${instances.length-1}")
           }
           else {
@@ -495,7 +593,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def mergeWriteGroups(wrGroups: Set[Set[AccessMatrix]]): Seq[Instance] = {
     // Assumes that all writers reach some unknown reader external to Accel.
     bankGroups(Set.empty, wrGroups) match {
-      case Right(instance) => Seq(instance)
+      case Right(instances) => instances
       case Left(issue)     => raiseIssue(issue); Nil
     }
   }

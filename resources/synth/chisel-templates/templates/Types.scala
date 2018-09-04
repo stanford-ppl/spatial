@@ -36,7 +36,7 @@ class RawBits(b: Int) extends Bundle {
 }
 
 // Fixed point numbers
-class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
+class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigInt] = None) extends Bundle {
 	// Overloaded
 	def this(s: Int, d: Int, f: Int) = this(s == 1, d, f)
 	def this(tuple: (Boolean, Int, Int)) = this(tuple._1, tuple._2, tuple._3)
@@ -47,6 +47,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
     def toSeq: Seq[FixedPoint] = Seq(this)
 
 	// Properties
+	// val litNum = if (litVal.isDefined) Some(litVal.get.S((d + f + 1).W).asUInt().apply(d+f,0)) else None
 	val number = UInt((d + f).W)
 	val debug_overflow = Bool()
 
@@ -62,8 +63,8 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 
 
 	def cast[T](dest: T, rounding: LSBCasting = Truncate, saturating: MSBCasting = Lazy, sign_extend: scala.Boolean = true, expect_neg: Bool = false.B, expect_pos: Bool = false.B): Unit = {
-		dest match { 
-			case dst: FixedPoint => 
+		dest match {
+			case dst: FixedPoint if this.litVal.isEmpty => 
 				val has_frac = dst.f > 0
 				val has_dec = dst.d > 0
 				val up_frac = dst.f max 1
@@ -157,10 +158,36 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				
 				
 				// dst.number := util.Cat(new_dec, new_frac) //new_frac + new_dec*(scala.math.pow(2,dst.f).toInt.U)
-			case dst: UInt => 
+			case dst: UInt if this.litVal.isEmpty => 
 				val result = Wire(new FixedPoint(true, dst.getWidth, 0))
 				this.cast(result, rounding, saturating, sign_extend, expect_neg, expect_pos)
 				dst := result.r
+			case dst: FixedPoint if this.litVal.isDefined =>  // Likely that there are mistakes here
+				val f_gain = dst.f - this.f
+				val d_gain = dst.d - this.d
+				val salt = rounding match {case Truncate => BigInt(0); case Unbiased if (f_gain < 0) => BigInt((scala.math.random * ((1 << -f_gain).toDouble)).toLong); case _ => BigInt(0)}
+				val newlit = saturating match {
+					case Lazy => 
+						if (f_gain < 0 & d_gain >= 0)       (this.litVal.get + salt) >> -f_gain
+						else if (f_gain >= 0 & d_gain >= 0) (this.litVal.get) << f_gain
+						else if (f_gain >= 0 & d_gain < 0)  ((this.litVal.get + salt) >> -f_gain) & BigInt((1 << (dst.d + dst.f + 1)) - 1)
+						else ((this.litVal.get) << f_gain) & BigInt((1 << (dst.d + dst.f + 1)) -1)
+					case Saturation => 
+						if (this.litVal.get > BigInt((1 << (dst.d + dst.f + 1))-1)) BigInt((1 << (dst.d + dst.f + 1))-1)
+					    else {
+							if (f_gain < 0 & d_gain >= 0)       (this.litVal.get + salt) >> -f_gain
+							else if (f_gain >= 0 & d_gain >= 0) (this.litVal.get) << f_gain
+							else if (f_gain >= 0 & d_gain < 0)  ((this.litVal.get + salt) >> -f_gain) & BigInt((1 << (dst.d + dst.f + 1)) - 1)
+							else ((this.litVal.get) << f_gain) & BigInt((1 << (dst.d + dst.f + 1)) -1)
+					    }
+					case _ => 
+						if (f_gain < 0 & d_gain >= 0)       (this.litVal.get + salt) >> -f_gain
+						else if (f_gain >= 0 & d_gain >= 0) (this.litVal.get) << f_gain
+						else if (f_gain >= 0 & d_gain < 0)  ((this.litVal.get + salt) >> -f_gain) & BigInt((1 << (dst.d + dst.f + 1)) - 1)
+						else ((this.litVal.get) << f_gain) & BigInt((1 << (dst.d + dst.f + 1)) -1)
+					}
+				val result = Wire(new FixedPoint(dst.s, dst.d, dst.f, Some(newlit)))
+				dst.r := newlit.S((dst.d + dst.f + 1).W).asUInt.apply(dst.d + dst.f - 1, 0)
 		}
 	}
 	
@@ -263,11 +290,11 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 					// val expanded_op = if (f != 0) util.Cat(util.Fill(f, op.msb), op.number) else op.number
 					val rhs_bits = op.f - f
 					val expanded_self = if (rhs_bits > 0) util.Cat(this.number, util.Fill(rhs_bits, false.B)) else this.number
-					val expanded_op = if (rhs_bits < 0) util.Cat(op.number, util.Fill(-rhs_bits, false.B)) else op.number
+					val expanded_op = if (rhs_bits < 0 && op.litVal.isEmpty) util.Cat(op.number, util.Fill(-rhs_bits, false.B)) else if (op.litVal.isDefined) op.litVal.get.U((d+f).W) else op.number
 					full_result.number := (expanded_self.*-*(expanded_op, Some(op_latency), flow)) >> scala.math.max(op.f, f)
 				} else {
 					val expanded_self = util.Cat(util.Fill(op.d+op.f, this.msb), this.number)
-					val expanded_op = util.Cat(util.Fill(d+f, op.msb), op.number)
+					val expanded_op = if (op.litVal.isDefined) op.litVal.get.U((d+f+op.d+op.f).W) else util.Cat(util.Fill(d+f, op.msb), op.number)
 					full_result.number := expanded_self.*-*(expanded_op, Some(op_latency), flow)
 				}
 
@@ -298,9 +325,11 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 
 				if (op.f + f == 0) {
 					if (op.s | s) {
-						(this.number.asSInt./-/(op.number.asSInt, Some(op_latency), flow)).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
+						val denominator = if (op.litVal.isDefined) op.litVal.get.S((op.d).W) else op.number.asSInt
+						(this.number.asSInt./-/(denominator, Some(op_latency), flow)).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
 					} else {
-						(this.number./-/(op.number, Some(op_latency), flow)).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
+						val denominator = if (op.litVal.isDefined) op.litVal.get.U((op.d).W) else op.number
+						(this.number./-/(denominator, Some(op_latency), flow)).FP(false, scala.math.max(op.d, d), scala.math.max(op.f, f))
 					}
 				} else {
 					// Compute upcasted type and return type
@@ -313,11 +342,11 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 					// TODO: Should go back and clean this a little, eventually..
 					if (op.s | s) {
 						val numerator = util.Cat(this.number, 0.U(upcasted_type._3.W)).asSInt
-						val denominator = op.number.asSInt
+						val denominator = if (op.litVal.isDefined) op.litVal.get.S((op.d + op.f).W) else op.number.asSInt
 						full_result.number := (numerator./-/(denominator, Some(op_latency), flow)).asUInt
 					} else {
 						val numerator = util.Cat(this.number, 0.U(upcasted_type._3.W))
-						val denominator = op.number
+						val denominator = if (op.litVal.isDefined) op.litVal.get.U((op.d + op.f).W) else op.number
 						full_result.number := (numerator./-/(denominator, Some(op_latency), flow)) // Not sure why we need the +1 in pow2
 					}
 					// Downcast to result
@@ -347,8 +376,9 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 				val return_type = (op.s | s, scala.math.max(op.d, d), scala.math.max(op.f, f))
 				// Get upcasted operators
 				val full_result = Wire(new FixedPoint(upcasted_type))
+				val denominator = if (op.litVal.isDefined) op.litVal.get.U((op.d + op.f).W) else op.number
 				// Do upcasted operation
-				full_result.number := this.number.%-%(op.number, delay, flow) // Not sure why we need the +1 in pow2
+				full_result.number := this.number.%-%(denominator, delay, flow) // Not sure why we need the +1 in pow2
 				// Downcast to result
 				val result = Wire(new FixedPoint(return_type))
 				full_result.cast(result)
@@ -630,7 +660,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int) extends Bundle {
 	// 	result
 	// }
 
-    override def cloneType = (new FixedPoint(s,d,f)).asInstanceOf[this.type] // See chisel3 bug 358
+    override def cloneType = (new FixedPoint(s,d,f,litVal)).asInstanceOf[this.type] // See chisel3 bug 358
 
 }
 

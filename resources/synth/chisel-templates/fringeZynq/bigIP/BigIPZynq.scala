@@ -1,15 +1,16 @@
 package fringe.fringeZynq.bigIP
 import fringe.FringeGlobals
 import fringe.bigIP.BigIP
+import templates.Utils
 import chisel3._
 import chisel3.util._
 import scala.collection.mutable.Set
 
 class BigIPZynq extends BigIP with ZynqBlackBoxes {
   def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
-        dividend / bigNum.U
+        Utils.getRetimed(dividend / bigNum.U, latency, flow)
       case None =>
         val m = Module(new Divider(dividend.getWidth, divisor.getWidth, false, latency))
         m.io.dividend := dividend
@@ -20,9 +21,9 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
   }
 
   def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
-        dividend / bigNum.S
+        Utils.getRetimed(dividend / bigNum.S, latency, flow)
       case None =>
         val m = Module(new Divider(dividend.getWidth, divisor.getWidth, true, latency))
         m.io.dividend := dividend.asUInt
@@ -33,9 +34,9 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
   }
 
   def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
-        dividend % bigNum.U
+        Utils.getRetimed(dividend % bigNum.U, latency, flow)
       case None =>
         val m = Module(new Modulo(dividend.getWidth, divisor.getWidth, false, latency))
         m.io.dividend := dividend
@@ -46,9 +47,9 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
   }
 
   def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
-    getConst(divisor) match { // Use combinational Verilog divider and ignore latency if divisor is constant
+    getConst(divisor) match { 
       case Some(bigNum) =>
-        dividend % bigNum.S
+        Utils.getRetimed(dividend % bigNum.S, latency, flow)
       case None =>
         val m = Module(new Modulo(dividend.getWidth, divisor.getWidth, true, latency))
         m.io.dividend := dividend.asUInt
@@ -66,7 +67,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
       else {
         val const = if (aconst.isDefined) aconst.get else bconst.get
         val other = if (aconst.isDefined) b else a
-        const.U * other
+        Utils.getRetimed(const.U * other, latency, flow)
       }
     } else {
       val m = Module(new Multiplier(a.getWidth, b.getWidth, math.max(a.getWidth, b.getWidth), false, latency))
@@ -85,7 +86,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
       else {
         val const = if (aconst.isDefined) aconst.get else bconst.get
         val other = if (aconst.isDefined) b else a
-        const.S * other
+        Utils.getRetimed(const.S * other, latency, flow)
       }
     } else {
       val m = Module(new Multiplier(a.getWidth, b.getWidth, math.max(a.getWidth, b.getWidth), true, latency))

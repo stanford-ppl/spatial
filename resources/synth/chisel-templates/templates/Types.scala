@@ -187,7 +187,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
 						else ((this.litVal.get) << f_gain) & BigInt((1 << (dst.d + dst.f + 1)) -1)
 					}
 				val result = Wire(new FixedPoint(dst.s, dst.d, dst.f, Some(newlit)))
-				dst.r := newlit.U((dst.d + dst.f).W)
+				dst.r := newlit.S((dst.d + dst.f + 1).W).asUInt.apply(dst.d + dst.f - 1, 0)
 		}
 	}
 	

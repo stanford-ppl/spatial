@@ -16,6 +16,8 @@ class Subprocess(args: String*)(react: (String,BufferedReader) => Option[String]
     writer.flush()
   }
 
+  def isAlive: Boolean = p.isAlive
+
   /** Returns the current list of lines in the error stream. */
   def errors(): List[String] = {
     val lines = ListBuffer[String]()
@@ -81,5 +83,5 @@ class Subprocess(args: String*)(react: (String,BufferedReader) => Option[String]
     (lines.reverse, errs.reverse)
   }
 
-  def kill(): Unit = if (p eq null) () else p.destroy()
+  def kill(): Unit = if (p eq null) () else p.destroyForcibly()
 }

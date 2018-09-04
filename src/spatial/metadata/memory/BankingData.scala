@@ -84,7 +84,7 @@ case class Instance(
   metapipe: Option[Ctrl],           // Controller if at least some accesses require n-buffering
   banking:  Seq[Banking],           // Banking information
   depth:    Int,                    // Depth of n-buffer
-  cost:     Int,                    // Cost estimate of this configuration
+  cost:     Long,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
   accType:  AccumType               // Type of accumulator for instance
@@ -168,7 +168,7 @@ case class Memory(
   }
 
   @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = {
-    if (banking.lengthIs(mem.seqRank.length)) {
+    if (banking.lengthIs(mem.sparseRank.length)) {
       banking.zip(addr).map{case(a,b) => a.bankSelect(Seq(b))}
     } else banking.map(_.bankSelect(addr))
   }
@@ -176,7 +176,7 @@ case class Memory(
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
     val w = mem.stagedDims.map(_.toInt).zip(padding).map{case(x,y) => x+y}
-    val D = mem.seqRank.length
+    val D = mem.sparseRank.length
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride

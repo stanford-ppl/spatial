@@ -161,6 +161,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
+          dbgs(s"a2 = $a2, from in lanes $laneIds in $a")
           val distinct = a2.groupBy{_.addr}
                            .mapValues{pairs => pairs.map(_.lane)}
                            .toSeq.map{case (adr, ls) => NDAddressAcrossLanes(adr, ls) }

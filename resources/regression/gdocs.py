@@ -473,6 +473,28 @@ def report_changes(backend):
 	print("Worsened:")
 	print(sorted(worsened_list))
 
+def strip_prefixes(backend):
+	sh = getDoc(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		# worksheet = sh.get_worksheet(x)
+		worksheet = sh.worksheet('index', x)
+		if (worksheet.title != "STATUS"):
+			print("Scrubbing %s" % worksheet.title)
+			lol = worksheet.get_all_values()
+			start = getCols(worksheet, "Test:")[0]
+			tests = list(filter(None, lol[0][start:]))
+			for t in tests:
+				if "spatial." in t:
+					col = lol[0].index(t)
+					newname = re.sub(r".*\.","",t)
+					if newname in lol[0][start:]:
+						print("Not replacing %s with %s because both exist (please merge)" % (t, newname))
+					else: 
+						print("Replace %s with %s" % (t, newname))
+						write(worksheet,1,col+1,newname)
+
 
 def report_slowdowns(prop, backend):
 	sh = getDoc(backend)
@@ -628,6 +650,9 @@ elif (sys.argv[1] == "delete_app_column"):
 elif (sys.argv[1] == "merge_apps_columns"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! merge_apps_columns('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	merge_apps_columns(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "strip_prefixes"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! strip_prefixes('%s')" % (sys.argv[2]))
+	strip_prefixes(sys.argv[2])
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3], sys.argv[4])
@@ -637,6 +662,7 @@ else:
 	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
+	print(" - strip_prefixes(backend)")
 	print(" - report_changes(backend)")
 	print(" - report_slowdowns(property (runtime, spatial, vcs), backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")

@@ -276,26 +276,26 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
 
     // Connect matching W port to memory
     if (directSelectEns.length > 0 & p.hasXBarW) {           // Has direct and x
-      val directChoiceEn = chisel3.util.PriorityMux(directSelectEns, directSelectEns)
-      val directChoiceData = chisel3.util.PriorityMux(directSelectEns, directSelectDatas)
-      val directChoiceOffset = chisel3.util.PriorityMux(directSelectEns, directSelectOffsets)
-      val xBarChoiceEn = chisel3.util.PriorityMux(xBarSelect, io.xBarW.map(_.en).flatten.toList)
-      val xBarChoiceData = chisel3.util.PriorityMux(xBarSelect, io.xBarW.map(_.data).flatten.toList)
-      val xBarChoiceOffset = chisel3.util.PriorityMux(xBarSelect, io.xBarW.map(_.ofs).flatten.toList)
+      val directChoiceEn = chisel3.util.Mux1H(directSelectEns, directSelectEns)
+      val directChoiceData = chisel3.util.Mux1H(directSelectEns, directSelectDatas)
+      val directChoiceOffset = chisel3.util.Mux1H(directSelectEns, directSelectOffsets)
+      val xBarChoiceEn = chisel3.util.Mux1H(xBarSelect, io.xBarW.map(_.en).flatten.toList)
+      val xBarChoiceData = chisel3.util.Mux1H(xBarSelect, io.xBarW.map(_.data).flatten.toList)
+      val xBarChoiceOffset = chisel3.util.Mux1H(xBarSelect, io.xBarW.map(_.ofs).flatten.toList)
       mem._1.io.w.ofs.head  := Mux(directSelectEns.or, directChoiceOffset, xBarChoiceOffset)
       mem._1.io.w.data.head := Mux(directSelectEns.or, directChoiceData, xBarChoiceData)
       mem._1.io.w.en.head   := Mux(directSelectEns.or, directChoiceEn, xBarChoiceEn)
     } else if (p.hasXBarW && directSelectEns.length == 0) {  // Has x only
-      val xBarChoiceEn = chisel3.util.PriorityMux(xBarSelect, io.xBarW.map(_.en).flatten.toList)
-      val xBarChoiceData = chisel3.util.PriorityMux(xBarSelect, io.xBarW.map(_.data).flatten.toList)
-      val xBarChoiceOffset = chisel3.util.PriorityMux(xBarSelect, io.xBarW.map(_.ofs).flatten.toList)
+      val xBarChoiceEn = chisel3.util.Mux1H(xBarSelect, io.xBarW.map(_.en).flatten.toList)
+      val xBarChoiceData = chisel3.util.Mux1H(xBarSelect, io.xBarW.map(_.data).flatten.toList)
+      val xBarChoiceOffset = chisel3.util.Mux1H(xBarSelect, io.xBarW.map(_.ofs).flatten.toList)
       mem._1.io.w.ofs.head  := xBarChoiceOffset
       mem._1.io.w.data.head := xBarChoiceData
       mem._1.io.w.en.head   := xBarChoiceEn 
     } else if (directSelectEns.length > 0) {               // Has direct only
-      val directChoiceEn = chisel3.util.PriorityMux(directSelectEns, directSelectEns)
-      val directChoiceData = chisel3.util.PriorityMux(directSelectEns, directSelectDatas)
-      val directChoiceOffset = chisel3.util.PriorityMux(directSelectEns, directSelectOffsets)
+      val directChoiceEn = chisel3.util.Mux1H(directSelectEns, directSelectEns)
+      val directChoiceData = chisel3.util.Mux1H(directSelectEns, directSelectDatas)
+      val directChoiceOffset = chisel3.util.Mux1H(directSelectEns, directSelectOffsets)
       mem._1.io.w.ofs.head  := directChoiceOffset
       mem._1.io.w.data.head := directChoiceData
       mem._1.io.w.en.head   := directChoiceEn
@@ -317,16 +317,16 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     mem._1.io.rMask := {if (p.hasXBarR) xBarSelect.reduce{_|_} else true.B} & directSelectEns.or
     // Connect matching R port to memory
     if (directSelectEns.length > 0 & p.hasXBarR) {          // Has direct and x
-      mem._1.io.r.ofs.head  := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectOffsets), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.ofs).flatten))
-      mem._1.io.r.en.head   := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectEns), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.en).flatten))
+      mem._1.io.r.ofs.head  := Mux(directSelectEns.or, chisel3.util.Mux1H(directSelectEns, directSelectOffsets), chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.ofs).flatten))
+      mem._1.io.r.en.head   := Mux(directSelectEns.or, chisel3.util.Mux1H(directSelectEns, directSelectEns), chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.en).flatten))
       mem._1.io.flow        := Mux(directSelectEns.or, chisel3.util.PriorityMux(directSelectEns, directSelectFlows), chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.flow).flatten))
     } else if (p.hasXBarR && directSelectEns.length == 0) { // Has x only
-      mem._1.io.r.ofs.head  := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.ofs).flatten)
-      mem._1.io.r.en.head   := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.en).flatten)
+      mem._1.io.r.ofs.head  := chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.ofs).flatten)
+      mem._1.io.r.en.head   := chisel3.util.Mux1H(xBarSelect, io.xBarR.map(_.en).flatten)
       mem._1.io.flow         := chisel3.util.PriorityMux(xBarSelect, io.xBarR.map(_.flow).flatten)
     } else if (directSelectEns.length > 0) {                                           // Has direct only
-      mem._1.io.r.ofs.head  := chisel3.util.PriorityMux(directSelectEns, directSelectOffsets)
-      mem._1.io.r.en.head   := chisel3.util.PriorityMux(directSelectEns, directSelectEns) 
+      mem._1.io.r.ofs.head  := chisel3.util.Mux1H(directSelectEns, directSelectOffsets)
+      mem._1.io.r.en.head   := chisel3.util.Mux1H(directSelectEns, directSelectEns) 
       mem._1.io.flow         := chisel3.util.PriorityMux(directSelectEns, directSelectFlows) 
     }
     // // Use flow for last active r port
@@ -339,7 +339,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     //   else r.io.input.asyn_reset := (xBarSelect ++ directSelectEns.patch(i-xBarSelect.size, Nil, 1)).foldLeft(false.B)(_|_)
     //   r.io.output.data
     // }
-    // mem._1.io.flow   := chisel3.util.PriorityMux(sels, io.flow)
+    // mem._1.io.flow   := chisel3.util.Mux1H(sels, io.flow)
   }
 
   // Connect read data to output
@@ -356,7 +356,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
-      val d = chisel3.util.PriorityMux(sel, datas)
+      val d = chisel3.util.Mux1H(sel, datas)
       wire := d
     } else {
       // Figure out which read port was active in direct
@@ -371,7 +371,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
-      val d = chisel3.util.PriorityMux(sel, datas)
+      val d = chisel3.util.Mux1H(sel, datas)
       wire := d
     }
   }

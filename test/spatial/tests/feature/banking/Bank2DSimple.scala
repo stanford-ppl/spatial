@@ -108,3 +108,43 @@ import spatial.dsl._
     println(r"PASS: ${gold == output.flatten}")
   }
 }
+
+
+@spatial class SRAMWithB2 extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+    val dst = DRAM[Int](20,12,12)
+
+    Accel {
+      val sram = SRAM[Int](20,12,12)
+      Foreach(20 by 1 par 1) { x =>
+        Foreach(12 by 1, 12 by 1) { (i,j) =>
+          sram(x, i, j) = i + j
+        }
+      }
+
+      // Print 5x5 portions to force specific banking
+      Foreach(20 by 1){x => 
+        Foreach(8 by 1, 8 by 1 par 1){ (r,c) => 
+          val data = List.tabulate(5){i => List.tabulate(5){j => 
+            val y = sram(x,r+i,c+j)
+            print(r"$y ")
+            if (j == 4) println("")
+            y
+          }}
+        }
+      }
+
+      dst store sram
+    }
+    
+    val output = getTensor3(dst)
+    val gold = (0::20, 0::12, 0::12){(i,j,k) => j+k}
+    printTensor3(output, "output")
+    printTensor3(gold, "gold")
+    println(r"Pass: ${gold == output}")
+    assert(gold == output)
+
+  }
+
+}

@@ -68,6 +68,18 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _ => false
     }
+
+    def isTileLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_]  => true
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isTileStore: Boolean = op match {
+      case _:FringeDenseStore[_,_]  => true
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
   }
 
   abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
@@ -94,6 +106,8 @@ package object control {
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
+    def isTileLoad: Boolean = op.exists(_.isTileLoad)
+    def isTileStore: Boolean = op.exists(_.isTileStore)
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
@@ -328,10 +342,10 @@ package object control {
       else {
         // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
         isLockstepAcross(iters, reference) &&
-        cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
+        (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
           case Some(Expect(_)) => true
           case _ => false
-        }}}
+        }}})
       }
     }
 

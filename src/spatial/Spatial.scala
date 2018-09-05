@@ -221,6 +221,8 @@ trait Spatial extends Compiler {
       //spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
+      spatialConfig.enableDot = true
+      spatialConfig.targetName = "Plasticine"
     }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
 
     cli.opt[Unit]("retime").action{ (_,_) =>
@@ -299,7 +301,7 @@ trait Spatial extends Compiler {
         }
       }
       else {
-        val target = targets.fpgas.find{_.name.toLowerCase == spatialConfig.targetName.toLowerCase }
+        val target = targets.all.find{_.name.toLowerCase == spatialConfig.targetName.toLowerCase }
         if (target.isDefined) {
           spatialConfig.target = target.get
         }
@@ -308,6 +310,8 @@ trait Spatial extends Compiler {
             error(s"No target found with the name '${spatialConfig.targetName}'.")
             error(s"Available FPGA targets: ")
             targets.fpgas.foreach{t => error(s"  ${t.name}") }
+            error(s"Available Other targets: ")
+            (targets.all -- targets.fpgas).foreach{t => error(s"  ${t.name}") }
             IR.logError()
             return
           }

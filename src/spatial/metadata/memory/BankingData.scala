@@ -84,7 +84,7 @@ case class Instance(
   metapipe: Option[Ctrl],           // Controller if at least some accesses require n-buffering
   banking:  Seq[Banking],           // Banking information
   depth:    Int,                    // Depth of n-buffer
-  cost:     Int,                    // Cost estimate of this configuration
+  cost:     Long,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
   accType:  AccumType               // Type of accumulator for instance

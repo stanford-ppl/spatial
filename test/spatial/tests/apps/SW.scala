@@ -112,7 +112,7 @@ import spatial.dsl._
             mux(from_left >= from_top && from_left >= from_diag, sw_tuple(from_left, SKIPB), mux(from_top >= from_diag, sw_tuple(from_top,SKIPA), sw_tuple(from_diag, ALIGN)))
           }
           previous_result := update
-          if ((c == length || r == length) && possible_entry_point.score < update.score) possible_entry_point := entry_tuple(r, c, update.score)
+          if ((c == length.value | r == length.value) && possible_entry_point.score < update.score) possible_entry_point := entry_tuple(r, c, update.score)
           if (c >= 0) {score_matrix(r,c) = sw_tuple(max(0, update.score),update.ptr)}
           // score_matrix(r,c) = update
         }
@@ -164,7 +164,7 @@ import spatial.dsl._
     val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
     // Pass if >75% match
-    val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == dash) || (b == dash)) 1 else 0}.reduce{_+_}
+    val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == d) || (b == d)) 1 else 0}.reduce{_+_}
     val cksum = matches.to[Float] > 0.75.to[Float]*measured_length.to[Float]*2
 
     println("Result A: " + seqa_aligned_string)

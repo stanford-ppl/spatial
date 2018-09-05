@@ -14,19 +14,29 @@ trait DotCodegen extends argon.codegen.Codegen {
   def currScope = stack.head
   def nodes = currScope.nodes
   val scopes = mutable.Map[Option[Sym[_]],Scope]()
-  def scope(sym:Option[Sym[_]]) = scopes.getOrElseUpdate(sym, Scope(sym))
+  def scope(sym:Option[Sym[_]]) = scopes.getOrElseUpdate(sym, {
+    Scope(sym)
+  })
+
+  override protected def preprocess[R](b: Block[R]): Block[R] = {
+    stack.clear
+    scopes.clear
+    super.preprocess(b)
+  }
 
   type Edge = (Sym[_], Sym[_], String, String) // (from, to, fromAlias, toAlias)
 
   case class Scope(sym:Option[Sym[_]]) {
-    val nodes = mutable.ListBuffer[Sym[_]]()
+    val _nodes = mutable.ListBuffer[Sym[_]]()
+    def nodes = _nodes.toList
+    def addNode(sym:Sym[_]) = if (!_nodes.contains(sym)) _nodes += sym
     val externNodes = mutable.ListBuffer[Sym[_]]()
     val edges = mutable.ListBuffer[(Sym[_], Sym[_], String, String)]()
     val fileName = sym match {
       case Some(sym) => src"$sym"
       case None => entryFile.replace(".dot","")
     }
-    val svgpath = s"${out}${files.sep}$fileName.svg"
+    val htmlpath = s"${out}${files.sep}$fileName.html"
 
     def addExternNode(node:Sym[_]):this.type = { externNodes += node; this }
     def addEdge(edge:Edge):this.type = { edges += edge; this }
@@ -73,7 +83,7 @@ trait DotCodegen extends argon.codegen.Codegen {
   override protected def postprocess[R](b: Block[R]): Block[R] = {
     files.listFiles(out, List(".dot")).foreach { file =>
       val path = out + files.sep + file.getName
-      val outPath = path.replace(".dot",".svg")
+      val outPath = path.replace(".dot",".html")
       val exit = s"dot -Tsvg -o $outPath $path" !
 
       if (exit != 0) {
@@ -106,11 +116,14 @@ trait DotCodegen extends argon.codegen.Codegen {
   def blocks(lhs:Sym[_]) = lhs.op.map { _.blocks }.getOrElse(Nil)
 
   def label(lhs:Sym[_]) = {
-    lhs.op.fold {
-      s"$lhs"
-    } { rhs =>
-      s"$lhs\\n${rhs.getClass.getSimpleName}"
+    var l = src"$lhs"
+    lhs.name.foreach { name =>
+      l += s"[$name]"
     }
+    lhs.op.foreach { rhs =>
+      l += s"\\n${rhs.getClass.getSimpleName}"
+    }
+    l 
   }
 
   // Node Attributes
@@ -121,6 +134,7 @@ trait DotCodegen extends argon.codegen.Codegen {
       at += "style" -> "filled"
     }
     at += "label" -> s""""${label(lhs)}""""
+    at += "URL" -> s""""file:///${out + files.sep + src"IR.html#$lhs"}""""
     at
   }
 
@@ -158,9 +172,9 @@ trait DotCodegen extends argon.codegen.Codegen {
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
 
-  override protected def quoteOrRemap(arg: Any): String = arg match {
-    case arg:SrcCtx => s"$arg"
-    case _ => super.quoteOrRemap(arg)
-  }
+  //override protected def quoteOrRemap(arg: Any): String = arg match {
+    //case op:Op[_] => s"$op"
+    //case _ => super.quoteOrRemap(arg)
+  //}
 
 }

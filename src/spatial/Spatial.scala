@@ -100,6 +100,8 @@ trait Spatial extends Compiler {
     lazy val chiselCodegen = ChiselGen(state)
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
+    lazy val irCodegen     = HtmlIRGenSpatial(state)
+    lazy val memIrCodegen  = HtmlMemIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
     lazy val pirCodegen    = PIRGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
@@ -127,10 +129,9 @@ trait Spatial extends Compiler {
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
+        iterationDiffAnalyzer   ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
-        /** Iteration difference analysis */
-        iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */
@@ -161,6 +162,8 @@ trait Spatial extends Compiler {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        irCodegen           ==>
+        memIrCodegen           ==>
         (spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
@@ -251,6 +254,10 @@ trait Spatial extends Compiler {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("forceBanking").action { (_,_) => 
+      spatialConfig.enableForceBanking = true
+    }.text("Ensures that memories will always get banked and compiler will never decide that it is cheaper to duplicate")
 
     cli.opt[Unit]("tightControl").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableTightControl = true

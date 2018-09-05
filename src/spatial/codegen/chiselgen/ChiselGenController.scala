@@ -267,17 +267,8 @@ trait ChiselGenController extends ChiselGenCommon {
 
   def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
     val isInner = sym.isInnerControl
-    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) {
-      sym match {
-          case Op(_: SwitchCase[_]) => scrubNoise(sym.parent.s.get.bodyLatency.sum) // For some reason, inner SwitchCases don't have latency set (issue #83)
-          case _ => scrubNoise(sym.bodyLatency.sum)
-        }
-      }
-      else 0.0
-    val ii = sym match {
-          case Op(_: SwitchCase[_]) => scrubNoise(sym.parent.s.get.II) // For some reason, inner SwitchCases don't have II set (issue #83)
-          case _ => scrubNoise(sym.II)
-        }
+    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) scrubNoise(sym.bodyLatency.sum) else 0.0
+    val ii = scrubNoise(sym.II)
 
     // Construct controller args
     emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")

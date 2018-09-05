@@ -13,9 +13,10 @@ import socket
 
 def write(wksh, row, col, txt):
 	try:
-		if (col > wksh.cols):
-        		wksh.insert_cols(col-1, inherit=True)
-		wksh.update_cell((row,col),txt)
+		if (wksh.title != "Probe"): # Never write to probe
+			if (col > wksh.cols):
+	        		wksh.insert_cols(col-1, inherit=True)
+			wksh.update_cell((row,col),txt)
 	except:
 		print("WARN: pygsheets failed write %s @ %d,%d... -_-" % (txt, row, col))
 
@@ -377,7 +378,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
 			worksheet = sh.worksheet('index', x)
-			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+			if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
 				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
 				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
@@ -400,7 +401,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			for x in range(0,numsheets):
 				# worksheet = sh.get_worksheet(x)
 				worksheet = sh.worksheet('index', x)
-				if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
+				if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
 					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)", os.uname()[1] ])
 					if (not keep_row_75): deleteRows(worksheet, 75)
 					# worksheet.update_cell(id,1, link)
@@ -472,6 +473,25 @@ def report_changes(backend):
 	print(sorted(improved_list))
 	print("Worsened:")
 	print(sorted(worsened_list))
+
+def combine_and_strip_prefixes(backend):
+	sh = getDoc(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		# worksheet = sh.get_worksheet(x)
+		worksheet = sh.worksheet('index', x)
+		if (worksheet.title != "STATUS" and worksheet.title != "Probe"):
+			print("Scrubbing %s" % worksheet.title)
+			lol = worksheet.get_all_values()
+			start = getCols(worksheet, "Test:")[0]
+			tests = list(filter(None, lol[0][start:]))
+			for t in tests:
+				if "spatial." in t:
+					col = lol[0].index(t)
+					purename = re.sub(r".*\.","",t)
+					merge_apps_columns(purename, t, backend, True)
+					print("Replace %s with %s" % (t, purename))
 
 
 def report_slowdowns(prop, backend):
@@ -558,7 +578,7 @@ def delete_app_column(appname, backend):
 					print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
 
 # This will take rows from new_appname column 0 until the last row with data and paste it into old_appname column
-def merge_apps_columns(old_appname, new_appname, backend):
+def merge_apps_columns(old_appname, new_appname, backend, keepOldname = False):
 	sh = getDoc(backend)
 	perf = isPerf(backend)
 
@@ -594,6 +614,8 @@ def merge_apps_columns(old_appname, new_appname, backend):
 						write(worksheet, i+1, old_col_in_sheet[0], data[i])
 						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
 				deleteCols(worksheet, new_col_in_sheet[0])
+			if keepOldname:
+				write(worksheet, 1, old_col_in_sheet[0], old_appname)
 
 			# print("delete app column")
 
@@ -628,6 +650,9 @@ elif (sys.argv[1] == "delete_app_column"):
 elif (sys.argv[1] == "merge_apps_columns"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! merge_apps_columns('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	merge_apps_columns(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "combine_and_strip_prefixes"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! combine_and_strip_prefixes('%s')" % (sys.argv[2]))
+	combine_and_strip_prefixes(sys.argv[2])
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3], sys.argv[4])
@@ -637,6 +662,7 @@ else:
 	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
+	print(" - combine_and_strip_prefixes(backend)")
 	print(" - report_changes(backend)")
 	print(" - report_slowdowns(property (runtime, spatial, vcs), backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")

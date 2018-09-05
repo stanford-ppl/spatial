@@ -884,20 +884,39 @@ object Utils {
     FixedPoint(s > 0, d, f, init, sign_extend)
   }
   def FixedPoint[T](s: Boolean, d: Int, f: Int, init: T, sign_extend: scala.Boolean = true): types.FixedPoint = {
-    val cst = Wire(new types.FixedPoint(s, d, f))
     init match {
-      case i: Double => cst.raw := (i * scala.math.pow(2,f)).toLong.S((d+f+1).W).asUInt()
-      case i: Bool => cst.r := i
+      case i: Double => 
+        val rawnum = (i * scala.math.pow(2,f)).toLong
+        val cst = Wire(new types.FixedPoint(s, d, f, Some(BigInt(rawnum))))
+        cst.raw := rawnum.S((d+f+1).W).asUInt()
+        cst
+      case i: Bool => 
+        val lit = if (i.litArg.isDefined) Some(i.litArg.get.num) else None
+        val cst = Wire(new types.FixedPoint(s, d, f, lit))
+        cst.r := i
+        cst
       case i: UInt => 
+        val lit = if (i.litArg.isDefined) Some(i.litArg.get.num) else None
+        val cst = Wire(new types.FixedPoint(s, d, f, lit))
         val tmp = Wire(new types.FixedPoint(s, i.getWidth, 0))
         tmp.r := i
         tmp.cast(cst, sign_extend = sign_extend)
-        // if (f > 0) cst.r := chisel3.util.Cat(i, 0.U(f.W)) else cst.r := i
-      case i: SInt => cst.r := FixedPoint(s,d,f,i.asUInt).r
-      case i: FixedPoint => cst.raw := i.raw
-      case i: Int => cst.raw := (i * scala.math.pow(2,f)).toLong.S((d+f+1).W).asUInt()
+        cst
+      case i: SInt => 
+        val lit = if (i.litArg.isDefined) Some(i.litArg.get.num) else None
+        val cst = Wire(new types.FixedPoint(s, d, f, lit))
+        cst.r := FixedPoint(s,d,f, i.asUInt).r
+        cst
+      case i: FixedPoint => 
+        val cst = Wire(new types.FixedPoint(s, d, f, i.litVal))
+        cst.raw := i.raw
+        cst
+      case i: Int => 
+        val rawnum = (i * scala.math.pow(2,f)).toLong
+        val cst = Wire(new types.FixedPoint(s, d, f, Some(BigInt(rawnum))))
+        cst.raw := rawnum.S((d+f+1).W).asUInt()
+        cst
     }
-    cst
   }
 
   def getFloatBits(num: Float) = java.lang.Float.floatToRawIntBits(num)

@@ -601,8 +601,8 @@ object Utils {
     def merge(y: XMap): XMap = {
       if (y.nonEmpty) {
         ListMap( (x ++ ListMap(y.map{case (k,v) => 
-                                val base = x.toList.length
-                                (({base + k._1}, 0, 0) -> v)
+                                val base = x.map(_._1._1).toList.sorted.reverse.headOption.getOrElse(0)
+                                (({base + k._1}, k._2, 0) -> v)
                               }.toArray:_*)).toArray:_*)
       } else x
     }

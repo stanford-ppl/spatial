@@ -13,12 +13,16 @@ trait DotCodegen extends argon.codegen.Codegen {
   val stack = mutable.Stack[Scope]()
   def currScope = stack.head
   def nodes = currScope.nodes
-  val scopeKeys = mutable.ListBuffer[Option[Sym[_]]]()
   val scopes = mutable.Map[Option[Sym[_]],Scope]()
   def scope(sym:Option[Sym[_]]) = scopes.getOrElseUpdate(sym, {
-    scopeKeys += sym
     Scope(sym)
   })
+
+  override protected def preprocess[R](b: Block[R]): Block[R] = {
+    stack.clear
+    scopes.clear
+    super.preprocess(b)
+  }
 
   type Edge = (Sym[_], Sym[_], String, String) // (from, to, fromAlias, toAlias)
 

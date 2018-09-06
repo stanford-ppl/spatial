@@ -127,8 +127,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
     // val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-    val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
-    val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}.zipWithIndex.map{case (a,i) => src"($i,0,0) -> (${a.accessWidth}, ${a.shiftAxis})"}.toList
+    val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}
+                                     .map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.toList
+    val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}
+                                    .map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.toList
 
     val templateName = if (inst.depth == 1 && name != "LineBuffer") s"${name}("
                        else {{if (name == "SRAM") appPropertyStats += HasNBufSRAM}; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}

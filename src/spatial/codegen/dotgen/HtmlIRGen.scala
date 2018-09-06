@@ -35,7 +35,7 @@ trait HtmlIRCodegen extends argon.codegen.Codegen {
               emitElem("td") {
                 emitElem("h2", "binds")
                 binds.foreach{b =>
-                  emitElem("h3", qdef(b), "id" -> s"$lhs")
+                  emitElem("h3", qdef(b), "id" -> s"$b")
                   emitMeta(b)
                 }
               }

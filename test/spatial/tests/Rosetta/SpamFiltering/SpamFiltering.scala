@@ -24,9 +24,8 @@ import spatial.targets._
 	val empty_str = ""
 
 	/* Params */
-	val parMem 			= 1
-	val parReduce 		= 48
-	val transfer_par  	= 4
+	val parReduce 		= 32
+	val transfer_par  	= 1 //16
 
 	def sigmoid(exponent 	: FeatureType,
 				sigmoidLUT	: SRAM1[FeatureType],
@@ -63,15 +62,15 @@ import spatial.targets._
 
 	}
 
-	def computeGradient(gradient : SRAM1[FeatureType], 
-						feature  : SRAM2[DataType],
-						scale	 : FeatureType, 
-						id 		 : I32, 
-						learning_rate    : Int) : Unit = {
+	def computeTheta(theta 		: SRAM1[FeatureType], 
+					 feature  	: SRAM2[DataType],
+					 scale	 	: FeatureType, 
+					 id 		: I32, 
+					 learning_rate    : Int) : Unit = {
 
 
-		Foreach(gradient.length by 1 par parReduce) { inx => /* foreach feature */
-			Pipe { gradient(inx) = -learning_rate.to[FeatureType] * scale * feature(id, inx).to[FeatureType] }
+		Foreach(theta.length by 1 par parReduce) { inx => /* foreach feature */
+			theta(inx) = theta(inx) - learning_rate.to[FeatureType] * scale * feature(id, inx).to[FeatureType] 
 		}
 	}
 
@@ -173,14 +172,14 @@ import spatial.targets._
 										}	
 		setMem(sigmoid_lut_dram, host_sigmoid_lut)
 
-		val num_training_local  = 100 // num_training_samples
+		val num_training_local  = 2 // num_training_samples
 		val step_size 			= 60000 /* same as learning rate */
 
 
 		Accel {
 
 			val training_sample = SRAM[DataType](num_training_local, num_features)
-			val theta_sram	 	= SRAM[FeatureType](num_features)
+			val theta_sram	 	= SRAM[FeatureType](num_features).buffer 
 			val label_sram 		= SRAM[LabelType](num_training_samples)
 
 			val sigmoidLUT 		= SRAM[FeatureType](sigmoid_lut_size)
@@ -197,29 +196,26 @@ import spatial.targets._
 				Foreach(num_training_samples by num_training_local ) { training_start => 
 
 					Parallel {
-						training_sample load training_set_dram(training_start :: training_start + num_training_local, 0 :: num_features par transfer_par) 
-						label_sram load label_dram(training_start :: training_start + num_training_local par transfer_par)
+						training_sample load  training_set_dram(training_start :: training_start + num_training_local, 0 :: num_features par transfer_par) 
+						label_sram 		load  label_dram(training_start :: training_start + num_training_local par transfer_par)
 					}
-					
 
-					MemFold(theta_sram)(num_training_local by 1 par parMem) { training_id =>	
+					Foreach(num_training_local by 1) { training_id =>	
 
-						val dp_result = Reg[FeatureType](0.to[FeatureType])
+						//val dp_result = Reg[FeatureType](0.to[FeatureType])
 						val prob_result = Reg[FeatureType](0.to[FeatureType])
 
-						val gradient_tmp = SRAM[FeatureType](num_features)
+						//val gradient_tmp = SRAM[FeatureType](num_features)
 
-						Pipe { dp_result := dotProduct(theta_sram, training_sample, training_id) }
-						Pipe { prob_result := sigmoid(dp_result.value, sigmoidLUT, sigmoid_lut_size) }
+						val dp_result   = dotProduct(theta_sram, training_sample, training_id) //}
+						Pipe { prob_result := sigmoid(dp_result, sigmoidLUT, sigmoid_lut_size) }
 						
-						Pipe {
-							val training_label = label_sram(training_id)
-							computeGradient(gradient_tmp, training_sample, (prob_result.value - training_label.to[FeatureType]), training_id, step_size)					
-						}
+						//Pipe {
+						val training_label = label_sram(training_id)
+						computeTheta(theta_sram, training_sample, (prob_result.value - training_label.to[FeatureType]), training_id, step_size)					
+						//}
 
-						//Pipe { updateParameter(thete_sram, gradient_tmp, step_size) }
-						gradient_tmp
-					} { _ + _ }
+					}
 				}
 			}
 

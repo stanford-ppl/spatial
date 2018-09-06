@@ -309,8 +309,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       if (memsWithReset.contains(rf)) throw new Exception(s"Currently only one resetter per RegFile is supported ($rf ${rf.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ rf
-        val flowEnable = src",${swap(parent,SM)}.io.flow"
-        val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
+        val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
         emitt(src"${rf}.io.reset := ${invisibleEnable} & ${and(en)}")
 
       }

@@ -398,7 +398,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
   val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
-  val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_}
+  val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_} | io.reset
   val anyEnable: Bool = io.xBarW.map{_.en}.flatten.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
   ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyEnable, wr_data, ff))
@@ -612,14 +612,14 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
     io.asInstanceOf[ShiftRegFileInterface].dump_out(i) := mem
-    (mem,coords,i)
+    (mem,coords,i,initval)
   }
 
   def stripCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ l.drop(x+1)}
   def stripCoord(l: HVec[UInt], x: Int): HVec[UInt] = {HVec(l.take(x) ++ l.drop(x+1))}
   def decrementAxisCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ List(l(x) - 1) ++ l.drop(x+1)}
   // Handle Writes
-  m.foreach{ case(mem, coords, flatCoord) => 
+  m.foreach{ case(mem, coords, flatCoord, initval) => 
     // Check all xBar w ports against this bank's coords
     val xBarSelect = (io.xBarW.map(_.banks).flatten.toList.grouped(p.banks.length).toList, io.xBarW.map(_.en).flatten.toList, io.xBarW.map(_.shiftEn).flatten.toList).zipped.map{ case(bids, en, shiftEn) => 
       bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en | shiftEn else false.B}
@@ -674,7 +674,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
         (data, enable)
       } else (0.U, false.B)
     if (p.isBuf) mem := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en, io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
-    else mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
+    else mem := Mux(io.reset, initval, Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
   }
 
   // Connect read data to output

@@ -92,7 +92,6 @@ import spatial.targets._
 				val frag_color = color 
 
 				if (in_triangle == true) {
-					//Parallel { 
 					fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color) ) 
 					frag_reg := frag_reg +  1.to[Int]  
 				}

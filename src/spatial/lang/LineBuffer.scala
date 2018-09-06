@@ -7,8 +7,8 @@ import spatial.node._
 import scala.collection.mutable.Queue
 
 @ref class LineBuffer[A:Bits] extends Top[LineBuffer[A]]
-         with LocalMem2[A,LineBuffer] {
-         // with Ref[Queue[Any],LineBuffer[A]] {
+         with LocalMem2[A,LineBuffer]
+         with Ref[Queue[Any],LineBuffer[A]] {
   val A: Bits[A] = Bits[A]
   val evMem: LineBuffer[A] <:< LocalMem[A,LineBuffer] = implicitly[LineBuffer[A] <:< LocalMem[A,LineBuffer]]
 
@@ -17,8 +17,11 @@ import scala.collection.mutable.Queue
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = stage(LineBufferEnq(this,data,ens))
   @rig def __reset(ens: Set[Bit]): Void = void
 
-  // /** Creates a load port to this LineBuffer at the given `row` and `col`. **/
-  // @api def apply(row: Index, col: Index): A = stage(LineBufferRead(this, row.s, col.s, Set.empty))
+  /** Creates a load port to this LineBuffer at the given `row` and `col`. **/
+  @api def apply(row: I32, col: I32): A = stage(LineBufferRead(this, Seq(row, col), Set.empty))
+
+  /** Load 1D DRAM into row of LineBuffer. */
+  @api def load(dram: DRAM1[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
 
 }
 

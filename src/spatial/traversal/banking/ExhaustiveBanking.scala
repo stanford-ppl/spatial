@@ -16,7 +16,7 @@ import spatial.util.IntLike._
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
   private val MAGIC_CUTOFF_N = 1.4
-  private val maxAttempts = 1500
+  private val max1DAttempts = 1500
   private val k = boundVar[I32]
   private val k0 = boundVar[I32]
   private val k1 = boundVar[I32]
@@ -91,7 +91,13 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           }
           findBanking(selGrps, dims, stagedDims)
         }
-        if (isValidBanking(banking,grps)) {
+        val dimsInStrategy = strategy.flatten.distinct
+        val prunedGrps = grps.map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.distinct}
+        dbgs(s"Check if $banking is valid for accesses:")
+        prunedGrps.flatten.foreach{x => 
+          dbgs(x.toString)
+        }
+        if (isValidBanking(banking,prunedGrps)) {
           Some(banking)
         }
         else None
@@ -103,7 +109,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   def isValidBanking(banking: Seq[ModBanking], grps: Set[Seq[SparseMatrix[Idx]]]): Boolean = {
     // TODO[2]: This may not be correct in all cases, need to verify!
     val banks = banking.map(_.nBanks).product
-    grps.forall{_.lengthLessThan(banks+1)}
+    grps.forall{a => dbgs(s"$a: lenght < ${banks+1}? ${a.lengthLessThan(banks+1)}");a.lengthLessThan(banks+1)}
   }
 
   /**
@@ -256,11 +262,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     def exhaustIterators(Ns: Iterator[Int], cheapAs: Boolean): Unit = {
       var attempts = 0
-      while(Ns.hasNext && banking.isEmpty) {
+      while(Ns.hasNext && banking.isEmpty && ((dims.size == stagedDims.size && attempts < max1DAttempts) || (dims.size < stagedDims.size))) {
         val N = Ns.next()
         val allAs = Alphas(rank, N, stagedDims)
         val As = if (cheapAs) allAs._1 else allAs._2
-        while (As.hasNext && banking.isEmpty) {
+        while (As.hasNext && banking.isEmpty && ((dims.size == stagedDims.size && attempts < max1DAttempts) || (dims.size < stagedDims.size))) {
           val alpha = As.next()
           if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
           attempts = attempts + 1

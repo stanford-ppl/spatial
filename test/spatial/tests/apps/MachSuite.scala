@@ -639,7 +639,8 @@ import spatial.targets._
     printMatrix(result_data, "result")
 
     val cksum = (0::ROWS, 0::COLS){(i,j) => if (i < ROWS-2 && j < COLS-2) gold(i,j) == result_data(i,j) else true }.reduce{_&&_}
-    println("PASS: " + cksum + " (Stencil2D) * Fix modulo addresses in scalagen?")
+    println("PASS: " + cksum + " (Stencil2D)")
+    assert(cksum)
 
   }
 }
@@ -719,10 +720,10 @@ import spatial.targets._
           val local_slice = SRAM[Int](COLS,ROWS)
           Foreach(COLS+1 by 1 par PX){ i => 
             val lb = LineBuffer[Int](3,ROWS)
-            // lb load data_dram(((p+slice)%HEIGHT), i, 0::ROWS par par_lb_load)
+            lb load data_dram(((p+slice)%HEIGHT), i, 0::ROWS par par_lb_load)
             Foreach(ROWS+1 by 1 par PX) {j => 
               val sr = RegFile[Int](3,3)
-              Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j%ROWS)}
+              Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j)}
               val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(slice+1,r,c)}{_+_}
               // For final version, make wr_value a Mux1H instead of a unique writer per val
               if (i == 0 || j == 0) {Pipe{}/*do nothing*/}
@@ -760,6 +761,7 @@ import spatial.targets._
 
     val cksum = gold.zip(result_data){_==_}.reduce{_&&_}
     println("PASS: " + cksum + " (Stencil3D)")
+    assert(cksum)
 
  }
 }

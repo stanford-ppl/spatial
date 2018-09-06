@@ -63,7 +63,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
-  @rig def __reset(ens: Set[Bit]): Void = void
+  @rig def __reset(ens: Set[Bit]): Void = stage(RegFileReset(this, ens))
 }
 object RegFile {
   /** Allocates a [[RegFile1]] with capacity for `length` elements of type A. */

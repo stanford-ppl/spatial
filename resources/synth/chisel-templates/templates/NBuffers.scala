@@ -124,6 +124,7 @@ class NBufMem(val mem: MemType,
       })
     val broadcastW = HVec(Array.tabulate(1 max numBroadcastWPorts){i => Input(new W_XBar(broadcastWMux.accessPars.getOr1(i), ofsWidth, banksWidths, bitWidth))})
     val broadcastR = HVec(Array.tabulate(1 max numBroadcastRPorts){i => Input(new R_XBar(broadcastRMux.accessPars.getOr1(i), ofsWidth, banksWidths))})
+    val reset = Input(Bool())
 
     // FIFO Specific
     val full = Output(Bool())
@@ -284,6 +285,7 @@ class NBufMem(val mem: MemType,
       val ffs = (0 until numBufs).map{ i => 
         Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits)) 
       }
+      ffs.foreach(_.io.reset := io.reset)
       // Route NBuf IO to FF IOs
       ffs.zipWithIndex.foreach{ case (f,i) => 
         // Connect XBarW ports
@@ -348,6 +350,7 @@ class NBufMem(val mem: MemType,
                         inits, syncMem, fracBits, isBuf = {i != 0}))
       }
       rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(i).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{case(a,b) => a:=b}; rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap}
+      rfs.foreach(_.io.reset := io.reset)
 
       // Route NBuf IO to SRAM IOs
       rfs.zipWithIndex.foreach{ case (f,i) => 
@@ -415,7 +418,7 @@ class NBufMem(val mem: MemType,
             val k_base = xBarRMuxPortMapping.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              io.output.data(outputXBarRMuxBufferBase + (k_base + m)) := f.io.output.data(k_base + m)
+              io.output.data(outputXBarRMuxBufferBase + (k_base + m)) := f.io.output.data(sram_index)
             }
             f.io.xBarR(k).en := io.xBarR(xBarRMuxBufferBase + k).en
             // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
@@ -666,6 +669,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     val directR = HVec(Array.tabulate(1){i => Input(new R_Direct(1, 1, List(List(1))))})
     val broadcastW = HVec(Array.tabulate(1){i => Input(new W_XBar(1, 1, List(1), bitWidth))})
     val broadcastR = HVec(Array.tabulate(1){i => Input(new R_XBar(1, 1, List(1)))})
+    val reset = Input(Bool())
 
     // FIFO Specific
     val full = Output(Bool())

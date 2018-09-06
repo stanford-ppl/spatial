@@ -51,6 +51,7 @@ import spatial.dsl._
           lb load img(ldaddr, 0::C par lb_par)
 
           Foreach(0 until C) { c =>
+          	// Foreach(3 by 1 par 3, 3 by 1 par 3){(i,j) => sr(i,j) = 0}
             Pipe{sr.reset(c == 0)}
 
             Foreach(0 until Kh par Kh){i => sr(i, *) <<= lb(i, c) }

@@ -106,11 +106,11 @@ trait Printing {
     state.logTab += 1
     x
     state.logTab -= 1
-  }
+  } else x
   @stateful def dbgblk(h: => String)(x: => Unit): Unit = if (config.enDbg) {
     dbgs(h)
     dbgblk(x)
-  }
+  } else x
 
   @stateful def log(x: => Any): Unit = if (config.enLog) state.log.println(x)
   @stateful def logs(x: => Any): Unit = if (config.enLog) state.log.println("  "*state.logTab + x)

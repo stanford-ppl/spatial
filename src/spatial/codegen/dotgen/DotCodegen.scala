@@ -2,7 +2,7 @@ package spatial.codegen.dotgen
 
 import argon._
 import scala.collection.mutable
-import utils.io.files
+import utils.io.files._
 import sys.process._
 import scala.language.postfixOps
 
@@ -31,12 +31,13 @@ trait DotCodegen extends argon.codegen.Codegen {
     def nodes = _nodes.toList
     def addNode(sym:Sym[_]) = if (!_nodes.contains(sym)) _nodes += sym
     val externNodes = mutable.ListBuffer[Sym[_]]()
-    val edges = mutable.ListBuffer[(Sym[_], Sym[_], String, String)]()
+    val edges = mutable.ListBuffer[Edge]()
     val fileName = sym match {
       case Some(sym) => src"$sym"
       case None => entryFile.replace(".dot","")
     }
-    val htmlpath = s"${out}${files.sep}$fileName.html"
+    val htmlPath = s"${out}${sep}$fileName.html"
+    val dotPath = s"${out}${sep}$fileName.dot"
 
     def addExternNode(node:Sym[_]):this.type = { externNodes += node; this }
     def addEdge(edge:Edge):this.type = { edges += edge; this }
@@ -81,13 +82,19 @@ trait DotCodegen extends argon.codegen.Codegen {
 
   // Generate dot graphs to svg files
   override protected def postprocess[R](b: Block[R]): Block[R] = {
-    files.listFiles(out, List(".dot")).foreach { file =>
-      val path = out + files.sep + file.getName
-      val outPath = path.replace(".dot",".html")
-      val exit = s"dot -Tsvg -o $outPath $path" !
-
-      if (exit != 0) {
-        info(s"Dot graph generation failed. Please install graphviz")
+    scopes.foreach { case (_, scope) =>
+      inGen(out, "dog.log") {
+        var errLine = ""
+        s"dot -Tsvg -o ${scope.htmlPath} ${scope.dotPath}" ! ProcessLogger (
+          { line => emit(line) },
+          { line => emit(line); errLine += line }
+        )
+        if (errLine.nonEmpty) {
+          val msg = if (errLine.contains("triangulation failed")) "Graph too large"
+          else if (errLine.contains("command not found")) "Please install graphviz."
+          else ""
+          warn(s"Dot graph generation failed for ${scope.dotPath}. $msg Log in ${out + sep}dot.log")
+        }
       }
     }
     super.postprocess(b)
@@ -134,7 +141,7 @@ trait DotCodegen extends argon.codegen.Codegen {
       at += "style" -> "filled"
     }
     at += "label" -> s""""${label(lhs)}""""
-    at += "URL" -> s""""file:///${out + files.sep + src"IR.html#$lhs"}""""
+    at += "URL" -> s""""${s"IR.html#$lhs"}""""
     at
   }
 
@@ -171,10 +178,5 @@ trait DotCodegen extends argon.codegen.Codegen {
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
-
-  //override protected def quoteOrRemap(arg: Any): String = arg match {
-    //case op:Op[_] => s"$op"
-    //case _ => super.quoteOrRemap(arg)
-  //}
 
 }

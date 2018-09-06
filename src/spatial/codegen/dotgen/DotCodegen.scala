@@ -31,7 +31,7 @@ trait DotCodegen extends argon.codegen.Codegen {
     def nodes = _nodes.toList
     def addNode(sym:Sym[_]) = if (!_nodes.contains(sym)) _nodes += sym
     val externNodes = mutable.ListBuffer[Sym[_]]()
-    val edges = mutable.ListBuffer[(Sym[_], Sym[_], String, String)]()
+    val edges = mutable.ListBuffer[Edge]()
     val fileName = sym match {
       case Some(sym) => src"$sym"
       case None => entryFile.replace(".dot","")
@@ -83,10 +83,18 @@ trait DotCodegen extends argon.codegen.Codegen {
   // Generate dot graphs to svg files
   override protected def postprocess[R](b: Block[R]): Block[R] = {
     scopes.foreach { case (_, scope) =>
-      val exit = s"dot -Tsvg -o ${scope.htmlPath} ${scope.dotPath}" !
-
-      if (exit != 0) {
-        info(s"Dot graph generation failed. Please install graphviz")
+      inGen(out, "dog.log") {
+        var errLine = ""
+        s"dot -Tsvg -o ${scope.htmlPath} ${scope.dotPath}" ! ProcessLogger (
+          { line => emit(line) },
+          { line => emit(line); errLine += line }
+        )
+        if (errLine.nonEmpty) {
+          val msg = if (errLine.contains("triangulation failed")) "Graph too large"
+          else if (errLine.contains("command not found")) "Please install graphviz."
+          else ""
+          warn(s"Dot graph generation failed for ${scope.dotPath}. $msg Log in ${out + sep}dot.log")
+        }
       }
     }
     super.postprocess(b)

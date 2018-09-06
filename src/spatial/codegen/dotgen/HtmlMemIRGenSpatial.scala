@@ -2,11 +2,11 @@ package spatial.codegen.dotgen
 
 import argon._
 import spatial.metadata.memory._
+import utils.io.files._
 
 case class HtmlMemIRGenSpatial(override val IR: State) extends HtmlIRGenSpatial(IR) {
 
   override def entryFile: String = s"Mem.$ext"
-  override def clearGen(): Unit = {}
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     if (lhs.isMem) {

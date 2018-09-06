@@ -2,7 +2,7 @@ package spatial.codegen.dotgen
 
 import argon._
 import scala.collection.mutable
-import utils.io.files
+import utils.io.files._
 import sys.process._
 import scala.language.postfixOps
 import spatial.metadata.control._
@@ -11,7 +11,10 @@ trait DotHierarchicalCodegen extends DotCodegen {
 
   override def entryFile: String = s"Top.$ext"
 
-  override def clearGen = {} // prevent clear flatGen
+  override def clearGen(): Unit = {
+    deleteFiles(s"$out$sep$entryFile")
+    deleteFiles(s"$out$sep$entryFile".replace(".dot", ".html"))
+  }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     currScope.addNode(lhs)
@@ -80,14 +83,14 @@ trait DotHierarchicalCodegen extends DotCodegen {
 
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = lhs match {
     case lhs if blocks(lhs).nonEmpty => 
-      super.nodeAttr(lhs) + ("URL" -> s""""file:///${scope(Some(lhs)).htmlpath}"""")
+      super.nodeAttr(lhs) + ("URL" -> s""""${scope(Some(lhs)).fileName}.html"""")
     case lhs => super.nodeAttr(lhs)
   }
 
   override def graphAttr(lhs:Sym[_]):Map[String,String] = lhs match {
     case lhs if blocks(lhs).nonEmpty => 
       // navigate back to parent graph, or flat dot graph if already at top level
-      super.graphAttr(lhs) + ("URL" -> s""""file:///${scope(lhs.blk.s).htmlpath}"""")
+      super.graphAttr(lhs) + ("URL" -> s""""${scope(lhs.blk.s).fileName}.html"""")
     case lhs => super.graphAttr(lhs)
   }
 

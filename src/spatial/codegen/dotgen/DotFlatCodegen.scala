@@ -2,13 +2,18 @@ package spatial.codegen.dotgen
 
 import argon._
 import scala.collection.mutable
-import utils.io.files
+import utils.io.files._
 import sys.process._
 import scala.language.postfixOps
 
 trait DotFlatCodegen extends DotCodegen {
 
   override def entryFile: String = s"Main.$ext"
+
+  override def clearGen(): Unit = {
+    deleteFiles(s"$out$sep$entryFile")
+    deleteFiles(s"$out$sep$entryFile".replace(".dot", ".html"))
+  }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     currScope.addNode(lhs)
@@ -31,7 +36,7 @@ trait DotFlatCodegen extends DotCodegen {
 
   override def graphAttr(lhs:Sym[_]):Map[String,String] = lhs match {
     case lhs if blocks(lhs).nonEmpty => 
-      super.graphAttr(lhs) + ("URL" -> s""""file:///${out + files.sep + s"$lhs.html"}"""")
+      super.graphAttr(lhs) + ("URL" -> s""""${s"$lhs.html"}"""")
     case lhs => super.graphAttr(lhs)
   }
 

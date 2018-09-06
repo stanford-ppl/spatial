@@ -46,7 +46,4 @@ resources/synth/chisel-templates/fringeXSIM/
 
 resources/synth/chisel-templates/test_run_dir/*
 bin/get
-<<<<<<< HEAD
 test-data/
-=======
->>>>>>> dot

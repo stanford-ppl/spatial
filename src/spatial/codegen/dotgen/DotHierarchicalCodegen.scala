@@ -14,7 +14,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
   override def clearGen = {} // prevent clear flatGen
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
-    nodes += lhs
+    currScope.addNode(lhs)
     emitNode(lhs)
     if (blocks(lhs).nonEmpty) {
       scope(Some(lhs)).begin {
@@ -22,7 +22,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
           emit(src"""${graphAttr(lhs).map { case (k,v) => s"$k=$v" }.mkString(" ")}""")
           //strMeta(lhs)
           rhs.binds.filter(_.isBound).foreach{ b =>
-            nodes += b
+            currScope.addNode(b)
             emitNode(b)
           }
           rhs.blocks.foreach(ret)
@@ -78,17 +78,17 @@ trait DotHierarchicalCodegen extends DotCodegen {
     }
   }
 
+  override def nodeAttr(lhs:Sym[_]):Map[String,String] = lhs match {
+    case lhs if blocks(lhs).nonEmpty => 
+      super.nodeAttr(lhs) + ("URL" -> s""""file:///${scope(Some(lhs)).htmlpath}"""")
+    case lhs => super.nodeAttr(lhs)
+  }
+
   override def graphAttr(lhs:Sym[_]):Map[String,String] = lhs match {
     case lhs if blocks(lhs).nonEmpty => 
       // navigate back to parent graph, or flat dot graph if already at top level
-      super.graphAttr(lhs) + ("URL" -> s""""file:///${scope(lhs.blk.s).svgpath}"""")
+      super.graphAttr(lhs) + ("URL" -> s""""file:///${scope(lhs.blk.s).htmlpath}"""")
     case lhs => super.graphAttr(lhs)
-  }
-
-  override def nodeAttr(lhs:Sym[_]):Map[String,String] = lhs match {
-    case lhs if blocks(lhs).nonEmpty => 
-      super.nodeAttr(lhs) + ("URL" -> s""""file:///${scope(Some(lhs)).svgpath}"""")
-    case lhs => super.nodeAttr(lhs)
   }
 
 }

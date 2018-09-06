@@ -182,7 +182,7 @@ package object memory {
       case _: RegFile[_,_] => true
       case _ => false
     }
-    // def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
+    def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
 

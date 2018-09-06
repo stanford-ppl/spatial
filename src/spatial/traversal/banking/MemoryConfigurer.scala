@@ -14,6 +14,7 @@ import spatial.metadata.control._
 import spatial.metadata.retiming._
 import spatial.metadata.memory._
 import spatial.util.spatialConfig
+import poly.{SparseMatrix, SparseVector}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -26,7 +27,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   // TODO: This may need to be tweaked based on the fix for issue #23
   final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
   final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
-  lazy val dimGrps: Seq[Seq[Seq[Int]]] = if (rank > 1) Seq(FLAT_BANKS, NEST_BANKS) else Seq(FLAT_BANKS)
+  lazy val dimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) else if (rank > 1) Seq(FLAT_BANKS, NEST_BANKS) else Seq(FLAT_BANKS)
 
 
   def configure(): Unit = {
@@ -37,18 +38,32 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbg(s"Src:  ${mem.ctx}")
     dbg(s"Src:  ${mem.ctx.content.getOrElse("<???>")}")
     dbg(s"Symbol:     ${stm(mem)}")
+    dbgs(s"DimGrps:   ${dimGrps}")
     dbg(s"---------------------------------------------------------------------")
     val readers = mem.readers
     val writers = mem.writers
     resetData(readers, writers)
 
     val readMatrices = readers.flatMap{rd => rd.affineMatrices }
-    val writeMatrices = writers.flatMap{wr => wr.affineMatrices }
+    val writeMatrices = if (mem.isLineBuffer) fakedAffineMatrices(writers)
+                        else writers.flatMap{wr => wr.affineMatrices }
 
     val instances = bank(readMatrices, writeMatrices)
 
     summarize(instances)
     finalize(instances)
+  }
+
+  protected def fakedAffineMatrices(writers: Set[Sym[_]]): Set[AccessMatrix] = {
+    writers.flatMap{wr => 
+      val raw = wr.affineMatrices 
+      raw.map{r => 
+        val access = r.access
+        val unroll = r.unroll
+        val matrix2 = r.matrix.prependBlankRow
+        AccessMatrix(access, matrix2, unroll)
+      }
+    }
   }
 
   protected def resetData(readers: Set[Sym[_]], writers: Set[Sym[_]]): Unit = {
@@ -321,16 +336,24 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       totalCost
     } else {
       val w                = mem.stagedDims.map(_.toInt)
-      val sizePenalty    = depth * w.product * volumePenalty * rdGroups.flatten.size
+      val sizePenalty    = depth * w.product * volumePenalty
+
+      val numWriters = wrGroups.flatten.size
+
+      // Assume direct banking for W, and crossbar for readers
+      val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn) depth * muxCost * numWriters * numWriters else 0
 
       dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
       dbg(s"  depth            = ${depth}")
       dbg(s"  volume           = ${w.product}")
+      dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
       dbgs(s"")
+
+      val totalCost =  rdGroups.flatten.size * (sizePenalty + rmuxPenalty).toLong
 
       dbgs(s"TOTAL COST: $sizePenalty")
 
-      sizePenalty.toLong
+      totalCost
 
     }
   }
@@ -441,7 +464,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val duplicationCost = cost(Seq(), depth, rdGroups, reachingWrGroups)
         val (banking, bankCost) = bankingCosts.minBy(_._2)
         dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
-        if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking) {
+        if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
           dbgs(s"Choosing to duplicate $mem for $rdGroups, $wrGroups.  ")
           val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, dimGrps)
           val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}
@@ -454,7 +477,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val accTyp = mem.accumType | accum
             Instance(Set(Set(reads.toSeq(i))),reachingWrGroups,ctrls,metapipe,wrBanking,depth,wrBankCost,ports,padding,accTyp)
           })
-        } else {
+        } else if (!mem.isLineBuffer) {
           val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
           // TODO[5]: Assumption: All memories are at least simple dual port
           val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
@@ -463,6 +486,16 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val accTyp = mem.accumType | accum
 
           Right(Seq(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp)))
+        } else {
+          val pseudoBanking = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*wrGroups.flatten.map(_.access).size, 1)) ++ banking
+          val padding = mem.stagedDims.map(_.toInt).zip(pseudoBanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+          // TODO[5]: Assumption: All memories are at least simple dual port
+          val ports = computePorts(rdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
+          val isBuffAccum = writes.cross(reads).exists{case (wr,rd) => rd.parent == wr.parent }
+          val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
+          val accTyp = mem.accumType | accum
+
+          Right(Seq(Instance(rdGroups,reachingWrGroups,ctrls,metapipe,pseudoBanking,depth,bankCost,ports,padding,accTyp)))
         }
       }
       else Left(issue.get)

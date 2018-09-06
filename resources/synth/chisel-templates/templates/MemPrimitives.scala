@@ -78,8 +78,8 @@ class R_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int]) e
   val flow = Vec(port_width, Bool())
 
   def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_XBar, f: Bool): Unit = {
-    bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
+    bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     en(lhs_lane) := rhs_port.en(rhs_lane)
     flow(lhs_lane) := f
   }
@@ -134,6 +134,7 @@ abstract class MemInterface(p: MemParams) extends Bundle {
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
   }
+  var reset = Input(Bool())
 }
 
 class StandardInterface(p: MemParams) extends MemInterface(p) {}  
@@ -350,10 +351,9 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       val xBarCandidatesEns = xBarIds.map(io.xBarR.map(_.en).flatten.toList(_))
       val xBarCandidatesBanks = xBarIds.map(io.xBarR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
       val xBarCandidatesOffsets = xBarIds.map(io.xBarR.map(_.ofs).flatten.toList(_))
-      val xBarCandidatesFlows = xBarIds.map(io.xBarR.map(_.flow).flatten.toList(_))
       val sel = m.map{ mem => 
-        if (xBarCandidatesEns.toList.length > 0) (xBarCandidatesEns, xBarCandidatesBanks, xBarCandidatesOffsets.zip(xBarCandidatesFlows)).zipped.map {case(en,banks,(ofs,flows)) => 
-          banks.zip(mem._2).map{case (b, coord) => Utils.getRetimed(b, Utils.sramload_latency, flows) === coord.U}.reduce{_&&_} && Utils.getRetimed(en, Utils.sramload_latency, flows)
+        if (xBarCandidatesEns.toList.length > 0) (xBarCandidatesEns, xBarCandidatesBanks, xBarCandidatesOffsets).zipped.map {case(en,banks,ofs) => 
+          banks.zip(mem._2).map{case (b, coord) => Utils.getRetimed(b, Utils.sramload_latency) === coord.U}.reduce{_&&_} && Utils.getRetimed(en, Utils.sramload_latency)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -365,11 +365,10 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       val directCandidatesEns = directIds.map(io.directR.map(_.en).flatten.toList(_))
       val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList(_))
       val directCandidatesOffsets = directIds.map(io.directR.map(_.ofs).flatten.toList(_))
-      val directCandidatesFlows = directIds.map(io.directR.map(_.flow).flatten.toList(_))
       // Create bit vector to select which bank was activated by this io
       val sel = m.map{ mem => 
-        if (directCandidatesEns.toList.length > 0) (directCandidatesEns, directCandidatesBanks, directCandidatesOffsets.zip(directCandidatesFlows)).zipped.map {case(en,banks,(ofs,flows)) => 
-          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && Utils.getRetimed(en, Utils.sramload_latency, flows)
+        if (directCandidatesEns.toList.length > 0) (directCandidatesEns, directCandidatesBanks, directCandidatesOffsets).zipped.map {case(en,banks,ofs) => 
+          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && Utils.getRetimed(en, Utils.sramload_latency)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }

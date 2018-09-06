@@ -13,6 +13,7 @@ import spatial.util.spatialConfig
 trait ChiselGenMem extends ChiselGenCommon {
 
   private var nbufs: List[Sym[_]] = List()
+  private var memsWithReset: List[Sym[_]] = List()
 
   val zipThreshold = 100 // Max number of characters before deciding to split line into many
   private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
@@ -40,7 +41,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
     val flowEnable = src",${swap(parent,SM)}.io.flow"
-    val ofsWidth = Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
+    val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
+                     else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
@@ -85,7 +87,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val parent = lhs.parent.s.get
     val flowEnable = src"${swap(parent,SM)}.io.flow"
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
-    val ofsWidth = 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
+    val ofsWidth = if (!mem.isLineBuffer) 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
+                   else 1 max Math.ceil(scala.math.log(paddedDims(mem,name).last / mem.instance.nBanks.last) / scala.math.log(2)).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                       else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
@@ -132,6 +135,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}
                                     .map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.toList
 
+    if (inst.depth == 1 && name == "LineBuffer") throw new Exception(s"Cannot create non-buffered line buffer!  Make sure $mem has readers and writers bound by a pipelined LCA, or else turn it into an SRAM")
     val templateName = if (inst.depth == 1 && name != "LineBuffer") s"${name}("
                        else {{if (name == "SRAM") appPropertyStats += HasNBufSRAM}; nbufs = nbufs :+ mem; s"NBufMem(${name}Type, "}
     if (mem.broadcastsAnyRead) appPropertyStats += HasBroadcastRead
@@ -210,7 +214,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     val dimensions = paddedDims(mem, name).mkString("List[Int](", ",", ")") //dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
-    val strides = numBanks // TODO: What to do with strides
+    val strides = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
     val initStr = if (init.isDefined) init.get.map(quoteAsScala).map(x => src"${x}.toDouble").mkString("Some(List(",",","))")
@@ -301,6 +305,16 @@ trait ChiselGenMem extends ChiselGenCommon {
     // RegFiles
     case op@RegFileNew(_, inits) => emitMem(lhs, "ShiftRegFile", inits)
     case RegFileReset(rf, en)    => 
+      val parent = lhs.parent
+      if (memsWithReset.contains(rf)) throw new Exception(s"Currently only one resetter per RegFile is supported ($rf ${rf.name} has more than 1)")
+      else {
+        memsWithReset = memsWithReset :+ rf
+        val flowEnable = src",${swap(parent,SM)}.io.flow"
+        val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
+        emitt(src"${rf}.io.reset := ${invisibleEnable} & ${and(en)}")
+
+      }
+
       // val parent = lhs.parent.s.get
       // val id = resettersOf(rf).map{_._1}.indexOf(lhs)
       // duplicatesOf(rf).indices.foreach{i => emitt(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
@@ -315,6 +329,8 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // LineBuffers
     case LineBufferNew(rows, cols) => emitMem(lhs, "LineBuffer", None)
+    case LineBufferBankedEnq(lb, data, ens) => emitWrite(lhs,lb,data,Seq(),Seq(),ens)
+    case LineBufferBankedRead(lb, bank, ofs, ens) => emitRead(lhs,lb,bank,ofs,ens)
     
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
@@ -347,29 +363,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
     val accesses = mem.accesses.filter(_.port.bufferPort.isDefined)
-
-    var specialLB = false
-    // val readCtrls = readPorts.map{case (port, readers) =>
-    //   val readTops = readers.flatMap{a => topControllerOf(a, mem, i) }
-    //   mem match {
-    //     case Def(_:LineBufferNew[_]) => // Allow empty lca, meaning we use a sequential pipe for rotations
-    //       if (readTops.nonEmpty) {
-    //         readTops.headOption.get.node
-    //       } else {
-    //         warn(u"Memory $mem, instance $i, port $port had no read top controllers.  Consider wrapping this linebuffer in a metapipe to get better speedup")
-    //         specialLB = true
-    //         // readTops.headOption.getOrElse{throw new Exception(u"Memory $mem, instance $i, port $port had no read top controllers") }    
-    //         readers.head.node
-    //       }
-    //     case _ =>
-    //       readTops.headOption.getOrElse{throw new Exception(u"Memory $mem, instance $i, port $port had no read top controllers") }.node    
-    //   }
-      
-    // }
-    // if (readCtrls.isEmpty) throw new Exception(u"Memory $mem, instance $i had no readers?")
-
-    // childrenOf(parentOf(readPorts.map{case (_, readers) => readers.flatMap{a => topControllerOf(a,mem,i)}.head}.head.node).get)
-    if (!specialLB && accesses.nonEmpty) {
+    if (accesses.nonEmpty) {
       val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses)
       if (lca.isParallel){ // Assume memory analysis chose buffering based on lockstep of different bodies within this parallel, and just use one
         val releventAccesses = accesses.toList.filter(_.ancestors.contains(lca.children.head)).toSet
@@ -383,23 +377,7 @@ trait ChiselGenMem extends ChiselGenCommon {
         info.toList        
       }
     } else {
-      throw new Exception("Implement LB with transient buffering")
-      // // Assume write comes before read and there is only one write
-      // val writer = writers.head.ctrl._1
-      // val reader = readers.head.ctrl._1
-      // val lca = leastCommonAncestorWithPaths[Exp[_]](reader, writer, {node => parentOf(node)})._1.get
-      // val allSiblings = childrenOf(lca)
-      // var writeSibling: Option[Exp[Any]] = None
-      // var candidate = writer
-      // while (!writeSibling.isDefined) {
-      //   if (allSiblings.contains(candidate)) {
-      //     writeSibling = Some(candidate)
-      //   } else {
-      //     candidate = parentOf(candidate).get
-      //   }
-      // }
-      // // Get LCA of read and write
-      // List((writeSibling.get, src"/*seq write*/"))
+      throw new Exception(s"Cannot create a buffer on $mem, which has no accesses")
     }
 
   }

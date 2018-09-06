@@ -41,6 +41,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 }
 object ModBanking {
   def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
+  def Simple(banks: Int, rank: Int) = ModBanking(banks, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
 }
 
 
@@ -159,6 +160,7 @@ case class Memory(
 
   def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
+  def Ps: Seq[Int] = banking.map(_.Ps).flatten
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>

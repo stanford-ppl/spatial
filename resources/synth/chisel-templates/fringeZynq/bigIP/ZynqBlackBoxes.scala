@@ -113,8 +113,8 @@ generate_target {all} [get_ips $moduleName]
     })
 
     // From doc: https://www.xilinx.com/support/documentation/ip_documentation/mult_gen/v12_0/pg108-mult-gen.pdf
-    // Use LUT-based mults when width <= 16 bits
-    val dspThreshold = 16 // Use DSPs for bit widths >= 16
+    // Use LUT-based mults when width <= 15 bits
+    val dspThreshold = 15 // Use DSPs for bit widths >= 15
     val multConstruction = if ((aWidth > dspThreshold) | (bWidth > dspThreshold) | (outWidth > dspThreshold)) {
       "Use_Mults"
     } else {

@@ -13,7 +13,7 @@ class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
   override protected def quote(s: Sym[_]): String = s.rhs match {
     case (_:Def.Node[_] | _:Def.Bound[_]) => 
       val q = super.quote(s)
-      elem("a", q, "href"->s"file:///$out/IR.html#$q")
+      elem("a", q, "href"->s"IR.html#$q")
     case _ => super.quote(s)
   }
 
@@ -54,7 +54,7 @@ class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
 
   override def emitMeta(lhs: Sym[_]): Unit = lhs match {
     case lhs if lhs.blocks.nonEmpty =>
-      emit(elem("a", "dot<br>", "href"->s"file:///$out/$lhs.html"))
+      emit(elem("a", "dot<br>", "href"->s"$lhs.html"))
       super.emitMeta(lhs)
     case lhs =>
       val parent = lhs match {
@@ -62,7 +62,7 @@ class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
         case _ => lhs.blk.s
       }
       val parentFile = parent.map { sym => s"$sym" }.getOrElse("Top")
-      emit(elem("a", "dot<br>", "href"->s"file:///$out/$parentFile.html"))
+      emit(elem("a", "dot<br>", "href"->s"$parentFile.html"))
       super.emitMeta(lhs)
   }
 

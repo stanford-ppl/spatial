@@ -61,6 +61,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
       val isOuter = children.exists{c => !c.isBranch || c.isOuterControl} || op.isMemReduce
       s.rawLevel = if (isOuter) Outer else Inner
+
+      // Set blk for nodes inside ctrl
+      op.blocks.zipWithIndex.foreach{case (block,bId) =>
+        block.stms.foreach{lhs =>
+          lhs.blk = Blk.Node(s, bId)
+        }
+      }
       
     case ctrl: Control[_] =>
       // Find all children controllers within this controller

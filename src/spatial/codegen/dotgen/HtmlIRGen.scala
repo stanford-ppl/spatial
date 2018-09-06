@@ -1,6 +1,7 @@
 package spatial.codegen.dotgen
 
 import argon._
+import utils.io.files._
 
 trait HtmlIRCodegen extends argon.codegen.Codegen {
 
@@ -10,6 +11,9 @@ trait HtmlIRCodegen extends argon.codegen.Codegen {
 
   protected def emitEntry(block: Block[_]): Unit = {
     ret(block)
+  }
+  override def clearGen(): Unit = {
+    deleteFiles(s"$out$sep$entryFile")
   }
 
   override protected def postprocess[R](block: Block[R]): Block[R] = {

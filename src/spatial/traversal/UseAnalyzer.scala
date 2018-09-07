@@ -87,7 +87,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     dbgs(s"  Uses:    ${pending.mkString(", ")}")
     dbgs(s"  Transient: ${lhs.isTransient}")
     // We care about whether the IR scope is outer, not whether the owning controller is outer
-    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl
+    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl || (blk.toScope.toCtrl.isInnerControl && blk.toScope.children.length > 0)
     dbgs(s"  Outer: $isOuter")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node

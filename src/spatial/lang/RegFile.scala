@@ -24,7 +24,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   @api def par(p: I32): C[A] = {
     implicit val C: Type[C[A]] = this.selfType
     val ds = this.dims
-    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => i.toSeries } :+ (ds.last par p)
+    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => Series(I32(0),i,I32(1),I32(1)) } :+ (ds.last par p)
     stage(MemDenseAlias(me,ranges))
   }
 

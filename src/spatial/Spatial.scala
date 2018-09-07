@@ -123,24 +123,23 @@ trait Spatial extends Compiler {
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
+        iterationDiffAnalyzer   ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
-        /** Iteration difference analysis */
-        iterationDiffAnalyzer   ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */
         regReadCSE          ==>
         /** Dead code elimination */
         useAnalyzer         ==>
-        transientCleanup    ==>
-        /** Update buffer depths */
-        bufferRecompute     ==> printer ==> transformerChecks ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
-        flatteningTransformer ==> printer ==> transformerChecks ==>
+        flatteningTransformer ==> 
+        /** Update buffer depths */
+        bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Accumulation Specialization **/
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
@@ -233,6 +232,10 @@ trait Spatial extends Compiler {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("forceBanking").action { (_,_) => 
+      spatialConfig.enableForceBanking = true
+    }.text("Ensures that memories will always get banked and compiler will never decide that it is cheaper to duplicate")
 
     cli.opt[Unit]("tightControl").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableTightControl = true

@@ -28,6 +28,7 @@ import spatial.dsl._
 
     val result = getMem(dramB)
     val golden = Array.empty[Float](32)
+    (0 until 32).foreach{i => golden(i) = dataB(i) }
     (0 until 32).foreach{i => golden(dataA(i)) = golden(dataA(i)) - 1 }
 
     printArray(result, "result")

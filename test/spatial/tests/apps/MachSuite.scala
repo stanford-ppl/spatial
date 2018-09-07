@@ -918,7 +918,7 @@ import spatial.targets._
     val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
     // Pass if >75% match
-    val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == dash) || (b == dash)) 1 else 0}.reduce{_+_}
+    val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == d) || (b == d)) 1 else 0}.reduce{_+_}
     val cksum = matches.to[Float] > 0.75.to[Float]*measured_length.to[Float]*2
 
     println("Result A: " + seqa_aligned_string)
@@ -1263,7 +1263,7 @@ import spatial.targets._
     val raw_pattern = raw_string_pattern.map{c => c.to[Int8] }
     val par_load = 16
     val outer_par = 4 (1 -> 1 -> 16)
-    val STRING_SIZE_NUM = raw_string.length.to[Int]
+    val STRING_SIZE_NUM = raw_string.length.to[Int] + (outer_par - (raw_string.length.to[Int] % outer_par)) // Round it out so that outer_par can evenly divide it
     val PATTERN_SIZE_NUM = raw_pattern.length.to[Int]
     val STRING_SIZE = ArgIn[Int]
     val PATTERN_SIZE = ArgIn[Int]
@@ -1337,7 +1337,7 @@ import spatial.targets._
     println("Found " + computed_nmatches)
 
     val cksum = gold_nmatches.reduce{_+_} == computed_nmatches
-    println("PASS: " + cksum + " (KMP) * Implement string find, string file parser, and string <-> hex <-> dec features once argon refactor is done so we can test any strings")
+    println("PASS: " + cksum + " (KMP)")
     assert(cksum)
   }
 }      
@@ -1726,8 +1726,7 @@ import spatial.targets._
           val upper_tmp = Reg[Int](0)
           Foreach(from until mid+1 by 1){ i => lower_fifo.enq(data_sram(i)) }
           Foreach(mid+1 until to+1 by 1){ j => upper_fifo.enq(data_sram(j)) }
-          Pipe.II(6).Foreach(from until to+1 by 1) { k =>  // Bug # 202
-          // Pipe.Foreach(from until to+1 by 1) { k =>  // Bug # 202
+          Pipe.II(6).Foreach(from until to+1 by 1) { k => 
             data_sram(k) = 
               if (lower_fifo.isEmpty) { upper_fifo.deq() }
               else if (upper_fifo.isEmpty) { lower_fifo.deq() }

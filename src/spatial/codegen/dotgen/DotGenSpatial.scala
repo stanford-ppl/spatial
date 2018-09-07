@@ -43,6 +43,7 @@ trait DotGenSpatial extends DotCodegen {
     case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
     case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
     case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"
+    case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
     case Def(GetDRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
     case _ => super.label(lhs)
   }

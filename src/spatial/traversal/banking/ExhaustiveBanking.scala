@@ -203,21 +203,22 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         case Nil => List(Nil)
         case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
       }
-    def allLoops(maxes: Seq[Int], steps: Seq[Int], iterators: Seq[Int]): Seq[Int] = maxes match {
+    def allLoops(maxes: Seq[Int], a: Seq[Int], B: Int, iterators: Seq[Int]): Seq[Int] = maxes match {
       case Nil => Nil
-      case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, steps.tail, iterators ++ Seq(i*steps.head))}
-      case h::tail if tail.isEmpty => (0 to h-1).map{i => i*steps.head + iterators.sum}
+      case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}
+      case h::tail if tail.isEmpty => (0 to h-1).map{i => i*a.head/B + iterators.sum}
     }
-    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, allPossible: Seq[Int]): Boolean = {
-      allLoops(p,a,Nil).map(_%N).sorted.distinct == allPossible
+    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int, allPossible: Seq[Int]): Boolean = {
+      val banksInFence = allLoops(p,a,B,Nil).map(_%N)
+      allPossible.forall{b => banksInFence.count(_==b) == B}
     }
     def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
     try {
       val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
-      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, Nil).map(_%(n*b)).sorted.distinct
-      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ List(stagedDims(i))}
-      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == allBanksAccessible.length).collect{case p if spansAllBanks(p,alpha,n*b,allBanksAccessible) => p}
+      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted.distinct
+      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1) List(stagedDims(i)) else List()}}
+      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == allBanksAccessible.length * b).collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible) => p}
       val PandCost = options.map{option => 
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product

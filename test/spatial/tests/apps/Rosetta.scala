@@ -4,7 +4,7 @@ import spatial.dsl._
 import spatial.targets._
 
 @spatial class Rendering3D extends SpatialTest {
-	override def runtimeArgs = "1 0"
+	override def runtimeArgs = "0 3192 0"
 	//override val target = Zynq
 	// struct size of power of 2
 	@struct case class triangle3D(x0 : UInt8, y0 : UInt8, z0 : UInt8, 
@@ -25,6 +25,7 @@ import spatial.targets._
 				   pixels 			: FIFO[Pixel],
 				   frame_buffer		: SRAM2[UInt8]) : Unit = {
 
+		//println(" " + size_pixels)
 		Foreach(size_pixels by 1){ i =>
 			val curr_pixel = pixels.deq()
 			frame_buffer(curr_pixel.y.to[I32], curr_pixel.x.to[I32]) = curr_pixel.color
@@ -36,15 +37,20 @@ import spatial.targets._
 				 pixels 	: FIFO[Pixel],
 				 z_buffer 	: SRAM2[UInt8]) : Int = {
 
+		val pixel_reg = Reg[Int](0)
+		Pipe { pixel_reg := 0.to[Int] }
+
 		Foreach(size_fragment by 1) { p =>
-			val curr_fragment = fragments.deq()
+			val curr_fragment = fragments.deq() //(p)
 			if (curr_fragment.z < z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32])) {
 				pixels.enq(Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color))
 				z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32]) = curr_fragment.z
+				pixel_reg := pixel_reg + 1.to[Int]
 			}
 		}
 
-		pixels.numel.to[Int]
+		//pixels.numel.to[Int]
+		pixel_reg.value 
 	}
 
 	def rasterization2(flag			: Boolean,
@@ -54,16 +60,16 @@ import spatial.targets._
 					   sample_triangle2D : triangle2D, 
 					   fragments 	: FIFO[CandidatePixel]) : Int = {
 
-		def pixel_in_triangle(x : Int, y : Int, tri2D : triangle2D) : Boolean = {
+		def pixel_in_triangle(x : Int16, y : Int16, tri2D : triangle2D) : Boolean = {
 
-			val pi0 = (x - tri2D.x0.to[Int]) * (tri2D.y1.to[Int] - tri2D.y0.to[Int]) -
-					   (y - tri2D.y0.to[Int]) * (tri2D.x1.to[Int] - tri2D.x0.to[Int])
-			val pi1 = (x - tri2D.x1.to[Int]) * (tri2D.y2.to[Int] - tri2D.y1.to[Int]) - 
-					   (y - tri2D.y1.to[Int]) * (tri2D.x2.to[Int] - tri2D.x1.to[Int])
-			val pi2 = (x - tri2D.x2.to[Int]) * (tri2D.y0.to[Int] - tri2D.y2.to[Int]) -
-					   (y - tri2D.y2.to[Int]) * (tri2D.x0.to[Int] - tri2D.x2.to[Int])
+			val pi0 =  (x - tri2D.x0.to[Int16]) * (tri2D.y1.to[Int16] - tri2D.y0.to[Int16]) -
+					   (y - tri2D.y0.to[Int16]) * (tri2D.x1.to[Int16] - tri2D.x0.to[Int16])
+			val pi1 =  (x - tri2D.x1.to[Int16]) * (tri2D.y2.to[Int16] - tri2D.y1.to[Int16]) - 
+					   (y - tri2D.y1.to[Int16]) * (tri2D.x2.to[Int16] - tri2D.x1.to[Int16])
+			val pi2 =  (x - tri2D.x2.to[Int16]) * (tri2D.y0.to[Int16] - tri2D.y2.to[Int16]) -
+					   (y - tri2D.y2.to[Int16]) * (tri2D.x0.to[Int16] - tri2D.x2.to[Int16])
 			
-			(pi0 >= 0.to[Int] && pi1 >= 0.to[Int] && pi2 >= 0.to[Int])
+			(pi0 >= 0.to[Int16] && pi1 >= 0.to[Int16] && pi2 >= 0.to[Int16])
 
 		}
 
@@ -71,10 +77,12 @@ import spatial.targets._
 		val x_max = xmax_index.value //(max_min(1).to[I32] - max_min(0).to[I32]).to[I32]
 		val y_max = ymax_index.value //(max_min(3).to[I32] - max_min(2).to[I32]).to[I32]
 
+		val frag_reg = Reg[Int](0)
+		Pipe { frag_reg := 0.to[Int] }
 		if ( (!flag) ) { 
-		   	Foreach(x_max by 1, y_max by 1 par 8){ (x_t, y_t) =>
-				val x = max_min(0).to[Int] + x_t.to[Int]
-				val y = max_min(2).to[Int] + y_t.to[Int]
+		   	Foreach(x_max by 1, y_max by 1 par 1){ (x_t, y_t) =>
+				val x = max_min(0).to[Int16] + x_t.to[Int16]
+				val y = max_min(2).to[Int16] + y_t.to[Int16]
 
 				val in_triangle = pixel_in_triangle(x, y, sample_triangle2D) 
 
@@ -83,7 +91,10 @@ import spatial.targets._
 				val frag_z = sample_triangle2D.z
 				val frag_color = color 
 
-				Pipe { fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color), in_triangle == true)	}			   
+				if (in_triangle == true) {
+					fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color) ) 
+					frag_reg := frag_reg +  1.to[Int]  
+				}
 			} /*
 			Foreach(max_index.value.to[I32] by 1 par 4) { k =>
 			 	val x = max_min(0).to[Int] + k.to[Int] % max_min(4).to[Int]
@@ -100,7 +111,8 @@ import spatial.targets._
 		    //    }
 		    } */
 		}
-		mux(flag, 0.to[Int], fragments.numel.to[Int]) /* if (flag) 0 else i */
+		frag_reg.value 
+		//mux(flag, 0.to[Int], fragments.numel.to[Int]) /* if (flag) 0 else i */
 	}
 
 	/* calculate bounding box for 2D triangle */
@@ -134,8 +146,8 @@ import spatial.targets._
 			val new_y1 = mux(check_negative, sample_triangle2D.y0, sample_triangle2D.y1)
 
 			Pipe { sample_triangle2D := triangle2D(new_x0, new_y0, new_x1, new_y1, 
-										    sample_triangle2D.x2, sample_triangle2D.y2,
-										    sample_triangle2D.z) } 
+										  		   sample_triangle2D.x2, sample_triangle2D.y2,
+										    	   sample_triangle2D.z) } 
 			
 			val min_x =  find_min(sample_triangle2D.x0, sample_triangle2D.x1, sample_triangle2D.x2)
 			val max_x =  find_max(sample_triangle2D.x0, sample_triangle2D.x1, sample_triangle2D.x2)
@@ -204,18 +216,12 @@ import spatial.targets._
 		val img_y_size = 256
 		val img_x_size = 256
 
-		val input_reg = ArgIn[Int] // input value should be 3192 
-		setArg(input_reg, args(0).to[Int])
-
-		val input_num = input_reg.value
-
 		val num_triangles = 3192 
-		val do_triangles = input_num
+		val last_triangle =  args(1).to[Int]
 
-		// val tris_to_do = ArgIn[Int]
-		// setArg(tris_to_do, args(2).to[Int])
+		val tri_start  = args(0).to[Int]
 
-		val run_on_board = args(1).to[Int] > 0.to[Int]  
+		val run_on_board = args(2).to[Int] > 0.to[Int]  
 		val input_file_name = if (run_on_board) "/home/jcamach2/Rendering3D/input_triangles.csv" else s"$DATA/rosetta/3drendering_input_triangles.csv"
 		val output_file_name = if (run_on_board) "/home/jcamach2/Rendering3D/sw_output.csv" else s"$DATA/rosetta/3drendering_sw_output.csv"
 		val input_trianges_csv = loadCSV2D[T](input_file_name, ",", "\n")
@@ -256,21 +262,22 @@ import spatial.targets._
 			val frame_buffer  = SRAM[UInt8](img_y_size, img_x_size)
 
 			/* instantiate buffer */
-			Foreach(img_y_size by 1, img_x_size by 1 par 24) { (i,j) =>
+			Foreach(img_y_size by 1, img_x_size by 1 par 16) { (i,j) =>
 				z_buffer(i,j) = 255.to[UInt8]
 				frame_buffer(i,j) = 0.to[UInt8]
 			}
 			
+			val do_triangles = last_triangle - tri_start
 			Foreach(do_triangles by vec_sram_len) { i =>
 
 				val load_len = min(vec_sram_len.to[Int], do_triangles - i)
 				val triangle3D_vector_sram = SRAM[triangle3D](vec_sram_len)
 
-				triangle3D_vector_sram load triangle3D_vector_dram(i :: i + load_len par 4) 
+				triangle3D_vector_sram load triangle3D_vector_dram(i :: i + vec_sram_len par 4) 
 	
 				Foreach(load_len by 1) { c =>
 
-					val curr_triangle3D = triangle3D_vector_sram(c)
+					val curr_triangle3D = triangle3D_vector_sram(c + tri_start)
 					val tri2D = Reg[triangle2D].buffer
 
 					val max_min	= RegFile[UInt8](5)
@@ -285,11 +292,11 @@ import spatial.targets._
 
 					val fragment = FIFO[CandidatePixel](500)
 
-					Pipe { projection(curr_triangle3D, tri2D, angle) }
-					Pipe { flag := rasterization1(tri2D, max_min, xmax_index, ymax_index) }
-					Pipe { size_fragment := rasterization2(flag.value, max_min, xmax_index, ymax_index, tri2D, fragment) }
-					Pipe { size_pixels := zculling(fragment, size_fragment.value, pixels, z_buffer) }
-					Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
+					'proj.Pipe { projection(curr_triangle3D, tri2D, angle) }
+					'rast1.Pipe { flag := rasterization1(tri2D, max_min, xmax_index, ymax_index) } 
+					'rast2.Pipe { size_fragment := rasterization2(flag.value, max_min, xmax_index, ymax_index, tri2D, fragment) }
+					'zcull.Pipe { size_pixels := zculling(fragment, size_fragment.value, pixels, z_buffer) }
+					'color.Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
 
 				}
 
@@ -325,7 +332,7 @@ import spatial.targets._
 		val frame_output = (0 :: img_y_size,  0 :: img_x_size) { (i,j) => if (frame_screen(i,j) > 0) 1.to[T] else 0.to[T] }
 		val gold_output = (0 :: img_y_size,  0 :: img_x_size) { (i,j) => if (sw_original_output.apply(img_y_size - 1- i,j) > 0) 1.to[T] else 0.to[T] }
 
-		val print_output = input_reg.value > 0.to[Int]
+		val print_output = true
 		if (print_output) { /* this is for making sure that I'm loading the file correctly */
 			for (i <- 0 until img_y_size) {
 				for (j <- 0 until img_x_size) {

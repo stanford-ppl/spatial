@@ -15,13 +15,13 @@ trait SpatialTest extends Spatial with DSLTest {
     private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
 
     override def parseMakeError(line: String): Result = {
-      if (line.contains("Placer could not place all instances")) Error(line)
-      else if (err.findFirstIn(line).isDefined) Error(line)
+      if (line.contains("Placer could not place all instances")) MakeError(line)
+      else if (err.findFirstIn(line).isDefined) MakeError(line)
       else super.parseMakeError(line)
     }
 
     override def parseRunError(line: String): Result = {
-      if (line.trim.endsWith("failed.")) Error(line)    // VCS assertion failure
+      if (line.trim.endsWith("failed.")) RunError(line)    // VCS assertion failure
       else super.parseRunError(line)
     }
   }
@@ -34,9 +34,9 @@ trait SpatialTest extends Spatial with DSLTest {
   ) {
     def shouldRun: Boolean = checkFlag("test.Scala")
     override def parseRunError(line: String): Result = {
-      if (line.trim.startsWith("at")) Error(prev) // Scala exception
-      else if (line.trim.contains("Assertion failure")) Error(line) // Assertion failure
-      else if (line.trim.contains("error")) Error(line) // Runtime/compiler error
+      if (line.trim.startsWith("at")) RunError(prev) // Scala exception
+      else if (line.trim.contains("Assertion failure")) RunError(line) // Assertion failure
+      else if (line.trim.contains("error")) RunError(line) // Runtime/compiler error
       else super.parseRunError(line)
     }
   }

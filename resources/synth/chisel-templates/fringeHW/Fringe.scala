@@ -102,6 +102,7 @@ class Fringe(
   println(s"[Fringe] loadStreamInfo: $loadStreamInfo, storeStreamInfo: $storeStreamInfo")
   val numStreams = loadStreamInfo.size + storeStreamInfo.size
   val assignment = getChannelAssignment(numStreams, numChannels)
+  val debugChannelID = 0
   val mags = List.tabulate(numChannels) { i =>
     val channelAssignment = assignment(i)
     val (loadStreamIDs, storeStreamIDs) = getAppStreamIDs(channelAssignment)
@@ -118,7 +119,6 @@ class Fringe(
     mag
   }
 
-  val debugChannelID = 0
 
   val numDebugs = mags(debugChannelID).numDebugs
   val numRegs = numArgIns + numArgOuts + 2 - numArgIOs + numDebugs // (command, status registers)

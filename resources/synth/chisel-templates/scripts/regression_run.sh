@@ -8,7 +8,7 @@ if [[ $GDOCS -eq 1 ]]; then
 	curpath=`pwd`
 	basepath=`echo $curpath | sed "s/\/spatial\/.*/\/spatial\//g"`
 
-	pass_line=`cat log | grep "Assertion" | wc -l`
+	pass_line=`cat log | grep -a "Assertion" | wc -l`
 
 	if [[ ${pass_line} -gt 0 ]]; then
 		pass=0
@@ -16,8 +16,8 @@ if [[ $GDOCS -eq 1 ]]; then
 		pass=1
 	fi
 
-	timeout_wc=`cat log | grep "TIMEOUT" | wc -l`
-	runtime_string=`cat log | grep "Design ran for" | sed "s/Design ran for //g" | sed "s/ cycles.*//g"`
+	timeout_wc=`cat log | grep -a "TIMEOUT" | wc -l`
+	runtime_string=`cat log | grep -a "Design ran for" | sed "s/Design ran for //g" | sed "s/ cycles.*//g"`
 
 	if [[ ${timeout_wc} -gt 0 ]]; then
 		runtime="TIMEOUT"
@@ -55,7 +55,7 @@ if [[ $GDOCS -eq 1 ]]; then
 	testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 	testdirsarray=($testdirs)
 	for t in "${testdirsarray[@]}"; do
-		fullname=`echo $fullname | sed "s/${t}_//g"`
+		fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"`
 	done
 	appname=$fullname
 	properties=`cat chisel/IOModule_1.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
@@ -64,8 +64,8 @@ if [[ $GDOCS -eq 1 ]]; then
 
 fi
 
-timeout=`if [[ $(cat log | grep TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
-pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+timeout=`if [[ $(cat log | grep -a TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
 
 if [[ $pass = 0 && $timeout = 0 ]]; then
 	exit 0

@@ -61,17 +61,18 @@ object DenseTransfer {
   ): Void = {
 
     // Special case if dram is a DenseAlias with the last dimension slashed
-    val normalCounting: Boolean = dram.rawRank.last == dram.seqRank.last
-    val dramOffsets: Seq[I32] = dram.starts()
+    val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
     val rawDramOffsets: Seq[I32] = dram.rawStarts()
-    val lens: Seq[I32] = dram.lens() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
+    val rawRank: Int = dram.rawRank.length
+    val sparseRank: Seq[Int] = dram.sparseRank ++ {if (!normalCounting) Seq(rawRank) else Nil }
+    val lens: Map[Int,I32] = dram.sparseLens() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
     val rawDims: Seq[I32] = dram.rawDims()
-    val strides: Seq[I32] = dram.steps()
-    val pars: Seq[I32] = dram.pars() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
-    val counters: Seq[() => Counter[I32]] = lens.zip(pars).map{case (d,p) => () => Counter[I32](start = 0, end = d, par = p) }
+    val strides: Map[Int,I32] = dram.sparseSteps()
+    val pars: Map[Int,I32] = dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
+    val counters: Seq[() => Counter[I32]] = sparseRank.map{d => () => Counter[I32](start = 0, end = lens(d), par = pars(d)) }
 
-    val p = pars.last
-    val requestLength: I32 = lens.last
+    val p = pars.toSeq.maxBy(_._1)._2
+    val requestLength: I32 = lens.toSeq.maxBy(_._1)._2
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
     p match {case Expect(p) => assert(p.toInt*A.nbits <= target.burstSize, s"Cannot parallelize by more than the burst size! Please shrink par (par ${p.toInt} * ${A.nbits} > ${target.burstSize})"); case _ =>}
 
@@ -81,8 +82,8 @@ object DenseTransfer {
         val indices = is :+ 0.to[I32]
 
         // Pad indices, strides with 0's against rawDramOffsets
-        val indicesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) indices(dram.seqRank.indexOf(i)) else 0.to[I32]}
-        val stridesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) strides(dram.seqRank.indexOf(i)) else 1.to[I32]}
+        val indicesPadded = dram.rawRank.map{i => if (dram.sparseRank.contains(i)) indices(dram.sparseRank.indexOf(i)) else 0.to[I32]}
+        val stridesPadded = dram.rawRank.map{i => strides.getOrElse(i, 1.to[I32])}
 
         val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
         val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}

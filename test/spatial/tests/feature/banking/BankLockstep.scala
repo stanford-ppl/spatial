@@ -69,7 +69,7 @@ import spatial.dsl._
         Reduce(Reg[Int])(max by 1 par 2){j =>  // j should dephase relative to LOOP1
           sram(i,j)
         }{_+_}
-      }
+      }{_+_}
 
     }
 

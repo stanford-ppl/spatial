@@ -25,8 +25,8 @@ import spatial.dsl._
         in load inputs(i::i+T par 16)
         val niter = Reg[Int]
         Pipe{niter.reset}
-        Pipe{niter.reset} // Testing codegen for multiple resetters
-        Pipe{niter := 0}
+        // Pipe{niter.reset} // Testing codegen for multiple resetters
+        // Pipe{niter := 0}
         Foreach(I by 1){x =>
           // niter := niter + 1
           niter :+= 1

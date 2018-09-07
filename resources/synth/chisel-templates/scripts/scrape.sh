@@ -22,7 +22,7 @@ aws_dir_name=`basename \`pwd\``
 testdirs=`find ${REGRESSION_HOME}/current-spatial/spatial/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 testdirsarray=($testdirs)
 for t in "${testdirsarray[@]}"; do
-	fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"`
+	fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"` 
 done
 appname=$fullname
 if [[ $1 = "Zynq" ]]; then
@@ -138,11 +138,11 @@ if [[ $1 = "Zynq" ]]; then
 	    rm /home/sync/\$(whoami)
 	    rm -rf /home/regression/${APP}*	  
 	fi" &> log
-    timeout=`if [[ $(cat log | grep TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
-    locked=`if [[ $(cat log | grep "Board locked" | wc -l) -gt 0 ]]; then cat log | grep "Board locked"; else echo 0; fi`
-    runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
+    timeout=`if [[ $(cat log | grep -a TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+    locked=`if [[ $(cat log | grep -a "Board locked" | wc -l) -gt 0 ]]; then cat log | grep -a "Board locked"; else echo 0; fi`
+    runtime=`cat log | grep -a "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
-    pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
+    pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
     python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"
 elif [[ $1 = "ZCU" ]]; then
 	APP=$(basename $(pwd))
@@ -165,11 +165,11 @@ elif [[ $1 = "ZCU" ]]; then
 	    rm /home/sync/\$(whoami)
 	    rm -rf /root/${APP}*	  
 	fi" &> log
-    timeout=`if [[ $(cat log | grep TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
-    locked=`if [[ $(cat log | grep "Board locked" | wc -l) -gt 0 ]]; then cat log | grep "Board locked"; else echo 0; fi`
-    runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
+    timeout=`if [[ $(cat log | grep -a TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+    locked=`if [[ $(cat log | grep -a "Board locked" | wc -l) -gt 0 ]]; then cat log | grep -a "Board locked"; else echo 0; fi`
+    runtime=`cat log | grep -a "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
-    pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
+    pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
     python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"	
 elif [[ $1 = "Arria10" ]]; then
 	APP=$(basename $(pwd))
@@ -188,11 +188,11 @@ elif [[ $1 = "Arria10" ]]; then
 	    rm /home/sync/\$(whoami)
 	    rm -rf /home/root/${APP}*	  
 	fi" &> log
-    timeout=`if [[ $(cat log | grep TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
-    locked=`if [[ $(cat log | grep "Board locked" | wc -l) -gt 0 ]]; then cat log | grep "Board locked"; else echo 0; fi`
-    runtime=`cat log | grep "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
+    timeout=`if [[ $(cat log | grep -a TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
+    locked=`if [[ $(cat log | grep -a "Board locked" | wc -l) -gt 0 ]]; then cat log | grep -a "Board locked"; else echo 0; fi`
+    runtime=`cat log | grep -a "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
-    pass=`if [[ $(cat log | grep "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
+    pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
     python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"	
 fi
 

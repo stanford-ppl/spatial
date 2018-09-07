@@ -91,8 +91,8 @@ trait ExternalAliases extends InternalAliases {
   type RegFile3[A] = spatial.lang.RegFile3[A]
   lazy val RegFile = spatial.lang.RegFile
 
-  // type LineBuffer[A] = spatial.lang.LineBuffer[A]
-  // lazy val LineBuffer = spatial.lang.LineBuffer
+  type LineBuffer[A] = spatial.lang.LineBuffer[A]
+  lazy val LineBuffer = spatial.lang.LineBuffer
 
   type FIFO[A] = spatial.lang.FIFO[A]
   lazy val FIFO = spatial.lang.FIFO

@@ -17,12 +17,7 @@ trait ChiselGenController extends ChiselGenCommon {
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
-
-  /* Set of control nodes which already have their enable signal emitted */
-  var enDeclaredSet = Set.empty[Sym[_]]
-
-  /* Set of control nodes which already have their done signal emitted */
-  var doneDeclaredSet = Set.empty[Sym[_]]
+  private var memsWithReset: List[Sym[_]] = List()
 
   var instrumentCounters: List[(Sym[_], Int)] = List()
 

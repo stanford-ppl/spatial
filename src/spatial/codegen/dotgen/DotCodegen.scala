@@ -39,7 +39,7 @@ trait DotCodegen extends argon.codegen.Codegen {
     val htmlPath = s"${out}${sep}$fileName.html"
     val dotPath = s"${out}${sep}$fileName.dot"
 
-    def addExternNode(node:Sym[_]):this.type = { externNodes += node; this }
+    def addExternNode(node:Sym[_]):this.type = { if (!node.isConst) externNodes += node; this }
     def addEdge(edge:Edge):this.type = { 
       val (from, to, alias) = edge
       if (!from.isConst && !to.isConst) edges += edge

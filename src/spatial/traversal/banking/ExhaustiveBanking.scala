@@ -16,19 +16,23 @@ import spatial.util.IntLike._
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
   private val MAGIC_CUTOFF_N = 1.4
-  private val max1DAttempts = 1500
   private val k = boundVar[I32]
   private val k0 = boundVar[I32]
   private val k1 = boundVar[I32]
   private val Bs = Seq(2, 4, 8, 16, 32, 64, 128, 256)
 
+  /** Returns a Map from Seq(banking schemes) to the readers for these schemes.  
+    * Generally, it will contain Map(Seq(flat_scheme, nested_scheme) -> all readers) but in 
+    * the case of dephased accesses that cannot be banked together, there will be multiple 
+    * entries in the map who each point to a different partition of readers
+    */
   override def bankAccesses(
     mem:    Sym[_],
     rank:   Int,
     reads:  Set[Set[AccessMatrix]],
     writes: Set[Set[AccessMatrix]],
     dimGrps: Seq[Seq[Seq[Int]]]
-  ): Seq[Seq[Banking]] = {
+  ): Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]] = {
 
     // Modify access matrices due to lockstep dephasing
     val readIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = reads.map{grp => grp.map{a => 
@@ -54,54 +58,74 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     val grps = (newReads ++ newWrites).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
     val fullStrategy = Seq.tabulate(rank){i => i}
-    if (grps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
-    else {
-      dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
-        val banking = strategy.map{dims =>
-          val selGrps = grps.map{grp => 
-            val sliceCompPairs = grp.map{mat => (mat.sliceDims(dims), mat.sliceDims(fullStrategy.diff(dims)))} 
-            var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
 
-            /** True if the sliced matrix at the given index should be kept
-              *   - If this slice is unique
-              *   - If it is not unique but its compliment collides
-              *   - If it is the first time we are seeing this slice
-              */
-            def isUniqueSlice(i: Int): Boolean = {
-              val current = sliceCompPairs(i)
-              val pairsExceptCurrent = sliceCompPairs.patch(i,Nil,1)
+    def findSchemes(myGrps: Set[Seq[SparseMatrix[Idx]]]): Seq[Seq[Banking]] = {
+      if (myGrps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
+      else {
+        dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
+          val banking = strategy.map{dims =>
+            val selGrps = myGrps.map{grp => 
+              val sliceCompPairs = grp.map{mat => (mat.sliceDims(dims), mat.sliceDims(fullStrategy.diff(dims)))} 
+              var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
 
-              val isUnique           = !pairsExceptCurrent.exists{case (keep, _) => keep == current._1 }
-              val complimentCollides = pairsExceptCurrent.exists{case (keep,drop) => keep == current._1 && drop == current._2 }
-              val firstTime          = !firstInstances.contains(current._1)
+              /** True if the sliced matrix at the given index should be kept
+                *   - If this slice is unique
+                *   - If it is not unique but its compliment collides
+                *   - If it is the first time we are seeing this slice
+                */
+              def isUniqueSlice(i: Int): Boolean = {
+                val current = sliceCompPairs(i)
+                val pairsExceptCurrent = sliceCompPairs.patch(i,Nil,1)
 
-              isUnique || complimentCollides || firstTime
+                val isUnique           = !pairsExceptCurrent.exists{case (keep, _) => keep == current._1 }
+                val complimentCollides = pairsExceptCurrent.exists{case (keep,drop) => keep == current._1 && drop == current._2 }
+                val firstTime          = !firstInstances.contains(current._1)
+
+                isUnique || complimentCollides || firstTime
+              }
+
+              Seq(sliceCompPairs.zipWithIndex.collect{case (current,i) if isUniqueSlice(i) =>
+                firstInstances += current._1
+                current._1
+              }:_*)
             }
-
-            Seq(sliceCompPairs.zipWithIndex.collect{case (current,i) if isUniqueSlice(i) =>
-              firstInstances += current._1
-              current._1
-            }:_*)
+            val stagedDims = dims.map(mem.stagedDims.map(_.toInt))
+            selGrps.zipWithIndex.foreach{case (grp,i) =>
+              dbgs(s"Banking accesses:")
+              dbgs(s"  Group #$i:")
+              grp.foreach{matrix => dbgss("    ", matrix.toString) }
+            }
+            findBanking(selGrps, dims, stagedDims)
           }
-          val stagedDims = dims.map(mem.stagedDims.map(_.toInt))
-          selGrps.zipWithIndex.foreach{case (grp,i) =>
-            dbgs(s"Banking accesses:")
-            dbgs(s"  Group #$i:")
-            grp.foreach{matrix => dbgss("    ", matrix.toString) }
+          val dimsInStrategy = strategy.flatten.distinct
+          val prunedGrps = myGrps.map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.distinct}
+          if (isValidBanking(banking,prunedGrps)) {
+            Some(banking)
           }
-          findBanking(selGrps, dims, stagedDims)
+          else None
         }
-        val dimsInStrategy = strategy.flatten.distinct
-        val prunedGrps = grps.map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.distinct}
-        dbgs(s"Check if $banking is valid for accesses:")
-        prunedGrps.flatten.foreach{x => 
-          dbgs(x.toString)
-        }
-        if (isValidBanking(banking,prunedGrps)) {
-          Some(banking)
-        }
-        else None
       }
+    }
+
+    val unifiedScheme = findSchemes(grps)
+      
+    if (unifiedScheme.nonEmpty) Map(reads -> unifiedScheme)
+    else {
+      // Regroup based on lockstepiness
+      val regroupedReads: Seq[Set[Set[AccessMatrix]]] = reads.map{grp => grp.map{a => 
+          val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
+              .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> readIterSubsts((iter,a.unroll.take(i))))}.toMap
+          (a,keyRules)
+        }.groupBy(_._2).map{case(rules,grp) => Set(grp.map(_._1.randomizeKeys(rules)).toSet)}.toSeq}.toSeq.flatten
+      dbgs(s"Attempting to regroup reads and bank by duplication with the following groups:")
+      regroupedReads.zipWithIndex.foreach{case(grp,i) => dbgs(s"New group #$i"); grp.flatten.foreach{a => dbgs(s"  $a")}}
+      val duplicationSchemes = regroupedReads.map{grp => 
+        val grps = (grp ++ newWrites).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
+        val bankings = findSchemes(grps)
+        (grp -> bankings)
+      }.toMap
+      dbgs(s"Found schemes $duplicationSchemes")
+      duplicationSchemes
     }
   }
 
@@ -109,7 +133,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   def isValidBanking(banking: Seq[ModBanking], grps: Set[Seq[SparseMatrix[Idx]]]): Boolean = {
     // TODO[2]: This may not be correct in all cases, need to verify!
     val banks = banking.map(_.nBanks).product
-    grps.forall{a => dbgs(s"$a: lenght < ${banks+1}? ${a.lengthLessThan(banks+1)}");a.lengthLessThan(banks+1)}
+    grps.forall{a => a.lengthLessThan(banks+1)}
   }
 
   /**
@@ -262,11 +286,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     def exhaustIterators(Ns: Iterator[Int], cheapAs: Boolean): Unit = {
       var attempts = 0
-      while(Ns.hasNext && banking.isEmpty && ((dims.size == stagedDims.size && attempts < max1DAttempts) || (dims.size < stagedDims.size))) {
+      while(Ns.hasNext && banking.isEmpty) {
         val N = Ns.next()
         val allAs = Alphas(rank, N, stagedDims)
         val As = if (cheapAs) allAs._1 else allAs._2
-        while (As.hasNext && banking.isEmpty && ((dims.size == stagedDims.size && attempts < max1DAttempts) || (dims.size < stagedDims.size))) {
+        while (As.hasNext && banking.isEmpty) {
           val alpha = As.next()
           if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
           attempts = attempts + 1

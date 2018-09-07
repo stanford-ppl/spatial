@@ -64,9 +64,9 @@ import spatial.dsl._
       val sram = SRAM[Int](4,16).hierarchical // Only try to bank hierarchically to expose bug #123
       val sram2 = SRAM[Int](4)
       sram load dram
-      'LOOP1.Foreach(4 by 1 par 2){i => 
+      out := 'LOOP1.Reduce(Reg[Int])(4 by 1 par 2){i => 
         val max = if (in.value < 10) 16 else 8 // Should always choose 16, but looks random to compiler
-        out := Reduce(Reg[Int])(max by 1 par 2){j =>  // j should dephase relative to LOOP1
+        Reduce(Reg[Int])(max by 1 par 2){j =>  // j should dephase relative to LOOP1
           sram(i,j)
         }{_+_}
       }

@@ -12,6 +12,6 @@ abstract class BankingStrategy {
     reads:  Set[Set[AccessMatrix]],        // Reads to this banked memory
     writes: Set[Set[AccessMatrix]],        // Writes to this banked memory
     dimGrps: Seq[Seq[Seq[Int]]]            // Sequence of dimension groupings
-  ): Seq[Seq[Banking]]                     // Sequence of possible multidimensional bankings
+  ): Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]]  // Mapping of Sequence of possible multidimensional bankings to the reads associated with it
 
 }

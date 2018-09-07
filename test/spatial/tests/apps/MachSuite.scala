@@ -608,9 +608,9 @@ import spatial.targets._
 
     Accel {
 
-      val filter = LUT[Int](3,3)(379,909,468, // Reverse columns because we shift in from left side
+      val filter = LUT[Int](3,3)(553,963,159, // Reverse columns because we shift in from left side
                                  771,886,165,
-                                 553,963,159)
+                                 379,909,468)
       val lb = LineBuffer[Int](3,COLS)
       val sr = RegFile[Int](3,3)
       val result_sram = SRAM[Int](ROWS,COLS)

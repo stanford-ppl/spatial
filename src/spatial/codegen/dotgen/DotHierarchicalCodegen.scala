@@ -38,10 +38,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
    * Accesstor symbols of enclosing blocks. Include sym
    * */
   def ancestors(sym:Sym[_]):List[Sym[_]] = {
-    val parent = sym match {
-      case sym if sym.isBound => sym.parent.s
-      case _ => sym.blk.s
-    }
+    val parent = sym.blk.s
     sym :: parent.toList.flatMap { parent => ancestors(parent) }
   }
 
@@ -56,7 +53,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
     (shared, branchA.filterNot(shared.contains(_)), branchB.filterNot(shared.contains(_)))
   }
 
-  override def addEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String) = {
+  override def addEdge(from:Sym[_], to:Sym[_], alias:Map[Sym[_], String]=Map.empty):Unit = {
     if (!nodes.contains(from)) dbgblk(src"emitEscapeEdge($from, $to):"){
       val (shared, fromBranch, toBranch) = ancestryBetween(from, to)
       dbgs(src"from=$from")
@@ -65,19 +62,21 @@ trait DotHierarchicalCodegen extends DotCodegen {
       dbgs(src"fromBranch=$fromBranch")
       dbgs(src"toBranch=$toBranch")
       toBranch.filterNot{ sym => sym == to }.foreach { ancestor =>
+        val toNode = toBranch(toBranch.indexOf(ancestor)-1)
         scope(Some(ancestor))
           .addExternNode(from)
-          .addEdge(from, to, src"$from", src"${toBranch(toBranch.indexOf(ancestor)-1)}")
+          .addEdge(from, to, alias + (to -> getAlias(toNode, alias)))
       }
       fromBranch.filterNot{ sym => sym == from }.foreach { ancestor =>
+        val fromNode = fromBranch(fromBranch.indexOf(ancestor)-1)
         scope(Some(ancestor))
           .addExternNode(to)
-          .addEdge(from, to, src"${fromBranch(fromBranch.indexOf(ancestor)-1)}", src"$to")
+          .addEdge(from, to, alias + (from -> getAlias(fromNode, alias)))
       }
       scope(shared.headOption)
-        .addEdge(from, to, src"${fromBranch.last}", src"${toBranch.last}")
+        .addEdge(from, to, alias + (from -> getAlias(fromBranch.last, alias)) + (to -> getAlias(toBranch.last, alias)))
     } else {
-      currScope.addEdge(from, to, fromAlias, toAlias)
+      currScope.addEdge(from, to, alias)
     }
   }
 

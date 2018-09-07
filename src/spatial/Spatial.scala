@@ -217,12 +217,13 @@ trait Spatial extends Compiler {
       spatialConfig.enableInterpret = false
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
-      spatialConfig.enableBroadcast = false
-      //spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
+      //spatialConfig.enableBroadcast = false
+      spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       spatialConfig.enableDot = true
       spatialConfig.targetName = "Plasticine"
+      spatialConfig.enableForceBanking = true
     }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
 
     cli.opt[Unit]("retime").action{ (_,_) =>

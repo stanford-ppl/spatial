@@ -85,6 +85,7 @@ package object access {
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
+    def isArgInRead: Boolean = a match {case Op(RegRead(Op(ArgInNew(_)))) => true; case _ => false}
 
     def isStreamStageEnabler: Boolean = a.op.exists(_.isStreamStageEnabler)
     def isStreamStageHolder: Boolean = a.op.exists(_.isStreamStageHolder)
@@ -194,7 +195,7 @@ package object access {
     val forkLayer = a.unroll.zip(b.unroll).zipWithIndex.collectFirst{case ((u0,u1),i) if (u0 != u1) => i}
     if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {
       val forkNode = aIters(forkLayer.get).parent.s.get
-      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access))
+      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access), Some(forkNode.toCtrl))
       if (mustClone) aIters.zipWithIndex.collect{case (x,i) if i > forkLayer.get => (x, a.unroll.take(i))}.toSet
       else Set()
     } else Set()    

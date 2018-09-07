@@ -297,3 +297,13 @@ case class EnableWriteBuffer(flag: Boolean) extends Data[EnableWriteBuffer](SetB
   * Default: false
   */
 case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.User)
+
+/** Flag set by the user to disable flattened banking and only attempt hierarchical banking,
+  * Used in cases where it could be tricky to find flattened scheme but hierarchical scheme 
+  * is very simple
+  *
+  * Getter:  sym.isHierarchicalBank
+  * Setter:  sym.isHierarchicalBank = (true | false)
+  * Default: false
+  */
+case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.User)

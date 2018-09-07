@@ -35,6 +35,9 @@ package object memory {
     def isNonBuffer: Boolean = metadata[EnableNonBuffer](s).exists(_.flag)
     def isNonBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableNonBuffer(flag))
 
+    def isHierarchicalBank: Boolean = metadata[HierarchicalBank](s).exists(_.flag)
+    def isHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, HierarchicalBank(flag))
+
     /** Pre-unrolling duplicates (one or more Memory instances per node) */
 
     def getDuplicates: Option[Seq[Memory]] = metadata[Duplicates](s).map(_.d)

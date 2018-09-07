@@ -47,3 +47,35 @@ import spatial.dsl._
     assert(got == gold)
   }
 }
+
+@spatial class DephasingDuplication extends SpatialTest {
+
+  // Inspired by MD_Grid
+  def main(args: Array[String]): Unit = {
+    val dram = DRAM[Int](4,16)
+    val result = DRAM[Int](4)
+    val out = ArgOut[Int]
+    val data = (0::4,0::16){(i,j) => i*16 + j}
+    val in = ArgIn[Int]
+    setArg(in, 3)
+    setMem(dram, data)
+
+    Accel {
+      val sram = SRAM[Int](4,16).hierarchical // Only try to bank hierarchically to expose bug #123
+      val sram2 = SRAM[Int](4)
+      sram load dram
+      'LOOP1.Foreach(4 by 1 par 2){i => 
+        val max = if (in.value < 10) 16 else 8 // Should always choose 16, but looks random to compiler
+        out := Reduce(Reg[Int])(max by 1 par 2){j =>  // j should dephase relative to LOOP1
+          sram(i,j)
+        }{_+_}
+      }
+
+    }
+
+    val gold = data.flatten.reduce{_+_}
+    val got = getArg(out)
+    println(r"gold $gold =?= $out out")
+    assert(out == gold)
+  }
+}

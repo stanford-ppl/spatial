@@ -61,6 +61,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 
   def buffer: C[A] = { this.isWriteBuffer = true; me }
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
+  def hierarchical: C[A] = { this.isHierarchicalBank = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)

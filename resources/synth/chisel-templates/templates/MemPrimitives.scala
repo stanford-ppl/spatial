@@ -647,7 +647,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     } else false.B
 
     // Connect matching W port to memory
-    val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
+    val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
     val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
     val (data, enable) = 
       if (directSelectEns.length > 0 & p.hasXBarW) {           // Has direct and x

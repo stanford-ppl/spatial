@@ -24,7 +24,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
     val input1 = Vec(numWriters, Input(UInt((d+f).W)))
     val input2 = Vec(numWriters, Input(UInt((d+f).W)))
     val enable = Vec(numWriters, Input(Bool()))
-    val reset = Vec(numWriters, Input(Bool()))
+    val reset = Input(Bool())
     val last = Vec(numWriters, Input(Bool()))
     val first = Vec(numWriters, Input(Bool()))
     val output = Output(UInt((d+f).W))
@@ -34,7 +34,7 @@ class FixFMAAccum(val numWriters: Int, val cycleLatency: Double, val fmaLatency:
   val activeIn2 = Mux1H(io.enable, io.input2)
   val activeEn  = io.enable.reduce{_|_}
   val activeLast = Mux1H(io.enable, io.last)
-  val activeReset = io.reset.reduce{_|_}
+  val activeReset = io.reset
   val activeFirst = io.first.reduce{_|_}
 
   val fixin1 = Wire(new FixedPoint(s,d,f))
@@ -90,7 +90,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val io = IO(new Bundle{
     val input1 = Vec(numWriters, Input(UInt((d+f).W)))
     val enable = Vec(numWriters, Input(Bool()))
-    val reset = Vec(numWriters, Input(Bool()))
+    val reset = Input(Bool())
     val last = Vec(numWriters, Input(Bool()))
     val first = Vec(numWriters, Input(Bool()))
     val output = Output(UInt((d+f).W))
@@ -99,7 +99,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val activeIn1 = Mux1H(io.enable, io.input1)
   val activeEn  = io.enable.reduce{_|_}
   val activeLast = Mux1H(io.enable, io.last)
-  val activeReset = io.reset.reduce{_|_}
+  val activeReset = io.reset
   val activeFirst = io.first.reduce{_|_}
 
   val fixin1 = Wire(new FixedPoint(s,d,f))

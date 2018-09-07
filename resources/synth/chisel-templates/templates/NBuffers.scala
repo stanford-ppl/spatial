@@ -77,7 +77,7 @@ class NBufMem(val mem: MemType,
   def this(tuple: (MemType, List[Int], Int, Int, List[Int], List[Int], NBufXMap, NBufXMap, 
     NBufDMap, NBufDMap, XMap, XMap, BankingMode)) = this(tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7,tuple._8,tuple._9,tuple._10, tuple._11, tuple._12, tuple._13, None, false, 0)
 
-  val depth = logicalDims.product // Size of memory
+  val depth = logicalDims.product + {if (mem == LineBufferType) (numBufs-1)*strides(0)*logicalDims(1) else 0} // Size of memory
   val N = logicalDims.length // Number of dimensions
   val ofsWidth = Utils.log2Up(depth/banks.product)
   val banksWidths = banks.map(Utils.log2Up(_))

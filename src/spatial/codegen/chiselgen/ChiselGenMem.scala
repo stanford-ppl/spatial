@@ -32,6 +32,16 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
   }
 
+  private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
+      val parent = lhs.parent
+      if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
+      else {
+        memsWithReset = memsWithReset :+ mem
+        val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+        emitt(src"${mem}.io.reset := ${invisibleEnable} & ${and(en)}")
+      }
+  }
+
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
     val name = if (mem.isInstanceOf[RegNew[_]]) "FF" else ""
@@ -220,6 +230,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val initStr = if (init.isDefined) init.get.map(quoteAsScala).map(x => src"${x}.toDouble").mkString("Some(List(",",","))")
       else "None"
     emitGlobalModule(src"""val $mem = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $BXBarW $BXBarR $bankingMode, $initStr, ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}))""")
+    if (mem.resetters.isEmpty) emitGlobalModule(src"$mem.io.reset := false.B")
   }
 
   private def ifaceType(mem: Sym[_]): String = {
@@ -247,30 +258,35 @@ trait ChiselGenMem extends ChiselGenCommon {
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Add, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+          if (lhs.resetters.isEmpty) emitGlobalModule(src"$lhs.io.reset := false.B")
         case Some(AccumMul) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = scala.math.max(1.0, latencyOption("FixMul", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Mul, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+          if (lhs.resetters.isEmpty) emitGlobalModule(src"$lhs.io.reset := false.B")
         case Some(AccumMin) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = scala.math.max(1.0, latencyOption("FixMin", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Min, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+          if (lhs.resetters.isEmpty) emitGlobalModule(src"$lhs.io.reset := false.B")
         case Some(AccumMax) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = scala.math.max(1.0, latencyOption("FixMax", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixOpAccum(Accum.Max, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+          if (lhs.resetters.isEmpty) emitGlobalModule(src"$lhs.io.reset := false.B")
         case Some(AccumFMA) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = scala.math.max(1.0, latencyOption("FixFMA", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
           emitGlobalModuleMap(src"${lhs}", src"Module(new FixFMAAccum($numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")
+          if (lhs.resetters.isEmpty) emitGlobalModule(src"$lhs.io.reset := false.B")
         case Some(AccumUnk) => throw new Exception(s"Cannot emit Reg with specialized reduce of type Unk yet!")
       }
     case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
@@ -284,7 +300,6 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"${reg}.io.input1($index) := $data.r")
       emitt(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
       emitt(src"${reg}.io.last($index)   := ${DL(src"${swap(parent, SM)}.io.ctrDone", lhs.fullDelay, true)}")
-      emitt(src"${reg}.io.reset($index) := false.B//${swap(parent, Resetter)}")
       emitt(src"${reg}.io.first($index) := ${first}")
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ${reg}.io.output")
@@ -296,28 +311,14 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitt(src"${reg}.io.input2($index) := $data2.r")
       emitt(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
       emitt(src"${reg}.io.last($index)   := ${DL(src"${swap(parent, SM)}.io.ctrDone", lhs.fullDelay, true)}")
-      emitt(src"${reg}.io.reset($index) := false.B//${swap(parent, Resetter)}")
       emitt(src"${reg}.io.first($index) := ${first}")
       emitGlobalWireMap(src"${lhs}", src"Wire(${lhs.tp})")
       emitt(src"${lhs}.r := ${reg}.io.output")
-    // Specialized FMA Register
+    case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
     case op@RegFileNew(_, inits) => emitMem(lhs, "ShiftRegFile", inits)
-    case RegFileReset(rf, en)    => 
-      val parent = lhs.parent
-      if (memsWithReset.contains(rf)) throw new Exception(s"Currently only one resetter per RegFile is supported ($rf ${rf.name} has more than 1)")
-      else {
-        memsWithReset = memsWithReset :+ rf
-        val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-        emitt(src"${rf}.io.reset := ${invisibleEnable} & ${and(en)}")
-
-      }
-
-      // val parent = lhs.parent.s.get
-      // val id = resettersOf(rf).map{_._1}.indexOf(lhs)
-      // duplicatesOf(rf).indices.foreach{i => emitt(src"${rf}_${i}_manual_reset_$id := $en & ${DL(swap(parent, DatapathEn), enableRetimeMatch(en, lhs), true)} ")}
-
+    case RegFileReset(rf, en)    => emitReset(lhs, rf, en)
     case RegFileShiftInVector(rf,data,addr,en,axis)  => emitWrite(lhs,rf,data.elems.map(_.asInstanceOf[Sym[_]]).toSeq,Seq(addr),Seq(),Seq(en), Some(axis))
     case RegFileShiftIn(rf,data,addr,en,axis)        => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en), Some(axis))
     case RegFileBankedShiftIn(rf,data,addr,en,axis)  => emitWrite(lhs,rf,data,addr,Seq(),en, Some(axis))

@@ -52,7 +52,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       Left(UnbankableGroup(mem,rdGroups.flatten,wrGroups.flatten))
     }
     else {
-      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, Seq(FLAT_BANKS))
+      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, Seq(FLAT_BANKS)).head._2
       if (bankings.nonEmpty) {
         val banking = bankings.head
         val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)

@@ -566,201 +566,205 @@ import spatial.targets._
 }
 
 
-// @spatial class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
-//   /*
-//            ←    COLS     →   
-//          ___________________             ___________________                         
-//         |                   |           |X  X  X  X  X  X 00|          
-//     ↑   |    ←3→            |           |                 00|    * this app pads right and bottom borders with 0      
-//         |    ___            |           |    VALID DATA   00|          
-//         |  ↑|   |           |           |X  X  X  X  X  X 00|          
-//         |  3|   | ----->    |    ->     |                 00|            
-//  ROWS   |  ↓|___|           |           |X  X  X  X  X  X 00|          
-//         |                   |           |                 00|          
-//         |                   |           |X  X  X  X  X  X 00|          
-//         |                   |           |                 00|          
-//     ↓   |                   |           |0000000000000000000|          
-//         |                   |           |0000000000000000000|          
-//          ```````````````````             ```````````````````      
+@spatial class Stencil2D extends SpatialTest { // ReviveMe (LineBuffer)
+  /*
+           ←    COLS     →   
+         ___________________             ___________________                         
+        |                   |           |X  X  X  X  X  X 00|          
+    ↑   |    ←3→            |           |                 00|    * this app pads right and bottom borders with 0      
+        |    ___            |           |    VALID DATA   00|          
+        |  ↑|   |           |           |X  X  X  X  X  X 00|          
+        |  3|   | ----->    |    ->     |                 00|            
+ ROWS   |  ↓|___|           |           |X  X  X  X  X  X 00|          
+        |                   |           |                 00|          
+        |                   |           |X  X  X  X  X  X 00|          
+        |                   |           |                 00|          
+    ↓   |                   |           |0000000000000000000|          
+        |                   |           |0000000000000000000|          
+         ```````````````````             ```````````````````      
                                                
                                                
-//   */
+  */
 
 
 
-//   def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
 
-//     // Problem properties
-//     val ROWS = 128
-//     val COLS = 64
-//     val filter_size = 9
-//     val par_lb_load = 4
+    // Problem properties
+    val ROWS = 128
+    val COLS = 64
+    val filter_size = 9
+    val par_lb_load = 4
 
-//     // Setup data
-//     val raw_data = loadCSV1D[Int](s"$DATA/stencil/stencil2d_data.csv", "\n")
-//     val data = raw_data.reshape(ROWS, COLS)
+    // Setup data
+    val raw_data = loadCSV1D[Int](s"$DATA/stencil/stencil2d_data.csv", "\n")
+    val data = raw_data.reshape(ROWS, COLS)
 
-//     // Setup DRAMs
-//     val data_dram = DRAM[Int](ROWS,COLS)
-//     val result_dram = DRAM[Int](ROWS,COLS)
+    // Setup DRAMs
+    val data_dram = DRAM[Int](ROWS,COLS)
+    val result_dram = DRAM[Int](ROWS,COLS)
 
-//     setMem(data_dram, data)
+    setMem(data_dram, data)
 
-//     Accel {
+    Accel {
 
-//       val filter = LUT[Int](3,3)(379,909,468, // Reverse columns because we shift in from left side
-//                                  771,886,165,
-//                                  553,963,159)
-//       val lb = LineBuffer[Int](3,COLS)
-//       val sr = RegFile[Int](3,3)
-//       val result_sram = SRAM[Int](ROWS,COLS)
-//       Foreach(ROWS by 1){ i =>
-//         val wr_row = (i-2)%ROWS
-//         lb load data_dram(i, 0::COLS par par_lb_load)
-//         Foreach(COLS by 1) {j =>
-//           Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j)}
-//           val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(r,c)}{_+_}
-//           val wr_col = (j-2)%COLS
-//           if (i >= 2 && j >= 2) {result_sram(wr_row,wr_col) = temp}
-//           else {result_sram(wr_row,wr_col) = 0}
-//         }
-//       }
+      val filter = LUT[Int](3,3)(553,963,159, // Reverse columns because we shift in from left side
+                                 771,886,165,
+                                 379,909,468)
+      val lb = LineBuffer[Int](3,COLS)
+      val sr = RegFile[Int](3,3)
+      val result_sram = SRAM[Int](ROWS,COLS)
+      Foreach(ROWS by 1){ i =>
+        val wr_row = (i-2)%ROWS
+        lb load data_dram(i, 0::COLS par par_lb_load)
+        Foreach(COLS by 1) {j =>
+          Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j)}
+          val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(r,c)}{_+_}
+          val wr_col = (j-2)%COLS
+          if (i >= 2 && j >= 2) {result_sram(wr_row,wr_col) = temp}
+          else {result_sram(wr_row,wr_col) = 0}
+        }
+      }
 
-//       result_dram store result_sram
-//     }
+      result_dram store result_sram
+    }
 
-//     // Get results
-//     val result_data = getMatrix(result_dram)
-//     val raw_gold = loadCSV1D[Int](s"$DATA/stencil/stencil2d_gold.csv", "\n")
-//     val gold = raw_gold.reshape(ROWS,COLS)
+    // Get results
+    val result_data = getMatrix(result_dram)
+    val raw_gold = loadCSV1D[Int](s"$DATA/stencil/stencil2d_gold.csv", "\n")
+    val gold = raw_gold.reshape(ROWS,COLS)
 
-//     // Printers
-//     printMatrix(gold, "gold")
-//     printMatrix(result_data, "result")
+    // Printers
+    printMatrix(gold, "gold")
+    printMatrix(result_data, "result")
 
-//     val cksum = (0::ROWS, 0::COLS){(i,j) => if (i < ROWS-2 && j < COLS-2) gold(i,j) == result_data(i,j) else true }.reduce{_&&_}
-//     println("PASS: " + cksum + " (Stencil2D) * Fix modulo addresses in scalagen?")
+    val cksum = (0::ROWS, 0::COLS){(i,j) => if (i < ROWS-2 && j < COLS-2) gold(i,j) == result_data(i,j) else true }.reduce{_&&_}
+    println("PASS: " + cksum + " (Stencil2D)")
+    assert(cksum)
 
-//   }
-// }
+  }
+}
 
 
-// @spatial class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
-//  /*
+@spatial class Stencil3D extends SpatialTest { // ReviveMe (LineBuffer)
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
+ /*
                                                                                                                              
-//  H   ↗        ___________________                  ___________________                                                                  
-//   E         /                   /|               /000000000000000000/ |                                                                
-//    I       / ←    ROW      →   / |              /0  x  x  x  x    0/ 0|                        
-//  ↙  G     /__________________ /  |             /0________________0/  0|                                                                 
-//      H   |                   |   |            |0  X  X  X  X  X  0| x0|      
-//       T  |     ___           |   |            |0                 0|  0|      
-//          |    /__/|          |   |            |0   VALID DATA    0|  0|    *This app frames all borders with original value  
-//    ↑     |  ↑|   ||          |   |            |0  X  X  X  X  X  0| x0|      
-//          |  3|   || ----->   |   |   --->     |0                 0|  0|        
-//   COL    |  ↓|___|/          |   |            |0  X  X  X  X  X  0| x0|      
-//          |                   |   |            |0                 0|  0|      
-//          |                   |   |            |0  X  X  X  X  X  0| x0|      
-//          |                   |  /             |0                 0| 0/      
-//    ↓     |                   | /              |0                 0|0/ 
-//          |                   |/               |0000000000000000000|/        
-//           ```````````````````                  ```````````````````      
+ H   ↗        ___________________                  ___________________                                                                  
+  E         /                   /|               /000000000000000000/ |                                                                
+   I       / ←    ROW      →   / |              /0  x  x  x  x    0/ 0|                        
+ ↙  G     /__________________ /  |             /0________________0/  0|                                                                 
+     H   |                   |   |            |0  X  X  X  X  X  0| x0|      
+      T  |     ___           |   |            |0                 0|  0|      
+         |    /__/|          |   |            |0   VALID DATA    0|  0|    *This app frames all borders with original value  
+   ↑     |  ↑|   ||          |   |            |0  X  X  X  X  X  0| x0|      
+         |  3|   || ----->   |   |   --->     |0                 0|  0|        
+  COL    |  ↓|___|/          |   |            |0  X  X  X  X  X  0| x0|      
+         |                   |   |            |0                 0|  0|      
+         |                   |   |            |0  X  X  X  X  X  0| x0|      
+         |                   |  /             |0                 0| 0/      
+   ↓     |                   | /              |0                 0|0/ 
+         |                   |/               |0000000000000000000|/        
+          ```````````````````                  ```````````````````      
                                                 
                                                 
-//  */
+ */
 
 
 
-//   def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
 
-//     // Problem properties
-//     val ROWS = 16 // Leading dim
-//     val COLS = 32
-//     val HEIGHT = 32
-//     val par_load = 16
-//     val par_store = 16
-//     val loop_height = 2 (1 -> 1 -> 8)
-//     val par_lb_load = 4 (1 -> 1 -> 16)
-//     val PX = 1
-//     // val num_slices = ArgIn[Int]
-//     // setArg(num_slices, args(0).to[Int])
-//     val num_slices = HEIGHT
-//     val filter_size = 3*3*3
+    // Problem properties
+    val ROWS = 16 // Leading dim
+    val COLS = 32
+    val HEIGHT = 32
+    val par_load = 16
+    val par_store = 16
+    val loop_height = 2 (1 -> 1 -> 8)
+    val par_lb_load = 4 (1 -> 1 -> 16)
+    val PX = 1
+    // val num_slices = ArgIn[Int]
+    // setArg(num_slices, args(0).to[Int])
+    val num_slices = HEIGHT
+    val filter_size = 3*3*3
 
-//     // Setup data
-//     val raw_data = loadCSV1D[Int](s"$DATA/stencil/stencil3d_data.csv", "\n")
-//     val data = raw_data.reshape(HEIGHT, COLS, ROWS)
+    // Setup data
+    val raw_data = loadCSV1D[Int](s"$DATA/stencil/stencil3d_data.csv", "\n")
+    val data = raw_data.reshape(HEIGHT, COLS, ROWS)
 
-//     // Setup DRAMs
-//     val data_dram = DRAM[Int](HEIGHT, COLS, ROWS)
-//     val result_dram = DRAM[Int](HEIGHT, COLS, ROWS)
+    // Setup DRAMs
+    val data_dram = DRAM[Int](HEIGHT, COLS, ROWS)
+    val result_dram = DRAM[Int](HEIGHT, COLS, ROWS)
 
-//     setMem(data_dram, data)
+    setMem(data_dram, data)
 
-//     Accel {
-//       val filter = LUT[Int](3,3,3)(   0,  0,  0,
-//                                       0, -1,  0,
-//                                       0,  0,  0,
+    Accel {
+      val filter = LUT[Int](3,3,3)(   0,  0,  0,
+                                      0, -1,  0,
+                                      0,  0,  0,
 
-//                                       0, -1,  0,
-//                                      -1,  6, -1,
-//                                       0, -1,  0,
+                                      0, -1,  0,
+                                     -1,  6, -1,
+                                      0, -1,  0,
 
-//                                       0,  0,  0,
-//                                       0, -1,  0,
-//                                       0,  0,  0)
+                                      0,  0,  0,
+                                      0, -1,  0,
+                                      0,  0,  0)
 
-//       val result_sram = SRAM[Int](HEIGHT,COLS,ROWS)
+      val result_sram = SRAM[Int](HEIGHT,COLS,ROWS)
 
-//       Foreach(num_slices by 1 par loop_height) { p => 
-//         val temp_slice = SRAM[Int](COLS,ROWS)
-//         MemReduce(temp_slice)(-1 until 2 by 1) { slice => 
-//           val local_slice = SRAM[Int](COLS,ROWS)
-//           Foreach(COLS+1 by 1 par PX){ i => 
-//             val lb = LineBuffer[Int](3,ROWS)
-//             lb load data_dram((p+slice)%HEIGHT, i, 0::ROWS par par_lb_load)
-//             Foreach(ROWS+1 by 1 par PX) {j => 
-//               val sr = RegFile[Int](3,3)
-//               Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j%ROWS)}
-//               val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(slice+1,r,c)}{_+_}
-//               // For final version, make wr_value a Mux1H instead of a unique writer per val
-//               if (i == 0 || j == 0) {Pipe{}/*do nothing*/}
-//               else if (i == 1 || i == COLS || j == 1 || j == ROWS) {
-//                 Pipe{
-//                   if (slice == 0) {local_slice(i-1, j-1) = sr(1,1); println("1 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // If on boundary of page, use meat only
-//                   else {local_slice(i-1, j-1) = 0} // If on boundary of page, ignore bread
-//                 }
-//               }
-//               else if (slice == 0 && (p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = sr(1,1); println("2 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // First and last page, use meat only
-//               else if ((p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = 0} // First and last page, ignore bread
-//               else {local_slice(i-1, j-1) = temp} // Otherwise write convolution result
-//             }       
-//           }
-//           local_slice
-//         }{_+_}
+      Foreach(num_slices by 1 par loop_height) { p => 
+        val temp_slice = SRAM[Int](COLS,ROWS)
+        MemReduce(temp_slice)(-1 until 2 by 1) { slice => 
+          val local_slice = SRAM[Int](COLS,ROWS)
+          Foreach(COLS+1 by 1 par PX){ i => 
+            val lb = LineBuffer[Int](3,ROWS)
+            lb load data_dram(((p+slice)%HEIGHT), i, 0::ROWS par par_lb_load)
+            Foreach(ROWS+1 by 1 par PX) {j => 
+              val sr = RegFile[Int](3,3)
+              Foreach(3 by 1 par 3) {k => sr(k,*) <<= lb(k,j)}
+              val temp = Reduce(Reg[Int](0))(3 by 1, 3 by 1){(r,c) => sr(r,c) * filter(slice+1,r,c)}{_+_}
+              // For final version, make wr_value a Mux1H instead of a unique writer per val
+              if (i == 0 || j == 0) {Pipe{}/*do nothing*/}
+              else if (i == 1 || i == COLS || j == 1 || j == ROWS) {
+                Pipe{
+                  if (slice == 0) {local_slice(i-1, j-1) = sr(1,1); println("1 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // If on boundary of page, use meat only
+                  else {local_slice(i-1, j-1) = 0} // If on boundary of page, ignore bread
+                }
+              }
+              else if (slice == 0 && (p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = sr(1,1); println("2 local_slice(" + {i-1} + "," + {j-1} + ") = " + sr(1,1))} // First and last page, use meat only
+              else if ((p == 0 || p == HEIGHT-1)) {local_slice(i-1,j-1) = 0} // First and last page, ignore bread
+              else {local_slice(i-1, j-1) = temp} // Otherwise write convolution result
+            }       
+          }
+          local_slice
+        }{_+_}
 
-//         Foreach(COLS by 1, ROWS by 1){(i,j) => result_sram(p, i, j) = temp_slice(i,j)}
+        Foreach(COLS by 1, ROWS by 1){(i,j) => result_sram(p, i, j) = temp_slice(i,j)}
 
-//       }
+      }
 
-//       result_dram(0::HEIGHT, 0::COLS, 0::ROWS par par_store) store result_sram
+      result_dram(0::HEIGHT, 0::COLS, 0::ROWS par par_store) store result_sram
 
 
-//     }
+    }
 
-//     // Get results
-//     val result_data = getTensor3(result_dram)
-//     val raw_gold = loadCSV1D[Int](s"$DATA/stencil/stencil3d_gold.csv", "\n")
-//     val gold = raw_gold.reshape(HEIGHT,COLS,ROWS)
+    // Get results
+    val result_data = getTensor3(result_dram)
+    val raw_gold = loadCSV1D[Int](s"$DATA/stencil/stencil3d_gold.csv", "\n")
+    val gold = raw_gold.reshape(HEIGHT,COLS,ROWS)
 
-//     // Printers
-//     printTensor3(gold, "gold") // Least significant dimension is horizontal, second-least is vertical, third least is ---- separated blocks
-//     printTensor3(result_data, "results")
+    // Printers
+    printTensor3(gold, "gold") // Least significant dimension is horizontal, second-least is vertical, third least is ---- separated blocks
+    printTensor3(result_data, "results")
 
-//     val cksum = gold.zip(result_data){_==_}.reduce{_&&_}
-//     println("PASS: " + cksum + " (Stencil3D)")
+    val cksum = gold.zip(result_data){_==_}.reduce{_&&_}
+    println("PASS: " + cksum + " (Stencil3D)")
+    assert(cksum)
 
-//  }
-// }
+ }
+}
 
 
 @spatial class NW_alg extends SpatialTest { // NW conflicts with something in spade

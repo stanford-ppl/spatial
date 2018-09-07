@@ -170,13 +170,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
         lhs.blk = Blk.Node(s, bId)
       }
     }
-    op match {
-      case ctrl: UnrolledLoop[_] => 
-        ctrl.iters.foreach{b => b.blk = Blk.Node(s, -1)}
-        ctrl.valids.foreach{b => b.blk = Blk.Node(s, -1)}
-      case ctrl: Control[_] =>
-        ctrl.iters.foreach{b => b.blk = Blk.Node(s, -1)}
-      case _ =>
+    op.binds.filter(_.isBound).foreach{ b =>
+      b.blk = Blk.Node(s, -1)
     }
   }
 

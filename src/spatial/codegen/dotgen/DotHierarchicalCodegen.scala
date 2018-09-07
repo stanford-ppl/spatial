@@ -38,10 +38,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
    * Accesstor symbols of enclosing blocks. Include sym
    * */
   def ancestors(sym:Sym[_]):List[Sym[_]] = {
-    val parent = sym match {
-      case sym if sym.isBound => sym.parent.s
-      case _ => sym.blk.s
-    }
+    val parent = sym.blk.s
     sym :: parent.toList.flatMap { parent => ancestors(parent) }
   }
 

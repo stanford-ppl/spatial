@@ -25,7 +25,7 @@ trait DotFlatCodegen extends DotCodegen {
       rhs.binds.filter(_.isBound).foreach{ b =>
         currScope.addNode(b)
         emitNode(b)
-        emitEdge(lhs, b, s"$lhs", s"$b")
+        emitEdge(lhs, b)
       }
       rhs.blocks.foreach(ret)
       close(src"}")

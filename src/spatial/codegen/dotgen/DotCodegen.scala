@@ -24,12 +24,12 @@ trait DotCodegen extends argon.codegen.Codegen {
     super.preprocess(b)
   }
 
-  type Edge = (Sym[_], Sym[_], String, String) // (from, to, fromAlias, toAlias)
+  type Edge = (Sym[_], Sym[_], Map[Sym[_], String]) // (from, to, alias)
 
   case class Scope(sym:Option[Sym[_]]) {
     val _nodes = mutable.ListBuffer[Sym[_]]()
     def nodes = _nodes.toList
-    def addNode(sym:Sym[_]) = if (!_nodes.contains(sym)) _nodes += sym
+    def addNode(sym:Sym[_]) = if (!_nodes.contains(sym) && !sym.isConst) _nodes += sym
     val externNodes = mutable.ListBuffer[Sym[_]]()
     val edges = mutable.ListBuffer[Edge]()
     val fileName = sym match {
@@ -40,7 +40,11 @@ trait DotCodegen extends argon.codegen.Codegen {
     val dotPath = s"${out}${sep}$fileName.dot"
 
     def addExternNode(node:Sym[_]):this.type = { externNodes += node; this }
-    def addEdge(edge:Edge):this.type = { edges += edge; this }
+    def addEdge(edge:Edge):this.type = { 
+      val (from, to, alias) = edge
+      if (!from.isConst && !to.isConst) edges += edge
+      this
+    }
 
     // called when enter a new scope
     def begin(block: => Unit) = {
@@ -55,10 +59,10 @@ trait DotCodegen extends argon.codegen.Codegen {
     def end = {
       enter {
         externNodes.foreach { node => emitNode(node) }
-        edges.groupBy { case (from,to,fromAlias,toAlias) => (fromAlias, toAlias) }.values.foreach { group =>
+        edges.groupBy { case (from,to,alias) => (getAlias(from, alias), getAlias(to, alias)) }.values.foreach { group =>
           // Avoid emit duplicated edges between nodes
-          val (from, to, fromAlias, toAlias) = group.head
-          emitEdge(from, to, fromAlias, toAlias)
+          val (from, to, alias) = group.head
+          emitEdge(from, to, alias)
         }
         close(src"}")
       }
@@ -153,12 +157,14 @@ trait DotCodegen extends argon.codegen.Codegen {
     at
   }
 
-  def addEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
-    if (nodes.contains(from) && nodes.contains(to)) currScope.addEdge((from, to, fromAlias, toAlias))
+  def addEdge(from:Sym[_], to:Sym[_], alias:Map[Sym[_], String]=Map.empty):Unit = {
+    if (nodes.contains(from) && nodes.contains(to)) currScope.addEdge((from, to, alias))
   }
 
-  def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
-    emitEdge(fromAlias, toAlias, edgeAttr(from, to))
+  def getAlias(node:Sym[_], alias:Map[Sym[_],String]) = alias.getOrElse(node, src"$node")
+
+  def emitEdge(from:Sym[_], to:Sym[_], alias:Map[Sym[_],String]=Map.empty):Unit = {
+    emitEdge(getAlias(from, alias), getAlias(to, alias), edgeAttr(from, to))
   }
 
   def emitEdge(fromAlias:String, toAlias:String, at:Map[String,String]):Unit = {
@@ -169,11 +175,11 @@ trait DotCodegen extends argon.codegen.Codegen {
     val groups = inputGroups(lhs)
     groups.foreach { case (name, inputs) => 
       inputs.foreach { in =>
-        addEdge(in, lhs, src"$in", src"${lhs}_${name}")
+        addEdge(in, lhs, Map(lhs -> src"${lhs}_${name}"))
       }
     }
     (inputs(lhs) diff groups.values.flatten.toSeq).foreach { in => 
-      addEdge(in, lhs, src"$in", src"$lhs")
+      addEdge(in, lhs)
     }
   }
 

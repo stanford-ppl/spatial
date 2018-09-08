@@ -1,6 +1,7 @@
 package spatial.codegen.dotgen
 
 import argon._
+import argon.node._
 import spatial.metadata.memory._
 import spatial.metadata.access._
 import spatial.lang._
@@ -44,6 +45,10 @@ trait DotGenSpatial extends DotCodegen {
   override def label(lhs:Sym[_]) = lhs match {
     case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
     case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
+    case Def(UnrolledReduce(ens, cchain, func, iters, valids)) =>
+      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"
+    case Def(UnrolledForeach(ens, cchain, func, iters, valids)) =>
+      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"
     case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"
     case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
     case Def(GetDRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
@@ -51,6 +56,7 @@ trait DotGenSpatial extends DotCodegen {
   }
 
   override def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = lhs match {
+    // Accesses
     case Def(SRAMBankedWrite(mem, data, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("data" -> data) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case Def(SRAMBankedRead(mem, bank, ofs, enss)) => 
@@ -73,6 +79,20 @@ trait DotGenSpatial extends DotCodegen {
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
     case Def(FIFONumel(mem, enss)) => 
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
+    // Controller
+    case Def(UnitPipe(ens, func)) =>
+      super.inputGroups(lhs) + ("ens" -> ens.toSeq)
+    case Def(ParallelPipe(ens, func)) =>
+      super.inputGroups(lhs) + ("ens" -> ens.toSeq)
+    case Def(UnrolledForeach(ens,cchain,func,iters,valids)) =>
+      super.inputGroups(lhs) + ("ens" -> ens.toSeq)
+    case Def(UnrolledReduce(ens,cchain,func,iters,valids)) =>
+      super.inputGroups(lhs) + ("ens" -> ens.toSeq)
+    case Def(Switch(selects, body)) =>
+      super.inputGroups(lhs) + ("selects" -> selects.toSeq)
+    case Def(StateMachine(ens, start, notDone, action, nextState)) =>
+      super.inputGroups(lhs) + ("ens" -> ens.toSeq)
+    //case Def(IfThenElse(cond, thenp, elsep)) =>
     case _ => super.inputGroups(lhs)
   }
 

@@ -2,7 +2,7 @@ package spatial.codegen.dotgen
 
 import argon._
 import scala.collection.mutable
-import utils.io.files
+import utils.io.files._
 import sys.process._
 import scala.language.postfixOps
 
@@ -14,22 +14,37 @@ trait DotCodegen extends argon.codegen.Codegen {
   def currScope = stack.head
   def nodes = currScope.nodes
   val scopes = mutable.Map[Option[Sym[_]],Scope]()
-  def scope(sym:Option[Sym[_]]) = scopes.getOrElseUpdate(sym, Scope(sym))
+  def scope(sym:Option[Sym[_]]) = scopes.getOrElseUpdate(sym, {
+    Scope(sym)
+  })
 
-  type Edge = (Sym[_], Sym[_], String, String) // (from, to, fromAlias, toAlias)
+  override protected def preprocess[R](b: Block[R]): Block[R] = {
+    stack.clear
+    scopes.clear
+    super.preprocess(b)
+  }
+
+  type Edge = (Sym[_], Sym[_], Map[Sym[_], String]) // (from, to, alias)
 
   case class Scope(sym:Option[Sym[_]]) {
-    val nodes = mutable.ListBuffer[Sym[_]]()
+    val _nodes = mutable.ListBuffer[Sym[_]]()
+    def nodes = _nodes.toList
+    def addNode(sym:Sym[_]) = if (!_nodes.contains(sym) && !sym.isConst) _nodes += sym
     val externNodes = mutable.ListBuffer[Sym[_]]()
-    val edges = mutable.ListBuffer[(Sym[_], Sym[_], String, String)]()
+    val edges = mutable.ListBuffer[Edge]()
     val fileName = sym match {
       case Some(sym) => src"$sym"
       case None => entryFile.replace(".dot","")
     }
-    val svgpath = s"${out}${files.sep}$fileName.svg"
+    val htmlPath = s"${out}${sep}$fileName.html"
+    val dotPath = s"${out}${sep}$fileName.dot"
 
-    def addExternNode(node:Sym[_]):this.type = { externNodes += node; this }
-    def addEdge(edge:Edge):this.type = { edges += edge; this }
+    def addExternNode(node:Sym[_]):this.type = { if (!node.isConst) externNodes += node; this }
+    def addEdge(edge:Edge):this.type = { 
+      val (from, to, alias) = edge
+      if (!from.isConst && !to.isConst) edges += edge
+      this
+    }
 
     // called when enter a new scope
     def begin(block: => Unit) = {
@@ -44,10 +59,10 @@ trait DotCodegen extends argon.codegen.Codegen {
     def end = {
       enter {
         externNodes.foreach { node => emitNode(node) }
-        edges.groupBy { case (from,to,fromAlias,toAlias) => (fromAlias, toAlias) }.values.foreach { group =>
+        edges.groupBy { case (from,to,alias) => (getAlias(from, alias), getAlias(to, alias)) }.values.foreach { group =>
           // Avoid emit duplicated edges between nodes
-          val (from, to, fromAlias, toAlias) = group.head
-          emitEdge(from, to, fromAlias, toAlias)
+          val (from, to, alias) = group.head
+          emitEdge(from, to, alias)
         }
         close(src"}")
       }
@@ -71,13 +86,19 @@ trait DotCodegen extends argon.codegen.Codegen {
 
   // Generate dot graphs to svg files
   override protected def postprocess[R](b: Block[R]): Block[R] = {
-    files.listFiles(out, List(".dot")).foreach { file =>
-      val path = out + files.sep + file.getName
-      val outPath = path.replace(".dot",".svg")
-      val exit = s"dot -Tsvg -o $outPath $path" !
-
-      if (exit != 0) {
-        info(s"Dot graph generation failed. Please install graphviz")
+    scopes.foreach { case (_, scope) =>
+      inGen(out, "dog.log") {
+        var errLine = ""
+        s"dot -Tsvg -o ${scope.htmlPath} ${scope.dotPath}" ! ProcessLogger (
+          { line => emit(line) },
+          { line => emit(line); errLine += line }
+        )
+        if (errLine.nonEmpty) {
+          val msg = if (errLine.contains("triangulation failed")) "Graph too large"
+          else if (errLine.contains("command not found")) "Please install graphviz."
+          else ""
+          warn(s"Dot graph generation failed for ${scope.dotPath}. $msg Log in ${out + sep}dot.log")
+        }
       }
     }
     super.postprocess(b)
@@ -106,11 +127,14 @@ trait DotCodegen extends argon.codegen.Codegen {
   def blocks(lhs:Sym[_]) = lhs.op.map { _.blocks }.getOrElse(Nil)
 
   def label(lhs:Sym[_]) = {
-    lhs.op.fold {
-      s"$lhs"
-    } { rhs =>
-      s"$lhs\\n${rhs.getClass.getSimpleName}"
+    var l = src"$lhs"
+    lhs.name.foreach { name =>
+      l += s"[$name]"
     }
+    lhs.op.foreach { rhs =>
+      l += s"\\n${rhs.getClass.getSimpleName}"
+    }
+    l 
   }
 
   // Node Attributes
@@ -121,6 +145,7 @@ trait DotCodegen extends argon.codegen.Codegen {
       at += "style" -> "filled"
     }
     at += "label" -> s""""${label(lhs)}""""
+    at += "URL" -> s""""${s"IR.html#$lhs"}""""
     at
   }
 
@@ -132,12 +157,14 @@ trait DotCodegen extends argon.codegen.Codegen {
     at
   }
 
-  def addEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
-    if (nodes.contains(from) && nodes.contains(to)) currScope.addEdge((from, to, fromAlias, toAlias))
+  def addEdge(from:Sym[_], to:Sym[_], alias:Map[Sym[_], String]=Map.empty):Unit = {
+    if (nodes.contains(from) && nodes.contains(to)) currScope.addEdge((from, to, alias))
   }
 
-  def emitEdge(from:Sym[_], to:Sym[_], fromAlias:String, toAlias:String):Unit = {
-    emitEdge(fromAlias, toAlias, edgeAttr(from, to))
+  def getAlias(node:Sym[_], alias:Map[Sym[_],String]) = alias.getOrElse(node, src"$node")
+
+  def emitEdge(from:Sym[_], to:Sym[_], alias:Map[Sym[_],String]=Map.empty):Unit = {
+    emitEdge(getAlias(from, alias), getAlias(to, alias), edgeAttr(from, to))
   }
 
   def emitEdge(fromAlias:String, toAlias:String, at:Map[String,String]):Unit = {
@@ -148,19 +175,14 @@ trait DotCodegen extends argon.codegen.Codegen {
     val groups = inputGroups(lhs)
     groups.foreach { case (name, inputs) => 
       inputs.foreach { in =>
-        addEdge(in, lhs, src"$in", src"${lhs}_${name}")
+        addEdge(in, lhs, Map(lhs -> src"${lhs}_${name}"))
       }
     }
     (inputs(lhs) diff groups.values.flatten.toSeq).foreach { in => 
-      addEdge(in, lhs, src"$in", src"$lhs")
+      addEdge(in, lhs)
     }
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
-
-  override protected def quoteOrRemap(arg: Any): String = arg match {
-    case arg:SrcCtx => s"$arg"
-    case _ => super.quoteOrRemap(arg)
-  }
 
 }

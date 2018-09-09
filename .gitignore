@@ -45,3 +45,5 @@ resources/synth/chisel-templates/fringeXSIM/
 *.tags
 
 resources/synth/chisel-templates/test_run_dir/*
+bin/get
+test-data/

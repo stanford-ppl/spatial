@@ -12,4 +12,7 @@ package object targets {
   lazy val AWS_F1 = xilinx.AWS_F1
   lazy val ZCU = xilinx.ZCU
   lazy val Zynq = xilinx.Zynq
+  lazy val Plasticine = plasticine.Plasticine
+
+  lazy val all: Set[HardwareTarget] = fpgas + Plasticine
 }

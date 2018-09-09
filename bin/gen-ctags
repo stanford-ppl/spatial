@@ -1,0 +1,10 @@
+#!/bin/bash
+
+ctags --exclude=log --languages=scala,java -f .tags -R \
+  src \
+  utils/src \
+  emul/src \
+  models/src \
+  forge/src \
+  poly/src \
+  argon/src

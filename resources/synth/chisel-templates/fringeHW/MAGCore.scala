@@ -151,7 +151,9 @@ class MAGCore(
   val cmdAddr = Wire(new BurstAddr(addrWidth, w, burstSizeBytes))
   cmdAddr.bits := cmdHead.addr + sizeCounter.io.out
 
-  val cmdRead = io.enable & cmdArbiter.io.deqReady & ~cmdHead.isWr
+  // don't issue commands if a response that cycle has the same tag to avoid edge cases in the coalescing logic
+  val cmdReadConflict = io.dram.rresp.valid & io.dram.rresp.bits.tag.asUInt === io.dram.cmd.bits.tag.asUInt
+  val cmdRead = io.enable & cmdArbiter.io.deqReady & ~cmdHead.isWr & ~cmdReadConflict
   val cmdWrite = io.enable & cmdArbiter.io.deqReady & cmdHead.isWr
 
   val rrespTag = io.dram.rresp.bits.tag
@@ -229,7 +231,6 @@ class MAGCore(
 
   val dramReady = io.dram.cmd.ready
 
-
   val gatherLoadIssueMux = Module(new MuxN(Bool(), numStreams))
   gatherLoadIssueMux.io.ins.foreach { _ := false.B }
   gatherLoadIssueMux.io.sel := cmdArbiter.io.tag
@@ -277,7 +278,7 @@ class MAGCore(
     val m = Module(new GatherBuffer(s.w, scatterGatherD, s.v, burstSizeBytes, addrWidth, cmdHead, io.dram.rresp.bits))
     m.io.rresp.valid := io.dram.rresp.valid & (rrespTag.streamId === i.U)
     m.io.rresp.bits := io.dram.rresp.bits
-    m.io.cmd.valid := cmdRead & cmdArbiter.io.tag === i.U & dramReady
+    m.io.cmd.valid := cmdRead & (cmdArbiter.io.tag === i.U) & dramReady
     m.io.cmd.bits := cmdHead
 
     gatherLoadIssueMux.io.ins(i) := ~cmdArbiter.io.empty & cmdDeqValidMux.io.ins(j) & dramCmdMux.io.ins(i).valid
@@ -286,7 +287,7 @@ class MAGCore(
     isSparseMux.io.ins(j) := true.B
 
     rrespReadyMux.io.ins(i) := true.B
-    cmdDeqValidMux.io.ins(i) := ~m.io.fifo.full & dramReady //& ~cmdCooldown.io.out
+    cmdDeqValidMux.io.ins(i) := cmdRead & ~m.io.fifo.full & dramReady //& ~cmdCooldown.io.out
     dramCmdMux.io.ins(i).valid := cmdRead & ~m.io.fifo.full & ~m.io.hit
     dramCmdMux.io.ins(i).bits.tag.uid := cmdAddr.burstTag    // rrespReadyMux.io.ins(i) := true.B
     // cmdDeqValidMux.io.ins(j) := ~m.io.fifo.full & dramReady

@@ -100,6 +100,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${swap(lhs, BaseEn)}""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${swap(lhs, IIDone)}""", """Wire(Bool())""")
+      emitGlobalWireMap(src"""${swap(lhs, Flow)}""", """Wire(Bool())""")
       // emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
       emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
@@ -402,6 +403,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     case II           => wireMap(src"${lhs}_ii")
     case SM           => wireMap(src"${lhs}_sm")
     case Inhibit      => wireMap(src"${lhs}_inhibit")
+    case Flow      => wireMap(src"${lhs}_flow")
   }
 
 }

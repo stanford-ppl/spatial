@@ -277,6 +277,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
+    case _:LineBufferEnq[_]     => addr.map{case laneAddr => Seq(laneAddr(0))}
     case _:LineBufferRead[_]    => addr.map{case laneAddr => 
       Seq(laneAddr(0)) ++ inst.bankSelects(mem, laneAddr).drop(1)
     }
@@ -294,6 +295,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case Op(_:RegFileShiftIn[_,_])  => Nil
     case Op(_:RegFileRead[_,_])     => Nil
     case Op(_:RegFileWrite[_,_])    => Nil
+    case Op(_:LineBufferEnq[_])     => addr.map{case laneAddr => laneAddr(0)}
     case Op(_:LineBufferRead[_])  => addr.map{case laneAddr => 
       inst.bankOffset(mem, Seq(0.to[I32]) ++ laneAddr.drop(1))
     }
@@ -439,7 +441,7 @@ trait MemoryUnrolling extends UnrollingBase {
         UWrite[A](stage(RegFileShiftIn(mem.asInstanceOf[RegFilex[A]], dat, addr, ens, op.axis)))
       })
 
-    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, enss)))
+    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, bank(0), enss)))
     case _:LineBufferRead[_]     => UVecRead(stage(LineBufferBankedRead(mem.asInstanceOf[LineBuffer[A]], bank, ofs, enss)))
     //case _:LineBufferColSlice[_]) => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))
     //case _:LineBufferRowSlice[_]) => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))

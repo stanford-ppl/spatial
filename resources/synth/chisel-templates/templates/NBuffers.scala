@@ -500,7 +500,7 @@ class NBufMem(val mem: MemType,
           lb.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
           lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map(_.asUInt / banks(1).U)
           lb.io.xBarW(bufferBase + k).banks.zipWithIndex.map{case (b,i) => 
-            if (i % 2 == 0) b := writeRow.io.output.count
+            if (i % 2 == 0) b := writeRow.io.output.count + io.xBarW(bufferBase + k).banks(i)
             else b := writeCol.io.output.count(i/2).asUInt % banks(1).U
           }
         }

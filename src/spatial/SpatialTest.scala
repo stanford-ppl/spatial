@@ -91,11 +91,29 @@ trait SpatialTest extends Spatial with DSLTest {
     override val makeTimeout: Long = 32400
   }
 
+  object PIR extends Backend(
+    name = "PIR",
+    args = "--pir --dot",
+    make = "",
+    run  = "" 
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.PIR")
+    override def runBackend(): Unit = {
+      s"${name}" should s"compile for backend PIR" in {
+        val result = compile().foldLeft[Result](Unknown){ case (result, generate) =>
+          result orElse generate()
+        }
+        result orElse Pass
+      }
+    }
+  }
+
+
   class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)
   object RequireErrors {
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, VCS_noretime)
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, VCS_noretime, PIR)
 
 }

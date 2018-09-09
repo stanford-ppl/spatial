@@ -16,6 +16,7 @@ val common = Seq(
     "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
     "org.scalatest" %% "scalatest" % scalatestVersion,	 // Testing
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args         
+    "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
 
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",
@@ -72,3 +73,5 @@ lazy val apps = project.settings(common).dependsOn(spatial)
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
+
+addCommandAlias("make", "; project spatial; test:compile")

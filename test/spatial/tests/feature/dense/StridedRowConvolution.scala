@@ -57,6 +57,7 @@ import spatial.dsl._
     val cksum = result.zip(gold){_==_}.reduce{_&&_}
     val cksum2 = result2.zip(gold2){_==_}.reduce{_&&_}
     println("PASS: " + {cksum && cksum2} + " (SimpleRowStridedConv)")
+    assert(cksum && cksum2)
   }
 }
 

@@ -732,6 +732,7 @@ import spatial.dsl._
     val cksum = gold.zip(results){_==_}.reduce{_&&_}    
 
     println("PASS: " + cksum + " (SingleLayerConv_design2)")
+    assert(cksum)
 
   }
 }
@@ -894,6 +895,7 @@ import spatial.dsl._
     val cksum = gold.zip(results){_==_}.reduce{_&&_}    
 
     println("PASS: " + cksum + " (SingleLayerConv_design1)")
+    assert(cksum)
 
   }
 }

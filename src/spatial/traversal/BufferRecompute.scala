@@ -27,7 +27,7 @@ case class BufferRecompute(IR: State) extends BlkTraversal {
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
-    case _: MemAlloc[_,_] if (!lhs.isFIFO & !lhs.isNonBuffer & !lhs.isStreamIn & !lhs.isStreamOut & !lhs.isArgIn & !lhs.isArgOut) => 
+    case _: MemAlloc[_,_] if (!lhs.isFIFO & !lhs.isNonBuffer & !lhs.isStreamIn & !lhs.isStreamOut & !lhs.isArgIn & !lhs.isArgOut & !lhs.isHostIO) => 
       // Recompute buffer depth
       if (lhs.getDuplicates.isDefined) {
         dbgs(s"Recomputing depth of $lhs")

@@ -336,12 +336,10 @@ package object control {
     @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean, forkNode: Option[Ctrl]): Boolean = {
       if (isFSM) false
       else if (isSwitch && isOuterControl) {
-        dbgs(s"runtime invariance for this $this $cchains")
         allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
         isLockstepAcross(iters, reference)
       }
       else {
-        dbgs(s"runtime invariance for this $this $cchains")
         // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
         isLockstepAcross(iters, reference) &&
         (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.isFixed(forkNode)}})

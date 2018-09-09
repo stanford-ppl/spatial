@@ -555,342 +555,346 @@ import spatial.dsl._
 }
 
 
-// @spatial class SingleLayerConv_IRCO extends SpatialTest {
-//   type T = FixPt[TRUE,_16,_0]
+@spatial class SingleLayerConv_IRCO extends SpatialTest {
+  type T = FixPt[TRUE,_16,_0]
 
-//   def main(args: Array[String]): Unit = {
+  override def runtimeArgs: Args = "16 32 32 32 2 0"
 
-//     val debug:scala.Boolean = false
+  def main(args: Array[String]): Unit = {
 
-//     val PX = 1
-//     val P1 = 2
-//     val P2 = 1
-//     val P3 = 1 // Not working
-//     val loadPar = 32 (1 -> 16)
-//     val storePar = 32 (1 -> 16)
-//     // Scalar params
-//     val INPUT_ROWS = ArgIn[Int]
-//     val INPUT_COLS = ArgIn[Int]
-//     val INPUT_CHANS = ArgIn[Int]
-//     val OUTPUT_CHANS = ArgIn[Int]
-//     val STRIDE = ArgIn[Int] // Assume horiz and vert stride match
-//     val KERNEL_ROWS = 3
-//     val KERNEL_COLS = 3
+    val debug:scala.Boolean = false
 
-//     // Shadow params (input args)
-//     val input_rows = args(0).to[Int]
-//     val input_cols = args(1).to[Int]
-//     val input_chans = args(2).to[Int]
-//     val output_chans = args(3).to[Int]
-//     val stride = args(4).to[Int]
-//     val print_data = args(5).to[Bit]
+    val PX = 1
+    val P1 = 1
+    val P2 = 1
+    val P3 = 1 // Not working
+    val loadPar = 32 (1 -> 16)
+    val storePar = 32 (1 -> 16)
+    // Scalar params
+    val INPUT_ROWS = ArgIn[Int]
+    val INPUT_COLS = ArgIn[Int]
+    val INPUT_CHANS = ArgIn[Int]
+    val OUTPUT_CHANS = ArgIn[Int]
+    val STRIDE = ArgIn[Int] // Assume horiz and vert stride match
+    val KERNEL_ROWS = 3
+    val KERNEL_COLS = 3
 
-//     // Set args
-//     setArg(INPUT_ROWS, input_rows)
-//     setArg(INPUT_COLS, input_cols)
-//     setArg(INPUT_CHANS, input_chans)
-//     setArg(OUTPUT_CHANS, output_chans)
-//     setArg(STRIDE, stride)
+    // Shadow params (input args)
+    val input_rows = args(0).to[Int]
+    val input_cols = args(1).to[Int]
+    val input_chans = args(2).to[Int]
+    val output_chans = args(3).to[Int]
+    val stride = args(4).to[Int]
+    val print_data = args(5).to[Bit]
 
-//     // HW Design properties
-//     val INPUT_COLS_MAX = 640
-//     val INPUT_CHANS_MAX = 64
-//     val OUTPUT_CHANS_MAX = 64
+    // Set args
+    setArg(INPUT_ROWS, input_rows)
+    setArg(INPUT_COLS, input_cols)
+    setArg(INPUT_CHANS, input_chans)
+    setArg(OUTPUT_CHANS, output_chans)
+    setArg(STRIDE, stride)
 
-//     // Memories
-//     val INPUT_DATA = DRAM[T](INPUT_CHANS, INPUT_ROWS, INPUT_COLS)
-//     val OUTPUT_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
-//     val KERNEL_DATA = DRAM[T](OUTPUT_CHANS, INPUT_CHANS, KERNEL_ROWS, KERNEL_COLS)
-//     val BIAS_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
+    // HW Design properties
+    val INPUT_COLS_MAX = 640
+    val INPUT_CHANS_MAX = 64
+    val OUTPUT_CHANS_MAX = 64
 
-//     // Load data (placeholder)
-//     val input = (0::INPUT_CHANS, 0::INPUT_ROWS, 0::INPUT_COLS) {(i,j,k) => ((i + j + k) % 8).to[T]}
-//     val output = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 0.to[T]}
-//     val kernel = (0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS) {(i,j,k,l) => if (random[Int](10) > 8) 1.to[T] else 0.to[T]}
-//     val bias = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 1.to[T]}
+    // Memories
+    val INPUT_DATA = DRAM[T](INPUT_CHANS, INPUT_ROWS, INPUT_COLS)
+    val OUTPUT_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
+    val KERNEL_DATA = DRAM[T](OUTPUT_CHANS, INPUT_CHANS, KERNEL_ROWS, KERNEL_COLS)
+    val BIAS_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
 
-//     // Set data
-//     setMem(INPUT_DATA, input)
-//     setMem(OUTPUT_DATA, output)
-//     setMem(KERNEL_DATA, kernel)
-//     setMem(BIAS_DATA, bias)
+    // Load data (placeholder)
+    val input = (0::INPUT_CHANS, 0::INPUT_ROWS, 0::INPUT_COLS) {(i,j,k) => ((i + j + k) % 8).to[T]}
+    val output = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 0.to[T]}
+    val kernel = (0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS) {(i,j,k,l) => if (random[Int](10) > 8) 1.to[T] else 0.to[T]}
+    val bias = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 1.to[T]}
 
-//     // setMem(KERNEL_COPY_CPU, kernel)
-//     // println("MANUALLY COPY KERNEL_DATA PTR TO ME!")
+    // Set data
+    setMem(INPUT_DATA, input)
+    setMem(OUTPUT_DATA, output)
+    setMem(KERNEL_DATA, kernel)
+    setMem(BIAS_DATA, bias)
 
-//     Accel{
-//       val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, INPUT_CHANS_MAX, KERNEL_ROWS, KERNEL_COLS)
-//       kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS)
-//       Foreach(INPUT_CHANS by 1){ ic => 
-//         val lb1 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 1)
-//         val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
-//         Foreach(INPUT_ROWS by STRIDE){ row => 
-//           // val bias_srams = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX) // / STRIDE?
-//           val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer
-//           Parallel {
-//             Foreach(OUTPUT_CHANS by 1 par P3) {oc => 
-//               if (ic == 0) accum_lines.loadOrigin(BIAS_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar), (oc,0))
-//               else accum_lines.loadOrigin(OUTPUT_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar), (oc,0))
-//             }
-//             Pipe{
-//               if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
-//               else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
-//             }
-//           }
-//           Foreach(INPUT_COLS by STRIDE par PX){ col =>
-//             val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
-//             val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
-//             if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(i, col)}
-//             else Foreach(3 by 1 par 3){i => sr2(i,*) <<= lb2(i, col::col+2)}
-//             val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
-//               if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
-//                   || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
-//                        {0.to[T]}
-//               else 
-//                 if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
-//                 else {sr2(i,KERNEL_COLS - 1 - j)}
-//             }}.flatten
+    // setMem(KERNEL_COPY_CPU, kernel)
+    // println("MANUALLY COPY KERNEL_DATA PTR TO ME!")
 
-//             Foreach(OUTPUT_CHANS by 1 par P1) { oc =>
-//               val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
-//                 kernel_sram(oc,ic,i,j)
-//               }}.flatten
+    Accel{
+      val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, INPUT_CHANS_MAX, KERNEL_ROWS, KERNEL_COLS)
+      kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS)
+      Foreach(INPUT_CHANS by 1){ ic => 
+        val lb1 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 1)
+        val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
+        Foreach(INPUT_ROWS by STRIDE){ row => 
+          // val bias_srams = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX) // / STRIDE?
+          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.flat
+          Parallel {
+            Foreach(OUTPUT_CHANS by 1 par P3) {oc => 
+              if (ic == 0) accum_lines(oc::oc+1, 0::INPUT_COLS/STRIDE) load BIAS_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar)
+              else accum_lines(oc::oc+1,0::INPUT_COLS/STRIDE) load OUTPUT_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar)
+            }
+            Pipe{
+              if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
+              else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
+            }
+          }
+          Foreach(INPUT_COLS by STRIDE par PX){ col =>
+            val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
+            val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
+            if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(i, col)}
+            else Foreach(2 by 1 /* par 2*/,3 by 1 par 3){(e,i) => sr2(i,*) <<= lb2(KERNEL_ROWS-1-i, col+e)}
+            val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
+              if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
+                  || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
+                       {0.to[T]}
+              else 
+                if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
+                else {sr2(i,KERNEL_COLS - 1 - j)}
+            }}.flatten
 
-//               val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}
+            Foreach(OUTPUT_CHANS by 1 par P1) { oc =>
+              val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
+                kernel_sram(oc,ic,i,j)
+              }}.flatten
 
-//               accum_lines(oc, col/STRIDE) = accum + accum_lines(oc, col/STRIDE)
-//               if (debug) println(" = " + accum_lines(oc, col/STRIDE))
+              val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}
 
-//             }
-//             // val accum = Reduce(Reg[T](0))(3 by 1, 3 by 1 par P2){(i,j) => 
-//             //   val data = if (    row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
-//             //                   || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
-//             //                {0.to[T]}
-//             //              else 
-//             //                 if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
-//             //                 else {sr2(i,KERNEL_COLS - 1 - j)}
-//             //     if (debug) println(" Partial is " + data + " * " + kernel_sram(oc, ic, i, j) + " @ " + i + "," + j)
-//             //     val k = kernel_sram(oc, ic, i, j)
-//             //     data * k
-//             //   }{_+_}
-//           }
+              accum_lines(oc, col/STRIDE) = accum + accum_lines(oc, col/STRIDE)
+              if (debug) println(" = " + accum_lines(oc, col/STRIDE))
 
-//           // Store line back
-//           Foreach(OUTPUT_CHANS by 1 par P2) { oc =>
-//             OUTPUT_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par storePar).storeOrigin(accum_lines, (oc,0))
-//           }
-//         }
-//       }
-//     }
+            }
+            // val accum = Reduce(Reg[T](0))(3 by 1, 3 by 1 par P2){(i,j) => 
+            //   val data = if (    row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
+            //                   || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
+            //                {0.to[T]}
+            //              else 
+            //                 if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
+            //                 else {sr2(i,KERNEL_COLS - 1 - j)}
+            //     if (debug) println(" Partial is " + data + " * " + kernel_sram(oc, ic, i, j) + " @ " + i + "," + j)
+            //     val k = kernel_sram(oc, ic, i, j)
+            //     data * k
+            //   }{_+_}
+          }
 
-//     // Get results
-//     val results = getTensor3(OUTPUT_DATA)
-//     println("Results are " + results.dim0 + " x " + results.dim1 + " x " + results.dim2)
+          // Store line back
+          Foreach(OUTPUT_CHANS by 1 par P2) { oc =>
+            OUTPUT_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par storePar) store accum_lines(oc::oc+1, 0::INPUT_COLS/STRIDE)
+          }
+        }
+      }
+    }
 
-//     // Compute Checks
-//     val gold = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) => 
-//       Array.tabulate(INPUT_CHANS){page => 
-//         if (debug && print_data) {
-//             println("Result working on " + k + "," + page + "," + i/STRIDE + "," + j/STRIDE)
-//             println(" Window: ")
-//             for (ii <- 0 until KERNEL_ROWS) { 
-//               for (jj <- 0 until KERNEL_COLS){
-//                 if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) print(" X") 
-//                 else print(" " + input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj)))
-//               } 
-//               println(" ")
-//             }
-//         }
+    // Get results
+    val results = getTensor3(OUTPUT_DATA)
+    println("Results are " + results.dim0 + " x " + results.dim1 + " x " + results.dim2)
+
+    // Compute Checks
+    val gold = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) => 
+      Array.tabulate(INPUT_CHANS){page => 
+        if (debug && print_data) {
+            println("Result working on " + k + "," + page + "," + i/STRIDE + "," + j/STRIDE)
+            println(" Window: ")
+            for (ii <- 0 until KERNEL_ROWS) { 
+              for (jj <- 0 until KERNEL_COLS){
+                if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) print(" X") 
+                else print(" " + input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj)))
+              } 
+              println(" ")
+            }
+        }
 
 
-//         Array.tabulate(KERNEL_ROWS){ii => Array.tabulate(KERNEL_COLS){jj => 
-//           val pxl = if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) 0.to[T] 
-//                     else input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj))
-//           val f = kernel(k,page, ii, jj)
-//           if (debug) println(" Partial is " + pxl + " * " + f + " @ " + ii + "," + jj)
-//           pxl * f
-//         }}.flatten.reduce{_+_}
-//       }.reduce{_+_} + bias(k, i/STRIDE, j/STRIDE)
-//     }
+        Array.tabulate(KERNEL_ROWS){ii => Array.tabulate(KERNEL_COLS){jj => 
+          val pxl = if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) 0.to[T] 
+                    else input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj))
+          val f = kernel(k,page, ii, jj)
+          if (debug) println(" Partial is " + pxl + " * " + f + " @ " + ii + "," + jj)
+          pxl * f
+        }}.flatten.reduce{_+_}
+      }.reduce{_+_} + bias(k, i/STRIDE, j/STRIDE)
+    }
   
-//     if (print_data) {
-//       printTensor3(input, "Input")
-//       printTensor4(kernel, "Kernel")
-//       printTensor3(gold, "Gold")
-//       printTensor3(results, "Extracted")  
+    if (print_data) {
+      printTensor3(input, "Input")
+      printTensor4(kernel, "Kernel")
+      printTensor3(gold, "Gold")
+      printTensor3(results, "Extracted")  
 
-//       val bitmask = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) =>
-//         if (results(k,i/STRIDE,j/STRIDE) == gold(k,i/STRIDE,j/STRIDE)) 1.to[Int] else 0.to[Int]
-//       }
-//       val num_wrong = bitmask.length - bitmask.reduce{_+_}
-//       printTensor3(bitmask, "Matchup")
-//       println("Error rate: " + num_wrong + " / " + bitmask.length + " incorrect")
+      val bitmask = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) =>
+        if (results(k,i/STRIDE,j/STRIDE) == gold(k,i/STRIDE,j/STRIDE)) 1.to[Int] else 0.to[Int]
+      }
+      val num_wrong = bitmask.length - bitmask.reduce{_+_}
+      printTensor3(bitmask, "Matchup")
+      println("Error rate: " + num_wrong + " / " + bitmask.length + " incorrect")
 
-//     }
-//     val cksum = gold.zip(results){_==_}.reduce{_&&_}    
+    }
+    val cksum = gold.zip(results){_==_}.reduce{_&&_}    
 
-//     println("PASS: " + cksum + " (SingleLayerConv_design2)")
+    println("PASS: " + cksum + " (SingleLayerConv_design2)")
 
-//   }
-// }
-
-
-// @spatial class SingleLayerConv_OIRC extends SpatialTest {
-//   type T = FixPt[TRUE,_16,_0]
-
-//   def main(args: Array[String]): Unit = {
-
-//     val debug:scala.Boolean = false
-
-//     val PX = 1
-//     val loadPar = 16 (1 -> 16)
-//     val storePar = 16 (1 -> 16)
-//     // Scalar params
-//     val INPUT_ROWS = ArgIn[Int]
-//     val INPUT_COLS = ArgIn[Int]
-//     val INPUT_CHANS = ArgIn[Int]
-//     val OUTPUT_CHANS = ArgIn[Int]
-//     val STRIDE = ArgIn[Int] // Assume horiz and vert stride match
-//     val KERNEL_ROWS = 3
-//     val KERNEL_COLS = 3
-
-//     // Shadow params (input args)
-//     val input_rows = args(0).to[Int]
-//     val input_cols = args(1).to[Int]
-//     val input_chans = args(2).to[Int]
-//     val output_chans = args(3).to[Int]
-//     val stride = args(4).to[Int]
-//     val print_data = args(5).to[Bit]
-
-//     // Set args
-//     setArg(INPUT_ROWS, input_rows)
-//     setArg(INPUT_COLS, input_cols)
-//     setArg(INPUT_CHANS, input_chans)
-//     setArg(OUTPUT_CHANS, output_chans)
-//     setArg(STRIDE, stride)
-
-//     // HW Design properties
-//     val INPUT_COLS_MAX = 640
-//     val INPUT_CHANS_MAX = 64
-//     val OUTPUT_CHANS_MAX = 64
-
-//     // Memories
-//     val INPUT_DATA = DRAM[T](INPUT_CHANS, INPUT_ROWS, INPUT_COLS)
-//     val OUTPUT_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
-//     val KERNEL_DATA = DRAM[T](OUTPUT_CHANS, INPUT_CHANS, KERNEL_ROWS, KERNEL_COLS)
-//     val BIAS_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
-
-//     // Load data (placeholder)
-//     val input = (0::INPUT_CHANS, 0::INPUT_ROWS, 0::INPUT_COLS) {(i,j,k) => ((i + j + k) % 8).to[T]}
-//     val output = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 0.to[T]}
-//     val kernel = (0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS) {(i,j,k,l) => if (random[Int](10) > 8) 1.to[T] else 0.to[T]}
-//     val bias = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 1.to[T]}
-
-//     // Set data
-//     setMem(INPUT_DATA, input)
-//     setMem(OUTPUT_DATA, output)
-//     setMem(KERNEL_DATA, kernel)
-//     setMem(BIAS_DATA, bias)
-
-//     // setMem(KERNEL_COPY_CPU, kernel)
-//     // println("MANUALLY COPY KERNEL_DATA PTR TO ME!")
-
-//     Accel{
-//       val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, INPUT_CHANS_MAX, KERNEL_ROWS, KERNEL_COLS)
-//       kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS)
-
-//       Foreach(OUTPUT_CHANS by 1){ oc => 
-//         Foreach(INPUT_CHANS by 1){ ic => 
-//           val lb1 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 1)
-//           val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
-//           Foreach(INPUT_ROWS by STRIDE){ row => 
-//             val bias_sram = SRAM[T](INPUT_COLS_MAX) // / STRIDE?
-//             val accum_line = SRAM[T](INPUT_COLS_MAX).buffer
-//             if (ic == 0) bias_sram load BIAS_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
-//             // Parallel{
-//               Pipe{accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)}
-//               Pipe{
-//                 if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
-//                 else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
-//               }
-//             // }
-//             Foreach(INPUT_COLS by STRIDE par PX){ col =>
-//               val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
-//               val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
-//               if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(i, col)}
-//               else Foreach(3 by 1 par 3){i => sr2(i,*) <<= lb2(i, col::col+2)}
-//               val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
-//                 kernel_sram(oc,ic,i,j)
-//               }}.flatten
-//               val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
-//                 if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
-//                     || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
-//                          {0.to[T]}
-//                 else 
-//                   if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
-//                   else {sr2(i,KERNEL_COLS - 1 - j)}
-//               }}.flatten
-
-//               val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}
-//               accum_line(col/STRIDE) = accum + accum_line(col/STRIDE) + mux(ic == 0, bias_sram(col/STRIDE), 0.to[T])
-//               if (debug) println(" = " + accum_line(col/STRIDE) + ", bias = " + mux(ic == 0, bias_sram(col/STRIDE), 0.to[T]))
-//             }
-
-//             // Store line back
-//             OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par storePar) store accum_line
-//           }
-//         }
-//       }
-//     }
-
-//     // Get results
-//     val results = getTensor3(OUTPUT_DATA)
-//     println("Results are " + results.dim0 + " x " + results.dim1 + " x " + results.dim2)
-
-//     // Compute Checks
-//     val gold = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) => 
-//       Array.tabulate(INPUT_CHANS){page => 
-//         if (debug && print_data) {
-//             println("Result working on " + k + "," + page + "," + i/STRIDE + "," + j/STRIDE)
-//             println(" Window: ")
-//             for (ii <- 0 until KERNEL_ROWS) { 
-//               for (jj <- 0 until KERNEL_COLS){
-//                 if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) print(" X") 
-//                 else print(" " + input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj)))
-//               } 
-//               println(" ")
-//             }
-//         }
+  }
+}
 
 
-//         Array.tabulate(KERNEL_ROWS){ii => Array.tabulate(KERNEL_COLS){jj => 
-//           val pxl = if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) 0.to[T] 
-//                     else input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj))
-//           val f = kernel(k,page, ii, jj)
-//           if (debug) println(" Partial is " + pxl + " * " + f + " @ " + ii + "," + jj)
-//           pxl * f
-//         }}.flatten.reduce{_+_}
-//       }.reduce{_+_} + bias(k, i/STRIDE, j/STRIDE)
-//     }
+@spatial class SingleLayerConv_OIRC extends SpatialTest {
+  type T = FixPt[TRUE,_16,_0]
+
+  override def runtimeArgs: Args = "16 32 32 32 2 0"
+
+  def main(args: Array[String]): Unit = {
+
+    val debug:scala.Boolean = false
+
+    val PX = 1
+    val loadPar = 16 (1 -> 16)
+    val storePar = 16 (1 -> 16)
+    // Scalar params
+    val INPUT_ROWS = ArgIn[Int]
+    val INPUT_COLS = ArgIn[Int]
+    val INPUT_CHANS = ArgIn[Int]
+    val OUTPUT_CHANS = ArgIn[Int]
+    val STRIDE = ArgIn[Int] // Assume horiz and vert stride match
+    val KERNEL_ROWS = 3
+    val KERNEL_COLS = 3
+
+    // Shadow params (input args)
+    val input_rows = args(0).to[Int]
+    val input_cols = args(1).to[Int]
+    val input_chans = args(2).to[Int]
+    val output_chans = args(3).to[Int]
+    val stride = args(4).to[Int]
+    val print_data = args(5).to[Bit]
+
+    // Set args
+    setArg(INPUT_ROWS, input_rows)
+    setArg(INPUT_COLS, input_cols)
+    setArg(INPUT_CHANS, input_chans)
+    setArg(OUTPUT_CHANS, output_chans)
+    setArg(STRIDE, stride)
+
+    // HW Design properties
+    val INPUT_COLS_MAX = 640
+    val INPUT_CHANS_MAX = 64
+    val OUTPUT_CHANS_MAX = 64
+
+    // Memories
+    val INPUT_DATA = DRAM[T](INPUT_CHANS, INPUT_ROWS, INPUT_COLS)
+    val OUTPUT_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
+    val KERNEL_DATA = DRAM[T](OUTPUT_CHANS, INPUT_CHANS, KERNEL_ROWS, KERNEL_COLS)
+    val BIAS_DATA = DRAM[T](OUTPUT_CHANS, INPUT_ROWS/STRIDE, INPUT_COLS/STRIDE)
+
+    // Load data (placeholder)
+    val input = (0::INPUT_CHANS, 0::INPUT_ROWS, 0::INPUT_COLS) {(i,j,k) => ((i + j + k) % 8).to[T]}
+    val output = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 0.to[T]}
+    val kernel = (0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS) {(i,j,k,l) => if (random[Int](10) > 8) 1.to[T] else 0.to[T]}
+    val bias = (0::OUTPUT_CHANS, 0::INPUT_ROWS/STRIDE, 0::INPUT_COLS/STRIDE){(i,j,k) => 1.to[T]}
+
+    // Set data
+    setMem(INPUT_DATA, input)
+    setMem(OUTPUT_DATA, output)
+    setMem(KERNEL_DATA, kernel)
+    setMem(BIAS_DATA, bias)
+
+    // setMem(KERNEL_COPY_CPU, kernel)
+    // println("MANUALLY COPY KERNEL_DATA PTR TO ME!")
+
+    Accel{
+      val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, INPUT_CHANS_MAX, KERNEL_ROWS, KERNEL_COLS)
+      kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::INPUT_CHANS, 0::KERNEL_ROWS, 0::KERNEL_COLS)
+
+      Foreach(OUTPUT_CHANS by 1){ oc => 
+        Foreach(INPUT_CHANS by 1){ ic => 
+          val lb1 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 1)
+          val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
+          Foreach(INPUT_ROWS by STRIDE){ row => 
+            val bias_sram = SRAM[T](INPUT_COLS_MAX) // / STRIDE?
+            val accum_line = SRAM[T](INPUT_COLS_MAX).buffer
+            if (ic == 0) bias_sram load BIAS_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
+            // Parallel{
+              Pipe{accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)}
+              Pipe{
+                if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
+                else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
+              }
+            // }
+            Foreach(INPUT_COLS by STRIDE par PX){ col =>
+              val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
+              val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
+              if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(i, col)}
+              else Foreach(2 by 1 /*par 2*/, 3 by 1 par 3){(e,i) => sr2(i,*) <<= lb2(KERNEL_ROWS-1-i, col+e)}
+              val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
+                kernel_sram(oc,ic,i,j)
+              }}.flatten
+              val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
+                if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
+                    || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
+                         {0.to[T]}
+                else 
+                  if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
+                  else {sr2(i,KERNEL_COLS - 1 - j)}
+              }}.flatten
+
+              val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}
+              accum_line(col/STRIDE) = accum + accum_line(col/STRIDE) + mux(ic == 0, bias_sram(col/STRIDE), 0.to[T])
+              if (debug) println(" = " + accum_line(col/STRIDE) + ", bias = " + mux(ic == 0, bias_sram(col/STRIDE), 0.to[T]))
+            }
+
+            // Store line back
+            OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par storePar) store accum_line
+          }
+        }
+      }
+    }
+
+    // Get results
+    val results = getTensor3(OUTPUT_DATA)
+    println("Results are " + results.dim0 + " x " + results.dim1 + " x " + results.dim2)
+
+    // Compute Checks
+    val gold = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) => 
+      Array.tabulate(INPUT_CHANS){page => 
+        if (debug && print_data) {
+            println("Result working on " + k + "," + page + "," + i/STRIDE + "," + j/STRIDE)
+            println(" Window: ")
+            for (ii <- 0 until KERNEL_ROWS) { 
+              for (jj <- 0 until KERNEL_COLS){
+                if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) print(" X") 
+                else print(" " + input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj)))
+              } 
+              println(" ")
+            }
+        }
+
+
+        Array.tabulate(KERNEL_ROWS){ii => Array.tabulate(KERNEL_COLS){jj => 
+          val pxl = if (i-KERNEL_ROWS+STRIDE+ii < 0 || j-KERNEL_COLS+STRIDE+jj < 0) 0.to[T] 
+                    else input(page,i-(KERNEL_ROWS-STRIDE-ii),j-(KERNEL_COLS-STRIDE-jj))
+          val f = kernel(k,page, ii, jj)
+          if (debug) println(" Partial is " + pxl + " * " + f + " @ " + ii + "," + jj)
+          pxl * f
+        }}.flatten.reduce{_+_}
+      }.reduce{_+_} + bias(k, i/STRIDE, j/STRIDE)
+    }
   
-//     if (print_data) {
-//       printTensor3(input, "Input")
-//       printTensor4(kernel, "Kernel")
-//       printTensor3(gold, "Gold")
-//       printTensor3(results, "Extracted")  
+    if (print_data) {
+      printTensor3(input, "Input")
+      printTensor4(kernel, "Kernel")
+      printTensor3(gold, "Gold")
+      printTensor3(results, "Extracted")  
 
-//       val bitmask = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) =>
-//         if (results(k,i/STRIDE,j/STRIDE) == gold(k,i/STRIDE,j/STRIDE)) 1.to[Int] else 0.to[Int]
-//       }
-//       val num_wrong = bitmask.length - bitmask.reduce{_+_}
-//       printTensor3(bitmask, "Matchup")
-//       println("Error rate: " + num_wrong + " / " + bitmask.length + " incorrect")
+      val bitmask = (0::OUTPUT_CHANS, 0::INPUT_ROWS by STRIDE, 0::INPUT_COLS by STRIDE){(k,i,j) =>
+        if (results(k,i/STRIDE,j/STRIDE) == gold(k,i/STRIDE,j/STRIDE)) 1.to[Int] else 0.to[Int]
+      }
+      val num_wrong = bitmask.length - bitmask.reduce{_+_}
+      printTensor3(bitmask, "Matchup")
+      println("Error rate: " + num_wrong + " / " + bitmask.length + " incorrect")
 
-//     }
-//     val cksum = gold.zip(results){_==_}.reduce{_&&_}    
+    }
+    val cksum = gold.zip(results){_==_}.reduce{_&&_}    
 
-//     println("PASS: " + cksum + " (SingleLayerConv_design1)")
+    println("PASS: " + cksum + " (SingleLayerConv_design1)")
 
-//   }
-// }
+  }
+}
 

@@ -14,7 +14,7 @@ import scala.collection.mutable.Queue
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(LineBufferRead(this,addr,ens))
-  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = stage(LineBufferEnq(this,data,ens))
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = stage(LineBufferEnq(this,data,addr(0),ens))
   @rig def __reset(ens: Set[Bit]): Void = void
 
   /** Creates a load port to this LineBuffer at the given `row` and `col`. **/
@@ -26,7 +26,8 @@ import scala.collection.mutable.Queue
 }
 
 object LineBuffer {
-  @api def apply[A:Bits](rows: I32, cols: I32): LineBuffer[A] = stage(LineBufferNew(rows,cols))
+  @api def apply[A:Bits](rows: I32, cols: I32): LineBuffer[A] = stage(LineBufferNew(rows,cols,1))
+  @api def strided[A:Bits](rows: I32, cols: I32, stride: I32): LineBuffer[A] = stage(LineBufferNew(rows,cols,stride))
 }
 
 //   /** Creates a vectorized load port to this LineBuffer at the given `row` and `cols`. **/

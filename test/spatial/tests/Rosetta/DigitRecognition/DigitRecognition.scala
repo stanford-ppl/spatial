@@ -27,15 +27,14 @@ import spatial.targets._
 
 
 	val num_training = 18000
-	val class_size = 1800 /* number of digits in training set that belong to each class */
-	val num_test = 2000
+	val class_size 	 = 1800 /* number of digits in training set that belong to each class */
+	val num_test 	 = 2000
 
 
 	/* Parameters to tune */
 	val k_const 				= 5 /* Number of nearest neighbors to handle */
 	val par_factor  			= 4
-
-
+	val parLoad 				= 1 //4
 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
@@ -57,13 +56,11 @@ import spatial.targets._
 				val first_label  = mux(value_1 <  value_2, label_1, label_2)
 				val second_label = mux(value_1 >= value_2, label_1, label_2)
 
-				Parallel {
-					knn_set(p, k) 	  = smaller_value 
-					knn_set(p, k + 1) = bigger_value
+				knn_set(p, k) 	  = smaller_value 
+				knn_set(p, k + 1) = bigger_value
 
-					label_set(p, k)		 = first_label
-					label_set(p, k + 1)  = second_label
-				}
+				label_set(p, k)		 = first_label
+				label_set(p, k + 1)  = second_label
 			}
 		}
 	}
@@ -101,32 +98,30 @@ import spatial.targets._
 	
 		// simplest implementation for counting 1-bits in bitstring
 		val sum_bits_tmp = RegFile[Int](4)
-		Parallel {  
-			val bits_d1 = Array.tabulate(64){ i =>
-							val d1 = x1.d1 
-							d1.bit(i) 
-						  }.reduce(_ + _)
-			sum_bits_tmp(0) = bits_d1.to[Int]
+		val bits_d1 = List.tabulate(64){ i =>
+						val d1 = x1.d1 
+						d1.bit(i).to[Int]
+					  }.reduce(_ + _)
+		sum_bits_tmp(0) = bits_d1
 
-			val bits_d2 =  Reduce(Reg[Int])(64 by 1 par parSum) { i =>
-							val d2 = x1.d2 
-							d2.bit(i).to[Int] 
-						 } { _ + _ }
-			sum_bits_tmp(1) = bits_d2 
+		val bits_d2 =  List.tabulate(64) { i =>
+						val d2 = x1.d2 
+						d2.bit(i).to[Int] 
+					  }.reduce(_ + _)
+		sum_bits_tmp(1) = bits_d2 
 
-			val bits_d3 =  Reduce(Reg[Int])(64 by 1 par parSum) { i =>
-							val d3 = x2.d3 
-							d3.bit(i).to[Int] 
-						 } { _ + _ }
-			sum_bits_tmp(2) = bits_d3 
-			
-			val bits_d4 = Reduce(Reg[Int])(64 by 1 par parSum) { i =>
-							val d4 = x2.d4
-							d4.bit(i).to[Int] 
-						 } { _ + _ }
-			sum_bits_tmp(3) = bits_d4 
-		}
-
+		val bits_d3 =  List.tabulate(64) { i =>
+						val d3 = x2.d3 
+						d3.bit(i).to[Int] 
+					  }.reduce(_ + _)
+		sum_bits_tmp(2) = bits_d3 
+		
+		val bits_d4 =  List.tabulate(64){ i =>
+						val d4 = x2.d4
+						d4.bit(i).to[Int] 
+					  }.reduce(_ + _)
+		sum_bits_tmp(3) = bits_d4 
+		
 		sum_bits_tmp(0) + sum_bits_tmp(1) + sum_bits_tmp(2) + sum_bits_tmp(3)
 	}
 
@@ -143,7 +138,7 @@ import spatial.targets._
 		val digit_xored2 = DigitType2(test_inst2.d3 ^ train_inst2.d3, test_inst2.d4 ^ train_inst2.d4)
 
 		val max_dist = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
-		max_dist.reset
+		max_dist := IntAndIndex(0.to[Int], 0.to[I32]) 
 
 		val dist = Reg[Int](0)
 		Parallel { 
@@ -155,10 +150,8 @@ import spatial.targets._
 		}	
 
 		if (dist.value < max_dist.value.value) {
-			Parallel { 
-				min_dists(p, max_dist.value.inx) = dist.value  
-				label_list(p, max_dist.value.inx) = train_label
-			}
+			min_dists(p, max_dist.value.inx) = dist.value  
+			label_list(p, max_dist.value.inx) = train_label
 		}
 		
 	}
@@ -343,12 +336,12 @@ import spatial.targets._
 			Foreach(num_test by num_test_local_len){ test_factor =>
 
 				Parallel { 
-					test_set_local1 load test_set_dram_1(test_factor :: test_factor + num_test_local_len par 4)
-					test_set_local2 load test_set_dram_2(test_factor :: test_factor + num_test_local_len par 4)
+					test_set_local1 load test_set_dram_1(test_factor :: test_factor + num_test_local_len par parLoad)
+					test_set_local2 load test_set_dram_2(test_factor :: test_factor + num_test_local_len par parLoad)
 				}
 
 				val results_local 	= SRAM[LabelType](num_test_local_len)
-				Foreach(num_test_local_len by 1) { test_inx =>
+				Sequential.Foreach(num_test_local_len by 1) { test_inx =>
 
 					val vote_list		= 	RegFile[Int](10).buffer
 
@@ -364,17 +357,17 @@ import spatial.targets._
 					val test_local1 = test_set_local1(test_inx)
 					val test_local2 = test_set_local2(test_inx)
 
-					Foreach(par_factor by 1 par par_factor) { p => 
+					Sequential.Foreach(par_factor by 1 par par_factor) { p => 
 						Foreach(train_set_par_num by 1 par 1) { train_inx =>
 							val curr_train_inx = p * train_set_par_num + train_inx
-							Pipe { update_knn(test_local1, test_local2,
-											  train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
-											  knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) }
+							update_knn(test_local1, test_local2,
+									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
+									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
 						}
-						network_sort(knn_tmp_large_set, label_list_tmp, p)
+						network_sort(knn_tmp_large_set, label_list_tmp, p) 
 					}
 					/* Do KNN */
-					Pipe { results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) }
+					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
 
 				}
 

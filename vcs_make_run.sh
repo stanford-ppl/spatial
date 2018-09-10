@@ -11,4 +11,4 @@ rm -r gen/$APP
 bin/spatial $APP --debugResources  --fpga ZCU --instrument
 cd gen/$APP
 make vcs
-#bash run.sh 1 1
+bash run.sh 0 3192 0

@@ -3,6 +3,8 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 @spatial class Bank2DSimple extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
   val R = 32; val C = 16
   val P = 1;  val Q = 4
 
@@ -27,6 +29,8 @@ import spatial.dsl._
 }
 
 @spatial class ComplicatedMuxPort extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
   val R = 32; val C = 16
   val P = 1;  val Q = 4
 
@@ -58,6 +62,8 @@ import spatial.dsl._
 
 
 @spatial class Bank2DStrange extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
   override def runtimeArgs: Args = ""
 
   type T = FixPt[TRUE,_16,_0]

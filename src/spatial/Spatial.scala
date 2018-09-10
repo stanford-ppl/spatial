@@ -7,6 +7,7 @@ import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
+import spatial.codegen.pirgen._
 import spatial.codegen.dotgen._
 
 import spatial.lang.{Tensor1, Text, Void}
@@ -102,6 +103,7 @@ trait Spatial extends Compiler {
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val memIrCodegen  = HtmlMemIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
+    lazy val pirCodegen    = PIRGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
@@ -166,7 +168,8 @@ trait Spatial extends Compiler {
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen)
+        (spatialConfig.enableSynth ? cppCodegen) ==>
+        (spatialConfig.enablePIR ? pirCodegen)
     }
 
     isl.shutdown(100)
@@ -208,6 +211,20 @@ trait Spatial extends Compiler {
     cli.opt[Unit]("dot").action( (_,_) =>
       spatialConfig.enableDot = true
     ).text("Enable dot graph generation [false]")
+
+    cli.opt[Unit]("pir").action { (_,_) =>
+      spatialConfig.enablePIR = true
+      spatialConfig.enableInterpret = false
+      spatialConfig.enableSynth = false
+      spatialConfig.enableRetiming = false
+      //spatialConfig.enableBroadcast = false
+      spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
+      //spatialConfig.ignoreParEdgeCases = true
+      spatialConfig.enableBufferCoalescing = false
+      spatialConfig.enableDot = true
+      spatialConfig.targetName = "Plasticine"
+      spatialConfig.enableForceBanking = true
+    }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
 
     cli.opt[Unit]("retime").action{ (_,_) =>
       spatialConfig.enableRetiming = true
@@ -285,7 +302,7 @@ trait Spatial extends Compiler {
         }
       }
       else {
-        val target = targets.fpgas.find{_.name.toLowerCase == spatialConfig.targetName.toLowerCase }
+        val target = targets.all.find{_.name.toLowerCase == spatialConfig.targetName.toLowerCase }
         if (target.isDefined) {
           spatialConfig.target = target.get
         }
@@ -294,6 +311,8 @@ trait Spatial extends Compiler {
             error(s"No target found with the name '${spatialConfig.targetName}'.")
             error(s"Available FPGA targets: ")
             targets.fpgas.foreach{t => error(s"  ${t.name}") }
+            error(s"Available Other targets: ")
+            (targets.all -- targets.fpgas).foreach{t => error(s"  ${t.name}") }
             IR.logError()
             return
           }

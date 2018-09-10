@@ -13,7 +13,7 @@ import ops._
              but still forces you to index the thing and hence only gets the
              first bit
  */
-class NBufCtr(val stride: Int = 1, val start: Option[Int], val stop: Option[Int], 
+class NBufCtr(val stride: Int = 1, val start: Option[Int], val stop: Option[Int], val init: Int = 0,
              val width: Int = 32) extends Module {
   val io = IO(new Bundle {
     val input = new Bundle {
@@ -34,7 +34,7 @@ class NBufCtr(val stride: Int = 1, val start: Option[Int], val stop: Option[Int]
 
     val nextCntDown = Mux(io.input.enable, Mux(cnt === 0.U(width.W), (stop.get-stride).U(width.W), cnt-stride.U(width.W)), cnt) // TODO: This could be an issue if strided counter is used in reverse
     val nextCntUp = Mux(io.input.enable, Mux(cnt + stride.U(width.W) >= stop.get.U(width.W), 0.U(width.W) + (cnt.asSInt + (stride - stop.get).S(width.W)).asUInt, cnt+stride.U(width.W)), cnt)
-    cnt := Utils.getRetimed(Mux(reset.toBool, 0.U, Mux(io.input.countUp, nextCntUp, nextCntDown)), 1)
+    cnt := Utils.getRetimed(Mux(reset.toBool, init.U, Mux(io.input.countUp, nextCntUp, nextCntDown)), 1, init = init.toLong)
 
     io.output.count := effectiveCnt    
   } else if (stop.isDefined) {
@@ -44,7 +44,7 @@ class NBufCtr(val stride: Int = 1, val start: Option[Int], val stop: Option[Int]
 
     val nextCntDown = Mux(io.input.enable, Mux(cnt === 0.U(width.W), (stop.get-stride).U(width.W), cnt-stride.U(width.W)), cnt) // TODO: This could be an issue if strided counter is used in reverse
     val nextCntUp = Mux(io.input.enable, Mux(cnt + stride.U(width.W) >= stop.get.U(width.W), 0.U(width.W) + cnt+stride.U(width.W) - stop.get.U(width.W), cnt+stride.U(width.W)), cnt)
-    cnt := Utils.getRetimed(Mux(reset.toBool, 0.U(width.W), Mux(io.input.countUp, nextCntUp, nextCntDown)), 1)
+    cnt := Utils.getRetimed(Mux(reset.toBool, init.U(width.W), Mux(io.input.countUp, nextCntUp, nextCntDown)), 1, init = init.toLong)
 
     io.output.count := effectiveCnt
   } else {
@@ -54,7 +54,7 @@ class NBufCtr(val stride: Int = 1, val start: Option[Int], val stop: Option[Int]
 
     val nextCntDown = Mux(io.input.enable, Mux(cnt === 0.U(width.W), io.input.stop-stride.U(width.W), cnt-stride.U(width.W)), cnt) // TODO: This could be an issue if strided counter is used in reverse
     val nextCntUp = Mux(io.input.enable, Mux(cnt + stride.U(width.W) >= io.input.stop, 0.U(width.W) + cnt+stride.U(width.W) - io.input.stop, cnt+stride.U(width.W)), cnt)
-    cnt := Utils.getRetimed(Mux(reset.toBool, 0.U(width.W), Mux(io.input.countUp, nextCntUp, nextCntDown)), 1)
+    cnt := Utils.getRetimed(Mux(reset.toBool, init.U(width.W), Mux(io.input.countUp, nextCntUp, nextCntDown)), 1, init = init.toLong)
 
     io.output.count := effectiveCnt
   }

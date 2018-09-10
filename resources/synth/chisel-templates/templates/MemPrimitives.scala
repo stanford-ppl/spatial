@@ -78,8 +78,8 @@ class R_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int]) e
   val flow = Vec(port_width, Bool())
 
   def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_XBar, f: Bool): Unit = {
-    bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
+    bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     en(lhs_lane) := rhs_port.en(rhs_lane)
     flow(lhs_lane) := f
   }
@@ -134,6 +134,7 @@ abstract class MemInterface(p: MemParams) extends Bundle {
   var output = new Bundle {
     var data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
   }
+  var reset = Input(Bool())
 }
 
 class StandardInterface(p: MemParams) extends MemInterface(p) {}  
@@ -350,10 +351,9 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       val xBarCandidatesEns = xBarIds.map(io.xBarR.map(_.en).flatten.toList(_))
       val xBarCandidatesBanks = xBarIds.map(io.xBarR.map(_.banks).flatten.toList.grouped(p.banks.length).toList(_))
       val xBarCandidatesOffsets = xBarIds.map(io.xBarR.map(_.ofs).flatten.toList(_))
-      val xBarCandidatesFlows = xBarIds.map(io.xBarR.map(_.flow).flatten.toList(_))
       val sel = m.map{ mem => 
-        if (xBarCandidatesEns.toList.length > 0) (xBarCandidatesEns, xBarCandidatesBanks, xBarCandidatesOffsets.zip(xBarCandidatesFlows)).zipped.map {case(en,banks,(ofs,flows)) => 
-          banks.zip(mem._2).map{case (b, coord) => Utils.getRetimed(b, Utils.sramload_latency, flows) === coord.U}.reduce{_&&_} && Utils.getRetimed(en, Utils.sramload_latency, flows)
+        if (xBarCandidatesEns.toList.length > 0) (xBarCandidatesEns, xBarCandidatesBanks, xBarCandidatesOffsets).zipped.map {case(en,banks,ofs) => 
+          banks.zip(mem._2).map{case (b, coord) => Utils.getRetimed(b, Utils.sramload_latency) === coord.U}.reduce{_&&_} && Utils.getRetimed(en, Utils.sramload_latency)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -365,11 +365,10 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
       val directCandidatesEns = directIds.map(io.directR.map(_.en).flatten.toList(_))
       val directCandidatesBanks = directIds.map(io.directR.map(_.banks).flatten.toList(_))
       val directCandidatesOffsets = directIds.map(io.directR.map(_.ofs).flatten.toList(_))
-      val directCandidatesFlows = directIds.map(io.directR.map(_.flow).flatten.toList(_))
       // Create bit vector to select which bank was activated by this io
       val sel = m.map{ mem => 
-        if (directCandidatesEns.toList.length > 0) (directCandidatesEns, directCandidatesBanks, directCandidatesOffsets.zip(directCandidatesFlows)).zipped.map {case(en,banks,(ofs,flows)) => 
-          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && Utils.getRetimed(en, Utils.sramload_latency, flows)
+        if (directCandidatesEns.toList.length > 0) (directCandidatesEns, directCandidatesBanks, directCandidatesOffsets).zipped.map {case(en,banks,ofs) => 
+          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && Utils.getRetimed(en, Utils.sramload_latency)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -399,7 +398,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
   val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
-  val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_}
+  val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_} | io.reset
   val anyEnable: Bool = io.xBarW.map{_.en}.flatten.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
   ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyEnable, wr_data, ff))
@@ -613,14 +612,14 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
     io.asInstanceOf[ShiftRegFileInterface].dump_out(i) := mem
-    (mem,coords,i)
+    (mem,coords,i,initval)
   }
 
   def stripCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ l.drop(x+1)}
   def stripCoord(l: HVec[UInt], x: Int): HVec[UInt] = {HVec(l.take(x) ++ l.drop(x+1))}
   def decrementAxisCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ List(l(x) - 1) ++ l.drop(x+1)}
   // Handle Writes
-  m.foreach{ case(mem, coords, flatCoord) => 
+  m.foreach{ case(mem, coords, flatCoord, initval) => 
     // Check all xBar w ports against this bank's coords
     val xBarSelect = (io.xBarW.map(_.banks).flatten.toList.grouped(p.banks.length).toList, io.xBarW.map(_.en).flatten.toList, io.xBarW.map(_.shiftEn).flatten.toList).zipped.map{ case(bids, en, shiftEn) => 
       bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en | shiftEn else false.B}
@@ -648,7 +647,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     } else false.B
 
     // Connect matching W port to memory
-    val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
+    val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
     val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
     val (data, enable) = 
       if (directSelectEns.length > 0 & p.hasXBarW) {           // Has direct and x
@@ -675,7 +674,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
         (data, enable)
       } else (0.U, false.B)
     if (p.isBuf) mem := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en, io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
-    else mem := Mux(shiftEnable, shiftSource, Mux(enable, data, mem))
+    else mem := Mux(io.reset, initval, Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
   }
 
   // Connect read data to output

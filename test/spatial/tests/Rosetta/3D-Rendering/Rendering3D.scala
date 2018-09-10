@@ -3,7 +3,7 @@ package spatial.tests.Rosetta
 import spatial.dsl._
 import spatial.targets._
 
-@spatial class Rendering3DTmp extends SpatialTest {
+@spatial class Rendering3D extends SpatialTest {
 	override def runtimeArgs = "1 0"
 	//override val target = Zynq
 	// struct size of power of 2
@@ -58,21 +58,14 @@ import spatial.targets._
 
 		def pixel_in_triangle(x : Int, y : Int, tri2D : triangle2D) : Boolean = {
 
-			val pi0 = Reg[Int]
-			val pi1 = Reg[Int]
-			val pi2 = Reg[Int]
-
-			Parallel {
-				pi0 := (x - tri2D.x0.to[Int]) * (tri2D.y1.to[Int] - tri2D.y0.to[Int]) -
+			val	pi0 = (x - tri2D.x0.to[Int]) * (tri2D.y1.to[Int] - tri2D.y0.to[Int]) -
 					   (y - tri2D.y0.to[Int]) * (tri2D.x1.to[Int] - tri2D.x0.to[Int])
-				pi1 := (x - tri2D.x1.to[Int]) * (tri2D.y2.to[Int] - tri2D.y1.to[Int]) - 
+			val	pi1 = (x - tri2D.x1.to[Int]) * (tri2D.y2.to[Int] - tri2D.y1.to[Int]) - 
 					   (y - tri2D.y1.to[Int]) * (tri2D.x2.to[Int] - tri2D.x1.to[Int])
-				pi2 := (x - tri2D.x2.to[Int]) * (tri2D.y0.to[Int] - tri2D.y2.to[Int]) -
+			val	pi2 = (x - tri2D.x2.to[Int]) * (tri2D.y0.to[Int] - tri2D.y2.to[Int]) -
 					   (y - tri2D.y2.to[Int]) * (tri2D.x0.to[Int] - tri2D.x2.to[Int])
-			}
-			
-			(pi0.value >= 0.to[Int] && pi1.value >= 0.to[Int] && pi2.value >= 0.to[Int])
 
+			(pi0 >= 0.to[Int] && pi1 >= 0.to[Int] && pi2 >= 0.to[Int])
 		}
 
 		val color = 100.to[UInt8]
@@ -83,9 +76,7 @@ import spatial.targets._
 				val x = max_min(0).to[Int] + k.to[Int] % max_min(4).to[Int]
 				val y = max_min(2).to[Int] + k.to[Int] / max_min(4).to[Int]
 
-
-				val in_triangle = Reg[Boolean](false).buffer
-				Pipe { in_triangle := pixel_in_triangle(x, y, sample_triangle2D) }
+				val in_triangle = pixel_in_triangle(x, y, sample_triangle2D) 
 
 				val frag_x = x.to[UInt8]
 				val frag_y = y.to[UInt8]
@@ -93,10 +84,10 @@ import spatial.targets._
 				val frag_color = color 
 
 				if (in_triangle.value == true) {
-					Pipe { fragment(i.value.to[I32]) = CandidatePixel(frag_x, frag_y, frag_z, frag_color) }
-					Pipe { i := i + 1 }
+					Pipe { fragment(i.value.to[I32]) = CandidatePixel(frag_x, frag_y, frag_z, frag_color);
+						   i := i + 1  }
+//					Pipe { } 
 				}
-			
 			}
 		}
 		mux(flag, 0.to[Int], i.value) /* if (flag) 0 else i */
@@ -240,21 +231,21 @@ import spatial.targets._
 		val triangle3D_vector_dram = DRAM[triangle3D](num_triangles)
 		setMem(triangle3D_vector_dram, triangle3D_vector_host)
 
-		val host_z_buffer = DRAM[UInt8](img_y_size, img_x_size)
-		val host_frame_buffer = DRAM[UInt8](img_y_size, img_x_size)
+		val host_z_buffer		 = DRAM[UInt8](img_y_size, img_x_size)
+		val host_frame_buffer 	 = DRAM[UInt8](img_y_size, img_x_size)
 
 		val vec_sram_len = num_triangles //24
 
 		Accel {
 			val angle = 0.to[Int]
 	
-			val z_buffer = SRAM[UInt8](img_y_size, img_x_size)
-			val frame_buffer  = SRAM[UInt8](img_y_size, img_x_size)
+			val z_buffer 		= SRAM[UInt8](img_y_size, img_x_size)
+			val frame_buffer 	= SRAM[UInt8](img_y_size, img_x_size)
 
 			/* instantiate buffer */
 			Foreach(img_y_size by 1, img_x_size by 1 par 24) { (i,j) =>
-				z_buffer(i,j) = 255.to[UInt8]
-				frame_buffer(i,j) = 0.to[UInt8]
+				z_buffer(i,j) 		= 255.to[UInt8]
+				frame_buffer(i,j) 	= 0.to[UInt8]
 			}
 			
 			Foreach(num_triangles by vec_sram_len) { i =>
@@ -267,18 +258,18 @@ import spatial.targets._
 				Foreach(load_len by 1) { c =>
 
 					val curr_triangle3D = triangle3D_vector_sram(c)
-					val tri2D = Reg[triangle2D].buffer
+					val tri2D 			= Reg[triangle2D].buffer
 
-					val max_min	= RegFile[UInt8](5)
-					val max_index = Reg[Int](0)
+					val max_min			= RegFile[UInt8](5)
+					val max_index 		= Reg[Int](0)
 						
-					val pixels = SRAM[Pixel](500)
+					val pixels 			= SRAM[Pixel](500)
 	
-					val flag = Reg[Boolean](false)
-					val size_fragment = Reg[Int](0.to[Int])
-					val size_pixels = Reg[Int](0.to[Int])
+					val flag 			= Reg[Boolean](false)
+					val size_fragment 	= Reg[Int](0.to[Int])
+					val size_pixels 	= Reg[Int](0.to[Int])
 
-					val fragment = SRAM[CandidatePixel](500)
+					val fragment 		= SRAM[CandidatePixel](500)
 
 					Pipe { projection(curr_triangle3D, tri2D, angle) }
 					Pipe { flag := rasterization1(tri2D, max_min, max_index) }

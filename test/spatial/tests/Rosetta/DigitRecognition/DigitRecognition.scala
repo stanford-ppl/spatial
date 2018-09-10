@@ -34,7 +34,7 @@ import spatial.targets._
 	/* Parameters to tune */
 	val k_const 				= 5 /* Number of nearest neighbors to handle */
 	val par_factor  			= 4
-	val parLoad 				= 4
+	val parLoad 				= 1 //4
 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
@@ -121,6 +121,7 @@ import spatial.targets._
 						d4.bit(i).to[Int] 
 					  }.reduce(_ + _)
 		sum_bits_tmp(3) = bits_d4 
+		
 		sum_bits_tmp(0) + sum_bits_tmp(1) + sum_bits_tmp(2) + sum_bits_tmp(3)
 	}
 

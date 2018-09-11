@@ -112,4 +112,9 @@ object files {
     }
   }
 
+  def splitPath(path:String) = {
+    val file = new File(path)
+    (file.getParent, file.getName)
+  }
+
 }

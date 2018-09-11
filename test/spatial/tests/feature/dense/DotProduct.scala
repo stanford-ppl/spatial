@@ -4,6 +4,7 @@ import spatial.dsl._
 import com.typesafe.config.ConfigFactory
 import pureconfig._
 import spatial.util.spatialConfig
+import spatial.metadata.params._
 import scala.reflect.ClassTag
 
 @spatial class DotProduct extends SpatialTest {
@@ -11,15 +12,20 @@ import scala.reflect.ClassTag
   type X = FixPt[TRUE,_32,_0]
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
+
+    // Load param specified with --param-path=fileName. If not set use defaults
     val params = loadParams(defaults=
       "innerPar"-> 4 (1 -> 192), 
       "outerPar"-> 2 (1 -> 6), 
       "tileSize"-> 32 (32 -> 64 -> 19200)
     )
+
     val B  = params("tileSize")
     val P1 = params("outerPar")
     val P2 = params("innerPar")
     val P3 = params("innerPar")
+    println(B, P1, P2)
+    //saveParams(params, s"$SPATIAL_HOME/saved.param") // Store used param to file
 
     val size = aIn.length; bound(size) = 1920000
 

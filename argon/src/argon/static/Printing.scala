@@ -193,6 +193,10 @@ trait Printing {
   @stateful def inGen[T](dir: String, filename: String)(blk: => T): T = {
     inStream(config.enGen, () => getOrCreateStream(dir,filename), blk, () => state.gen, {s => state.gen = s})
   }
+  @stateful def inGen[T](path: String)(blk: => T): T = {
+    val (dir, filename) = files.splitPath(path)
+    inGen(dir, filename)(blk)
+  }
   @stateful def withGen[T](dir: String, filename: String)(blk: => T): T = {
     inStream(config.enGen, () => createStream(dir,filename), blk, () => state.gen, {s => state.gen = s}, _.close())
   }

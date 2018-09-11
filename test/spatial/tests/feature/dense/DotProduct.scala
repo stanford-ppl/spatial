@@ -1,22 +1,25 @@
 package spatial.tests.feature.dense
 
 import spatial.dsl._
-
-
+import com.typesafe.config.ConfigFactory
+import pureconfig._
+import spatial.util.spatialConfig
+import scala.reflect.ClassTag
 
 @spatial class DotProduct extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 
-  val innerPar = 4
-  val outerPar = 1
-  val tileSize = 32
-
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
-    val B  = tileSize (32 -> 64 -> 19200)
-    val P1 = outerPar (1 -> 6)
-    val P2 = innerPar (1 -> 192)
-    val P3 = innerPar (1 -> 192)
+    val params = loadParams(defaults=
+      "innerPar"-> 4 (1 -> 192), 
+      "outerPar"-> 2 (1 -> 6), 
+      "tileSize"-> 32 (32 -> 64 -> 19200)
+    )
+    val B  = params("tileSize")
+    val P1 = params("outerPar")
+    val P2 = params("innerPar")
+    val P3 = params("innerPar")
 
     val size = aIn.length; bound(size) = 1920000
 

@@ -23,8 +23,9 @@ import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
 
 import spatial.util.spatialConfig
+import spatial.util.ParamLoader
 
-trait Spatial extends Compiler {
+trait Spatial extends Compiler with ParamLoader {
 
   val target: HardwareTarget = null   // Optionally overridden by the application
   final val desc: String = "Spatial compiler"
@@ -283,6 +284,10 @@ trait Spatial extends Compiler {
     cli.opt[Unit]("runtime").action{ (_,_) =>
       spatialConfig.enableRuntimeModel = true
     }.text("Enable application runtime estimation")
+
+    cli.opt[String]("param-path").action{(x,_) => 
+      spatialConfig.paramPath = Some(x)
+    }.text("Set path to load application parameter")
   }
 
   override def settings(): Unit = {

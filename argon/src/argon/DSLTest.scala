@@ -269,7 +269,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     // If running from a non-testing script, run the standard compiler flow
     val args = sys.env.get("TEST_ARGS").map(_.split(" ")).getOrElse(Array.empty)
     System.out.println(s"Running standard compilation flow for test with args: ${args.mkString(" ")}")
-    name should "compile" in { compile(args); sys.exit(0) }
+    //name should "compile" in { compile(args); sys.exit(0) }
+    compile(args) // Force init happen before staging graph.
   }
   else if (tests.isEmpty) {
     ignore should "...nothing? (No backends enabled. Enable using -D<backend>=true)" in { () }

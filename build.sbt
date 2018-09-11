@@ -17,6 +17,7 @@ val common = Seq(
     "org.scalatest" %% "scalatest" % scalatestVersion,	 // Testing
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args         
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
+    "com.github.pureconfig" %% "pureconfig" % "0.9.2",
 
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",

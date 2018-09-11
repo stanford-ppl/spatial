@@ -51,4 +51,6 @@ class SpatialConfig extends Config {
   var enableBufferCoalescing: Boolean = true
 
   var enablePIR = false
+
+  var paramPath:Option[String] = None
 }

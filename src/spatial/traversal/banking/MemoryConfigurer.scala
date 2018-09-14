@@ -49,25 +49,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     resetData(readers, writers)
 
     val readMatrices = readers.flatMap{rd => rd.affineMatrices }
-    val writeMatrices = if (mem.isLineBuffer) fakedAffineMatrices(writers)
-                        else writers.flatMap{wr => wr.affineMatrices }
+    val writeMatrices = writers.flatMap{wr => wr.affineMatrices}
 
     val instances = bank(readMatrices, writeMatrices)
 
     summarize(instances)
     finalize(instances)
-  }
-
-  protected def fakedAffineMatrices(writers: Set[Sym[_]]): Set[AccessMatrix] = {
-    writers.flatMap{wr => 
-      val raw = wr.affineMatrices 
-      raw.map{r => 
-        val access = r.access
-        val unroll = r.unroll
-        val matrix2 = r.matrix.prependBlankRow
-        AccessMatrix(access, matrix2, unroll)
-      }
-    }
   }
 
   protected def resetData(readers: Set[Sym[_]], writers: Set[Sym[_]]): Unit = {
@@ -469,7 +456,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val duplicationCost = cost(Seq(), depth, instRdGroups, reachingWrGroups)
           val (banking, bankCost) = bankingCosts.minBy(_._2)
           dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
-          if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
+          if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut && !mem.isRegFile) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
             dbgs(s"Choosing to duplicate $mem for $instRdGroups, $wrGroups.  ")
             val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, dimGrps).head._2
             val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}

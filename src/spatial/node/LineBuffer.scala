@@ -8,8 +8,8 @@ import spatial.lang._
   val dims = Seq(rows, cols)
 }
 
-@op case class LineBufferEnq[A:Bits](mem: LineBuffer[A], data: Bits[A], row: Idx, ens: Set[Bit]) extends Enqueuer[A] {
-  override def addr: Seq[Idx] = Seq(row)
+@op case class LineBufferEnq[A:Bits](mem: LineBuffer[A], data: Bits[A], addrs: Seq[Idx], ens: Set[Bit]) extends Enqueuer[A] {
+  override def addr: Seq[Idx] = addrs
 }
 @op case class LineBufferRead[A:Bits](mem: LineBuffer[A], addr: Seq[Idx], ens: Set[Bit]) extends Reader[A,A]
 

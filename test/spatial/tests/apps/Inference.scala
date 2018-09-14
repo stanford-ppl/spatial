@@ -3,7 +3,7 @@ package spatial.tests.apps
 import spatial.dsl._
 
 @spatial class SingleLayerConv_RCIO extends SpatialTest {
-  override def runtimeArgs: Args = "16 32 32 32 2 0"
+  override def runtimeArgs: Args = "16 32 32 32 2 0" and "16 32 16 16 1 0"
   type T = FixPt[TRUE,_16,_0]
   type T2 = FixPt[TRUE,_32,_0]
   type REALT = FixPt[TRUE,_4,_12]
@@ -356,7 +356,7 @@ import spatial.dsl._
 
 @spatial class SingleLayerConv_RCIO_NonBuf extends SpatialTest {
   override def backends: Seq[Backend] = DISABLED
-  override def runtimeArgs: Args = "16 32 32 32 2 0"
+  override def runtimeArgs: Args = "16 32 32 32 2 0" and "16 32 16 16 1 0"
   type T = FixPt[TRUE,_16,_0]
   type T2 = FixPt[TRUE,_32,_0]
   type REALT = FixPt[TRUE,_4,_12]
@@ -558,7 +558,7 @@ import spatial.dsl._
 @spatial class SingleLayerConv_IRCO extends SpatialTest {
   type T = FixPt[TRUE,_16,_0]
 
-  override def runtimeArgs: Args = "16 32 32 32 2 0"
+  override def runtimeArgs: Args = "16 32 32 32 2 0" and "16 32 16 16 1 0"
 
   def main(args: Array[String]): Unit = {
 
@@ -642,18 +642,18 @@ import spatial.dsl._
           Foreach(INPUT_COLS by STRIDE par PX){ col =>
             val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
             val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
-            if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(i, col)}
+            if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(KERNEL_ROWS-1-i, col)}
             else Foreach(2 by 1 /* par 2*/,3 by 1 par 3){(e,i) => sr2(i,*) <<= lb2(KERNEL_ROWS-1-i, col+e)}
-            val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
-              if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
-                  || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
-                       {0.to[T]}
-              else 
-                if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
-                else {sr2(i,KERNEL_COLS - 1 - j)}
-            }}.flatten
 
             Foreach(OUTPUT_CHANS by 1 par P1) { oc =>
+              val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
+                if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
+                    || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
+                         {0.to[T]}
+                else 
+                  if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
+                  else {sr2(i,KERNEL_COLS - 1 - j)}
+              }}.flatten
               val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
                 kernel_sram(oc,ic,i,j)
               }}.flatten
@@ -741,7 +741,7 @@ import spatial.dsl._
 @spatial class SingleLayerConv_OIRC extends SpatialTest {
   type T = FixPt[TRUE,_16,_0]
 
-  override def runtimeArgs: Args = "16 32 32 32 2 0"
+  override def runtimeArgs: Args = "16 32 32 32 2 0" and "16 32 16 16 1 0"
 
   def main(args: Array[String]): Unit = {
 
@@ -822,18 +822,15 @@ import spatial.dsl._
             Foreach(INPUT_COLS by STRIDE par PX){ col =>
               val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
               val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
-              if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(i, col)}
+              if (STRIDE.value == 1) Foreach(3 by 1 par 3){i => sr1(i,*) <<= lb1(KERNEL_ROWS-1-i, col)}
               else Foreach(2 by 1 /*par 2*/, 3 by 1 par 3){(e,i) => sr2(i,*) <<= lb2(KERNEL_ROWS-1-i, col+e)}
               val filter_elements = List.tabulate(3){i => List.tabulate(3){j => 
                 kernel_sram(oc,ic,i,j)
               }}.flatten
               val data_elements = List.tabulate(3){i => List.tabulate(3){j => 
-                if (row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
-                    || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0 ) 
-                         {0.to[T]}
-                else 
-                  if (STRIDE.value == 1) {sr1(i,KERNEL_COLS - 1 - j)} 
-                  else {sr2(i,KERNEL_COLS - 1 - j)}
+                mux(row.to[Int] + STRIDE.value - KERNEL_ROWS + i.to[Int] < 0 
+                    || col.to[Int] + STRIDE.value - KERNEL_COLS + j.to[Int] < 0, 0.to[T],
+                    mux(STRIDE.value == 1, sr1(i,KERNEL_COLS - 1 - j), sr2(i,KERNEL_COLS - 1 - j)) ) 
               }}.flatten
 
               val accum = data_elements.zip(filter_elements).map{case(a,b) => a*b}.reduce{_+_}

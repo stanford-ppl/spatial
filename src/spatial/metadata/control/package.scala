@@ -68,6 +68,18 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _ => false
     }
+
+    def isTileLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_]  => true
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isTileStore: Boolean = op match {
+      case _:FringeDenseStore[_,_]  => true
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
   }
 
   abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
@@ -94,6 +106,8 @@ package object control {
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
+    def isTileLoad: Boolean = op.exists(_.isTileLoad)
+    def isTileStore: Boolean = op.exists(_.isTileStore)
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
@@ -312,14 +326,14 @@ package object control {
       * If reference is defined, only accounts for the stages up to and including the reference.
       * This is currently trivially true for inner controllers.
       */
-    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
+    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
       val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
-      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
-      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
+      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
+      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
     }
 
-    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean): Boolean = {
+    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean, forkNode: Option[Ctrl]): Boolean = {
       if (isFSM) false
       else if (isSwitch && isOuterControl) {
         allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
@@ -328,10 +342,7 @@ package object control {
       else {
         // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
         isLockstepAcross(iters, reference) &&
-        (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
-          case Some(Expect(_)) => true
-          case _ => false
-        }}})
+        (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.isFixed(forkNode)}})
       }
     }
 
@@ -636,6 +647,15 @@ package object control {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
     }
+    def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
+      case Some(Expect(_)) => true
+      case _ => 
+        val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+        val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+        val endFixed = end match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+        startFixed && stepFixed && endFixed
+    }
+
     def nIters: Option[Bound] = (start,step,end) match {
       case (Final(min), Final(stride), Final(max)) =>
         Some(Final(Math.ceil((max - min).toDouble / stride).toInt))

@@ -27,8 +27,12 @@ object files {
     }
   }
 
+  /**
+    * Delete a directory
+    */
   def deleteDirectory(file: File): Unit = {
     for (file <- file.listFiles) deleteFiles(file)
+    file.delete()
   }
 
   /**
@@ -37,6 +41,13 @@ object files {
   def deleteFiles(file: File): Unit = {
     if (file.isDirectory) deleteDirectory(file)
     if (file.exists) file.delete()
+  }
+
+  /**
+    * Delete the given path
+    */
+  def deleteFiles(path: String): Unit = {
+    deleteFiles(new File(path))
   }
 
   /**
@@ -88,6 +99,17 @@ object files {
     }
     out.close()
     in.close()
+  }
+
+  def listFiles(dir:String, exts:List[String]=Nil):List[java.io.File] = {
+    val d = new java.io.File(dir)
+    if (d.exists && d.isDirectory) {
+      d.listFiles.filter { file =>
+        file.isFile && exts.exists { ext => file.getName.endsWith(ext) }
+      }.toList
+    } else {
+      Nil
+    }
   }
 
 }

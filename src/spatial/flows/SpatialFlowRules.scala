@@ -61,7 +61,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
       val isOuter = children.exists{c => !c.isBranch || c.isOuterControl} || op.isMemReduce
       s.rawLevel = if (isOuter) Outer else Inner
-      
+
     case ctrl: Control[_] =>
       // Find all children controllers within this controller
       val children = op.blocks.flatMap(_.stms.filter(_.isControl))
@@ -112,6 +112,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
         val control: Ctrl = Ctrl.Node(s, stageId)
         val parent: Ctrl  = if (body.isPseudoStage) master else control
         ctrl.iters.foreach{b => b.rawParent = parent}
+        ctrl match {
+          case ctrl:UnrolledLoop[_] => ctrl.valids.foreach{b => b.rawParent = parent}
+          case _ =>
+        }
 
         // --- Scope Hierarchy --- //
         // Always track all scopes in the scope hierarchy
@@ -139,10 +143,9 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
 
       // --- Blk Hierarchy --- //
-      // Set the blk of each symbol defined in this controller
+      // Set the reads and writes of each symbol defined in this controller
       op.blocks.zipWithIndex.foreach{case (block,bId) =>
         block.stms.foreach{lhs =>
-          lhs.blk = Blk.Node(s, bId)
           lhs match {
             case Accessor(wr,rd) =>
               wr.foreach{w => s.writtenMems += w.mem }
@@ -157,7 +160,19 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
         }
       }
 
-    case _ => // Nothin'
+    case _ =>
+  }
+
+  @flow def blockLevel(s: Sym[_], op: Op[_]): Unit = {
+    // Set blk for nodes inside ctrl
+    op.blocks.zipWithIndex.foreach{case (block,bId) =>
+      block.stms.foreach{lhs =>
+        lhs.blk = Blk.Node(s, bId)
+      }
+    }
+    op.binds.filter(_.isBound).foreach{ b =>
+      b.blk = Blk.Node(s, -1)
+    }
   }
 
   /** Set the control schedule of controllers based on the following ordered rules:

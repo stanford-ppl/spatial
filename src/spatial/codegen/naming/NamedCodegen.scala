@@ -29,6 +29,7 @@ trait NamedCodegen extends Codegen {
       case ArgOutNew(_) => s"${s}_${s.nameOr("argOut")}"
       case RegNew(_)    => s"${s}_${s.nameOr("reg")}"
       case RegFileNew(_,_) => s"${s}_${s.nameOr("regfile")}"
+      case LineBufferNew(_,_,_) => s"${s}_${s.nameOr("linebuf")}"
       case FIFONew(_)   => s"${s}_${s.nameOr("fifo")}"
       case LIFONew(_)   => s"${s}_${s.nameOr("lifo")}"
       case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}"

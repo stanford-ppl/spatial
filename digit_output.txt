@@ -1,0 +1,73 @@
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from plugins.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading project definition from /local/ssd/home/jcamach2/spatial/project[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mSet current project to spatial (in build file:/local/ssd/home/jcamach2/spatial/)[0m
+[0m[[0m[0minfo[0m] [0m[0mSet current project to apps (in build file:/local/ssd/home/jcamach2/spatial/)[0m
+[0m[[0m[32msuccess[0m] [0m[0mTotal time: 2 s, completed Sep 11, 2018 9:12:16 AM[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from plugins.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading project definition from /local/ssd/home/jcamach2/spatial/project[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mSet current project to spatial (in build file:/local/ssd/home/jcamach2/spatial/)[0m
+[0m[[0m[32msuccess[0m] [0m[0mTotal time: 3 s, completed Sep 11, 2018 9:12:30 AM[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from plugins.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading project definition from /local/ssd/home/jcamach2/spatial/project[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mSet current project to spatial (in build file:/local/ssd/home/jcamach2/spatial/)[0m
+Running standard compilation flow for test with args: --name DigitRecognition --sim --fpga ZCU
+[[33mwarn[0m] Area model file ZCU_Area.csv for target ZCU was missing expected fields: 
+[[33mwarn[0m] BRAM
+[[34minfo[0m] Compiling DigitRecognition to /local/ssd/home/jcamach2/spatial/gen/DigitRecognition/
+[[34minfo[0m] Completed
+[[32msuccess[0m] Total time: 19.1850 seconds
+export TEST_ARGS="--name DigitRecognition --sim --fpga ZCU"; sbt -Dci=true "; testOnly spatial.tests.Rosetta.DigitRecognition"
+[0m[[0m[0minfo[0m] [0m[0mLoading project definition from /local/ssd/home/jcamach2/spatial/gen/DigitRecognition/project[0m
+[0m[[0m[0minfo[0m] [0m[0mUpdating ProjectRef(uri("file:/local/ssd/home/jcamach2/spatial/gen/DigitRecognition/project/"), "digitrecognition-build")...[0m
+[0m[[0m[0minfo[0m] [0m[0mDone updating.[0m
+[0m[[0m[0minfo[0m] [0m[0mLoading settings from build.sbt ...[0m
+[0m[[0m[0minfo[0m] [0m[0mSet current project to spatial-app (in build file:/local/ssd/home/jcamach2/spatial/gen/DigitRecognition/)[0m
+[0m[[0m[0minfo[0m] [0m[0mUpdating ...[0m
+[0m[[0m[0minfo[0m] [0m[0mDone updating.[0m
+[0m[[0m[0minfo[0m] [0m[0mCompiling 196 Scala sources to /local/ssd/home/jcamach2/spatial/gen/DigitRecognition/target/scala-2.12/classes ...[0m
+[0m[[0m[0minfo[0m] [0m[0mDone compiling.[0m
+[0m[[0m[0minfo[0m] [0m[0mPackaging /local/ssd/home/jcamach2/spatial/gen/DigitRecognition/target/scala-2.12/spatial-app_2.12-0.1.0-SNAPSHOT.jar ...[0m
+[0m[[0m[0minfo[0m] [0m[0mDone packaging.[0m
+[0m[[0m[0minfo[0m] [0m[0mRunning Main 0[0m
+200.0000 out of 2000 correct.
+Pass? true
+[0m[[0m[32msuccess[0m] [0m[0mTotal time: 11781 s, completed Sep 11, 2018 12:29:40 PM[0m
+[0m[[0m[31merror[0m] [0m[0mExpected letter[0m
+[0m[[0m[31merror[0m] [0m[0mExpected symbol[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '+'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '++'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '^'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '^^'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '+-'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'debug'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'info'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'warn'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'error'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'show'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'all'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'Global'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '*'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'Zero'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'ThisBuild'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'ProjectRef('[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '{'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected project ID[0m
+[0m[[0m[31merror[0m] [0m[0mExpected configuration[0m
+[0m[[0m[31merror[0m] [0m[0mExpected configuration ident[0m
+[0m[[0m[31merror[0m] [0m[0mExpected key[0m
+[0m[[0m[31merror[0m] [0m[0mExpected end of input.[0m
+[0m[[0m[31merror[0m] [0m[0mExpected ';'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected 'early('[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '-'[0m
+[0m[[0m[31merror[0m] [0m[0mExpected '!'[0m
+[0m[[0m[31merror[0m] [0m[0m0[0m
+[0m[[0m[31merror[0m] [0m[0m^[0m

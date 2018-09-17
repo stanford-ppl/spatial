@@ -34,7 +34,7 @@ import spatial.targets._
 	/* Parameters to tune */
 	val k_const 				= 5 /* Number of nearest neighbors to handle */
 	val par_factor  			= 4
-	val parLoad 				= 1 //4
+	val parLoad 				= 4
 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
@@ -230,7 +230,7 @@ import spatial.targets._
 																		} 
 													 ).reduce(_ ++ _)
 
-		val print_vec = false  
+		val print_vec = true
 		if (print_vec) { /* this is for making sure that I'm loading the file correctly */
 			for (i <- 0 until class_size) {
 				println(entire_training_vec1(i).d1)
@@ -382,6 +382,9 @@ import spatial.targets._
 		val cksum =	result_digits.zip(expected_results){ (d1,d2) => if (d1 == d2) 1.0 else 0.0 }.reduce{ _ + _ }
 		print(cksum)
 		println(" out of " + num_test + " correct.")
+
+		val passed = cksum >= 180.0
+		println("Pass? " + passed)
 	}
 
 

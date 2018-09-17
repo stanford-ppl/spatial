@@ -57,10 +57,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }.toSet}.toSet
 
     val grps = (newReads ++ newWrites).map(_.toSeq.filter(_.parent != Ctrl.Host).map(_.matrix).distinct)
+
     val fullStrategy = Seq.tabulate(rank){i => i}
 
     def findSchemes(myGrps: Set[Seq[SparseMatrix[Idx]]]): Seq[Seq[Banking]] = {
-      if (myGrps.forall(_.lengthLessThan(2))) Seq(Seq(ModBanking.Unit(rank)))
+      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Seq(Seq(ModBanking.Unit(rank)))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Seq(Seq(ModBanking.Simple(1, Seq(1), 1)))
       else {
         dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
           val banking = strategy.map{dims =>
@@ -127,7 +129,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       dbgs(s"Found schemes $duplicationSchemes")
       duplicationSchemes
     }
-  }
+  } 
 
   /** True if this is a valid banking strategy for the given sets of access matrices. */
   def isValidBanking(banking: Seq[ModBanking], grps: Set[Seq[SparseMatrix[Idx]]]): Boolean = {

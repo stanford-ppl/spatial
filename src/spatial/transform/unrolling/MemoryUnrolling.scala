@@ -210,7 +210,7 @@ trait MemoryUnrolling extends UnrollingBase {
               dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
               val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
               val bank3 = vecsInSegment.map(bank.getOrElse(Nil)(_))
-              val ofs3 = vecsInSegment.map(ofs.getOrElse(Nil)(_))
+              val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
               val ens3 = vecsInSegment.map(ens2(_))
               (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
             }.toSeq

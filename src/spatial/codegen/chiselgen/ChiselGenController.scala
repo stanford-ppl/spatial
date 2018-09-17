@@ -17,12 +17,7 @@ trait ChiselGenController extends ChiselGenCommon {
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
-
-  /* Set of control nodes which already have their enable signal emitted */
-  var enDeclaredSet = Set.empty[Sym[_]]
-
-  /* Set of control nodes which already have their done signal emitted */
-  var doneDeclaredSet = Set.empty[Sym[_]]
+  private var memsWithReset: List[Sym[_]] = List()
 
   var instrumentCounters: List[(Sym[_], Int)] = List()
 
@@ -300,6 +295,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released & ${getForwardPressure(sym.toCtrl)} """)
+    emitt(src"""${swap(sym, SM)}.io.flow := ${swap(sym, Flow)}""")
     emitt(src"""${swap(sym, SM)}.io.rst := ${swap(sym, Resetter)} // generally set by parent""")
 
     //  Capture rst out (ctrRst)
@@ -308,7 +304,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Capture sm done
     emitt(src"""${swap(sym, Done)} := ${swap(sym, SM)}.io.done // Used to delay in cg, now delay in templates""")
-    emitt(src"""${swap(sym, SM)}.io.flow := ${getBackPressure(sym.toCtrl)}""")
+    emitt(src"""${swap(sym, Flow)} := ${getBackPressure(sym.toCtrl)}""")
 
     // Capture datapath_en
     if (sym.cchains.isEmpty) emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ${swap(sym, Mask)} // Used to have many variations""")

@@ -35,6 +35,12 @@ package object memory {
     def isNonBuffer: Boolean = metadata[EnableNonBuffer](s).exists(_.flag)
     def isNonBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableNonBuffer(flag))
 
+    def isHierarchicalBank: Boolean = metadata[HierarchicalBank](s).exists(_.flag)
+    def isHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, HierarchicalBank(flag))
+
+    def isFlatBank: Boolean = metadata[FlatBank](s).exists(_.flag)
+    def isFlatBank_=(flag: Boolean): Unit = metadata.add(s, FlatBank(flag))
+
     /** Pre-unrolling duplicates (one or more Memory instances per node) */
 
     def getDuplicates: Option[Seq[Memory]] = metadata[Duplicates](s).map(_.d)
@@ -46,6 +52,9 @@ package object memory {
     def getPadding: Option[Seq[Int]] = metadata[Padding](s).map(_.dims)
     def padding: Seq[Int] = getPadding.getOrElse{throw new Exception(s"No padding defined for $s")}
     def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
+
+    /** Stride info for LineBuffer */
+    def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}
 
     /** Post-unrolling duplicates (exactly one Memory instance per node) */
 
@@ -182,7 +191,7 @@ package object memory {
       case _: RegFile[_,_] => true
       case _ => false
     }
-    // def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
+    def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
 

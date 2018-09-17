@@ -45,7 +45,7 @@ else
   echo -e "$INFO Test Data Directory: $TEST_DATA_HOME"
 fi
 
-fileout="test_$(date +'%m_%d_%y_%H_%M_%S').log"
+fileout="test_$(date +'%m_%d_%y_%H_%M_%S')_$type.log"
 echo -e "$INFO Running tests $tests"
 echo -e "$INFO Logging tests to $fileout"
 
@@ -67,6 +67,8 @@ elif [[ $type == "zcu" ]]; then
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "arria10" ]]; then
   nice -n 20 sbt -Dmaxthreads=$threads -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "pir" ]]; then
+  nice -n 20 sbt -Dmaxthreads=$threads -Dtest.PIR=true "testOnly $tests" 2>&1 | tee $fileout
 
 # Verilog tests that report to gdocs (https://docs.google.com/spreadsheets/d/1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM/edit#gid=1748974351)
 elif [[ $type == "vcs-gdocs" ]]; then
@@ -106,6 +108,7 @@ else
   echo "  aws	       - Target the AWS F1 board"
   echo "  zcu	       - Target the ZCU board"
   echo "  arria10      - Target the Arria 10 board"
+  echo "  pir          - Plasticine IR compilation"
   exit 1
 fi
 

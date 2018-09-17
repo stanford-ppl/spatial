@@ -41,7 +41,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 }
 object ModBanking {
   def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
-  def Simple(banks: Int, rank: Int) = ModBanking(banks, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
+  def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
 }
 
 
@@ -307,3 +307,13 @@ case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.Us
   * Default: false
   */
 case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.User)
+
+/** Flag set by the user to disable hierarchical banking and only attempt flat banking,
+  * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
+  * user knows that a flat scheme exists or is a simpler search
+  *
+  * Getter:  sym.isFlatBank
+  * Setter:  sym.isFlatBank = (true | false)
+  * Default: false
+  */
+case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)

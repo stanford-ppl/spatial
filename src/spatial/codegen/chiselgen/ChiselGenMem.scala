@@ -50,7 +50,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val parent = lhs.parent.s.get 
     emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-    val flowEnable = src",${swap(parent,SM)}.io.flow"
+    val flowEnable = src",${swap(parent,Flow)}"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -95,7 +95,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
-    val flowEnable = src"${swap(parent,SM)}.io.flow"
+    val flowEnable = src"${swap(parent,Flow)}"
     val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
     val ofsWidth = if (!mem.isLineBuffer) 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
                    else 1 max Math.ceil(scala.math.log(paddedDims(mem,name).last / mem.instance.nBanks.last) / scala.math.log(2)).toInt
@@ -328,8 +328,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
     // LineBuffers
-    case LineBufferNew(rows, cols) => emitMem(lhs, "LineBuffer", None)
-    case LineBufferBankedEnq(lb, data, ens) => emitWrite(lhs,lb,data,Seq(),Seq(),ens)
+    case LineBufferNew(rows, cols, stride) => emitMem(lhs, "LineBuffer", None)
+    case LineBufferBankedEnq(lb, data, row, ens) => emitWrite(lhs,lb,data,Seq(row),Seq(),ens)
     case LineBufferBankedRead(lb, bank, ofs, ens) => emitRead(lhs,lb,bank,ofs,ens)
     
     // FIFOs

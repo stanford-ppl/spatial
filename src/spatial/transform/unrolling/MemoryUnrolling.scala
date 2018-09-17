@@ -199,7 +199,6 @@ trait MemoryUnrolling extends UnrollingBase {
 
         val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
         val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
-        dbgs(s"getting $bank and $ofs for $addr2")
         /** End withFlow **/
 
         val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty) {
@@ -277,6 +276,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
+    case _:LineBufferEnq[_]     => addr.map{case laneAddr => Seq(laneAddr(0))}
     case _:LineBufferRead[_]    => addr.map{case laneAddr => 
       Seq(laneAddr(0)) ++ inst.bankSelects(mem, laneAddr).drop(1)
     }
@@ -294,6 +294,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case Op(_:RegFileShiftIn[_,_])  => Nil
     case Op(_:RegFileRead[_,_])     => Nil
     case Op(_:RegFileWrite[_,_])    => Nil
+    case Op(_:LineBufferEnq[_])     => addr.map{case laneAddr => laneAddr(0)}
     case Op(_:LineBufferRead[_])  => addr.map{case laneAddr => 
       inst.bankOffset(mem, Seq(0.to[I32]) ++ laneAddr.drop(1))
     }
@@ -439,25 +440,8 @@ trait MemoryUnrolling extends UnrollingBase {
         UWrite[A](stage(RegFileShiftIn(mem.asInstanceOf[RegFilex[A]], dat, addr, ens, op.axis)))
       })
 
-    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, enss)))
+    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, bank(0), enss)))
     case _:LineBufferRead[_]     => UVecRead(stage(LineBufferBankedRead(mem.asInstanceOf[LineBuffer[A]], bank, ofs, enss)))
-    //case _:LineBufferColSlice[_]) => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))
-    //case _:LineBufferRowSlice[_]) => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))
-
-//    case op:RegFileVectorShiftIn[_] =>
-//      MultiWrite(data.map{d => d.zipWithIndex.map{case (vec,i) =>
-//        val addr = bank.get.apply(i)
-//        val en = ens.get.apply(i)
-//        UWrite[A](RegFile.vector_shift_in(mem.asInstanceOf[Sym[RegFile[T]]],vec.asInstanceOf[Sym[Vector[T]]], addr, en, op.ax))
-//      }}.get)
-
-//    case _:LineBufferRotateEnq[_] =>
-//      val rows = bank.flatten.distinct
-//      if (rows.length > 1) {
-//        bug(s"Conflicting rows in banked LineBuffer rotate enqueue: " + rows.mkString(", "))
-//        bug(ctx)
-//      }
-//      UWrite[A](stage(LineBufferBankedRotateEnq(mem.asInstanceOf[LineBuffer[A]],data,enss,rows.head)))
 
     case _ => throw new Exception(s"bankedAccess called on unknown access node ${node.productPrefix}")
   }

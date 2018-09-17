@@ -30,3 +30,4 @@ object Latency extends RemapSignal
 object II extends RemapSignal
 object SM extends RemapSignal
 object Inhibit extends RemapSignal
+object Flow extends RemapSignal

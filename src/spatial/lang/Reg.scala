@@ -46,6 +46,37 @@ object Reg {
   }
 }
 
+@ref class FIFOReg[A:Bits] extends LocalMem0[A,FIFOReg] with StagedVarLike[A] with Ref[Ptr[Any],FIFOReg[A]] {
+  val A: Bits[A] = Bits[A]
+  private implicit val evA: A <:< Bits[A] = Bits[A].box
+  override val evMem: FIFOReg[A] <:< LocalMem[A,FIFOReg] = implicitly[FIFOReg[A] <:< LocalMem[A,FIFOReg]]
+
+  @api def value: A = FIFOReg.deq(this)
+
+  // --- Typeclass Methods
+  @rig def __sread(): A = FIFOReg.deq(this)
+  @rig def __sassign(x: A): Unit = FIFOReg.enq(this, x)
+
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = this.value
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = FIFOReg.enq(this, data, ens)
+  @rig def __reset(ens: Set[Bit]): Void = void
+}
+
+object FIFOReg {
+  @api def apply[A:Bits]: FIFOReg[A] = FIFOReg.alloc[A](zero[A])
+  @api def apply[A:Bits](reset: A): FIFOReg[A] = FIFOReg.alloc[A](reset)
+
+  @rig def alloc[A:Bits](reset: A): FIFOReg[A] = stage(FIFORegNew[A](Bits[A].box(reset)))
+  @rig def deq[A](reg: FIFOReg[A]): A = {
+    implicit val tA: Bits[A] = reg.A
+    stage(FIFORegDeq(reg))
+  }
+  @rig def enq[A](reg: FIFOReg[A], data: Bits[A], ens: Set[Bit] = Set.empty): Void = {
+    implicit val tA: Bits[A] = reg.A
+    stage(FIFORegEnq(reg,data,ens))
+  }
+}
+
 object ArgIn {
   @api def apply[A:Bits]: Reg[A] = stage(ArgInNew(Bits[A].zero))
 }

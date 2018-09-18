@@ -258,6 +258,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
     case FIFOType =>
     case LIFOType =>
     case LineBufferType => 
+    case FIFORegType =>
   }
   c.io.broadcastW.foreach{p => poke(p.en.head, false)}
   step(1)
@@ -305,7 +306,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
       case FIFOType =>
       case LIFOType =>
       case LineBufferType => 
-
+      case FIFORegType =>
     }
     c.io.directR.foreach{p => poke(p.en.head, false)}
     // Rotate buffer
@@ -357,7 +358,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
       case FIFOType =>
       case LIFOType =>
       case LineBufferType => 
-
+      case FIFORegType =>
     }
 
     // Turn off wEn
@@ -417,6 +418,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
       case FIFOType =>
       case LIFOType =>
       case LineBufferType => 
+      case FIFORegType =>
     }
     println("")
     

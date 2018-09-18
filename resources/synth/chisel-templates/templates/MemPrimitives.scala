@@ -20,6 +20,7 @@ object FIFOType extends MemType
 object LIFOType extends MemType
 object ShiftRegFileType extends MemType
 object LineBufferType extends MemType
+object FIFORegType extends MemType
 
 sealed trait MemInterfaceType
 object StandardInterface extends MemInterfaceType
@@ -377,9 +378,7 @@ class SRAM(p: MemParams) extends MemPrimitive(p) {
     }
   }
 
-}
-
-
+}  
 
 class FF(p: MemParams) extends MemPrimitive(p) {
   // Compatibility with standard mem codegen
@@ -403,6 +402,44 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
   ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyEnable, wr_data, ff))
   io.output.data.foreach(_ := ff)
+
+}
+
+class FIFOReg(p: MemParams) extends MemPrimitive(p) {
+  // Compatibility with standard mem codegen
+  def this(logicalDims: List[Int], bitWidth: Int, 
+           banks: List[Int], strides: List[Int], 
+           xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+           directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+  // def this(logicalDims: List[Int], bitWidth: Int, 
+  //          banks: List[Int], strides: List[Int], 
+  //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
+  //          directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
+  //          bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, {if (init.isDefined) Some(init.get.map(_.toDouble)) else None}, syncMem, fracBits))
+  def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
+  def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
+  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
+
+  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
+  val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_} | io.reset
+  val anyWrite: Bool = io.xBarW.map{_.en}.flatten.toList.reduce{_|_}
+  val anyRead: Bool = io.xBarR.map{_.en}.flatten.toList.reduce{_|_}
+  val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
+  ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyWrite, wr_data, ff))
+  io.output.data.foreach(_ := ff)
+
+  val isValid = Module(new SRFF())
+  isValid.io.input.set := anyWrite
+  isValid.io.input.reset := anyRead
+  isValid.io.input.asyn_reset := false.B
+
+  // Check if there is data
+  io.asInstanceOf[FIFOInterface].empty := ~isValid.io.output.data
+  io.asInstanceOf[FIFOInterface].full := isValid.io.output.data
+  io.asInstanceOf[FIFOInterface].almostEmpty := false.B
+  io.asInstanceOf[FIFOInterface].almostFull := false.B
+  io.asInstanceOf[FIFOInterface].numel := Mux(isValid.io.output.data, 1.U, 0.U)
 
 }
 
@@ -846,8 +883,6 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
   }
 
 }
-
-
 
 // To be deprecated...
 
@@ -1321,3 +1356,4 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   }
 
 }
+

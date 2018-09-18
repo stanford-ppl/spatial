@@ -211,38 +211,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     result.mkString("&")
   }
 
-  // def getStreamEnablers(c: Sym[_]): String = {
-  //   // If we are inside a stream pipe, the following may be set
-  //   // Add 1 to latency of fifo checks because SM takes one cycle to get into the done state
-
-  //   if (c.hasStreamAncestor) {
-  //     // TODO: Assumes only one stream access to the fifo (i.e. readersOf(pt).head)
-  //     val lat = c.bodyLatency.sum
-  //     val readsFrom = getReadStreams(c.toCtrl).map{
-  //       case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         fifo.readers.head match {
-  //           // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", lat+1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-  //           // case Op(FIFOBankedDeq(_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].empty", 1, true)} | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-  //           case Op(FIFOBankedDeq(_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].empty | ~${remappedEns(fifo.readers.head,ens.flatten.toList)})"
-  //           case Op(FIFOPeek(_,_)) => src""
-  //         }
-  //       case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-  //     }
-
-  //     val writesTo = getWriteStreams(c.toCtrl).map{
-  //       case fifo @ Op(FIFONew(size)) => // In case of unaligned load, a full fifo should not necessarily halt the stream
-  //         fifo.writers.head match {
-  //           // case Op(FIFOBankedEnq(_,_,ens)) => src"(${DL(src"~$fifo.io.asInstanceOf[FIFOInterface].full", 1, true)} | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-  //           case Op(FIFOBankedEnq(_,_,ens)) => src"(~$fifo.io.asInstanceOf[FIFOInterface].full | ~${remappedEns(fifo.writers.head,ens.flatten.toList)})"
-  //         }
-  //       case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo,Ready)}"
-  //       // case fifo @ Op(BufferedOutNew(_, bus)) => src"" //src"~${fifo}_waitrequest"
-  //     }
-
-  //     {if ((writesTo++readsFrom).nonEmpty) "&" else ""} + (writesTo ++ readsFrom).filter(_ != "").mkString(" & ")
-  //   } else {""}
-  // }
-
   // Hack for gather/scatter/unaligned load/store, we want the controller to keep running
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
@@ -270,6 +238,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].empty"
+      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.io.empty"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
@@ -277,6 +247,12 @@ trait ChiselGenCommon extends ChiselCodegen {
       case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].full | (~${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+      case merge@Op(MergeBufferNew(_,_)) =>
+        merge.writers.filter{ c => c.parent.s == sym.s }.head match {
+          case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
+            src"~${merge}.io.full($way)"
+        }
     }) else "true.B"
   }
 

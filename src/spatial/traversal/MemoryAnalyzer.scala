@@ -23,8 +23,10 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
     case m:LUT[_,_]     => new MemoryConfigurer(m, strategy)
     case m:LineBuffer[_] => new MemoryConfigurer(m, strategy)
     case m:FIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
+    case m:MergeBuffer[_] => new FIFOConfigurer(m, strategy)
     case m:LIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
     case m:Reg[_]       => new MemoryConfigurer(m, strategy)
+    case m:FIFOReg[_]       => new MemoryConfigurer(m, strategy)
     case m:StreamIn[_]  => new MemoryConfigurer(m, strategy)
     case m:StreamOut[_] => new MemoryConfigurer(m, strategy)
     case _ => throw new Exception(s"Don't know how to bank memory of type ${mem.tp}")

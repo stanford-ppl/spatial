@@ -166,7 +166,7 @@ import spatial.targets._
 				min_dists(p,k) = 256.to[Int]
 				label_list(p, k) = 0.to[LabelType]
 			}
-			Foreach(vote_len by 1) { v =>
+			Foreach(vote_len by 1 par 1) { v =>
 				vote_list(v) = 0.to[Int]
 			}
 		}
@@ -230,13 +230,13 @@ import spatial.targets._
 																		} 
 													 ).reduce(_ ++ _)
 
-		val print_vec = true
-		if (print_vec) { /* this is for making sure that I'm loading the file correctly */
-			for (i <- 0 until class_size) {
-				println(entire_training_vec1(i).d1)
-				println(entire_training_vec1(i).d2)
-			}
-		}
+		//val print_vec = true
+		//if (print_vec) { /* this is for making sure that I'm loading the file correctly */
+	//		for (i <- 0 until class_size) {
+	//			println(entire_training_vec1(i).d1)
+	//			println(entire_training_vec1(i).d2)
+	//		}
+	//	}
 
 		setMem(training_set_dram_1, entire_training_vec1)
 		setMem(training_set_dram_2, entire_training_vec2)
@@ -349,7 +349,7 @@ import spatial.targets._
 					val knn_tmp_large_set = RegFile[Int](par_factor, k_const).buffer // when parallelizing, size will need to be k_const * par_factor
 					val label_list_tmp 	= 	RegFile[LabelType](par_factor, k_const).buffer
 
-					Pipe { initialize(knn_tmp_large_set, label_list_tmp, vote_list) }
+					initialize(knn_tmp_large_set, label_list_tmp, vote_list) 
 
 					/* Training Loop */
 					val train_set_par_num = num_train_local_len / par_factor
@@ -383,7 +383,7 @@ import spatial.targets._
 		print(cksum)
 		println(" out of " + num_test + " correct.")
 
-		val passed = cksum >= 180.0
+		val passed = cksum >= 1800.0
 		println("Pass? " + passed)
 	}
 

@@ -324,6 +324,8 @@ class NBufMem(val mem: MemType,
       val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR.head === a.U, {if (Utils.retime) 1 else 0})}
       (0 until sramBroadcastRPorts).foreach {k => io.output.data(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output.data(0)}) }
       
+    case FIFORegType => throw new Exception("NBuffered FIFOReg should be impossible?")
+
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
                                   banks, combinedXBarWMux, combinedXBarRMux))

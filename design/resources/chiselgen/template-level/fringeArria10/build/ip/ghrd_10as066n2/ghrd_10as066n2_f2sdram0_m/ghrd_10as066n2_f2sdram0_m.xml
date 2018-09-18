@@ -1,0 +1,644 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deploy
+ date="2018.01.15.14:58:42"
+ outputDirectory="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/">
+ <perimeter>
+  <parameter
+     name="AUTO_GENERATION_ID"
+     type="Integer"
+     defaultValue="0"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_UNIQUE_ID"
+     type="String"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_FAMILY"
+     type="String"
+     defaultValue="Arria 10"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE"
+     type="String"
+     defaultValue="10AS066N3F40E2SG"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_SPEEDGRADE"
+     type="String"
+     defaultValue="2"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_CLOCK_RATE"
+     type="Long"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_CLOCK_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_RESET_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_MASTER_ADDRESS_MAP"
+     type="AddressMap"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_MASTER_ADDRESS_WIDTH"
+     type="AddressWidthType"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <interface name="clk" kind="clock" start="0">
+   <property name="clockRate" value="0" />
+   <property name="externallyDriven" value="false" />
+   <property name="ptfSchematicName" value="" />
+   <port name="clk_clk" direction="input" role="clk" width="1" />
+  </interface>
+  <interface name="clk_reset" kind="reset" start="0">
+   <property name="associatedClock" value="" />
+   <property name="synchronousEdges" value="NONE" />
+   <port name="clk_reset_reset" direction="input" role="reset" width="1" />
+  </interface>
+  <interface name="master" kind="avalon" start="1">
+   <property name="adaptsTo" value="" />
+   <property name="addressGroup" value="0" />
+   <property name="addressUnits" value="SYMBOLS" />
+   <property name="alwaysBurstMaxBurst" value="false" />
+   <property name="associatedClock" value="clk" />
+   <property name="associatedReset" value="clk_reset" />
+   <property name="bitsPerSymbol" value="8" />
+   <property name="burstOnBurstBoundariesOnly" value="false" />
+   <property name="burstcountUnits" value="WORDS" />
+   <property name="constantBurstBehavior" value="false" />
+   <property name="dBSBigEndian" value="false" />
+   <property name="doStreamReads" value="false" />
+   <property name="doStreamWrites" value="false" />
+   <property name="holdTime" value="0" />
+   <property name="interleaveBursts" value="false" />
+   <property name="isAsynchronous" value="false" />
+   <property name="isBigEndian" value="false" />
+   <property name="isReadable" value="false" />
+   <property name="isWriteable" value="false" />
+   <property name="linewrapBursts" value="false" />
+   <property name="maxAddressWidth" value="32" />
+   <property name="maximumPendingReadTransactions" value="0" />
+   <property name="maximumPendingWriteTransactions" value="0" />
+   <property name="minimumReadLatency" value="1" />
+   <property name="minimumResponseLatency" value="1" />
+   <property name="prSafe" value="false" />
+   <property name="readLatency" value="0" />
+   <property name="readWaitTime" value="1" />
+   <property name="registerIncomingSignals" value="false" />
+   <property name="registerOutgoingSignals" value="false" />
+   <property name="setupTime" value="0" />
+   <property name="timingUnits" value="Cycles" />
+   <property name="waitrequestAllowance" value="0" />
+   <property name="writeWaitTime" value="0" />
+   <port name="master_address" direction="output" role="address" width="32" />
+   <port name="master_readdata" direction="input" role="readdata" width="32" />
+   <port name="master_read" direction="output" role="read" width="1" />
+   <port name="master_write" direction="output" role="write" width="1" />
+   <port
+       name="master_writedata"
+       direction="output"
+       role="writedata"
+       width="32" />
+   <port
+       name="master_waitrequest"
+       direction="input"
+       role="waitrequest"
+       width="1" />
+   <port
+       name="master_readdatavalid"
+       direction="input"
+       role="readdatavalid"
+       width="1" />
+   <port
+       name="master_byteenable"
+       direction="output"
+       role="byteenable"
+       width="4" />
+  </interface>
+  <interface name="master_reset" kind="reset" start="1">
+   <property name="associatedClock" value="" />
+   <property name="associatedDirectReset" value="" />
+   <property name="associatedResetSinks" value="none" />
+   <property name="synchronousEdges" value="NONE" />
+   <port name="master_reset_reset" direction="output" role="reset" width="1" />
+  </interface>
+ </perimeter>
+ <entity
+   kind="ghrd_10as066n2_f2sdram0_m"
+   version="1.0"
+   name="ghrd_10as066n2_f2sdram0_m">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="-1" />
+  <parameter name="AUTO_GENERATION_ID" value="0" />
+  <parameter name="AUTO_DEVICE" value="10AS066N3F40E2SG" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="AUTO_MASTER_ADDRESS_MAP" value="" />
+  <parameter name="AUTO_CLK_RESET_DOMAIN" value="-1" />
+  <parameter name="AUTO_CLK_CLOCK_DOMAIN" value="-1" />
+  <parameter name="AUTO_UNIQUE_ID" value="" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <parameter name="AUTO_MASTER_ADDRESS_WIDTH" value="-1" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/synth/ghrd_10as066n2_f2sdram0_m.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/synth/ghrd_10as066n2_f2sdram0_m.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m.ip" />
+  </sourceFiles>
+  <childSourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_jtag_avalon_master/altera_jtag_avalon_master_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_jtag_phy/altera_avalon_st_jtag_interface_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_timing_adapter/avalon-st_timing_adapter_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_sc_fifo/altera_avalon_sc_fifo_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_sc_fifo/altera_avalon_sc_fifo.v" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_st_bytes_to_packets/altera_avalon_st_bytes_to_packets_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_st_packets_to_bytes/altera_avalon_st_packets_to_bytes_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_packets_to_master/altera_avalon_packets_to_master_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_channel_adapter/avalon-st_channel_adapter_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_channel_adapter/avalon-st_channel_adapter_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/merlin/altera_reset_controller/altera_reset_controller_hw.tcl" />
+  </childSourceFiles>
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_jtag_interface"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_timing_adapter_171_xf5weri"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_sc_fifo"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_bytes_to_packets"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_packets_to_bytes"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_packets_to_master"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_channel_adapter_171_2swajja"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_channel_adapter_171_vh2yu6y"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_reset_controller"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_jtag_avalon_master"
+   version="17.1"
+   name="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki">
+  <parameter name="FAST_VER" value="0" />
+  <parameter name="AUTO_DEVICE" value="10AS066N3F40E2SG" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="USE_PLI" value="0" />
+  <parameter name="PLI_PORT" value="50000" />
+  <parameter name="COMPONENT_CLOCK" value="0" />
+  <parameter name="FIFO_DEPTHS" value="2" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_avalon_master_171/synth/ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_avalon_master_171/synth/ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_jtag_avalon_master/altera_jtag_avalon_master_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_jtag_phy/altera_avalon_st_jtag_interface_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_timing_adapter/avalon-st_timing_adapter_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_sc_fifo/altera_avalon_sc_fifo_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_sc_fifo/altera_avalon_sc_fifo.v" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_st_bytes_to_packets/altera_avalon_st_bytes_to_packets_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_st_packets_to_bytes/altera_avalon_st_packets_to_bytes_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_packets_to_master/altera_avalon_packets_to_master_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_channel_adapter/avalon-st_channel_adapter_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_channel_adapter/avalon-st_channel_adapter_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/merlin/altera_reset_controller/altera_reset_controller_hw.tcl" />
+  </childSourceFiles>
+  <instantiator instantiator="ghrd_10as066n2_f2sdram0_m" as="f2sdram0_m" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_jtag_interface"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_timing_adapter_171_xf5weri"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_sc_fifo"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_bytes_to_packets"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_packets_to_bytes"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_packets_to_master"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_channel_adapter_171_2swajja"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_channel_adapter_171_vh2yu6y"</message>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_reset_controller"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_jtag_dc_streaming"
+   version="17.1"
+   name="altera_avalon_st_jtag_interface">
+  <parameter name="UPSTREAM_FIFO_SIZE" value="0" />
+  <parameter name="USE_DOWNSTREAM_READY" value="0" />
+  <parameter name="FABRIC" value="2.0" />
+  <parameter name="DOWNSTREAM_FIFO_SIZE" value="64" />
+  <parameter name="MGMT_CHANNEL_WIDTH" value="-1" />
+  <parameter name="PURPOSE" value="1" />
+  <parameter name="USE_PLI" value="0" />
+  <parameter name="PLI_PORT" value="50000" />
+  <parameter name="COMPONENT_CLOCK" value="0" />
+  <parameter name="EXPORT_JTAG" value="0" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_jtag_interface.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_jtag_dc_streaming.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_jtag_sld_node.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_jtag_streaming.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_clock_crosser.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_std_synchronizer_nocut.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_pipeline_base.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_idle_remover.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_idle_inserter.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_pipeline_stage.sv"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_jtag_interface.sdc"
+       attributes="NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_jtag_interface.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_jtag_dc_streaming.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_jtag_sld_node.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_jtag_streaming.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_clock_crosser.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_std_synchronizer_nocut.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_pipeline_base.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_idle_remover.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_idle_inserter.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_pipeline_stage.sv"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_jtag_dc_streaming_171/synth/altera_avalon_st_jtag_interface.sdc"
+       attributes="NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_jtag_phy/altera_avalon_st_jtag_interface_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="jtag_phy_embedded_in_jtag_master" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_jtag_interface"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="timing_adapter"
+   version="17.1"
+   name="ghrd_10as066n2_f2sdram0_m_timing_adapter_171_xf5weri">
+  <parameter name="inErrorWidth" value="0" />
+  <parameter name="inUseValid" value="true" />
+  <parameter name="inUseReady" value="false" />
+  <parameter name="inBitsPerSymbol" value="8" />
+  <parameter name="outReadyLatency" value="0" />
+  <parameter name="inChannelWidth" value="0" />
+  <parameter name="inSymbolsPerBeat" value="1" />
+  <parameter name="inUseEmptyPort" value="NO" />
+  <parameter name="inMaxChannel" value="0" />
+  <parameter name="outUseReady" value="true" />
+  <parameter name="outUseValid" value="true" />
+  <parameter name="inReadyLatency" value="0" />
+  <parameter name="inUseEmpty" value="false" />
+  <parameter name="inErrorDescriptor" value="" />
+  <parameter name="inUsePackets" value="false" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/timing_adapter_171/synth/ghrd_10as066n2_f2sdram0_m_timing_adapter_171_xf5weri.sv"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/timing_adapter_171/synth/ghrd_10as066n2_f2sdram0_m_timing_adapter_171_xf5weri.sv"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_timing_adapter/avalon-st_timing_adapter_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="timing_adt" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_timing_adapter_171_xf5weri"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avalon_sc_fifo"
+   version="17.1"
+   name="altera_avalon_sc_fifo">
+  <parameter name="EXPLICIT_MAXCHANNEL" value="0" />
+  <parameter name="ENABLE_EXPLICIT_MAXCHANNEL" value="false" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_sc_fifo_171/synth/altera_avalon_sc_fifo.v"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_sc_fifo_171/synth/altera_avalon_sc_fifo.v"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_sc_fifo/altera_avalon_sc_fifo_hw.tcl" />
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_sc_fifo/altera_avalon_sc_fifo.v" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="fifo" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_sc_fifo"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avalon_st_bytes_to_packets"
+   version="17.1"
+   name="altera_avalon_st_bytes_to_packets">
+  <parameter name="CHANNEL_WIDTH_DERIVED" value="8" />
+  <parameter name="ENCODING" value="0" />
+  <parameter name="CHANNEL_WIDTH" value="8" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_st_bytes_to_packets_171/synth/altera_avalon_st_bytes_to_packets.v"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_st_bytes_to_packets_171/synth/altera_avalon_st_bytes_to_packets.v"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_st_bytes_to_packets/altera_avalon_st_bytes_to_packets_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="b2p" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_bytes_to_packets"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avalon_st_packets_to_bytes"
+   version="17.1"
+   name="altera_avalon_st_packets_to_bytes">
+  <parameter name="CHANNEL_WIDTH_DERIVED" value="8" />
+  <parameter name="ENCODING" value="0" />
+  <parameter name="CHANNEL_WIDTH" value="8" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_st_packets_to_bytes_171/synth/altera_avalon_st_packets_to_bytes.v"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_st_packets_to_bytes_171/synth/altera_avalon_st_packets_to_bytes.v"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_st_packets_to_bytes/altera_avalon_st_packets_to_bytes_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="p2b" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_st_packets_to_bytes"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avalon_packets_to_master"
+   version="17.1"
+   name="altera_avalon_packets_to_master">
+  <parameter name="EXPORT_MASTER_SIGNALS" value="0" />
+  <parameter name="FAST_VER" value="0" />
+  <parameter name="FIFO_WIDTHU" value="1" />
+  <parameter name="FIFO_DEPTHS" value="2" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_packets_to_master_171/synth/altera_avalon_packets_to_master.v"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_avalon_packets_to_master_171/synth/altera_avalon_packets_to_master.v"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_packets_to_master/altera_avalon_packets_to_master_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="transacto" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_avalon_packets_to_master"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="channel_adapter"
+   version="17.1"
+   name="ghrd_10as066n2_f2sdram0_m_channel_adapter_171_2swajja">
+  <parameter name="inErrorWidth" value="0" />
+  <parameter name="inUseReady" value="true" />
+  <parameter name="inBitsPerSymbol" value="8" />
+  <parameter name="inChannelWidth" value="8" />
+  <parameter name="inSymbolsPerBeat" value="1" />
+  <parameter name="outChannelWidth" value="0" />
+  <parameter name="inUseEmptyPort" value="AUTO" />
+  <parameter name="inMaxChannel" value="255" />
+  <parameter name="inReadyLatency" value="0" />
+  <parameter name="outMaxChannel" value="0" />
+  <parameter name="inUseEmpty" value="false" />
+  <parameter name="inErrorDescriptor" value="" />
+  <parameter name="inUsePackets" value="true" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/channel_adapter_171/synth/ghrd_10as066n2_f2sdram0_m_channel_adapter_171_2swajja.sv"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/channel_adapter_171/synth/ghrd_10as066n2_f2sdram0_m_channel_adapter_171_2swajja.sv"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_channel_adapter/avalon-st_channel_adapter_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="b2p_adapter" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_channel_adapter_171_2swajja"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="channel_adapter"
+   version="17.1"
+   name="ghrd_10as066n2_f2sdram0_m_channel_adapter_171_vh2yu6y">
+  <parameter name="inErrorWidth" value="0" />
+  <parameter name="inUseReady" value="true" />
+  <parameter name="inBitsPerSymbol" value="8" />
+  <parameter name="inChannelWidth" value="0" />
+  <parameter name="inSymbolsPerBeat" value="1" />
+  <parameter name="outChannelWidth" value="8" />
+  <parameter name="inUseEmptyPort" value="AUTO" />
+  <parameter name="inMaxChannel" value="0" />
+  <parameter name="inReadyLatency" value="0" />
+  <parameter name="outMaxChannel" value="255" />
+  <parameter name="inUseEmpty" value="false" />
+  <parameter name="inErrorDescriptor" value="" />
+  <parameter name="inUsePackets" value="true" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/channel_adapter_171/synth/ghrd_10as066n2_f2sdram0_m_channel_adapter_171_vh2yu6y.sv"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/channel_adapter_171/synth/ghrd_10as066n2_f2sdram0_m_channel_adapter_171_vh2yu6y.sv"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/avalon_st/altera_avalon_st_channel_adapter/avalon-st_channel_adapter_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="p2b_adapter" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: ghrd_10as066n2_f2sdram0_m_channel_adapter_171_vh2yu6y"</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_reset_controller"
+   version="17.1"
+   name="altera_reset_controller">
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_reset_controller_171/synth/altera_reset_controller.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_reset_controller_171/synth/altera_reset_synchronizer.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_reset_controller_171/synth/altera_reset_controller.sdc"
+       attributes="NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_reset_controller_171/synth/altera_reset_controller.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_reset_controller_171/synth/altera_reset_synchronizer.v"
+       attributes="" />
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_f2sdram0_m/altera_reset_controller_171/synth/altera_reset_controller.sdc"
+       attributes="NO_AUTO_INSTANCE_DISCOVERY NO_SDC_PROMOTION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/merlin/altera_reset_controller/altera_reset_controller_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator
+     instantiator="ghrd_10as066n2_f2sdram0_m_altera_jtag_avalon_master_171_wqhllki"
+     as="rst_controller" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_f2sdram0_m">"Generating: altera_reset_controller"</message>
+  </messages>
+ </entity>
+</deploy>

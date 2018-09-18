@@ -1,0 +1,51 @@
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_TOOL_NAME "QsysPrimePro"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_TOOL_ENV "QsysPrimePro"
+set_global_assignment -library "ghrd_10as066n2_ILC" -name SOPCINFO_FILE [file join $::quartus(qip_path) "ghrd_10as066n2_ILC.sopcinfo"]
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name SLD_INFO "QSYS_NAME ghrd_10as066n2_ILC HAS_SOPCINFO 1 GENERATION_ID 0"
+set_global_assignment -library "ghrd_10as066n2_ILC" -name MISC_FILE [file join $::quartus(qip_path) "ghrd_10as066n2_ILC.cmp"]
+set_global_assignment -library "ghrd_10as066n2_ILC" -name SLD_FILE [file join $::quartus(qip_path) "ghrd_10as066n2_ILC.regmap"]
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_TARGETED_DEVICE_FAMILY "Arria 10"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_GENERATED_DEVICE_FAMILY "{Arria 10}"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_QSYS_MODE "STANDALONE"
+set_global_assignment -name SYNTHESIS_ONLY_QIP ON
+set_global_assignment -library "ghrd_10as066n2_ILC" -name MISC_FILE [file join $::quartus(qip_path) "../ghrd_10as066n2_ILC.ip"]
+
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_NAME "aW50ZXJydXB0X2xhdGVuY3lfY291bnRlcg=="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_DISPLAY_NAME "SW50ZWwgRlBHQSBJbnRlcnJ1cHQgTGF0ZW5jeSBDb3VudGVy"
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_AUTHOR "SW50ZWwgQ29ycG9yYXRpb24="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_VERSION "MTcuMQ=="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_DESCRIPTION "VGhpcyBjb21wb25lbnQgbWVhc3VyZXMgdGhlIHRpbWUgdGFrZW4gZnJvbSB0aGUgbW9tZW50IGFuIElSUSBzaWduYWwgaXMgZmlyZWQgdGlsbCB0aGUgSW50ZXJydXB0IFNlcnZpY2UgUm91dGluZSBiZWdpbnMgaW4gY2xvY2sgY3ljbGU="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_PARAMETER "SU5UUl9UWVBF::MA==::SU5URVJSVVBUX1RZUEU="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_PARAMETER "Q0xPQ0tfUkFURQ==::MTAwMDAwMDAw::Q0xPQ0tfUkFURQ=="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_PARAMETER "SVJRX1BPUlRfQ05U::Mg==::SVJRX1BPUlRfQ09VTlQ="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_GROUP "UHJvY2Vzc29ycyBhbmQgUGVyaXBoZXJhbHMvSW50ZXItUHJvY2VzcyBDb21tdW5pY2F0aW9u"
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cHM6Ly9kb2N1bWVudGF0aW9uLmFsdGVyYS5jb20vIy9saW5rL3NmbzE0MDA3ODc5NTI5MzIvbHJvMTQwMjA3MTcyOTU2Mg=="
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_COMPONENT_DOCUMENTATION_LINK "aHR0cHM6Ly9kb2N1bWVudGF0aW9uLmFsdGVyYS5jb20vIy9saW5rL2hjbzE0MjE2OTgwNDIwODcvaGNvMTQyMTY5ODAxMzQwOA=="
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_NAME "Z2hyZF8xMGFzMDY2bjJfSUxD"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_DISPLAY_NAME "c3lzdGVt"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_REPORT_HIERARCHY "On"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_INTERNAL "Off"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_VERSION "MS4w"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19HRU5FUkFUSU9OX0lE::MA==::QXV0byBHRU5FUkFUSU9OX0lE"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfRkFNSUxZ::QXJyaWEgMTA=::QXV0byBERVZJQ0VfRkFNSUxZ"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0U=::MTBBUzA2Nk4zRjQwRTJTRw==::QXV0byBERVZJQ0U="
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfU1BFRURHUkFERQ==::Mg==::QXV0byBERVZJQ0VfU1BFRURHUkFERQ=="
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfUkFURQ==::LTE=::QXV0byBDTE9DS19SQVRF"
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfQ0xPQ0tfRE9NQUlO::LTE=::QXV0byBDTE9DS19ET01BSU4="
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19DTEtfUkVTRVRfRE9NQUlO::LTE=::QXV0byBSRVNFVF9ET01BSU4="
+set_global_assignment -entity "ghrd_10as066n2_ILC" -library "ghrd_10as066n2_ILC" -name IP_COMPONENT_PARAMETER "QVVUT19JUlFfSU5URVJSVVBUU19VU0VE::LTE=::QXV0byBJTlRFUlJVUFRTX1VTRUQ="
+
+
+set_global_assignment -library "interrupt_latency_counter_171" -name VERILOG_FILE [file join $::quartus(qip_path) "interrupt_latency_counter_171/synth/interrupt_latency_counter.v"]
+set_global_assignment -library "interrupt_latency_counter_171" -name VERILOG_FILE [file join $::quartus(qip_path) "interrupt_latency_counter_171/synth/irq_detector.v"]
+set_global_assignment -library "interrupt_latency_counter_171" -name VERILOG_FILE [file join $::quartus(qip_path) "interrupt_latency_counter_171/synth/state_machine_counter.v"]
+set_global_assignment -library "ghrd_10as066n2_ILC" -name VERILOG_FILE [file join $::quartus(qip_path) "synth/ghrd_10as066n2_ILC.v"]
+
+
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_TOOL_NAME "interrupt_latency_counter"
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_TOOL_VERSION "17.1"
+set_global_assignment -entity "interrupt_latency_counter" -library "interrupt_latency_counter_171" -name IP_TOOL_ENV "QsysPrimePro"
+

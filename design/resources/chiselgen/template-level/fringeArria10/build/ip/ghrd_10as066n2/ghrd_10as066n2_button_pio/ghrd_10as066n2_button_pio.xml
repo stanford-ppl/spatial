@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deploy
+ date="2018.01.09.14:30:43"
+ outputDirectory="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_button_pio/">
+ <perimeter>
+  <parameter
+     name="AUTO_GENERATION_ID"
+     type="Integer"
+     defaultValue="0"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_UNIQUE_ID"
+     type="String"
+     defaultValue=""
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_FAMILY"
+     type="String"
+     defaultValue="Arria 10"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE"
+     type="String"
+     defaultValue="10AS066N3F40E2SG"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_DEVICE_SPEEDGRADE"
+     type="String"
+     defaultValue="2"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_CLOCK_RATE"
+     type="Long"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_CLOCK_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <parameter
+     name="AUTO_CLK_RESET_DOMAIN"
+     type="Integer"
+     defaultValue="-1"
+     onHdl="0"
+     affectsHdl="1" />
+  <interface name="clk" kind="clock" start="0">
+   <property name="clockRate" value="0" />
+   <property name="externallyDriven" value="false" />
+   <property name="ptfSchematicName" value="" />
+   <port name="clk" direction="input" role="clk" width="1" />
+  </interface>
+  <interface name="external_connection" kind="conduit" start="0">
+   <property name="associatedClock" value="" />
+   <property name="associatedReset" value="" />
+   <property name="prSafe" value="false" />
+   <port name="in_port" direction="input" role="export" width="4" />
+  </interface>
+  <interface name="irq" kind="interrupt" start="0">
+   <property
+       name="associatedAddressablePoint"
+       value="ghrd_10as066n2_button_pio.s1" />
+   <property name="associatedClock" value="clk" />
+   <property name="associatedReset" value="reset" />
+   <property name="bridgedReceiverOffset" value="0" />
+   <property name="bridgesToReceiver" value="" />
+   <property name="irqScheme" value="NONE" />
+   <port name="irq" direction="output" role="irq" width="1" />
+  </interface>
+  <interface name="reset" kind="reset" start="0">
+   <property name="associatedClock" value="clk" />
+   <property name="synchronousEdges" value="DEASSERT" />
+   <port name="reset_n" direction="input" role="reset_n" width="1" />
+  </interface>
+  <interface name="s1" kind="avalon" start="0">
+   <property name="addressAlignment" value="NATIVE" />
+   <property name="addressGroup" value="0" />
+   <property name="addressSpan" value="4" />
+   <property name="addressUnits" value="WORDS" />
+   <property name="alwaysBurstMaxBurst" value="false" />
+   <property name="associatedClock" value="clk" />
+   <property name="associatedReset" value="reset" />
+   <property name="bitsPerSymbol" value="8" />
+   <property name="bridgedAddressOffset" value="0" />
+   <property name="bridgesToMaster" value="" />
+   <property name="burstOnBurstBoundariesOnly" value="false" />
+   <property name="burstcountUnits" value="WORDS" />
+   <property name="constantBurstBehavior" value="false" />
+   <property name="explicitAddressSpan" value="0" />
+   <property name="holdTime" value="0" />
+   <property name="interleaveBursts" value="false" />
+   <property name="isBigEndian" value="false" />
+   <property name="isFlash" value="false" />
+   <property name="isMemoryDevice" value="false" />
+   <property name="isNonVolatileStorage" value="false" />
+   <property name="linewrapBursts" value="false" />
+   <property name="maximumPendingReadTransactions" value="0" />
+   <property name="maximumPendingWriteTransactions" value="0" />
+   <property name="minimumReadLatency" value="1" />
+   <property name="minimumResponseLatency" value="1" />
+   <property name="minimumUninterruptedRunLength" value="1" />
+   <property name="prSafe" value="false" />
+   <property name="printableDevice" value="false" />
+   <property name="readLatency" value="0" />
+   <property name="readWaitStates" value="1" />
+   <property name="readWaitTime" value="1" />
+   <property name="registerIncomingSignals" value="false" />
+   <property name="registerOutgoingSignals" value="false" />
+   <property name="setupTime" value="0" />
+   <property name="timingUnits" value="Cycles" />
+   <property name="transparentBridge" value="false" />
+   <property name="waitrequestAllowance" value="0" />
+   <property name="wellBehavedWaitrequest" value="false" />
+   <property name="writeLatency" value="0" />
+   <property name="writeWaitStates" value="0" />
+   <property name="writeWaitTime" value="0" />
+   <port name="address" direction="input" role="address" width="2" />
+   <port name="write_n" direction="input" role="write_n" width="1" />
+   <port name="writedata" direction="input" role="writedata" width="32" />
+   <port name="chipselect" direction="input" role="chipselect" width="1" />
+   <port name="readdata" direction="output" role="readdata" width="32" />
+  </interface>
+ </perimeter>
+ <entity
+   kind="ghrd_10as066n2_button_pio"
+   version="1.0"
+   name="ghrd_10as066n2_button_pio">
+  <parameter name="AUTO_CLK_CLOCK_RATE" value="-1" />
+  <parameter name="AUTO_GENERATION_ID" value="0" />
+  <parameter name="AUTO_DEVICE" value="10AS066N3F40E2SG" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="AUTO_CLK_RESET_DOMAIN" value="-1" />
+  <parameter name="AUTO_CLK_CLOCK_DOMAIN" value="-1" />
+  <parameter name="AUTO_UNIQUE_ID" value="" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_button_pio/synth/ghrd_10as066n2_button_pio.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_button_pio/synth/ghrd_10as066n2_button_pio.v"
+       attributes="CONTAINS_INLINE_CONFIGURATION" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_button_pio.ip" />
+  </sourceFiles>
+  <childSourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_pio/altera_avalon_pio_hw.tcl" />
+  </childSourceFiles>
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_button_pio">"Generating: ghrd_10as066n2_button_pio"</message>
+   <message level="Info" culprit="ghrd_10as066n2_button_pio">"Generating: ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui"</message>
+   <message level="Info" culprit="button_pio">Starting RTL generation for module 'ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui'</message>
+   <message level="Info" culprit="button_pio">  Generation command is [exec /opt/intelFPGA_pro/17.1/quartus/linux64/perl/bin/perl -I /opt/intelFPGA_pro/17.1/quartus/linux64/perl/lib -I /opt/intelFPGA_pro/17.1/quartus/sopc_builder/bin/europa -I /opt/intelFPGA_pro/17.1/quartus/sopc_builder/bin/perl_lib -I /opt/intelFPGA_pro/17.1/quartus/sopc_builder/bin -I /opt/intelFPGA_pro/17.1/quartus/../ip/altera/sopc_builder_ip/common -I /opt/intelFPGA_pro/17.1/quartus/../ip/altera/sopc_builder_ip/altera_avalon_pio -- /opt/intelFPGA_pro/17.1/quartus/../ip/altera/sopc_builder_ip/altera_avalon_pio/generate_rtl.pl --name=ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui --dir=/tmp/user/26364/alt7540_2560225239912873636.dir/0043_button_pio_gen/ --quartus_dir=/opt/intelFPGA_pro/17.1/quartus --verilog --config=/tmp/user/26364/alt7540_2560225239912873636.dir/0043_button_pio_gen//ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui_component_configuration.pl  --do_build_sim=0  ]</message>
+   <message level="Info" culprit="button_pio">Done RTL generation for module 'ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui'</message>
+  </messages>
+ </entity>
+ <entity
+   kind="altera_avalon_pio"
+   version="17.1"
+   name="ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui">
+  <parameter name="derived_do_test_bench_wiring" value="false" />
+  <parameter name="generateIRQ" value="true" />
+  <parameter name="derived_has_irq" value="true" />
+  <parameter name="captureEdge" value="true" />
+  <parameter name="clockRate" value="100000000" />
+  <parameter name="derived_has_out" value="false" />
+  <parameter name="derived_has_in" value="true" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="derived_has_tri" value="false" />
+  <parameter name="derived_capture" value="true" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="derived_edge_type" value="FALLING" />
+  <parameter name="irqType" value="EDGE" />
+  <parameter name="derived_irq_type" value="EDGE" />
+  <parameter name="edgeType" value="FALLING" />
+  <parameter name="width" value="4" />
+  <parameter name="bitClearingEdgeCapReg" value="true" />
+  <parameter name="direction" value="Input" />
+  <generatedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_button_pio/altera_avalon_pio_171/synth/ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui.v"
+       attributes="" />
+  </generatedFiles>
+  <childGeneratedFiles>
+   <file
+       path="/home/tianzhao/quartus_17_fringe_ref/a10_soc_devkit_ghrd/ip/ghrd_10as066n2/ghrd_10as066n2_button_pio/altera_avalon_pio_171/synth/ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui.v"
+       attributes="" />
+  </childGeneratedFiles>
+  <sourceFiles>
+   <file
+       path="/opt/intelFPGA_pro/17.1/ip/altera/sopc_builder_ip/altera_avalon_pio/altera_avalon_pio_hw.tcl" />
+  </sourceFiles>
+  <childSourceFiles/>
+  <instantiator instantiator="ghrd_10as066n2_button_pio" as="button_pio" />
+  <messages>
+   <message level="Info" culprit="ghrd_10as066n2_button_pio">"Generating: ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui"</message>
+   <message level="Info" culprit="button_pio">Starting RTL generation for module 'ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui'</message>
+   <message level="Info" culprit="button_pio">  Generation command is [exec /opt/intelFPGA_pro/17.1/quartus/linux64/perl/bin/perl -I /opt/intelFPGA_pro/17.1/quartus/linux64/perl/lib -I /opt/intelFPGA_pro/17.1/quartus/sopc_builder/bin/europa -I /opt/intelFPGA_pro/17.1/quartus/sopc_builder/bin/perl_lib -I /opt/intelFPGA_pro/17.1/quartus/sopc_builder/bin -I /opt/intelFPGA_pro/17.1/quartus/../ip/altera/sopc_builder_ip/common -I /opt/intelFPGA_pro/17.1/quartus/../ip/altera/sopc_builder_ip/altera_avalon_pio -- /opt/intelFPGA_pro/17.1/quartus/../ip/altera/sopc_builder_ip/altera_avalon_pio/generate_rtl.pl --name=ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui --dir=/tmp/user/26364/alt7540_2560225239912873636.dir/0043_button_pio_gen/ --quartus_dir=/opt/intelFPGA_pro/17.1/quartus --verilog --config=/tmp/user/26364/alt7540_2560225239912873636.dir/0043_button_pio_gen//ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui_component_configuration.pl  --do_build_sim=0  ]</message>
+   <message level="Info" culprit="button_pio">Done RTL generation for module 'ghrd_10as066n2_button_pio_altera_avalon_pio_171_3t26uui'</message>
+  </messages>
+ </entity>
+</deploy>

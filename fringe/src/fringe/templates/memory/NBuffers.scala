@@ -496,6 +496,19 @@ class NBufMem(
       writeCol.io.input.reset := ctrl.io.swap
       writeCol.io.input.saturate := false.B
 
+      val gotFirst = Module(new SRFF())
+      gotFirst.io.input.set := Utils.risingEdge(en)
+      gotFirst.io.input.reset := io.xBarW.map{p => Utils.getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_} | ctrl.io.swap
+      gotFirst.io.input.asyn_reset := false.B
+
+      val base = chisel3.util.PriorityMux(io.xBarW.map(_.en).flatten, writeCol.io.output.count)
+      val colCorrection = Module(new FF(32))
+      colCorrection.io.xBarW(0).data.head := base.asUInt
+      colCorrection.io.xBarW(0).init.head := 0.U
+      colCorrection.io.xBarW(0).en.head := en & ~gotFirst.io.output.data
+      colCorrection.io.xBarW(0).reset.head := reset.toBool | Utils.risingEdge(!gotFirst.io.output.data)
+      val colCorrectionValue = Mux(en & ~gotFirst.io.output.data, base.asUInt, colCorrection.io.output.data(0))
+
       val wCRN_width = 1 + log2Up(numrows)
       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
       writeRow.io.input.enable := ctrl.io.swap
@@ -509,6 +522,12 @@ class NBufMem(
         (0 until sramXBarWPorts).foreach {k => 
           lb.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en
           lb.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
+          lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map((_.asUInt - colCorrectionValue) / banks(1).U)
+          lb.io.xBarW(bufferBase + k).banks.zipWithIndex.map{case (b,i) => 
+            if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - io.xBarW(bufferBase + k).banks(0)
+            else b := (writeCol.io.output.count(i/2).asUInt - colCorrectionValue) % banks(1).U
+          }
+
           lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map(_.asUInt / banks(1).U)
           lb.io.xBarW(bufferBase + k).banks.zipWithIndex.foreach{case (b,i) =>
             if (i % 2 == 0) b := writeRow.io.output.count

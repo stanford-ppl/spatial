@@ -91,7 +91,8 @@ trait ChiselGenMath extends ChiselGenCommon {
       // emitt(src"${lhs}.r := Utils.fixrand($seed, 32, ${swap(lhs.parent.s.get, DatapathEn)}).r.apply(Utils.log2Up($size) max 1, 0)")
       emitt(s"val ${quote(lhs)}_bitsize = Utils.log2Up($size) max 1")
       emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
-      emitGlobalModule(src"${lhs}_rng.io.en := ${swap(lhs.parent.s.get, DatapathEn)}")
+      val en = if (lhs.parent.s.isDefined) src"${swap(lhs.parent.s.get, DatapathEn)}" else "true.B"
+      emitGlobalModule(src"${lhs}_rng.io.en := $en")
       emitt(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     // case FixUnif() =>
     //   val bits = lhs.tp match {

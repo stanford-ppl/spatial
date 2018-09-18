@@ -194,6 +194,8 @@ package object memory {
     def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
+    def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
+    def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
 
     def isLUT: Boolean = mem match {
       case _: LUT[_,_] => true

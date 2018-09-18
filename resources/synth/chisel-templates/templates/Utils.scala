@@ -688,6 +688,28 @@ object Utils {
   def singleCycleModulo(num: UInt, den: UInt): UInt = {
     num % den
   }
+  def sqrt(num: FixedPoint, latency: Int): UInt = {
+    FringeGlobals.bigIP.sqrt(num.r, latency)
+  }
+  def sin(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def cos(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def atan(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def sinh(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def cosh(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+
+
+
+
   def sqrt(num: FloatingPoint): FloatingPoint = {
     val m = num.m
     val e = num.e

@@ -62,6 +62,7 @@ sim-hw:
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
 	cp chisel/template-level/fringeVCS/SRAMVerilogSim.v . || :
+	cp chisel/template-level/fringeVCS/Math.v . || :
 	sbt "runMain top.Instantiator --backend-name verilator --target-dir ${VERILATOR_SRC} --testArgs"
 	cp scripts/verilator.mk ${VERILATOR_SRC}/Makefile
 	mv ${VERILATOR_SRC}/top* ${VERILATOR_SRC}/verilator_srcs_tmp
@@ -108,6 +109,7 @@ aws-sim-hw:
 	# First use chisel to create the verilog
 	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
 	cat chisel/template-level/fringeVCS/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/Top.v
+	cat chisel/template-level/fringeVCS/Math.v >> ${AWS_V_SIM_DIR}/Top.v
 	cat chisel/template-level/fringeVCS/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/Top.v
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}

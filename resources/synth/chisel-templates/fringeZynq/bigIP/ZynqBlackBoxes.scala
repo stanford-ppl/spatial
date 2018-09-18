@@ -4,6 +4,19 @@ import chisel3._
 import chisel3.util._
 import scala.collection.mutable.Set
 
+abstract class CordicInterface(width: Int) extends Bundle {
+  var aclk = Input(Clock())
+  var m_axis_dout_tdata = Output(UInt(width.W))
+}
+class CartesianInterface(width: Int) extends CordicInterface(width) {
+  var s_axis_cartesian_tvalid = Input(Bool())
+  var s_axis_cartesian_tdata = Input(UInt(width.W))
+}
+class PhaseInterface(width: Int) extends CordicInterface(width) {
+  var s_axis_phase_tvalid = Input(Bool())
+  var s_axis_phase_tdata = Input(UInt(width.W))
+}
+
 trait ZynqBlackBoxes {
 
   // To avoid creating the same IP twice
@@ -150,33 +163,100 @@ generate_target {all} [get_ips $moduleName]
     })
 
 
-    val m = Module(new SqrtBBox(width, signed, latency))
+    val m = Module(new Cordic(width, signed, latency, "Square_Root"))
     m.io.aclk := clock
-    m.io.s_axis_cartesian_tvalid := true.B
-    m.io.s_axis_cartesian_tdata := io.a
+    m.io.asInstanceOf[CartesianInterface].s_axis_cartesian_tvalid := true.B
+    m.io.asInstanceOf[CartesianInterface].s_axis_cartesian_tdata := io.a
     io.out := m.io.m_axis_dout_tdata
   }
 
-  class SqrtBBox(val width: Int, val signed: Boolean, val latency: Int) extends BlackBox {
+  class Sin(val width: Int, val signed: Boolean, val latency: Int) extends Module {
     val io = IO(new Bundle {
-      val aclk = Input(Clock())
-      val s_axis_cartesian_tvalid = Input(Bool())
-      val s_axis_cartesian_tdata = Input(UInt(width.W))
-      val m_axis_dout_tdata = Output(UInt(width.W))
+      val a = Input(UInt(width.W))
+      val out = Output(UInt(width.W))
     })
 
+
+    val m = Module(new Cordic(width, signed, latency, "Sin_and_Cos"))
+    m.io.aclk := clock
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tvalid := true.B
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tdata := io.a
+    io.out := m.io.m_axis_dout_tdata(width-1, 0)
+  }
+
+  class Cos(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle {
+      val a = Input(UInt(width.W))
+      val out = Output(UInt(width.W))
+    })
+
+
+    val m = Module(new Cordic(width, signed, latency, "Sin_and_Cos"))
+    m.io.aclk := clock
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tvalid := true.B
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tdata := io.a
+    io.out := m.io.m_axis_dout_tdata(width*2-1, width)
+  }
+
+  class Atan(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle {
+      val a = Input(UInt(width.W))
+      val out = Output(UInt(width.W))
+    })
+
+
+    val m = Module(new Cordic(width, signed, latency, "Arc_Tan"))
+    m.io.aclk := clock
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tvalid := true.B
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tdata := io.a
+    io.out := m.io.m_axis_dout_tdata
+  }
+
+  class Sinh(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle {
+      val a = Input(UInt(width.W))
+      val out = Output(UInt(width.W))
+    })
+
+
+    val m = Module(new Cordic(width, signed, latency, "Sinh_and_Cosh"))
+    m.io.aclk := clock
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tvalid := true.B
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tdata := io.a
+    io.out := m.io.m_axis_dout_tdata(width-1, 0)
+  }
+
+  class Cosh(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle {
+      val a = Input(UInt(width.W))
+      val out = Output(UInt(width.W))
+    })
+
+
+    val m = Module(new Cordic(width, signed, latency, "Sinh_and_Cosh"))
+    m.io.aclk := clock
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tvalid := true.B
+    m.io.asInstanceOf[PhaseInterface].s_axis_phase_tdata := io.a
+    io.out := m.io.m_axis_dout_tdata(width*2-1, width)
+  }
+
+
+  class Cordic(val width: Int, val signed: Boolean, val latency: Int, func: String) extends BlackBox {
+    val io = if (func == "Square_Root") IO(new CartesianInterface(width))
+             else                       IO(new PhaseInterface(width))
+
     val signedString = if (signed) "Signed" else "Unsigned"
-    val moduleName = s"sqrt_${width}_${width}_${latency}_${signedString}"
-    override def desiredName = s"sqrt_${width}_${width}_${latency}_${signedString}"
+    val moduleName = s"${func}_${width}_${width}_${latency}_${signedString}"
+    override def desiredName = s"${func}_${width}_${width}_${latency}_${signedString}"
 
     // Print required stuff into a tcl file
     if (!createdIP.contains(moduleName)) {
       FringeGlobals.tclScript.println(
 s"""
-## Integer SquareRooter
+## Integer $func
 create_ip -name cordic -vendor xilinx.com -library ip -version 6.0 -module_name $moduleName
 set_property -dict [list CONFIG.Input_Width.VALUE_SRC USER] [get_bd_cells cordic_0]
-set_property -dict [list CONFIG.Functional_Selection {Square_Root} CONFIG.Input_Width {$width} CONFIG.Output_Width {$width} CONFIG.Data_Format {UnsignedFraction} CONFIG.Output_Width {$width} CONFIG.Coarse_Rotation {false}] [get_bd_cells cordic_0]
+set_property -dict [list CONFIG.Functional_Selection {${func}} CONFIG.Input_Width {$width} CONFIG.Output_Width {$width} CONFIG.Data_Format {UnsignedFraction} CONFIG.Output_Width {$width} CONFIG.Coarse_Rotation {false}] [get_bd_cells cordic_0]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 """)

@@ -18,6 +18,21 @@ abstract class BigIP {
   def sqrt(a: UInt, latency: Int): UInt = {
     throw new Exception("sqrt not implemented!")
   }
+  def sin(a: UInt, latency: Int): UInt = {
+    throw new Exception("sin not implemented!")
+  }
+  def cos(a: UInt, latency: Int): UInt = {
+    throw new Exception("cos not implemented!")
+  }
+  def atan(a: UInt, latency: Int): UInt = {
+    throw new Exception("atan not implemented!")
+  }
+  def sinh(a: UInt, latency: Int): UInt = {
+    throw new Exception("sinh not implemented!")
+  }
+  def cosh(a: UInt, latency: Int): UInt = {
+    throw new Exception("cosh not implemented!")
+  }
 
   def fsqrt(a: UInt, latency: Int): UInt = {
     throw new Exception("fsqrt not implemented!")

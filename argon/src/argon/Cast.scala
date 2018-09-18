@@ -20,6 +20,13 @@ abstract class CastFunc[A,B:Type] {
   @rig def get(a: A): Option[B] = Some(apply(a))
   @rig def getLeft(b: B): Option[A] = None
 
+  @rig def saturating(a: A): B = apply(a)
+  @rig def unbiased(a: A): B = apply(a)
+  @rig def unbsat(a: A): B = apply(a)
+  @rig def saturatingGetLeft(b: B): Option[A] = getLeft(b)
+  @rig def unbiasedGetLeft(b: B): Option[A] = getLeft(b)
+  @rig def unbsatGetLeft(b: B): Option[A] = getLeft(b)
+
   @rig def unchecked(a: A): B = apply(a)
   @rig def uncheckedGetLeft(b: B): Option[A] = getLeft(b)
 }
@@ -39,6 +46,13 @@ abstract class Cast2Way[A:Type,B:Type] extends CastFunc[A,B] {
   @rig def applyLeft(b: B): A
   @rig override def getLeft(b: B): Option[A] = Some(applyLeft(b))
 
+  @rig override def saturating(a: A): B = apply(a)
+  @rig override def unbiased(a: A): B = apply(a)
+  @rig override def unbsat(a: A): B = apply(a)
+  @rig def saturatingLeft(b: B): A = applyLeft(b)
+  @rig def unbiasedLeft(b: B): A = applyLeft(b)
+  @rig def unbsatLeft(b: B): A = applyLeft(b)
+
   @rig def uncheckedLeft(b: B): A = applyLeft(b)
 }
 
@@ -48,6 +62,9 @@ abstract class Cast2Way[A:Type,B:Type] extends CastFunc[A,B] {
   */
 class Lifter[A,B:Type] extends CastFunc[A,B] {
   @rig def apply(a: A): B = tB.from(a, warnOnLoss = true)
+  @rig override def saturating(a: A): B = tB.from(a, saturating = true)
+  @rig override def unbiased(a: A): B = tB.from(a, unbiased = true)
+  @rig override def unbsat(a: A): B = tB.from(a, unbiased = true, saturating = true)
   @rig override def unchecked(a: A): B = tB.from(a)
 }
 

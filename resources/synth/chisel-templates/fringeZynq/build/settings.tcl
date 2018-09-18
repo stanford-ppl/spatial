@@ -1,6 +1,6 @@
 ## TARGET_ARCH must either be ZC706 or Zedboard or ZCU102
-set TARGET ZC706
-#set TARGET Zedboard
+# set TARGET ZC706
+set TARGET Zedboard
 
 switch $TARGET {
   "ZC706" {

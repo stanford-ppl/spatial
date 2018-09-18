@@ -103,6 +103,37 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     m.io.out
   }
 
+  override def sin(a: UInt, latency: Int): UInt = {
+    val m = Module(new Sin(a.getWidth, false, latency))
+    m.io.a := a
+    m.io.out
+  }
+
+  override def cos(a: UInt, latency: Int): UInt = {
+    val m = Module(new Cos(a.getWidth, false, latency))
+    m.io.a := a
+    m.io.out
+  }
+
+  override def atan(a: UInt, latency: Int): UInt = {
+    val m = Module(new Atan(a.getWidth, false, latency))
+    m.io.a := a
+    m.io.out
+  }
+
+  override def sinh(a: UInt, latency: Int): UInt = {
+    val m = Module(new Sinh(a.getWidth, false, latency))
+    m.io.a := a
+    m.io.out
+  }
+
+  override def cosh(a: UInt, latency: Int): UInt = {
+    val m = Module(new Cosh(a.getWidth, false, latency))
+    m.io.a := a
+    m.io.out
+  }
+
+
   def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int): UInt = {
     val m = Module(new FAdd(mw, e, latency))
     m.io.a := a

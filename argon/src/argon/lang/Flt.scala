@@ -107,6 +107,15 @@ object FltFmt {
   @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
     stage(FltToFix[M,E,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
   }
+  @rig def __toFixSat[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
+    stage(FltToFix[M,E,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
+  }
+  @rig def __toFixUnb[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
+    stage(FltToFix[M,E,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
+  }
+  @rig def __toFixUnbSat[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
+    stage(FltToFix[M,E,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
+  }
   @rig def __toFlt[M2:INT,E2:INT]: Flt[M2,E2] = {
     stage(FltToFlt[M,E,M2,E2](this, FltFmt(INT[M2],INT[E2])))
   }

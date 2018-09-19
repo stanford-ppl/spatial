@@ -5,18 +5,20 @@ import spatial.dsl._
 @spatial class MergeSort extends SpatialTest {
   override def runtimeArgs: Args = NoArgs
 
+  def log(x: scala.Int, base: scala.Int) = Math.round(scala.math.log(x.toDouble) / scala.math.log(base.toDouble)).toInt
+
   def main(args: Array[String]): Unit = {
     type T = I32
 
-    val n = 1024
+    val n = 4096
     val mem = List.fill(2) { DRAM[T](n) }
     val data = Array.tabulate(n) { i => random[T](n) }
     setMem(mem(0), data)
 
     Accel {
-      val ways = 2
+      val ways = 4
       val mergePar = 16
-      val sramBlockSize = 64
+      val sramBlockSize = 256
 
       // SRAM block sort
       Pipe {
@@ -24,7 +26,7 @@ import spatial.dsl._
         val mergeSizeInit = blockSizeInit * ways
         val mergeCountInit = sramBlockSize / mergeSizeInit
         // extra level for base case
-        val levelCount = (sramBlockSize / mergeSizeInit) + 1
+        val levelCount = log(sramBlockSize / blockSizeInit, ways) + 1
 
         val sram = SRAM[T](sramBlockSize)
         val sramMergeBuf = MergeBuffer[T](ways, mergePar)
@@ -76,7 +78,7 @@ import spatial.dsl._
         val mergeSizeInit = blockSizeInit * ways
         val mergeCountInit = n / mergeSizeInit
         // extra level for base case
-        val levelCount = n / mergeSizeInit
+        val levelCount = log(n / blockSizeInit, ways)
 
         val doubleBuf = Reg[Boolean]
         doubleBuf := true

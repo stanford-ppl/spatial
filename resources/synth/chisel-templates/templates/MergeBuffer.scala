@@ -227,7 +227,7 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
 
   sortPipe.io.in.bits := Vec(outBits)
 
-  io.outBound.valid := io.inBound.map { _.valid }.reduce{ _&_ }
+  io.outBound.valid := io.inBound.map { _.valid }.reduce{ _|_ }
   io.outBound.bits := io.inBound.map { _.bits }.reduce{ _+_ }
 
   io.out.valid := sortPipe.io.out.valid
@@ -246,22 +246,22 @@ class MergeBufferNWay(ways: Int, w: Int, v: Int) extends Module {
       m.io.initMerge := io.initMerge
       m.io.inBound := io.inBound
       io.out <> m.io.out
-      io.outBound <> m.io.outBound
+      io.outBound := m.io.outBound
     }
     case _ => {
       val twoWay = Module(new MergeBufferTwoWay(w, v))
+      twoWay.io.initMerge := io.initMerge
       val mergeBuffers = List.tabulate(2) { i =>
         val n = ways / 2
         val nWay = Module(new MergeBufferNWay(n, w, v))
         nWay.io.in.zipWithIndex.foreach { case (in, j) =>
           in <> io.in(i * n + j)
         }
-
         nWay.io.initMerge := io.initMerge
-
         nWay.io.inBound.zipWithIndex.foreach { case (inBound, j) =>
           inBound := io.inBound(i * n + j)
         }
+
         twoWay.io.in(i) <> nWay.io.out
         twoWay.io.inBound(i) := nWay.io.outBound
       }

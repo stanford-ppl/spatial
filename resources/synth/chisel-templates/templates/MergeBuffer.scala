@@ -159,12 +159,14 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
   val sortPipe = Module(new SortPipe(w, v))
   sortPipe.io.out.ready := io.out.ready
 
+  val countEn = sortPipe.io.in.valid & sortPipe.io.in.ready
+
   val counterW = log2Ceil(v)
   val headCounter = List.fill(2) { Module(new UpDownCounter(counterW)) }
   headCounter.zipWithIndex.foreach { case (hc, i) =>
     hc.io.init := 0.U
     hc.io.incDec := true.B
-    hc.io.en := sortPipe.io.in.valid & sortPipe.io.in.ready
+    hc.io.en := countEn
   }
 
   val initMerge = Module(new fringe.FringeFF(Bool()))
@@ -186,9 +188,8 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
     sc.io.init := io.inBound(i).bits
     sc.io.incDec := false.B
     sc.io.saturate := true.B
-    sc.io.stride := v.U
     sc.io.reset := io.inBound(i).valid
-    sc.io.en := buffers(i).io.out.valid & buffers(i).io.out.ready
+    sc.io.en := countEn
   }
 
   val shifters = List.fill(2) { Module(new BarrelShifter(Valid(UInt(w.W)), v)) }
@@ -218,8 +219,10 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
   val lValid = Vec(lBits).asUInt
   headCounter(0).io.stride := PopCount(rValid)
   headCounter(1).io.stride := PopCount(lValid)
+  streamCounter(0).io.stride := PopCount(rValid)
+  streamCounter(1).io.stride := PopCount(lValid)
 
-  val oneSided = ((rValid | lValid).andR & streamCounter.map { _.io.out === 0.U }.reduce { _|_ })
+  val oneSided = ((rValid | lValid).andR & streamCounter.map { _.io.out < v.U }.reduce { _|_ })
   sortPipe.io.in.valid := oneSided | shifters.map { s => s.io.out.map { _.valid }.reduce { _&_ } }.reduce { _&_ }
 
   sortPipe.io.in.bits := Vec(outBits)

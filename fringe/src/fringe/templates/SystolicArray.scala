@@ -103,7 +103,7 @@ class SystolicArray2D(val dims: List[Int], val neighborhood_size: List[Int], val
   // Create registers
   val registers = if (inits.isDefined){
     List.tabulate(dims(0)){i => List.tabulate(dims(1)){j =>  
-      val initval = (inits.get.apply(i*dims(1)+j)*-*scala.math.pow(2,fracBits)).toLong
+      val initval = (inits.get.apply(i*dims(1)+j)*scala.math.pow(2,fracBits)).toLong
       RegInit(initval.U(bitWidth.W))
     }}.flatten
   } else {
@@ -204,7 +204,7 @@ class SystolicArray2D(val dims: List[Int], val neighborhood_size: List[Int], val
         registers(i*dims(1) + j) := new_val.r  
       }.elsewhen(io.reset){
         if (inits.isDefined){
-          registers(i*dims(1) + j) := (inits.get.apply(i*dims(1)+j)*-*scala.math.pow(2,fracBits)).toLong.U(bitWidth.W)
+          registers(i*dims(1) + j) := (inits.get.apply(i*dims(1)+j)*scala.math.pow(2,fracBits)).toLong.U(bitWidth.W)
         } else {
           operation match {
             case _@(Sum | Min | Max) => registers(i*dims(1)+j) := 0.U(bitWidth.W)

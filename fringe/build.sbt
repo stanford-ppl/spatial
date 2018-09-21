@@ -5,7 +5,7 @@ val scalatest_version = "3.0.5"
 val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.0-SNAPSHOT_2017-10-06")
 val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAPSHOT")
 
-name := "fringe"
+name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")
 scalaVersion := scala_version
 version := fringe_version
 organization := "edu.stanford.ppl"

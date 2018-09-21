@@ -336,6 +336,8 @@ class NBufMem(
       val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR.head === a.U, {if (globals.retime) 1 else 0})}
       (0 until sramBroadcastRPorts).foreach {k => io.output.data(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output.data(0)}) }
       
+    case FIFORegType => throw new Exception("NBuffered FIFOReg should be impossible?")
+
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
                                   banks, combinedXBarWMux, combinedXBarRMux))
@@ -527,12 +529,6 @@ class NBufMem(
           lb.io.xBarW(bufferBase + k).banks.zipWithIndex.map{case (b,i) => 
             if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - io.xBarW(bufferBase + k).banks(0)
             else b := (writeCol.io.output.count(i/2).asUInt - colCorrectionValue) % banks(1).U
-          }
-
-          lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map(_.asUInt / banks(1).U)
-          lb.io.xBarW(bufferBase + k).banks.zipWithIndex.foreach{case (b,i) =>
-            if (i % 2 == 0) b := writeRow.io.output.count
-            else b := writeCol.io.output.count(i/2).asUInt % banks(1).U
           }
         }
       }

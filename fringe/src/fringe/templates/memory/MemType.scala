@@ -7,3 +7,4 @@ object FIFOType extends MemType
 object LIFOType extends MemType
 object ShiftRegFileType extends MemType
 object LineBufferType extends MemType
+object FIFORegType extends MemType

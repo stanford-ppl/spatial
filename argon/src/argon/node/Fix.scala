@@ -229,7 +229,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(2))    => a * a
     case (_, Literal(0.5))  => stage(FixSqrt(a))
     case (_, Literal(-0.5)) => stage(FixRecipSqrt(a))
-    case (_, Literal(-1))   => stage(FixInv(a))
+    case (_, Literal(-1))   => stage(FixRecip(a))
     case _ => super.rewrite
   }
 }
@@ -266,7 +266,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixAtan[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.atan)
 
 /** Fixed point reciprocal **/
-@op case class FixRecip[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recip)
+@op case class FixRecip[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recip){
+  @rig override def rewrite: Fix[S, I, F] = a match {
+    case Op(FixRecip(x)) => x
+    case _ => super.rewrite
+  }
+}
 
 /** Fixed point inverse square root */
 @op case class FixRecipSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recipSqrt)

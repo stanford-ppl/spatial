@@ -24,7 +24,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
 
   def upcastUInt(fmt: emul.FixFormat): UInt = {
     val result = Wire(new FixedPoint(fmt))
-    if (litVal.isDefined) result.r := litVal.get.toInt.FP(fmt.sign, fmt.ibits, fmt.fbits).r
+    if (litVal.isDefined) result.r := litVal.get.toInt.FP(fmt.sign, fmt.ibits + f, fmt.fbits - f).r
     else result.r := Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, Truncate, Wrapping).r
     result.r
   }
@@ -182,7 +182,6 @@ object FixedPoint {
 
   /** Creates a FixedPoint wire with the given Int literal value. */
   def apply(s: Boolean, d: Int, f: Int, value: Int): FixedPoint = {
-    Console.println(s"making new fixpt from ${value}")
     FixedPoint(s,d,f, BigInt(value) << f)
   }
 
@@ -194,7 +193,7 @@ object FixedPoint {
   /** Creates a FixedPoint wire with the given BigInt literal value. */
   def apply(s: Boolean, d: Int, f: Int, value: BigInt): FixedPoint = {
     val cst = Wire(new FixedPoint(s, d, f, Some(value)))
-    cst.raw := value.S((d + f + 1).W).asUInt()
+    cst.raw := value.S((d + f + 1).W).apply(d+f-1,0).asUInt()
     cst
   }
 }

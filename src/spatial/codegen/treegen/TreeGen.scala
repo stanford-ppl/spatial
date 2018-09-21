@@ -47,12 +47,12 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
       emit(s"""<h4> </h4>$table_init""")
     }
 
-    print_stream_info(lhs)
     rhs.blocks.foreach{blk => gen(blk) }
 
     if (!isLeaf) {
       emit(s"""</TABLE></div>""")
     }
+    print_stream_info(lhs)
     close(s"""</TD><!-- Close $name -->""")
   }
 

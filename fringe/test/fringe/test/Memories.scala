@@ -230,7 +230,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
 
   // Broadcast
   c.mem match {
-    case SRAMType => 
+    case BankedSRAMType => 
       for (i <- 0 until c.logicalDims(0) by c.banks(0)) {
         for (j <- 0 until c.logicalDims(1) by c.banks(1)) {
           (0 until c.banks(0)).foreach{ ii => (0 until c.banks(1)).foreach{ jj =>
@@ -268,7 +268,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
   for (buf <- 0 until c.numBufs) {
     println("Buffer: " + buf)
     c.mem match {
-      case SRAMType => 
+      case BankedSRAMType => 
         val rPar = c.directRMux.values.toList.head.values.toList.map(_._1).flatten.length
         val base = c.directRMux.keys.toList.head * rPar
         for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
@@ -325,7 +325,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
 
   for (epoch <- 0 until c.numBufs*2) {
     c.mem match {
-      case SRAMType => 
+      case BankedSRAMType => 
         // Write to each address
         val wPar = c.directWMux.values.toList.head.values.toList.map(_._1).flatten.length
         for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
@@ -382,7 +382,7 @@ class NBufMemTests(c: NBufMem) extends PeekPokeTester(c) {
 
     // Check each address
     c.mem match {
-      case SRAMType => 
+      case BankedSRAMType => 
         val rPar = c.directRMux.values.toList.head.values.toList.map(_._1).flatten.length
         for (i <- 0 until c.logicalDims(0) by c.banks(0)) { // Each row
           for (j <- 0 until c.logicalDims(1) by c.banks(1)) {

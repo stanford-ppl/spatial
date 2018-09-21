@@ -4,6 +4,8 @@ import chisel3._
 import chisel3.util._
 import fringe.globals
 import fringe.utils.getRetimed
+import fringe.templates.math._
+import fringe.utils.implicits._
 import fringe.BigIP
 
 class BigIPZynq extends BigIP with ZynqBlackBoxes {
@@ -194,7 +196,42 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     m.io.a := a
     m.io.out
   }
-  override def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int): UInt = {
+  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+    if (src.litArg.isEmpty) {
+      val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
+      fix2fixBox.io.a := src
+      fix2fixBox.io.expect_neg := false.B
+      fix2fixBox.io.expect_pos := false.B
+      fix2fixBox.io.b
+    }
+    // Likely that there are mistakes here
+    else {
+      val f_gain = f2 - f1
+      val d_gain = d2 - d1
+      val salt = rounding match {
+        case Unbiased if f_gain < 0 => BigInt((scala.math.random * (1 << -f_gain).toDouble).toLong)
+        case _ => BigInt(0)
+      }
+      val newlit = saturating match {
+        case Wrapping =>
+          if (f_gain < 0 & d_gain >= 0)       (src.litArg.get.num + salt) >> -f_gain
+          else if (f_gain >= 0 & d_gain >= 0) (src.litArg.get.num) << f_gain
+          else if (f_gain >= 0 & d_gain < 0)  ((src.litArg.get.num + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
+          else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
+        case Saturating =>
+          if (src.litArg.get.num > BigInt((1 << (d2 + f2 + 1))-1)) BigInt((1 << (d2 + f2 + 1))-1)
+          else {
+            if (f_gain < 0 & d_gain >= 0)       (src.litArg.get.num + salt) >> -f_gain
+            else if (f_gain >= 0 & d_gain >= 0) (src.litArg.get.num) << f_gain
+            else if (f_gain >= 0 & d_gain < 0)  ((src.litArg.get.num + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
+            else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
+          }
+      }
+      newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0)
+    }
+  }
+
+  override def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     val m = Module(new Float2Fix(mw, e, sign, dec, frac))
     m.io.a := a
     m.io.out

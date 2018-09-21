@@ -20,12 +20,12 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
 
   globals.target = targetName match {
     case "verilator" => new targets.verilator.Verilator
-    case "vcs"       => new targets.vcs.VCS
+    case "vcs"  | "VCS"       => new targets.vcs.VCS
     case "xsim"      => new targets.xsim.XSim
     case "aws"       => new targets.aws.AWS_F1
     case "aws-sim"   => new targets.aws.AWS_Sim
-    case "zynq"      => new targets.zynq.Zynq
-    case "zcu"       => new targets.zcu.ZCU
+    case "zynq" | "Zynq"      => new targets.zynq.Zynq
+    case "zcu"  | "ZCU"       => new targets.zcu.ZCU
     case "arria10"   => new targets.arria10.Arria10
     case "asic"      => new targets.asic.ASIC
     case _           => throw new Exception(s"Unknown target '$targetName'")

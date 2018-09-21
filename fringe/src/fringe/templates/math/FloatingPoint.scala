@@ -76,7 +76,7 @@ class FloatingPoint(val m: Int, val e: Int) extends Bundle {
   }
 
 
-  def toFixed(sign: Boolean, dec: Int, frac: Int): FixedPoint = Math.flt2fix(this, sign, dec, frac)
+  def toFixed(sign: Boolean, dec: Int, frac: Int): FixedPoint = Math.flt2fix(this, sign, dec, frac, Truncate, Wrapping)
 
   def toFloat(m_out: Int, e_out: Int): FloatingPoint = Math.flt2flt(this, m_out, e_out)
 

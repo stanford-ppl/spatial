@@ -22,7 +22,7 @@ class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
     val rdata = Output(UInt(t.getWidth.W))
 }
 
-abstract class SRAMBlackBox[T<:Data](params: Map[String,Param]) extends BlackBox {
+abstract class SRAMBlackBox[T<:Data](params: Map[String,Param]) extends BlackBox(params) {
   val io: SRAMVerilogIO[T]
 }
 

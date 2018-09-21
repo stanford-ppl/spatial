@@ -2,6 +2,8 @@ package fringe.targets.zynq
 
 import chisel3._
 import fringe._
+import fringe.templates.math._
+import fringe.utils.implicits._
 
 import scala.collection.mutable.Set
 

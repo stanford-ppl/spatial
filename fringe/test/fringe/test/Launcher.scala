@@ -3,6 +3,7 @@ package fringe.test
 import chisel3.iotesters.Driver
 import scala.reflect.runtime.universe
 import fringe.utils.Banks._
+import fringe.utils._
 import fringe.utils.XMap._
 import fringe.utils.DMap._
 import fringe.utils.NBufXMap._
@@ -136,13 +137,13 @@ object Arguments {
              BankedMemory )
         )
   val NBufMem = List( 
-           ( SRAMType, List(8,12), 2, 32, 
+           ( BankedSRAMType, List(8,12), 2, 32, 
              List(1,2), List(1,1),
              NBufXMap(), NBufXMap(),
              NBufDMap(0 -> DMap((0,0,0) -> (List(Banks(0,0),Banks(0,1)),None))),  NBufDMap(1 -> DMap((0,0,0) -> (List(Banks(0,0),Banks(0,1)),None))),
              XMap((0,0,0) -> (1, None)), XMap(),
              BankedMemory),
-           ( SRAMType, List(8,12), 5, 32, 
+           ( BankedSRAMType, List(8,12), 5, 32, 
              List(2,2), List(1,1),
              NBufXMap(), NBufXMap(),
              NBufDMap(0 -> DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None))),  NBufDMap(4 -> DMap((0,0,0) -> (List(Banks(0,0), Banks(0,1), Banks(1,0), Banks(1,1)), None))),

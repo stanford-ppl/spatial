@@ -1,6 +1,7 @@
 package fringe
 
 import chisel3._
+import fringe.templates.math.{OverflowMode, RoundingMode}
 
 abstract class BigIP {
   case class Unimplemented(op: String) extends Exception(s"$op is not implemented for the given target.")
@@ -84,10 +85,10 @@ abstract class BigIP {
   def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int): UInt = throw Unimplemented("fix2flt")
 
   /** Conversion from one fixed point type to another fixed point type. */
-  def fix2fix(a: UInt, sign: Boolean, dec: Int, frac: Int): UInt = throw Unimplemented("fix2fix")
+  def fix2fix(a: UInt, sign1: Boolean, dec1: Int, frac1: Int, sign2: Boolean, dec2: Int, frac2: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = throw Unimplemented("fix2fix")
 
   /** Conversion from floating point (man, exp) to fixed point (sign, dec, frac). */
-  def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int): UInt = throw Unimplemented("flt2fix")
+  def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = throw Unimplemented("flt2fix")
 
   /** Conversion from one floating point type (man1, exp1) to another floating point type (man2, exp2). */
   def flt2flt(a: UInt, man1: Int, exp1: Int, man2: Int, exp2: Int): UInt = throw Unimplemented("flt2flt")

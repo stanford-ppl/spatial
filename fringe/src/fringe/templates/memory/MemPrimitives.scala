@@ -5,6 +5,7 @@ import chisel3.util._
 import fringe._
 import fringe.templates.counters.{CompactingCounter, CompactingIncDincCtr, IncDincCtr, SingleSCounterCheap}
 import fringe.templates.math.Math
+import fringe.utils._
 import fringe.utils.XMap._
 import fringe.utils.DMap._
 import fringe.utils.HVec

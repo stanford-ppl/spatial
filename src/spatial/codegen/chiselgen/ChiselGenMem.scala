@@ -244,7 +244,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     // SRAMs
-    case op: SRAMNew[_,_] => emitMem(lhs, "SRAM", None)
+    case op: SRAMNew[_,_] => emitMem(lhs, "BankedSRAM", None)
     case op@SRAMBankedRead(sram,bank,ofs,ens) => emitRead(lhs, sram, bank, ofs, ens)
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitWrite(lhs, sram, data, bank, ofs, ens)
 

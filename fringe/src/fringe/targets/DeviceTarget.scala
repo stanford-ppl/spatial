@@ -17,25 +17,17 @@ trait DeviceTarget {
 
   val magPipelineDepth: Int = 1
 
-  val fixmul_latency = 0.03125
-  val fixdiv_latency = 0.03125
-  val fixadd_latency = 0.1875
-  val fixsub_latency = 0.625
-  val fixmod_latency = 0.5
-  val fixeql_latency = 1
-  val sramload_latency = 0
-  val sramstore_latency = 0
+  var fixmul_latency = 0.03125
+  var fixdiv_latency = 0.03125
+  var fixadd_latency = 0.1875
+  var fixsub_latency = 0.625
+  var fixmod_latency = 0.5
+  var fixeql_latency = 1
+  var sramload_latency = 0
+  var sramstore_latency = 0
 
-  val SramThreshold = 0 // Threshold between turning Mem1D into register array vs real memory
-  val mux_latency = 1
-
-  // TODO: What is this?
-  lazy val delay_per_numIter: Double = List(
-    fixsub_latency*32 + fixdiv_latency*32 + fixadd_latency*32,
-    fixmul_latency*32 + fixdiv_latency*32 + fixadd_latency*32,
-    fixsub_latency*32 + fixmod_latency*32 + fixeql_latency + mux_latency + fixadd_latency*32,
-    fixmul_latency*32 + fixmod_latency*32 + fixeql_latency + mux_latency + fixadd_latency*32
-  ).max
+  var SramThreshold = 0 // Threshold between turning Mem1D into register array vs real memory
+  var mux_latency = 1
 
   // TODO: What is this?
   val addrWidth: Int = 32

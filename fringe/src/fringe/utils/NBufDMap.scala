@@ -6,8 +6,8 @@ import scala.collection.immutable.ListMap
 object NBufDMap {
 
   type NBufDMap = ListMap[Int, DMap]
-  def NBufDMap(xs:(Int,DMap)*): NBufDMap = ListMap[Int, DMap](xs:_*)
-  def NBufDMap(xs: => Seq[(Int, DMap)]): NBufDMap = ListMap[Int,DMap](xs:_*)
+  def apply(xs:(Int,DMap)*): NBufDMap = ListMap[Int, DMap](xs:_*)
+  def apply(xs: => Seq[(Int, DMap)]): NBufDMap = ListMap[Int,DMap](xs:_*)
 
   implicit class NBufDMapOps(x: NBufDMap) {
     def mergeDMaps: DMap = {

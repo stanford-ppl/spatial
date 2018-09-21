@@ -81,16 +81,18 @@ trait ChiselGenMath extends ChiselGenCommon {
     case BitRandom(None) if lhs.parent.s.isDefined => emitt(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
     case FixRandom(None) if lhs.parent.s.isDefined => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>
+      emitGlobalWire(src"val $lhs = Wire(${lhs.tp})")
       val seed = (scala.math.random*1000).toInt
       val size = x match{
         case Some(Const(xx)) => s"$xx"
         case Some(_) => s"$x"
         case None => "4096"
       }
-      emitt(s"val ${quote(lhs)}_bitsize = chisel3.util.log2Up($size) max 1")
+      emitt(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
       emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
-      emitGlobalModule(src"${lhs}_rng.io.en := true.B")
-      emitt(src"val $lhs = ${lhs}_rng.io.output(${lhs}_bitsize,0)")
+      val en = if (lhs.parent.s.isDefined) src"${swap(lhs.parent.s.get, DatapathEn)}" else "true.B"
+      emitGlobalModule(src"${lhs}_rng.io.en := $en")
+      emitt(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     // case FixUnif() =>
     //   val bits = lhs.tp match {
     //     case FixPtType(s,d,f) => f
@@ -133,7 +135,27 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixSqrt(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := sqrt($x).r")
+      emitt(src"$lhs.r := Math.sqrt($x, ${latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
+
+    case FixSin(x) =>
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Math.sin($x, ${latencyOptionString("FixSin", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
+
+    case FixCos(x) =>
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Math.cos($x, ${latencyOptionString("FixCos", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
+
+    case FixAtan(x) =>
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Math.tan($x, ${latencyOptionString("FixAtan", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
+
+    case FixSinh(x) =>
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Math.sin($x, ${latencyOptionString("FixSinh", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
+
+    case FixCosh(x) =>
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Math.cos($x, ${latencyOptionString("FixCosh", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
 
     case FltFMA(x,y,z) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
@@ -196,7 +218,10 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux(($a < $b), $a, $b).r")
     case FixMax(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux(($a > $b), $a, $b).r")
-    case FixToFix(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ${a}.toFixed(new emul.FixFormat(${fmt.sign}, ${fmt.ibits}, ${fmt.fbits})).r")
+    case FixToFix(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Truncate, Wrapping).r")
+    case FixToFixSat(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Truncate, Saturating).r")
+    case FixToFixUnb(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Unbiased, Wrapping).r")
+    case FixToFixUnbSat(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Unbiased, Saturating).r")
     case FixToFlt(a, fmt) => 
       val FixPtType(s,d,f) = a.tp
       val FltPtType(m,e) = lhs.tp

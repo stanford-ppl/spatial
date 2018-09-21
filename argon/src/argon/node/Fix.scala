@@ -292,6 +292,42 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
+@op case class FixToFixSat[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Fix[S1,I1,F1],
+    f2: FixFmt[S2,I2,F2])
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
+  override val isTransient = true
+  @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
+    case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
+    case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]
+    case _ => super.rewrite
+  }
+}
+
+@op case class FixToFixUnb[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Fix[S1,I1,F1],
+    f2: FixFmt[S2,I2,F2])
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
+  override val isTransient = true
+  @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
+    case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
+    case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]
+    case _ => super.rewrite
+  }
+}
+
+@op case class FixToFixUnbSat[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Fix[S1,I1,F1],
+    f2: FixFmt[S2,I2,F2])
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
+  override val isTransient = true
+  @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
+    case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
+    case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]
+    case _ => super.rewrite
+  }
+}
+
 /** Fixed point type conversion to floating point */
 @op case class FixToFlt[S1:BOOL,I1:INT,F1:INT,M2:INT,E2:INT](
     a:  Fix[S1,I1,F1],

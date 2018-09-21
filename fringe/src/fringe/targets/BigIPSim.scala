@@ -1,5 +1,6 @@
 package fringe.targets
 
+import chisel3.core.IntParam
 import chisel3._
 import fringe.BigIP
 import fringe.templates.hardfloat._
@@ -65,6 +66,44 @@ class BigIPSim extends BigIP {
     } else {
       getRetimed(a * b, latency, flow)
     }
+  }
+
+  override def sqrt(num: UInt, latency: Int): UInt = {
+    val m = Module(new SqrtSim(num.getWidth, false, latency))
+    m.io.x := num
+    m.io.y
+  }
+  override def sin(num: UInt, latency: Int): UInt = {
+    num // TODO    
+  }
+  override def cos(num: UInt, latency: Int): UInt = {
+    num // TODO    
+  }
+  override def atan(num: UInt, latency: Int): UInt = {
+    num // TODO    
+  }
+  override def sinh(num: UInt, latency: Int): UInt = {
+    num // TODO    
+  }
+  override def cosh(num: UInt, latency: Int): UInt = {
+    num // TODO    
+  }
+
+  class SqrtSim(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle{
+      val x = Input(UInt(width.W))
+      val y = Output(UInt(width.W))
+    })
+    val m = Module(new SqrtSimBBox(width, signed, latency))
+    m.io.clk := clock
+    m.io.reset := reset.toBool
+    m.io.x := io.x
+    io.y := m.io.y
+  }
+
+
+  override def fsqrt(num: UInt, latency: Int): UInt = {
+    num // TODO
   }
 
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt = {
@@ -198,3 +237,15 @@ class BigIPSim extends BigIP {
 }
 
 
+
+  class SqrtSimBBox(val width: Int, val signed: Boolean, val latency: Int) extends BlackBox(
+    Map("DWIDTH" -> IntParam(width))
+  ) {
+    val io = IO(new Bundle{
+      val clk = Input(Clock())
+      val rdy = Output(Bool())
+      val reset = Input(Bool())
+      val x = Input(UInt(width.W))
+      val y = Output(UInt(width.W))
+    })
+  }

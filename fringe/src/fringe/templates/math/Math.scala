@@ -74,6 +74,25 @@ object Math {
 
   // --- Fixed Point Operations --- //
 
+  def sqrt(num: FixedPoint, latency: Int): UInt = {
+    globals.bigIP.sqrt(num.r, latency)
+  }
+  def sin(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def cos(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def atan(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def sinh(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+  def cosh(num: FixedPoint, latency: Int): UInt = {
+    num.r //TODO
+  }
+
   private def upcast(a: FixedPoint, b: FixedPoint): (FixedPoint, FixedPoint, FixedPoint, FixedPoint) = {
     // Compute upcasted type and return type
     val return_type = a.fmt combine b.fmt
@@ -430,6 +449,16 @@ object Math {
   def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
     val result = Wire(new FixedPoint(s,d,f))
     result.r := globals.bigIP.fix2fix(a.r,a.s,a.d,a.f,s,d,f, rounding, saturating)
+    result
+  }
+  def fix2fix(a: UInt, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+    val result = Wire(new FixedPoint(s,d,f))
+    result.r := globals.bigIP.fix2fix(a,false,a.getWidth,0,s,d,f, rounding, saturating)
+    result
+  }
+  def fix2fix(a: SInt, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+    val result = Wire(new FixedPoint(s,d,f))
+    result.r := globals.bigIP.fix2fix(a.asUInt,true,a.getWidth,0,s,d,f, rounding, saturating)
     result
   }
   def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {

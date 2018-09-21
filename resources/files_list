@@ -26,8 +26,7 @@
 ./synth/aws.sw-resources/gen_aws_design.py
 ./synth/aws.sw-resources/gen_aws_tb.py
 ./synth/run.sh
-./synth/chisel-templates/templates/Utils.scala
-./synth/chisel-templates/templates/MergeBuffer.scala
+./synth/vcs.hw-resources/Math.v
 ./synth/vcs.hw-resources/Makefile
 ./synth/vcs.hw-resources/vc_hdrs.h
 ./synth/vcs.hw-resources/DRAMSim2/SimulatorObject.h

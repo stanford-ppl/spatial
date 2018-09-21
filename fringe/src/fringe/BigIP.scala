@@ -22,6 +22,12 @@ abstract class BigIP {
   // TODO: ???
   def sqrt(a: UInt, latency: Int): UInt = throw Unimplemented("sqrt")
 
+  def sin(a: UInt, latency: Int): UInt = throw Unimplemented("sin")
+  def cos(a: UInt, latency: Int): UInt = throw Unimplemented("cos")
+  def atan(a: UInt, latency: Int): UInt = throw Unimplemented("ata")
+  def sinh(a: UInt, latency: Int): UInt = throw Unimplemented("sin")
+  def cosh(a: UInt, latency: Int): UInt = throw Unimplemented("cos")
+
   /** Floating point addition. */
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt
 

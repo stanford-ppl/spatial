@@ -43,6 +43,9 @@ trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   @rig def sigmoid(a: A): A
 
   @rig def __toFix[S:BOOL,I:INT,F:INT]: Fix[S,I,F]
+  @rig def __toFixSat[S:BOOL,I:INT,F:INT]: Fix[S,I,F]
+  @rig def __toFixUnb[S:BOOL,I:INT,F:INT]: Fix[S,I,F]
+  @rig def __toFixUnbSat[S:BOOL,I:INT,F:INT]: Fix[S,I,F]
   @rig def __toFlt[M:INT,E:INT]: Flt[M,E]
 }
 object Num {

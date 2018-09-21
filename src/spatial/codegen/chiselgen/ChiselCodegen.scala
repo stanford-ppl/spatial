@@ -174,13 +174,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   final protected def startFile(): Unit = {
       emit("""package accel""")
-      emit("import templates._")
-      emit("import templates.ops._")
-      emit("import types._")
+      emit("import fringe.templates._")
+      emit("import fringe.utils._")
+      emit("import fringe.utils.implicits._")
+      emit("import fringe.templates.math._")
+      emit("import fringe.templates.counters._")
+      emit("import fringe.templates.memory._")
+      emit("import fringe.templates.retiming._")
       emit("import api._")
       emit("import chisel3._")
       emit("import chisel3.util._")
-      emit("import Utils._")    
       emit("import scala.collection.immutable._")
   }
 
@@ -378,25 +381,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
 
   override def copyDependencies(out: String): Unit = {
-    val resourcesPath = "synth/chisel-templates"
 
-    if (spatialConfig.enableDebugResources) {
-      dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
-      dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
-      dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
-      dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
-    }
-
-
-    dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
-    dependencies ::= FileDep(resourcesPath, "Top.scala", outputPath = Some("Top.scala"))
+    // if (spatialConfig.enableDebugResources) {
+    //   dependencies ::= DirDep("fringe/src", "fringe")
+    // }
 
     super.copyDependencies(out)
   }

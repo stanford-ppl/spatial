@@ -16,7 +16,6 @@ trait ChiselGenDelay extends ChiselGenCommon {
 
     case DelayLine(delay, data) =>
       if (delay > maxretime) maxretime = delay
-      // emit(src"""val $lhs = Utils.delay($data, $size)""")
 
       data.rhs match {
         case Def.Const(_) => 

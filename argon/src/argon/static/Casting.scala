@@ -22,6 +22,30 @@ trait Casting {
       case Left(cast)  => cast.get(b)
       case Right(cast) => cast.getLeft(b)
     }
+    @rig def saturating(a: A): B = c match {
+      case Left(cast)  => cast.saturatingLeft(a)
+      case Right(cast) => cast.saturating(a)
+    }
+    @rig def unbiased(a: A): B = c match {
+      case Left(cast)  => cast.unbiasedLeft(a)
+      case Right(cast) => cast.unbiased(a)
+    }
+    @rig def unbsat(a: A): B = c match {
+      case Left(cast)  => cast.unbsatLeft(a)
+      case Right(cast) => cast.unbsat(a)
+    }
+    @rig def saturatingLeft(b: B): Option[A] = c match {
+      case Left(cast)  => cast.get(b)
+      case Right(cast) => cast.saturatingGetLeft(b)
+    }
+    @rig def unbiasedLeft(b: B): Option[A] = c match {
+      case Left(cast)  => cast.get(b)
+      case Right(cast) => cast.unbiasedGetLeft(b)
+    }
+    @rig def unbsatLeft(b: B): Option[A] = c match {
+      case Left(cast)  => cast.get(b)
+      case Right(cast) => cast.unbsatGetLeft(b)
+    }
     @rig def unchecked(a: A): B = c match {
       case Left(cast)  => cast.uncheckedLeft(a)
       case Right(cast) => cast.unchecked(a)

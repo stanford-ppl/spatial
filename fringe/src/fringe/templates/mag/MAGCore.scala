@@ -155,7 +155,9 @@ class MAGCore(
   val cmdAddr = Wire(new BurstAddr(addrWidth, w, burstSizeBytes))
   cmdAddr.bits := cmdHead.addr + sizeCounter.io.out
 
-  val cmdRead = io.enable & cmdArbiter.io.deqReady & !cmdHead.isWr
+  // don't issue commands if a response that cycle has the same tag to avoid edge cases in the coalescing logic
+  val cmdReadConflict = io.dram.rresp.valid & io.dram.rresp.bits.tag.asUInt === io.dram.cmd.bits.tag.asUInt
+  val cmdRead = io.enable & cmdArbiter.io.deqReady & ~cmdHead.isWr & ~cmdReadConflict
   val cmdWrite = io.enable & cmdArbiter.io.deqReady & cmdHead.isWr
 
   val rrespTag = io.dram.rresp.bits.tag
@@ -212,7 +214,6 @@ class MAGCore(
     tag.streamId := cmdArbiter.io.tag
     i.bits.tag := tag
     val size = Wire(new BurstAddr(cmdHead.size.getWidth, w, burstSizeBytes))
-//    size.bits := cmdHead.size
     size.bits := Mux(isSparseMux.io.out, cmdHead.size, Mux(sizeCounter.io.done, cmdHead.size - sizeCounter.io.out, maxBytesPerCmd.U))
     i.bits.size := size.burstTag + (size.burstOffset != 0.U)
     i.bits.isWr := cmdHead.isWr
@@ -281,7 +282,7 @@ class MAGCore(
     val m = Module(new GatherBuffer(s.w, scatterGatherD, s.v, burstSizeBytes, addrWidth, cmdHead, io.dram.rresp.bits))
     m.io.rresp.valid := io.dram.rresp.valid & (rrespTag.streamId === i.U)
     m.io.rresp.bits := io.dram.rresp.bits
-    m.io.cmd.valid := cmdRead & cmdArbiter.io.tag === i.U & dramReady
+    m.io.cmd.valid := cmdRead & (cmdArbiter.io.tag === i.U) & dramReady
     m.io.cmd.bits := cmdHead
 
     gatherLoadIssueMux.io.ins(i) := !cmdArbiter.io.empty & cmdDeqValidMux.io.ins(j) & dramCmdMux.io.ins(i).valid
@@ -290,13 +291,9 @@ class MAGCore(
     isSparseMux.io.ins(j) := true.B
 
     rrespReadyMux.io.ins(i) := true.B
-    cmdDeqValidMux.io.ins(i) := !m.io.fifo.full & dramReady //& ~cmdCooldown.io.out
+    cmdDeqValidMux.io.ins(i) := cmdRead & !m.io.fifo.full & dramReady
     dramCmdMux.io.ins(i).valid := cmdRead & !m.io.fifo.full & !m.io.hit
-    dramCmdMux.io.ins(i).bits.tag.uid := cmdAddr.burstTag    // rrespReadyMux.io.ins(i) := true.B
-    // cmdDeqValidMux.io.ins(j) := ~m.io.fifo.full & dramReady
-    // dramCmdMux.io.ins(j).valid := cmdRead & ~m.io.fifo.full & ~m.io.hit // Why valid if ~full instead of if ~empty?
-    // dramCmdMux.io.ins(j).bits.tag.uid := cmdAddr.burstTag
-    // dramCmdMux.io.ins(j).bits.size := 1.U
+    dramCmdMux.io.ins(i).bits.tag.uid := cmdAddr.burstTag
 
     val stream = io.app.loads(i)
     stream.rdata.bits := m.io.fifo.deq

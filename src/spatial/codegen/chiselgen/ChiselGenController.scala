@@ -180,7 +180,7 @@ trait ChiselGenController extends ChiselGenCommon {
     if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) {
       emitt(src"""${swap(lhs, IIDone)} := true.B""")
     } else {
-      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + chisel3.util.log2Up(${swap(lhs, II)})));""")
+      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + fringe.utils.log2Up(${swap(lhs, II)})));""")
       emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ~${swap(lhs, Mask)}""")
       emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,DatapathEn)}""")
       emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")

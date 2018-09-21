@@ -19,12 +19,12 @@ trait ChiselGenMath extends ChiselGenCommon {
     rhs match {
       case FixMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure)).r")
       case UnbMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, rounding = Unbiased)).r")
-      case SatMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, saturating = Saturation)).r")
-      case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, saturating = Saturation, rounding = Unbiased)).r")
+      case SatMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, saturating = Saturating)).r")
+      case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
       case FixDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure)).r")
       case UnbDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, rounding = Unbiased)).r")
-      case SatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturation)).r")
-      case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturation, rounding = Unbiased)).r")
+      case SatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturating)).r")
+      case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
       case FixMod(a,b) => emitt(src"$lhs.r := ($a.mod($b, $lat, $backpressure)).r")
       case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one.div($a, $lat, $backpressure)).r")
       case FixFMA(x,y,z) => emitt(src"${lhs}.r := Math.fma($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt, $backpressure).toFixed($lhs).r")
@@ -87,7 +87,7 @@ trait ChiselGenMath extends ChiselGenCommon {
         case Some(_) => s"$x"
         case None => "4096"
       }
-      emitt(s"val ${quote(lhs)}_bitsize = log2Up($size) max 1")
+      emitt(s"val ${quote(lhs)}_bitsize = chisel3.util.log2Up($size) max 1")
       emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
       emitGlobalModule(src"${lhs}_rng.io.en := true.B")
       emitt(src"val $lhs = ${lhs}_rng.io.output(${lhs}_bitsize,0)")

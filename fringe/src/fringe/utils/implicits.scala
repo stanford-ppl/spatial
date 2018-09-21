@@ -3,7 +3,8 @@ package fringe.utils
 import chisel3._
 import chisel3.util.Cat
 import fringe.globals
-import fringe.templates.math.{FixedPoint, FloatingPoint, Math, Truncate, Wrapping}
+import fringe.templates.memory._
+import fringe.templates.math.{FixedPoint, FloatingPoint, Math, Truncate, RoundingMode, OverflowMode, Wrapping}
 
 
 object implicits {
@@ -82,35 +83,28 @@ object implicits {
     def <+> (c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <+> c
     def <-> (c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <-> c
 
-    def *-* (c: SInt): SInt = this.*-*(c, None, true.B)
-    def *-* (c: UInt): UInt = this.*-*(c, None, true.B)
-    def *-* (c: FixedPoint): FixedPoint = this.*-*(c, None, true.B)
-
-    def *-*(c: UInt, delay: Option[Double], flow: Bool): UInt = Math.mul(b, c, delay, flow)
-    def *-*(c: SInt, delay: Option[Double], flow: Bool): SInt = Math.mul(b.asSInt, c, delay, flow)
-    def *-*(c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
-      Math.mul(b.trueFP(c.fmt), c, delay, flow, Truncate, Wrapping)
+    def mul(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = {
+      Math.mul(b.trueFP(c.fmt), c, delay, flow, rounding, saturating)
     }
 
-    def /-/(c: UInt): UInt = this./-/(c, None, true.B)
-    def /-/(c: SInt): SInt = this./-/(c, None, true.B)
-    def /-/(c: FixedPoint): FixedPoint = this./-/(c, None, true.B)
-
-    // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
-    def /-/(c: UInt, delay: Option[Double], flow: Bool): UInt = Math.div(b, c, delay, flow)
-    def /-/(c: SInt, delay: Option[Double], flow: Bool): SInt = Math.div(b.asSInt, c, delay, flow)
-    def /-/(c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
-      Math.div(b.trueFP(c.fmt), c, delay, flow, Truncate, Wrapping)
+    def div(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = {
+      Math.div(b.trueFP(c.fmt), c, delay, flow, rounding, saturating)
     }
 
-    def %-%(c: UInt): UInt = this.%-%(c, None, true.B)
-    def %-%(c: SInt): SInt = this.%-%(c, None, true.B)
-    def %-%(c: FixedPoint): FixedPoint = this.%-%(c, None, true.B)
+    def mod(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = {
+      Math.mod(b.trueFP(c.fmt), c, delay, flow, rounding, saturating)
+    }
 
-    def %-%(c: UInt, delay: Option[Double], flow: Bool): UInt = Math.mod(b, c, delay, flow)
-    def %-%(c: SInt, delay: Option[Double], flow: Bool): SInt = Math.mod(b.asSInt, c, delay, flow)
-    def %-%(c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
-      Math.mod(b.trueFP(c.fmt), c, delay, flow, Truncate, Wrapping)
+    def mul(c: UInt, delay: Option[Double], flow: Bool): UInt = {
+      Math.mul(b, c, delay, flow)
+    }
+
+    def div(c: UInt, delay: Option[Double], flow: Bool): UInt = {
+      Math.div(b, c, delay, flow)
+    }
+
+    def mod(c: UInt, delay: Option[Double], flow: Bool): UInt = {
+      Math.mod(b, c, delay, flow)
     }
 
     /** Convert this to the given FixedPoint format, overflowing if outside the representable bounds. */
@@ -154,35 +148,28 @@ object implicits {
     def <+>(c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <+> c
     def <->(c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <-> c
 
-    def *-*(c: UInt): SInt = this.*-*(c, None, true.B)
-    def *-*(c: SInt): SInt = this.*-*(c, None, true.B)
-    def *-*(c: FixedPoint): FixedPoint = this.*-*(c, None, true.B)
-
-    // TODO: Find better way to capture UInt / UInt, since implicit resolves won't make it this far
-    def *-*(c: UInt, delay: Option[Double], flow: Bool): SInt = Math.mul(b, c.asSInt, delay, flow)
-    def *-*(c: SInt, delay: Option[Double], flow: Bool): SInt = Math.mul(b, c, delay, flow)
-    def *-*(c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
-      Math.mul(b.trueFP(c.fmt), c, delay, flow, Truncate, Wrapping)
+    def mul(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = {
+      Math.mul(b.trueFP(c.fmt), c, delay, flow, rounding, saturating)
     }
 
-    def /-/(c: UInt): SInt = this./-/(c, None, true.B)
-    def /-/(c: SInt): SInt = this./-/(c, None, true.B)
-    def /-/(c: FixedPoint): FixedPoint = this./-/(c,None, true.B)
-
-    def /-/(c: UInt, delay: Option[Double], flow: Bool): SInt = Math.div(b, c.asSInt, delay, flow)
-    def /-/(c: SInt, delay: Option[Double], flow: Bool): SInt = Math.div(b, c, delay, flow)
-    def /-/(c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
-      Math.div(b.trueFP(c.fmt), c, delay, flow, Truncate, Wrapping)
+    def div(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = {
+      Math.div(b.trueFP(c.fmt), c, delay, flow, rounding, saturating)
     }
 
-    def %-%(c: UInt): SInt = this.%-%(c, None, true.B)
-    def %-%(c: SInt): SInt = this.%-%(c, None, true.B)
-    def %-%(c: FixedPoint): FixedPoint = this.%-%(c, None, true.B)
+    def mod(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = {
+      Math.mod(b.trueFP(c.fmt), c, delay, flow, rounding, saturating)
+    }
 
-    def %-%(c: UInt, delay: Option[Double], flow: Bool): SInt = Math.mod(b, c.asSInt, delay, flow)
-    def %-%(c: SInt, delay: Option[Double], flow: Bool): SInt = Math.mod(b, c, delay, flow)
-    def %-%(c: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
-      Math.mod(b.trueFP(c.fmt), c, delay, flow, Truncate, Wrapping)
+    def mul(c: SInt, delay: Option[Double], flow: Bool): SInt = {
+      Math.mul(b, c, delay, flow)
+    }
+
+    def div(c: SInt, delay: Option[Double], flow: Bool): SInt = {
+      Math.div(b, c, delay, flow)
+    }
+
+    def mod(c: SInt, delay: Option[Double], flow: Bool): SInt = {
+      Math.mod(b, c, delay, flow)
     }
 
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = FixedPoint(s, d, f, b)
@@ -202,30 +189,12 @@ object implicits {
   implicit class IntOps(v: Int) {
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = FixedPoint(s, d, f, v)
     def FlP(m: Int, e: Int): FloatingPoint = FloatingPoint(m, e, v)
-    def *-*(x: Int): Int = v*x
-    def /-/(x: Int): Int = v/x
-    def %-%(x: Int): Int = v%x
-    def *-*(x: Double): Double = v*x
-    def /-/(x: Double): Double = v/x
-    def %-%(x: Double): Double = v%x
-    def *-*(x: Long): Long = v*x
-    def /-/(x: Long): Long = v/x
-    def %-%(x: Long): Long = v%x
     def indices[T](func: Int => T): Seq[T] = (0 until v).map{i => func(i) }.toSeq
   }
 
   implicit class DoubleOps(v: Double) {
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = FixedPoint(s, d, f, v)
     def FlP(m: Int, e: Int): FloatingPoint = FloatingPoint(m, e, v)
-    def *-*(x: Double): Double = v*x
-    def /-/(x: Double): Double = v/x
-    def %-%(x: Double): Double = v%x
-    def *-*(x: Int): Double = v*x
-    def /-/(x: Int): Double = v/x
-    def %-%(x: Int): Double = v%x
-    def *-*(x: Long): Double = v*x
-    def /-/(x: Long): Double = v/x
-    def %-%(x: Long): Double = v%x
   }
 
 }

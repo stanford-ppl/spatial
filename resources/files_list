@@ -26,7 +26,8 @@
 ./synth/aws.sw-resources/gen_aws_design.py
 ./synth/aws.sw-resources/gen_aws_tb.py
 ./synth/run.sh
-./synth/buildDbgResources.sbt
+./synth/chisel-templates/templates/Utils.scala
+./synth/chisel-templates/templates/MergeBuffer.scala
 ./synth/vcs.hw-resources/Makefile
 ./synth/vcs.hw-resources/vc_hdrs.h
 ./synth/vcs.hw-resources/DRAMSim2/SimulatorObject.h
@@ -122,7 +123,6 @@
 ./synth/vcs.sw-resources/FringeContextBase.h
 ./synth/vcs.sw-resources/simDefs.h
 ./synth/vcs.sw-resources/FringeContextVCS.h
-./synth/sim.Makefile
 ./synth/de1.hw-resources/DE1_SoC_Computer.qpf
 ./synth/de1.hw-resources/VGA_Subsystem.qsys
 ./synth/de1.hw-resources/DE1_SoC_Computer.jdi
@@ -1018,8 +1018,8 @@
 ./synth/zcu.sw-resources/FringeContextBase.h
 ./synth/zcu.sw-resources/ZCUUtils.cpp
 ./scalagen/run.sh
-./scalagen/Makefile
 ./scalagen/project/build.properties
+./scalagen/sim.Makefile
 ./scalagen/build.sbt
 ./models/AWS_F1_Area.csv
 ./models/Zynq_Area.csv

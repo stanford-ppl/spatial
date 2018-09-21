@@ -171,14 +171,6 @@ object Arguments {
     (List(5,5), List(3,3), List(0,1.0,0,1.0,0,1.0,0,1.0,0), List(0,0,0,0,1,0,0,0,0), None, Max, 32, 0)
   )
 
-  val LineBuffer = List( 
-    (3,10,1,1,1,1,1,1,3,0,2),
-    (3,10,1,1,2,2,2,1,3,0,2),
-    (5,10,2,1,1,1,1,1,5,0,2),
-    (5,10,2,2,1,1,1,1,5,0,2),
-    (5,10,1,3,1,1,1,1,5,0,2),
-    (5,10,1,3,1,1,1,1,5,1,2)
-  )
 }
 // End args
 
@@ -324,14 +316,6 @@ object Launcher {
     (s"SystolicArray2D$i" -> { (backendName: String) =>
       Driver(() => new SystolicArray2D(arg), "verilator") {
           (c) => new SystolicArray2DTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.LineBuffer.zipWithIndex.map{ case(arg,i) => 
-    (s"LineBuffer$i" -> { (backendName: String) =>
-      Driver(() => new LineBuffer(arg), "verilator") {
-          (c) => new LineBufferTests(c)
         }
       }) 
   }.toMap

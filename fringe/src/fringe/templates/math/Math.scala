@@ -210,7 +210,6 @@ object Math {
         val b_upcast = b.uint
         result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow)
       }
-      Console.println(s"uptype ${upcast_type}, return type ${return_type}")
       val result = Wire(new FixedPoint(return_type))
       val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
       val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B

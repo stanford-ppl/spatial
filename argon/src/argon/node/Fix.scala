@@ -28,7 +28,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Bitwise inversion of a fixed point value */
+/** Reciprocal of a number */
 @op case class FixInv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](a => ~a) {
   @rig override def rewrite: Fix[S, I, F] = a match {
     case Op(FixInv(x)) => x

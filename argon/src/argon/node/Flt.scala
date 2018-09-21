@@ -30,7 +30,25 @@ abstract class FltOp1[M:INT,E:INT] extends FltOp[M,E,Flt[M,E]]
 @op case class FltAbs[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltCeil[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltFloor[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
-@op case class FltPow[M:INT,E:INT](b: Flt[M,E], e: Flt[M,E]) extends FltOp1[M,E]
+@op case class FltPow[M:INT,E:INT](b: Flt[M,E], e: Flt[M,E]) extends FltOp1[M,E] {
+  @rig override def rewrite: Flt[M,E] = (b,e) match {
+    case (_, Literal(0))    => R.from(1)
+    case (Literal(1), _)    => b
+    case (_, Literal(1))    => b
+    case (_, Literal(2))    => b * b
+    case (_, Literal(0.5))  => stage(FltSqrt(b))
+    case (_, Literal(-0.5)) => stage(FltRecipSqrt(b))
+    case (_, Literal(-1))   => stage(FltInv(b))
+    case _ => super.rewrite
+  }
+}
+@op case class FltInv[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E] {
+  @rig override def rewrite: Flt[M,E] = a match {
+    case Op(FltInv(x)) => x
+    case _ => super.rewrite
+  }
+}
+
 @op case class FltExp[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltLn[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]
 @op case class FltSqrt[M:INT,E:INT](a: Flt[M,E]) extends FltOp1[M,E]

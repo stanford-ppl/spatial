@@ -190,22 +190,27 @@ object Math {
       else           Math.div(a.uint, b.uint, Some(latency), flow).FP(return_type)
     }
     else {
+      // Interpret numerator as this type
       val upcast_type = if (round == Truncate && overflow == Wrapping) return_type.copy(fbits = return_type.fbits + 1)
-                        else return_type.copy(ibits = a.d + b.d, fbits = a.d + b.d + 1)
+                        else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f + 1)
+      // But upcast it to this type
+      val op_upcast_type = if (round == Truncate && overflow == Wrapping) return_type.copy(fbits = a.f + b.f + 1)
+                           else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f + 1)
 
       val result_upcast = Wire(new FixedPoint(upcast_type))
 
       // TODO: Why is this not upcasting the denominator?
       if (a.s | b.s) {
-        val a_upcast = a.upcastSInt(return_type)
+        val a_upcast = a.upcastSInt(op_upcast_type)
         val b_upcast = b.sint
         result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow).asUInt
       }
       else {
-        val a_upcast = a.upcastUInt(return_type)
+        val a_upcast = a.upcastUInt(op_upcast_type)
         val b_upcast = b.uint
         result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow)
       }
+      Console.println(s"uptype ${upcast_type}, return type ${return_type}")
       val result = Wire(new FixedPoint(return_type))
       val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
       val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B

@@ -38,7 +38,6 @@ abstract class SimTarget extends DeviceTarget {
         fringeArgOut.valid := accelArgOut.valid
       }
     }
-    Console.println(s"fringe ${fringe.io.memStreams} and ${accel.io.memStreams}")
     fringe.io.memStreams <> accel.io.memStreams
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done

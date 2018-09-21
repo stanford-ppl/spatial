@@ -24,7 +24,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
 
   def upcastUInt(fmt: emul.FixFormat): UInt = {
     val result = Wire(new FixedPoint(fmt))
-    Math.cast(this, result, Truncate, Wrapping, sign_extend = true, expect_neg = false.B, expect_pos = false.B)
+    result.r := Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, Truncate, Wrapping).r
     result.r
   }
   def upcastSInt(fmt: emul.FixFormat): SInt = {
@@ -47,7 +47,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
 
   def msb: Bool = number(d+f-1)
 
-  def cast(dest: FixedPoint): Unit = Math.cast(this, dest, Truncate, Wrapping, sign_extend = true, false.B, false.B)
+  def cast(dest: FixedPoint): Unit = dest.r := Math.fix2fix(this, dest.s, dest.d, dest.f, Truncate, Wrapping)
 
   // Arithmetic
   override def connect(rawop: Data)(implicit ctx: SourceInfo, opts: CompileOptions): Unit = rawop match {
@@ -76,14 +76,14 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
   def *(that: UInt): FixedPoint = this * that.trueFP(fmt)
   def *(that: SInt): FixedPoint = this * that.trueFP(fmt)
 
-  def mul(that: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = Math.mul(this, that, delay, flow, Truncate, Wrapping)
+  def mul(that: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = Math.mul(this, that, delay, flow, rounding, saturating)
 
   /** Fixed point division with standard truncation and overflow. */
   def /(that: FixedPoint): FixedPoint = Math.div(this, that, delay = None, flow = true.B, round = Truncate, overflow = Wrapping)
   def /(that: UInt): FixedPoint = this / that.trueFP(fmt)
   def /(that: SInt): FixedPoint = this / that.trueFP(fmt)
 
-  def div(that: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = Math.div(this, that, delay, flow, Truncate, Wrapping)
+  def div(that: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping): FixedPoint = Math.div(this, that, delay, flow, rounding, saturating)
 
   /** Fixed point modulus with standard truncation and overflow. */
   def %(that: FixedPoint): FixedPoint = Math.mod(this, that, delay = None, flow = true.B, round = Truncate, overflow = Wrapping)
@@ -151,7 +151,8 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
     neg
   }
 
-  def toFixed(fmt: emul.FixFormat): FixedPoint = Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits)
+  def toFixed(fmt: emul.FixFormat): FixedPoint = Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, Truncate, Wrapping)
+  def toFixed(num: FixedPoint): FixedPoint = Math.fix2fix(this, num.s, num.d, num.f, Truncate, Wrapping)
   def toFloat(fmt: emul.FltFormat): FloatingPoint = Math.fix2flt(this, fmt.sbits, fmt.ebits)
 
   override def cloneType = (new FixedPoint(s,d,f,litVal)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -171,7 +172,7 @@ object FixedPoint {
     val cst = Wire(new FixedPoint(s, d, f, init.litArg.map(_.num)))
     val tmp = Wire(new FixedPoint(s, init.getWidth, 0))
     tmp.r := init
-    Math.cast(tmp, cst, Truncate, Wrapping, sign_extend = sign_extend, expect_neg = false.B, expect_pos = false.B)
+    cst.r := Math.fix2fix(tmp, s, d, f, Truncate, Wrapping)
     cst
   }
 

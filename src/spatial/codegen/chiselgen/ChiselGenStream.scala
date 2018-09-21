@@ -136,7 +136,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 //             // emitGlobalWire(src"""val converted_data = Wire(UInt(16.W))""")
 //             emitGlobalWireMap(src"""stream_out_startofpacket""", """Wire(Bool())""")
 //             emitGlobalWireMap(src"""stream_out_endofpacket""", """Wire(Bool())""")
-//             emit(src"""stream_out_startofpacket := Utils.risingEdge(${swap(parent, DatapathEn)})""")
+//             emit(src"""stream_out_startofpacket := risingEdge(${swap(parent, DatapathEn)})""")
 //             emit(src"""stream_out_endofpacket := ${swap(parent, Done)}""")
 //             emit(src"""// emiiting data for stream ${stream}""")
 //             // emit(src"""${stream} := ${data.head}""")

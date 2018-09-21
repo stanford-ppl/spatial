@@ -27,7 +27,7 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.4"
 )
 
-libraryDependencies += "edu.stanford.ppl" %% "templateresources" % "1.0"
+libraryDependencies += "edu.stanford.ppl" %% "fringe" % "1.0"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

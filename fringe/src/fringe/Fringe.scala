@@ -47,7 +47,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(regWidth.W)))
 
     // Accel memory IO
-    val memStreams = new AppStreams(loadStreamInfo, storeStreamInfo)
+    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
 
     // AXI Debuggers

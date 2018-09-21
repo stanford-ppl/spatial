@@ -1,7 +1,7 @@
 package fringe
 
 sealed trait ChannelAssignment {
-  protected def numStreams: Int = globals.loadStreamInfo.size + globals.storeStreamInfo.size
+  protected def numStreams: Int = globals.NUM_LOAD_STREAMS + globals.NUM_STORE_STREAMS
   protected def numChannels: Int = globals.target.num_channels
 
   /** Divide up channels within memStreams into 'numChannels'.

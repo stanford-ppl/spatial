@@ -6,6 +6,7 @@ import fringe.globals
 import fringe.templates.math.FixedPoint
 import fringe.utils.{getRetimed, log2Up, risingEdge}
 import fringe.utils.HVec
+import fringe.utils._
 import fringe.utils.XMap._
 import fringe.utils.DMap._
 import fringe.utils.NBufDMap._
@@ -166,7 +167,7 @@ class NBufMem(
 
   // Create physical mems
   mem match {
-    case SRAMType => 
+    case BankedSRAMType => 
       val srams = (0 until numBufs).map{ i => 
         Module(new BankedSRAM(logicalDims, bitWidth,
                         banks, strides, 
@@ -497,8 +498,8 @@ class NBufMem(
       writeCol.io.input.saturate := false.B
 
       val gotFirst = Module(new SRFF())
-      gotFirst.io.input.set := Utils.risingEdge(en)
-      gotFirst.io.input.reset := io.xBarW.map{p => Utils.getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_} | ctrl.io.swap
+      gotFirst.io.input.set := risingEdge(en)
+      gotFirst.io.input.reset := io.xBarW.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_} | ctrl.io.swap
       gotFirst.io.input.asyn_reset := false.B
 
       val base = chisel3.util.PriorityMux(io.xBarW.map(_.en).flatten, writeCol.io.output.count)
@@ -506,7 +507,7 @@ class NBufMem(
       colCorrection.io.xBarW(0).data.head := base.asUInt
       colCorrection.io.xBarW(0).init.head := 0.U
       colCorrection.io.xBarW(0).en.head := en & ~gotFirst.io.output.data
-      colCorrection.io.xBarW(0).reset.head := reset.toBool | Utils.risingEdge(!gotFirst.io.output.data)
+      colCorrection.io.xBarW(0).reset.head := reset.toBool | risingEdge(!gotFirst.io.output.data)
       val colCorrectionValue = Mux(en & ~gotFirst.io.output.data, base.asUInt, colCorrection.io.output.data(0))
 
       val wCRN_width = 1 + log2Up(numrows)
@@ -518,11 +519,11 @@ class NBufMem(
       xBarWMux.foreach { case (bufferPort, portMapping) =>
         val bufferBase = xBarWMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
         val sramXBarWPorts = portMapping.accessPars.length
-        // val wMask = Utils.getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+        // val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
         (0 until sramXBarWPorts).foreach {k => 
           lb.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en
           lb.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
-          lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map((_.asUInt - colCorrectionValue) / banks(1).U)
+          lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map{x => (x.asUInt - colCorrectionValue) / banks(1).U}
           lb.io.xBarW(bufferBase + k).banks.zipWithIndex.map{case (b,i) => 
             if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - io.xBarW(bufferBase + k).banks(0)
             else b := (writeCol.io.output.count(i/2).asUInt - colCorrectionValue) % banks(1).U
@@ -545,8 +546,8 @@ class NBufMem(
         val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
         val outputBufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
         val sramXBarRPorts = portMapping.accessPars.length
-        // val rMask = Utils.getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (Utils.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-        // val outSel = (0 until numBufs).map{ a => Utils.getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (Utils.retime) 1 else 0}) }
+        // val rMask = getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+        // val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (retime) 1 else 0}) }
         (0 until sramXBarRPorts).foreach {k => 
           val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
           val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum

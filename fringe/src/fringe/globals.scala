@@ -59,8 +59,8 @@ object globals {
   var streamInsInfo: List[StreamParInfo] = Nil
   var streamOutsInfo: List[StreamParInfo] = Nil
 
-  def LOAD_STREAMS: List[StreamParInfo] = loadStreamInfo
-  def STORE_STREAMS: List[StreamParInfo] = storeStreamInfo
+  def LOAD_STREAMS: List[StreamParInfo] = if (loadStreamInfo.isEmpty) List(StreamParInfo(EXTERNAL_W, EXTERNAL_V, 0, false)) else loadStreamInfo
+  def STORE_STREAMS: List[StreamParInfo] = if (storeStreamInfo.isEmpty) List(StreamParInfo(EXTERNAL_W, EXTERNAL_V, 0, false)) else storeStreamInfo
 
   def NUM_LOAD_STREAMS: Int = LOAD_STREAMS.size
   def NUM_STORE_STREAMS: Int = STORE_STREAMS.size
@@ -70,5 +70,5 @@ object globals {
   def NUM_ARG_IOS: Int = numArgIOs
   def NUM_ARG_LOOPS: Int = argOutLoopbacksMap.size max 1
   def NUM_ARGS: Int = numArgIns + numArgOuts
-  def NUM_STREAMS: Int = loadStreamInfo.size + storeStreamInfo.size
+  def NUM_STREAMS: Int = LOAD_STREAMS.size + STORE_STREAMS.size
 }

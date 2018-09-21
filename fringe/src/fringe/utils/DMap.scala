@@ -15,9 +15,9 @@ object DMap {
     def accessParsBelowMuxPort(mport: Int, mofs: Int, castgrp: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs) | (p._1._1 == mport & p._1._2 == mofs & p._1._3 < castgrp)}.accessPars
   }
 
-  def DMap(xs:((Int,Int,Int),(List[Banks], Option[Int]))*): DMap = ListMap[(Int,Int,Int), (List[Banks],Option[Int])](xs.map{x => x._1 -> x._2}:_*)
+  def apply(xs:((Int,Int,Int),(List[Banks], Option[Int]))*): DMap = ListMap[(Int,Int,Int), (List[Banks],Option[Int])](xs.map{x => x._1 -> x._2}:_*)
 
   // Example: val b = DMap((0,0) -> List(Banks(0,0), Banks(0,1)), (0,2) -> List(Banks(0,2),Banks(0,3)), (1,0) -> List(Banks(0,0),Banks(1,0)))
-  def DMap(xs: => Seq[((Int,Int,Int), (List[Banks],Option[Int]))]): DMap = ListMap[(Int,Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => k -> v}:_*)
+  def apply(xs: => Seq[((Int,Int,Int), (List[Banks],Option[Int]))]): DMap = ListMap[(Int,Int,Int),(List[Banks],Option[Int])](xs.map{case(k,v) => k -> v}:_*)
 
 }

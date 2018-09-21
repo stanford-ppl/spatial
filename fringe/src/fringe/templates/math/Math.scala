@@ -4,7 +4,6 @@ import chisel3._
 import fringe.globals
 import fringe.utils.getRetimed
 import fringe.utils.implicits._
-
 import scala.math.BigInt
 
 /** Math operations API.
@@ -22,9 +21,6 @@ object Math {
       val latency = delay.getOrElse(globals.target.fixmul_latency * b.getWidth).toInt
       globals.bigIP.multiply(a, b, latency, flow)
     }
-    else if (globals.regression_testing == "1") {
-      getRetimed(a * b, delay.getOrElse(0.0).toInt)
-    }
     else a * b
   }
 
@@ -33,9 +29,6 @@ object Math {
       val latency = delay.getOrElse(globals.target.fixmul_latency * b.getWidth).toInt
       globals.bigIP.multiply(a, b, latency, flow)
     }
-    else if (globals.regression_testing == "1") {
-      getRetimed(a * b, delay.getOrElse(0.0).toInt)
-    }
     else a * b
   }
 
@@ -43,9 +36,6 @@ object Math {
     if (globals.retime) {
       val latency = delay.getOrElse(globals.target.fixdiv_latency * b.getWidth).toInt
       globals.bigIP.divide(a, b, latency, flow)
-    }
-    else if (globals.regression_testing == "1") {
-      getRetimed(a/b, delay.getOrElse(0.0).toInt)
     }
     else globals.target match {
       case _:fringe.targets.zynq.Zynq  => globals.bigIP.divide(a, b, (globals.target.fixdiv_latency * b.getWidth).toInt, flow)
@@ -58,9 +48,6 @@ object Math {
       val latency = delay.getOrElse(globals.target.fixdiv_latency * b.getWidth).toInt
       globals.bigIP.divide(a, b, latency, flow)
     }
-    else if (globals.regression_testing == "1") {
-      getRetimed(a / b, delay.getOrElse(0.0).toInt)
-    }
     else a / b
   }
 
@@ -69,9 +56,6 @@ object Math {
       val latency = delay.getOrElse(globals.target.fixmod_latency * b.getWidth).toInt
       globals.bigIP.mod(a, b, latency, flow)
     }
-    else if (globals.regression_testing == "1") {
-      getRetimed(a % b, delay.getOrElse(0.0).toInt)
-    }
     else a % b
   }
 
@@ -79,9 +63,6 @@ object Math {
     if (globals.retime) {
       val latency = delay.getOrElse(globals.target.fixmod_latency * b.getWidth).toInt
       globals.bigIP.mod(a, b, latency, flow)
-    }
-    else if (globals.regression_testing == "1") {
-      getRetimed(a % b, delay.getOrElse(0.0).toInt)
     }
     else a % b
   }
@@ -131,7 +112,11 @@ object Math {
     // Downcast to result
     val expect_neg = if (a.s | b.s) a_upcast.msb & b_upcast.msb   else false.B
     val expect_pos = if (a.s | b.s) !a_upcast.msb & !b_upcast.msb else true.B
-    Math.cast(result_upcast, result, round, overflow, sign_extend = true, expect_neg, expect_pos)
+    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow))
+    fix2fixBox.io.a := result_upcast.r
+    fix2fixBox.io.expect_neg := expect_neg
+    fix2fixBox.io.expect_pos := expect_pos
+    result.r := fix2fixBox.io.b
     result
   }
 
@@ -144,7 +129,11 @@ object Math {
     // Downcast to result
     val expect_neg = if (a.s | b.s) a_upcast.msb & !b_upcast.msb else true.B
     val expect_pos = if (a.s | b.s) !a_upcast.msb & b_upcast.msb else false.B
-    Math.cast(result_upcast, result, round, overflow, sign_extend = true, expect_neg, expect_pos)
+    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow))
+    fix2fixBox.io.a := result_upcast.r
+    fix2fixBox.io.expect_neg := expect_neg
+    fix2fixBox.io.expect_pos := expect_pos
+    result.r := fix2fixBox.io.b
     result
   }
 
@@ -182,7 +171,11 @@ object Math {
     val result = Wire(new FixedPoint(return_type))
     val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
     val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B
-    Math.cast(result_upcast, result, round, overflow, sign_extend = true, expect_neg, expect_pos)
+    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow))
+    fix2fixBox.io.a := result_upcast.r
+    fix2fixBox.io.expect_neg := expect_neg
+    fix2fixBox.io.expect_pos := expect_pos
+    result.r := fix2fixBox.io.b
     result
   }
 
@@ -216,7 +209,11 @@ object Math {
       val result = Wire(new FixedPoint(return_type))
       val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
       val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B
-      Math.cast(result_upcast, result, round, overflow, sign_extend = true, expect_neg, expect_pos)
+      val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow))
+      fix2fixBox.io.a := result_upcast.r
+      fix2fixBox.io.expect_neg := expect_neg
+      fix2fixBox.io.expect_pos := expect_pos
+      result.r := fix2fixBox.io.b
       result
     }
   }
@@ -230,7 +227,11 @@ object Math {
     val result = Wire(new FixedPoint(return_type))
     // Downcast to result
     result_upcast.r := Math.mod(a.uint, b.uint, delay, flow)
-    Math.cast(result_upcast, result, round, overflow, sign_extend = true, expect_neg = false.B, expect_pos = false.B)
+    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow))
+    fix2fixBox.io.a := result_upcast.r
+    fix2fixBox.io.expect_neg := false.B
+    fix2fixBox.io.expect_pos := false.B
+    result.r := fix2fixBox.io.b
     result
   }
 
@@ -293,118 +294,6 @@ object Math {
   def neq(a: FixedPoint, b: FixedPoint): Bool = {
     val upcast_type = a.fmt combine b.fmt
     a.upcastUInt(upcast_type) =/= b.upcastUInt(upcast_type)
-  }
-
-  def cast(src: FixedPoint, dst: FixedPoint, rounding: RoundingMode, saturating: OverflowMode, sign_extend: Boolean, expect_neg: Bool, expect_pos: Bool): Unit = {
-    if (src.litVal.isEmpty) {
-      val has_frac = dst.f > 0
-      val has_dec = dst.d > 0
-      val up_frac = dst.f max 1
-      val up_dec = dst.d max 1
-      val tmp_frac = Wire(UInt(up_frac.W))
-      val new_frac = Wire(UInt(up_frac.W))
-      val new_dec = Wire(UInt(up_dec.W))
-      if (!has_frac) tmp_frac := 0.U(1.W)
-      if (!has_frac) new_frac := 0.U(1.W)
-      if (!has_dec)  new_dec := 0.U(1.W)
-
-      // Compute new frac part
-      val shave_f = src.f - dst.f
-      val shave_d = src.d - dst.d
-      if (has_frac) {
-        if (dst.f < src.f) { // shrink decimals
-          rounding match {
-            case Truncate => tmp_frac := src(shave_f + dst.f - 1, shave_f)
-            case Unbiased =>
-              val prng = Module(new PRNG(scala.math.abs(scala.util.Random.nextInt)))
-              prng.io.en := true.B
-              val salted = src.r + prng.io.output(shave_f - 1, 0)
-              tmp_frac := salted(shave_f + dst.f - 1, shave_f)
-          }
-        }
-        else if (dst.f > src.f) { // expand decimals
-          val expand = dst.f - src.f
-          if (src.f > 0) tmp_frac := util.Cat(src(src.f - 1, 0), 0.U(expand.W))
-          else           tmp_frac := 0.U(expand.W)
-        }
-        else { // keep same
-          tmp_frac := src(dst.f - 1, 0)
-        }
-      }
-
-      // Compute new dec part (concatenated with frac part from before)
-      if (has_dec) {
-        if (dst.d < src.d) { // shrink decimals
-          saturating match {
-            case Wrapping =>
-              dst.debug_overflow := (0 until shave_d).map{i => src(src.d + src.f - 1 - i) }.reduce{_||_}
-              new_frac := tmp_frac
-              new_dec := src(dst.d + src.f - 1, src.f)
-            case Saturating =>
-              val sign = src.msb
-              val overflow = (sign & expect_pos) | (!sign & expect_neg)
-              val not_saturated = (src(src.f + src.d - 1, src.f + src.d - 1 - shave_d) === 0.U(shave_d.W)) | (~src(src.f + src.d - 1, src.f + src.d - 1 - shave_d) === 0.U(shave_d.W))
-
-              val saturated_frac = Mux(expect_pos,
-                util.Cat(util.Fill(up_frac, true.B)),
-                Mux(expect_neg, 0.U(up_frac.W), 0.U(up_frac.W)))
-              val saturated_dec = Mux(expect_pos,
-                util.Cat(~(dst.s | src.s).B, util.Fill(up_dec - 1, true.B)),
-                Mux(expect_neg, 1.U((dst.d).W) << (dst.d - 1), 1.U((dst.d).W) << (dst.d - 1)))
-
-              new_frac := Mux(src.r === 0.U, 0.U, Mux(not_saturated & !overflow, tmp_frac, saturated_frac))
-              new_dec := Mux(src.r === 0.U, 0.U, Mux(not_saturated & !overflow, src(dst.d + src.f - 1, src.f), saturated_dec))
-          }
-        }
-        else if (dst.d > src.d) { // expand decimals
-          val expand = dst.d - src.d
-          val sgn_extend: Bool = if (src.s & sign_extend) src.msb else false.B
-          new_frac := tmp_frac
-          new_dec  := util.Cat(util.Fill(expand, sgn_extend), src(src.f + src.d - 1, src.f))
-        }
-        else { // keep same
-          new_frac := tmp_frac
-          new_dec := src(src.f + src.d - 1, src.f)
-          // (0 until dst.d).map{ i => number(i + f)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
-        }
-
-      }
-
-      if (has_dec & has_frac)       dst.r := chisel3.util.Cat(new_dec, new_frac)
-      else if (has_dec & !has_frac) dst.r := new_dec
-      else if (!has_dec & has_frac) dst.r := tmp_frac
-    }
-    // Likely that there are mistakes here
-    else {
-      val f_gain = dst.f - src.f
-      val d_gain = dst.d - src.d
-      val salt = rounding match {
-        case Unbiased if f_gain < 0 => BigInt((scala.math.random * (1 << -f_gain).toDouble).toLong)
-        case _ => BigInt(0)
-      }
-      val newlit = saturating match {
-        case Wrapping =>
-          if (f_gain < 0 & d_gain >= 0)       (src.litVal.get + salt) >> -f_gain
-          else if (f_gain >= 0 & d_gain >= 0) (src.litVal.get) << f_gain
-          else if (f_gain >= 0 & d_gain < 0)  ((src.litVal.get + salt) >> -f_gain) & BigInt((1 << (dst.d + dst.f + 1)) - 1)
-          else ((src.litVal.get) << f_gain) & BigInt((1 << (dst.d + dst.f + 1)) -1)
-        case Saturating =>
-          if (src.litVal.get > BigInt((1 << (dst.d + dst.f + 1))-1)) BigInt((1 << (dst.d + dst.f + 1))-1)
-          else {
-            if (f_gain < 0 & d_gain >= 0)       (src.litVal.get + salt) >> -f_gain
-            else if (f_gain >= 0 & d_gain >= 0) (src.litVal.get) << f_gain
-            else if (f_gain >= 0 & d_gain < 0)  ((src.litVal.get + salt) >> -f_gain) & BigInt((1 << (dst.d + dst.f + 1)) - 1)
-            else ((src.litVal.get) << f_gain) & BigInt((1 << (dst.d + dst.f + 1)) -1)
-          }
-      }
-      dst.r := newlit.S((dst.d + dst.f + 1).W).asUInt.apply(dst.d + dst.f - 1, 0)
-    }
-  }
-
-  def cast(src: FixedPoint, dst: UInt, rounding: RoundingMode, saturating: OverflowMode, sign_extend: Boolean, expect_neg: Bool, expect_pos: Bool): Unit = {
-    val result = Wire(new FixedPoint(true, dst.getWidth, 0))
-    cast(src, result, rounding, saturating, sign_extend, expect_neg, expect_pos)
-    dst := result.r
   }
 
 
@@ -534,14 +423,14 @@ object Math {
     result.r := globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e)
     result
   }
-  def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int): FixedPoint = {
+  def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a.r,s,d,f)
+    result.r := globals.bigIP.fix2fix(a.r,a.s,a.d,a.f,s,d,f, rounding, saturating)
     result
   }
-  def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int): FixedPoint = {
+  def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
     val result = Wire(new FixedPoint(sign,dec,frac))
-    result.r := globals.bigIP.flt2fix(a.r,a.m,a.e,sign,dec,frac)
+    result.r := globals.bigIP.flt2fix(a.r,a.m,a.e,sign,dec,frac, rounding, saturating)
     result
   }
 

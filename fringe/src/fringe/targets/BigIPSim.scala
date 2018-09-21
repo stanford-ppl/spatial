@@ -3,7 +3,9 @@ package fringe.targets
 import chisel3._
 import fringe.BigIP
 import fringe.templates.hardfloat._
-import fringe.templates.math.FloatingPoint
+import fringe.templates.math._
+import fringe.utils.implicits._
+import fringe.templates.math.{OverflowMode, RoundingMode, FloatingPoint}
 import fringe.utils.getRetimed
 
 class BigIPSim extends BigIP {
@@ -156,6 +158,43 @@ class BigIPSim extends BigIP {
     result := ~comp.io.eq
     result
   }
+
+  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+    if (src.litArg.isEmpty) {
+      val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
+      fix2fixBox.io.a := src
+      fix2fixBox.io.expect_neg := false.B
+      fix2fixBox.io.expect_pos := false.B
+      fix2fixBox.io.b
+    }
+    // Likely that there are mistakes here
+    else {
+      val f_gain = f2 - f1
+      val d_gain = d2 - d1
+      val salt = rounding match {
+        case Unbiased if f_gain < 0 => BigInt((scala.math.random * (1 << -f_gain).toDouble).toLong)
+        case _ => BigInt(0)
+      }
+      val newlit = saturating match {
+        case Wrapping =>
+          if (f_gain < 0 & d_gain >= 0)       (src.litArg.get.num + salt) >> -f_gain
+          else if (f_gain >= 0 & d_gain >= 0) (src.litArg.get.num) << f_gain
+          else if (f_gain >= 0 & d_gain < 0)  ((src.litArg.get.num + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
+          else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
+        case Saturating =>
+          if (src.litArg.get.num > BigInt((1 << (d2 + f2 + 1))-1)) BigInt((1 << (d2 + f2 + 1))-1)
+          else {
+            if (f_gain < 0 & d_gain >= 0)       (src.litArg.get.num + salt) >> -f_gain
+            else if (f_gain >= 0 & d_gain >= 0) (src.litArg.get.num) << f_gain
+            else if (f_gain >= 0 & d_gain < 0)  ((src.litArg.get.num + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
+            else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
+          }
+      }
+      newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0)
+    }
+
+  }
+
 }
 
 

@@ -6,8 +6,8 @@ import scala.collection.immutable.ListMap
 object NBufXMap {
 
   type NBufXMap = ListMap[Int, XMap]
-  def NBufXMap(xs:(Int, XMap)*): NBufXMap = ListMap[Int,XMap](xs:_*)
-  def NBufXMap(xs: => Seq[(Int, XMap)]): NBufXMap = ListMap[Int,XMap](xs:_*)
+  def apply(xs:(Int, XMap)*): NBufXMap = ListMap[Int,XMap](xs:_*)
+  def apply(xs: => Seq[(Int, XMap)]): NBufXMap = ListMap[Int,XMap](xs:_*)
   implicit class NBufXMapOps(x: NBufXMap) {
     def mergeXMaps: XMap = {
       ListMap(x.sortByBufferPort.map{case (buf,map) =>

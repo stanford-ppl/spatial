@@ -4,6 +4,10 @@ import scala.collection.immutable.ListMap
 
 object XMap {
   /* Map from (muxPort, muxOfs, castgroup) to (width of muxPort, isShift) */
+  def apply(xs:((Int, Int, Int), (Int, Option[Int]))*): XMap = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{x => x._1 -> x._2}:_*)
+  // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
+  def apply(xs: => Seq[((Int,Int,Int), (Int,Option[Int]))]): XMap = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{case(k,v) => k -> v}:_*)
+
   type XMap = ListMap[(Int, Int, Int), (Int, Option[Int])]
   implicit class XMapOps(x: XMap) {
     def muxAddrs: Seq[(Int,Int,Int)] = x.keys.toSeq
@@ -21,8 +25,5 @@ object XMap {
       } else x
     }
   }
-  def XMap(xs:((Int, Int, Int), (Int, Option[Int]))*): XMap = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{x => x._1 -> x._2}:_*)
-  // Example: val a = XMap((0,0) -> 2, (0,2) -> 3, (1,0) -> 4)
-  def XMap(xs: => Seq[((Int,Int,Int), (Int,Option[Int]))]): XMap = ListMap[(Int,Int,Int),(Int,Option[Int])](xs.map{case(k,v) => k -> v}:_*)
 
 }

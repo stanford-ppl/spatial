@@ -132,7 +132,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       emitGlobalModule(src"""val ${cchain}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
       emitGlobalModule(src"""val ${cchain}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
       emitGlobalModule(src"""val ${cchain}_starts = List(${counter_data.map{_._1}}) """)
-      emitGlobalModule(src"""val ${cchain} = Module(new templates.Counter(List(${counter_data.map(_._4)}), """ + 
+      emitGlobalModule(src"""val ${cchain} = Module(new counters.Counter(List(${counter_data.map(_._4)}), """ + 
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
                        src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
 
@@ -266,14 +266,14 @@ trait ChiselGenCommon extends ChiselCodegen {
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
     val backpressure = if (controllerStack.nonEmpty) swap(controllerStack.head, SM) + ".io.flow" else "true.B"
     if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
-    else src"Utils.getRetimed($name, ${latency}.toInt, $backpressure)"
+    else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
   // DL for when we are visiting children but emitting DL on signals that belong to parent
   def DLo[T](name: String, latency: T, isBit: Boolean = false): String = {
     val backpressure = "true.B"
     if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
-    else src"Utils.getRetimed($name, ${latency}.toInt, $backpressure)"
+    else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
 

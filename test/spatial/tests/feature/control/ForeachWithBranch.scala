@@ -36,7 +36,7 @@ import spatial.dsl._
     val y = args(1).to[Int]
     val result = simpleSeq(x, y)
 
-    val a1 = Array.tabulate(96){i => x * i}
+    val a1 = Array.tabulate(96){i => x - 3 + i}
     val gold = a1(y)
 
     println("expected: " + gold)

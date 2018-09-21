@@ -1027,3 +1027,4 @@
 ./models/ZCU_Latency.csv
 ./models/AWS_F1_Latency.csv
 ./models/Zynq_Latency.csv
+./converter.py

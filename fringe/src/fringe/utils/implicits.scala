@@ -126,6 +126,8 @@ object implicits {
     def cast(c: FixedPoint, sign_extend: Boolean = false): Unit = { c.r := FixedPoint(c.s,c.d,c.f,b, sign_extend).r }
     def cast(c: => UInt): Unit = { c.r := b.r }
 
+    def toFixed(fmt: emul.FixFormat): FixedPoint = FixedPoint(fmt.sign, fmt.ibits, fmt.fbits, b)
+
   }
 
   implicit class SIntOps(val b:SInt) {
@@ -191,6 +193,9 @@ object implicits {
     def FlP(fmt: emul.FltFormat): FloatingPoint = FloatingPoint(fmt.sbits, fmt.ebits, b)
 
     def cast(c: FixedPoint): Unit = { c.r := FixedPoint(c.s, c.d, c.f, b).r }
+
+    def toFixed(fmt: emul.FixFormat): FixedPoint = FixedPoint(fmt.sign, fmt.ibits, fmt.fbits, b)
+
   }
 
 

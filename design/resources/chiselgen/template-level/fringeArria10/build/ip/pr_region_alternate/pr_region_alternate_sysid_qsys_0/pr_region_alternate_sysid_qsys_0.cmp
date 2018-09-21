@@ -1,9 +1,0 @@
-	component pr_region_alternate_sysid_qsys_0 is
-		port (
-			clock    : in  std_logic                     := 'X'; -- clk
-			readdata : out std_logic_vector(31 downto 0);        -- readdata
-			address  : in  std_logic                     := 'X'; -- address
-			reset_n  : in  std_logic                     := 'X'  -- reset_n
-		);
-	end component pr_region_alternate_sysid_qsys_0;
-

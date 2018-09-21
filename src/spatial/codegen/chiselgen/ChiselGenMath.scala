@@ -61,7 +61,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp))))
     case FixRecip(y) => 
       emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
-      emit(src"${lhs}_one.r := 1.U.toFixed(${lhs}_one).r")
+      emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
       MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixMod(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))) 
     case FixFMA(x,y,z) => MathDL(lhs, rhs, latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))) 
@@ -78,8 +78,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSRU(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x >>> $shift).r")
-    case BitRandom(None) if lhs.parent.s.isDefined => emitt(src"val $lhs = fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
-    case FixRandom(None) if lhs.parent.s.isDefined => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs.r := fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
+    case BitRandom(None) if lhs.parent.s.isDefined => emitt(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
+    case FixRandom(None) if lhs.parent.s.isDefined => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>
       val seed = (scala.math.random*1000).toInt
       val size = x match{
@@ -159,26 +159,17 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := ($x / $y).r")
 
-    // //case FltAbs(x)  =>
-    // //  val FltPtType(g,e) = x.tp
-    // //  val (e,g) = x.tp match {case FltPtType(g,e) => (e,g)}
-    // //  emitt(src"val $lhs = Mux(${x} < 0.FlP($g,$e), -$x, $x)")
-    // case FltAbs(x)  => x.tp match {
-    //   case DoubleType() => throw new Exception("DoubleType not supported for FltAbs!")
-    //   case HalfType() => emitt(src"val $lhs = fabs($x)")
-    //   case FloatType()  => emitt(src"val $lhs = fabs($x)")
-    // }
-    // case FltLog(x)  => x.tp match {
-    //   case DoubleType() => throw new Exception("DoubleType not supported for FltLog!")
-    //   case HalfType() => emitt(src"val $lhs = flog($x)")
-    //   case FloatType()  => emitt(src"val $lhs = flog($x)")
-    // }
-    // case FltExp(x)  => x.tp match {
-    //   case DoubleType() => throw new Exception("DoubleType not supported for FltExp!")
-    //   case HalfType() => emitt(src"val $lhs = fexp($x)")
-    //   case FloatType()  => emitt(src"val $lhs = fexp($x)")
-    // }
-    case FltSqrt(x) => emitt(src"val $lhs = fsqrt($x)")
+    case FltMax(x,y) => 
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Mux($x > $y, ${x}.r, ${y}.r)")
+
+    case FltMin(x,y) => 
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Mux($x < $y, ${x}.r, ${y}.r)")
+
+    case FltPow(x,exp) => throw new Exception(s"FltPow($x, $exp) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
+
+    case FltSqrt(x) => emitt(src"val $lhs = Math.sqrt($x)")
 
     // case FltPow(x,y) => if (emitEn) throw new Exception("Pow not implemented in hardware yet!")
     // case FixFloor(x) => emitt(src"val $lhs = floor($x)")
@@ -205,7 +196,7 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux(($a < $b), $a, $b).r")
     case FixMax(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux(($a > $b), $a, $b).r")
-    case FixToFix(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ${a}.toFixed($lhs).r")
+    case FixToFix(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := ${a}.toFixed(new emul.FixFormat(${fmt.sign}, ${fmt.ibits}, ${fmt.fbits})).r")
     case FixToFlt(a, fmt) => 
       val FixPtType(s,d,f) = a.tp
       val FltPtType(m,e) = lhs.tp
@@ -213,7 +204,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltToFix(a, fmt) => 
       val FixPtType(s,d,f) = lhs.tp
       val FltPtType(m,e) = a.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"flt2fix($a.r, $s,$d,$f, $m,$e)")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"flt2fix($a.r, $s,$d,$f, $m,$e, Truncate, Wrapping)")
     case FltRecip(x) => x.tp match {
       case DoubleType() => throw new Exception("DoubleType not supported for FltRecip") 
       case HalfType()   => emitt(src"val $lhs = frec($x)")

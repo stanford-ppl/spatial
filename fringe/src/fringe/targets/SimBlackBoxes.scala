@@ -5,6 +5,7 @@ import fringe._
 import fringe.templates.math._
 import fringe.utils.implicits._
 import fringe.templates.math.{OverflowMode, RoundingMode}
+import chisel3.core.IntParam
 
 import scala.collection.mutable.Set
 
@@ -97,4 +98,13 @@ trait SimBlackBoxes {
     else if (!has_dec & has_frac) io.b := tmp_frac
   }
 
+  class Log2BBox(width: Int, signed: Boolean, latency: Int) extends BlackBox(Map("DWIDTH" -> IntParam(width))){
+    val io = IO(new Bundle {
+      val clk = Input(Clock())
+      val reset = Input(Bool())
+      val flow = Input(Bool())
+      val x = Input(UInt(width.W))
+      val y = Output(UInt(width.W))
+    })
+  }
 }

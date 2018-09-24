@@ -72,6 +72,7 @@ elif [[ $type == "pir" ]]; then
 elif [[ $type == "vcs-gdocs" ]]; then
   export GDOCS=1
   export FRINGE_PACKAGE="vcs-gdocs"
+  make resources
   hash=`git rev-parse HEAD`
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export timestamp=`git show -s --format=%ci`

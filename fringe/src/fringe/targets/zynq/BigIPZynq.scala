@@ -87,7 +87,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     }
   }
 
-  override def sqrt(a: UInt, latency: Int): UInt = {
+  override def sqrt(a: UInt, latency: Int, flow: Bool): UInt = {
     val m = Module(new SquareRooter(a.getWidth, false, latency))
     m.io.a := a
     m.io.out
@@ -169,7 +169,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     m.io.a := a
     m.io.out
   }
-  override def fsqrt(a: UInt, mw: Int, e: Int): UInt = {
+  override def fsqrt(a: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FSqrt(mw, e))
     m.io.a := a
     m.io.out

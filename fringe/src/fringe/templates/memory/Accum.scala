@@ -79,7 +79,7 @@ class FixFMAAccum(
     val fixadd = Wire(new FixedPoint(s,d,f))
     fixadd.r := Mux(isFirstRound, 0.U, acc.io.output.data(0))
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := Math.fma(fixin1, fixin2, fixadd, fmaLatency.toInt, true.B).r
+    result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B).r
     acc.io.xBarW(0).data(0) := result.r
     acc.io.xBarW(0).en(0) := getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
     acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + fmaLatency)

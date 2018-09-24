@@ -16,55 +16,37 @@ object Math {
   def floor(a: UInt): UInt = a
   def ceil(a: UInt): UInt = a
 
+  def log2(a: UInt, delay: Option[Double], flow: Bool): UInt = {
+    globals.bigIP.log2(a, delay.getOrElse(0.0).toInt, flow)
+  }
   def mul(a: UInt, b: UInt, delay: Option[Double], flow: Bool): UInt = {
-    if (globals.retime) {
-      val latency = delay.getOrElse(globals.target.fixmul_latency * b.getWidth).toInt
-      globals.bigIP.multiply(a, b, latency, flow)
-    }
-    else a * b
+    val latency = delay.getOrElse(globals.target.fixmul_latency * b.getWidth).toInt
+    globals.bigIP.multiply(a, b, latency, flow)
   }
 
   def mul(a: SInt, b: SInt, delay: Option[Double], flow: Bool): SInt = {
-    if (globals.retime) {
-      val latency = delay.getOrElse(globals.target.fixmul_latency * b.getWidth).toInt
-      globals.bigIP.multiply(a, b, latency, flow)
-    }
-    else a * b
+    val latency = delay.getOrElse(globals.target.fixmul_latency * b.getWidth).toInt
+    globals.bigIP.multiply(a, b, latency, flow)
   }
 
   def div(a: SInt, b: SInt, delay: Option[Double], flow: Bool): SInt = {
-    if (globals.retime) {
-      val latency = delay.getOrElse(globals.target.fixdiv_latency * b.getWidth).toInt
-      globals.bigIP.divide(a, b, latency, flow)
-    }
-    else globals.target match {
-      case _:fringe.targets.zynq.Zynq  => globals.bigIP.divide(a, b, (globals.target.fixdiv_latency * b.getWidth).toInt, flow)
-      case _ => a / b
-    }
+    val latency = delay.getOrElse(globals.target.fixdiv_latency * b.getWidth).toInt
+    globals.bigIP.divide(a, b, latency, flow)
   }
 
   def div(a: UInt, b: UInt, delay: Option[Double], flow: Bool): UInt = {
-    if (globals.retime) {
-      val latency = delay.getOrElse(globals.target.fixdiv_latency * b.getWidth).toInt
-      globals.bigIP.divide(a, b, latency, flow)
-    }
-    else a / b
+    val latency = delay.getOrElse(globals.target.fixdiv_latency * b.getWidth).toInt
+    globals.bigIP.divide(a, b, latency, flow)
   }
 
   def mod(a: UInt, b: UInt, delay: Option[Double], flow: Bool): UInt = {
-    if (globals.retime) {
-      val latency = delay.getOrElse(globals.target.fixmod_latency * b.getWidth).toInt
-      globals.bigIP.mod(a, b, latency, flow)
-    }
-    else a % b
+    val latency = delay.getOrElse(globals.target.fixmod_latency * b.getWidth).toInt
+    globals.bigIP.mod(a, b, latency, flow)
   }
 
   def mod(a: SInt, b: SInt, delay: Option[Double], flow: Bool): SInt = {
-    if (globals.retime) {
-      val latency = delay.getOrElse(globals.target.fixmod_latency * b.getWidth).toInt
-      globals.bigIP.mod(a, b, latency, flow)
-    }
-    else a % b
+    val latency = delay.getOrElse(globals.target.fixmod_latency * b.getWidth).toInt
+    globals.bigIP.mod(a, b, latency, flow)
   }
 
   def singleCycleDivide(num: SInt, den: SInt): SInt = num / den
@@ -74,23 +56,35 @@ object Math {
 
   // --- Fixed Point Operations --- //
 
-  def sqrt(num: FixedPoint, latency: Int): UInt = {
-    globals.bigIP.sqrt(num.r, latency)
+  def sqrt(num: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    val result = Wire(new FixedPoint(num.s, num.d, num.f))
+    val latency = delay.getOrElse(0.0).toInt
+    if (num.f == 0) result.r := globals.bigIP.sqrt(num.r, latency, flow)
+    else if (num.f % 2 == 0) { // sqrt(r/2^f) = sqrt(r) / 2^(f/2)
+      val intSqrt = globals.bigIP.sqrt(num.r, latency, flow)
+      result.r := intSqrt >> (num.f/2)
+    }
+    else {// sqrt(r/2^f) = sqrt(r) / sqrt(2^f)
+      val intSqrt = globals.bigIP.sqrt(num.r, latency, flow)
+      val denSqrt = globals.bigIP.sqrt((1.U << num.f), latency, flow)
+      result.r := Math.div(intSqrt, (1.U << (num.f/2)), Some(0.0), flow)
+    }
+    result
   }
-  def sin(num: FixedPoint, latency: Int): UInt = {
-    num.r //TODO
+  def sin(num: FixedPoint, delay: Option[Double]): FixedPoint = {
+    num //TODO
   }
-  def cos(num: FixedPoint, latency: Int): UInt = {
-    num.r //TODO
+  def cos(num: FixedPoint, delay: Option[Double]): FixedPoint = {
+    num //TODO
   }
-  def atan(num: FixedPoint, latency: Int): UInt = {
-    num.r //TODO
+  def atan(num: FixedPoint, delay: Option[Double]): FixedPoint = {
+    num //TODO
   }
-  def sinh(num: FixedPoint, latency: Int): UInt = {
-    num.r //TODO
+  def sinh(num: FixedPoint, delay: Option[Double]): FixedPoint = {
+    num //TODO
   }
-  def cosh(num: FixedPoint, latency: Int): UInt = {
-    num.r //TODO
+  def cosh(num: FixedPoint, delay: Option[Double]): FixedPoint = {
+    num //TODO
   }
 
   private def upcast(a: FixedPoint, b: FixedPoint): (FixedPoint, FixedPoint, FixedPoint, FixedPoint) = {
@@ -380,15 +374,15 @@ object Math {
     result
   }
 
-  def abs(a: FloatingPoint): FloatingPoint = {
+  def fabs(a: FloatingPoint): FloatingPoint = {
     val result = Wire(new FloatingPoint(a.fmt))
     result.r := globals.bigIP.fabs(a.r, a.m, a.e)
     result
   }
 
-  def sqrt(a: FloatingPoint): FloatingPoint = {
+  def fsqrt(a: FloatingPoint, latency: Option[Double], flow: Bool): FloatingPoint = {
     val result = Wire(new FloatingPoint(a.fmt))
-    result := globals.bigIP.fsqrt(a.r, a.m, a.e)
+    result := globals.bigIP.fsqrt(a.r, a.m, a.e, latency.getOrElse(0.0).toInt, flow)
     result
   }
 
@@ -507,8 +501,8 @@ object Math {
   }
 
   // TODO: Use IP
-  def fma(m0: FixedPoint, m1: FixedPoint, add: FixedPoint, delay: Int, flow: Bool): FixedPoint = {
-    mul(m0, m1, Some(delay), flow, Truncate, Wrapping) + getRetimed(add, delay, flow)
+  def fma(m0: FixedPoint, m1: FixedPoint, add: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    mul(m0, m1, delay, flow, Truncate, Wrapping) + getRetimed(add, delay.getOrElse(0.0).toInt, flow)
   }
 
 }

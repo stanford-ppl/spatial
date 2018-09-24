@@ -20,13 +20,15 @@ abstract class BigIP {
   def multiply(a: SInt, b: SInt, latency: Int, flow: Bool): SInt
 
   // TODO: ???
-  def sqrt(a: UInt, latency: Int): UInt = throw Unimplemented("sqrt")
+  def sqrt(a: UInt, latency: Int, flow: Bool): UInt = throw Unimplemented("sqrt")
 
   def sin(a: UInt, latency: Int): UInt = throw Unimplemented("sin")
   def cos(a: UInt, latency: Int): UInt = throw Unimplemented("cos")
   def atan(a: UInt, latency: Int): UInt = throw Unimplemented("ata")
   def sinh(a: UInt, latency: Int): UInt = throw Unimplemented("sin")
   def cosh(a: UInt, latency: Int): UInt = throw Unimplemented("cos")
+
+  def log2(a: UInt, latency: Int, flow: Bool): UInt = throw Unimplemented("log2")
 
   /** Floating point addition. */
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt
@@ -78,8 +80,7 @@ abstract class BigIP {
 
   /** Floating point square root (out = sqrt(x)). */
   // TODO: Why do we have two variants here?
-  def fsqrt(a: UInt, latency: Int): UInt = throw Unimplemented("fsqrt")
-  def fsqrt(a: UInt, m: Int, e: Int): UInt = throw Unimplemented("fsqrt")
+  def fsqrt(a: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = throw Unimplemented("fsqrt")
 
   /** Floating point reciprocal square root. */
   def frsqrt(a: UInt, m: Int, e: Int): UInt = throw Unimplemented("frsqrt")

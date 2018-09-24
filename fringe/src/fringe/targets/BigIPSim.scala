@@ -9,7 +9,7 @@ import fringe.utils.implicits._
 import fringe.templates.math.{OverflowMode, RoundingMode, FloatingPoint}
 import fringe.utils.getRetimed
 
-class BigIPSim extends BigIP {
+class BigIPSim extends BigIP with SimBlackBoxes {
   def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
     getConst(divisor) match { 
       case Some(bigNum) => getRetimed(dividend / bigNum.U, latency, flow)
@@ -68,7 +68,13 @@ class BigIPSim extends BigIP {
     }
   }
 
-  override def sqrt(num: UInt, latency: Int): UInt = {
+  override def log2(a: UInt, latency: Int, flow: Bool): UInt = {
+    val m = Module(new Log2Sim(a.getWidth, false, latency))
+    m.io.x := a
+    m.io.y
+  }
+  
+  override def sqrt(num: UInt, latency: Int, flow: Bool): UInt = {
     val m = Module(new SqrtSim(num.getWidth, false, latency))
     m.io.x := num
     m.io.y
@@ -89,6 +95,18 @@ class BigIPSim extends BigIP {
     num // TODO    
   }
 
+  class Log2Sim(val width: Int, val signed: Boolean, val latency: Int) extends Module {
+    val io = IO(new Bundle{
+      val x = Input(UInt(width.W))
+      val y = Output(UInt(width.W))
+    })
+    val m = Module(new Log2BBox(width, signed, latency))
+    m.io.clk := clock
+    m.io.reset := reset.toBool
+    m.io.x := io.x
+    io.y := m.io.y
+  }
+
   class SqrtSim(val width: Int, val signed: Boolean, val latency: Int) extends Module {
     val io = IO(new Bundle{
       val x = Input(UInt(width.W))
@@ -102,8 +120,14 @@ class BigIPSim extends BigIP {
   }
 
 
-  override def fsqrt(num: UInt, latency: Int): UInt = {
-    num // TODO
+  override def fsqrt(a: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
+    val fma = Module(new DivSqrtRecFN_small(m, e, 0))
+    fma.io.a := recFNFromFN(m, e, a)
+    fma.io.inValid := true.B // TODO: What should this be?
+    fma.io.sqrtOp := true.B // TODO: What should this be?
+    fma.io.roundingMode := 0.U(3.W) // TODO: What should this be?
+    fma.io.detectTininess := false.B // TODO: What should this be?
+    fNFromRecFN(m, e, fma.io.out)
   }
 
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt = {
@@ -234,6 +258,22 @@ class BigIPSim extends BigIP {
 
   }
 
+  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int): UInt = {
+    val conv = Module(new INToRecFN(a.getWidth,exp,man))
+    conv.io.signedIn := false.B
+    conv.io.in := a
+    conv.io.roundingMode := 0.U(3.W)
+    conv.io.detectTininess := false.B
+    conv.io.out
+  }
+
+  override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+    val conv = Module(new RecFNToIN(exp,man,a.getWidth))
+    conv.io.signedOut := false.B
+    conv.io.in := a
+    conv.io.roundingMode := 0.U(3.W)
+    conv.io.out
+  }
 }
 
 

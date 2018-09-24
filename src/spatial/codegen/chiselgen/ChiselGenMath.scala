@@ -27,7 +27,15 @@ trait ChiselGenMath extends ChiselGenCommon {
       case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
       case FixMod(a,b) => emitt(src"$lhs.r := ($a.mod($b, $lat, $backpressure)).r")
       case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one.div($a, $lat, $backpressure)).r")
-      case FixFMA(x,y,z) => emitt(src"${lhs}.r := Math.fma($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt, $backpressure).toFixed($lhs).r")
+      case FixSqrt(x) => emitt(src"$lhs.r := Math.sqrt($x, $lat, $backpressure).r")
+      case FixSin(x) => emitt(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
+      case FixCos(x) => emitt(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
+      case FixAtan(x) => emitt(src"$lhs.r := Math.tan($x, $lat, $backpressure).r")
+      case FixSinh(x) => emitt(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
+      case FixCosh(x) => emitt(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
+      case FixRecipSqrt(a) => emitt(src"$lhs.r := (${lhs}_one.div(Math.sqrt($a, ${latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp)))}, $backpressure), $lat, $backpressure)).r")
+      case FixFMA(x,y,z) => emitt(src"${lhs}.r := Math.fma($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}, $backpressure).toFixed($lhs).r")
+      case FltSqrt(x) => emitt(src"val $lhs = Math.fsqrt($x, $lat, $backpressure)")
     }
   }
 
@@ -59,6 +67,10 @@ trait ChiselGenMath extends ChiselGenCommon {
     case UnbSatDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("SatDiv", Some(bitWidth(lhs.tp)))) 
     case FixMul(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMul", Some(bitWidth(lhs.tp))))
     case FixDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp))))
+    case FixRecipSqrt(a) => 
+      emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
+      emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
+      MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixRecip(y) => 
       emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
       emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
@@ -133,30 +145,12 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := Mux($x < 0.U, -$x, $x).r")
 
-    case FixSqrt(x) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := Math.sqrt($x, ${latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
-
-    case FixSin(x) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := Math.sin($x, ${latencyOptionString("FixSin", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
-
-    case FixCos(x) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := Math.cos($x, ${latencyOptionString("FixCos", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
-
-    case FixAtan(x) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := Math.tan($x, ${latencyOptionString("FixAtan", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
-
-    case FixSinh(x) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := Math.sin($x, ${latencyOptionString("FixSinh", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
-
-    case FixCosh(x) =>
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := Math.cos($x, ${latencyOptionString("FixCosh", Some(bitWidth(lhs.tp)))}.getOrElse(0.0).toInt).r")
-
+    case FixSqrt(x) => MathDL(lhs, rhs, latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp))))
+    case FixSin(x) => MathDL(lhs, rhs, latencyOptionString("FixSin", Some(bitWidth(lhs.tp))))
+    case FixCos(x) => MathDL(lhs, rhs, latencyOptionString("FixCos", Some(bitWidth(lhs.tp))))
+    case FixAtan(x) => MathDL(lhs, rhs, latencyOptionString("FixAtan", Some(bitWidth(lhs.tp))))
+    case FixSinh(x) => MathDL(lhs, rhs, latencyOptionString("FixSinh", Some(bitWidth(lhs.tp))))
+    case FixCosh(x) => MathDL(lhs, rhs, latencyOptionString("FixCosh", Some(bitWidth(lhs.tp))))
     case FltFMA(x,y,z) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := ($x.FltFMA($y, $z).r)")
@@ -191,7 +185,7 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FltPow(x,exp) => throw new Exception(s"FltPow($x, $exp) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
 
-    case FltSqrt(x) => emitt(src"val $lhs = Math.sqrt($x)")
+    case FltSqrt(x) => MathDL(lhs, rhs, latencyOptionString("FltSqrt", Some(bitWidth(lhs.tp))))
 
     // case FltPow(x,y) => if (emitEn) throw new Exception("Pow not implemented in hardware yet!")
     // case FixFloor(x) => emitt(src"val $lhs = floor($x)")
@@ -225,11 +219,11 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixToFlt(a, fmt) => 
       val FixPtType(s,d,f) = a.tp
       val FltPtType(m,e) = lhs.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"fix2flt($a.r, $s,$d,$f, $m,$e)")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2flt($a, $m,$e).r")
     case FltToFix(a, fmt) => 
       val FixPtType(s,d,f) = lhs.tp
       val FltPtType(m,e) = a.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"flt2fix($a.r, $s,$d,$f, $m,$e, Truncate, Wrapping)")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.flt2fix($a, $s,$d,$f, Truncate, Wrapping).r")
     case FltRecip(x) => x.tp match {
       case DoubleType() => throw new Exception("DoubleType not supported for FltRecip") 
       case HalfType()   => emitt(src"val $lhs = frec($x)")

@@ -39,7 +39,7 @@ import spatial.dsl._
         Pipe { ff_out_sram(0, i) = sram1(i) + sram2(i) }
         Pipe { ff_out_sram(1, i) = sram1(i) * sram2(i) }
         Pipe { ff_out_sram(2, i) = sram1(i) / sram2(i) }
-        Pipe { ff_out_sram(3, i) = sqrt(sram1(i)) }
+        Pipe { ff_out_sram(3, i) = sqrt(abs(sram1(i))) }
         Pipe { ff_out_sram(4, i) = sram1(i) - sram2(i) }
         Pipe { ff_out_sram(5, i) = mux((sram1(i) < sram2(i)),1.to[T],0.to[T])  }
         Pipe { ff_out_sram(6, i) = mux((sram1(i) > sram2(i)),1.to[T],0.to[T]) }
@@ -70,7 +70,7 @@ import spatial.dsl._
       val a = if (i == 0 ) {data1(j) + data2(j) }
       else if (i == 1 ) { data1(j) * data2(j) }
       else if (i == 2 ) { data1(j) / data2(j) }
-      else if (i == 3 ) { sqrt(data1(j)) }
+      else if (i == 3 ) { sqrt(abs(data1(j))) }
       else if (i == 4 ) { data1(j) - data2(j) }
       else if (i == 5 ) { if (data1(j) < data2(j)) 1.to[T] else 0.to[T] }
       else if (i == 6 ) { if (data1(j) > data2(j)) 1.to[T] else 0.to[T] }
@@ -86,7 +86,8 @@ import spatial.dsl._
       else 0.to[T]
       val b = out_ram(i,j)
       println(i + " Expected: " + a + ", Actual: " + b)
-      assert(abs(a - b) <= margin)
+      if (i == 3 || i == 12)  assert(abs(a - b) <= 8.to[T])
+      else         assert(abs(a - b) <= margin)
     }
   }
 }

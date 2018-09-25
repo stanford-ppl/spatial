@@ -90,7 +90,7 @@ object FloatingPoint {
 
   def apply(m: Int, e: Int, init: Double): FloatingPoint = {
     val cst = Wire(new FloatingPoint(m,e))
-    cst.r := FloatingPoint.bits(init.toFloat, cst.fmt).U((m+e).W)
+    cst.r := FloatingPoint.bits(init.toFloat, cst.fmt).S((m+e+1).W).asUInt.apply(m+e-1,0)
     cst
   }
 

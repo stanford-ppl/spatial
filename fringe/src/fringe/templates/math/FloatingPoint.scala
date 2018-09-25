@@ -112,10 +112,12 @@ object FloatingPoint {
 
   def bits(num: Float, fmt: emul.FltFormat): Int = {
     val emflt = new emul.FloatPoint(emul.FloatValue(num), true, fmt)
+    Console.println(s"making new flt for $num, = ${emflt.bits.map(_.toBoolean).toList}")
     emflt.bits.map(_.toBoolean).zipWithIndex.map{case (b: Boolean, i: Int) => {if (b) 1.toInt else 0.toInt} << i}.sum
   }
   def bits(num: Double, fmt: emul.FltFormat): Long = {
     val emflt = new emul.FloatPoint(emul.FloatValue(num), true, fmt)
+    Console.println(s"making new flt for $num, = ${emflt.bits.map(_.toBoolean).toList}")
     emflt.bits.map(_.toBoolean).zipWithIndex.map{case (b: Boolean, i: Int) => {if (b) 1.toLong else 0.toLong} << i}.sum
   }
   def bits(num: Float): Int = bits(num, new emul.FltFormat(23,8))

@@ -109,12 +109,16 @@ trait CppGenArray extends CppGenCommon {
     case op@ArrayNew(size)      => emitNewArray(lhs, lhs.tp, src"$size")
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case DataAsBits(bits)       => 
+      println(s"bits type ${bits.tp}")
       bits.tp match {
         case FltPtType(_,_) =>
           emit(src"${lhs.tp} $lhs;")
           emit(src"float* ${lhs}_ptr = &${toTrueFix(quote(bits), bits.tp)};")
           emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(*reinterpret_cast<int32_t*>(${lhs}_ptr) >> ${lhs}_i & 1); }")
         case FixPtType(s,i,f) => 
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & 1); }")
+        case BitType() => 
           emit(src"${lhs.tp} $lhs;")
           emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & 1); }")
       }

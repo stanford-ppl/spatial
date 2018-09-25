@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
     a(9) = x.to[Float].as[T]
     a(10) = x.to[Half].as[T]
     a(11) = abs(x)
-    a(12) = x % z
+    a(12) = 0 /*x % z*/
     a(13) = 0 /*sqrt(x)*/
     a(15) = 0 /*ln(x)*/
     a(16) = 1.to[T] / x

@@ -62,12 +62,12 @@ object Math {
     if (num.f == 0) result.r := globals.bigIP.sqrt(num.r, latency, flow)
     else if (num.f % 2 == 0) { // sqrt(r/2^f) = sqrt(r) / 2^(f/2)
       val intSqrt = globals.bigIP.sqrt(num.r, latency, flow)
-      result.r := intSqrt >> (num.f/2)
+      result.r := intSqrt << (num.f/2)
     }
     else {// sqrt(r/2^f) = sqrt(r) / sqrt(2^f)
       val intSqrt = globals.bigIP.sqrt(num.r, latency, flow)
       val denSqrt = globals.bigIP.sqrt((1.U << num.f), latency, flow)
-      result.r := Math.div(intSqrt, (1.U << (num.f/2)), Some(0.0), flow)
+      result.r := Math.div(intSqrt << num.f, (1.U << (num.f/2)), Some(0.0), flow)
     }
     result
   }
@@ -431,13 +431,29 @@ object Math {
   def fma(m0: FloatingPoint, m1: FloatingPoint, add: FloatingPoint): FloatingPoint = {
     assert(m0.fmt == m1.fmt && m1.fmt == add.fmt)
     val result = Wire(new FloatingPoint(m0.fmt))
-    result.r := globals.bigIP.ffma(m0.r, m1.r, add.r, m0.m, m0.e)
+    result.r := globals.bigIP.fadd(globals.bigIP.fmul(m0.r, m1.r, m0.m, m0.e), add.r, m0.m, m0.e, 0)
     result
   }
 
   def fix2flt(a: FixedPoint, m: Int, e: Int): FloatingPoint = {
     val result = Wire(new FloatingPoint(m,e))
-    result.r := globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e)
+    if (a.f == 0) result.r := globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e)
+    // else if (a.f > e) {
+    //   Console.println(s"[WARN] Conversion from ${a.fmt} to Float[$m,$e] may lose precision!")
+    //   val truncate = a.f - e + 1
+    //   val tmp = Wire(new FixedPoint(a.s, a.d + truncate, a.f - truncate))
+    //   tmp.r := a.r >> truncate
+    //   result.r := fix2flt(tmp, m, e ).r
+    // }
+    else {
+      // val raw = globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e)
+      // val exp = raw(m+e-1,m)
+      // val newexp = exp - scala.math.pow(2,a.f).toInt.U(e.W)
+      // val newall = chisel3.util.Cat(raw.msb, chisel3.util.Cat(newexp, raw(m-1,0)))
+      // result.r := newall
+      val tmp = Wire(new FloatingPoint(m,e))
+      result.r := Math.div(tmp, FloatingPoint(m,e,scala.math.pow(2,a.f))).r
+    }
     result
   }
   def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
@@ -457,7 +473,19 @@ object Math {
   }
   def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
     val result = Wire(new FixedPoint(sign,dec,frac))
-    result.r := globals.bigIP.flt2fix(a.r,a.m,a.e,sign,dec,frac, rounding, saturating)
+    if (frac == 0) result.r := globals.bigIP.flt2fix(a.r,a.m,a.e,sign,dec,frac, rounding, saturating)
+    // else if (frac > a.e) {
+    //   Console.println(s"[WARN] Conversion from ${a.fmt} to Fix[$sign,$dec,$frac] may lose precision!")
+    //   val truncate = frac - a.e + 1
+    //   result.r := flt2fix(a,sign,dec+truncate,frac-truncate,rounding,saturating).r << truncate
+    // }
+    else           result.r := globals.bigIP.flt2fix(Math.mul(a, FloatingPoint(a.m,a.e,scala.math.pow(2,frac))).r,a.m,a.e,sign,dec,frac, rounding, saturating)
+    // else {
+    //   val exp = a.raw_exp
+    //   val newexp = exp + scala.math.pow(2,frac).toInt.U(a.e.W)
+    //   val newall = chisel3.util.Cat(a.msb, chisel3.util.Cat(newexp, a.raw_mantissa))
+    //   result.r := globals.bigIP.flt2fix(newall, a.m, a.e, sign, dec, frac, rounding, saturating)
+    // }
     result
   }
 
@@ -468,11 +496,11 @@ object Math {
   }
 
 
-  def frand(seed: Int, m: Int, e: Int): FloatingPoint = {
+  def frand(seed: Int, m: Int, e: Int, en: Bool): FloatingPoint = {
       val size = m+e
       val flt_rng = Module(new PRNG(seed, size))
       val result = Wire(new FloatingPoint(m, e))
-      flt_rng.io.en := true.B
+      flt_rng.io.en := en
       result.r := flt_rng.io.output
       result
   }

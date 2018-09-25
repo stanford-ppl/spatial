@@ -9,9 +9,9 @@ import spatial.dsl._
 
     val length = 8
 
-    val data1 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
-    val data2 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
-    val data3 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
+    val data1 = Array.tabulate(length){i => if (i % 3 == 1) random[T](128) else -random[T](128)}
+    val data2 = Array.tabulate(length){i => if (i % 3 == 1) random[T](128) else -random[T](128)}
+    val data3 = Array.tabulate(length){i => if (i % 3 == 1) random[T](128) else -random[T](128)}
 
     val dram1 = DRAM[T](length)
     val dram2 = DRAM[T](length)

@@ -121,102 +121,102 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
 
   override def fsqrt(a: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
-    val fma = Module(new DivSqrtRecFN_small(m, e, 0))
-    fma.io.a := recFNFromFN(m, e, a)
+    val fma = Module(new DivSqrtRecFN_small(e, m, 0))
+    fma.io.a := recFNFromFN(e, m, a)
     fma.io.inValid := true.B // TODO: What should this be?
     fma.io.sqrtOp := true.B // TODO: What should this be?
     fma.io.roundingMode := 0.U(3.W) // TODO: What should this be?
     fma.io.detectTininess := false.B // TODO: What should this be?
-    fNFromRecFN(m, e, fma.io.out)
+    fNFromRecFN(e, m, fma.io.out)
   }
 
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt = {
     val result = Wire(new FloatingPoint(m, e))
-    val fma = Module(new MulAddRecFN(m, e))
-    fma.io.a := recFNFromFN(m, e, a)
-    fma.io.b := recFNFromFN(m, e, FloatingPoint.bits(1.0f).S((m+e).W))
-    fma.io.c := recFNFromFN(m, e, b)
+    val fma = Module(new MulAddRecFN(e, m))
+    fma.io.a := recFNFromFN(e, m, a)
+    fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
+    fma.io.c := recFNFromFN(e, m, b)
     fma.io.op := 0.U(2.W)
-    fNFromRecFN(m, e, fma.io.out)
+    fNFromRecFN(e, m, fma.io.out)
   }
 
   def fsub(a: UInt, b: UInt, m: Int, e: Int): UInt = {
-    val fma = Module(new MulAddRecFN(m, e))
-    fma.io.a := recFNFromFN(m, e, a)
-    fma.io.b := recFNFromFN(m, e, FloatingPoint.bits(1.0f).S((m+e).W))
-    fma.io.c := recFNFromFN(m, e, b)
+    val fma = Module(new MulAddRecFN(e, m))
+    fma.io.a := recFNFromFN(e, m, a)
+    fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
+    fma.io.c := recFNFromFN(e, m, b)
     fma.io.op := 1.U(2.W)
-    fNFromRecFN(m, e, fma.io.out)
+    fNFromRecFN(e, m, fma.io.out)
   }
   def fmul(a: UInt, b: UInt, m: Int, e: Int): UInt = {
-    val fma = Module(new MulAddRecFN(m, e))
-    fma.io.a := recFNFromFN(m, e, a)
-    fma.io.b := recFNFromFN(m, e, b)
-    fma.io.c := recFNFromFN(m, e, FloatingPoint.bits(0.0f).S((m+e).W))
+    val fma = Module(new MulAddRecFN(e, m))
+    fma.io.a := recFNFromFN(e, m, a)
+    fma.io.b := recFNFromFN(e, m, b)
+    fma.io.c := recFNFromFN(e, m, FloatingPoint.bits(0.0f).S((m+e).W))
     fma.io.op := 0.U(2.W)
-    fNFromRecFN(m, e, fma.io.out)
+    fNFromRecFN(e, m, fma.io.out)
   }
   def fdiv(a: UInt, b: UInt, m: Int, e: Int): UInt = {
-    val fma = Module(new DivSqrtRecFN_small(m, e, 0))
-    fma.io.a := recFNFromFN(m, e, a)
-    fma.io.b := recFNFromFN(m, e, b)
+    val fma = Module(new DivSqrtRecFN_small(e, m, 0))
+    fma.io.a := recFNFromFN(e, m, a)
+    fma.io.b := recFNFromFN(e, m, b)
     fma.io.inValid := true.B // TODO: What should this be?
     fma.io.sqrtOp := false.B // TODO: What should this be?
     fma.io.roundingMode := 0.U(3.W) // TODO: What should this be?
     fma.io.detectTininess := false.B // TODO: What should this be?
-    fNFromRecFN(m, e, fma.io.out)
+    fNFromRecFN(e, m, fma.io.out)
   }
 
   def flt(a: UInt, b: UInt, m: Int, e: Int): Bool = {
     val result = Wire(Bool())
-    val comp = Module(new CompareRecFN(m, e))
-    comp.io.a := recFNFromFN(m, e, a)
-    comp.io.b := recFNFromFN(m, e, b)
+    val comp = Module(new CompareRecFN(e, m))
+    comp.io.a := recFNFromFN(e, m, a)
+    comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.lt
     result
   }
   def feq(a: UInt, b: UInt, m: Int, e: Int): Bool = {
     val result = Wire(Bool())
-    val comp = Module(new CompareRecFN(m, e))
-    comp.io.a := recFNFromFN(m, e, a)
-    comp.io.b := recFNFromFN(m, e, b)
+    val comp = Module(new CompareRecFN(e, m))
+    comp.io.a := recFNFromFN(e, m, a)
+    comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.eq
     result
   }
   def fgt(a: UInt, b: UInt, m: Int, e: Int): Bool = {
     val result = Wire(Bool())
-    val comp = Module(new CompareRecFN(m, e))
-    comp.io.a := recFNFromFN(m, e, a)
-    comp.io.b := recFNFromFN(m, e, b)
+    val comp = Module(new CompareRecFN(e, m))
+    comp.io.a := recFNFromFN(e, m, a)
+    comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.gt
     result
   }
   def fge(a: UInt, b: UInt, m: Int, e: Int): Bool = {
     val result = Wire(Bool())
-    val comp = Module(new CompareRecFN(m, e))
-    comp.io.a := recFNFromFN(m, e, a)
-    comp.io.b := recFNFromFN(m, e, b)
+    val comp = Module(new CompareRecFN(e, m))
+    comp.io.a := recFNFromFN(e, m, a)
+    comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.gt | comp.io.eq
     result
   }
   def fle(a: UInt, b: UInt, m: Int, e: Int): Bool = {
     val result = Wire(Bool())
-    val comp = Module(new CompareRecFN(m, e))
-    comp.io.a := recFNFromFN(m, e, a)
-    comp.io.b := recFNFromFN(m, e, b)
+    val comp = Module(new CompareRecFN(e, m))
+    comp.io.a := recFNFromFN(e, m, a)
+    comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.lt | comp.io.eq
     result
   }
   def fne(a: UInt, b: UInt, m: Int, e: Int): Bool = {
     val result = Wire(Bool())
-    val comp = Module(new CompareRecFN(m, e))
-    comp.io.a := recFNFromFN(m, e, a)
-    comp.io.b := recFNFromFN(m, e, b)
+    val comp = Module(new CompareRecFN(e, m))
+    comp.io.a := recFNFromFN(e, m, a)
+    comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := ~comp.io.eq
     result
@@ -260,17 +260,17 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int): UInt = {
     val conv = Module(new INToRecFN(a.getWidth,exp,man))
-    conv.io.signedIn := false.B
+    conv.io.signedIn := sign.B
     conv.io.in := a
     conv.io.roundingMode := 0.U(3.W)
     conv.io.detectTininess := false.B
-    conv.io.out
+    fNFromRecFN(exp, man, conv.io.out)
   }
 
   override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     val conv = Module(new RecFNToIN(exp,man,a.getWidth))
-    conv.io.signedOut := false.B
-    conv.io.in := a
+    conv.io.signedOut := sign.B
+    conv.io.in := recFNFromFN(exp, man, a)
     conv.io.roundingMode := 0.U(3.W)
     conv.io.out
   }

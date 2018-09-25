@@ -317,3 +317,12 @@ case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.
   * Default: false
   */
 case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
+
+/** Flag set by the user to ensure an SRAM will merge the buffers, in cases
+    where you have metapipelined access such as pre-load, accumulate, store.
+  *
+  * Getter:  sym.shouldCoalesce
+  * Setter:  sym.shouldCoalesce = (true | false)
+  * Default: false
+  */
+case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User)

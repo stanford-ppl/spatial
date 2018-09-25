@@ -34,8 +34,9 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixSinh(x) => emitt(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
       case FixCosh(x) => emitt(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
       case FixRecipSqrt(a) => emitt(src"$lhs.r := (${lhs}_one.div(Math.sqrt($a, ${latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp)))}, $backpressure), $lat, $backpressure)).r")
-      case FixFMA(x,y,z) => emitt(src"${lhs}.r := Math.fma($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}, $backpressure).toFixed($lhs).r")
-      case FltSqrt(x) => emitt(src"val $lhs = Math.fsqrt($x, $lat, $backpressure)")
+      case FixFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}, $backpressure).toFixed($lhs).r")
+      case FltFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z).r")
+      case FltSqrt(x) => emitt(src"$lhs.r := Math.fsqrt($x, $lat, $backpressure).r")
     }
   }
 
@@ -93,6 +94,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case BitRandom(None) if lhs.parent.s.isDefined => emitt(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
     case FixRandom(None) if lhs.parent.s.isDefined => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>
+      val FixPtType(s,d,f) = lhs.tp
       emitGlobalWire(src"val $lhs = Wire(${lhs.tp})")
       val seed = (scala.math.random*1000).toInt
       val size = x match{
@@ -105,41 +107,23 @@ trait ChiselGenMath extends ChiselGenCommon {
       val en = if (lhs.parent.s.isDefined) src"${swap(lhs.parent.s.get, DatapathEn)}" else "true.B"
       emitGlobalModule(src"${lhs}_rng.io.en := $en")
       emitt(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
-    // case FixUnif() =>
-    //   val bits = lhs.tp match {
-    //     case FixPtType(s,d,f) => f
-    //   }
-    //   val seed = (random*1000).toInt
-    //   emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
-    //   emitGlobalModule(src"${lhs}_rng.io.en := true.B")
-    //   emitt(src"val ${lhs} = Wire(new FixedPoint(false, 0, $bits))")
-    //   emitt(src"${lhs}.r := ${lhs}_rng.io.output(${bits},0)")
-    // case FixConvert(x) => lhs.tp match {
-    //   case IntType()  =>
-    //     emitGlobalWireMap(src"$lhs", "Wire(new FixedPoint(true, 32, 0))")
-    //     emitt(src"${x}.cast($lhs)")
-    //   case LongType() =>
-    //     // val pad = bitWidth(lhs.tp) - bitWidth(x.tp)
-    //     emitGlobalWireMap(src"$lhs","Wire(new FixedPoint(true, 64, 0))")
-    //     emitt(src"${x}.cast($lhs)")
-    //     // if (pad > 0) {
-    //     //   emitt(src"${lhs}.r := chisel3.util.Cat(0.U(${pad}.W), ${x}.r)")
-    //     // } else {
-    //     //   emitt(src"${lhs}.r := ${x}.r.apply(${bitWidth(lhs.tp)-1}, 0)")
-    //     // }
-    //   case FixPtType(s,d,f) =>
-    //     emitt(src"val $lhs = Wire(new FixedPoint($s, $d, $f))")
-    //     emitt(src"${x}.cast($lhs)")
-    // }
-    // case FixPtToFltPt(x) => 
-    //    val FltPtType(m,e) = lhs.tp
-    //    emitt(src"val $lhs = $x.toFloat($m,$e)")
-
-    // case StringToFixPt(x) => lhs.tp match {
-    //   case IntType()  => emitt(src"val $lhs = $x.toInt")
-    //   case LongType() => emitt(src"val $lhs = $x.toLong")
-    //   case _ => emitt(src"val $lhs = $x // No rule for this")
-    // }
+    case FltRandom(None) if lhs.parent.s.isDefined => 
+      val FltPtType(m,e) = lhs.tp
+      emitGlobalWire(src"val $lhs = Wire(${lhs.tp})")
+      emitt(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, ${swap(lhs.parent.s.get, DatapathEn)}).r")
+    case FltRandom(x) => throw new Exception(s"Can only generate random float with no bounds right now!")
+      // emitGlobalWire(src"val $lhs = Wire(${lhs.tp})")
+      // val seed = (scala.math.random*1000).toInt
+      // val size = x match{
+      //   case Some(Const(xx)) => s"$xx"
+      //   case Some(_) => s"$x"
+      //   case None => "4096"
+      // }
+      // emitt(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
+      // emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
+      // val en = if (lhs.parent.s.isDefined) src"${swap(lhs.parent.s.get, DatapathEn)}" else "true.B"
+      // emitGlobalModule(src"${lhs}_rng.io.en := $en")
+      // emitt(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
 
     case FixAbs(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
@@ -151,9 +135,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixAtan(x) => MathDL(lhs, rhs, latencyOptionString("FixAtan", Some(bitWidth(lhs.tp))))
     case FixSinh(x) => MathDL(lhs, rhs, latencyOptionString("FixSinh", Some(bitWidth(lhs.tp))))
     case FixCosh(x) => MathDL(lhs, rhs, latencyOptionString("FixCosh", Some(bitWidth(lhs.tp))))
-    case FltFMA(x,y,z) => 
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := ($x.FltFMA($y, $z).r)")
+    case FltFMA(x,y,z) => MathDL(lhs, rhs, latencyOptionString("FltFMA", Some(bitWidth(lhs.tp)))) 
 
     case FltNeg(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
@@ -182,6 +164,10 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltMin(x,y) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := Mux($x < $y, ${x}.r, ${y}.r)")
+
+    case FltAbs(x) => 
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"$lhs.r := chisel3.util.Cat(false.B, ${x}(${x}.getWidth-1,0))")
 
     case FltPow(x,exp) => throw new Exception(s"FltPow($x, $exp) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
 
@@ -216,10 +202,14 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixToFixSat(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Truncate, Saturating).r")
     case FixToFixUnb(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Unbiased, Wrapping).r")
     case FixToFixUnbSat(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Unbiased, Saturating).r")
+    case FltToFlt(a, fmt) => 
+      val FltPtType(m,e) = lhs.tp
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emitt(src"${lhs}.r := Math.flt2flt(${a}, $m, $e).r")
     case FixToFlt(a, fmt) => 
       val FixPtType(s,d,f) = a.tp
       val FltPtType(m,e) = lhs.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2flt($a, $m,$e).r")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2flt($a,$m,$e).r")
     case FltToFix(a, fmt) => 
       val FixPtType(s,d,f) = lhs.tp
       val FltPtType(m,e) = a.tp
@@ -238,6 +228,8 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixFloor(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
     case FixCeil(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
+    // case FltFloor(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
+    // case FltCeil(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
     case DataAsBits(data) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.zipWithIndex.foreach{case (dab, i) => dab := $data(i)}")
     case BitsAsData(data, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := chisel3.util.Cat($data.reverse)")
     // case FltInvSqrt(x) => x.tp match {

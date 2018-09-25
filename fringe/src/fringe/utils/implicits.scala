@@ -177,7 +177,7 @@ object implicits {
     def trueFP(fmt: emul.FixFormat): FixedPoint = FixedPoint(fmt.sign, fmt.ibits max b.getWidth, fmt.fbits, b)
 
     def FlP(m: Int, e: Int): FloatingPoint = FloatingPoint(m, e, b)
-    def FlP(fmt: emul.FltFormat): FloatingPoint = FloatingPoint(fmt.sbits, fmt.ebits, b)
+    def FlP(fmt: emul.FltFormat): FloatingPoint = FloatingPoint(fmt.sbits+1, fmt.ebits, b)
 
     def cast(c: FixedPoint): Unit = { c.r := FixedPoint(c.s, c.d, c.f, b).r }
 

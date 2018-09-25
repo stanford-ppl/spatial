@@ -59,7 +59,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override protected def remap(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
     // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
-    case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
+    case FltPtType(m,e) => s"new FloatingPoint($m, $e)"
     case BitType() => "Bool()"
     case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"

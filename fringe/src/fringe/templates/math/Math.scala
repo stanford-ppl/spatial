@@ -258,7 +258,18 @@ object Math {
     val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
     val result = Wire(new FixedPoint(upcast_type))
-    result.r := getRetimed(a.upcastUInt(upcast_type) ^ b.upcastUInt(upcast_type), latency, flow)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) result.r := getRetimed(a.r.asSInt ^ b.r.asSInt, latency, flow).r
+      else           result.r := getRetimed(a.r ^ b.r, latency, flow).r
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) result.r := getRetimed(a_up.r.asSInt ^ b_up.r.asSInt, latency, flow).r
+      else           result.r := getRetimed(a_up.r ^ b_up.r, latency, flow).r
+    }
     result
   }
 
@@ -273,7 +284,18 @@ object Math {
     val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
     val result = Wire(new FixedPoint(upcast_type))
-    result.r := getRetimed(a.upcastUInt(upcast_type) & b.upcastUInt(upcast_type), latency, flow)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) result.r := getRetimed(a.r.asSInt & b.r.asSInt, latency, flow).r
+      else           result.r := getRetimed(a.r & b.r, latency, flow).r
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) result.r := getRetimed(a_up.r.asSInt & b_up.r.asSInt, latency, flow).r
+      else           result.r := getRetimed(a_up.r & b_up.r, latency, flow).r
+    }
     result
   }
 
@@ -281,7 +303,18 @@ object Math {
     val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
     val result = Wire(new FixedPoint(upcast_type))
-    result.r := getRetimed(a.upcastUInt(upcast_type) | b.upcastUInt(upcast_type), latency, flow)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) result.r := getRetimed(a.r.asSInt | b.r.asSInt, latency, flow).r
+      else           result.r := getRetimed(a.r | b.r, latency, flow).r
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) result.r := getRetimed(a_up.r.asSInt | b_up.r.asSInt, latency, flow).r
+      else           result.r := getRetimed(a_up.r | b_up.r, latency, flow).r
+    }
     result
   }
 

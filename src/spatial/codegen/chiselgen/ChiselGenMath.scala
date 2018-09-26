@@ -7,15 +7,17 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.retiming._
 import spatial.util.spatialConfig
 
 trait ChiselGenMath extends ChiselGenCommon {
 
   // TODO: Clean this and make it nice
-  private def MathDL(lhs: Sym[_], rhs: Op[_], lat: String): Unit = {
+  private def MathDL(lhs: Sym[_], rhs: Op[_], nodelat: Double): Unit = {
     emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
 
     val backpressure = if (controllerStack.nonEmpty) getBackPressure(controllerStack.head.toCtrl) else "true.B"
+    val lat = if ((lhs.fullDelay + nodelat).toInt != (lhs.fullDelay.toInt + nodelat.toInt)) s"Some($nodelat + 1.0)" else s"Some($nodelat)"
     rhs match {
       case FixMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure)).r")
       case UnbMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, rounding = Unbiased)).r")
@@ -33,55 +35,93 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixAtan(x) => emitt(src"$lhs.r := Math.tan($x, $lat, $backpressure).r")
       case FixSinh(x) => emitt(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
       case FixCosh(x) => emitt(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
-      case FixRecipSqrt(a) => emitt(src"$lhs.r := (${lhs}_one.div(Math.sqrt($a, ${latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp)))}, $backpressure), $lat, $backpressure)).r")
-      case FixFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z,${latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))}, $backpressure).toFixed($lhs).r")
-      case FltFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z).r")
+      case FixRecipSqrt(a) => emitt(src"$lhs.r := (${lhs}_one.div(Math.sqrt($a, ${s"""latencyOption("FixSqrt", Some(bitWidth(lhs.tp)))"""}, $backpressure), $lat, $backpressure)).r")
+      case FixFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).toFixed($lhs).r")
+      case FltFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).r")
       case FltSqrt(x) => emitt(src"$lhs.r := Math.fsqrt($x, $lat, $backpressure).r")
+      case FltAdd(x,y) => emitt(src"$lhs.r := Math.fadd($x, $y, $lat, $backpressure).r")
+      case FltSub(x,y) => emitt(src"$lhs.r := Math.fsub($x, $y, $lat, $backpressure).r")
+      case FltMul(x,y) => emitt(src"$lhs.r := Math.fmul($x, $y, $lat, $backpressure).r")
+      case FltDiv(x,y) => emitt(src"$lhs.r := Math.fdiv($x, $y, $lat, $backpressure).r")
+      case FixLst(x,y) => emitt(src"$lhs.r := Math.lt($x, $y, $lat, $backpressure).r")
+      case FixLeq(x,y) => emitt(src"$lhs.r := Math.lte($x, $y, $lat, $backpressure).r")
+      case FixNeq(x,y) => emitt(src"$lhs.r := Math.neq($x, $y, $lat, $backpressure).r")
+      case FixEql(x,y) => emitt(src"$lhs.r := Math.eql($x, $y, $lat, $backpressure).r")
+      case FltLst(x,y) => emitt(src"$lhs.r := Math.flt($x, $y, $lat, $backpressure).r")
+      case FltLeq(x,y) => emitt(src"$lhs.r := Math.flte($x, $y, $lat, $backpressure).r")
+      case FltNeq(x,y) => emitt(src"$lhs.r := Math.fneq($x, $y, $lat, $backpressure).r")
+      case FltEql(x,y) => emitt(src"$lhs.r := Math.feql($x, $y, $lat, $backpressure).r")
+      case FltRecip(x) => emitt(src"$lhs.r := Math.frec($x, $lat, $backpressure).r")
+      case FixInv(x)   => emitt(src"$lhs.r := Math.inv($x,$lat, $backpressure).r")
+      case FixNeg(x)   => emitt(src"$lhs.r := Math.neg($x,$lat, $backpressure).r")
+      case FixAdd(x,y) => emitt(src"$lhs.r := Math.add($x,$y,$lat, $backpressure, Truncate, Wrapping).r")
+      case FixSub(x,y) => emitt(src"$lhs.r := Math.sub($x,$y,$lat, $backpressure, Truncate, Wrapping).r")
+      case FixAnd(x,y)  => emitt(src"$lhs.r := Math.and($x,$y,$lat, $backpressure).r")
+      case FixOr(x,y)   => emitt(src"$lhs.r := Math.or($x,$y,$lat, $backpressure).r")
+      case FixXor(x,y)  => emitt(src"$lhs.r := Math.xor($x,$y,$lat, $backpressure).r")
+      case SatAdd(x,y) => emitt(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
+      case SatSub(x,y) => emitt(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
+      case FixToFix(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Wrapping).r")
+      case FixToFixSat(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating).r")
+      case FixToFixUnb(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping).r")
+      case FixToFixUnbSat(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Saturating).r")
+      case FixToFlt(a, fmt) => 
+        val FixPtType(s,d,f) = a.tp
+        val FltPtType(m,e) = lhs.tp
+        emitt(src"$lhs.r := Math.fix2flt($a,$m,$e,$lat,$backpressure).r")
+      case FltToFix(a, fmt) => 
+        val FixPtType(s,d,f) = lhs.tp
+        val FltPtType(m,e) = a.tp
+        emitt(src"$lhs.r := Math.flt2fix($a, $s,$d,$f,$lat,$backpressure, Truncate, Wrapping).r")
+      case FltToFlt(a, fmt) => 
+        val FltPtType(m,e) = lhs.tp
+        emitt(src"$lhs.r := Math.flt2flt($a, $m, $e, $lat, $backpressure).r")
+
     }
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case _ if lhs.isBroadcastAddr => // Do nothing
-    case FixInv(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := (~$x).r")
-    case FixNeg(x)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := (-$x).r")
-    case FixAdd(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x + $y).r")
-    case FixSub(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x - $y).r")
-    case FixAnd(x,y)  => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs := ($x & $y).r")
-    case FixOr(x,y)   => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs := ($x | $y).r")
-    case FixXor(x,y)  => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs := ($x ^ $y).r")
+    case FixInv(x)   => MathDL(lhs, rhs, latencyOption("FixInv", Some(bitWidth(lhs.tp))))
+    case FixNeg(x)   => MathDL(lhs, rhs, latencyOption("FixNeg", Some(bitWidth(lhs.tp))))
+    case FixAdd(x,y) => MathDL(lhs, rhs, latencyOption("FixAdd", Some(bitWidth(lhs.tp))))
+    case FixSub(x,y) => MathDL(lhs, rhs, latencyOption("FixSub", Some(bitWidth(lhs.tp))))
+    case FixAnd(x,y)  => MathDL(lhs, rhs, latencyOption("FixAnd", Some(bitWidth(lhs.tp))))
+    case FixOr(x,y)   => MathDL(lhs, rhs, latencyOption("FixOr", Some(bitWidth(lhs.tp))))
+    case FixXor(x,y)  => MathDL(lhs, rhs, latencyOption("FixXor", Some(bitWidth(lhs.tp))))
     case FixPow(x,y)  => throw new Exception(s"FixPow($x, $y) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
     case VecApply(vector, i) => emitGlobalWireMap(src"""$lhs""", src"""Wire(${lhs.tp})"""); emitt(src"$lhs := $vector.apply($i)")
 
-    case FixLst(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x < $y")
-    case FixLeq(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x <= $y")
-    case FixNeq(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x =/= $y")
-    case FixEql(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x === $y")
-    case FltLst(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x < $y")
-    case FltLeq(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x <= $y")
-    case FltNeq(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x =/= $y")
-    case FltEql(x,y) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})"); emitt(src"$lhs := $x === $y")
-    case UnbMul(x,y) => MathDL(lhs, rhs, latencyOptionString("UnbMul", Some(bitWidth(lhs.tp)))) 
-    case UnbDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("UnbDiv", Some(bitWidth(lhs.tp)))) 
-    case SatMul(x,y) => MathDL(lhs, rhs, latencyOptionString("SatMul", Some(bitWidth(lhs.tp)))) 
-    case SatDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("SatDiv", Some(bitWidth(lhs.tp)))) 
-    case UnbSatMul(x,y) => MathDL(lhs, rhs, latencyOptionString("SatMul", Some(bitWidth(lhs.tp)))) 
-    case UnbSatDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("SatDiv", Some(bitWidth(lhs.tp)))) 
-    case FixMul(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMul", Some(bitWidth(lhs.tp))))
-    case FixDiv(x,y) => MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp))))
+    case FixLst(x,y) => MathDL(lhs, rhs, latencyOption("FixLst", Some(bitWidth(lhs.tp))))
+    case FixLeq(x,y) => MathDL(lhs, rhs, latencyOption("FixLeq", Some(bitWidth(lhs.tp))))
+    case FixNeq(x,y) => MathDL(lhs, rhs, latencyOption("FixNeq", Some(bitWidth(lhs.tp))))
+    case FixEql(x,y) => MathDL(lhs, rhs, latencyOption("FixEql", Some(bitWidth(lhs.tp))))
+    case FltLst(x,y) => MathDL(lhs, rhs, latencyOption("FltLst", Some(bitWidth(lhs.tp))))
+    case FltLeq(x,y) => MathDL(lhs, rhs, latencyOption("FltLeq", Some(bitWidth(lhs.tp))))
+    case FltNeq(x,y) => MathDL(lhs, rhs, latencyOption("FltNeq", Some(bitWidth(lhs.tp))))
+    case FltEql(x,y) => MathDL(lhs, rhs, latencyOption("FltEql", Some(bitWidth(lhs.tp))))
+    case UnbMul(x,y) => MathDL(lhs, rhs, latencyOption("UnbMul", Some(bitWidth(lhs.tp)))) 
+    case UnbDiv(x,y) => MathDL(lhs, rhs, latencyOption("UnbDiv", Some(bitWidth(lhs.tp)))) 
+    case SatMul(x,y) => MathDL(lhs, rhs, latencyOption("SatMul", Some(bitWidth(lhs.tp)))) 
+    case SatDiv(x,y) => MathDL(lhs, rhs, latencyOption("SatDiv", Some(bitWidth(lhs.tp)))) 
+    case UnbSatMul(x,y) => MathDL(lhs, rhs, latencyOption("SatMul", Some(bitWidth(lhs.tp)))) 
+    case UnbSatDiv(x,y) => MathDL(lhs, rhs, latencyOption("SatDiv", Some(bitWidth(lhs.tp)))) 
+    case FixMul(x,y) => MathDL(lhs, rhs, latencyOption("FixMul", Some(bitWidth(lhs.tp))))
+    case FixDiv(x,y) => MathDL(lhs, rhs, latencyOption("FixDiv", Some(bitWidth(lhs.tp))))
     case FixRecipSqrt(a) => 
       emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
       emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
-      MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
+      MathDL(lhs, rhs, latencyOption("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixRecip(y) => 
       emitGlobalWireMap(src"${lhs}_one", src"Wire(${lhs.tp})")
       emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
-      MathDL(lhs, rhs, latencyOptionString("FixDiv", Some(bitWidth(lhs.tp)))) 
-    case FixMod(x,y) => MathDL(lhs, rhs, latencyOptionString("FixMod", Some(bitWidth(lhs.tp)))) 
-    case FixFMA(x,y,z) => MathDL(lhs, rhs, latencyOptionString("FixFMA", Some(bitWidth(lhs.tp)))) 
+      MathDL(lhs, rhs, latencyOption("FixDiv", Some(bitWidth(lhs.tp)))) 
+    case FixMod(x,y) => MathDL(lhs, rhs, latencyOption("FixMod", Some(bitWidth(lhs.tp)))) 
+    case FixFMA(x,y,z) => MathDL(lhs, rhs, latencyOption("FixFMA", Some(bitWidth(lhs.tp)))) 
       
 
-    case SatAdd(x,y) => emitt(src"val $lhs = $x <+> $y")
-    case SatSub(x,y) => emitt(src"val $lhs = $x <-> $y")
+    case SatAdd(x,y) => MathDL(lhs, rhs, latencyOption("FixAdd", Some(bitWidth(lhs.tp))))
+    case SatSub(x,y) => MathDL(lhs, rhs, latencyOption("FixSub", Some(bitWidth(lhs.tp))))
     case FixSLA(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r << $shift).r // TODO: cast to proper type (chisel expands bits)")
@@ -129,34 +169,22 @@ trait ChiselGenMath extends ChiselGenCommon {
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := Mux($x < 0.U, -$x, $x).r")
 
-    case FixSqrt(x) => MathDL(lhs, rhs, latencyOptionString("FixSqrt", Some(bitWidth(lhs.tp))))
-    case FixSin(x) => MathDL(lhs, rhs, latencyOptionString("FixSin", Some(bitWidth(lhs.tp))))
-    case FixCos(x) => MathDL(lhs, rhs, latencyOptionString("FixCos", Some(bitWidth(lhs.tp))))
-    case FixAtan(x) => MathDL(lhs, rhs, latencyOptionString("FixAtan", Some(bitWidth(lhs.tp))))
-    case FixSinh(x) => MathDL(lhs, rhs, latencyOptionString("FixSinh", Some(bitWidth(lhs.tp))))
-    case FixCosh(x) => MathDL(lhs, rhs, latencyOptionString("FixCosh", Some(bitWidth(lhs.tp))))
-    case FltFMA(x,y,z) => MathDL(lhs, rhs, latencyOptionString("FltFMA", Some(bitWidth(lhs.tp)))) 
+    case FixSqrt(x) => MathDL(lhs, rhs, latencyOption("FixSqrt", Some(bitWidth(lhs.tp))))
+    case FixSin(x) => MathDL(lhs, rhs, latencyOption("FixSin", Some(bitWidth(lhs.tp))))
+    case FixCos(x) => MathDL(lhs, rhs, latencyOption("FixCos", Some(bitWidth(lhs.tp))))
+    case FixAtan(x) => MathDL(lhs, rhs, latencyOption("FixAtan", Some(bitWidth(lhs.tp))))
+    case FixSinh(x) => MathDL(lhs, rhs, latencyOption("FixSinh", Some(bitWidth(lhs.tp))))
+    case FixCosh(x) => MathDL(lhs, rhs, latencyOption("FixCosh", Some(bitWidth(lhs.tp))))
+    case FltFMA(x,y,z) => MathDL(lhs, rhs, latencyOption("FltFMA", Some(bitWidth(lhs.tp)))) 
 
     case FltNeg(x) =>
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := (-$x).r")
 
-    case FltAdd(x,y) => 
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := ($x + $y).r")
-
-    case FltSub(x,y) => 
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := ($x - $y).r")
-
-    case FltMul(x,y) => 
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := ($x * $y).r")
-
-    case FltDiv(x,y) => 
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"$lhs.r := ($x / $y).r")
-
+    case FltAdd(x,y) => MathDL(lhs, rhs, latencyOption("FltAdd", Some(bitWidth(lhs.tp))))
+    case FltSub(x,y) => MathDL(lhs, rhs, latencyOption("FltSub", Some(bitWidth(lhs.tp))))
+    case FltMul(x,y) => MathDL(lhs, rhs, latencyOption("FltMul", Some(bitWidth(lhs.tp))))
+    case FltDiv(x,y) => MathDL(lhs, rhs, latencyOption("FltDiv", Some(bitWidth(lhs.tp))))
     case FltMax(x,y) => 
       emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
       emitt(src"$lhs.r := Mux($x > $y, ${x}.r, ${y}.r)")
@@ -171,7 +199,7 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FltPow(x,exp) => throw new Exception(s"FltPow($x, $exp) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
 
-    case FltSqrt(x) => MathDL(lhs, rhs, latencyOptionString("FltSqrt", Some(bitWidth(lhs.tp))))
+    case FltSqrt(x) => MathDL(lhs, rhs, latencyOption("FltSqrt", Some(bitWidth(lhs.tp))))
 
     // case FltPow(x,y) => if (emitEn) throw new Exception("Pow not implemented in hardware yet!")
     // case FixFloor(x) => emitt(src"val $lhs = floor($x)")
@@ -198,27 +226,14 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixMin(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux(($a < $b), $a, $b).r")
     case FixMax(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := Mux(($a > $b), $a, $b).r")
-    case FixToFix(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Truncate, Wrapping).r")
-    case FixToFixSat(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Truncate, Saturating).r")
-    case FixToFixUnb(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Unbiased, Wrapping).r")
-    case FixToFixUnbSat(a, fmt) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, Unbiased, Saturating).r")
-    case FltToFlt(a, fmt) => 
-      val FltPtType(m,e) = lhs.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emitt(src"${lhs}.r := Math.flt2flt(${a}, $m, $e).r")
-    case FixToFlt(a, fmt) => 
-      val FixPtType(s,d,f) = a.tp
-      val FltPtType(m,e) = lhs.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.fix2flt($a,$m,$e).r")
-    case FltToFix(a, fmt) => 
-      val FixPtType(s,d,f) = lhs.tp
-      val FltPtType(m,e) = a.tp
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"${lhs}.r := Math.flt2fix($a, $s,$d,$f, Truncate, Wrapping).r")
-    case FltRecip(x) => x.tp match {
-      case DoubleType() => throw new Exception("DoubleType not supported for FltRecip") 
-      case HalfType()   => emitt(src"val $lhs = frec($x)")
-      case FloatType()  => emitt(src"val $lhs = frec($x)")
-    }
+    case FixToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFix", Some(bitWidth(lhs.tp))))
+    case FixToFixSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixSat", Some(bitWidth(lhs.tp))))
+    case FixToFixUnb(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnb", Some(bitWidth(lhs.tp))))
+    case FixToFixUnbSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnbSat", Some(bitWidth(lhs.tp))))
+    case FltToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFlt", Some(bitWidth(lhs.tp))))
+    case FixToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFlt", Some(bitWidth(lhs.tp))))
+    case FltToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFix", Some(bitWidth(lhs.tp))))
+    case FltRecip(x) => MathDL(lhs, rhs, latencyOption("FltRecip", Some(bitWidth(lhs.tp)))) 
     
     case And(a, b) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := $a & $b")
     case Not(a) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs := ~$a")

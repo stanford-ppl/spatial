@@ -23,10 +23,10 @@ import scala.reflect.ClassTag
     a(10) = x.to[Half].to[T]
     a(11) = abs(x)
     a(12) = x % z
-    a(13) = sqrt(x)
+    a(13) = sqrt_approx(x)
     a(15) = 0 /*ln(x)*/
     a(16) = 1.to[T] / x
-    a(17) = 1.to[T] / sqrt(y)
+    a(17) = 1.to[T] / sqrt_approx(y)
     a(18) = floor(x)
     a(19) = ceil(x)
     a
@@ -78,8 +78,8 @@ import scala.reflect.ClassTag
 
 
     println(s"Big margin because vcs simulation of sqrt is sketchy")
-    val cksumInt = Array[Int](goldInt:_*).zip(getMem(dramInt)){case(a,b) => abs(a-b) < 3}.reduce{_&_}
-    val cksumQ   = Array[Q16](goldQ:_*).zip(getMem(dramQ16)){case(a,b) => abs(a-b) < 2.toUnchecked[Q16]}.reduce{_&_}
+    val cksumInt = Array[Int](goldInt:_*).zip(getMem(dramInt)){case(a,b) => abs(a-b) <= 3}.reduce{_&_}
+    val cksumQ   = Array[Q16](goldQ:_*).zip(getMem(dramQ16)){case(a,b) => abs(a-b) <= 2.toUnchecked[Q16]}.reduce{_&_}
     println(r"Int: $cksumInt, Q: $cksumQ")
     assert(cksumInt)
     assert(cksumQ)

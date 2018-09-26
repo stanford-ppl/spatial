@@ -115,7 +115,8 @@ object Math {
   }
 
 
-  def add(a: FixedPoint, b: FixedPoint, round: RoundingMode, overflow: OverflowMode): FixedPoint = {
+  def add(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     // Allocate upcasted and result wires
     val (a_upcast, b_upcast, result_upcast, result) = upcast(a, b)
 
@@ -129,11 +130,12 @@ object Math {
     fix2fixBox.io.a := result_upcast.r
     fix2fixBox.io.expect_neg := expect_neg
     fix2fixBox.io.expect_pos := expect_pos
-    result.r := fix2fixBox.io.b
+    result.r := getRetimed(fix2fixBox.io.b, latency, flow)
     result
   }
 
-  def sub(a: FixedPoint, b: FixedPoint, round: RoundingMode, overflow: OverflowMode): FixedPoint = {
+  def sub(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val (a_upcast, b_upcast, result_upcast, result) = upcast(a, b)
 
     // Instantiate an unsigned subtraction
@@ -146,7 +148,7 @@ object Math {
     fix2fixBox.io.a := result_upcast.r
     fix2fixBox.io.expect_neg := expect_neg
     fix2fixBox.io.expect_pos := expect_pos
-    result.r := fix2fixBox.io.b
+    result.r := getRetimed(fix2fixBox.io.b, latency, flow)
     result
   }
 
@@ -252,24 +254,27 @@ object Math {
     result
   }
 
-  def xor(a: FixedPoint, b: FixedPoint): FixedPoint = {
+  def xor(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
     val result = Wire(new FixedPoint(upcast_type))
-    result.r := a.upcastUInt(upcast_type) ^ b.upcastUInt(upcast_type)
+    result.r := getRetimed(a.upcastUInt(upcast_type) ^ b.upcastUInt(upcast_type), latency, flow)
     result
   }
 
-  def and(a: FixedPoint, b: FixedPoint): FixedPoint = {
+  def and(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
     val result = Wire(new FixedPoint(upcast_type))
-    result.r := a.upcastUInt(upcast_type) & b.upcastUInt(upcast_type)
+    result.r := getRetimed(a.upcastUInt(upcast_type) & b.upcastUInt(upcast_type), latency, flow)
     result
   }
 
-  def or(a: FixedPoint, b: FixedPoint): FixedPoint = {
+  def or(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
     val result = Wire(new FixedPoint(upcast_type))
-    result.r := a.upcastUInt(upcast_type) | b.upcastUInt(upcast_type)
+    result.r := getRetimed(a.upcastUInt(upcast_type) | b.upcastUInt(upcast_type), latency, flow)
     result
   }
 
@@ -291,92 +296,147 @@ object Math {
     result
   }
 
-  def lt(a: FixedPoint, b: FixedPoint): Bool = {
+  def lt(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
-    if (a.s | b.s) a.upcastSInt(upcast_type) < b.upcastSInt(upcast_type)
-    else           a.upcastUInt(upcast_type) < b.upcastUInt(upcast_type)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) getRetimed(a.r.asSInt < b.r.asSInt, latency, flow)
+      else           getRetimed(a.r < b.r, latency, flow)
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) getRetimed(a_up.r.asSInt < b_up.r.asSInt, latency, flow)
+      else           getRetimed(a_up.r < b_up.r, latency, flow)
+    }
   }
 
-  def lte(a: FixedPoint, b: FixedPoint): Bool = {
+  def lte(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
-    if (a.s | b.s) a.upcastSInt(upcast_type) <= b.upcastSInt(upcast_type)
-    else           a.upcastUInt(upcast_type) <= b.upcastUInt(upcast_type)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) getRetimed(a.r.asSInt <= b.r.asSInt, latency, flow)
+      else           getRetimed(a.r <= b.r, latency, flow)
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) getRetimed(a_up.r.asSInt <= b_up.r.asSInt, latency, flow)
+      else           getRetimed(a_up.r <= b_up.r, latency, flow)
+    }
   }
 
-  def eql(a: FixedPoint, b: FixedPoint): Bool = {
+  def eql(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
-    a.upcastUInt(upcast_type) === b.upcastUInt(upcast_type)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) getRetimed(a.r.asSInt === b.r.asSInt, latency, flow)
+      else           getRetimed(a.r === b.r, latency, flow)
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) getRetimed(a_up.r.asSInt === b_up.r.asSInt, latency, flow)
+      else           getRetimed(a_up.r === b_up.r, latency, flow)
+    }
   }
 
-  def neq(a: FixedPoint, b: FixedPoint): Bool = {
+  def neq(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt
-    a.upcastUInt(upcast_type) =/= b.upcastUInt(upcast_type)
+    if (a.fmt == upcast_type && b.fmt == upcast_type) {
+      if (a.s | b.s) getRetimed(a.r.asSInt =/= b.r.asSInt, latency, flow)
+      else           getRetimed(a.r =/= b.r, latency, flow)
+    }
+    else { // should really catch all cases
+      val a_up = Wire(new FixedPoint(upcast_type))
+      val b_up = Wire(new FixedPoint(upcast_type))
+      a.cast(a_up)
+      b.cast(b_up)
+      if (a.s | b.s) getRetimed(a_up.r.asSInt =/= b_up.r.asSInt, latency, flow)
+      else           getRetimed(a_up.r =/= b_up.r, latency, flow)
+    }
+  }
+
+  def neg(a: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
+    getRetimed(-a, latency, flow)
   }
 
 
   // --- Floating Point Operations --- //
 
-  def add(a: FloatingPoint, b: FloatingPoint): FloatingPoint = {
+  def fadd(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
     // TODO: Make this a property of the DeviceTarget?
-    val latency = 13
     assert(a.fmt == b.fmt)
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fadd(a.r, b.r, a.m, a.e, latency)
+    result.r := globals.bigIP.fadd(a.r, b.r, a.m, a.e, delay.getOrElse(0.0).toInt, flow)
     result
   }
 
-  def sub(a: FloatingPoint, b: FloatingPoint): FloatingPoint = {
+  def fsub(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
     assert(a.fmt == b.fmt)
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fsub(a.r, b.r, a.m, a.e)
+    result.r := globals.bigIP.fsub(a.r, b.r, a.m, a.e, delay.getOrElse(0.0).toInt, flow)
     result
   }
 
-  def mul(a: FloatingPoint, b: FloatingPoint): FloatingPoint = {
+  def fmul(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
     assert(a.fmt == b.fmt)
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fmul(a.r, b.r, a.m, a.e)
+    result.r := globals.bigIP.fmul(a.r, b.r, a.m, a.e, delay.getOrElse(0.0).toInt, flow)
     result
   }
 
-  def div(a: FloatingPoint, b: FloatingPoint): FloatingPoint = {
+  def fdiv(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
     assert(a.fmt == b.fmt)
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fdiv(a.r, b.r, a.m, a.e)
+    result.r := globals.bigIP.fdiv(a.r, b.r, a.m, a.e, delay.getOrElse(0.0).toInt, flow)
     result
   }
 
-  def lt(a: FloatingPoint, b: FloatingPoint): Bool = {
+  def flt(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     assert(a.fmt == b.fmt)
     val result = Wire(new Bool)
-    result := globals.bigIP.flt(a.r, b.r, a.m, a.e)
+    result := globals.bigIP.flt(a.r, b.r, a.m, a.e, latency, flow)
     result
   }
 
-  def lte(a: FloatingPoint, b: FloatingPoint): Bool = {
+  def flte(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     assert(a.fmt == b.fmt)
     val result = Wire(new Bool)
-    result := globals.bigIP.fle(a.r, b.r, a.m, a.e)
+    result := globals.bigIP.fle(a.r, b.r, a.m, a.e, latency, flow)
     result
   }
 
-  def eql(a: FloatingPoint, b: FloatingPoint): Bool = {
+  def feql(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     assert(a.fmt == b.fmt)
     val result = Wire(new Bool)
-    result := globals.bigIP.feq(a.r, b.r, a.m, a.e)
+    result := globals.bigIP.feq(a.r, b.r, a.m, a.e, latency, flow)
     result
   }
 
-  def neq(a: FloatingPoint, b: FloatingPoint): Bool = {
+  def fneq(a: FloatingPoint, b: FloatingPoint, delay: Option[Double], flow: Bool): Bool = {
+    val latency = delay.getOrElse(0.0).toInt
     assert(a.fmt == b.fmt)
     val result = Wire(new Bool)
-    result := globals.bigIP.fne(a.r, b.r, a.m, a.e)
+    result := globals.bigIP.fne(a.r, b.r, a.m, a.e, latency, flow)
     result
   }
 
-  def fabs(a: FloatingPoint): FloatingPoint = {
+  def fabs(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fabs(a.r, a.m, a.e)
+    result.r := globals.bigIP.fabs(a.r, a.m, a.e, latency, flow)
     result
   }
 
@@ -386,58 +446,67 @@ object Math {
     result
   }
 
-  def exp(a: FloatingPoint): FloatingPoint = {
+  def exp(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fexp(a.r, a.m, a.e)
+    result.r := globals.bigIP.fexp(a.r, a.m, a.e, latency, flow)
     result
   }
 
-  def tanh(a: FloatingPoint): FloatingPoint = {
+  def tanh(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.ftanh(a.r, a.m, a.e)
+    result.r := globals.bigIP.ftanh(a.r, a.m, a.e, latency, flow)
     result
   }
 
-  def sigmoid(a: FloatingPoint): FloatingPoint = {
+  def sigmoid(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result := globals.bigIP.fsigmoid(a.r, a.m, a.e)
+    result := globals.bigIP.fsigmoid(a.r, a.m, a.e, latency, flow)
     result
   }
 
-  def ln(a: FloatingPoint): FloatingPoint = {
+  def ln(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.fln(a.r, a.m, a.e)
+    result.r := globals.bigIP.fln(a.r, a.m, a.e, latency, flow)
     result
   }
   
-  def recip(a: FloatingPoint): FloatingPoint = {
+  def recip(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.frec(a.r, a.m, a.e)
+    result.r := globals.bigIP.frec(a.r, a.m, a.e, latency, flow)
     result
   }
   
-  def recip_sqrt(a: FloatingPoint): FloatingPoint = {
+  def recip_sqrt(a: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(a.fmt))
-    result.r := globals.bigIP.frsqrt(a.r, a.m, a.e)
+    result.r := globals.bigIP.frsqrt(a.r, a.m, a.e, latency, flow)
     result
   }
 
-  def accum(v: FloatingPoint, en: Bool, last: Bool): FloatingPoint = {
+  def accum(v: FloatingPoint, en: Bool, last: Bool, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(v.fmt))
-    result.r := globals.bigIP.fltaccum(v.r, en, last, v.m, v.e)
+    result.r := globals.bigIP.fltaccum(v.r, en, last, v.m, v.e,latency, flow)
     result
   }
 
-  def fma(m0: FloatingPoint, m1: FloatingPoint, add: FloatingPoint): FloatingPoint = {
+  def fma(m0: FloatingPoint, m1: FloatingPoint, add: FloatingPoint, delay: Option[Double], flow: Bool): FloatingPoint = {
     assert(m0.fmt == m1.fmt && m1.fmt == add.fmt)
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(m0.fmt))
-    result.r := globals.bigIP.fadd(globals.bigIP.fmul(m0.r, m1.r, m0.m, m0.e), add.r, m0.m, m0.e, 0)
+    result.r := globals.bigIP.fadd(globals.bigIP.fmul(m0.r, m1.r, m0.m, m0.e, latency, flow), getRetimed(add.r, latency, flow), m0.m, m0.e, 0, flow)
     result
   }
 
-  def fix2flt(a: FixedPoint, m: Int, e: Int): FloatingPoint = {
+  def fix2flt(a: FixedPoint, m: Int, e: Int, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(m,e))
-    if (a.f == 0) result.r := globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e)
+    if (a.f == 0) result.r := globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e, latency, flow)
     // else if (a.f > e) {
     //   Console.println(s"[WARN] Conversion from ${a.fmt} to Float[$m,$e] may lose precision!")
     //   val truncate = a.f - e + 1
@@ -452,34 +521,39 @@ object Math {
       // val newall = chisel3.util.Cat(raw.msb, chisel3.util.Cat(newexp, raw(m-1,0)))
       // result.r := newall
       val tmp = Wire(new FloatingPoint(m,e))
-      result.r := Math.div(tmp, FloatingPoint(m,e,scala.math.pow(2,a.f))).r
+      tmp.r := globals.bigIP.fix2flt(a.r,a.s,a.d,a.f,m,e, latency, flow)
+      result.r := Math.fdiv(tmp, FloatingPoint(m,e,scala.math.pow(2,a.f)),Some(0.0),true.B).r
     }
     result
   }
-  def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+  def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a.r,a.s,a.d,a.f,s,d,f, rounding, saturating)
+    result.r := globals.bigIP.fix2fix(a.r,a.s,a.d,a.f,s,d,f, latency, flow, rounding, saturating)
     result
   }
-  def fix2fix(a: UInt, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+  def fix2fix(a: UInt, s: Boolean, d: Int, f: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a,false,a.getWidth,0,s,d,f, rounding, saturating)
+    result.r := globals.bigIP.fix2fix(a,false,a.getWidth,0,s,d,f, latency, flow, rounding, saturating)
     result
   }
-  def fix2fix(a: SInt, s: Boolean, d: Int, f: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+  def fix2fix(a: SInt, s: Boolean, d: Int, f: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a.asUInt,true,a.getWidth,0,s,d,f, rounding, saturating)
+    result.r := globals.bigIP.fix2fix(a.asUInt,true,a.getWidth,0,s,d,f, latency, flow, rounding, saturating)
     result
   }
-  def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+  def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FixedPoint(sign,dec,frac))
-    if (frac == 0) result.r := globals.bigIP.flt2fix(a.r,a.m,a.e,sign,dec,frac, rounding, saturating)
+    if (frac == 0) result.r := globals.bigIP.flt2fix(a.r,a.m,a.e,sign,dec,frac, latency, flow, rounding, saturating)
     // else if (frac > a.e) {
     //   Console.println(s"[WARN] Conversion from ${a.fmt} to Fix[$sign,$dec,$frac] may lose precision!")
     //   val truncate = frac - a.e + 1
     //   result.r := flt2fix(a,sign,dec+truncate,frac-truncate,rounding,saturating).r << truncate
     // }
-    else           result.r := globals.bigIP.flt2fix(Math.mul(a, FloatingPoint(a.m,a.e,scala.math.pow(2,frac))).r,a.m,a.e,sign,dec,frac, rounding, saturating)
+    else           result.r := globals.bigIP.flt2fix(Math.fmul(a, FloatingPoint(a.m,a.e,scala.math.pow(2,frac)), Some(0.0), true.B).r,a.m,a.e,sign,dec,frac,latency, flow, rounding, saturating)
     // else {
     //   val exp = a.raw_exp
     //   val newexp = exp + scala.math.pow(2,frac).toInt.U(a.e.W)
@@ -489,9 +563,10 @@ object Math {
     result
   }
 
-  def flt2flt(a: FloatingPoint, manOut: Int, expOut: Int): FloatingPoint = {
+  def flt2flt(a: FloatingPoint, manOut: Int, expOut: Int, delay: Option[Double], flow: Bool): FloatingPoint = {
+    val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(manOut,expOut))
-    result.r := globals.bigIP.flt2flt(a.r,a.m,a.e,manOut,expOut)
+    result.r := globals.bigIP.flt2flt(a.r,a.m,a.e,manOut,expOut, latency, flow)
     result
   }
 

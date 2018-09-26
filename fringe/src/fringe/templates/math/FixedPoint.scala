@@ -25,7 +25,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
   def upcastUInt(fmt: emul.FixFormat): UInt = {
     val result = Wire(new FixedPoint(fmt))
     if (litVal.isDefined) result.r := litVal.get.toInt.FP(fmt.sign, fmt.ibits + f, fmt.fbits - f).r
-    else result.r := Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, Truncate, Wrapping).r
+    else result.r := Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, None, true.B, Truncate, Wrapping).r
     result.r
   }
   def upcastSInt(fmt: emul.FixFormat): SInt = {
@@ -48,7 +48,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
 
   def msb: Bool = number(d+f-1)
 
-  def cast(dest: FixedPoint): Unit = dest.r := Math.fix2fix(this, dest.s, dest.d, dest.f, Truncate, Wrapping)
+  def cast(dest: FixedPoint): Unit = dest.r := Math.fix2fix(this, dest.s, dest.d, dest.f, None, true.B, Truncate, Wrapping)
 
   // Arithmetic
   override def connect(rawop: Data)(implicit ctx: SourceInfo, opts: CompileOptions): Unit = rawop match {
@@ -57,20 +57,20 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
   }
 
   /** Fixed point addition with standard truncation and overflow. */
-  def +(that: FixedPoint): FixedPoint = Math.add(this, that, round = Truncate, overflow = Wrapping)
+  def +(that: FixedPoint): FixedPoint = Math.add(this, that, None, true.B, round = Truncate, overflow = Wrapping)
   def +(that: UInt): FixedPoint = this + that.trueFP(fmt)
   def +(that: SInt): FixedPoint = this + that.trueFP(fmt)
 
   /** Fixed point addition with standard truncation and saturation on overflow. */
-  def <+>(that: FixedPoint): FixedPoint = Math.add(this, that, round = Truncate, overflow = Saturating)
+  def <+>(that: FixedPoint): FixedPoint = Math.add(this, that, None, true.B, round = Truncate, overflow = Saturating)
 
   /** Fixed point subtraction with standard truncation and overflow. */
-  def -(that: FixedPoint): FixedPoint = Math.sub(this, that, round = Truncate, overflow = Wrapping)
+  def -(that: FixedPoint): FixedPoint = Math.sub(this, that, None, true.B, round = Truncate, overflow = Wrapping)
   def -(that: UInt): FixedPoint = this - that.trueFP(fmt)
   def -(that: SInt): FixedPoint = this - that.trueFP(fmt)
 
   /** Fixed point subtraction with standard truncation and saturation on overflow. */
-  def <->(that: FixedPoint): FixedPoint = Math.sub(this, that, round = Truncate, overflow = Saturating)
+  def <->(that: FixedPoint): FixedPoint = Math.sub(this, that, None, true.B, round = Truncate, overflow = Saturating)
 
   /** Fixed point multiplication with standard truncation and overflow. */
   def *(that: FixedPoint): FixedPoint = Math.mul(this, that, delay = None, flow = true.B, round = Truncate, overflow = Wrapping)
@@ -103,39 +103,39 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
   def <<(shift: Int): FixedPoint = Math.arith_left_shift(this, shift)
   def >>>(shift: Int): FixedPoint = Math.logic_right_shift(this, shift)
 
-  def <(that: FixedPoint): Bool = Math.lt(this, that)
+  def <(that: FixedPoint): Bool = Math.lt(this, that, None, true.B)
   def <(that: UInt): Bool = this < that.trueFP(fmt)
   def <(that: SInt): Bool = this < that.trueFP(fmt)
 
-  def <=(that: FixedPoint): Bool = Math.lte(this, that)
+  def <=(that: FixedPoint): Bool = Math.lte(this, that, None, true.B)
   def <=(that: UInt): Bool = this <= that.trueFP(fmt)
   def <=(that: SInt): Bool = this <= that.trueFP(fmt)
 
-  def >(that: FixedPoint): Bool = Math.lt(that, this)
+  def >(that: FixedPoint): Bool = Math.lt(that, this, None, true.B)
   def >(that: UInt): Bool = this > that.trueFP(fmt)
   def >(that: SInt): Bool = this > that.trueFP(fmt)
 
-  def >=(that: FixedPoint): Bool = Math.lte(that, this)
+  def >=(that: FixedPoint): Bool = Math.lte(that, this, None, true.B)
   def >=(that: UInt): Bool = this >= that.trueFP(fmt)
   def >=(that: SInt): Bool = this >= that.trueFP(fmt)
 
-  def ^(that: FixedPoint): FixedPoint = Math.xor(this, that)
+  def ^(that: FixedPoint): FixedPoint = Math.xor(this, that, None, true.B)
   def ^(that: UInt): FixedPoint = this ^ that.trueFP(fmt)
   def ^(that: SInt): FixedPoint = this ^ that.trueFP(fmt)
 
-  def &(that: FixedPoint): FixedPoint = Math.and(this, that)
+  def &(that: FixedPoint): FixedPoint = Math.and(this, that, None, true.B)
   def &(that: UInt): FixedPoint = this & that.trueFP(fmt)
   def &(that: SInt): FixedPoint = this & that.trueFP(fmt)
 
-  def |(that: FixedPoint): FixedPoint = Math.or(this, that)
+  def |(that: FixedPoint): FixedPoint = Math.or(this, that, None, true.B)
   def |(that: UInt): FixedPoint = this | that.trueFP(fmt)
   def |(that: SInt): FixedPoint = this | that.trueFP(fmt)
 
-  def ===(that: FixedPoint): Bool = Math.eql(this, that)
+  def ===(that: FixedPoint): Bool = Math.eql(this, that, None, true.B)
   def ===(that: UInt): Bool = this === that.trueFP(fmt)
   def ===(that: SInt): Bool = this === that.trueFP(fmt)
 
-  def =/=(that: FixedPoint): Bool = Math.neq(this, that)
+  def =/=(that: FixedPoint): Bool = Math.neq(this, that, None, true.B)
   def =/=(that: UInt): Bool = this =/= that.trueFP(fmt)
   def =/=(that: SInt): Bool = this =/= that.trueFP(fmt)
 
@@ -152,9 +152,9 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
     neg
   }
 
-  def toFixed(fmt: emul.FixFormat): FixedPoint = Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, Truncate, Wrapping)
-  def toFixed(num: FixedPoint): FixedPoint = Math.fix2fix(this, num.s, num.d, num.f, Truncate, Wrapping)
-  def toFloat(fmt: emul.FltFormat): FloatingPoint = Math.fix2flt(this, fmt.sbits, fmt.ebits)
+  def toFixed(fmt: emul.FixFormat): FixedPoint = Math.fix2fix(this, fmt.sign, fmt.ibits, fmt.fbits, None, true.B, Truncate, Wrapping)
+  def toFixed(num: FixedPoint): FixedPoint = Math.fix2fix(this, num.s, num.d, num.f, None, true.B, Truncate, Wrapping)
+  def toFloat(fmt: emul.FltFormat): FloatingPoint = Math.fix2flt(this, fmt.sbits, fmt.ebits, None, true.B)
 
   override def cloneType = (new FixedPoint(s,d,f,litVal)).asInstanceOf[this.type] // See chisel3 bug 358
 }
@@ -173,7 +173,7 @@ object FixedPoint {
     val cst = Wire(new FixedPoint(s, d, f, init.litArg.map(_.num)))
     val tmp = Wire(new FixedPoint(s, init.getWidth, 0))
     tmp.r := init
-    cst.r := Math.fix2fix(tmp, s, d, f, Truncate, Wrapping).r
+    cst.r := Math.fix2fix(tmp, s, d, f, None, true.B, Truncate, Wrapping).r
     cst
   }
 

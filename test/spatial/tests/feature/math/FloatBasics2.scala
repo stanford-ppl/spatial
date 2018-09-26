@@ -61,10 +61,13 @@ import spatial.dsl._
     printArray((getMem(dram1)), "A : ")
     printArray((getMem(dram2)), "B : ")
     printArray((getMem(dram3)), "C : ")
+    val ops = Array[String]("ADD", "MUL", "DIV", "SRT", "SUB", "FLT", "FGT", "FEQ", "ABS", "EXP", "LOG", "REC", "RST", "SIG", "TAN", "FMA")
     println("Result ADD, MUL, DIV, SRT, SUB, FLT, FGT, FEQ, ABS, EXP, LOG, REC, RST, SIG, TAN, FMA ")
 
     val out_ram = getMatrix(ff_out)
     val margin = 0.000001.to[T]
+
+    var allgood = true
 
     (0::16,0::length).foreach{(i,j) =>
       val a = if (i == 0 ) {data1(j) + data2(j) }
@@ -85,9 +88,11 @@ import spatial.dsl._
       else if (i == 15) { data1(j) * data2(j) + data3(j) }
       else 0.to[T]
       val b = out_ram(i,j)
-      println(r"$i Expected: $a, Actual: $b")
-      if (i == 3 || i == 12)  assert( (a.isNaN && b.isNaN) || (a >= (b - 8.to[T]) && a <= (b + 8.to[T])) )
-      else                    assert( (a.isNaN && b.isNaN) || (a >= (b - margin) && a <= (b + margin)) )
+      val good = if (i == 3 || i == 12)  if ((a.isNaN && b.isNaN) || (a >= (b - 8.to[T]) && a <= (b + 8.to[T])) ) true else false
+                 else                    if ((a.isNaN && b.isNaN) || (a >= (b - margin) && a <= (b + margin)) ) true else false
+      println(r"$i,$j (${ops(i)}: $good) Expected: $a, Actual: $b")
+      if (good == false) allgood = false
     }
+    assert(allgood)
   }
 }

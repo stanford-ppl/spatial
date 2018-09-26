@@ -150,19 +150,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
-  def latencyOptionString(op: String, b: Option[Int]): String = {
-    if (spatialConfig.enableRetiming) {
-      val latency = latencyOption(op, b)
-      if (b.isDefined) {
-        s"""Some(${latency})"""
-      } else {
-        s"""Some(${latency})"""
-      }
-    } else {
-      "None"      
-    }
-  }
-
   protected def enableRetimeMatch(en: Sym[_], lhs: Sym[_]): Double = { 
     // val last_def_delay = en match {
     //   case Def(And(_,_)) => latencyOption("And", None)

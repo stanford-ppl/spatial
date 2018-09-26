@@ -72,63 +72,69 @@ class BigIPASIC extends BigIP with ASICBlackBoxes {
       m.io.out.asSInt
   }
 
-  def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int): UInt = {
+  def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FAdd(mw, e))
     m.io.a := a
     m.io.b := b
     m.io.out
   }
 
-  def fsub(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
+  def fsub(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FSub(mw, e))
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fmul(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
+  def fmul(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FMul(mw, e))
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fdiv(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
+  def fdiv(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FDiv(mw, e))
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def flt(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def flt(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FLt(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def feq(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def feq(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FEq(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fgt(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fgt(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FGt(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fge(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fge(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FGe(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fle(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fle(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FLe(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fne(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fne(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FNe(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out

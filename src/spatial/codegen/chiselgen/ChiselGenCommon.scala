@@ -202,11 +202,11 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => println(s"forwpressure $z");emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => println(s"backpressure $z");emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
@@ -341,6 +341,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   def swap(lhs: => String, s: RemapSignal): String = s match {
     case En           => wireMap(src"${lhs}_en")
     case Done         => wireMap(src"${lhs}_done")
+    case DoneCondition => wireMap(src"${lhs}_doneCondition")
     case BaseEn       => wireMap(src"${lhs}_base_en")
     case Mask         => wireMap(src"${lhs}_mask")
     case Resetter     => wireMap(src"${lhs}_resetter")

@@ -262,6 +262,13 @@ object Math {
     result
   }
 
+  def inv(a: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
+    val latency = delay.getOrElse(0.0).toInt
+    val result = Wire(new FixedPoint(a.fmt))
+    result.r := getRetimed(~a, latency, flow).r
+    result
+  }
+
   def and(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool): FixedPoint = {
     val latency = delay.getOrElse(0.0).toInt
     val upcast_type = a.fmt combine b.fmt

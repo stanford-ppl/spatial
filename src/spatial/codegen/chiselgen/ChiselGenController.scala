@@ -495,6 +495,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
       alphaconv_register(src"$state")
+      emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
+      emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
 
       emitt("// Emitting notDone")
       visitBlock(notDone)
@@ -512,11 +514,9 @@ trait ChiselGenController extends ChiselGenCommon {
       emitt(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
       emitt(src"${swap(lhs, SM)}.io.nextState := ${nextState.result}.r.asSInt //Mux(${DL(swap(lhs, IIDone), src"1 max ${if (spatialConfig.enableRetiming) nextState.result.fullDelay else 0}", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
       emitt(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
-      emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
-      emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
-      emitt(src"${swap(lhs, Blank)}_doneCondition := ~${notDone.result}")
-      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${swap(lhs, Blank)}_doneCondition")
+      emitt(src"${swap(lhs, DoneCondition)} := ~${notDone.result}")
+      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${swap(lhs, DoneCondition)}")
       emitChildrenCxns(lhs, true)
       exitCtrl(lhs)
 

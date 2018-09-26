@@ -12,30 +12,41 @@ import spatial.util.spatialConfig
 
 trait ChiselGenMath extends ChiselGenCommon {
 
+  // Cut back on code size by replacing long strings
+  var ensigs = new scala.collection.mutable.ListBuffer[String]
+
+  private def newEnsig(code: String): String = {
+    emitGlobalWireMap(s"ensig${ensigs.size}", "Wire(Bool())")
+    emitt(s"${swap(s"ensig${ensigs.size}", Blank)} := $code")
+    ensigs += code
+    s"${swap(s"ensig${ensigs.size-1}", Blank)}"
+  }
   // TODO: Clean this and make it nice
   private def MathDL(lhs: Sym[_], rhs: Op[_], nodelat: Double): Unit = {
     emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
 
-    val backpressure = if (controllerStack.nonEmpty) getBackPressure(controllerStack.head.toCtrl) else "true.B"
+    val backpressure_raw = if (controllerStack.nonEmpty) getBackPressure(controllerStack.head.toCtrl) else "true.B"
+    val backpressure = if (ensigs.contains(backpressure_raw) && backpressure_raw != "true.B") s"${swap(s"ensig${ensigs.indexOf(backpressure_raw)}", Blank)}"
+                       else {newEnsig(backpressure_raw)}
     val lat = if ((lhs.fullDelay + nodelat).toInt != (lhs.fullDelay.toInt + nodelat.toInt)) s"Some($nodelat + 1.0)" else s"Some($nodelat)"
     rhs match {
-      case FixMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure)).r")
-      case UnbMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, rounding = Unbiased)).r")
-      case SatMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, saturating = Saturating)).r")
-      case UnbSatMul(a,b) => emitt(src"$lhs.r := ($a.mul($b, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
-      case FixDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure)).r")
-      case UnbDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, rounding = Unbiased)).r")
-      case SatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturating)).r")
-      case UnbSatDiv(a,b) => emitt(src"$lhs.r := ($a.div($b, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
-      case FixMod(a,b) => emitt(src"$lhs.r := ($a.mod($b, $lat, $backpressure)).r")
-      case FixRecip(a) => emitt(src"$lhs.r := (${lhs}_one.div($a, $lat, $backpressure)).r")
+      case FixMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure)).r")
+      case UnbMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, rounding = Unbiased)).r")
+      case SatMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, saturating = Saturating)).r")
+      case UnbSatMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
+      case FixDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure)).r")
+      case UnbDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, rounding = Unbiased)).r")
+      case SatDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, saturating = Saturating)).r")
+      case UnbSatDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
+      case FixMod(x,y) => emitt(src"$lhs.r := ($x.mod($y, $lat, $backpressure)).r")
+      case FixRecip(x) => emitt(src"$lhs.r := (${lhs}_one.div($x, $lat, $backpressure)).r")
       case FixSqrt(x) => emitt(src"$lhs.r := Math.sqrt($x, $lat, $backpressure).r")
       case FixSin(x) => emitt(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
       case FixCos(x) => emitt(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
       case FixAtan(x) => emitt(src"$lhs.r := Math.tan($x, $lat, $backpressure).r")
       case FixSinh(x) => emitt(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
       case FixCosh(x) => emitt(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
-      case FixRecipSqrt(a) => emitt(src"$lhs.r := (${lhs}_one.div(Math.sqrt($a, ${s"""latencyOption("FixSqrt", Some(bitWidth(lhs.tp)))"""}, $backpressure), $lat, $backpressure)).r")
+      case FixRecipSqrt(x) => emitt(src"$lhs.r := (${lhs}_one.div(Math.sqrt($x, ${s"""latencyOption("FixSqrt", Some(bitWidth(lhs.tp)))"""}, $backpressure), $lat, $backpressure)).r")
       case FixFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).toFixed($lhs).r")
       case FltFMA(x,y,z) => emitt(src"$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).r")
       case FltSqrt(x) => emitt(src"$lhs.r := Math.fsqrt($x, $lat, $backpressure).r")
@@ -61,21 +72,21 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixXor(x,y)  => emitt(src"$lhs.r := Math.xor($x,$y,$lat, $backpressure).r")
       case SatAdd(x,y) => emitt(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
       case SatSub(x,y) => emitt(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
-      case FixToFix(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Wrapping).r")
-      case FixToFixSat(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating).r")
-      case FixToFixUnb(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping).r")
-      case FixToFixUnbSat(a, fmt) => emitt(src"$lhs.r := Math.fix2fix(${a}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Saturating).r")
-      case FixToFlt(a, fmt) => 
-        val FixPtType(s,d,f) = a.tp
+      case FixToFix(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Wrapping).r")
+      case FixToFixSat(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating).r")
+      case FixToFixUnb(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping).r")
+      case FixToFixUnbSat(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Saturating).r")
+      case FixToFlt(x, fmt) => 
+        val FixPtType(s,d,f) = x.tp
         val FltPtType(m,e) = lhs.tp
-        emitt(src"$lhs.r := Math.fix2flt($a,$m,$e,$lat,$backpressure).r")
-      case FltToFix(a, fmt) => 
+        emitt(src"$lhs.r := Math.fix2flt($x,$m,$e,$lat,$backpressure).r")
+      case FltToFix(x, fmt) => 
         val FixPtType(s,d,f) = lhs.tp
-        val FltPtType(m,e) = a.tp
-        emitt(src"$lhs.r := Math.flt2fix($a, $s,$d,$f,$lat,$backpressure, Truncate, Wrapping).r")
-      case FltToFlt(a, fmt) => 
+        val FltPtType(m,e) = x.tp
+        emitt(src"$lhs.r := Math.flt2fix($x, $s,$d,$f,$lat,$backpressure, Truncate, Wrapping).r")
+      case FltToFlt(x, fmt) => 
         val FltPtType(m,e) = lhs.tp
-        emitt(src"$lhs.r := Math.flt2flt($a, $m, $e, $lat, $backpressure).r")
+        emitt(src"$lhs.r := Math.flt2flt($x, $m, $e, $lat, $backpressure).r")
 
     }
   }

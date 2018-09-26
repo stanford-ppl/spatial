@@ -89,83 +89,97 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
 
   override def sqrt(a: UInt, latency: Int, flow: Bool): UInt = {
     val m = Module(new SquareRooter(a.getWidth, false, latency))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
 
-  def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int): UInt = {
+  def fadd(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FAdd(mw, e, latency))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
 
-  def fsub(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
-    val m = Module(new FSub(mw, e))
+  def fsub(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
+    val m = Module(new FSub(mw, e, latency))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fmul(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
-    val m = Module(new FMul(mw, e))
+  def fmul(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
+    val m = Module(new FMul(mw, e, latency))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fdiv(a: UInt, b: UInt, mw: Int, e: Int): UInt = {
-    val m = Module(new FDiv(mw, e))
+  def fdiv(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
+    val m = Module(new FDiv(mw, e, latency))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def flt(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def flt(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FLt(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def feq(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def feq(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FEq(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fgt(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fgt(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FGt(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fge(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fge(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FGe(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fle(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fle(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FLe(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  def fne(a: UInt, b: UInt, mw: Int, e: Int): Bool = {
+  def fne(a: UInt, b: UInt, mw: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val m = Module(new FNe(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.out
   }
-  override def fabs(a: UInt, mw: Int, e: Int): UInt = {
+  override def fabs(a: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FAbs(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def fexp(a: UInt, mw: Int, e: Int): UInt = {
+  override def fexp(a: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FExp(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def fln(a: UInt, mw: Int, e: Int): UInt = {
+  override def fln(a: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FLog(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
@@ -174,35 +188,39 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     m.io.a := a
     m.io.out
   }
-  override def frec(a: UInt, mw: Int, e: Int): UInt = {
+  override def frec(a: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FRec(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def frsqrt(a: UInt, mw: Int, e: Int): UInt = {
+  override def frsqrt(a: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FRSqrt(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def ffma(a: UInt, b: UInt, c: UInt, mw: Int, e: Int): UInt = {
+  override def ffma(a: UInt, b: UInt, c: UInt, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FFma(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.b := b
     m.io.c := c
     m.io.out
   }
-  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, mw: Int, e: Int): UInt = {
+  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new Fix2Float(dec, frac, mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     if (src.litArg.isEmpty) {
       val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
       fix2fixBox.io.a := src
       fix2fixBox.io.expect_neg := false.B
       fix2fixBox.io.expect_pos := false.B
-      fix2fixBox.io.b
+      getRetimed(fix2fixBox.io.b, latency, flow)
     }
     // Likely that there are mistakes here
     else {
@@ -227,22 +245,25 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
             else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
           }
       }
-      newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0)
+      getRetimed(newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0), latency, flow)
     }
   }
 
-  override def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+  override def flt2fix(a: UInt, mw: Int, e: Int, sign: Boolean, dec: Int, frac: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     val m = Module(new Float2Fix(mw, e, sign, dec, frac))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def flt2flt(a: UInt, mwa: Int, ea: Int, mw_out: Int, e_out: Int): UInt = {
+  override def flt2flt(a: UInt, mwa: Int, ea: Int, mw_out: Int, e_out: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new Float2Float(mwa, ea, mw_out, e_out))
+    m.io.flow := flow
     m.io.a := a
     m.io.out
   }
-  override def fltaccum(a: UInt, en: Bool, last: Bool, mw: Int, e: Int): UInt = {
+  override def fltaccum(a: UInt, en: Bool, last: Bool, mw: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val m = Module(new FAccum(mw, e))
+    m.io.flow := flow
     m.io.a := a
     m.io.en := en
     m.io.last := last

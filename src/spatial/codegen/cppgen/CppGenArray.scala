@@ -109,7 +109,6 @@ trait CppGenArray extends CppGenCommon {
     case op@ArrayNew(size)      => emitNewArray(lhs, lhs.tp, src"$size")
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case DataAsBits(bits)       => 
-      println(s"bits type ${bits.tp}")
       bits.tp match {
         case FltPtType(_,_) =>
           emit(src"${lhs.tp} $lhs;")

@@ -114,8 +114,8 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     })
     val m = Module(new SqrtSimBBox(width, signed, latency))
     m.io.clk := clock
-    m.io.reset := reset.toBool
-    m.io.x := io.x
+    m.io.reset := reset.toBool | (getRetimed(io.x,1,true.B) =/= io.x) // Hacky but should be ok for now
+    m.io.x := getRetimed(io.x,1,true.B)
     io.y := m.io.y
   }
 
@@ -127,36 +127,36 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     fma.io.sqrtOp := true.B // TODO: What should this be?
     fma.io.roundingMode := 0.U(3.W) // TODO: What should this be?
     fma.io.detectTininess := false.B // TODO: What should this be?
-    fNFromRecFN(e, m, fma.io.out)
+    getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
 
-  def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int): UInt = {
+  def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val result = Wire(new FloatingPoint(m, e))
     val fma = Module(new MulAddRecFN(e, m))
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
     fma.io.c := recFNFromFN(e, m, b)
     fma.io.op := 0.U(2.W)
-    fNFromRecFN(e, m, fma.io.out)
+    getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
 
-  def fsub(a: UInt, b: UInt, m: Int, e: Int): UInt = {
+  def fsub(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
     fma.io.c := recFNFromFN(e, m, b)
     fma.io.op := 1.U(2.W)
-    fNFromRecFN(e, m, fma.io.out)
+    getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
-  def fmul(a: UInt, b: UInt, m: Int, e: Int): UInt = {
+  def fmul(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, b)
     fma.io.c := recFNFromFN(e, m, FloatingPoint.bits(0.0f).S((m+e).W))
     fma.io.op := 0.U(2.W)
-    fNFromRecFN(e, m, fma.io.out)
+    getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
-  def fdiv(a: UInt, b: UInt, m: Int, e: Int): UInt = {
+  def fdiv(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new DivSqrtRecFN_small(e, m, 0))
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, b)
@@ -164,71 +164,71 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     fma.io.sqrtOp := false.B // TODO: What should this be?
     fma.io.roundingMode := 0.U(3.W) // TODO: What should this be?
     fma.io.detectTininess := false.B // TODO: What should this be?
-    fNFromRecFN(e, m, fma.io.out)
+    getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
 
-  def flt(a: UInt, b: UInt, m: Int, e: Int): Bool = {
+  def flt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.lt
-    result
+    getRetimed(result, latency, flow)
   }
-  def feq(a: UInt, b: UInt, m: Int, e: Int): Bool = {
+  def feq(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.eq
-    result
+    getRetimed(result, latency, flow)
   }
-  def fgt(a: UInt, b: UInt, m: Int, e: Int): Bool = {
+  def fgt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.gt
-    result
+    getRetimed(result, latency, flow)
   }
-  def fge(a: UInt, b: UInt, m: Int, e: Int): Bool = {
+  def fge(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.gt | comp.io.eq
-    result
+    getRetimed(result, latency, flow)
   }
-  def fle(a: UInt, b: UInt, m: Int, e: Int): Bool = {
+  def fle(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := comp.io.lt | comp.io.eq
-    result
+    getRetimed(result, latency, flow)
   }
-  def fne(a: UInt, b: UInt, m: Int, e: Int): Bool = {
+  def fne(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
     result := ~comp.io.eq
-    result
+    getRetimed(result, latency, flow)
   }
 
-  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     if (src.litArg.isEmpty) {
       val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
       fix2fixBox.io.a := src
       fix2fixBox.io.expect_neg := false.B
       fix2fixBox.io.expect_pos := false.B
-      fix2fixBox.io.b
+      getRetimed(fix2fixBox.io.b, latency, flow)
     }
     // Likely that there are mistakes here
     else {
@@ -253,26 +253,26 @@ class BigIPSim extends BigIP with SimBlackBoxes {
             else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
           }
       }
-      newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0)
+      getRetimed(newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0), latency, flow)
     }
 
   }
 
-  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int): UInt = {
+  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int, latency: Int, flow: Bool): UInt = {
     val conv = Module(new INToRecFN(a.getWidth,exp,man))
     conv.io.signedIn := sign.B
     conv.io.in := a
     conv.io.roundingMode := 0.U(3.W)
     conv.io.detectTininess := false.B
-    fNFromRecFN(exp, man, conv.io.out)
+    getRetimed(fNFromRecFN(exp, man, conv.io.out), latency, flow)
   }
 
-  override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+  override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     val conv = Module(new RecFNToIN(exp,man,a.getWidth))
     conv.io.signedOut := sign.B
     conv.io.in := recFNFromFN(exp, man, a)
     conv.io.roundingMode := 0.U(3.W)
-    conv.io.out
+    getRetimed(conv.io.out, latency, flow)
   }
 }
 

@@ -14,9 +14,9 @@ trait ZynqBlackBoxes {
 
   class Divider(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val dividend = Input(UInt(dividendWidth.W))
       val divisor = Input(UInt(divisorWidth.W))
-      val flow = Input(Bool())
       val out = Output(UInt(dividendWidth.W))
     })
 
@@ -24,6 +24,7 @@ trait ZynqBlackBoxes {
 
     val m = Module(new DivModBBox(dividendWidth, divisorWidth, signed, false, fractionBits, latency))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_dividend_tvalid := true.B
     m.io.s_axis_dividend_tdata := io.dividend
     m.io.s_axis_divisor_tvalid := true.B
@@ -34,9 +35,9 @@ trait ZynqBlackBoxes {
 
   class Modulo(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val dividend = Input(UInt(dividendWidth.W))
       val divisor = Input(UInt(divisorWidth.W))
-      val flow = Input(Bool())
       val out = Output(UInt(dividendWidth.W))
     })
 
@@ -44,6 +45,7 @@ trait ZynqBlackBoxes {
 
     val m = Module(new DivModBBox(dividendWidth, divisorWidth, signed, true, fractionBits, latency))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_dividend_tvalid := true.B
     m.io.s_axis_dividend_tdata := io.dividend
     m.io.s_axis_divisor_tvalid := true.B
@@ -89,9 +91,9 @@ generate_target {all} [get_ips $moduleName]
 
   class Multiplier(val aWidth: Int, val bWidth: Int, val outWidth: Int, val signed: Boolean, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt(aWidth.W))
       val b = Input(UInt(bWidth.W))
-      val flow = Input(Bool())
       val out = Output(UInt(outWidth.W))
     })
 
@@ -147,6 +149,7 @@ generate_target {all} [get_ips $moduleName]
 
   class SquareRooter(val width: Int, val signed: Boolean, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt(width.W))
       val out = Output(UInt(width.W))
     })
@@ -154,6 +157,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new SqrtBBox(width, signed, latency))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_cartesian_tvalid := true.B
     m.io.s_axis_cartesian_tdata := io.a
     io.out := m.io.m_axis_dout_tdata
@@ -162,6 +166,7 @@ generate_target {all} [get_ips $moduleName]
   class SqrtBBox(val width: Int, val signed: Boolean, val latency: Int) extends BlackBox {
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_cartesian_tvalid = Input(Bool())
       val s_axis_cartesian_tdata = Input(UInt(width.W))
       val m_axis_dout_tdata = Output(UInt(width.W))
@@ -178,7 +183,7 @@ s"""
 ## Integer SquareRooter
 create_ip -name cordic -vendor xilinx.com -library ip -version 6.0 -module_name $moduleName
 set_property -dict [list CONFIG.Input_Width.VALUE_SRC USER] [get_bd_cells cordic_0]
-set_property -dict [list CONFIG.Functional_Selection {Square_Root} CONFIG.Input_Width {$width} CONFIG.Output_Width {$width} CONFIG.Data_Format {UnsignedFraction} CONFIG.Output_Width {$width} CONFIG.Coarse_Rotation {false}] [get_bd_cells cordic_0]
+set_property -dict [list CONFIG.Functional_Selection {Square_Root} CONFIG.ACLKEN {true} CONFIG.Input_Width {$width} CONFIG.Output_Width {$width} CONFIG.Data_Format {UnsignedFraction} CONFIG.Output_Width {$width} CONFIG.Coarse_Rotation {false}] [get_bd_cells cordic_0]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 """)
@@ -191,12 +196,14 @@ generate_target {all} [get_ips $moduleName]
 
   class FAbs(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new FAbsBBox(exp, frac, exp, frac))
     //m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -207,6 +214,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       //val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -222,7 +230,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fabs
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Absolute} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {0} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Absolute} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {0} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -235,12 +243,14 @@ generate_target {all} [get_ips $moduleName]
 
   class FExp(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new FExpBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -252,6 +262,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -269,7 +280,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fexp
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Exponential} CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Medium_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Exponential} CONFIG.Has_ACLKEN {true}  CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Medium_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -283,12 +294,14 @@ generate_target {all} [get_ips $moduleName]
 
   class FLog(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new FLogBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -300,6 +313,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -317,7 +331,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## flog
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Logarithm} CONFIG.Flow_Control {NonBlocking} CONFIG.Maximum_Latency {true} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Medium_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Logarithm} CONFIG.Has_ACLKEN {true}  CONFIG.Flow_Control {NonBlocking} CONFIG.Maximum_Latency {true} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Medium_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -331,12 +345,14 @@ generate_target {all} [get_ips $moduleName]
 
   class FSqrt(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new FSqrtBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -348,6 +364,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -363,7 +380,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fsqrt
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Square_root} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {28} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Square_root} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {28} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -376,6 +393,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FAdd(val frac: Int, val exp: Int, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
@@ -383,6 +401,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FAddBBox(exp, frac, exp, frac, latency))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -396,6 +415,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -415,7 +435,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fadd
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Add_Sub_Value {Add} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {$Mult_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$latency}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Add_Sub_Value {Add} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {$Mult_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$latency}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -426,8 +446,9 @@ generate_target {all} [get_ips $moduleName]
     }
   }
 
-  class FSub(val frac: Int, val exp: Int) extends Module {
+  class FSub(val frac: Int, val exp: Int, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
@@ -435,6 +456,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FSubBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -448,6 +470,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -465,7 +488,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fsub
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Add_Sub_Value {Subtract} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.C_Latency {12}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Add_Sub_Value {Subtract} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.C_Latency {12}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -476,8 +499,9 @@ generate_target {all} [get_ips $moduleName]
     }
   }
 
-  class FMul(val frac: Int, val exp: Int) extends Module {
+  class FMul(val frac: Int, val exp: Int, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
@@ -485,6 +509,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FMulBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -498,6 +523,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -515,7 +541,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fmul
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Multiply} CONFIG.A_Precision_Type {Custom} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {8} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Multiply} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {8} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -526,8 +552,9 @@ generate_target {all} [get_ips $moduleName]
     }
   }
 
-  class FDiv(val frac: Int, val exp: Int) extends Module {
+  class FDiv(val frac: Int, val exp: Int, val latency: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
@@ -535,6 +562,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FDivBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -548,6 +576,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -565,7 +594,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fdiv
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Divide} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$inExp} CONFIG.C_Result_Fraction_Width {$inFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {28} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Divide} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$inExp} CONFIG.C_Result_Fraction_Width {$inFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {28} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -578,6 +607,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FLt(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(Bool())
@@ -585,6 +615,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FLtBBox(exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -598,6 +629,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -615,7 +647,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## flt
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.C_Compare_Operation {Less_Than} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.Has_ACLKEN {true}  CONFIG.C_Compare_Operation {Less_Than} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -628,6 +660,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FLe(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(Bool())
@@ -635,6 +668,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FLeBBox(exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -648,6 +682,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -665,7 +700,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fle
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.C_Compare_Operation {Less_Than_Or_Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.Has_ACLKEN {true}  CONFIG.C_Compare_Operation {Less_Than_Or_Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -678,6 +713,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FEq(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(Bool())
@@ -685,6 +721,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FEqBBox(exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -698,6 +735,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -715,7 +753,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## feq
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.C_Compare_Operation {Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.Has_ACLKEN {true}  CONFIG.C_Compare_Operation {Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -728,6 +766,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FNe(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(Bool())
@@ -735,6 +774,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FNeBBox(exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -748,6 +788,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -765,7 +806,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fne
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.C_Compare_Operation {Not_Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.Has_ACLKEN {true}  CONFIG.C_Compare_Operation {Not_Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -778,6 +819,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FGt(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(Bool())
@@ -785,6 +827,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FGtBBox(exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -798,6 +841,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -815,7 +859,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fgt
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.C_Compare_Operation {Greater_Than} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.Has_ACLKEN {true}  CONFIG.C_Compare_Operation {Greater_Than} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -828,6 +872,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FGe(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val out = Output(Bool())
@@ -835,6 +880,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FGeBBox(exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -848,6 +894,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -865,7 +912,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fgt
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.C_Compare_Operation {Greater_Than_Or_Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Compare} CONFIG.Has_ACLKEN {true}  CONFIG.C_Compare_Operation {Greater_Than_Or_Equal} CONFIG.A_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {1} CONFIG.C_Result_Fraction_Width {0} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -878,12 +925,14 @@ generate_target {all} [get_ips $moduleName]
 
   class Fix2Float(val dec: Int, val pt: Int, val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((dec+pt).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new Fix2FloatBBox(dec, pt, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -895,6 +944,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inIntWidth+inFracWidth).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -910,7 +960,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## fix2float
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Fixed_to_float} CONFIG.A_Precision_Type {Custom} CONFIG.Result_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inIntWidth} CONFIG.C_A_Fraction_Width {$inFracWidth} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Accum_Msb {32} CONFIG.C_Accum_Lsb {-31} CONFIG.C_Accum_Input_Msb {32} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {6} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Fixed_to_float} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Result_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inIntWidth} CONFIG.C_A_Fraction_Width {$inFracWidth} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Accum_Msb {32} CONFIG.C_Accum_Lsb {-31} CONFIG.C_Accum_Input_Msb {32} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {6} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -924,12 +974,14 @@ generate_target {all} [get_ips $moduleName]
   // TODO: Sign isn't used anywhere
   class Float2Fix(val frac: Int, val exp: Int, val sign: Boolean, val dec: Int, val pt: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((dec+pt).W))
     })
 
     val m = Module(new Float2FixBBox(exp, frac, dec, pt))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -941,6 +993,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -956,7 +1009,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## float2fix
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Float_to_fixed} CONFIG.A_Precision_Type {Custom} CONFIG.Result_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.C_Result_Exponent_Width {$outIntWidth} CONFIG.C_Result_Fraction_Width {$outFracWidth} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {6} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Float_to_fixed} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Result_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.C_Result_Exponent_Width {$outIntWidth} CONFIG.C_Result_Fraction_Width {$outFracWidth} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {6} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -969,12 +1022,14 @@ generate_target {all} [get_ips $moduleName]
 
   class Float2Float(val exp1: Int, val frac1: Int, val exp2: Int, val frac2: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp1+frac1).W))
       val out = Output(UInt((exp2+frac2).W))
     })
 
     val m = Module(new Float2FloatBBox(exp1, frac1, exp2, frac2))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -986,6 +1041,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -1001,7 +1057,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## float2float
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Float_to_float} CONFIG.A_Precision_Type {Custom} CONFIG.Result_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Float_to_float} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.Result_Precision_Type {Custom} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {No_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {2} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -1015,12 +1071,14 @@ generate_target {all} [get_ips $moduleName]
 
   class FRec(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new FRecBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -1030,6 +1088,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -1047,7 +1106,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## frec
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Reciprocal} CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Reciprocal} CONFIG.Has_ACLKEN {true}  CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -1061,12 +1120,14 @@ generate_target {all} [get_ips $moduleName]
 
   class FRSqrt(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val out = Output(UInt((exp+frac).W))
     })
 
     val m = Module(new FRSqrtBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     io.out := m.io.m_axis_result_tdata
@@ -1076,6 +1137,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val m_axis_result_tvalid = Output(Bool())
@@ -1093,7 +1155,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## frsqrt
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Rec_Square_Root} CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Rec_Square_Root} CONFIG.Has_ACLKEN {true}  CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {$precisionType} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {$precisionType} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {$Latency} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -1106,6 +1168,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FFma(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val b = Input(UInt((exp+frac).W))
       val c = Input(UInt((exp+frac).W))
@@ -1114,6 +1177,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FFmaBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := true.B
     m.io.s_axis_b_tdata := io.b
@@ -1129,6 +1193,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tdata = Input(UInt((inExp+inFrac).W))
       val s_axis_b_tvalid = Input(Bool())
@@ -1148,7 +1213,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## ffma
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {FMA} CONFIG.A_Precision_Type {Custom} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {19} CONFIG.C_Rate {1}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {FMA} CONFIG.Has_ACLKEN {true}  CONFIG.A_Precision_Type {Custom} CONFIG.C_Mult_Usage {Full_Usage} CONFIG.Flow_Control {NonBlocking} CONFIG.C_A_Exponent_Width {$inExp} CONFIG.C_A_Fraction_Width {$inFrac} CONFIG.Result_Precision_Type {Custom} CONFIG.C_Result_Exponent_Width {$outExp} CONFIG.C_Result_Fraction_Width {$outFrac} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {19} CONFIG.C_Rate {1}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 
@@ -1161,6 +1226,7 @@ generate_target {all} [get_ips $moduleName]
 
   class FAccum(val frac: Int, val exp: Int) extends Module {
     val io = IO(new Bundle {
+      val flow = Input(Bool())
       val a = Input(UInt((exp+frac).W))
       val en = Input(Bool())
       val last  = Input(Bool())
@@ -1169,6 +1235,7 @@ generate_target {all} [get_ips $moduleName]
 
     val m = Module(new FAccumBBox(exp, frac, exp, frac))
     m.io.aclk := clock
+    m.io.aclken := io.flow
     m.io.aresetn := ~reset.toBool
     m.io.s_axis_a_tdata := io.a
     m.io.s_axis_a_tvalid := io.en
@@ -1180,6 +1247,7 @@ generate_target {all} [get_ips $moduleName]
 
     val io = IO(new Bundle {
       val aclk = Input(Clock())
+      val aclken = Input(Bool())
       val aresetn = Input(Bool())
       val s_axis_a_tvalid = Input(Bool())
       val s_axis_a_tlast = Input(Bool())
@@ -1198,7 +1266,7 @@ generate_target {all} [get_ips $moduleName]
 s"""
 ## faccum
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name $moduleName
-set_property -dict [list CONFIG.Operation_Type {Accumulator} CONFIG.Add_Sub_Value {Add} CONFIG.Has_ARESETn {true} CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {Single} CONFIG.C_A_Exponent_Width {8} CONFIG.C_A_Fraction_Width {24} CONFIG.Result_Precision_Type {Single} CONFIG.C_Result_Exponent_Width {8} CONFIG.C_Result_Fraction_Width {24} CONFIG.C_Mult_Usage {Medium_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {22} CONFIG.C_Rate {1} CONFIG.Has_A_TLAST {true} CONFIG.RESULT_TLAST_Behv {Pass_A_TLAST}] [get_ips $moduleName]
+set_property -dict [list CONFIG.Operation_Type {Accumulator} CONFIG.Has_ACLKEN {true}  CONFIG.Add_Sub_Value {Add} CONFIG.Has_ARESETn {true} CONFIG.Flow_Control {NonBlocking} CONFIG.A_Precision_Type {Single} CONFIG.C_A_Exponent_Width {8} CONFIG.C_A_Fraction_Width {24} CONFIG.Result_Precision_Type {Single} CONFIG.C_Result_Exponent_Width {8} CONFIG.C_Result_Fraction_Width {24} CONFIG.C_Mult_Usage {Medium_Usage} CONFIG.Has_RESULT_TREADY {false} CONFIG.C_Latency {22} CONFIG.C_Rate {1} CONFIG.Has_A_TLAST {true} CONFIG.RESULT_TLAST_Behv {Pass_A_TLAST}] [get_ips $moduleName]
 set_property generate_synth_checkpoint false [get_files $moduleName.xci]
 generate_target {all} [get_ips $moduleName]
 

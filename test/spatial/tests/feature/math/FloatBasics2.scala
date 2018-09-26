@@ -38,15 +38,15 @@ import spatial.dsl._
 
         Pipe { ff_out_sram(0, i) = sram1(i) + sram2(i) }
         Pipe { ff_out_sram(1, i) = sram1(i) * sram2(i) }
-        Pipe { ff_out_sram(2, i) = sram1(i) / sram2(i) }
-        Pipe { ff_out_sram(3, i) = sqrt(sram1(i)) }
+        Pipe { ff_out_sram(2, i) = 0.to[T]/*sram1(i) / sram2(i)*/ }
+        Pipe { ff_out_sram(3, i) = 0.to[T]/*sqrt(sram1(i))*/ }
         Pipe { ff_out_sram(4, i) = sram1(i) - sram2(i) }
         Pipe { ff_out_sram(5, i) = mux((sram1(i) < sram2(i)),1.to[T],0.to[T])  }
         Pipe { ff_out_sram(6, i) = mux((sram1(i) > sram2(i)),1.to[T],0.to[T]) }
         Pipe { ff_out_sram(7, i) = mux((sram1(i) == sram2(i)),1.to[T],0.to[T]) }
 
-        Pipe { ff_out_sram(8, i) = abs(sram1(i)) }
-        Pipe { ff_out_sram(9, i) = exp_taylor(sram1(i)) /*exp(sram1(i))*/ }
+        Pipe { ff_out_sram(8, i) = 0.to[T]/*abs(sram1(i))*/ }
+        Pipe { ff_out_sram(9, i) = 0.to[T]/*exp_taylor(sram1(i)) /*exp(sram1(i))*/*/ }
         Pipe { ff_out_sram(10, i) = 0.to[T] /*ln(sram1(i))*/ }
         Pipe { ff_out_sram(11, i) = 1.to[T]/sram1(i) }
         Pipe { ff_out_sram(12, i) = 1.to[T]/sqrt(sram1(i)) }
@@ -72,14 +72,14 @@ import spatial.dsl._
     (0::16,0::length).foreach{(i,j) =>
       val a = if (i == 0 ) {data1(j) + data2(j) }
       else if (i == 1 ) { data1(j) * data2(j) }
-      else if (i == 2 ) { data1(j) / data2(j) }
-      else if (i == 3 ) { sqrt(data1(j)) }
+      // else if (i == 2 ) { data1(j) / data2(j) }
+      // else if (i == 3 ) { sqrt(data1(j)) }
       else if (i == 4 ) { data1(j) - data2(j) }
       else if (i == 5 ) { if (data1(j) < data2(j)) 1.to[T] else 0.to[T] }
       else if (i == 6 ) { if (data1(j) > data2(j)) 1.to[T] else 0.to[T] }
       else if (i == 7 ) { if (data1(j) == data2(j)) 1.to[T] else 0.to[T] }
-      else if (i == 8 ) { abs(data1(j)) }
-      else if (i == 9 ) { exp_taylor(data1(j)) }
+      // else if (i == 8 ) { abs(data1(j)) }
+      // else if (i == 9 ) { exp_taylor(data1(j)) }
       else if (i == 10) { 0.to[T] /*ln(data1(j))*/ }
       else if (i == 11) { 1.to[T]/(data1(j)) }
       else if (i == 12) { 1.to[T]/sqrt(data1(j)) }

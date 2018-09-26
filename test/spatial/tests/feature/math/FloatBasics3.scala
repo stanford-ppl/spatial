@@ -21,14 +21,14 @@ import scala.reflect.ClassTag
     a(8) = x.to[Q16].as[T]
     a(9) = x.to[Float].as[T]
     a(10) = x.to[Half].as[T]
-    a(11) = abs(x)
+    a(11) = 0 /*abs(x)*/
     a(12) = 0 /*x % z*/
     a(13) = 0 /*sqrt(x)*/
     a(15) = 0 /*ln(x)*/
     a(16) = 1.to[T] / x
     a(17) = 1.to[T] / sqrt(y)
-    a(18) = floor(x)
-    a(19) = ceil(x)
+    a(18) = 0 /*floor(x)*/
+    a(19) = 0 /*ceil(x)*/
     a
   }
    def test[T:Num:ClassTag](xOut: Reg[T], yOut: Reg[T], zOut: Reg[T]): SRAM1[T] = {

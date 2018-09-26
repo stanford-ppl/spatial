@@ -27,17 +27,18 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     val backpressure_raw = if (controllerStack.nonEmpty) getBackPressure(controllerStack.head.toCtrl) else "true.B"
     val backpressure = if (ensigs.contains(backpressure_raw) && backpressure_raw != "true.B") s"${swap(s"ensig${ensigs.indexOf(backpressure_raw)}", Blank)}"
+                       else if (backpressure_raw == "true.B") "true.B"
                        else {newEnsig(backpressure_raw)}
     val lat = if ((lhs.fullDelay + nodelat).toInt != (lhs.fullDelay.toInt + nodelat.toInt)) s"Some($nodelat + 1.0)" else s"Some($nodelat)"
     rhs match {
-      case FixMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure)).r")
-      case UnbMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, rounding = Unbiased)).r")
-      case SatMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, saturating = Saturating)).r")
-      case UnbSatMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
-      case FixDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure)).r")
-      case UnbDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, rounding = Unbiased)).r")
-      case SatDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, saturating = Saturating)).r")
-      case UnbSatDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, saturating = Saturating, rounding = Unbiased)).r")
+      case FixMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Truncate, Wrapping)).r")
+      case UnbMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Unbiased, Wrapping)).r")
+      case SatMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Truncate, Saturating)).r")
+      case UnbSatMul(x,y) => emitt(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Unbiased, Saturating)).r")
+      case FixDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, Truncate, Wrapping)).r")
+      case UnbDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, Unbiased, Wrapping)).r")
+      case SatDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, Truncate, Saturating)).r")
+      case UnbSatDiv(x,y) => emitt(src"$lhs.r := ($x.div($y, $lat, $backpressure, Unbiased, Saturating)).r")
       case FixMod(x,y) => emitt(src"$lhs.r := ($x.mod($y, $lat, $backpressure)).r")
       case FixRecip(x) => emitt(src"$lhs.r := (${lhs}_one.div($x, $lat, $backpressure)).r")
       case FixSqrt(x) => emitt(src"$lhs.r := Math.sqrt($x, $lat, $backpressure).r")
@@ -71,7 +72,7 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixOr(x,y)   => emitt(src"$lhs.r := Math.or($x,$y,$lat, $backpressure).r")
       case FixXor(x,y)  => emitt(src"$lhs.r := Math.xor($x,$y,$lat, $backpressure).r")
       case SatAdd(x,y) => emitt(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
-      case SatSub(x,y) => emitt(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
+      case SatSub(x,y) => emitt(src"$lhs.r := Math.sub($x, $y,$lat, $backpressure, Truncate, Saturating).r")
       case FixToFix(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Wrapping).r")
       case FixToFixSat(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating).r")
       case FixToFixUnb(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping).r")
@@ -135,13 +136,13 @@ trait ChiselGenMath extends ChiselGenCommon {
     case SatSub(x,y) => MathDL(lhs, rhs, latencyOption("FixSub", Some(bitWidth(lhs.tp))))
     case FixSLA(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r << $shift).r // TODO: cast to proper type (chisel expands bits)")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r << $shift).r")
     case FixSRA(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x >> $shift).r")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r >> $shift).r")
     case FixSRU(x,y) => 
       val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x >>> $shift).r")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r >>> $shift).r")
     case BitRandom(None) if lhs.parent.s.isDefined => emitt(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
     case FixRandom(None) if lhs.parent.s.isDefined => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>

@@ -77,6 +77,16 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixToFixSat(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating).r")
       case FixToFixUnb(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping).r")
       case FixToFixUnbSat(x, fmt) => emitt(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Saturating).r")
+      case FixSLA(x,y) => 
+        val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
+        emitt(src"$lhs.r := Math.arith_left_shift($x, $shift, $lat, $backpressure).r")
+      case FixSRA(x,y) => 
+        val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
+        emitt(src"$lhs.r := Math.arith_right_shift($x, $shift, $lat, $backpressure).r")
+      case FixSRU(x,y) => 
+        val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
+        emitt(src"$lhs.r := Math.logic_right_shift($x, $shift, $lat, $backpressure).r")
+
       case FixToFlt(x, fmt) => 
         val FixPtType(s,d,f) = x.tp
         val FltPtType(m,e) = lhs.tp
@@ -134,15 +144,9 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case SatAdd(x,y) => MathDL(lhs, rhs, latencyOption("FixAdd", Some(bitWidth(lhs.tp))))
     case SatSub(x,y) => MathDL(lhs, rhs, latencyOption("FixSub", Some(bitWidth(lhs.tp))))
-    case FixSLA(x,y) => 
-      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r << $shift).r")
-    case FixSRA(x,y) => 
-      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r >> $shift).r")
-    case FixSRU(x,y) => 
-      val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := ($x.r >>> $shift).r")
+    case FixSLA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
+    case FixSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
+    case FixSRU(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case BitRandom(None) if lhs.parent.s.isDefined => emitt(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}) === 1.U")
     case FixRandom(None) if lhs.parent.s.isDefined => emitGlobalWire(src"val $lhs = Wire(${lhs.tp})");emitt(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${swap(lhs.parent.s.get, DatapathEn)}).r")
     case FixRandom(x) =>

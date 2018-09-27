@@ -318,21 +318,25 @@ object Math {
     result
   }
 
-  def arith_right_shift(a: FixedPoint, shift: Int): FixedPoint = {
+  def arith_right_shift(a: FixedPoint, shift: Int, delay: Option[Double], flow: Bool): FixedPoint = {
     val result = Wire(new FixedPoint(a.fmt))
-    result.r := util.Cat(util.Fill(shift, a.msb), a(a.d+a.f-1, shift))
+    val latency = delay.getOrElse(0.0).toInt
+    val sgnextend = if (a.s) util.Fill(shift, a.msb) else util.Fill(shift, false.B)
+    result.r := getRetimed(util.Cat(sgnextend, a(a.d+a.f-1, shift)), latency, flow)
     result
   }
 
-  def arith_left_shift(a: FixedPoint, shift: Int): FixedPoint = {
+  def arith_left_shift(a: FixedPoint, shift: Int, delay: Option[Double], flow: Bool): FixedPoint = {
     val result = Wire(new FixedPoint(a.fmt))
-    result.r := a.r << shift
+    val latency = delay.getOrElse(0.0).toInt
+    result.r := getRetimed(a.r << shift, latency, flow)
     result
   }
 
-  def logic_right_shift(a: FixedPoint, shift: Int): FixedPoint = {
+  def logic_right_shift(a: FixedPoint, shift: Int, delay: Option[Double], flow: Bool): FixedPoint = {
     val result = Wire(new FixedPoint(a.fmt))
-    result.r := a.r >> shift
+    val latency = delay.getOrElse(0.0).toInt
+    result.r := getRetimed(a.r >> shift, latency, flow)
     result
   }
 

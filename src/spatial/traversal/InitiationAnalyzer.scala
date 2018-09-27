@@ -32,7 +32,8 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
     dbgs(s" - Iter Diff: $minIterDiff (from $iterdiffs)")
     lhs.bodyLatency = latency
     val compilerII = if (forceII1) 1.0 else if (minIterDiff.isEmpty) interval else if (minIterDiff.get == 1) interval else scala.math.ceil(latency/minIterDiff.get)
-    lhs.II = lhs.userII.getOrElse(compilerII)
+    lhs.II = if (lhs.getUserSchedule.isDefined && lhs.userSchedule == Sequenced) latency
+             else                                                                lhs.userII.getOrElse(compilerII)
   }
 
   private def visitControl(lhs: Sym[_], rhs: Op[_]): Unit = {

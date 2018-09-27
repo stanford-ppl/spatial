@@ -32,5 +32,8 @@ import spatial.dsl._
     println(r"test1: ${getArg(t1)} =?= -56")
     println(r"test3: ${getArg(t3)} =?= -4")
     println(r"test4: ${getArg(t4)} =?= 1073741820")
+    assert(t1 == -56)
+    assert(t3 == -4)
+    assert(t4 == 1073741820)
   }
 }

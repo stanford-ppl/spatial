@@ -99,9 +99,9 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
   /** Fixed point ceiling (round towards positive infinity). */
   def ceil: FixedPoint = Math.ceil(this)
 
-  def >>(shift: Int): FixedPoint = Math.arith_right_shift(this, shift)
-  def <<(shift: Int): FixedPoint = Math.arith_left_shift(this, shift)
-  def >>>(shift: Int): FixedPoint = Math.logic_right_shift(this, shift)
+  def >>(shift: Int): FixedPoint = Math.arith_right_shift(this, shift, None, true.B)
+  def <<(shift: Int): FixedPoint = Math.arith_left_shift(this, shift, None, true.B)
+  def >>>(shift: Int): FixedPoint = Math.logic_right_shift(this, shift, None, true.B)
 
   def <(that: FixedPoint): Bool = Math.lt(this, that, None, true.B)
   def <(that: UInt): Bool = this < that.trueFP(fmt)

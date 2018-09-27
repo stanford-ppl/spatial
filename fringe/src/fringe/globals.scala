@@ -59,8 +59,8 @@ object globals {
   var streamInsInfo: List[StreamParInfo] = Nil
   var streamOutsInfo: List[StreamParInfo] = Nil
 
-  def LOAD_STREAMS: List[StreamParInfo] = if (loadStreamInfo.isEmpty) List(StreamParInfo(EXTERNAL_W, EXTERNAL_V, 0, false)) else loadStreamInfo
-  def STORE_STREAMS: List[StreamParInfo] = if (storeStreamInfo.isEmpty) List(StreamParInfo(EXTERNAL_W, EXTERNAL_V, 0, false)) else storeStreamInfo
+  def LOAD_STREAMS: List[StreamParInfo] = if (loadStreamInfo.isEmpty) List(StreamParInfo(DATA_WIDTH, WORDS_PER_STREAM, 0, false)) else loadStreamInfo
+  def STORE_STREAMS: List[StreamParInfo] = if (storeStreamInfo.isEmpty) List(StreamParInfo(DATA_WIDTH, WORDS_PER_STREAM, 0, false)) else storeStreamInfo
 
   def NUM_LOAD_STREAMS: Int = LOAD_STREAMS.size
   def NUM_STORE_STREAMS: Int = STORE_STREAMS.size

@@ -10,7 +10,7 @@ class MAGToAXI4Bridge(val p: AXI4BundleParameters, val tagWidth: Int) extends Mo
   Predef.assert(p.dataBits == 512, s"ERROR: Unsupported data width ${p.dataBits} in MAGToAXI4Bridge")
 
   val io = IO(new Bundle {
-    val in = Flipped(new DRAMStream(32, 16))  // hardcoding stuff here
+    val in = Flipped(new DRAMStream(globals.DATA_WIDTH, globals.WORDS_PER_STREAM))  // hardcoding stuff here
     val M_AXI = new AXI4Inlined(p)
   })
 
@@ -53,8 +53,8 @@ class MAGToAXI4Bridge(val p: AXI4BundleParameters, val tagWidth: Int) extends Mo
   io.in.wdata.ready := io.M_AXI.WREADY // Used to be shift registered
 
   // R
-  val rdataAsVec = Vec(List.tabulate(16) { i =>
-      io.M_AXI.RDATA(512 - 1 - i*32, 512 - 1 - i*32 - 31)
+  val rdataAsVec = Vec(List.tabulate(globals.EXTERNAL_V) { i =>
+      io.M_AXI.RDATA((globals.EXTERNAL_W*globals.EXTERNAL_V) - 1 - i*globals.EXTERNAL_W, (globals.EXTERNAL_W*globals.EXTERNAL_V) - 1 - i*globals.EXTERNAL_W - (globals.EXTERNAL_W-1))
   }.reverse)
   io.in.rresp.bits.rdata := rdataAsVec // Used to be shift registered
 

@@ -37,6 +37,7 @@ class MAGCore(
   val axiParams: AXI4BundleParameters,
   val isDebugChannel: Boolean = false
 ) extends Module {
+  Console.println(s"making magcore with $w and $v")
 
   val numRdataDebug = 0
   val numRdataWordsDebug = 16

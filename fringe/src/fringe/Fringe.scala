@@ -20,7 +20,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val statusReg = 1   //       Changing these values alone has no effect on the logic below.
 
   // Some constants (mostly MAG-related) that will later become module parameters
-  val v = globals.target.wordsPerStream
+  val v = WORDS_PER_STREAM
   val numOutstandingBursts = 1024  // Picked arbitrarily
   val burstSizeBytes = 64
   val d = 64        // FIFO depth: Controls FIFO sizes for address, size, and wdata
@@ -83,8 +83,8 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
       w = DATA_WIDTH,
       d = d,
       v = WORDS_PER_STREAM,
-      loadStreamInfo  = if (loads.isEmpty) List(StreamParInfo(DATA_WIDTH,16,0,false)) else loads.map{LOAD_STREAMS.apply},
-      storeStreamInfo = if (stores.isEmpty) List(StreamParInfo(DATA_WIDTH,16,0,false)) else stores.map{STORE_STREAMS.apply},
+      loadStreamInfo  = LOAD_STREAMS,
+      storeStreamInfo = STORE_STREAMS,
       numOutstandingBursts,
       burstSizeBytes,
       axiParams,

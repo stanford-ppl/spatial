@@ -16,10 +16,10 @@ module SqrtSimBBox
 
    // Keep track of which bit I'm working on.
    reg [4:0]  bitl;
-   wire [DWIDTH/2-1] bit1 = 1 << bitl;
-   wire [DWIDTH-1] bit2 = 1 << (bitl << 1);
+   wire [DWIDTH/2-1:0] bit1 = 1 << bitl;
+   wire [DWIDTH-1:0] bit2 = 1 << (bitl << 1);
 
-   assign y = {DWIDTH/2'h0, acc};
+   assign y = {{DWIDTH{1'b0}}, acc};
 
    // The output is ready when the bitl counter underflows.
    wire rdy = bitl[4];
@@ -60,3 +60,19 @@ module SqrtSimBBox
       end
 
 endmodule
+
+module Log2BBox
+#(
+    parameter DWIDTH = 32)
+(
+ input  clk,
+ output rdy,
+ input  reset,
+ input  [DWIDTH-1:0] x,
+ output reg [DWIDTH-1:0] y
+);
+  always @(posedge clk) begin
+    y <= $clog2(x);
+  end
+endmodule
+

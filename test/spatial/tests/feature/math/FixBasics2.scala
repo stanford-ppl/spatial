@@ -9,9 +9,9 @@ import spatial.dsl._
 
     val length = 8
 
-    val data1 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
-    val data2 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
-    val data3 = Array.tabulate(length){i => if (i % 3 == 1) random[T](1024) else -random[T](1024)}
+    val data1 = Array.tabulate(length){i => if (i % 3 == 1) random[T](128) else -random[T](128)}
+    val data2 = Array.tabulate(length){i => if (i % 3 == 1) random[T](128) else -random[T](128)}
+    val data3 = Array.tabulate(length){i => if (i % 3 == 1) random[T](128) else -random[T](128)}
 
     val dram1 = DRAM[T](length)
     val dram2 = DRAM[T](length)
@@ -39,7 +39,7 @@ import spatial.dsl._
         Pipe { ff_out_sram(0, i) = sram1(i) + sram2(i) }
         Pipe { ff_out_sram(1, i) = sram1(i) * sram2(i) }
         Pipe { ff_out_sram(2, i) = sram1(i) / sram2(i) }
-        Pipe { ff_out_sram(3, i) = sqrt(sram1(i)) }
+        Pipe { ff_out_sram(3, i) = sqrt_approx(abs(sram1(i).to[Int])).to[T] }
         Pipe { ff_out_sram(4, i) = sram1(i) - sram2(i) }
         Pipe { ff_out_sram(5, i) = mux((sram1(i) < sram2(i)),1.to[T],0.to[T])  }
         Pipe { ff_out_sram(6, i) = mux((sram1(i) > sram2(i)),1.to[T],0.to[T]) }
@@ -48,7 +48,7 @@ import spatial.dsl._
         Pipe { ff_out_sram(8, i) = abs(sram1(i)) }
         Pipe { ff_out_sram(9, i) = 0 /*exp(sram1(i))*/ }
         Pipe { ff_out_sram(10, i) = 0 /*ln(sram1(i))*/ }
-        Pipe { ff_out_sram(11, i) = (1.to[Float]/sram1(i).to[Float]).to[T] }
+        Pipe { ff_out_sram(11, i) = 0 /*(1.to[Float]/sram1(i).to[Float]).to[T]*/ }
         Pipe { ff_out_sram(12, i) = 0 /*1.to[T]/sqrt(sram1(i))*/ }
         Pipe { ff_out_sram(13, i) = 0 /*sigmoid(sram1(i))*/ }
         Pipe { ff_out_sram(14, i) = 0 /*tanh(sram1(i))*/ }
@@ -65,12 +65,15 @@ import spatial.dsl._
 
     val out_ram = getMatrix(ff_out)
     val margin = 0.0001.to[T]
+    val ops = Array[String]("ADD", "MUL", "DIV", "SRT", "SUB", "FLT", "FGT", "FEQ", "ABS", "EXP", "LOG", "REC", "RST", "SIG", "TAN", "FMA")
+    var allgood = true
+
 
     (0::16,0::length).foreach{(i,j) =>
       val a = if (i == 0 ) {data1(j) + data2(j) }
       else if (i == 1 ) { data1(j) * data2(j) }
       else if (i == 2 ) { data1(j) / data2(j) }
-      else if (i == 3 ) { sqrt(data1(j)) }
+      else if (i == 3 ) { sqrt_approx(abs(data1(j).to[Int])).to[T] }
       else if (i == 4 ) { data1(j) - data2(j) }
       else if (i == 5 ) { if (data1(j) < data2(j)) 1.to[T] else 0.to[T] }
       else if (i == 6 ) { if (data1(j) > data2(j)) 1.to[T] else 0.to[T] }
@@ -78,15 +81,18 @@ import spatial.dsl._
       else if (i == 8 ) { abs(data1(j)) }
       // else if (i == 9 ) { exp(data1(j)) }
       // else if (i == 10) { ln(data1(j)) }
-      else if (i == 11) { (1.to[Float]/data1(j).to[Float]).to[T] }
+      // else if (i == 11) { (1.to[Float]/data1(j).to[Float]).to[T] }
       // else if (i == 12) { 1.to[T]/sqrt(data1(j)) }
       // else if (i == 13) { sigmoid(data1(j)) }
       // else if (i == 14) { tanh(data1(j)) }
       else if (i == 15) { data1(j) * data2(j) + data3(j) }
       else 0.to[T]
       val b = out_ram(i,j)
-      println(i + " Expected: " + a + ", Actual: " + b)
-      assert(abs(a - b) <= margin)
+      val good = if (i == 3 || i == 12)  if (a >= (b - 8.to[T]) && a <= (b + 8.to[T])) true else false
+                 else                    if (a >= (b - margin) && a <= (b + margin)) true else false
+      println(r"$i,$j (${ops(i)}: $good) Expected: $a, Actual: $b")
+      if (good == false) allgood = false
     }
+    assert(allgood)
   }
 }

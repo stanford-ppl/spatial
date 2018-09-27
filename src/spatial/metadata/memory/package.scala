@@ -41,6 +41,9 @@ package object memory {
     def isFlatBank: Boolean = metadata[FlatBank](s).exists(_.flag)
     def isFlatBank_=(flag: Boolean): Unit = metadata.add(s, FlatBank(flag))
 
+    def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
+    def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
+
     /** Pre-unrolling duplicates (one or more Memory instances per node) */
 
     def getDuplicates: Option[Seq[Memory]] = metadata[Duplicates](s).map(_.d)

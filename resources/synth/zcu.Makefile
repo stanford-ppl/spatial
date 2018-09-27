@@ -27,7 +27,7 @@ sw:
 
 hw:
 	echo "$$(date +%s)" > start.log
-	sed -i "s/EPRINTF(/fprintf(stderr,/g" zcu.sw-resources/FringeContextZynq.h # Not sure why eprintf randomly crashes zcu
+	sed -i "s/EPRINTF(/fprintf(stderr,/g" zcu.sw-resources/FringeContextZCU.h # Not sure why eprintf randomly crashes zcu
 
 	sbt "runMain top.Instantiator --verilog --testArgs zcu"
 	mv ${BIGIP_SCRIPT} ${ZCU_V_DIR}/

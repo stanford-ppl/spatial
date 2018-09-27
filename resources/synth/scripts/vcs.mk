@@ -2,7 +2,7 @@ CC=g++
 LINK=g++
 CROSS_COMPILE=
 
-FRINGE_SRC=./SW
+FRINGE_SRC=../vcs.sw-resources
 HOST_SRC=./
 STATIC_SRC=./datastructures/static
 

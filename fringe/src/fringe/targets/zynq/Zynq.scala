@@ -52,4 +52,12 @@ abstract class ZynqLike extends DeviceTarget {
   }
 }
 
-class Zynq extends ZynqLike
+class Zynq extends ZynqLike {
+  override def makeBigIP: BigIP = new fringe.targets.zynq.BigIPZynq
+  override def regFileAddrWidth(n: Int): Int = 32
+  override val magPipelineDepth: Int = 0
+  override val addrWidth: Int = 32
+  override val dataWidth: Int = 32
+  override val wordsPerStream: Int = 16
+  override val num_channels = 4
+}

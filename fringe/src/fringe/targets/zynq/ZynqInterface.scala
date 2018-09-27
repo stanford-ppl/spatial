@@ -1,9 +1,12 @@
 package fringe.targets.zynq
 
 import chisel3._
+import chisel3.util.Decoupled
 import fringe.globals._
+import fringe._
 import fringe.TopInterface
 import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Lite, AXI4Probe}
+import fringe.templates.axi4._
 
 class ZynqInterface extends TopInterface {
   val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
@@ -17,4 +20,5 @@ class ZynqInterface extends TopInterface {
   val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
   val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
   val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
+
 }

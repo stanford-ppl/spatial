@@ -50,16 +50,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
-    case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + {if (f == 0 && !s) s".U($d.W)" else s".FP($s, $d, $f)"}
+    case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + s".FP($s, $d, $f)"
     case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
     case (_:Bit, c:Bool) => s"${c.value}.B"
     case _ => super.quoteConst(tp,c)
   }
 
   override protected def remap(tp: Type[_]): String = tp match {
-    case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
+    case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
     // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
-    case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
+    case FltPtType(m,e) => s"new FloatingPoint($m, $e)"
     case BitType() => "Bool()"
     case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
@@ -113,7 +113,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*numWriters[ ]*=[ ]*([0-9]+)[ ]*\\).*".r
       val extractor(d,w,n) = rhs
       s"${vec}ff${d}_${w}_${n}wr"
-    } else if (rhs.contains(" templates.FF(")) {
+    } else if (rhs.contains(" FF(")) {
       val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
       val extractor(d,w) = rhs
       s"${vec}ff${d}_${w}"
@@ -142,13 +142,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor(depth,width) = rhs
       s"${vec}rcp${depth}_${width}"
     } else if (rhs.contains(" InnerControl(")) {
-      val extractor = ".*InnerControl\\([ ]*templates\\.([a-zA-Z]+)[ ]*,[ ]*([falsetrue]+)[ ]*.*\\).*".r
+      val extractor = ".*InnerControl\\([ ]*([a-zA-Z]+)[ ]*,[ ]*([falsetrue]+)[ ]*.*\\).*".r
       val extractor(style,fsm) = rhs
       val st = style.take(3)
       val f = fsm.replace("false", "f").replace("true", "t")
       s"${vec}inr${st}_${f}"
     } else if (rhs.contains(" OuterControl(")) {
-      val extractor = ".*OuterControl\\([ ]*templates\\.([a-zA-Z]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*.*\\).*".r
+      val extractor = ".*OuterControl\\([ ]*([a-zA-Z]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*.*\\).*".r
       val extractor(style,children,fsm) = rhs
       val f = fsm.replace("false", "f").replace("true", "t")
       val st = style.take(3)

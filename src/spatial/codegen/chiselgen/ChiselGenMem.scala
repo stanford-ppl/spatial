@@ -59,9 +59,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get 
-    emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
+    if (lhs.parent.stage == -1) emitControlSignals(parent)
     val invisibleEnable = invisibleEnableRead(lhs,mem)
-    val flowEnable = src",${swap(parent,SM)}.io.flow"
+    val flowEnable = src",${swap(parent,Flow)}"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -106,7 +106,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
-    val flowEnable = src"${swap(parent,SM)}.io.flow"
+    if (lhs.parent.stage == -1) emitControlSignals(parent)
+    val flowEnable = src"${swap(parent,Flow)}"
     val invisibleEnable = invisibleEnableWrite(lhs)
     val ofsWidth = if (!mem.isLineBuffer) 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
                    else 1 max Math.ceil(scala.math.log(paddedDims(mem,name).last / mem.instance.nBanks.last) / scala.math.log(2)).toInt
@@ -355,8 +356,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
     case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
     case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@FIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.numel")
+    case op@FIFOPeek(fifo,_) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io.output.data(0)")
+    case FIFONumel(fifo,_)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
 
@@ -366,8 +367,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
     case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
     case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@LIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.numel")
+    case op@LIFOPeek(fifo,_) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io.output.data(0)")
+    case LIFONumel(fifo,_)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     

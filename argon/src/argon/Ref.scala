@@ -69,7 +69,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   /** Create a checked value from the given constant
     * Value may be either a constant or a parameter
     */
-  @rig final def from(c: Any, warnOnLoss: Boolean = false, errorOnLoss: Boolean = false, isParam: Boolean = false): A = getFrom(c,isParam) match {
+  @rig final def from(c: Any, warnOnLoss: Boolean = false, errorOnLoss: Boolean = false, isParam: Boolean = false, saturating: Boolean = false, unbiased: Boolean = false): A = getFrom(c,isParam,saturating,unbiased) match {
     case Some((v,exact)) =>
       if (!exact && errorOnLoss) {
         error(ctx, s"Loss of precision detected: ${this.tp} cannot exactly represent ${escapeConst(c)}.")
@@ -96,7 +96,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
     * Instead, it should return None if c is not convertible to an A, or return
     * Some((a,false)) if c can be represented as an A, but not exactly.
     */
-  @rig def getFrom(c: Any, isParam: Boolean = false): Option[(A,Boolean)] = value(c) match {
+  @rig def getFrom(c: Any, isParam: Boolean = false, saturating: Boolean = false, unbiased: Boolean = false): Option[(A,Boolean)] = value(c) match {
     case Some((v,exact)) if isParam => Some((_param(this, v), exact))
     case Some((v,exact)) => Some((_const(this, v),exact))
     case None => None

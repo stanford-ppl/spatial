@@ -2,7 +2,7 @@ CC=g++
 LINK=g++
 CROSS_COMPILE=arm-linux-gnueabihf-
 
-FRINGE_SRC=./SW
+FRINGE_SRC=../arria10.sw-resources
 HOST_SRC=./
 STATIC_SRC=./datastructures/static
 

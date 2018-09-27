@@ -23,7 +23,7 @@ help:
 sw:
 	cp scripts/zcu.mk cpp/Makefile
 	make -C cpp -j8
-	tar -czf $(APPNAME).tar.gz -C ${ZCU_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C zcu.sw-resources/utils set_perms setClocks.sh run.sh
+	tar -czf $(APPNAME).tar.gz -C ${ZCU_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C ../zcu.sw-resources/utils set_perms setClocks.sh run.sh
 
 hw:
 	echo "$$(date +%s)" > start.log

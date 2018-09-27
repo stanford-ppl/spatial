@@ -33,8 +33,8 @@ import spatial.targets._
 
 	/* Parameters to tune */
 	val k_const 				= 5 /* Number of nearest neighbors to handle */
-	val par_factor  			= 1
-	val parLoad 				= 1
+	val par_factor  			= 4
+	val parLoad 				= 4
 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
@@ -74,20 +74,19 @@ import spatial.targets._
 		val partition_index_list = RegFile[I32](par_factor)
 		Foreach(par_factor by 1 par par_factor) { p => partition_index_list(p) = 0.to[Int] }
 
+		val insert_this_label = Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32]))
 		Sequential.Foreach(k_const by 1) { k => //doesn't work without Sequential 
-			val insert_this_label =	Reduce(Reg[LabelAndIndex])(par_factor by 1 par par_factor) { p =>
+			insert_this_label :=  Reduce(Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32])))(par_factor by 1 par par_factor) { p =>
 										val check_at_index = partition_index_list(p)
-										val curr_index 	   = k_const + check_at_index
-
-										val current_label = par_label_set(p, curr_index)
-										val current_dist  = par_knn_set(p, curr_index)
+										
+										val current_label = par_label_set(p, check_at_index)
+										val current_dist  = par_knn_set(p, check_at_index)
 
 										LabelAndIndex(current_dist, current_label, p)
 									}{ (a, b) => mux(a.dist < b.dist, a, b) }
-			Parallel {
-				sorted_label_set(k) = insert_this_label.label 
-				partition_index_list(insert_this_label.inx) = partition_index_list(insert_this_label.inx) + 1.to[I32]
-			}
+			
+			sorted_label_set(k) = insert_this_label.value.label 
+			partition_index_list(insert_this_label.value.inx) = partition_index_list(insert_this_label.value.inx) + 1.to[I32]
 		}
 
 	} 
@@ -143,6 +142,12 @@ import spatial.targets._
 		val dist = Reg[Int](0)
 		Parallel { 
 			Pipe { dist := hamming_distance(digit_xored1, digit_xored2) }
+			//println(test_inst1.d1)
+			//println(test_inst2.d3)
+			//println(train_inst1.d1)
+			//println(train_inst1.d2)
+			//println(dist.value)
+			//println()
 
 			Reduce(max_dist)(k_const by 1) { k =>
 				IntAndIndex(min_dists(p, k), k)
@@ -180,6 +185,7 @@ import spatial.targets._
 
 		/* Apply merge-sort first. Each row of knn_set should already be sorted */
 		val sorted_label_list = RegFile[LabelType](k_const)
+
 		merge_sorted_lists(knn_set, label_list, sorted_label_list)
 
 		Foreach(sorted_label_list.length by 1){ i =>
@@ -187,11 +193,12 @@ import spatial.targets._
 		}
 
 		val best_label = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
-		best_label.reset
+		best_label := IntAndIndex(0.to[Int], 0.to[I32]) //best_label.reset
 
 		Reduce(best_label)(vote_list.length by 1) { j =>
 			IntAndIndex(vote_list(j), j)
 		} {(l1,l2) => mux(l1.value > l2.value, l1, l2) }
+
 
 		best_label.inx.to[LabelType]
 	}
@@ -230,13 +237,13 @@ import spatial.targets._
 																		} 
 													 ).reduce(_ ++ _)
 
-		//val print_vec = true
-		//if (print_vec) { /* this is for making sure that I'm loading the file correctly */
-	//		for (i <- 0 until class_size) {
-	//			println(entire_training_vec1(i).d1)
-	//			println(entire_training_vec1(i).d2)
-	//		}
-	//	}
+	val print_vec = false
+	if (print_vec) { /* this is for making sure that I'm loading the file correctly */
+		for (i <- 0 until class_size) {
+			println(entire_training_vec1(i).d1)
+			println(entire_training_vec1(i).d2)
+		}
+	}
 
 		setMem(training_set_dram_1, entire_training_vec1)
 		setMem(training_set_dram_2, entire_training_vec2)
@@ -286,7 +293,7 @@ import spatial.targets._
 		/* output */
 		val results_dram	  =  DRAM[LabelType](num_test)
 
-		val num_test_local_len 		= 20 // num_test /* for on chip memory */
+		val num_test_local_len 		= 200 // num_test /* for on chip memory */
 		val num_train_local_len 	= num_training
 
 		initialize_train_data(training_set_dram_1, training_set_dram_2, label_set_dram, file_string)
@@ -352,19 +359,21 @@ import spatial.targets._
 					initialize(knn_tmp_large_set, label_list_tmp, vote_list) 
 
 					/* Training Loop */
-					val train_set_par_num = num_train_local_len / par_factor
+					val train_set_num_per_partition = num_train_local_len / par_factor
 
 					val test_local1 = test_set_local1(test_inx)
 					val test_local2 = test_set_local2(test_inx)
 
 					Sequential.Foreach(par_factor by 1 par par_factor) { p => 
-						Foreach(train_set_par_num by 1) { train_inx =>
-							val curr_train_inx = p * train_set_par_num + train_inx
+						Foreach(train_set_num_per_partition by 1) { train_inx =>
+							val curr_train_inx = p * train_set_num_per_partition + train_inx
 							update_knn(test_local1, test_local2,
 									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
 						}
+						
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 
+
 					}
 					/* Do KNN */
 					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
@@ -377,7 +386,7 @@ import spatial.targets._
 		}
 
 		val result_digits = getMem(results_dram)
-    
+    	printArray(result_digits)
 		/* Test */
 		val cksum =	result_digits.zip(expected_results){ (d1,d2) => if (d1 == d2) 1.0 else 0.0 }.reduce{ _ + _ }
 		print(cksum)

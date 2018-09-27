@@ -28,9 +28,9 @@ trait ScalaGenReg extends ScalaCodegen with ScalaGenMemories {
       emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
       emit(src"$lhs.initMem($init)")
 
-    case RegReset(reg, ens) =>
+    case RegReset(reg, ens) => 
       val init = reg match {case Op(RegNew(i)) => i }
-      emit(src"val $lhs = if (${and(ens)}) $reg.set($init)")
+      emit(src"val $lhs = if (${and(ens)}) $reg.reset()")
 
     case RegRead(reg)       => emit(src"val $lhs = $reg.value")
     case RegWrite(reg,v,en) => emit(src"val $lhs = if (${and(en)}) $reg.set($v)")

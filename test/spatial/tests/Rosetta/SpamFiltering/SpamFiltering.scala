@@ -24,8 +24,8 @@ import spatial.targets._
 	val empty_str = ""
 
 	/* Params */
-	val parReduce 		= 32
-	val transfer_par  	= 1 //16
+	val parReduce 		= 16
+	val transfer_par  	= 16
 
 	def sigmoid(exponent 	: FeatureType,
 				sigmoidLUT	: SRAM1[FeatureType],

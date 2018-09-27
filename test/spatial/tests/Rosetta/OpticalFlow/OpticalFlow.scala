@@ -10,6 +10,10 @@ import spatial.targets._
   val window_inx = 5
   val buf_num = 7
 
+  /* Par factors */
+  val parLoad   = 1
+  val parStore  = 1
+
   @struct case class IntAndIndex(value : Int, inx : I32)
 
   @struct case class Gradient(x : Pixel, y : Pixel, z : Pixel, padding : UInt32)
@@ -51,7 +55,7 @@ import spatial.targets._
     val gradient_y_lb = SRAM[Pixel](max_width).buffer
 
     Foreach(max_height + 2 by 1) { row =>
-      lb_frame load frame(row, 0::max_width)
+      lb_frame load frame(row, 0::max_width par parLoad)
 
       Foreach(max_width + 2 by 1) { col =>
 
@@ -78,8 +82,8 @@ import spatial.targets._
       }
 
       if (row >= 2) {
-         gradient_x(row - 2, 0::max_width) store gradient_x_lb
-         gradient_y(row - 2, 0::max_width) store gradient_y_lb
+         gradient_x(row - 2, 0::max_width par parStore) store gradient_x_lb
+         gradient_y(row - 2, 0::max_width par parStore) store gradient_y_lb
       }
     }
 
@@ -107,10 +111,10 @@ import spatial.targets._
     Foreach(max_height by 1) { h =>
 
       Parallel {
-        lb_frame1 load frame1(h, 0::max_width)
-        lb_frame2 load frame2(h, 0::max_width)
-        lb_frame4 load frame4(h, 0::max_width)
-        lb_frame5 load frame5(h, 0::max_width)
+        lb_frame1 load frame1(h, 0::max_width par parLoad)
+        lb_frame2 load frame2(h, 0::max_width par parLoad)
+        lb_frame4 load frame4(h, 0::max_width par parLoad)
+        lb_frame5 load frame5(h, 0::max_width par parLoad)
       }
 
       Foreach(max_width  by 1) { w =>
@@ -156,9 +160,9 @@ import spatial.targets._
 
     Foreach(max_height + buf_limit by 1) { r =>
         Parallel {
-          lb_frame_x load gradient_x(r, 0::max_width)
-          lb_frame_y load gradient_y(r, 0::max_width)
-          lb_frame_z load gradient_z(r, 0::max_width)
+          lb_frame_x load gradient_x(r, 0::max_width par parLoad)
+          lb_frame_y load gradient_y(r, 0::max_width par parLoad)
+          lb_frame_z load gradient_z(r, 0::max_width par parLoad)
         }
         Foreach(max_width by 1) {  c =>
             //  val shift_up_new_gradient = mux(r < max_height, Gradient(lb_frame_x(max_lut_i,c), lb_frame_y(max_lut_i,c), lb_frame_z(max_lut_i,c), 0.to[UInt32]), 
@@ -177,7 +181,7 @@ import spatial.targets._
               filt_grad_lb(c) = accum_grad_y
         }
         if (r >= buf_limit) {
-          filt_grad(r - buf_limit, 0::max_width) store filt_grad_lb
+          filt_grad(r - buf_limit, 0::max_width par parStore) store filt_grad_lb
         }
     }
 
@@ -247,10 +251,10 @@ import spatial.targets._
     Foreach(max_height by 1) { h =>
 
       Parallel {
-        lb_frame1 load frame1(h, 0::max_width)
-        lb_frame2 load frame2(h, 0::max_width)
-        lb_frame4 load frame4(h, 0::max_width)
-        lb_frame5 load frame5(h, 0::max_width)
+        lb_frame1 load frame1(h, 0::max_width par parLoad)
+        lb_frame2 load frame2(h, 0::max_width par parLoad)
+        lb_frame4 load frame4(h, 0::max_width par parLoad)
+        lb_frame5 load frame5(h, 0::max_width par parLoad)
       }
 
       Foreach(max_width  by 1) { w =>
@@ -296,13 +300,14 @@ import spatial.targets._
     Foreach(max_height + buf_limit by 1) { r =>
 
         /* shift down sram fram manually */
-        Foreach(buf_num - 1 by 1, max_width by 1 par 8) { (b,c) =>
-          lb_frame_xyz(buf_num + 1, c) = lb_frame_xyz(buf_num, c)
+        if (r < max_height) {
+          Foreach(buf_num - 1 by 1, max_width by 1 par 8) { (b,c) =>
+            lb_frame_xyz(buf_num + 1, c) = lb_frame_xyz(buf_num, c)
+          }
+          Foreach(max_width by 1) { c => 
+            lb_frame_xyz(0, c) = TriPixel(gradient_x.deq(), gradient_y.deq(), gradient_z.deq(), 0.to[UInt32])
+          }
         }
-        Foreach(max_width by 1) { c => 
-          lb_frame_xyz(0, c) = TriPixel(gradient_x.deq(), gradient_y.deq(), gradient_z.deq(), 0.to[UInt32])
-        }
-
         /* gradient computation */
         Foreach(max_width by 1) {  c =>
 
@@ -564,9 +569,9 @@ import spatial.targets._
     val velocity_outputs_dram_y   =  DRAM[Pixel](max_height, max_width)
 
     /* Intermmediate values */
-   // val gradient_x_buf  = DRAM[Pixel](max_height, max_width)
-   // val gradient_y_buf  = DRAM[Pixel](max_height, max_width)
-   // val gradient_z_buf  = DRAM[Pixel](max_height, max_width)
+    val gradient_x_buf  = DRAM[Pixel](max_height, max_width)
+    val gradient_y_buf  = DRAM[Pixel](max_height, max_width)
+    val gradient_z_buf  = DRAM[Pixel](max_height, max_width)
 
     val y_filtered          = DRAM[Gradient](max_height, max_width)
     val grad_filtered       = DRAM[Gradient](max_height, max_width)
@@ -578,27 +583,27 @@ import spatial.targets._
     val velocity_outputs_y = DRAM[Pixel](max_height, max_width)
 
 
-    /* Parameters to tune */
-    val par_factor_frame = 1
-
     Accel {
       val fifo_depth = 512
-      val gradient_x      = FIFO[Pixel](fifo_depth)
-      val gradient_y      = FIFO[Pixel](fifo_depth)
-      val gradient_z      = FIFO[Pixel](fifo_depth)
+      //val gradient_x      = FIFO[Pixel](fifo_depth)
+      //val gradient_y      = FIFO[Pixel](fifo_depth)
+     //val gradient_z      = FIFO[Pixel](fifo_depth)
 
-      Stream { 
+      val y_filtered_buf  = SRAM[Gradient](max_height, max_width)
+
+      Sequential { 
           Parallel {
-            gradient_xy_compute(frame3_a, gradient_x, gradient_y) 
-            gradient_z_compute(frame1, frame2, frame3_b, frame4, frame5, gradient_z)
+            gradient_xy_compute_tmp(frame3_a, gradient_x_buf, gradient_y_buf) 
+            gradient_z_compute_tmp(frame1, frame2, frame3_b, frame4, frame5, gradient_z_buf) 
           }
-          gradient_weight_y(gradient_x, gradient_y, gradient_z, y_filtered) 
+         // gradient_weight_y_tmp(gradient_x_buf, gradient_y_buf, gradient_z_buf, y_filtered) 
           //gradient_weight_x(y_filtered, grad_filtered) 
           //outer_product(grad_filtered, curr_out_product) 
           //tensor_weight_y(curr_out_product, tensor_y) 
           //tensor_weight_x(tensor_y, tensor_final) 
           //compute_flow(tensor_final, velocity_outputs_dram_x, velocity_outputs_dram_y) 
       }
+      //y_filtered store y_filtered_buf
 
     }
 
@@ -614,18 +619,29 @@ import spatial.targets._
                                       Velocity(velocity_outputs_matrix_x(i,j), velocity_outputs_matrix_y(i,j)) }
 
 
-    val filt_grad_output = getMatrix(y_filtered)                                    
+    val filt_grad_output = getMatrix(gradient_z_buf)                                    
     val print_velocity_output = true
     if (print_velocity_output) {
       for (i <- 0 until max_height) {
         for (j <- 0 until 20 + 0*max_width) {
-          print( filt_grad_output(i,j) ) //velocity_final_output.apply(i,j) )
+          print( filt_grad_output (i,j) ) //velocity_final_output.apply(i,j) )
           print(",")
         }
         println() 
       }
     }
+    println("pass?")
 
+    val y_grad_output = getMatrix(gradient_y_buf)                                    
+    if (print_velocity_output) {
+      for (i <- 0 until max_height) {
+        for (j <- 0 until 20 + 0*max_width) {
+          print( y_grad_output (i,j) ) //velocity_final_output.apply(i,j) )
+          print(",")
+        }
+        println() 
+      }
+    }
 
 
 

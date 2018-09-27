@@ -18,10 +18,10 @@ object XMap {
     def accessParsBelowMuxPort(mport: Int, mofs: Int, castgrp: Int): Seq[Int] = x.sortByMuxPortAndOfs.filter{p => p._1._1 < mport | (p._1._1 == mport & p._1._2 < mofs) | (p._1._1 == mport & p._1._2 == mofs & p._1._3 < castgrp)}.accessPars
     def merge(y: XMap): XMap = {
       if (y.nonEmpty) {
-        ListMap( (x ++ ListMap(y.map{case (k,v) =>
-          val base = x.toList.length
-          ({base + k._1}, 0, 0) -> v
-        }.toArray:_*)).toArray:_*)
+        ListMap( (x ++ ListMap(y.map{case (k,v) => 
+                                val base = x.map(_._1._1).toList.sorted.reverse.headOption.getOrElse(0) + 1
+                                (({base + k._1}, k._2, 0) -> v)
+                              }.toArray:_*)).toArray:_*)
       } else x
     }
   }

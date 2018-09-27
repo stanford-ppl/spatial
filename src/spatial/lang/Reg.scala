@@ -17,7 +17,12 @@ import spatial.metadata.memory._
   @api def reset(): Void = stage(RegReset(this,Set.empty))
   @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))
 
+  /** Indicate that the memory should be buffered and ignore
+    * ignore potential situation where result from running sequentially
+    * does not match with resurt from running pipelined
+    */
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
+  /** Do not buffer memory */
   def nonbuffer: Reg[A] = { this.isNonBuffer = true; me }
 
   // --- Typeclass Methods

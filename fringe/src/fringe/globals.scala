@@ -1,0 +1,74 @@
+package fringe
+import java.io.{File, PrintWriter}
+
+import fringe.targets.DeviceTarget
+
+/** Fringe global constants. **/
+object globals {
+  /** Name of target. */
+  var target: DeviceTarget = _
+
+  /** Target-specific BigIP handle. */
+  def bigIP: BigIP = target.bigIP
+
+  /** DRAM interface pipeline depth. */
+  def magPipelineDepth: Int = target.magPipelineDepth
+
+  def ADDR_WIDTH: Int = target.addrWidth
+  def DATA_WIDTH: Int = target.dataWidth
+  def WORDS_PER_STREAM: Int = target.wordsPerStream
+  def EXTERNAL_W: Int = target.external_w
+  def EXTERNAL_V: Int = target.external_v
+  def TARGET_W: Int = target.target_w
+  def NUM_CHANNELS: Int = target.num_channels
+
+  // TODO: What is this?
+  var retime = false
+
+  // TODO: What is this?
+  var tight_control = false
+
+  // TODO: What is this?
+  var enableDebugRegs: Boolean = true
+
+  // TODO: What is this?
+  var channelAssignment: ChannelAssignment = BasicRoundRobin
+
+  /** TCL script generator. */
+  private var _tclScript: PrintWriter = {
+    val pw = new PrintWriter(new File("bigIP.tcl"))
+    pw.flush()
+    pw
+  }
+  def tclScript: PrintWriter = _tclScript
+  def tclScript_=(value: PrintWriter): Unit = _tclScript = value
+
+
+  var regression_testing: String = scala.util.Properties.envOrElse("RUNNING_REGRESSION", "0")
+
+  // Top parameters
+  // These are set by the generated Instantiator class
+  var numArgIns: Int = 1      // Number of ArgIn registers
+  var numArgOuts: Int = 1     // Number of ArgOut registers
+  var numArgIOs: Int = 0      // Number of HostIO registers
+  var numArgInstrs: Int = 0   // TODO: What is this?
+  var argOutLoopbacksMap: Map[Int,Int] = Map.empty // TODO: What is this?
+
+  var loadStreamInfo: List[StreamParInfo] = Nil
+  var storeStreamInfo: List[StreamParInfo] = Nil
+  var streamInsInfo: List[StreamParInfo] = Nil
+  var streamOutsInfo: List[StreamParInfo] = Nil
+
+  def LOAD_STREAMS: List[StreamParInfo] = if (loadStreamInfo.isEmpty) List(StreamParInfo(EXTERNAL_W, EXTERNAL_V, 0, false)) else loadStreamInfo
+  def STORE_STREAMS: List[StreamParInfo] = if (storeStreamInfo.isEmpty) List(StreamParInfo(EXTERNAL_W, EXTERNAL_V, 0, false)) else storeStreamInfo
+
+  def NUM_LOAD_STREAMS: Int = LOAD_STREAMS.size
+  def NUM_STORE_STREAMS: Int = STORE_STREAMS.size
+
+  def NUM_ARG_INS: Int = numArgIns
+  def NUM_ARG_OUTS: Int = numArgOuts
+  def NUM_ARG_IOS: Int = numArgIOs
+  def NUM_ARG_LOOPS: Int = argOutLoopbacksMap.size max 1
+  def NUM_ARGS: Int = numArgIns + numArgOuts
+  def NUM_STREAMS: Int = LOAD_STREAMS.size + STORE_STREAMS.size
+}

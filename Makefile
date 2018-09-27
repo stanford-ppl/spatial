@@ -6,16 +6,16 @@ all: apps
 ###-----------------------------------###
 install: 
 	bash bin/make_poly.sh
-	sbt "; project emul; publishLocal"
-	sbt "; project templateResources; publishLocal"
+	sbt "; project emul; +publishLocal"
+	sbt "; project fringe; publishLocal"
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
 apps:  
 	bash bin/make_poly.sh
-	sbt "; project emul; publishLocal"
-	sbt "; project templateResources; publishLocal"
+	sbt "; project emul; +publishLocal"
+	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"
 
 app: apps
@@ -25,8 +25,8 @@ app: apps
 ###-----------------------------------###
 tests:
 	bash bin/make_poly.sh
-	sbt "; project emul; publishLocal"
-	sbt "; project templateResources; publishLocal"
+	sbt "; project emul; +publishLocal"
+	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"
 	sbt test:compile
 
@@ -37,7 +37,7 @@ test: tests
 ###-----------------------------------###
 resources:
 	bash bin/update_resources.sh
-	sbt "; project templateResources; publishLocal"
+	sbt "; project fringe; publishLocal"
 
 ###-----------------------------------###
 ## Remove all generated files.	       ##

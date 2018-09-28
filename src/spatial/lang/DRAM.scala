@@ -109,7 +109,9 @@ object DRAM {
   /** Creates a dense, burst transfer from the on-chip `local` to this DRAM's region of main memory.
     * Restricted to the first `len` elements in local.
     **/
-  @api def store(local: SRAM1[A], len: I32): Void = stage(DenseTransfer(this,local.apply(0::len),isLoad = false))
+  @api def store(local: SRAM1[A], len: I32): Void = {
+    stage(DenseTransfer(this,local.apply(0::len),isLoad = false))
+  }
 }
 
 /** A 2-dimensional [[DRAM]] with elements of type A. */
@@ -119,10 +121,14 @@ object DRAM {
   @api def cols: I32 = dim1
 
   /** Creates a dense, burst transfer from the SRAM2 `data` to this region of main memory. */
-  @api def store(data: SRAM2[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
+  @api def store(data: SRAM2[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
 
   /** Creates a dense, burst transfer from the RegFile2 `data` to this region of main memory. */
-  @api def store(data: RegFile2[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
+  @api def store(data: RegFile2[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
 }
 
 /** A 3-dimensional [[DRAM]] with elements of type A. */
@@ -130,10 +136,14 @@ object DRAM {
   def rank: Seq[Int] = Seq(0,1,2)
 
   /** Creates a dense, burst transfer from the SRAM3 `data` to this region of main memory. */
-  @api def store(data: SRAM3[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
+  @api def store(data: SRAM3[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
 
   /** Creates a dense, burst transfer from the RegFile3 `data` to this region of main memory. */
-  @api def store(data: RegFile3[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
+  @api def store(data: RegFile3[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
 }
 
 /** A 4-dimensional [[DRAM]] with elements of type A. */
@@ -141,7 +151,9 @@ object DRAM {
   def rank: Seq[Int] = Seq(0,1,2,3)
 
   /** Creates a dense, burst transfer from the SRAM4 `data` to this region of main memory. */
-  @api def store(data: SRAM4[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
+  @api def store(data: SRAM4[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
 }
 
 /** A 5-dimensional [[DRAM]] with elements of type A. */
@@ -149,7 +161,9 @@ object DRAM {
   def rank: Seq[Int] = Seq(0,1,2,3,4)
 
   /** Creates a dense, burst transfer from the SRAM5 `data` to this region of main memory. */
-  @api def store(data: SRAM5[A]): Void = stage(DenseTransfer(this, data, isLoad = false))
+  @api def store(data: SRAM5[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
 }
 
 /** A sparse, 1-dimensional region of DRAM with elements of type A. */

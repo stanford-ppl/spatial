@@ -39,6 +39,18 @@ resources:
 	bash bin/update_resources.sh
 	sbt "; project fringe; publishLocal"
 
+
+###-----------------------------------###
+## Make all documentation .            ##
+###-----------------------------------###
+doc:
+	bin/scrub_doc prep
+	sbt doc
+	bin/scrub_doc replace
+	bin/scrub_doc scrub
+	echo "Please publish to spatial-doc:"
+	echo "  cp -r target/scala-2.12/api/* ~/spatial-doc"
+
 ###-----------------------------------###
 ## Remove all generated files.	       ##
 ###-----------------------------------###

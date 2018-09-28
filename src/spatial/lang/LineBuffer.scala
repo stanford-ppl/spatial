@@ -21,7 +21,9 @@ import scala.collection.mutable.Queue
   @api def apply(row: I32, col: I32): A = stage(LineBufferRead(this, Seq(row, col), Set.empty))
 
   /** Load 1D DRAM into row of LineBuffer. */
-  @api def load(dram: DRAM1[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM1[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
 
 }
 

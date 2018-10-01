@@ -32,7 +32,7 @@ object globals {
   var enableDebugRegs: Boolean = true
 
   // TODO: What is this?
-  var channelAssignment: ChannelAssignment = BasicRoundRobin
+  var channelAssignment: ChannelAssignment = AllToOne
 
   /** TCL script generator. */
   private var _tclScript: PrintWriter = {

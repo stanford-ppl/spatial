@@ -12,6 +12,11 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
     SparseMatrix[K](rows2)
   }
 
+  def prependBlankRow: SparseMatrix[K] = {
+    val rows2 = Seq(SparseVector[K](Map[K,Int](), 0, Map[K,Option[K]]())) ++ rows
+    SparseMatrix[K](rows2)
+  }
+
   def sliceDims(dims: Seq[Int]): SparseMatrix[K] = SparseMatrix[K](dims.map{i => rows(i) })
 
   def map(f: SparseVector[K] => SparseVector[K]): SparseMatrix[K] = SparseMatrix[K](rows.map(f))

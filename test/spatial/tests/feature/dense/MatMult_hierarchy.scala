@@ -196,7 +196,7 @@ import spatial.dsl._
 
 
             // **LAYER 3** ACCUMULATOR (REGISTER LEVEL)
-            val tileC_acc = RegFile[T](n_r,n_r)
+            val tileC_acc = RegFile[T](n_r,n_r).coalesce
             Foreach(m_c by n_r){ accum_m =>
               // DATA MOVEMENT
               Foreach(n_r by 1, n_r by 1 par n_r) { (copy_m, copy_n) =>

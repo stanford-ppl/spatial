@@ -46,12 +46,12 @@ import spatial.dsl._
         Pipe { ff_out_sram(7, i) = mux((sram1(i) == sram2(i)),1.to[T],0.to[T]) }
 
         Pipe { ff_out_sram(8, i) = abs(sram1(i)) }
-        Pipe { ff_out_sram(9, i) = exp(sram1(i)) }
-        Pipe { ff_out_sram(10, i) = ln(sram1(i)) }
+        Pipe { ff_out_sram(9, i) = exp_taylor(sram1(i)) }
+        Pipe { ff_out_sram(10, i) = 0 /*ln(sram1(i))*/ }
         Pipe { ff_out_sram(11, i) = 1.to[T]/sram1(i) }
         Pipe { ff_out_sram(12, i) = 1.to[T]/sqrt(sram1(i)) }
-        Pipe { ff_out_sram(13, i) = sigmoid(sram1(i)) }
-        Pipe { ff_out_sram(14, i) = tanh(sram1(i)) }
+        Pipe { ff_out_sram(13, i) = 0 /*sigmoid(sram1(i))*/ }
+        Pipe { ff_out_sram(14, i) = 0 /*tanh(sram1(i))*/ }
         Pipe { ff_out_sram(15, i) = sram1(i) * sram2(i) + sram3(i) }
       }
 
@@ -76,12 +76,12 @@ import spatial.dsl._
       else if (i == 6 ) { if (data1(j) > data2(j)) 1.to[T] else 0.to[T] }
       else if (i == 7 ) { if (data1(j) == data2(j)) 1.to[T] else 0.to[T] }
       else if (i == 8 ) { abs(data1(j)) }
-      else if (i == 9 ) { exp(data1(j)) }
-      else if (i == 10) { ln(data1(j)) }
+      else if (i == 9 ) { exp_taylor(data1(j)) }
+      else if (i == 10) { 0 /*ln(data1(j))*/ }
       else if (i == 11) { 1.to[T]/(data1(j)) }
       else if (i == 12) { 1.to[T]/sqrt(data1(j)) }
-      else if (i == 13) { sigmoid(data1(j)) }
-      else if (i == 14) { tanh(data1(j)) }
+      else if (i == 13) { 0 /*sigmoid(data1(j))*/ }
+      else if (i == 14) { 0 /*tanh(data1(j))*/ }
       else if (i == 15) { data1(j) * data2(j) + data3(j) }
       else 0.to[T]
       val b = out_ram(i,j)

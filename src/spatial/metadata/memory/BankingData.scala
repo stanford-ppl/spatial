@@ -41,6 +41,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 }
 object ModBanking {
   def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
+  def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
 }
 
 
@@ -159,6 +160,7 @@ case class Memory(
 
   def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
+  def Ps: Seq[Int] = banking.map(_.Ps).flatten
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
@@ -295,3 +297,32 @@ case class EnableWriteBuffer(flag: Boolean) extends Data[EnableWriteBuffer](SetB
   * Default: false
   */
 case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.User)
+
+/** Flag set by the user to disable flattened banking and only attempt hierarchical banking,
+  * Used in cases where it could be tricky to find flattened scheme but hierarchical scheme 
+  * is very simple
+  *
+  * Getter:  sym.isHierarchicalBank
+  * Setter:  sym.isHierarchicalBank = (true | false)
+  * Default: false
+  */
+case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.User)
+
+/** Flag set by the user to disable hierarchical banking and only attempt flat banking,
+  * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
+  * user knows that a flat scheme exists or is a simpler search
+  *
+  * Getter:  sym.isFlatBank
+  * Setter:  sym.isFlatBank = (true | false)
+  * Default: false
+  */
+case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
+
+/** Flag set by the user to ensure an SRAM will merge the buffers, in cases
+    where you have metapipelined access such as pre-load, accumulate, store.
+  *
+  * Getter:  sym.shouldCoalesce
+  * Setter:  sym.shouldCoalesce = (true | false)
+  * Default: false
+  */
+case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User)

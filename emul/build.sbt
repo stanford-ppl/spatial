@@ -7,12 +7,7 @@ isSnapshot := true
 val common = Seq(
   scalaVersion := scala_version,
   version := "1.0",
-
-  /** External Libraries (e.g. maven dependencies) **/
-  libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
-    "com.lihaoyi" %% "utest" % "0.6.3" % "test"          // Testing
-  ),
+  crossScalaVersions := Seq(scala_version, "2.11.7"),
 
   /** Scalac Options **/
   scalacOptions += "-target:jvm-1.8",               // JVM 1.8
@@ -27,8 +22,6 @@ val common = Seq(
   scalacOptions += "-language:existentials",        // Globally enable existentials
   scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
   scalacOptions += "-Xfuture",                      // Enable "future language features"
-  scalacOptions += "-opt:l:method,inline",          // Enable method optimizations, inlining
-  scalacOptions += "-opt-warnings:none",            // Disable optimization warnings
 
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,
@@ -37,7 +30,6 @@ val common = Seq(
 
   /** Testing **/
   scalacOptions in Test ++= Seq("-Yrangepos"),
-  testFrameworks += new TestFramework("utest.runner.Framework"),
 
   /** Macro Paradise **/
   resolvers += Resolver.sonatypeRepo("snapshots"),
@@ -51,4 +43,3 @@ val common = Seq(
 
 /** Projects **/
 lazy val emul = (project in file(".")).settings(common)
-

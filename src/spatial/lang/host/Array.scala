@@ -168,7 +168,7 @@ import utils.implicits.Readable._
 
   @api override def toText: Text = this.mkString(", ")
 
-  @rig override def getFrom(c: Any, isParam: Boolean = false): Option[(Array[A],Boolean)] = c match {
+  @rig override def getFrom(c: Any, isParam: Boolean = false, saturating: Boolean = false, unbiased: Boolean = false): Option[(Array[A],Boolean)] = c match {
     case d: scala.Array[_] if d.isEmpty => Some((stage(ArrayFromSeq[A](Nil)), true))
 
     case d: scala.Array[_] =>

@@ -43,28 +43,18 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --fpga Zynq --debugResources",
-    make = "make vcs",
+    args = "--synth --fpga VCS",
+    make = "make",
     run  = "bash scripts/regression_run.sh vcs"
   ) {
     override def shouldRun: Boolean = checkFlag("test.VCS")
     override val makeTimeout: Long = 3600
   }
 
-  object VCS_noretime extends ChiselBackend(
-    name = "VCS_noretime",
-    args = "--synth --noretime --debugResources",
-    make = "make vcs",
-    run  = "bash scripts/regression_run.sh vcs-noretime"
-  ) {
-    override def shouldRun: Boolean = checkFlag("test.VCS_noretime")
-    override val makeTimeout: Long = 3600
-  }
-
   object Zynq extends ChiselBackend(
     name = "Zynq",
-    args = "--synth --fpga Zynq --debugResources",
-    make = "make zynq",
+    args = "--synth --fpga Zynq",
+    make = "make",
     run  = "bash scripts/scrape.sh Zynq"
   ) {
     override def shouldRun: Boolean = checkFlag("test.Zynq")
@@ -73,8 +63,8 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth --fpga ZCU --debugResources",
-    make = "make zcu",
+    args = "--synth --fpga ZCU",
+    make = "make",
     run  = "bash scripts/scrape.sh ZCU"
   ) {
     override def shouldRun: Boolean = checkFlag("test.ZCU")
@@ -83,7 +73,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object AWS extends ChiselBackend(
     name = "AWS",
-    args = "--synth --fpga AWS_F1 --debugResources",
+    args = "--synth --fpga AWS_F1",
     make = "make aws-F1-afi",
     run  = "bash scripts/scrape.sh AWS"
   ) {
@@ -114,6 +104,6 @@ trait SpatialTest extends Spatial with DSLTest {
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, VCS_noretime, PIR)
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, PIR)
 
 }

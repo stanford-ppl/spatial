@@ -86,13 +86,13 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
 
     case ctrl: Control[_] if deleteChild =>
       dbgs(s"Deleting $lhs and inlining body with parent")
-      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.isStreamControl)) deleteChild = false
+      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.children.head.isStreamControl && !lhs.isStreamControl)) deleteChild = false
       ctrl.bodies.foreach{body => 
         body.blocks.foreach{case (_,block) => 
           inlineBlock(block)
         }
       }
-      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.isStreamControl)) deleteChild = true
+      if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.children.head.isStreamControl && !lhs.isStreamControl)) deleteChild = true
       void.asInstanceOf[Sym[A]]
 
     case _:Switch[_]  => super.transform(lhs,rhs)

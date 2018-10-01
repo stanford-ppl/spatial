@@ -14,7 +14,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
   def getReadStreamsAndFIFOs(ctrl: Ctrl): Set[Sym[_]] = {
     ctrl.children.flatMap(getReadStreamsAndFIFOs).toSet ++
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
-                     .filter{mem => mem.isStreamIn || mem.isFIFO }
+                     .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer }
                      .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 

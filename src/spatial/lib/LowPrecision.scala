@@ -15,12 +15,12 @@ trait LowPrecision {
 
     val sram_in = SRAM[Float](size)
     val sram_out = SRAM[Byte](size)
-    val maxo = Reg[Float]
-    val delta = Reg[Float]
+    val maxo: Reg[Float] = Reg[Float]
+    val delta: Reg[Float] = Reg[Float]
 
     Reduce(maxo)(X.length by size) { ii =>
       sram_in load X(ii :: ii + size)
-      val maxi = Reg[Float]
+      val maxi: Reg[Float] = Reg[Float]
       Reduce(maxi)(0 until size) { jj =>
         abs(sram_in(jj))
       }{ (a, b) => max(a, b) }
@@ -55,8 +55,8 @@ trait LowPrecision {
   ): Unit = {
     val sat_neg = (-scala.math.pow(2, (precision - factor - 1))).to[Int]
     val sat_pos = (scala.math.pow(2, (precision - factor - 1)) - 1).to[Int]
-    val maxsram = Reg[Float]
-    val delta = Reg[Float]
+    val maxsram: Reg[Float] = Reg[Float]
+    val delta: Reg[Float] = Reg[Float]
 
     Named(s"${parent}_Reduce").Reduce(maxsram)(X.rows by 1, X.cols by 1) { (i, j) =>
       abs(X(i, j))
@@ -87,8 +87,8 @@ trait LowPrecision {
   ): Unit = {
     val sat_neg = (-scala.math.pow(2, (precision - factor - 1))).to[Int]
     val sat_pos = (scala.math.pow(2, (precision - factor - 1)) - 1).to[Int]
-    val maxsram = Reg[Float]
-    val delta = Reg[Float]
+    val maxsram: Reg[Float] = Reg[Float]
+    val delta: Reg[Float] = Reg[Float]
 
     Named(s"${parent}_Reduce").Reduce(maxsram)(X.length by 1) { i =>
       abs(X(i))
@@ -243,11 +243,11 @@ trait LowPrecision {
 
     val sram_in = SRAM[Float](size)
     val sram_out = SRAM[Byte](size)
-    val maxo = Reg[Float]
+    val maxo: Reg[Float] = Reg[Float]
 
     Reduce(maxo)(X.length by size) { ii =>
       sram_in load X(ii :: ii + size)
-      val maxi = Reg[Float]
+      val maxi: Reg[Float] = Reg[Float]
       Reduce(maxi)(0 until size) { jj =>
         abs(sram_in(jj))
       } { (a, b) => max(a, b) }

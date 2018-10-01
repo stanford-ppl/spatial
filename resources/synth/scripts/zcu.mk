@@ -2,7 +2,7 @@ CC=g++
 LINK=g++
 CROSS_COMPILE=/usr/bin/aarch64-linux-gnu-
 
-FRINGE_SRC=./fringeZCU
+FRINGE_SRC=../zcu.sw-resources
 HOST_SRC=./
 STATIC_SRC=./datastructures/static
 
@@ -16,8 +16,7 @@ INCLUDES +=													\
 			-I${STATIC_SRC} 							\
 			-I${STATIC_SRC}/standalone  	\
 			-I${FRINGE_SRC} 					  	\
-			-I../zcu.sw-resources 					  	\
-			-I${HOST_SRC}/fringeZCU/xil_libs					\
+			-I${HOST_SRC}/SW/xil_libs					\
 
 
 OBJECTS=$(SOURCES:.cpp=.o)
@@ -26,7 +25,7 @@ DEFINES=$(OBJECTS:.o=.d)
 
 CXXFLAGS=-DZCU -D__DELITE_CPP_STANDALONE__ -D__USE_STD_STRING__  -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 -O0 -g -march=armv8-a -mcpu=cortex-a53
 #CXXFLAGS=-DZCU -D__DELITE_CPP_STANDALONE__  -std=c++11
-LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm # -L${HOST_SRC}/fringeZCU/xil_libs -lxil
+LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm # -L${HOST_SRC}/SW/xil_libs -lxil
 
 all: pre-build-checks Top
 

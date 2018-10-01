@@ -23,7 +23,7 @@ help:
 sw:
 	cp scripts/zynq.mk cpp/Makefile
 	make -C cpp -j8
-	tar -czf $(APPNAME).tar.gz -C ${ZYNQ_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C zynq.sw-resources/utils set_perms setClocks.sh run.sh
+	tar -czf $(APPNAME).tar.gz -C ${ZYNQ_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C ../zynq.sw-resources/utils set_perms setClocks.sh run.sh
 
 hw:
 	echo "$$(date +%s)" > start.log

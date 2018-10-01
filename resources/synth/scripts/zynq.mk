@@ -2,7 +2,7 @@ CC=g++
 LINK=g++
 CROSS_COMPILE=/usr/bin/arm-linux-gnueabihf-
 
-FRINGE_SRC=./SW
+FRINGE_SRC=../zynq.sw-resources
 HOST_SRC=./
 STATIC_SRC=./datastructures/static
 
@@ -15,7 +15,6 @@ INCLUDES +=													\
 			-I$(JAVA_HOME)/include/linux 	\
 			-I${STATIC_SRC} 							\
 			-I${STATIC_SRC}/standalone  	\
-			-I../zynq.sw-resources 					  	\
 			-I${FRINGE_SRC} 					  	\
 
 

@@ -55,7 +55,7 @@ object SparseTransfer {
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 
     // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
-    val iters = Reg[I32](0)
+    val iters: Reg[I32] = Reg[I32]
     Pipe{
       iters := mux(requestLength < 16.to[I32], 16.to[I32],
                mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) ))

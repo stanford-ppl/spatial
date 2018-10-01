@@ -101,7 +101,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
     case GetDRAMAddress(dram) =>
       val id = argHandle(dram)
-      emit(src"""val $lhs = io.argIns(api.${id}_ptr)""")
+      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
+      emit(src"""$lhs.r := io.argIns(api.${id}_ptr)""")
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasTileLoad

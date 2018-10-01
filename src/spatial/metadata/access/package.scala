@@ -16,6 +16,8 @@ package object access {
     def isParEnq: Boolean = op match {
       // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true
+      case _:MergeBufferEnq[_] => true
+      case _:MergeBufferBankedEnq[_] => true
       case _:LIFOBankedPush[_] => true
       case _:SRAMBankedWrite[_,_] => true
       case _:FIFOEnq[_] => true
@@ -27,7 +29,9 @@ package object access {
 
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
-      case _:FIFOBankedDeq[_] => true
+      case _:FIFORegDeq[_] => true
+      case _:MergeBufferDeq[_] => true
+      case _:MergeBufferBankedDeq[_] => true
       case _:LIFOPop[_] => true
       case _:LIFOBankedPop[_] => true
       case _:StreamInRead[_] => true
@@ -37,7 +41,10 @@ package object access {
 
     def isStreamStageHolder: Boolean = op match {
       case _:FIFOEnq[_] => true
+      case _:FIFORegEnq[_] => true
       case _:FIFOBankedEnq[_] => true
+      case _:MergeBufferEnq[_] => true
+      case _:MergeBufferBankedEnq[_] => true
       case _:LIFOPush[_] => true
       case _:LIFOBankedPush[_] => true
       case _:StreamOutWrite[_] => true
@@ -85,6 +92,7 @@ package object access {
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
+    def isArgInRead: Boolean = a match {case Op(RegRead(Op(ArgInNew(_)))) => true; case _ => false}
 
     def isStreamStageEnabler: Boolean = a.op.exists(_.isStreamStageEnabler)
     def isStreamStageHolder: Boolean = a.op.exists(_.isStreamStageHolder)
@@ -157,8 +165,12 @@ package object access {
       case Op(_:RegFileShiftIn[_,_])        => 1
       case Op(op:RegFileShiftInVector[_,_]) => op.data.width
       case Op(ua: UnrolledAccessor[_,_])    => ua.width
+      case Op(MergeBufferBound(_,_,_,_)) => 1
+      case Op(MergeBufferInit(_,_,_)) => 1
       case Op(RegWrite(_,_,_)) => 1
       case Op(RegRead(_))      => 1
+      case Op(FIFORegDeq(_))      => 1
+      case Op(FIFORegEnq(_,_,_))      => 1
       case _ => -1
     }
 
@@ -194,7 +206,7 @@ package object access {
     val forkLayer = a.unroll.zip(b.unroll).zipWithIndex.collectFirst{case ((u0,u1),i) if (u0 != u1) => i}
     if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {
       val forkNode = aIters(forkLayer.get).parent.s.get
-      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access))
+      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access), Some(forkNode.toCtrl))
       if (mustClone) aIters.zipWithIndex.collect{case (x,i) if i > forkLayer.get => (x, a.unroll.take(i))}.toSet
       else Set()
     } else Set()    

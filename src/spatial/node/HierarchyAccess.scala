@@ -29,6 +29,7 @@ object StatusReader {
 
 /** Reset of a memory */
 abstract class Resetter[A:Type] extends EnPrimitive[Void] {
+  override def effects: Effects = Effects.Writes(mem)
   val tA: Type[A] = Type[A]
   def mem: Sym[_]
 }

@@ -67,9 +67,9 @@ import spatial.dsl._
     val noise_denom = 10
     
     // Generate some test data
-    val sX = (0::points, 0::D){(i,j) => (random[TX](maxX) - (maxX/3).to[TX])}
-    val W_gold = Array.tabulate(D) { i => (random[TM](3) / 2)}
-    val Y_noise = Array.tabulate(points) { i => (random[Int](noise_num).to[TM] - (noise_num.to[TM]/2)) / noise_denom.to[TM] }
+    val sX = (0::points, 0::D){(i,j) => 0.5.to[TX]}//(random[TX](maxX) - (maxX/3).to[TX])}
+    val W_gold = Array.tabulate(D) { i => 1.to[TM]}//(random[TM](3) / 2)}
+    val Y_noise = Array.tabulate(points) { i => 0.to[TM]}//(random[Int](noise_num).to[TM] - (noise_num.to[TM]/2)) / noise_denom.to[TM] }
     val sY = Array.tabulate(points) { i => Array.tabulate(D){j => (W_gold(j) * sX(i,j).to[TM])}.reduce{_+_} + Y_noise(i) }
 
     val E = ArgIn[Int]

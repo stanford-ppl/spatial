@@ -28,7 +28,9 @@ trait CppGenMath extends CppGenCommon {
     case FixMin(x,y) => emit(src"${lhs.tp} $lhs = $x < $y ? $x : $y;")
     case FixMax(x,y) => emit(src"${lhs.tp} $lhs = $x > $y ? $x : $y;")
     case FixRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
+    case FixRecipSqrt(y) => emit(src"${lhs.tp} $lhs = 1.0 / sqrt($y);")
     case FixFMA(a,b,c) => emit(src"${lhs.tp} $lhs = $a * $b + $c;")
+    case FltIsNaN(a) => emit(src"${lhs.tp} $lhs = isnan($a);")
     case FltFMA(a,b,c) => emit(src"${lhs.tp} $lhs = $a * $b + $c;")
     case FltRecip(y) => emit(src"${lhs.tp} $lhs = 1.0 / $y;")
     case FltAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
@@ -41,6 +43,8 @@ trait CppGenMath extends CppGenCommon {
     case FixLst(x,y)  => emit(src"${lhs.tp} $lhs = $x < $y;")
     case FixLeq(x,y) => emit(src"${lhs.tp} $lhs = $x <= $y;")
     case FixNeq(x,y) => emit(src"${lhs.tp} $lhs = $x != $y;")
+    case FltMax(x,y) => emit(src"${lhs.tp} $lhs = $x > $y ? $x : $y;")
+    case FltMin(x,y) => emit(src"${lhs.tp} $lhs = $x < $y ? $x : $y;")
     case FixEql(x,y) => emit(src"${lhs.tp} $lhs = $x == $y;")
     case FltLst(x,y)  => emit(src"${lhs.tp} $lhs = $x < $y;")
     case FltLeq(x,y) => emit(src"${lhs.tp} $lhs = $x <= $y;")
@@ -53,6 +57,7 @@ trait CppGenMath extends CppGenCommon {
     case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
     case Or(x,y) => emit(src"${lhs.tp} $lhs = $x | $y;")
     case Xor(x,y) => emit(src"${lhs.tp} $lhs = $x ^ $y;")
+    case Xnor(x,y) => emit(src"${lhs.tp} $lhs = !($x ^ $y);")
     case Not(x) => emit(src"${lhs.tp} $lhs = !$x;")
     // case FixConvert(x) => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $x;  // should be fixpt ${lhs.tp}")
     // case FixPtToFltPt(x) => lhs.tp match {
@@ -108,6 +113,21 @@ trait CppGenMath extends CppGenCommon {
     case FixFloor(x)   => emit(src"${lhs.tp} $lhs = floor($x);")
     case FixCeil(x)    => emit(src"${lhs.tp} $lhs = ceil($x);")
     case FixToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FixToFixSat(a, fmt)   => 
+        val max = lhs.tp match {case x:Fix[_,_,_] => x.maxValue; case _ => throw new Exception("Error in Saturating Cast")}
+        val min = lhs.tp match {case x:Fix[_,_,_] => x.minValue; case _ => throw new Exception("Error in Saturating Cast")}
+        emit(src"${lhs.tp} $lhs;")
+        emit(src"if ($a > ${max}) $lhs = ${max};")
+        emit(src"else if ($a < ${min}) $lhs = ${min};")
+        emit(src"else $lhs = (${lhs.tp}) $a;")
+    case FixToFixUnb(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
+    case FixToFixUnbSat(a, fmt)   => 
+        val max = lhs.tp match {case x:Fix[_,_,_] => x.maxValue; case _ => throw new Exception("Error in Saturating Cast")}
+        val min = lhs.tp match {case x:Fix[_,_,_] => x.minValue; case _ => throw new Exception("Error in Saturating Cast")}
+        emit(src"${lhs.tp} $lhs;")
+        emit(src"if ($a > ${max}) $lhs = ${max};")
+        emit(src"else if ($a < ${min}) $lhs = ${min};")
+        emit(src"else $lhs = (${lhs.tp}) $a;")
     case FixToFlt(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
     case FltToFix(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")
     case FltToFlt(a, fmt)   => emit(src"${lhs.tp} $lhs = (${lhs.tp}) $a;")

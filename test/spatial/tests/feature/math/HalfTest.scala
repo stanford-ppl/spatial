@@ -19,7 +19,7 @@ import spatial.dsl._
 
     val out = getArg(hOut)
     println("out: " + out)
-    if (b) assert(out == 1) else assert(out == 0)
+    if (b) assert(out == 1.to[Half]) else assert(out == 0.to[Half])
   }
 }
 

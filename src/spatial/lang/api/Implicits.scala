@@ -32,7 +32,9 @@ trait Implicits extends argon.lang.api.Implicits { this: MuxAPI =>
     def apply(range: ((Int, Int), Int))(implicit ov2: Overload1): I32 = createParam(b, range._1._1, range._1._2, range._2)
   }
 
-  @api def param[A](c: Lift[A]): A = c.B.from(c.literal, errorOnLoss = true, isParam = true)
+  @api def param[A](c: Lift[A]): A = {
+    c.B.from(c.literal, errorOnLoss = true, isParam = true)
+  }
 
   @rig def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
     val p = I32.p(default)

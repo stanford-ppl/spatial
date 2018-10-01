@@ -17,12 +17,7 @@ trait ChiselGenController extends ChiselGenCommon {
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
-
-  /* Set of control nodes which already have their enable signal emitted */
-  var enDeclaredSet = Set.empty[Sym[_]]
-
-  /* Set of control nodes which already have their done signal emitted */
-  var doneDeclaredSet = Set.empty[Sym[_]]
+  private var memsWithReset: List[Sym[_]] = List()
 
   var instrumentCounters: List[(Sym[_], Int)] = List()
 
@@ -45,7 +40,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val id = instrumentCounters.length
       if (spatialConfig.compressWires == 1 || spatialConfig.compressWires == 2) {
         emitInstrumentation(src"ic(${id*2}).io.enable := ${swap(lhs,En)}; ic(${id*2}).reset := accelReset")
-        emitInstrumentation(src"ic(${id*2+1}).io.enable := Utils.risingEdge(${swap(lhs, Done)}); ic(${id*2+1}).reset := accelReset")
+        emitInstrumentation(src"ic(${id*2+1}).io.enable := risingEdge(${swap(lhs, Done)}); ic(${id*2+1}).reset := accelReset")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ic(${id*2}).io.count""")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ic(${id*2+1}).io.count""")
@@ -54,7 +49,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emitInstrumentation(src"""val ${lhs}_cycles = Module(new InstrumentationCounter())""")
         emitInstrumentation(src"${lhs}_cycles.io.enable := ${swap(lhs,En)}; ${lhs}_cycles.reset := accelReset")
         emitInstrumentation(src"""val ${lhs}_iters = Module(new InstrumentationCounter())""")
-        emitInstrumentation(src"${lhs}_iters.io.enable := Utils.risingEdge(${swap(lhs, Done)}); ${lhs}_iters.reset := accelReset")
+        emitInstrumentation(src"${lhs}_iters.io.enable := risingEdge(${swap(lhs, Done)}); ${lhs}_iters.reset := accelReset")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ${lhs}_cycles.io.count""")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")
         emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ${lhs}_iters.io.count""")
@@ -185,7 +180,7 @@ trait ChiselGenController extends ChiselGenCommon {
     if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) {
       emitt(src"""${swap(lhs, IIDone)} := true.B""")
     } else {
-      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
+      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + fringe.utils.log2Up(${swap(lhs, II)})));""")
       emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ~${swap(lhs, Mask)}""")
       emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,DatapathEn)}""")
       emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
@@ -296,10 +291,11 @@ trait ChiselGenController extends ChiselGenCommon {
     createInstrumentation(sym)
 
     // Create controller
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = ${swap(sym, Latency)}))")
+    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = ${swap(sym, Latency)}))")
 
     // Connect enable and rst in (rst)
     emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released & ${getForwardPressure(sym.toCtrl)} """)
+    emitt(src"""${swap(sym, SM)}.io.flow := ${swap(sym, Flow)}""")
     emitt(src"""${swap(sym, SM)}.io.rst := ${swap(sym, Resetter)} // generally set by parent""")
 
     //  Capture rst out (ctrRst)
@@ -308,7 +304,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Capture sm done
     emitt(src"""${swap(sym, Done)} := ${swap(sym, SM)}.io.done // Used to delay in cg, now delay in templates""")
-    emitt(src"""${swap(sym, SM)}.io.flow := ${getBackPressure(sym.toCtrl)}""")
+    emitt(src"""${swap(sym, Flow)} := ${getBackPressure(sym.toCtrl)}""")
 
     // Capture datapath_en
     if (sym.cchains.isEmpty) emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ${swap(sym, Mask)} // Used to have many variations""")
@@ -347,7 +343,7 @@ trait ChiselGenController extends ChiselGenCommon {
         val x = sym match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
         emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${x.fullDelay})""")
       } else {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)""")
+        emitt(src"""${swap(sym, SM)}.io.ctrDone := risingEdge(${swap(sym, SM)}.io.ctrInc)""")
       }
     }
 
@@ -362,7 +358,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emitGlobalWire(src"val accelReset = reset.toBool | io.reset")
         emitt(s"""${swap(lhs, BaseEn)} := io.enable""")
         emitt(s"""${swap(lhs, En)} := ${swap(lhs, BaseEn)} & !io.done & ${getForwardPressure(lhs.toCtrl)}""")
-        emitt(s"""${swap(lhs, Resetter)} := Utils.getRetimed(accelReset, 1)""")
+        emitt(s"""${swap(lhs, Resetter)} := getRetimed(accelReset, 1)""")
         emitt(src"""${swap(lhs, Mask)} := true.B""")
         emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
         emitIICounter(lhs)
@@ -499,6 +495,8 @@ trait ChiselGenController extends ChiselGenCommon {
       emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
       val state = notDone.input
       alphaconv_register(src"$state")
+      emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
+      emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
 
       emitt("// Emitting notDone")
       visitBlock(notDone)
@@ -516,11 +514,9 @@ trait ChiselGenController extends ChiselGenCommon {
       emitt(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
       emitt(src"${swap(lhs, SM)}.io.nextState := ${nextState.result}.r.asSInt //Mux(${DL(swap(lhs, IIDone), src"1 max ${if (spatialConfig.enableRetiming) nextState.result.fullDelay else 0}", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
       emitt(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
-      emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
       emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
-      emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
-      emitt(src"${swap(lhs, Blank)}_doneCondition := ~${notDone.result}")
-      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${swap(lhs, Blank)}_doneCondition")
+      emitt(src"${swap(lhs, DoneCondition)} := ~${notDone.result}")
+      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${swap(lhs, DoneCondition)}")
       emitChildrenCxns(lhs, true)
       exitCtrl(lhs)
 
@@ -542,7 +538,7 @@ trait ChiselGenController extends ChiselGenCommon {
       } else { // If outer, latch in selects in case the body mutates the condition
         selects.indices.foreach{i => 
           emitGlobalWire(src"""val ${cases(i)}_switch_sel_reg = RegInit(false.B)""")
-          emitt(src"""${cases(i)}_switch_sel_reg := Mux(Utils.risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
+          emitt(src"""${cases(i)}_switch_sel_reg := Mux(risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
           emitt(src"""${swap(lhs, SM)}.io.selectsIn($i) := ${selects(i)}""")
         }
       }
@@ -646,7 +642,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
 
         emit ("""// Set Build Info""")
-        val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
+        // val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
         if (spatialConfig.compressWires >= 1) {
           pipeRtMap.groupBy(_._1._1).map{x => 
             val listBuilder = x._2.toList.sortBy(_._1._2).map(_._2)
@@ -670,19 +666,18 @@ trait ChiselGenController extends ChiselGenCommon {
           }
         }
 
-        emit (s"Utils.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
-        emit (s"Utils.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
-        emit (s"Utils.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
-        emit (s"Utils.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
-        emit (s"Utils.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
-        emit (s"Utils.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
-        // emit (s"Utils.tight_control   = ${spatialConfig.enableTightControl}")
-        emit (s"Utils.mux_latency    = ${latencyOption("Mux", None)}.toInt")
-        emit (s"Utils.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
-        emit (s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
-        emit (s"Utils.SramThreshold = 4")
-        emit (s"""Utils.target = ${trgt}""")
-        emit (s"""Utils.retime = ${spatialConfig.enableRetiming}""")
+        emit (s"globals.target.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
+        emit (s"globals.target.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
+        emit (s"globals.target.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
+        emit (s"globals.target.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
+        emit (s"globals.target.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
+        emit (s"globals.target.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
+        // emit (s"tight_control   = ${spatialConfig.enableTightControl}")
+        emit (s"globals.target.mux_latency    = ${latencyOption("Mux", None)}.toInt")
+        emit (s"globals.target.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
+        emit (s"globals.target.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
+        emit (s"globals.target.SramThreshold = 4")
+        emit (s"""globals.retime = ${spatialConfig.enableRetiming}""")
 
       }
 

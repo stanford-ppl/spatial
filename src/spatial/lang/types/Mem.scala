@@ -30,34 +30,46 @@ trait LocalMem1[A,C[T]<:LocalMem1[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
 
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
-  @api def load(dram: DRAM1[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM1[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
 
   /** Creates a sparse gather from the given region of DRAM to this on-chip memory. */
-  @api def gather(dram: DRAMSparseTile[A]): Void = stage(SparseTransfer(dram,me,isGather=true))
+  @api def gather(dram: DRAMSparseTile[A]): Void = {
+    stage(SparseTransfer(dram,me,isGather=true))
+  }
 }
 trait LocalMem2[A,C[T]<:LocalMem2[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
 
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
-  @api def load(dram: DRAM2[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM2[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
 }
 trait LocalMem3[A,C[T]<:LocalMem3[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
 
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
-  @api def load(dram: DRAM3[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM3[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
 }
 trait LocalMem4[A,C[T]<:LocalMem4[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
 
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
-  @api def load(dram: DRAM4[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM4[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
 }
 trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
 
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
-  @api def load(dram: DRAM5[A]): Void = stage(DenseTransfer(dram,me,isLoad = true))
+  @api def load(dram: DRAM5[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
 }
 
 

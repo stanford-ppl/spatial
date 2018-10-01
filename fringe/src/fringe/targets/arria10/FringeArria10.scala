@@ -46,7 +46,7 @@ class FringeArria10 (
     val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(w.W)))
 
     // Accel memory IO
-    val memStreams = new AppStreams(loadStreamInfo, storeStreamInfo)
+    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
     // TODO: need to add memory stream support
 
     // External enable

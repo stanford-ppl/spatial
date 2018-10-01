@@ -6,6 +6,7 @@ module RetimeShiftRegister
     input clock,
     input reset,
     input flow,
+    input [WIDTH-1:0] init,
     input [WIDTH-1:0] in,
     output logic [WIDTH-1:0] out
 );
@@ -21,7 +22,7 @@ module RetimeShiftRegister
   always @(posedge clock) begin
     if (reset) begin
       for(i=0; i<STAGES; i=i+1) begin
-        sr[i] <= {WIDTH{1'b0}};
+        sr[i] <= init;
       end
     end else begin
       if (flow) begin 

@@ -8,7 +8,7 @@ import spatial.dsl._
   val window: scala.Int = 16
 
   def compute_kernel[T:Num](start: scala.Int, sr: RegFile1[T]): T = {
-    Reduce(Reg[T](0.to[T]))(window/2 by 1) { k => sr(k+start) }{_+_} / window
+    Reduce(Reg[T](0.to[T]))(window/2 by 1) { k => sr(k+start) }{_+_}.value / window
   }
 
   def main(args: Array[String]): Unit = {

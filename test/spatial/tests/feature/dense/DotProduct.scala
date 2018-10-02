@@ -11,19 +11,18 @@ import scala.reflect.ClassTag
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 
+  // Can be overwritten using --param-path=fileName at command line
+  defaultParams(defaults=
+    "ip"-> 4 (1 -> 192), 
+    "op"-> 2 (1 -> 6), 
+    "ts"-> 32 (32 -> 64 -> 19200)
+  )
+
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
-
-    // Load param specified with --param-path=fileName. If not set use defaults
-    val params = loadParams(defaults=
-      "innerPar"-> 4 (1 -> 192), 
-      "outerPar"-> 2 (1 -> 6), 
-      "tileSize"-> 32 (32 -> 64 -> 19200)
-    )
-
-    val B  = params("tileSize")
-    val P1 = params("outerPar")
-    val P2 = params("innerPar")
-    val P3 = params("innerPar")
+    val B  = params("ts")
+    val P1 = params("op")
+    val P2 = params("ip")
+    val P3 = params("ip")
     println(B, P1, P2)
     //saveParams(params, s"$SPATIAL_HOME/saved.param") // Store used param to file
 

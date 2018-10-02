@@ -2,11 +2,11 @@ package spatial.codegen.dotgen
 
 import argon._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 
-class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
+case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
 
   override def entryFile: String = s"IR.$ext"
-  override def clearGen(): Unit = {}
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
 
@@ -87,8 +87,44 @@ class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
     case data => super.emitMeta(data)
   }
 
-}
-object HtmlIRGenSpatial {
-  def apply(IR:State) = new HtmlIRGenSpatial(IR)
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
+    super.gen(lhs, rhs)
+
+    if (lhs.isMem) {
+      inGen(out, s"Mem.$ext") {
+        super.gen(lhs, rhs)
+        if (lhs.writers.nonEmpty) {
+          emitElem("table", "border"->3, "cellpadding"->10, "cellspacing"->10) {
+            emitElem("tbody") {
+              emitElem("tr") {
+                emitElem("th", s"writers(${lhs.writers.size})")
+                lhs.writers.foreach { access =>
+                  emitElem("td") {
+                    super.gen(access, access.op.get)
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (lhs.readers.nonEmpty) {
+          emitElem("table", "border"->3, "cellpadding"->10, "cellspacing"->10) {
+            emitElem("tbody") {
+              emitElem("tr") {
+                emitElem("th", s"readers(${lhs.readers.size})")
+                lhs.readers.foreach { access =>
+                  emitElem("td") {
+                    super.gen(access, access.op.get)
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+
 }
 

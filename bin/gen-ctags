@@ -5,6 +5,7 @@ ctags --exclude=log --languages=scala,java -f .tags -R \
   utils/src \
   emul/src \
   models/src \
+  fringe/src \
   forge/src \
   poly/src \
   argon/src

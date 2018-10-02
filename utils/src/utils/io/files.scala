@@ -112,4 +112,13 @@ object files {
     }
   }
 
+  def splitPath(path:String) = {
+    val file = new File(path)
+    (file.getParent, file.getName)
+  }
+
+  def buildPath(parts:String*):String = {
+    parts.mkString(sep)
+  }
+
 }

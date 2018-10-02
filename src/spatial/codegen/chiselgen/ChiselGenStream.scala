@@ -122,7 +122,6 @@ trait ChiselGenStream extends ChiselGenCommon {
 //       val datacsv = data.map{d => src"${d}"}.mkString(",")
 //       val en = ens.map(quote).mkString("&")
 
-//       emit(src"""val ${lhs}_wId = getStreamOutLane("$stream")*-*${ens.length}""")
 //       emit(src"""${swap(stream, ValidOptions)}(${lhs}_wId) := $en & ${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", src"${symDelay(lhs)}.toInt", true)} & ~${swap(parent, Done)} /*mask off double-enq for sram loads*/""")
 //       emit(src"""${swap(src"${stream}_valid_stops", Blank)}(${lhs}_wId) := ${swap(parent, Done)} // Should be delayed by body latency + ready-off bubbles""")
 //       (0 until ens.length).map{ i => emit(src"""${swap(stream, DataOptions)}(${lhs}_wId + ${i}) := ${data(i)}""")}
@@ -136,7 +135,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 //             // emitGlobalWire(src"""val converted_data = Wire(UInt(16.W))""")
 //             emitGlobalWireMap(src"""stream_out_startofpacket""", """Wire(Bool())""")
 //             emitGlobalWireMap(src"""stream_out_endofpacket""", """Wire(Bool())""")
-//             emit(src"""stream_out_startofpacket := Utils.risingEdge(${swap(parent, DatapathEn)})""")
+//             emit(src"""stream_out_startofpacket := risingEdge(${swap(parent, DatapathEn)})""")
 //             emit(src"""stream_out_endofpacket := ${swap(parent, Done)}""")
 //             emit(src"""// emiiting data for stream ${stream}""")
 //             // emit(src"""${stream} := ${data.head}""")

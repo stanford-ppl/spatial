@@ -9,6 +9,7 @@ import utils.tags.instrument
 import utils.implicits.collections._
 
 import scala.collection.mutable.ArrayBuffer
+import spatial.util.IntLike._
 
 trait MemoryUnrolling extends UnrollingBase {
 
@@ -209,7 +210,7 @@ trait MemoryUnrolling extends UnrollingBase {
               dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
               val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
               val bank3 = vecsInSegment.map(bank.getOrElse(Nil)(_))
-              val ofs3 = vecsInSegment.map(ofs.getOrElse(Nil)(_))
+              val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
               val ens3 = vecsInSegment.map(ens2(_))
               (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
             }.toSeq
@@ -275,6 +276,10 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
+    case _:LineBufferEnq[_]     => addr.map{case laneAddr => Seq(laneAddr(0))}
+    case _:LineBufferRead[_]    => addr.map{case laneAddr => 
+      Seq(laneAddr(0)) ++ inst.bankSelects(mem, laneAddr).drop(1)
+    }
     case _ => addr.map{case laneAddr =>
       inst.bankSelects(mem, laneAddr)
     }
@@ -286,9 +291,13 @@ trait MemoryUnrolling extends UnrollingBase {
     addr:   Seq[Seq[Idx]],
     inst:   Memory
   )(implicit ctx: SrcCtx): Seq[Idx] = access match {
-    case _:RegFileShiftIn[_,_]  => Nil
-    case _:RegFileRead[_,_]     => Nil
-    case _:RegFileWrite[_,_]    => Nil
+    case Op(_:RegFileShiftIn[_,_])  => Nil
+    case Op(_:RegFileRead[_,_])     => Nil
+    case Op(_:RegFileWrite[_,_])    => Nil
+    case Op(_:LineBufferEnq[_])     => addr.map{case laneAddr => laneAddr(0)}
+    case Op(_:LineBufferRead[_])  => addr.map{case laneAddr => 
+      inst.bankOffset(mem, Seq(0.to[I32]) ++ laneAddr.drop(1))
+    }
     case _ => addr.map{case laneAddr =>
       inst.bankOffset(mem, laneAddr)
     }
@@ -393,6 +402,7 @@ trait MemoryUnrolling extends UnrollingBase {
     ofs:    Seq[Idx],
     enss:   Seq[Set[Bit]]
   )(implicit vT: Type[Vec[A]], ctx: SrcCtx): UnrolledAccess[A] = node match {
+    case _:MergeBufferDeq[_] => UVecRead(stage(MergeBufferBankedDeq(mem.asInstanceOf[MergeBuffer[A]], enss)))
     case _:FIFODeq[_]       => UVecRead(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
     case _:LIFOPop[_]       => UVecRead(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))
     case _:LUTRead[_,_]     => UVecRead(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
@@ -400,6 +410,9 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:SRAMRead[_,_]    => UVecRead(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
     case _:StreamInRead[_]  => UVecRead(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
+    case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))
+    case op:MergeBufferBound[_] => UWrite[A](stage(MergeBufferBound(mem.asInstanceOf[MergeBuffer[A]], op.way, data.head, enss.head)))
+    case op:MergeBufferInit[_,_] => UWrite[A](stage(MergeBufferInit(mem.asInstanceOf[MergeBuffer[A]], data.head, enss.head)))
     case _:FIFOEnq[_]        => UWrite[A](stage(FIFOBankedEnq(mem.asInstanceOf[FIFO[A]], data, enss)))
     case _:LIFOPush[_]       => UWrite[A](stage(LIFOBankedPush(mem.asInstanceOf[LIFO[A]], data, enss)))
     case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileVectorWrite(mem.asInstanceOf[RegFilex[A]], data, bank, enss)))
@@ -410,7 +423,9 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LIFOPeek[_]       => URead(stage(LIFOPeek(mem.asInstanceOf[LIFO[A]], enss.flatten.toSet)))
 
     case _:RegRead[_]        => URead(stage(RegRead(mem.asInstanceOf[Reg[A]])))
+    case _:FIFORegDeq[_]    => URead(stage(FIFORegDeq(mem.asInstanceOf[FIFOReg[A]])))
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))
+    case _:FIFORegEnq[_]   => UWrite[A](stage(FIFORegEnq(mem.asInstanceOf[FIFOReg[A]],data.head, enss.head)))
     case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
     case _:GetReg[_]         => URead(stage(GetReg(mem.asInstanceOf[Reg[A]])))
 
@@ -431,25 +446,8 @@ trait MemoryUnrolling extends UnrollingBase {
         UWrite[A](stage(RegFileShiftIn(mem.asInstanceOf[RegFilex[A]], dat, addr, ens, op.axis)))
       })
 
-    //case _:LineBufferEnq[_])      => UWrite[T](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, enss)))
-    //case _:LineBufferLoad[_])     => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))
-    //case _:LineBufferColSlice[_]) => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))
-    //case _:LineBufferRowSlice[_]) => UVecRead(stage(LineBufferBankedLoad(mem.asInstanceOf[LineBuffer[A]], bank, addr, enss)))
-
-//    case op:RegFileVectorShiftIn[_] =>
-//      MultiWrite(data.map{d => d.zipWithIndex.map{case (vec,i) =>
-//        val addr = bank.get.apply(i)
-//        val en = ens.get.apply(i)
-//        UWrite[A](RegFile.vector_shift_in(mem.asInstanceOf[Sym[RegFile[T]]],vec.asInstanceOf[Sym[Vector[T]]], addr, en, op.ax))
-//      }}.get)
-
-//    case _:LineBufferRotateEnq[_] =>
-//      val rows = bank.flatten.distinct
-//      if (rows.length > 1) {
-//        bug(s"Conflicting rows in banked LineBuffer rotate enqueue: " + rows.mkString(", "))
-//        bug(ctx)
-//      }
-//      UWrite[A](stage(LineBufferBankedRotateEnq(mem.asInstanceOf[LineBuffer[A]],data,enss,rows.head)))
+    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, bank(0), enss)))
+    case _:LineBufferRead[_]     => UVecRead(stage(LineBufferBankedRead(mem.asInstanceOf[LineBuffer[A]], bank, ofs, enss)))
 
     case _ => throw new Exception(s"bankedAccess called on unknown access node ${node.productPrefix}")
   }

@@ -23,8 +23,9 @@ import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
 
 import spatial.util.spatialConfig
+import spatial.util.ParamLoader
 
-trait Spatial extends Compiler {
+trait Spatial extends Compiler with ParamLoader {
 
   val target: HardwareTarget = null   // Optionally overridden by the application
   final val desc: String = "Spatial compiler"
@@ -266,10 +267,6 @@ trait Spatial extends Compiler {
       overrideRetime = true
     }.text("Enable tighter timing between controllers at the expense of potentially failing timing")
 
-    cli.opt[Unit]("debugResources").action { (_,_) => 
-      spatialConfig.enableDebugResources = true
-    }.text("Copy chisel + fringe templates with DirDep and do not use the published jars for templates")
-
     cli.opt[Unit]("cheapFifos").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.useCheapFifos = true
       spatialConfig.enableRetiming = true
@@ -283,6 +280,10 @@ trait Spatial extends Compiler {
     cli.opt[Unit]("runtime").action{ (_,_) =>
       spatialConfig.enableRuntimeModel = true
     }.text("Enable application runtime estimation")
+
+    cli.opt[String]("param-path").action{(x,_) => 
+      loadParams(x)
+    }.text("Set path to load application parameter")
   }
 
   override def settings(): Unit = {

@@ -3,6 +3,8 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 @spatial class Bank4DHard extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
   // Not really "hard", but used to keep ExhaustiveBanking churning for a crazy long time
   val I = 16; val R = 3; val C = 3; val O = 16
   val PI = 2; val PR = 3;val PC= 3; val PO = 2

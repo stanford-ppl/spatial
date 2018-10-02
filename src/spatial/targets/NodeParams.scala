@@ -34,7 +34,7 @@ trait NodeParams {
       }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 
-    case op:FltOp[_,_,_]   => (s"${op.name}_${op.fmt.mbits}_${op.fmt.ebits}", Nil)
+    case op:FltOp[_,_,_]   => (op.name, Nil)
 
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
 

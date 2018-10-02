@@ -1,22 +1,30 @@
 package spatial.tests.feature.dense
 
 import spatial.dsl._
-
-
+import com.typesafe.config.ConfigFactory
+import pureconfig._
+import spatial.util.spatialConfig
+import spatial.metadata.params._
+import scala.reflect.ClassTag
 
 @spatial class DotProduct extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 
-  val innerPar = 4
-  val outerPar = 1
-  val tileSize = 32
+  // Can be overwritten using --param-path=fileName at command line
+  defaultParams(defaults=
+    "ip"-> 4 (1 -> 192), 
+    "op"-> 2 (1 -> 6), 
+    "ts"-> 32 (32 -> 64 -> 19200)
+  )
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
-    val B  = tileSize (32 -> 64 -> 19200)
-    val P1 = outerPar (1 -> 6)
-    val P2 = innerPar (1 -> 192)
-    val P3 = innerPar (1 -> 192)
+    val B  = params("ts")
+    val P1 = params("op")
+    val P2 = params("ip")
+    val P3 = params("ip")
+    println(B, P1, P2)
+    //saveParams(params, s"$SPATIAL_HOME/saved.param") // Store used param to file
 
     val size = aIn.length; bound(size) = 1920000
 

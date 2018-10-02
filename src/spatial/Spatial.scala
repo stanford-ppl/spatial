@@ -282,7 +282,7 @@ trait Spatial extends Compiler with ParamLoader {
     }.text("Enable application runtime estimation")
 
     cli.opt[String]("param-path").action{(x,_) => 
-      spatialConfig.paramPath = Some(x)
+      loadParams(x)
     }.text("Set path to load application parameter")
   }
 

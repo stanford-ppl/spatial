@@ -117,4 +117,8 @@ object files {
     (file.getParent, file.getName)
   }
 
+  def buildPath(parts:String*):String = {
+    parts.mkString(sep)
+  }
+
 }

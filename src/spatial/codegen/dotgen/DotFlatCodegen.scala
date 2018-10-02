@@ -10,10 +10,8 @@ trait DotFlatCodegen extends DotCodegen {
 
   override def entryFile: String = s"Main.$ext"
 
-  override def clearGen(): Unit = {
-    deleteFiles(s"$out$sep$entryFile")
-    deleteFiles(s"$out$sep$entryFile".replace(".dot", ".html"))
-  }
+  // Remove all dot files. First dot gen
+  //override def clearGen(): Unit = super.clearGen()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     currScope.addNode(lhs)

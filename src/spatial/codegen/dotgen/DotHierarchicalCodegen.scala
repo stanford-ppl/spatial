@@ -11,10 +11,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
 
   override def entryFile: String = s"Top.$ext"
 
-  override def clearGen(): Unit = {
-    deleteFiles(s"$out$sep$entryFile")
-    deleteFiles(s"$out$sep$entryFile".replace(".dot", ".html"))
-  }
+  override def clearGen(): Unit = {} // everything cleared in DotFlatCodegen
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     currScope.addNode(lhs)

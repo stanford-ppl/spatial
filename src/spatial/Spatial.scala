@@ -101,7 +101,6 @@ trait Spatial extends Compiler {
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
-    lazy val memIrCodegen  = HtmlMemIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
     lazy val pirCodegen    = PIRGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
@@ -163,7 +162,6 @@ trait Spatial extends Compiler {
         /** Code generation */
         treeCodegen         ==>
         irCodegen           ==>
-        memIrCodegen           ==>
         (spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>

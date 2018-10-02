@@ -28,6 +28,7 @@ libraryDependencies ++= Seq(
 )
 
 val fringe_name = "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")
+
 libraryDependencies += "edu.stanford.ppl" %% fringe_name % "1.0"
 
 resolvers ++= Seq(

@@ -17,7 +17,9 @@ elif [ -f $file_or_tests ]; then
    tests=""
    while read LINE 
    do  
-      if [[ $LINE == spatial.tests.* ]]; then 
+      if [[ $LINE == \#* ]]; then 
+        :
+      elif [[ $LINE == spatial.tests.* ]]; then 
          tests="$tests $LINE"
         echo "$LINE"
       else 

@@ -4,7 +4,6 @@ import argon.Config
 import spatial.dse.DSEMode
 import spatial.targets.HardwareTarget
 
-
 class SpatialConfig extends Config {
 
   var targetName: String = _
@@ -51,5 +50,4 @@ class SpatialConfig extends Config {
 
   var enablePIR = false
 
-  var paramPath:Option[String] = None
 }

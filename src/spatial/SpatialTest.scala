@@ -3,6 +3,8 @@ package spatial
 import argon.DSLTest
 import forge.SrcCtx
 import spatial.lang.{Bit, Text, Void}
+import utils.io.files
+import spatial.util.spatialConfig
 
 trait SpatialTest extends Spatial with DSLTest {
   /** By default, SpatialTests have no runtime arguments. Override to add list(s) of arguments. */
@@ -83,7 +85,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object PIR extends Backend(
     name = "PIR",
-    args = "--pir --dot",
+    args = s"--pir --dot --param-path=${files.buildPath(DATA, "params", "pir", "unpar", s"${name.split("\\.").last}.param")}",
     make = "",
     run  = "" 
   ) {
@@ -93,6 +95,7 @@ trait SpatialTest extends Spatial with DSLTest {
         val result = compile().foldLeft[Result](Unknown){ case (result, generate) =>
           result orElse generate()
         }
+        saveParams(files.buildPath(spatialConfig.genDir, "pir", "saved.param"))
         result orElse Pass
       }
     }

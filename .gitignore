@@ -49,3 +49,4 @@ bin/get
 test-data/
 branchname
 reghash
+bin/spatialfast

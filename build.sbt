@@ -17,6 +17,7 @@ val common = Seq(
     "org.scalatest" %% "scalatest" % scalatestVersion,	 // Testing
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args         
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
+    "com.github.pureconfig" %% "pureconfig" % "0.9.2",
 
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",
@@ -61,7 +62,7 @@ val common = Seq(
 /** Projects **/
 lazy val utils  = project.settings(common)
 lazy val emul   = project.settings(common)
-lazy val templateResources   = (project in file("./resources/synth/chisel-templates")).settings(common).settings(scalaVersion := "2.11")
+lazy val fringe = project.settings(common).settings(scalaVersion := "2.11")
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)

@@ -27,7 +27,8 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.4"
 )
 
-libraryDependencies += "edu.stanford.ppl" %% "templateresources" % "1.0"
+val fringe_name = "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")
+libraryDependencies += "edu.stanford.ppl" %% fringe_name % "1.0"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

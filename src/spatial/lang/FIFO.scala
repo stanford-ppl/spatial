@@ -49,4 +49,14 @@ import scala.collection.mutable.Queue
 }
 object FIFO {
   @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
+  @rig def alloc[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
+  @rig def deq[A](fifo: FIFO[A], ens: Set[Bit] = Set.empty): A = {
+    implicit val tA: Bits[A] = fifo.A
+    stage(FIFODeq(fifo, ens))
+  }
+  @rig def enq[A](fifo: FIFO[A], data: Bits[A], ens: Set[Bit] = Set.empty): Void = {
+    implicit val tA: Bits[A] = fifo.A
+    stage(FIFOEnq(fifo,data,ens))
+  }
+
 }

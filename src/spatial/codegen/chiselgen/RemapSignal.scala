@@ -10,6 +10,7 @@ object Resetter extends RemapSignal
 object DatapathEn extends RemapSignal
 object CtrTrivial extends RemapSignal
 // A few non-canonical signals
+object DoneCondition extends RemapSignal
 object IIDone extends RemapSignal
 object RstEn extends RemapSignal
 object CtrEn extends RemapSignal
@@ -30,3 +31,4 @@ object Latency extends RemapSignal
 object II extends RemapSignal
 object SM extends RemapSignal
 object Inhibit extends RemapSignal
+object Flow extends RemapSignal

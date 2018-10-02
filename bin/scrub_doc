@@ -1,0 +1,107 @@
+#!/usr/bin/env python
+
+import os
+import shutil
+import re
+import sys
+
+def delete_from_index(package): 
+	for dname, dirs, files in os.walk("target/scala-2.12/api/"):
+		for fname in files:
+			fpath    = os.path.join(dname, fname)
+			fpathdst = os.path.join(dname, "%s.dst" % fname)
+			dst = open(fpathdst,"w+")
+			with open(fpath) as f:
+				start = -1
+				stop = -1
+				for num, line in enumerate(f, 1):
+					if (line.find("name=\"spatial.%s\"" % package) >= 0):
+						start = num
+					elif ((line.find("name=\"spatial.") >= 0 or line.find("class=\"current") >= 0 or line.find("class=\"fullcomment") >= 0) and start >= 0):
+						stop = num
+					if (start == -1 or stop != -1):
+						dst.write(line)
+
+			dst.close()
+			os.rename(os.path.abspath(fpathdst), os.path.abspath(fpath))
+			if (os.path.isdir("target/scala-2.12/api/spatial/%s" % package)):
+				shutil.rmtree("target/scala-2.12/api/spatial/%s" % package)
+
+def delete_implicits():
+	for dname, dirs, files in os.walk("target/scala-2.12/api/"):
+	    for fname in files:
+	        fpath = os.path.join(dname, fname)
+	        with open(fpath) as f:
+	            s = f.read()
+	        s = s.replace("(implicitctx:forge.SrcCtx,implicitstate:argon.State)", "")
+	        s = s.replace("(<span class=\"implicit\">implicit </span><span name=\"ctx\">ctx: <span class=\"extype\" name=\"forge.SrcCtx\">SrcCtx</span></span>, <span name=\"state\">state: <span class=\"extype\" name=\"argon.State\">State</span></span>)","")
+	        s = s.replace("(<span class=\"implicit\">implicit </span><span name=\"arg0\">arg0: <a href=\"index.html#Bits[T]=argon.lang.types.Bits[T]\" class=\"extmbr\" name=\"spatial.lang.Bits\">lang.Bits</a>[<span class=\"extype\" name=\"spatial.lang.FIFO.A\">A</span>]</span>)", "")
+	        s = s.replace("(<span class=\"implicit\">implicit </span><span name=\"arg0\">arg0: <a href=\"index.html#Bits[T]=argon.lang.types.Bits[T]\" class=\"extmbr\" name=\"spatial.lang.Bits\">lang.Bits</a>[<span class=\"extype\" name=\"spatial.lang.FIFO.tp.A\">A</span>]</span>)","")
+	        s = s.replace("(<span class=\"implicit\">implicit </span><span name=\"arg0\">arg0: <a href=\"index.html#Bits[T]=argon.lang.types.Bits[T]\" class=\"extmbr\" name=\"spatial.lang.Bits\">lang.Bits</a>[<span class=\"extype\" name=\"spatial.lang.FIFO.alloc.A\">A</span>]</span>, <span name=\"ctx\">ctx: <span class=\"extype\" name=\"forge.SrcCtx\">SrcCtx</span></span>, <span name=\"state\">state: <span class=\"extype\" name=\"argon.State\">State</span></span>)","")
+	        s = s.replace("(<span class=\"implicit\">implicit </span><span name=\"arg0\">arg0: <a href=\"index.html#Bits[T]=argon.lang.types.Bits[T]\" class=\"extmbr\" name=\"spatial.lang.Bits\">lang.Bits</a>[<span class=\"extype\" name=\"spatial.lang.FIFO.apply.A\">A</span>]</span>, <span name=\"ctx\">ctx: <span class=\"extype\" name=\"forge.SrcCtx\">SrcCtx</span></span>, <span name=\"state\">state: <span class=\"extype\" name=\"argon.State\">State</span></span>)","")
+	        with open(fpath, "w") as f:
+	            f.write(s)
+
+def fix_html():
+	delete_implicits()
+	delete_from_index("traversal")
+	delete_from_index("transform")
+	delete_from_index("dse")
+	delete_from_index("codegen")
+	delete_from_index("flows")
+	delete_from_index("issues")
+	delete_from_index("math")
+	delete_from_index("metadata")
+	delete_from_index("node")
+	delete_from_index("report")
+	delete_from_index("rewrites")
+	delete_from_index("util")
+
+def prepare_scala():
+	if (os.path.isdir("src/spatial/.lang")): shutil.rmtree("src/spatial/.lang")
+	shutil.move(os.path.abspath("src/spatial/lang"), os.path.abspath("src/spatial/.lang"))
+	shutil.copytree("src/spatial/.lang","src/spatial/lang")
+
+	for dname, dirs, files in os.walk("src/spatial/lang"):
+		for fname in files:
+			fpath    = os.path.join(dname, fname)
+			fpathdst = os.path.join(dname, "%s.dst" % fname)
+			dst = open(fpathdst,"w+")
+			with open(fpath) as f:
+				# print(fpath)
+				openbrackets = 0
+				openargs = 0
+				for num, line in enumerate(f, 1):
+					if (line.find("@api def") >= 0 or openargs >= 1):
+						openbrackets = openbrackets + line.count('{') - line.count('}')
+						openargs = openargs + line.count('(') - line.count(')')
+						matches = re.findall("[^<>]=[^>=].*?(?= = |\n)", line)
+						if (matches and openargs == 0):
+							dst.write(line.replace("@api","").replace(matches[-1],' = throw new Exception("dont care! woo!")'))
+						else:
+							dst.write(line)
+
+					elif (openbrackets >= 1):
+						openbrackets = openbrackets + line.count('{') - line.count('}')
+					else:
+						dst.write(line)
+
+			dst.close()
+			os.rename(os.path.abspath(fpathdst), os.path.abspath(fpath))
+
+
+def replace_scala():
+	if (os.path.isdir("src/spatial/.lang")):
+		if (os.path.isdir("src/spatial/lang")): shutil.rmtree("src/spatial/lang")
+		shutil.move(os.path.abspath("src/spatial/.lang"), os.path.abspath("src/spatial/lang"))	
+	else:
+		print(".lang does not exist!")
+
+if (sys.argv[1] == "prep"):
+	prepare_scala()
+elif (sys.argv[1] == "scrub"):
+	fix_html()
+elif (sys.argv[1] == "replace"):
+	replace_scala()
+else:
+	print("Please specify option (prep, scrub, replace)")

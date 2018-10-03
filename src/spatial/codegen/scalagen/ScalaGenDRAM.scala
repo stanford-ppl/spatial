@@ -13,7 +13,7 @@ trait ScalaGenDRAM extends ScalaGenMemories {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMStaticNew(dims,zero) =>
+    case op@DRAMHostNew(dims,zero) =>
       emitMemObject(lhs){
         emit(src"""object $lhs extends Memory[${op.A}]("${lhs.fullname}")""")
       }
@@ -23,6 +23,9 @@ trait ScalaGenDRAM extends ScalaGenMemories {
 
     case DRAMAddress(dram) =>
       emit(src"val $lhs = FixedPoint.fromInt(0)")
+
+    case DRAMIsAlloc(dram) =>
+      emit(src"val $lhs = true")
 
     case op@SetMem(dram, data) =>
       open(src"val $lhs = {")

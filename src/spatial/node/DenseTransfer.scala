@@ -135,7 +135,7 @@ object DenseTransfer {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val size = requestLength
         val size_bytes = size * bytesPerWord
-        cmdStream := BurstCmd(addr_bytes.to[I64], size_bytes, false)
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
         // issueQueue.enq(size)
       }
 
@@ -213,7 +213,7 @@ object DenseTransfer {
           Pipe {
             val aligned = alignmentCalc(dramAddr)
 
-            cmdStream := BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false)
+            cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false), dram.isAlloc)
             //          issueQueue.enq(aligned.size)
             startBound := aligned.start
             endBound := aligned.end
@@ -254,7 +254,7 @@ object DenseTransfer {
         val addr_bytes = addr
         val size_bytes = size * bytesPerWord
 
-        cmdStream := BurstCmd(addr_bytes.to[I64], size_bytes, true)
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, true), dram.isAlloc)
       }
       // Fringe
       Fringe.denseLoad(dram, cmdStream, dataStream)
@@ -275,7 +275,7 @@ object DenseTransfer {
       Pipe {
         val aligned = alignmentCalc(dramAddr)
 
-        cmdStream := BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true)
+        cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true), dram.isAlloc)
         issueQueue.enq( IssuedCmd(aligned.size, aligned.start, aligned.end) )
       }
 

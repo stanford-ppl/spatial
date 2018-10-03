@@ -13,7 +13,7 @@ trait PIRGenDRAM extends PIRGenMemories {
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMStaticNew(dims,zero) =>
+    case op@DRAMHostNew(dims,zero) =>
       emitMemObject(lhs){
         emit(src"""object $lhs extends Memory[${op.A}]("${lhs.fullname}")""")
       }

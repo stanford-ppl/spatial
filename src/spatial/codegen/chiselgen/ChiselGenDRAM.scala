@@ -14,14 +14,14 @@ trait ChiselGenDRAM extends ChiselGenCommon {
   var requesters = scala.collection.mutable.HashMap[Sym[_], Int]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case DRAMStaticNew(_,_) =>
+    case DRAMHostNew(_,_) =>
       hostDrams += (lhs -> hostDrams.size)
 
-    case DRAMDynNew() =>
+    case DRAMAccelNew(dim) =>
       val reqCount = lhs.consumers.collect {
         case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
       }.size
-      emitGlobalModule(src"""val $lhs = Module(new DRAMAllocator($reqCount))""")
+      emitGlobalModule(src"""val $lhs = Module(new DRAMAllocator(${dim}, $reqCount))""")
       val id = accelDrams.size
       emitt(src"io.heap.req($id) := $lhs.io.heapReq")
       emitt(src"$lhs.io.heapResp := io.heap.resp($id)")
@@ -29,20 +29,30 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
     case DRAMAlloc(dram, dims) =>
       dram match {
-        case _@Op(DRAMDynNew()) =>
+        case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent
           val invEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
           emitt(src"${dram}.io.appReq($id).valid := $invEnable")
           emitt(src"${dram}.io.appReq($id).bits.allocDealloc := true.B")
-          emitt(src"${dram}.io.appReq($id).bits.sizeAddr := ${dims}.r")
+          val d = dims.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
+          emitt(src"${dram}.io.appReq($id).bits.dims.zip($d).foreach { case (l, r) => l := r }")
           requesters += (lhs -> id)
+        case _ =>
+      }
+
+    case DRAMIsAlloc(dram) =>
+      dram match {
+        case _@Op(DRAMAccelNew(_)) =>
+          emit(src"val $lhs = $dram.io.isAlloc")
+        case _@Op(DRAMHostNew(_,_)) =>
+          emit(src"val $lhs = true.B")
         case _ =>
       }
 
     case DRAMDealloc(dram) =>
       dram match {
-        case _@Op(DRAMDynNew()) =>
+        case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent
           val invEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
@@ -54,9 +64,9 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
     case DRAMAddress(dram) =>
       dram match {
-        case _@Op(DRAMDynNew()) =>
+        case _@Op(DRAMAccelNew(_)) =>
           emit(src"val $lhs = ${dram}.io.addr")
-        case _@Op(DRAMStaticNew(_,_)) =>
+        case _@Op(DRAMHostNew(_,_)) =>
           val id = argHandle(dram)
           emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
           emit(src"""$lhs.r := io.argIns(api.${id}_ptr)""")

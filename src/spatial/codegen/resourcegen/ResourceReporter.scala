@@ -35,7 +35,7 @@ case class ResourceReporter(IR: State)  extends NamedCodegen with FileDependenci
     case op: LUTNew[_,_] => emit(s"${lhs}: ${bitWidth(lhs.tp.typeArgs.head)} bits x ${lhs.constDims.product}")
     case op: MergeBufferNew[_] => emit(s"${lhs}: ${bitWidth(lhs.tp.typeArgs.head)} bits x ${lhs.constDims.product}")
     case AccelScope(func)     => inAccel{ rhs.blocks.foreach{blk => gen(blk) } }
-    case _:Control[_] => rhs.blocks.foreach{blk => gen(blk)
+    case _:Control[_] => rhs.blocks.foreach{blk => gen(blk)}
     case _ => rhs.blocks.foreach{blk => gen(blk) }
   }
 

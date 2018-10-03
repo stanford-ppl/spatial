@@ -1,4 +1,4 @@
-package fringe.templates.mag
+package fringe.templates.heap
 
 import chisel3._
 import chisel3.util._

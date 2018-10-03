@@ -17,12 +17,16 @@ case class ResourceReporter(IR: State)  extends NamedCodegen with FileDependenci
   override val lang: String = "reports"
   override val ext: String = "rpt"
 
-  override protected def emitEntry(block: Block[_]): Unit = { gen(block) }
+  override protected def emitEntry(block: Block[_]): Unit = { config.enGen = true; gen(block) }
 
   private def bitWidth(tp: Type[_]): Int = tp match {
     case Bits(bT) => bT.nbits
     case _ => -1
   }
+
+  override def emitHeader(): Unit = { config.enGen = true; super.emitHeader() }
+
+  override def emitFooter(): Unit = { config.enGen = true; super.emitFooter() }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op: SRAMNew[_,_] => emit(s"${lhs}: ${bitWidth(lhs.tp.typeArgs.head)} bits x ${lhs.constDims.product} >? ${spatialConfig.sramThreshold}")
@@ -34,7 +38,7 @@ case class ResourceReporter(IR: State)  extends NamedCodegen with FileDependenci
     case op: FIFORegNew[_] => emit(s"${lhs}: ${bitWidth(lhs.tp.typeArgs.head)} bits x 1")
     case op: LUTNew[_,_] => emit(s"${lhs}: ${bitWidth(lhs.tp.typeArgs.head)} bits x ${lhs.constDims.product}")
     case op: MergeBufferNew[_] => emit(s"${lhs}: ${bitWidth(lhs.tp.typeArgs.head)} bits x ${lhs.constDims.product}")
-    case AccelScope(func)     => inAccel{ rhs.blocks.foreach{blk => gen(blk) } }
+    case AccelScope(func)     => /*inAccel{*/ rhs.blocks.foreach{blk => gen(blk) } /*}*/
     case _:Control[_] => rhs.blocks.foreach{blk => gen(blk)}
     case _ => rhs.blocks.foreach{blk => gen(blk) }
   }

@@ -13,7 +13,7 @@ import spatial.util.spatialConfig
 trait DotGenSpatial extends DotCodegen {
 
   override def inputs(lhs:Sym[_]):Seq[Sym[_]] = lhs match {
-    case Def(_:GetDRAMAddress[_,_]) => Nil
+    case Def(_:DRAMAddress[_,_]) => Nil
     case lhs if lhs.isDRAM => 
       super.inputs(lhs) ++ 
       lhs.consumers.filter { c => 
@@ -51,7 +51,7 @@ trait DotGenSpatial extends DotCodegen {
       super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"
     case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"
     case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
-    case Def(GetDRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
+    case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
     case _ => super.label(lhs)
   }
 

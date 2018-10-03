@@ -8,6 +8,7 @@ case class ChiselGen(IR: State) extends ChiselCodegen
 	with ChiselGenCounter
   with ChiselGenDebug
 	with ChiselGenDelay
+	with ChiselGenDRAM
   with ChiselGenInterface
   with ChiselGenMath
   with ChiselGenMem

@@ -42,6 +42,7 @@ class Arria10 extends DeviceTarget {
     // memStream connections
     fringe.io.externalEnable := false.B
     fringe.io.memStreams <> accel.io.memStreams
+    fringe.io.heap <> accel.io.heap
 
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done

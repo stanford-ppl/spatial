@@ -25,7 +25,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
     case Some(data) if (lhs.parent.hasAncestor(data.parent)) =>
       // Don't get rid of reads being used for DRAM allocations
-      if (lhs.consumers.exists{case Op(DRAMNew(_, _)) => true; case _ => false }) {
+      if (lhs.consumers.exists{case Op(DRAMStaticNew(_,_)) => true; case _ => false }) {
         dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
         super.transform(lhs, rhs)
       }
@@ -58,7 +58,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
     }
 
     // Add ArgIns for DRAM dimensions
-    case DRAMNew(F(dims),_) =>
+    case DRAMStaticNew(F(dims),_) =>
       dimMapping ++= dims.distinct.map{
         case d @ Op(RegRead(reg)) if reg.isArgIn  => dbg(s"DRAM: $lhs ($dims), dim: $d = ArgIn, mapping to $d");                         d -> d
         case d @ Op(RegRead(reg)) if reg.isHostIO => dbg(s"DRAM: $lhs ($dims), dim: $d = HostIO, mapping to $d");                        d -> d   // TODO[3]: Allow DRAM dims with HostIO?

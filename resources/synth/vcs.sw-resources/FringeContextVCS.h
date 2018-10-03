@@ -22,6 +22,13 @@
 //Source: http://stackoverflow.com/questions/13893085/posix-spawnp-and-piping-child-output-to-a-string
 class FringeContextVCS : public FringeContextBase<void> {
 
+  typedef union {
+    struct {
+        uint64_t done : 1, timeout : 1, allocDealloc : 3, sizeAddr : 59;
+    };
+    uint64_t bits;
+  } status_t;
+
   pid_t sim_pid;
   Channel *cmdChannel;
   Channel *respChannel;
@@ -329,7 +336,7 @@ public:
 
   virtual void run() {
     // Current assumption is that the design sets arguments individually
-    uint32_t status = 0;
+    status_t status = { .bits = 0 };
 
     // Implement 4-way handshake
     writeReg(statusReg, 0);
@@ -339,17 +346,31 @@ public:
     sleep(0.1);
     writeReg(commandReg, 1);
 
-    while((status == 0) && (numCycles <= maxCycles)) {
+    while((!status.done && !status.timeout) && (numCycles <= maxCycles)) {
       step();
-      status = readReg(statusReg);
-    }  
+      status.bits = readReg(statusReg);
+      switch (status.allocDealloc) {
+        case 1:
+          status.allocDealloc = 3;
+          status.sizeAddr = (uint64_t)malloc(status.sizeAddr);
+          writeReg(statusReg, status.bits);
+          break;
+        case 2:
+          status.allocDealloc = 4;
+          free(status.sizeAddr);
+          writeReg(statusReg, status.bits);
+          break;
+        default:
+          break;
+      }
+    }
     EPRINTF("Design ran for %lu cycles, status = %u\n", numCycles, status);
-    if (status == 0) { // Design did not run to completion
+    if (!status.done && !status.timeout) { // Design did not run to completion
       EPRINTF("=========================================\n");
       EPRINTF("ERROR: Simulation terminated after %lu cycles\n", numCycles);
       EPRINTF("=========================================\n");
     } else {  // Ran to completion, pull down command signal
-      if (status & 0x2) { // Hardware timeout
+      if (status.timeout) { // Hardware timeout
         EPRINTF("=========================================\n");
         EPRINTF("Hardware timeout after %lu cycles\n", numCycles);
         EPRINTF("=========================================\n");
@@ -358,9 +379,9 @@ public:
      dumpAllRegs();
      // dumpDebugRegs();
       writeReg(commandReg, 0);
-      while (status != 0) {
+      while (status.done || status.timeout) {
         step();
-        status = readReg(statusReg);
+        status.bits = readReg(statusReg);
       }
     }
   }

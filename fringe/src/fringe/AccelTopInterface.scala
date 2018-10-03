@@ -12,6 +12,7 @@ abstract class AccelInterface extends Bundle {
   val argOutLoopbacks: Vec[UInt]      // TODO: Input: Vec of 64b UInts for ???
 
   val memStreams: AppStreams      // TODO: Flipped: ???
+  val heap: HeapIO
 }
 
 abstract class AbstractAccelTop extends Module {

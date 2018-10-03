@@ -676,7 +676,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit (s"globals.target.mux_latency    = ${latencyOption("Mux", None)}.toInt")
         emit (s"globals.target.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
         emit (s"globals.target.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
-        emit (s"globals.target.SramThreshold = 4")
+        emit (s"globals.target.SramThreshold = ${spatialConfig.sramThreshold}")
         emit (s"""globals.retime = ${spatialConfig.enableRetiming}""")
 
       }

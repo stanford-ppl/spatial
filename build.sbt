@@ -7,7 +7,7 @@ name := "spatial"
 trapExit := false
 
 val common = Seq(
-  organization := "edu.stanford.ppl"
+  organization := "edu.stanford.ppl",
   scalaVersion := scala_version,
   version := spatial_version,
 

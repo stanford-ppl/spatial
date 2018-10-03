@@ -55,7 +55,7 @@ val common = Seq(
   addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
 
   /** Release **/
-  publishArtifact := false
+  publishArtifact := true
 )
 
 

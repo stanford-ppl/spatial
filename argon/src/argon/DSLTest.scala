@@ -19,7 +19,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     * Suggested argument syntax is:
     *   override def compileArgs: Args = "arg00 arg01 arg02" and "arg10 arg11 arg12"
     *   OR, e.g.
-    *   override def compileArgs = Args(Seq.tabulate(N){i => s"$i ${i+1}" })
+    *   override def compileArgs = Args(Seq.tabulate(N){i => s"i {i+1}" })
     *
     *   Use the first version for a small number of diverse arguments.
     *   Use the second version to generate a large number of runtime arguments using some pattern.
@@ -33,7 +33,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     * Suggested argument syntax is:
     *   override def runtimeArgs: Args = "arg00 arg01 arg02" and "arg10 arg11 arg12"
     *   OR, e.g.
-    *   override def runtimeArgs = Args(Seq.tabulate(N){i => s"$i ${i+1}" })
+    *   override def runtimeArgs = Args(Seq.tabulate(N){i => s"i {i+1}" })
     *
     *   Use the first version for a small number of diverse arguments.
     *   Use the second version to generate a large number of runtime arguments using some pattern.

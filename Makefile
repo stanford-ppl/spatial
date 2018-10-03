@@ -8,6 +8,12 @@ install:
 	bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
+	sbt "; project argon; publishLocal"
+	sbt "; project forge; publishLocal"
+	sbt "; project spatial; publishLocal"
+	sbt "; project models; publishLocal"
+	sbt "; project poly; publishLocal"
+	sbt "; project utils; publishLocal"
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##

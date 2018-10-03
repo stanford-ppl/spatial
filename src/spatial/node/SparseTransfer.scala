@@ -80,7 +80,7 @@ object SparseTransfer {
           Foreach(iters par p){i =>
             val addr: I64 = (addrs.__read(Seq(i),Set()) * bytesPerWord).to[I64] + dram.address
             val addr_bytes = addr
-            addrBus := addr_bytes
+            addrBus := (addr_bytes, dram.isAlloc)
           }
         }
         else {
@@ -88,7 +88,7 @@ object SparseTransfer {
             val cond = i >= requestLength
             val addr: I64 = mux(cond, dram.address, (addrs.__read(Seq(i),Set(!cond)) * bytesPerWord).to[I64] + dram.address)
             val addr_bytes = addr
-            addrBus := addr_bytes
+            addrBus := (addr_bytes, dram.isAlloc)
           }
         }
         // Fringe
@@ -115,7 +115,7 @@ object SparseTransfer {
             val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
             val addr_bytes = addr
 
-            cmdBus := pack(data, addr_bytes)
+            cmdBus := (pack(data, addr_bytes), dram.isAlloc)
           }
         }
         else {
@@ -128,7 +128,7 @@ object SparseTransfer {
             val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
             val addr_bytes = addr
 
-            cmdBus := pack(data, addr_bytes)
+            cmdBus := (pack(data, addr_bytes), dram.isAlloc)
           }
         }
         // Fringe

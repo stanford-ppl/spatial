@@ -147,6 +147,26 @@ trait ChiselGenMem extends ChiselGenCommon {
     dims.zip(padding).map{case (d:Int,p:Int) => d+p}
   }
 
+  private def expandInits(mem: Sym[_], inits: Seq[Sym[_]], name: String): String = {
+    val dims = if (name == "FF") List(1) else mem.constDims
+    val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    val pDims = dims.zip(padding).map{case (d:Int,p:Int) => d+p}
+    val paddedInits = Seq.tabulate(pDims.product){i => 
+      val coords = pDims.zipWithIndex.map{ case (b,j) =>
+        i % (pDims.drop(j).product) / pDims.drop(j+1).product
+      }
+      if (coords.zip(dims).map{case(c:Int,d:Int) => c < d}.reduce{_&&_}) {
+        val flatCoord = coords.zipWithIndex.map{ case (b,j) => 
+          b * dims.drop(j+1).product
+        }.sum
+        src"${quoteAsScala(inits(flatCoord))}.toDouble"
+      }
+      else 
+        "0.toDouble"
+    }
+    paddedInits.mkString("Some(List(",",","))")
+  }
+
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     if (mem.dephasedAccesses.nonEmpty) appPropertyStats += HasDephasedAccess
     val inst = mem.instance
@@ -239,8 +259,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val strides = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
-    val initStr = if (init.isDefined) init.get.map(quoteAsScala).map(x => src"${x}.toDouble").mkString("Some(List(",",","))")
-      else "None"
+    val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     emitGlobalModule(src"""val $mem = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $BXBarW $BXBarR $bankingMode, $initStr, ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}))""")
     if (mem.resetters.isEmpty) emitGlobalModule(src"$mem.io.reset := false.B")
   }

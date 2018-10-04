@@ -4,10 +4,10 @@ val paradise_version  = "2.1.0"
 val scalatestVersion  = "3.0.5"
 
 name := "spatial"
+organization := "edu.stanford.ppl"
 trapExit := false
 
 val common = Seq(
-  organization := "edu.stanford.ppl",
   scalaVersion := scala_version,
   version := spatial_version,
 
@@ -55,7 +55,7 @@ val common = Seq(
   addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
 
   /** Release **/
-  publishArtifact := true
+  publishArtifact := false
 )
 
 
@@ -71,8 +71,12 @@ lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 lazy val spatial = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly)
 lazy val apps = project.settings(common).dependsOn(spatial)
 
+lazy val smallTest = project.settings(
+  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/dense/"),
+).dependsOn(spatial)
+
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
 
-addCommandAlias("make", "; project spatial; test:compile")
+addCommandAlias("make", "; project smallTest; test:compile")

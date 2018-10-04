@@ -28,7 +28,7 @@ import spatial.dsl._
     setMem(vec2, b)
 
     Accel {
-      Foreach(sizeA by tsA, sizeB by tsB par op){ (i,j) =>
+      Foreach(sizeA by tsA, sizeB by tsB par op) { (i,j) =>
         val b1 = SRAM[T](tsA)
         val b2 = SRAM[T](tsB)
         val outTile = SRAM[T](tsA, tsB)

@@ -4,7 +4,7 @@ feature.dense.TPCHQ6
 feature.dense.BlackScholes
 feature.dense.GDA
 feature.dense.LogReg
-feature.dense.GEMM
+feature.dense.GEMV
 # feature.dense.MatMult_inner
 # apps.SGD
 # apps.SGD_minibatch

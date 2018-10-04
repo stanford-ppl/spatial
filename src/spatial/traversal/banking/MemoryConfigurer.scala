@@ -539,7 +539,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")
     else if (metapipes.size > 1)
       Some("Ambiguous metapipes")
-    else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce)
+    else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce && !mem.shouldCoalesce)
       Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
     else
       None

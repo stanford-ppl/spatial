@@ -8,7 +8,7 @@ fi
 
 
 rm -r gen/$APP
-bin/spatial $APP --debugResources  --fpga ZCU --instrument
+bin/spatial $APP --fpga=VCS --instrument
 cd gen/$APP
-make vcs
-bash run.sh 0 3192 0
+make
+#bash run.sh 1 1

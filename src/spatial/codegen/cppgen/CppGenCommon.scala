@@ -67,6 +67,7 @@ trait CppGenCommon extends CppCodegen {
       }
     case FloatType()  => "float"
     case DoubleType() => "double"
+    case FltPtType(g,e) => "float"
     case _: Bit => "bool"
     case _: Text => "string"
     case ai: Reg[_] => remap(ai.typeArgs.head)
@@ -74,6 +75,26 @@ trait CppGenCommon extends CppCodegen {
     case t: Tup2[_,_] => s"${super.remap(tp)}".replaceAll("\\[","").replaceAll("\\]","").replaceAll(",","")
     case _: host.Array[_] => "vector<" + remap(tp.typeArgs.head) + ">"
     case _ => super.remap(tp)
+  }
+
+  protected def conv(tp: Type[_]): String = tp match {
+    case FixPtType(s,d,f) => 
+      val u = if (!s) "u" else ""
+      if (f > 0) {"stod"} else {
+        if (d+f > 64) throw new Exception(s"Please don't parse 128 bit integers from strings :(.. It's a pain to implement for all archs")
+        else if (d+f > 32) s"sto${u}ll"
+        else if (d+f > 16) s"sto${u}l"
+        else if (d+f > 8) s"sto${u}l"
+        else if (d+f > 4) s"sto${u}l"
+        else if (d+f > 2) s"sto${u}l"
+        else if (d+f == 2) s"sto${u}l"
+        else "bool"
+      }
+    case FloatType()  => "stof"
+    case DoubleType() => "stod"
+    case FltPtType(g,e) => "stod"
+    case _: Bit => "stoi"
+    case _ => throw new Exception(s"Cannot convert string to $tp")
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {

@@ -50,16 +50,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
-    case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + {if (f == 0 && !s) s".U($d.W)" else s".FP($s, $d, $f)"}
+    case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + s".FP($s, $d, $f)"
     case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
     case (_:Bit, c:Bool) => s"${c.value}.B"
     case _ => super.quoteConst(tp,c)
   }
 
   override protected def remap(tp: Type[_]): String = tp match {
-    case FixPtType(s,d,f) => if (f == 0 && !s) s"UInt($d.W)" else s"new FixedPoint($s, $d, $f)"
+    case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
     // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
-    case FltPtType(g,e) => s"new FloatingPoint($e, $g)"
+    case FltPtType(m,e) => s"new FloatingPoint($m, $e)"
     case BitType() => "Bool()"
     case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
@@ -113,7 +113,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*numWriters[ ]*=[ ]*([0-9]+)[ ]*\\).*".r
       val extractor(d,w,n) = rhs
       s"${vec}ff${d}_${w}_${n}wr"
-    } else if (rhs.contains(" templates.FF(")) {
+    } else if (rhs.contains(" FF(")) {
       val extractor = ".*FF\\([ ]*([0-9]+)[ ]*,[ ]*([0-9]+)[ ]*\\).*".r
       val extractor(d,w) = rhs
       s"${vec}ff${d}_${w}"
@@ -142,13 +142,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       val extractor(depth,width) = rhs
       s"${vec}rcp${depth}_${width}"
     } else if (rhs.contains(" InnerControl(")) {
-      val extractor = ".*InnerControl\\([ ]*templates\\.([a-zA-Z]+)[ ]*,[ ]*([falsetrue]+)[ ]*.*\\).*".r
+      val extractor = ".*InnerControl\\([ ]*([a-zA-Z]+)[ ]*,[ ]*([falsetrue]+)[ ]*.*\\).*".r
       val extractor(style,fsm) = rhs
       val st = style.take(3)
       val f = fsm.replace("false", "f").replace("true", "t")
       s"${vec}inr${st}_${f}"
     } else if (rhs.contains(" OuterControl(")) {
-      val extractor = ".*OuterControl\\([ ]*templates\\.([a-zA-Z]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*.*\\).*".r
+      val extractor = ".*OuterControl\\([ ]*([a-zA-Z]+)[ ]*,[ ]*([0-9]+)[ ]*,[ ]*isFSM[ ]*=[ ]*([falsetrue]+)[ ]*.*\\).*".r
       val extractor(style,children,fsm) = rhs
       val f = fsm.replace("false", "f").replace("true", "t")
       val st = style.take(3)
@@ -174,13 +174,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   final protected def startFile(): Unit = {
       emit("""package accel""")
-      emit("import templates._")
-      emit("import templates.ops._")
-      emit("import types._")
+      emit("import fringe.templates._")
+      emit("import fringe.utils._")
+      emit("import fringe.utils.implicits._")
+      emit("import fringe.templates.math._")
+      emit("import fringe.templates.counters._")
+      emit("import fringe.templates.memory._")
+      emit("import fringe.templates.retiming._")
       emit("import api._")
       emit("import chisel3._")
       emit("import chisel3.util._")
-      emit("import Utils._")    
       emit("import scala.collection.immutable._")
   }
 
@@ -378,25 +381,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
 
   override def copyDependencies(out: String): Unit = {
-    val resourcesPath = "synth/chisel-templates"
 
-    if (spatialConfig.enableDebugResources) {
-      dependencies ::= DirDep(resourcesPath, "templates", relPath = "template-level/")
-      dependencies ::= DirDep(resourcesPath, "emul", relPath = "template-level/")
-      dependencies ::= DirDep(resourcesPath, "hardfloat", relPath = "template-level/templates/")
-      dependencies ::= DirDep(resourcesPath, "fringeHW", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeASIC", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeDE1SoC", relPath = "template-level/")
-      // dependencies ::= DirDep(resourcesPath, "fringeXSIM", relPath = "template-level/")
-    }
-
-
-    dependencies ::= DirDep(resourcesPath, "fringeZynq", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeAWS", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeArria10", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "fringeVCS", relPath = "template-level/")
-    dependencies ::= DirDep(resourcesPath, "scripts", "../", Some("scripts/"))
-    dependencies ::= FileDep(resourcesPath, "Top.scala", outputPath = Some("Top.scala"))
+    // if (spatialConfig.enableDebugResources) {
+    //   dependencies ::= DirDep("fringe/src", "fringe")
+    // }
 
     super.copyDependencies(out)
   }

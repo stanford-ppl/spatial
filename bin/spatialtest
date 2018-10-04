@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+
+import glob
+import re
+from argparse import ArgumentParser
+import os, sys, datetime
+import subprocess
+from os.path import dirname, abspath
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+class SpatialArgumentParser(ArgumentParser):
+  
+  def print_help(self, file=None):
+    print("""
+Spatial
+Usage: spatial <app> [options]
+
+Help:
+  -h, --help            Prints this usage text
+
+Verbosity:
+  -q, --quiet           Disable all logging and printing
+  -v, --verbose         Enable logging
+  --vv                  Enable verbose logging
+
+Output:
+  -c, --clean           Reset output directory
+  -o, --out <value>     Location of output directory. [./gen/<appname>]
+  -d, --detail <value>  Dot graph detail (0: control only, 1: all nodes) [1]
+
+DSE:
+  --dse                 Enables design space exploration [false]
+  --threads <value>     Sets number of threads to use in DSE
+  --bruteforce          Enables bruteforce DSE
+  --heuristic           Enables heuristic DSE
+  --nonaming            Disables the debug name for all syms, using "x${s.id}" only'
+
+Backends:
+  --fpga <value>        Sets name of FPGA target [Default]
+  --sim                 Enables codegen to Scala (disables retiming by default) [false]
+  --synth               Enables codegen to chisel + cpp (Synthesis) [true]
+  --dot                 Enables dot graph generation
+  --retime              Force retiming for --sim
+  --noretime            Disables retiming for all targets
+  --multifile <value>   Sets file splitting [4]:
+                          0: <DEPRECATED> no splitting or scoping
+                          1: <DEPRECATED> no splitting but yes scoping on inner pipes
+                          2: <DEPRECATED> no splitting but yes scoping everywhere
+                          3: <DEPRECATED> splitting for inner pipes only
+                          4: all blocks
+                          5: java class file compression
+                          6: <EXPERIMENTAL, UNSTABLE> further compression
+
+Experimental:
+  --asyncMem            Enables asynchronous memories
+  --instrument          Enables counters for each loop to assist in balancing pipelines
+  --tightControl        Enables tighter timing between controllers at the expense of potentially failing timing
+  --cheapFifos          Enables cheap fifos; accesses must be multiples of each other and not have lane-enables
+  --runtime             Enables application runtime estimation
+      """)
+  #sys.exit(0)
+
+def main():
+    parser = SpatialArgumentParser()
+    parser.add_argument('app', type=str, help='name of application to run')
+    parser.add_argument('--thread', type=int, default=16, help='Number of threads to run')
+    parser.add_argument('--backend', type=str, help='Testing Backend')
+    parser.add_argument('--project', type=str, default="smallTest", help='Testing Backend')
+
+    (opts, args) = parser.parse_known_args()
+
+    java_cmd = ""
+    if (opts.backend is None):
+        java_cmd += "export TEST_ARGS=\"{}\"; ".format(' '.join(args))
+    if (opts.backend is not None):
+        java_cmd += "sbt -Dmaxthreads={} ".format(opts.thread)
+        java_cmd += "-Dtest.{}=true ".format(opts.backend)
+    else:
+        java_cmd += "export TEST_ARGS=\"{}\"; ".format(' '.join(args))
+        java_cmd += "sbt -Dmaxthreads={} ".format(opts.thread)
+        java_cmd += "-Dci=true "
+    java_cmd += "\"; "
+    java_cmd += " project {}; test:compile; testOnly {}".format(opts.project, opts.app)
+    java_cmd += "\""
+
+    print(java_cmd)
+
+    ecode = os.system(java_cmd)
+
+if __name__ == "__main__":
+    main()

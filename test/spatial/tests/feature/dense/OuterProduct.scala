@@ -6,18 +6,11 @@ import spatial.dsl._
   override def runtimeArgs: Args = "640 640"
   type X = FixPt[TRUE,_32,_0]
 
-  defaultParams(defaults=
-    "ts1" -> 32 (64 -> 64 -> 38400),
-    "ts2" -> 32 (64 -> 64 -> 38400),
-    "ip" -> 8 (1 -> 256),
-    "op" -> 1 (1 -> 4)
-  )
-
   def outerproduct[T:Num](a: Array[T], b: Array[T]): Array[T] = {
-    val tileSizeA = params("ts1")
-    val tileSizeB = params("ts2")
-    val outerPar  = params("op")
-    val innerPar  = params("ip")
+    val tsA = loadParam("tsA", 32 (64 -> 64 -> 38400))
+    val tsB = loadParam("tsB", 32 (64 -> 64 -> 38400))
+    val ip = loadParam("ip", 8 (1 -> 256))
+    val op = loadParam("op", 1 (1 -> 4))
 
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400
@@ -35,21 +28,20 @@ import spatial.dsl._
     setMem(vec2, b)
 
     Accel {
-      Foreach(sizeA by tileSizeA, sizeB by tileSizeB par outerPar){ (i,j) =>
-        val b1 = SRAM[T](tileSizeA)
-        val b2 = SRAM[T](tileSizeB)
-        val outTile = SRAM[T](tileSizeA, tileSizeB)
+      Foreach(sizeA by tsA, sizeB by tsB par op){ (i,j) =>
+        val b1 = SRAM[T](tsA)
+        val b2 = SRAM[T](tsB)
+        val outTile = SRAM[T](tsA, tsB)
         //val blkA = Reg[Int]
         //val blkB = Reg[Int]
         Parallel {
-          b1 load vec1(i::i+tileSizeA par innerPar)
-          b2 load vec2(j::j+tileSizeB par innerPar)
-          //Pipe{ blkA := min(sizeA - i, tileSizeA) }
-          //Pipe{ blkB := min(sizeB - j, tileSizeB) }
+          b1 load vec1(i::i+tsA par ip)
+          b2 load vec2(j::j+tsB par ip)
+          //Pipe{ blkA := min(sizeA - i, tsA) }
+          //Pipe{ blkB := min(sizeB - j, tsB) }
         }
-        Foreach(tileSizeA by 1, tileSizeB par innerPar){ (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
-
-        out(i::i+tileSizeA, j::j+tileSizeB par 16) store outTile
+        Foreach(tsA by 1, tsB par ip){ (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
+        out(i::i+tsA, j::j+tsB par ip) store outTile
       }
     }
     getMem(out)

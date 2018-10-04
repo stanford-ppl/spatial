@@ -1,9 +1,10 @@
 feature.dense.DotProduct
 feature.dense.OuterProduct
-# feature.dense.TPCHQ6
-# feature.dense.BlackScholes
-# feature.dense.GDA
-# feature.dense.LogReg
+feature.dense.TPCHQ6
+feature.dense.BlackScholes
+feature.dense.GDA
+feature.dense.LogReg
+feature.dense.GEMM
 # feature.dense.MatMult_inner
 # apps.SGD
 # apps.SGD_minibatch

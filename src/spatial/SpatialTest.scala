@@ -83,15 +83,16 @@ trait SpatialTest extends Spatial with DSLTest { self =>
     override val makeTimeout: Long = 32400
   }
 
-  abstract class PIRBackEnd (name: String, paramFolder:String) extends Backend(
+  abstract class PIRBackEnd (name: String, paramField:String) extends Backend(
     name, 
-    args = s"--pir --dot --load-param=${files.buildPath(DATA, "params", "pir", paramFolder, s"${self.name}.param")}",
+    args = s"--pir --dot",
     make = "",
     run  = "" 
   ) {
     override def shouldRun: Boolean = checkFlag(s"test.${name}")
     override def runBackend(): Unit = {
       s"${name}" should s"compile for backend PIR" in {
+        loadParams(files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField"))
         val result = compile().foldLeft[Result](Unknown){ case (result, generate) =>
           result orElse generate()
         }
@@ -103,17 +104,17 @@ trait SpatialTest extends Spatial with DSLTest { self =>
 
   object PIRNoPar extends PIRBackEnd (
     name="PIRNoPar", 
-    paramFolder="nopar"
+    paramField="nopar"
   )
 
   object PIRSmallPar extends PIRBackEnd (
     name="PIRSmallPar", 
-    paramFolder="smallpar"
+    paramField="smallpar"
   )
 
   object PIRBigPar extends PIRBackEnd (
     name="PIRBigPar", 
-    paramFolder="bigpar"
+    paramField="bigpar"
   )
 
   class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)

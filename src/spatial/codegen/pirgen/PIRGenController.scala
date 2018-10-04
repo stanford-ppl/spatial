@@ -89,113 +89,41 @@ trait PIRGenController extends PIRGenControl with PIRGenStream with PIRGenMemori
 
   //inGen(kernel(lhs)){ // open another file
   //}
-  private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
-  }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
-      emitControlObject(lhs, Set.empty, func){
-        open("try {")
-        globalMems = true
-        if (!lhs.willRunForever) {
-          gen(func)
-        }
-        else {
-          if (streamIns.nonEmpty) {
-            emit(src"def hasItems = " + streamIns.map(quote).map(_ + ".nonEmpty").mkString(" || "))
-          }
-          else {
-            emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
-            emit(src"val ${lhs}_iters = Console.readLine.toInt")
-            emit(src"var ${lhs}_ctr = 0")
-            emit(src"def hasItems: Boolean = { val has = ${lhs}_ctr < ${lhs}_iters ; ${lhs}_ctr += 1; has }")
-          }
-          open(src"while(hasItems) {")
-            emitControlBlock(lhs, func)
-          close("}")
-        }
-        // HACK: Print out streams after block finishes running
-        streamOuts.foreach{case x@Op(StreamOutNew(bus)) =>
-          if (!bus.isInstanceOf[DRAMBus[_]]) emit(src"$x.dump()")
-        }
-        emitControlDone(lhs)
-        bufferedOuts.foreach{buff => emit(src"$buff.close()") }
-        globalMems = false
-        close("}")
-        open("catch {")
-          emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
-          emit(src"""case t: Throwable => throw t""")
-        close("}")
+      inGen(out, "AccelMain.scala") {
+        //define(lhs, "Controller()")
+        ret(func)
       }
 
     case UnitPipe(ens, func) =>
-      emitControlObject(lhs, ens, func) {
-        emitControlBlock(lhs, func)
-        emitControlDone(lhs)
-      }
-
+      ret(func)
 
     case ParallelPipe(ens, func) =>
-      emitControlObject(lhs, ens, func){
-        gen(func)
-        emitControlDone(lhs)
-      }
+      ret(func)
 
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
-      emitControlObject(lhs, ens, func) {
-        emitUnrolledLoop(lhs, cchain, iters, valids) {
-          emitControlBlock(lhs, func)
-        }
-        emitControlDone(lhs)
-      }
+      define(lhs, s"LoopController", "cchain" -> cchain, "ens"->ens)
+      ret(func)
 
     case UnrolledReduce(ens,cchain,func,iters,valids) =>
-      emitControlObject(lhs, ens, func) {
-        emitUnrolledLoop(lhs, cchain, iters, valids) {
-          emitControlBlock(lhs, func)
-        }
-        emitControlDone(lhs)
-      }
+      ret(func)
 
     case op@Switch(selects, body) =>
-      emitControlObject(lhs, Set.empty, body){
-        selects.indices.foreach { i =>
-          open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
-          ret(op.cases(i).body)
-          close("}")
-        }
-        if (op.R.isBits)      emit(src"else { ${invalid(op.R)} }")
-        else if (op.R.isVoid) emit(src"else ()")
-        else                  emit(src"else { null.asInstanceOf[${op.R}]")
-        emitControlDone(lhs)
-      }
+      ret(body)
 
     case SwitchCase(body) => // Controlled by Switch
+      ret(body)
 
     case StateMachine(ens, start, notDone, action, nextState) =>
-      emitControlObject(lhs, ens, notDone, action, nextState){
-        val stat = notDone.input
-        emit(src"var $stat: ${stat.tp} = $start")
-        open(src"def notDone() = {")
-          ret(notDone)
-        close("}")
-        open(src"while( notDone() ){")
-          gen(action)
-          gen(nextState)
-          emit(src"$stat = ${nextState.result}")
-        close("}")
-        emitControlDone(lhs)
-      }
+      ret(notDone)
+      ret(action)
+      ret(nextState)
 
     case IfThenElse(cond, thenp, elsep) =>
-      emitControlObject(lhs, Set.empty, thenp, elsep){
-        open(src"if ($cond) { ")
-          ret(thenp)
-        close("}")
-        open("else {")
-          ret(elsep)
-        close("}")
-      }
+      ret(thenp)
+      ret(elsep)
 
     case _ => super.gen(lhs, rhs)
   }

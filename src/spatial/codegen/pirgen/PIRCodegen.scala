@@ -9,8 +9,9 @@ import spatial.lang._
 import spatial.util.spatialConfig
 
 import scala.collection.mutable
+import spatial.traversal.AccelTraversal
 
-trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen {
+trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen with AccelTraversal with PIRFormattedCodegen {
   override val lang: String = "pir"
   override val ext: String = "scala"
   final val CODE_WINDOW: Int = 75
@@ -25,38 +26,37 @@ trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen {
   //}
 
   override def emitHeader(): Unit = {
-    emit("import pir._")
-    emit("import pir.node._")
-    emit("import arch._")
-    emit("import prism.enums._")
-    emit("")
+    inGen(out, "AccelMain.scala") {
+      emit("import pir._")
+      emit("import pir.node._")
+      emit("import arch._")
+      emit("import prism.enums._")
+      emit("")
+      open(s"""object ${spatialConfig.name} extends PIRApp {""")
+    }
 
-    open(s"""object ${spatialConfig.name} extends PIRApp {""")
     super.emitHeader()
   }
 
   override def emitFooter():Unit = {
-    emit(s"")
-    close("}")
+    inGen(out, "AccelMain.scala") {
+      emit(s"")
+      close("}")
+    }
 
     super.emitFooter()
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
     emit(s"// $lhs = $rhs TODO: Unmatched Node")
-    warn(s"// $lhs = $rhs TODO: Unmatched Node")
     rhs.blocks.foreach(ret)
-  }
-
-  override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    if (withReturn) emit(src"${b.result}")
   }
 
   def emitPreMain(): Unit = { }
   def emitPostMain(): Unit = { }
 
   override protected def emitEntry(block: Block[_]): Unit = {
-    open(src"object Main {")
+    open(src"object Host {")
       open(src"def main(args: Array[String]): Unit = {")
         emitPreMain()
         gen(block)

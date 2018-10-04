@@ -220,7 +220,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
-      spatialConfig.enableDot = true
+      //spatialConfig.enableDot = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
     }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")

@@ -77,7 +77,7 @@ trait CppGenCommon extends CppCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def conv(tp: Type[_]): String = tp match {
+  protected def conv(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => 
       val u = if (!s) "u" else ""
       if (f > 0) {"stod"} else {

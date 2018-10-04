@@ -57,8 +57,14 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
     }
   }
 
+  /** Indicate that the memory should be buffered and ignore
+    * ignore potential situation where result from running sequentially
+    * does not match with resurt from running pipelined
+    */
   def buffer: C[A] = { this.isWriteBuffer = true; me }
+  /** Do not buffer memory */
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
+  def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)

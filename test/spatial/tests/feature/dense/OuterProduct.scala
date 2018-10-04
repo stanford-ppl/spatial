@@ -6,18 +6,18 @@ import spatial.dsl._
   override def runtimeArgs: Args = "640 640"
   type X = FixPt[TRUE,_32,_0]
 
-  val ip = 8
-  val op = 1
-
-  val tileSize1 = 32
-  val tileSize2 = 32
-
+  defaultParams(defaults=
+    "ts1" -> 32 (64 -> 64 -> 38400),
+    "ts2" -> 32 (64 -> 64 -> 38400),
+    "ip" -> 8 (1 -> 256),
+    "op" -> 1 (1 -> 4)
+  )
 
   def outerproduct[T:Num](a: Array[T], b: Array[T]): Array[T] = {
-    val tileSizeA = tileSize1 (64 -> 64 -> 38400)
-    val tileSizeB = tileSize2 (64 -> 64 -> 38400)
-    val outerPar  = op (1 -> 4)
-    val innerPar  = ip (1 -> 256)
+    val tileSizeA = params("ts1")
+    val tileSizeB = params("ts2")
+    val outerPar  = params("op")
+    val innerPar  = params("ip")
 
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400

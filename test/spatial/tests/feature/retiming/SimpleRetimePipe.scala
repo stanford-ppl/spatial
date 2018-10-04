@@ -5,7 +5,6 @@ import spatial.dsl._
 import spatial.node.DelayLine
 
 @spatial class SimpleRetimePipe extends SpatialTest {
-  override def backends = super.backends.filterNot{be => (be == Scala) | (be == VCS_noretime)}
 
   def main(args: Array[String]): Unit = {
     val a = ArgIn[Int]

@@ -55,7 +55,7 @@ object SparseTransfer {
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 
     // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
-    val iters = Reg[I32](0)
+    val iters: Reg[I32] = Reg[I32]
     Pipe{
       iters := mux(requestLength < 16.to[I32], 16.to[I32],
                mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) ))
@@ -80,7 +80,7 @@ object SparseTransfer {
           Foreach(iters par p){i =>
             val addr: I64 = (addrs.__read(Seq(i),Set()) * bytesPerWord).to[I64] + dram.address
             val addr_bytes = addr
-            addrBus := addr_bytes
+            addrBus := (addr_bytes, dram.isAlloc)
           }
         }
         else {
@@ -88,7 +88,7 @@ object SparseTransfer {
             val cond = i >= requestLength
             val addr: I64 = mux(cond, dram.address, (addrs.__read(Seq(i),Set(!cond)) * bytesPerWord).to[I64] + dram.address)
             val addr_bytes = addr
-            addrBus := addr_bytes
+            addrBus := (addr_bytes, dram.isAlloc)
           }
         }
         // Fringe
@@ -115,7 +115,7 @@ object SparseTransfer {
             val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
             val addr_bytes = addr
 
-            cmdBus := pack(data, addr_bytes)
+            cmdBus := (pack(data, addr_bytes), dram.isAlloc)
           }
         }
         else {
@@ -128,7 +128,7 @@ object SparseTransfer {
             val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
             val addr_bytes = addr
 
-            cmdBus := pack(data, addr_bytes)
+            cmdBus := (pack(data, addr_bytes), dram.isAlloc)
           }
         }
         // Fringe

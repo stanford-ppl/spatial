@@ -4,7 +4,6 @@ import argon.Config
 import spatial.dse.DSEMode
 import spatial.targets.HardwareTarget
 
-
 class SpatialConfig extends Config {
 
   var targetName: String = _
@@ -22,12 +21,12 @@ class SpatialConfig extends Config {
   // --- Backends --- //
   var enableSim: Boolean = false
   var enableSynth: Boolean = true
+  var enableResourceReporter: Boolean = false
   var enableTree: Boolean = true
   var enableDot: Boolean = false
 
   var enableInstrumentation: Boolean = false
   var enableTightControl: Boolean = false
-  var enableDebugResources: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
   var enableForceBanking: Boolean = false
@@ -38,6 +37,7 @@ class SpatialConfig extends Config {
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
   var compressWires = 0
+  var sramThreshold = 0 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true
 
@@ -51,4 +51,5 @@ class SpatialConfig extends Config {
   var enableBufferCoalescing: Boolean = true
 
   var enablePIR = false
+
 }

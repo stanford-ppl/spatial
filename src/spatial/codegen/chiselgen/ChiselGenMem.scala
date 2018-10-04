@@ -32,6 +32,17 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
   }
 
+  private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
+    val parent = lhs.parent.s.get 
+    if (mem.isFIFOReg) src"${swap(parent, Done)}"
+    else               src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+  }
+
+  private def invisibleEnableWrite(lhs: Sym[_]): String = {
+    val parent = lhs.parent.s.get 
+    val flowEnable = src"${swap(parent,SM)}.io.flow"
+    src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
+  }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       val parent = lhs.parent
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
@@ -48,8 +59,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get 
-    emitControlSignals(parent) // Hack for compressWires > 0, when RegRead in outer control is used deeper in the hierarchy
-    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+    if (lhs.parent.stage == -1) emitControlSignals(parent)
+    val invisibleEnable = invisibleEnableRead(lhs,mem)
     val flowEnable = src",${swap(parent,Flow)}"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
@@ -95,8 +106,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
+    if (lhs.parent.stage == -1) emitControlSignals(parent)
     val flowEnable = src"${swap(parent,Flow)}"
-    val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)} & $flowEnable"""
+    val invisibleEnable = invisibleEnableWrite(lhs)
     val ofsWidth = if (!mem.isLineBuffer) 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
                    else 1 max Math.ceil(scala.math.log(paddedDims(mem,name).last / mem.instance.nBanks.last) / scala.math.log(2)).toInt
     val banksWidths = if (mem match {case Op(_:RegFileNew[_,_]) => true; case Op(_:LUTNew[_,_]) => true; case _ => false}) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -133,6 +145,26 @@ trait ChiselGenMem extends ChiselGenCommon {
     val dims = if (name == "FF") List(1) else mem.constDims
     val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
     dims.zip(padding).map{case (d:Int,p:Int) => d+p}
+  }
+
+  private def expandInits(mem: Sym[_], inits: Seq[Sym[_]], name: String): String = {
+    val dims = if (name == "FF") List(1) else mem.constDims
+    val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    val pDims = dims.zip(padding).map{case (d:Int,p:Int) => d+p}
+    val paddedInits = Seq.tabulate(pDims.product){i => 
+      val coords = pDims.zipWithIndex.map{ case (b,j) =>
+        i % (pDims.drop(j).product) / pDims.drop(j+1).product
+      }
+      if (coords.zip(dims).map{case(c:Int,d:Int) => c < d}.reduce{_&&_}) {
+        val flatCoord = coords.zipWithIndex.map{ case (b,j) => 
+          b * dims.drop(j+1).product
+        }.sum
+        src"${quoteAsScala(inits(flatCoord))}.toDouble"
+      }
+      else 
+        "0.toDouble"
+    }
+    paddedInits.mkString("Some(List(",",","))")
   }
 
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
@@ -227,8 +259,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val strides = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
-    val initStr = if (init.isDefined) init.get.map(quoteAsScala).map(x => src"${x}.toDouble").mkString("Some(List(",",","))")
-      else "None"
+    val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     emitGlobalModule(src"""val $mem = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $BXBarW $BXBarR $bankingMode, $initStr, ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}))""")
     if (mem.resetters.isEmpty) emitGlobalModule(src"$mem.io.reset := false.B")
   }
@@ -236,6 +267,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def ifaceType(mem: Sym[_]): String = {
     mem match {
       case Op(_:FIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
+      case Op(_:FIFORegNew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
       case Op(_:LIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
       case _ => ""
     }
@@ -244,9 +276,14 @@ trait ChiselGenMem extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     // SRAMs
-    case op: SRAMNew[_,_] => emitMem(lhs, "SRAM", None)
+    case op: SRAMNew[_,_] => emitMem(lhs, "BankedSRAM", None)
     case op@SRAMBankedRead(sram,bank,ofs,ens) => emitRead(lhs, sram, bank, ofs, ens)
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitWrite(lhs, sram, data, bank, ofs, ens)
+
+    // FIFORegs
+    case FIFORegNew(init) => emitMem(lhs, "FIFOReg", Some(List(init)))
+    case FIFORegEnq(reg, data, ens) => emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
+    case FIFORegDeq(reg) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
 
     // Registers
     case RegNew(init) => 
@@ -296,7 +333,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegAccumOp(reg, data, ens, t, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val parent = lhs.parent.s.get
-      val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+      val invisibleEnable = invisibleEnableRead(lhs,reg)
       emitt(src"${reg}.io.input1($index) := $data.r")
       emitt(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
       emitt(src"${reg}.io.last($index)   := ${DL(src"${swap(parent, SM)}.io.ctrDone", lhs.fullDelay, true)}")
@@ -306,7 +343,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val parent = lhs.parent.s.get
-      val invisibleEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+      val invisibleEnable = invisibleEnableRead(lhs,reg)
       emitt(src"${reg}.io.input1($index) := $data1.r")
       emitt(src"${reg}.io.input2($index) := $data2.r")
       emitt(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
@@ -338,8 +375,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
     case FIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
     case FIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@FIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.numel")
+    case op@FIFOPeek(fifo,_) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io.output.data(0)")
+    case FIFONumel(fifo,_)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
 
@@ -349,14 +386,40 @@ trait ChiselGenMem extends ChiselGenCommon {
     case LIFOIsFull(fifo,_)  => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
     case LIFOIsAlmostEmpty(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
     case LIFOIsAlmostFull(fifo,_) => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@LIFOPeek(fifo,_) => emitt(src"val $lhs = $fifo.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emitt(src"val $lhs = $fifo.io${ifaceType(fifo)}.numel")
+    case op@LIFOPeek(fifo,_) => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io.output.data(0)")
+    case LIFONumel(fifo,_)   => emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})");emitt(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     
     // LUTs
     case op@LUTNew(dims, init) => emitMem(lhs, "LUT", Some(init))
     case op@LUTBankedRead(lut,bank,ofs,ens) => emitRead(lhs,lut,bank,ofs,ens)
+
+    // MergeBuffer
+    case MergeBufferNew(ways, par) =>
+      val readers = lhs.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.size
+      emitGlobalModule(src"""val $lhs = Module(new MergeBuffer(${ways.toInt}, ${par.toInt}, ${bitWidth(lhs.tp.typeArgs.head)}, $readers))""")
+    case MergeBufferBankedEnq(merge, way, data, ens) =>
+      val d = data.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
+      emitt(src"""$merge.io.in_data($way).zip($d).foreach{case (l, r) => l := r }""")
+      val invEn = invisibleEnableWrite(lhs)
+      val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
+      emitt(src"""$merge.io.in_wen($way).zip($en).foreach{case (l, r) => l := r }""")
+    case MergeBufferBankedDeq(merge, ens) => 
+      val readerIdx = merge.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.toSeq.indexOf(lhs)
+      emitGlobalWireMap(src"""$lhs""", src"""Wire(Vec(${ens.length}, ${merge.tp.typeArgs.head}))""")
+      emitt(src"""$lhs.toSeq.zip($merge.io.out_data).foreach{case (l, r) => l.r := r }""")
+      val invEn = invisibleEnableRead(lhs,merge)
+      val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
+      emitt(src"""$merge.io.out_ren($readerIdx).zip($en).foreach{case (l, r) => l := r }""")
+    case MergeBufferBound(merge, way, data, ens) =>
+      val invEn = invisibleEnableWrite(lhs)
+      emitt(src"$merge.io.inBound_wen($way) := ${and(ens)} & $invEn")
+      emitt(src"$merge.io.inBound_data($way) := ${data}.r")
+    case MergeBufferInit(merge, data, ens) =>
+      val invEn = invisibleEnableWrite(lhs)
+      emitt(src"$merge.io.initMerge_wen := ${and(ens)} & $invEn")
+      emitt(src"$merge.io.initMerge_data := ${data}.r")
 
     case _ => super.gen(lhs, rhs)
   }

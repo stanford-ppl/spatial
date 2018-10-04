@@ -185,15 +185,24 @@ object FixFmt {
   def maxInt: Fix[S,I,F] = uconst(fmt.toEmul.MAX_INTEGRAL_VALUE_FP)
 
   /** Returns the minimum value representable by this number's format. */
-  def minValue: Fix[S,I,F] = uconst(fmt.toEmul.MAX_VALUE_FP)
+  def minValue: Fix[S,I,F] = uconst(fmt.toEmul.MIN_VALUE_FP)
 
   /** Returns the maximum value representable by this number's format. */
-  def maxValue: Fix[S,I,F] = uconst(fmt.toEmul.MIN_VALUE_FP)
+  def maxValue: Fix[S,I,F] = uconst(fmt.toEmul.MAX_VALUE_FP)
 
   @api override def toText: Text = stage(FixToText(this))
 
   @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
     stage(FixToFix[S,I,F,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
+  }
+  @rig def __toFixSat[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
+    stage(FixToFixSat[S,I,F,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
+  }
+  @rig def __toFixUnb[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
+    stage(FixToFixUnb[S,I,F,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
+  }
+  @rig def __toFixUnbSat[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
+    stage(FixToFixUnbSat[S,I,F,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
   }
   @rig def __toFlt[M:INT,E:INT]: Flt[M,E] = stage(FixToFlt[S,I,F,M,E](this, FltFmt(INT[M],INT[E])))
 }

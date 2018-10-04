@@ -107,8 +107,7 @@ trait MathAPI { this: Implicits with MuxAPI =>
       mux(x < 10.to[T], x*0.22.toUnchecked[T] + 1.to[T], // Linearize
         mux( x < 100.to[T], x*0.08.toUnchecked[T] + 2.5.to[T], // Linearize
           mux( x < 1000.to[T], x*0.028.toUnchecked[T] + 8.to[T], // Linearize
-            mux( x < 10000.to[T], x*0.008.toUnchecked[T] + 20.to[T], // Linearize
-              mux( x < 100000.to[T], x*0.003.toUnchecked[T] + 60.toUnchecked[T], x*0.0002.toUnchecked[T] + 300.to[T]))))))
+            mux( x < 10000.to[T], x*0.008.toUnchecked[T] + 20.to[T], x*0.0002.toUnchecked[T] + 300.to[T]))))) // Linearize
   }
 
 }

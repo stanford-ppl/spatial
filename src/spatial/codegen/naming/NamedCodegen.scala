@@ -24,10 +24,12 @@ trait NamedCodegen extends Codegen {
 
       case _: IfThenElse[_]    => s"${s}_IfThenElse"
 
-      case DRAMNew(_,_) => s"${s}_${s.nameOr("dram")}"
+      case DRAMHostNew(_,_) => s"${s}_${s.nameOr("dramhost")}"
+      case DRAMAccelNew(_) => s"${s}_${s.nameOr("dramaccel")}"
       case ArgInNew(_)  => s"${s}_${s.nameOr("argIn")}"
       case ArgOutNew(_) => s"${s}_${s.nameOr("argOut")}"
       case RegNew(_)    => s"${s}_${s.nameOr("reg")}"
+      case FIFORegNew(_)    => s"${s}_${s.nameOr("fiforeg")}"
       case RegFileNew(_,_) => s"${s}_${s.nameOr("regfile")}"
       case LineBufferNew(_,_,_) => s"${s}_${s.nameOr("linebuf")}"
       case FIFONew(_)   => s"${s}_${s.nameOr("fifo")}"
@@ -40,9 +42,15 @@ trait NamedCodegen extends Codegen {
 
       case RegRead(reg)      => s"${s}_${s.nameOr(src"rd_$reg")}"
       case RegWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"
+      case FIFORegDeq(reg)      => s"${s}_${s.nameOr(src"deq_$reg")}"
+      case FIFORegEnq(reg,_,_) => s"${s}_${s.nameOr(src"enq_$reg")}"
 
       case _:SRAMBankedRead[_,_]  => s"${s}_${s.nameOr("rd")}"
       case _:SRAMBankedWrite[_,_] => s"${s}_${s.nameOr("wr")}"
+
+      case MergeBufferNew(_,_)   => s"${s}_${s.nameOr("mergeBuf")}"
+      case MergeBufferBankedEnq(buf,_,_,_)   => s"${s}_${s.nameOr(src"enq_$buf")}"
+      case MergeBufferBankedDeq(buf,_)   => s"${s}_${s.nameOr(src"deq_$buf")}"
 
       case FIFOBankedEnq(fifo,_,_)   => s"${s}_${s.nameOr(src"enq_$fifo")}"
       case FIFOBankedDeq(fifo,_)     => s"${s}_${s.nameOr(src"deq_$fifo")}"

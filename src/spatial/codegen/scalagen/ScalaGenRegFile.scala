@@ -13,7 +13,7 @@ trait ScalaGenRegFile extends ScalaGenMemories {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegFileNew(_, inits) => emitBankedInitMem(lhs, inits, op.A)
-    case RegFileReset(rf, en)    => emit(src"val $lhs = if ($en) $rf.reset()")
+    case RegFileReset(rf, en)    => emit(src"val $lhs = if (${and(en)}) $rf.reset()")
     case RegFileShiftIn(rf,data,addr,en,axis) =>
       val ctx = s""""${lhs.ctx}""""
       emit(src"val $lhs = if (${and(en)}) $rf.shiftIn($ctx, Seq($addr), $axis, $data)")

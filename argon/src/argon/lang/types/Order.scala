@@ -10,15 +10,23 @@ trait Order[A] extends Top[A] with Ref[Any,A] {
   private implicit def A: Order[A] = this.selfType
 
   // --- Infix Methods
+  /** Returns true if `a` is less than `b`, false otherwise. **/
   @api def <(b: A): Bit
+  /** Returns true if `a` is less than or equal to `b`, false otherwise. **/
   @api def <=(b: A): Bit
+  /** Returns true if `a` is greater than `b`, false otherwise. **/
   @api def >(b: A): Bit = b < me
+  /** Returns true if `a` is greater than or equal to `b`, false otherwise. **/
   @api def >=(b: A): Bit = b <= me
 
   // --- Typeclass Methods
+  /** Returns true if `a` is less than `b`, false otherwise. **/
   @api def lt(a: A, b: A): Bit = a < b
+  /** Returns true if `a` is less than or equal to `b`, false otherwise. **/
   @api def leq(a: A, b: A): Bit = a <= b
+  /** Returns true if `a` is greater than `b`, false otherwise. **/
   @api def gt(a: A, b: A): Bit = a > b
+  /** Returns true if `a` is greater than or equal to `b`, false otherwise. **/
   @api def geq(a: A, b: A): Bit = a >= b
 
   @rig def min(a: A, b: A): A

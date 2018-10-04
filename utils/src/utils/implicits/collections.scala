@@ -2,6 +2,7 @@ package utils.implicits
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import utils.math.ReduceTree
 
 /**
   * General helper methods for various data structures in Scala.
@@ -29,6 +30,8 @@ object collections {
       case (false, _, Nil) => x
       case (false, _, _)   => y.head +: inter(!left, x, y.tail)
     }
+
+    def reduceTree(reduce: (A,A) => A): A = ReduceTree(x:_*)(reduce)
 
     def interleave(y: Seq[A])(implicit tag: ClassTag[A]): Seq[A] = inter(left=true,x,y)
 

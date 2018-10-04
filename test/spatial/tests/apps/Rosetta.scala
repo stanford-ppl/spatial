@@ -134,7 +134,7 @@ import spatial.targets._
 		}
 
 		val this_check = Reg[Int](0)
-		Pipe { this_check := check_clockwise(sample_triangle2D.value) }
+		this_check := check_clockwise(sample_triangle2D.value) 
 
 		/* correspomds to the clockwise_vertices function */
 		if (this_check.value != 0.to[Int]) {
@@ -145,23 +145,23 @@ import spatial.targets._
 			val new_x1 = mux(check_negative, sample_triangle2D.x0, sample_triangle2D.x1)
 			val new_y1 = mux(check_negative, sample_triangle2D.y0, sample_triangle2D.y1)
 
-			Pipe { sample_triangle2D := triangle2D(new_x0, new_y0, new_x1, new_y1, 
+			sample_triangle2D := triangle2D(new_x0, new_y0, new_x1, new_y1, 
 										  		   sample_triangle2D.x2, sample_triangle2D.y2,
-										    	   sample_triangle2D.z) } 
+										    	   sample_triangle2D.z) 
 			
 			val min_x =  find_min(sample_triangle2D.x0, sample_triangle2D.x1, sample_triangle2D.x2)
 			val max_x =  find_max(sample_triangle2D.x0, sample_triangle2D.x1, sample_triangle2D.x2)
 			val min_y =  find_min(sample_triangle2D.y0, sample_triangle2D.y1, sample_triangle2D.y2)
 			val max_y =  find_max(sample_triangle2D.y0, sample_triangle2D.y1, sample_triangle2D.y2)
 
-			Parallel { 
-				Pipe { max_min(0) = min_x }
-				Pipe { max_min(1) = max_x }
-				Pipe { max_min(2) = min_y }
-				Pipe { max_min(3) = max_y }
-				Pipe { ymax_index := (max_y - min_y).to[Int] } //Pipe { max_min(4) = max_x - min_x }
-				Pipe { xmax_index := (max_x - min_x).to[Int] }
-			}
+			
+			max_min(0) = min_x 
+			max_min(1) = max_x 
+			max_min(2) = min_y 
+			max_min(3) = max_y 
+			ymax_index := (max_y - min_y).to[Int]  //Pipe { max_min(4) = max_x - min_x }
+			xmax_index := (max_x - min_x).to[Int] 
+
 		}
 
 		(this_check.value == 0.to[Int])
@@ -182,31 +182,29 @@ import spatial.targets._
 
 		val z = Reg[UInt8]
 
-		Parallel {
+		x0 := mux(angle == 0, sample_triangle3D.x0, 
+					mux(angle == 1, sample_triangle3D.x0, sample_triangle3D.z0))
+		y0 := mux(angle == 0, sample_triangle3D.y0, 	
+					mux(angle == 1, sample_triangle3D.z0, sample_triangle3D.y0))
 
-			x0 := mux(angle == 0, sample_triangle3D.x0, 
-						mux(angle == 1, sample_triangle3D.x0, sample_triangle3D.z0))
-			y0 := mux(angle == 0, sample_triangle3D.y0, 	
-						mux(angle == 1, sample_triangle3D.z0, sample_triangle3D.y0))
+		x1 := mux(angle == 0, sample_triangle3D.x1, 
+					mux(angle == 1, sample_triangle3D.x1, sample_triangle3D.z1))
+		y1 := mux(angle == 0, sample_triangle3D.y1, 	
+					mux(angle == 1, sample_triangle3D.z1, sample_triangle3D.y1))
 
-			x1 := mux(angle == 0, sample_triangle3D.x1, 
-						mux(angle == 1, sample_triangle3D.x1, sample_triangle3D.z1))
-			y1 := mux(angle == 0, sample_triangle3D.y1, 	
-						mux(angle == 1, sample_triangle3D.z1, sample_triangle3D.y1))
+		x2 := mux(angle == 0, sample_triangle3D.x2, 
+		    		 mux(angle == 1, sample_triangle3D.x2, sample_triangle3D.z2))
+		y2 := mux(angle == 0, sample_triangle3D.y2, 	
+					 mux(angle == 1, sample_triangle3D.z2, sample_triangle3D.y2)) 
 
-			x2 := mux(angle == 0, sample_triangle3D.x2, 
-			    		 mux(angle == 1, sample_triangle3D.x2, sample_triangle3D.z2))
-			y2 := mux(angle == 0, sample_triangle3D.y2, 	
-						 mux(angle == 1, sample_triangle3D.z2, sample_triangle3D.y2)) 
+		val f1 = sample_triangle3D.z0 / 3.to[UInt8] + sample_triangle3D.z1 / 3.to[UInt8] + sample_triangle3D.z2 / 3.to[UInt8]
+		val f2 = sample_triangle3D.y0 / 3.to[UInt8] + sample_triangle3D.y1 / 3.to[UInt8] + sample_triangle3D.y2 / 3.to[UInt8]
+		val f3 = sample_triangle3D.x0 / 3.to[UInt8] + sample_triangle3D.x1 / 3.to[UInt8] + sample_triangle3D.x2 / 3.to[UInt8]
 
-			val f1 = sample_triangle3D.z0 / 3.to[UInt8] + sample_triangle3D.z1 / 3.to[UInt8] + sample_triangle3D.z2 / 3.to[UInt8]
-			val f2 = sample_triangle3D.y0 / 3.to[UInt8] + sample_triangle3D.y1 / 3.to[UInt8] + sample_triangle3D.y2 / 3.to[UInt8]
-			val f3 = sample_triangle3D.x0 / 3.to[UInt8] + sample_triangle3D.x1 / 3.to[UInt8] + sample_triangle3D.x2 / 3.to[UInt8]
+		 z :=  mux(angle == 0, f1, mux(angle == 1, f2, f3)) 
+		
 
-			 z :=  mux(angle == 0, f1, mux(angle == 1, f2, f3)) 
-		}
-
-		Pipe { proj_triangle2D := triangle2D(x0.value, y0.value, x1.value, y1.value, x2.value, y2.value, z.value) }
+		proj_triangle2D := triangle2D(x0.value, y0.value, x1.value, y1.value, x2.value, y2.value, z.value) 
 	}
 
 	def main(args: Array[String]): Void = {

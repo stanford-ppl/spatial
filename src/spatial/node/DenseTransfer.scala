@@ -135,7 +135,7 @@ object DenseTransfer {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val size = requestLength
         val size_bytes = size * bytesPerWord
-        cmdStream := BurstCmd(addr_bytes.to[I64], size_bytes, false)
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
         // issueQueue.enq(size)
       }
 
@@ -207,13 +207,13 @@ object DenseTransfer {
       // Command generator
       Pipe{ // Outer pipe necessary or else acks may come back after extra write commands
         Pipe {
-          val startBound = Reg[I32]
-          val endBound   = Reg[I32]
-          val length     = Reg[I32]
+          val startBound: Reg[I32] = Reg[I32]
+          val endBound: Reg[I32]   = Reg[I32]
+          val length: Reg[I32]     = Reg[I32]
           Pipe {
             val aligned = alignmentCalc(dramAddr)
 
-            cmdStream := BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false)
+            cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false), dram.isAlloc)
             //          issueQueue.enq(aligned.size)
             startBound := aligned.start
             endBound := aligned.end
@@ -254,7 +254,7 @@ object DenseTransfer {
         val addr_bytes = addr
         val size_bytes = size * bytesPerWord
 
-        cmdStream := BurstCmd(addr_bytes.to[I64], size_bytes, true)
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, true), dram.isAlloc)
       }
       // Fringe
       Fringe.denseLoad(dram, cmdStream, dataStream)
@@ -275,7 +275,7 @@ object DenseTransfer {
       Pipe {
         val aligned = alignmentCalc(dramAddr)
 
-        cmdStream := BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true)
+        cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true), dram.isAlloc)
         issueQueue.enq( IssuedCmd(aligned.size, aligned.start, aligned.end) )
       }
 
@@ -285,9 +285,9 @@ object DenseTransfer {
       // Receive
       Pipe {
         // TODO: Should also try Reg[IssuedCmd] here
-        val start = Reg[I32]
-        val end   = Reg[I32]
-        val size  = Reg[I32]
+        val start: Reg[I32] = Reg[I32]
+        val end: Reg[I32]   = Reg[I32]
+        val size: Reg[I32]  = Reg[I32]
         Pipe {
           val cmd = issueQueue.deq()
           start := cmd.start

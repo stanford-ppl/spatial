@@ -6,7 +6,7 @@ import spatial.lang.{Bit, Text, Void}
 import utils.io.files
 import spatial.util.spatialConfig
 
-trait SpatialTest extends Spatial with DSLTest {
+trait SpatialTest extends Spatial with DSLTest { self =>
   /** By default, SpatialTests have no runtime arguments. Override to add list(s) of arguments. */
   override def runtimeArgs: Args = NoArgs
 
@@ -83,13 +83,13 @@ trait SpatialTest extends Spatial with DSLTest {
     override val makeTimeout: Long = 32400
   }
 
-  object PIR extends Backend(
-    name = "PIR",
-    args = s"--pir --dot --param-path=${files.buildPath(DATA, "params", "pir", "unpar", s"${name.split("\\.").last}.param")}",
+  abstract class PIRBackEnd (name: String, paramFolder:String) extends Backend(
+    name, 
+    args = s"--pir --dot --load-param=${files.buildPath(DATA, "params", "pir", paramFolder, s"${self.name}.param")}",
     make = "",
     run  = "" 
   ) {
-    override def shouldRun: Boolean = checkFlag("test.PIR")
+    override def shouldRun: Boolean = checkFlag(s"test.${name}")
     override def runBackend(): Unit = {
       s"${name}" should s"compile for backend PIR" in {
         val result = compile().foldLeft[Result](Unknown){ case (result, generate) =>
@@ -101,12 +101,26 @@ trait SpatialTest extends Spatial with DSLTest {
     }
   }
 
+  object PIRNoPar extends PIRBackEnd (
+    name="PIRNoPar", 
+    paramFolder="nopar"
+  )
+
+  object PIRSmallPar extends PIRBackEnd (
+    name="PIRSmallPar", 
+    paramFolder="smallpar"
+  )
+
+  object PIRBigPar extends PIRBackEnd (
+    name="PIRBigPar", 
+    paramFolder="bigpar"
+  )
 
   class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)
   object RequireErrors {
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, PIR)
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, PIRNoPar, PIRSmallPar, PIRBigPar)
 
 }

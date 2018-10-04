@@ -71,8 +71,12 @@ lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 lazy val spatial = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly)
 lazy val apps = project.settings(common).dependsOn(spatial)
 
+lazy val smallTest = project.settings(
+  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/dense/"),
+).dependsOn(spatial)
+
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
 
-addCommandAlias("make", "; project spatial; test:compile")
+addCommandAlias("make", "; project smallTest; test:compile")

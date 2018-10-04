@@ -4,7 +4,8 @@ all: apps
 ###-----------------------------------###
 ## Publish spatial locally.            ##
 ###-----------------------------------###
-publish: 
+publish:
+    bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project argon; publishLocal"

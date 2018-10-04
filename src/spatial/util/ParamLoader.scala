@@ -27,12 +27,17 @@ trait ParamLoader { self:Spatial =>
    * Load parameters from a file path 
    * @param path: path to load params from
    * */
-  def loadParams(path:String) = {
+  def loadParams(paramPath:String) = {
+    val path::field::_ = if (paramPath.contains(":")) {
+      paramPath.split(":").map(_.trim).toList
+    } else {
+      List(paramPath, "params")
+    }
     val file = new java.io.File(path)
     if (file.exists & !file.isDirectory) {
       info(s"Loading params from $path")
       val conf = ConfigFactory.load(ConfigFactory.parseFile(file))
-      conf.getConfig("params").entrySet.asScala.map { e => 
+      conf.getConfig(field).entrySet.asScala.map { e => 
         val name = e.getKey
         val param = parseParam(e.getValue.unwrapped)
         param.name = Some(name)
@@ -53,10 +58,9 @@ trait ParamLoader { self:Spatial =>
         case fullRange(v,min,step,max) => createParam(v.toInt, min.toInt, step.toInt, max.toInt)
         case minMax(v, min, max) => createParam(v.toInt, min.toInt, 1, max.toInt)
         case int(v) => v.toInt.to[I32]
-        case x if params.contains(x) => params(x)
-        case s => throw new Exception(s"Unexpected format $s for param=$name")
+        case s => throw new Exception(s"Unexpected string format $s for param of $name")
       }
-    case s => throw new Exception(s"Unexpected format $s for param=$name")
+    case s => throw new Exception(s"Unexpected format $s for param of $name")
   }
 
   /*

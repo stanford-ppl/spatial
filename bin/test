@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+
+import glob
+import re
+from argparse import ArgumentParser
+import os, sys, datetime
+import subprocess
+from os.path import dirname, abspath
+
+def main():
+    parser = ArgumentParser()
+    parser.add_argument('app', type=str, help='name of application to run')
+    parser.add_argument('--thread', type=int, default=16, help='Number of threads to run')
+    parser.add_argument('--backend', type=str, help='Testing Backend')
+    parser.add_argument('--project', type=str, default="smallTest", help='project name')
+
+    (opts, args) = parser.parse_known_args()
+
+    if opts.app.startswith("file:"):
+        apps = ["*." + line.strip('\n') for line in open(opts.app.replace("file:",""), 'r') if not line.startswith("#")]
+    else:
+        apps = [opts.app]
+
+    java_cmd = ""
+    if (opts.backend is None):
+        java_cmd += "export TEST_ARGS=\"{}\"; ".format(' '.join(args))
+    if (opts.backend is not None):
+        java_cmd += "sbt -Dmaxthreads={} ".format(opts.thread)
+        java_cmd += "-Dtest.{}=true ".format(opts.backend)
+    else:
+        java_cmd += "export TEST_ARGS=\"{}\"; ".format(' '.join(args))
+        java_cmd += "sbt -Dmaxthreads={} ".format(opts.thread)
+        java_cmd += "-Dci=true "
+    java_cmd += "\"; "
+    java_cmd += " project {}; test:compile; testOnly {}".format(opts.project, ' '.join(apps))
+    java_cmd += "\""
+
+    print(java_cmd)
+
+    ecode = os.system(java_cmd)
+
+if __name__ == "__main__":
+    main()

@@ -76,7 +76,7 @@ import spatial.dsl._
         }{_+_}
       }{_+_}
 
-      sigma(0 :: C, 0 :: C par 16) store sigmaOut
+      sigma(0 :: C, 0 :: C par ip) store sigmaOut
     }
 
     getMem(sigma)

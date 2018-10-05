@@ -775,14 +775,15 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     if (size <= globals.target.SramThreshold) {
       val m = (0 until size).map{ i =>
         val reg = RegInit(0.U(bitWidth.W))
-        reg := Mux(io.w.en.head & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
+        reg := Mux(io.w.en.head & wInBound & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
         (i.U(addrWidth.W) -> reg)
       }
       val radder = getRetimed(io.r.ofs.head,1,io.flow)
       io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.flow)
     } else {
       val m = Module(new SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
-      m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      else           m.io.raddr     := 0.U
       m.io.waddr     := io.w.ofs.head
       m.io.wen       := io.w.en.head & wInBound & io.wMask
       m.io.wdata     := io.w.data.head
@@ -804,13 +805,13 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     }
   }
 
-  if (globals.regression_testing == "1") {
-    io.debug.invalidRAddr := ~rInBound
-    io.debug.invalidWAddr := ~wInBound
-    io.debug.rwOn := io.w.en.head & io.r.en.head & io.wMask & io.rMask
-    io.debug.error := !rInBound | !wInBound | (io.w.en.head & io.r.en.head & io.wMask & io.rMask)
-    // io.debug.addrProbe := m(0.U)
-  }
+  // if (globals.regression_testing == "1") {
+  //   io.debug.invalidRAddr := ~rInBound
+  //   io.debug.invalidWAddr := ~wInBound
+  //   io.debug.rwOn := io.w.en.head & io.r.en.head & io.wMask & io.rMask
+  //   io.debug.error := !rInBound | !wInBound | (io.w.en.head & io.r.en.head & io.wMask & io.rMask)
+  //   // io.debug.addrProbe := m(0.U)
+  // }
 }
 
 

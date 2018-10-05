@@ -2,10 +2,9 @@
 all: apps
 
 ###-----------------------------------###
-## Update local numeric emulation lib. ##
+## Publish spatial locally.            ##
 ###-----------------------------------###
-install: 
-	bash bin/make_poly.sh
+publish: 
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project argon; publishLocal"
@@ -14,6 +13,14 @@ install:
 	sbt "; project models; publishLocal"
 	sbt "; project poly; publishLocal"
 	sbt "; project utils; publishLocal"
+
+###-----------------------------------###
+## Update fringe and emul libs.        ##
+###-----------------------------------###
+install: 
+	bash bin/make_poly.sh
+	sbt "; project emul; +publishLocal"
+	sbt "; project fringe; publishLocal"
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##

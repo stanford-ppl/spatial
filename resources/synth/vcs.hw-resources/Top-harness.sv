@@ -535,7 +535,7 @@ module test;
   endfunction
 
   function void stopVCD();
-    vcdon = 1;
+    vcdon = 0;
   endfunction
 
 

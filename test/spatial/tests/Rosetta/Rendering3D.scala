@@ -212,8 +212,8 @@ import spatial.targets._
 		val num_triangles = 3192 
 
 		val run_on_board = false // args(1).to[Int] > 0.to[Int]  
-		val input_file_name = if (!run_on_board) "/home/jcamach2/spatial-lang/apps/src/Rosetta/3D-Rendering/input_triangles.csv" else "/home/jcamach2/Rendering3D/input_triangles.csv"
-		val output_file_name = if (!run_on_board) "/home/jcamach2/spatial-lang/apps/src/Rosetta/3D-Rendering/sw_output.csv" else "/home/jcamach2/Rendering3D/sw_output.csv"
+		val input_file_name = s"$DATA/rosetta/rendering/input_triangles.csv"
+		val output_file_name = s"$DATA/rosetta/rendering/sw_output.csv"
 		val input_trianges_csv = loadCSV2D[T](input_file_name, ",", "\n")
 
 		val output_image = DRAM[UInt8](img_y_size, img_x_size)

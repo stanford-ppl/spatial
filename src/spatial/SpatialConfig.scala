@@ -21,6 +21,7 @@ class SpatialConfig extends Config {
   // --- Backends --- //
   var enableSim: Boolean = false
   var enableSynth: Boolean = true
+  var enableResourceReporter: Boolean = false
   var enableTree: Boolean = true
   var enableDot: Boolean = false
 
@@ -36,6 +37,7 @@ class SpatialConfig extends Config {
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
   var compressWires = 0
+  var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true
 

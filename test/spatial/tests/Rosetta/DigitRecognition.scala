@@ -2,9 +2,11 @@ package spatial.tests.Rosetta
 
 import spatial.dsl._
 import spatial.targets._
+import utils.implicits._
 
 
 @spatial class DigitRecognition extends SpatialTest {
+	override def runtimeArgs: Args = "18000 2000"
 
     type LabelType	 		= UInt8
 
@@ -26,15 +28,12 @@ import spatial.targets._
 	val empty_str = ""
 
 
-	val num_training = 18000
 	val class_size 	 = 1800 /* number of digits in training set that belong to each class */
-	val num_test 	 = 2000
-
 
 	/* Parameters to tune */
 	val k_const 				= 5 /* Number of nearest neighbors to handle */
-	val par_factor  			= 4
-	val parLoad 				= 4
+	val par_factor  			= 1
+	val parLoad 				= 1
 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
@@ -72,7 +71,8 @@ import spatial.targets._
 
 
 		val partition_index_list = RegFile[I32](par_factor)
-		Foreach(par_factor by 1 par par_factor) { p => partition_index_list(p) = 0.to[Int] }
+		partition_index_list.reset
+		// Foreach(par_factor by 1 par par_factor) { p => partition_index_list(p) = 0.to[Int] }
 
 		val insert_this_label = Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32]))
 		Sequential.Foreach(k_const by 1) { k => //doesn't work without Sequential 
@@ -96,32 +96,28 @@ import spatial.targets._
 
 	
 		// simplest implementation for counting 1-bits in bitstring
-		val sum_bits_tmp = RegFile[Int](4)
 		val bits_d1 = List.tabulate(64){ i =>
 						val d1 = x1.d1 
 						d1.bit(i).to[Int]
-					  }.reduce(_ + _)
-		sum_bits_tmp(0) = bits_d1
+					  }.reduceTree(_ + _)
 
 		val bits_d2 =  List.tabulate(64) { i =>
 						val d2 = x1.d2 
 						d2.bit(i).to[Int] 
-					  }.reduce(_ + _)
-		sum_bits_tmp(1) = bits_d2 
+					  }.reduceTree(_+_)
 
 		val bits_d3 =  List.tabulate(64) { i =>
 						val d3 = x2.d3 
 						d3.bit(i).to[Int] 
-					  }.reduce(_ + _)
-		sum_bits_tmp(2) = bits_d3 
+					  }.reduceTree(_ + _)
 		
 		val bits_d4 =  List.tabulate(64){ i =>
 						val d4 = x2.d4
 						d4.bit(i).to[Int] 
-					  }.reduce(_ + _)
-		sum_bits_tmp(3) = bits_d4 
+					  }.reduceTree(_ + _)
 		
-		sum_bits_tmp(0) + sum_bits_tmp(1) + sum_bits_tmp(2) + sum_bits_tmp(3)
+		println(r"sum 1s in ${x1.d1} = ${bits_d1}, ${x1.d2} = ${bits_d2}, ${x2.d3} = ${bits_d3}, ${x2.d4} = ${bits_d4},")
+		bits_d1 + bits_d2 + bits_d3 + bits_d4
 	}
 
 	def update_knn(test_inst1 	: DigitType1, 
@@ -137,47 +133,24 @@ import spatial.targets._
 		val digit_xored2 = DigitType2(test_inst2.d3 ^ train_inst2.d3, test_inst2.d4 ^ train_inst2.d4)
 
 		val max_dist = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
-		Pipe { max_dist := IntAndIndex(0.to[Int], 0.to[I32]) }
+		max_dist.reset()
+		// Pipe { max_dist := IntAndIndex(0.to[Int], 0.to[I32]) }
 
-		val dist = Reg[Int](0)
-		Parallel { 
-			Pipe { dist := hamming_distance(digit_xored1, digit_xored2) }
-			//println(test_inst1.d1)
-			//println(test_inst2.d3)
-			//println(train_inst1.d1)
-			//println(train_inst1.d2)
-			//println(dist.value)
-			//println()
+		val dist = hamming_distance(digit_xored1, digit_xored2)
 
-			Reduce(max_dist)(k_const by 1) { k =>
-				IntAndIndex(min_dists(p, k), k)
-			} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
-		}	
+		Reduce(max_dist)(k_const by 1) { k =>
+			// println(r"checking dists ${min_dists(p,k)} for $k")
+			IntAndIndex(min_dists(p, k), k)
+		} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
 
-		if (dist.value < max_dist.value.value) {
-			min_dists(p, max_dist.value.inx) = dist.value  
+		println(r"dist = ${dist}, max_dist = ${max_dist.value}")
+		if (dist < max_dist.value.value) {
+			min_dists(p, max_dist.value.inx) = dist
+			println(r"knn_tmp_large_set($p, ${max_dist.value.inx}) = ${dist}")
 			label_list(p, max_dist.value.inx) = train_label
 		}
 		
 	}
-
-	def initialize(min_dists	: RegFile2[Int],
-				   label_list	: RegFile2[LabelType],
-				   vote_list	: RegFile1[Int]) = {
-		val vote_len = vote_list.length /* should always be 10 */
-
-		Parallel { 
-			Foreach(par_factor by 1, k_const by 1 par k_const) { (p,k) => 
-				min_dists(p,k) = 256.to[Int]
-				label_list(p, k) = 0.to[LabelType]
-			}
-			Foreach(vote_len by 1 par 1) { v =>
-				vote_list(v) = 0.to[Int]
-			}
-		}
-	}
-
-
 
 	def knn_vote(knn_set  	: RegFile2[Int],
 				 label_list : RegFile2[LabelType],
@@ -205,20 +178,19 @@ import spatial.targets._
 
 	def initialize_train_data(training_set_dram_1 : DRAM1[DigitType1], 
 							  training_set_dram_2 : DRAM1[DigitType2], 
-							  label_set_dram : DRAM1[LabelType], 
-							  file_string : String) = {
+							  label_set_dram : DRAM1[LabelType]) = {
 		/* Rosetta sw version assumes unsigned long long => 64 bits. */
 
-		val training0_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_0.dat", ",", "\n")
-		val training1_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_1.dat", ",", "\n")
-		val training2_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_2.dat", ",", "\n")
-		val training3_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_3.dat", ",", "\n")
-		val training4_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_4.dat", ",", "\n")	
-		val training5_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_5.dat", ",", "\n")	
-		val training6_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_6.dat", ",", "\n")	
-		val training7_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_7.dat", ",", "\n")	
-		val training8_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_8.dat", ",", "\n")	
-		val training9_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/training_set_9.dat", ",", "\n")	
+		val training0_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_0.dat", ",", "\n")
+		val training1_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_1.dat", ",", "\n")
+		val training2_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_2.dat", ",", "\n")
+		val training3_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_3.dat", ",", "\n")
+		val training4_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_4.dat", ",", "\n")	
+		val training5_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_5.dat", ",", "\n")	
+		val training6_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_6.dat", ",", "\n")	
+		val training7_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_7.dat", ",", "\n")	
+		val training8_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_8.dat", ",", "\n")	
+		val training9_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_9.dat", ",", "\n")	
 
 		val training_list = List(training0_dat, training1_dat, training2_dat, training3_dat, training4_dat, training5_dat, 
 								 training6_dat, training7_dat, training8_dat, training9_dat)
@@ -254,9 +226,8 @@ import spatial.targets._
 
 
 	def initialize_test_data(test_set_dram_1 : DRAM1[DigitType1], 
-							 test_set_dram_2 : DRAM1[DigitType2], 
-							 file_string 	 : String) = {
-		val test_dat = loadCSV2D[UInt64]("/home/jcamach2/" + file_string + "DigitRecognition/196data/test_set.dat", ",", "\n")
+							 test_set_dram_2 : DRAM1[DigitType2]) = {
+		val test_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/test_set.dat", ",", "\n")
 
 		val test_actual_vector1 = Array.tabulate(test_set_dram_1.length) { i =>
 									val sample1 = test_dat.apply(i, 0).to[UInt64]
@@ -277,40 +248,44 @@ import spatial.targets._
 
 	def main(args: Array[String]): Void = {
 
+		val num_training = ArgIn[Int]; 
+		setArg(num_training, args(0).to[Int])
+		val num_test 	 = ArgIn[Int]; 
+		setArg(num_test, args(1).to[Int])
 
-		val run_on_board = (args(0).to[Int] > 0.to[Int]).as[Boolean]
-		val file_string = if (run_on_board) empty_str else simulate_file_string 
+		val max_num_training = 18000
+		val max_num_test 	 = 2000
 
 		/* input */
-		val training_set_dram_1 =  DRAM[DigitType1](num_training)	
-		val training_set_dram_2 =  DRAM[DigitType2](num_training)
+		val training_set_dram_1 =  DRAM[DigitType1](max_num_training)	
+		val training_set_dram_2 =  DRAM[DigitType2](max_num_training)
 
-		val label_set_dram 	  =  DRAM[LabelType](num_training)
+		val label_set_dram 	  =  DRAM[LabelType](max_num_training)
 
-		val test_set_dram_1	  =	 DRAM[DigitType1](num_test)
-		val test_set_dram_2	  =	 DRAM[DigitType2](num_test)
+		val test_set_dram_1	  =	 DRAM[DigitType1](max_num_test)
+		val test_set_dram_2	  =	 DRAM[DigitType2](max_num_test)
 
 		/* output */
-		val results_dram	  =  DRAM[LabelType](num_test)
+		val results_dram	  =  DRAM[LabelType](max_num_test)
 
-		val num_test_local_len 		= 200 // num_test /* for on chip memory */
-		val num_train_local_len 	= num_training
+		val num_test_tile 		= 200
+		val num_train_tile  	= 18000
 
-		initialize_train_data(training_set_dram_1, training_set_dram_2, label_set_dram, file_string)
-		initialize_test_data(test_set_dram_1, test_set_dram_2, file_string)		
+		initialize_train_data(training_set_dram_1, training_set_dram_2, label_set_dram)
+		initialize_test_data(test_set_dram_1, test_set_dram_2)		
 
-		val expected_results = loadCSV1D[LabelType]("/home/jcamach2/" + file_string + "DigitRecognition/196data/expected.dat", "\n")
+		val expected_results = loadCSV1D[LabelType](s"$DATA/rosetta/digitrecognition/expected.dat", "\n")
  
 		val test_dram = DRAM[Int](k_const)
 		Accel {
 
-			val train_set_local1 	= SRAM[DigitType1](num_train_local_len)
-			val train_set_local2 	= SRAM[DigitType2](num_train_local_len)
+			val train_set_local1 	= SRAM[DigitType1](num_train_tile)
+			val train_set_local2 	= SRAM[DigitType2](num_train_tile)
 
-			val label_set_local 	= SRAM[LabelType](num_train_local_len)
+			val label_set_local 	= SRAM[LabelType](num_train_tile)
 
-			val test_set_local1 	= SRAM[DigitType1](num_test_local_len)
-			val test_set_local2 	= SRAM[DigitType2](num_test_local_len)
+			val test_set_local1 	= SRAM[DigitType1](num_test_tile)
+			val test_set_local2 	= SRAM[DigitType2](num_test_tile)
 
 			/* ####### Debugging Sorting Functions  #############
 			val test_sort = RegFile[Int](par_factor * k_const)
@@ -334,53 +309,57 @@ import spatial.targets._
 			*/
 		
 			Parallel { 
-				train_set_local1 load training_set_dram_1 //for now do this
-				train_set_local2 load training_set_dram_2
+				train_set_local1 load training_set_dram_1(0::num_training) //for now do this
+				train_set_local2 load training_set_dram_2(0::num_training)
 
-				label_set_local load label_set_dram
+				label_set_local load label_set_dram(0::num_training)
 			}
 
-			Foreach(num_test by num_test_local_len){ test_factor =>
+			Foreach(num_test by num_test_tile){ test_factor =>
+				val num_test_left = min(num_test - test_factor, num_test_tile)
 
 				Parallel { 
-					test_set_local1 load test_set_dram_1(test_factor :: test_factor + num_test_local_len par parLoad)
-					test_set_local2 load test_set_dram_2(test_factor :: test_factor + num_test_local_len par parLoad)
+					test_set_local1 load test_set_dram_1(test_factor :: test_factor + num_test_left par parLoad)
+					test_set_local2 load test_set_dram_2(test_factor :: test_factor + num_test_left par parLoad)
 				}
 
-				val results_local 	= SRAM[LabelType](num_test_local_len)
-				Sequential.Foreach(num_test_local_len by 1) { test_inx =>
-
-					val vote_list		= 	RegFile[Int](10).buffer
+				val results_local 	= SRAM[LabelType](num_test_tile)
+				Sequential.Foreach(num_test_left by 1) { test_inx =>
+					println(r"test point ${test_inx}:")
+					val vote_list		= 	RegFile[Int](10, Seq.fill(10)(0.to[Int])).buffer
 
 					/* initialize KNN */
-					val knn_tmp_large_set = RegFile[Int](par_factor, k_const).buffer // when parallelizing, size will need to be k_const * par_factor
-					val label_list_tmp 	= 	RegFile[LabelType](par_factor, k_const).buffer
-
-					initialize(knn_tmp_large_set, label_list_tmp, vote_list) 
+					val knn_tmp_large_set = RegFile[Int](par_factor, k_const, Seq.fill(par_factor*k_const)(256.to[Int])).buffer // when parallelizing, size will need to be k_const * par_factor
+					val label_list_tmp 	= 	RegFile[LabelType](par_factor, k_const, Seq.fill(par_factor*k_const)(0.to[LabelType])).buffer
 
 					/* Training Loop */
-					val train_set_num_per_partition = num_train_local_len / par_factor
+					val train_set_num_per_partition = num_training / par_factor
 
 					val test_local1 = test_set_local1(test_inx)
 					val test_local2 = test_set_local2(test_inx)
 
 					Sequential.Foreach(par_factor by 1 par par_factor) { p => 
 						Foreach(train_set_num_per_partition by 1) { train_inx =>
+							println(r"  training on ${train_inx}")
 							val curr_train_inx = p * train_set_num_per_partition + train_inx
 							update_knn(test_local1, test_local2,
 									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
 						}
+						println("train result for $p")
+						'DEBUG2.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
 						
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 
 
 					}
 					/* Do KNN */
 					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
+					println("debug3")
+					'DEBUG3.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
 
 				}
 
-				results_dram(test_factor :: test_factor + num_test_local_len) store results_local 
+				results_dram(test_factor :: test_factor + num_test_left) store results_local 
 			} 
 
 		}

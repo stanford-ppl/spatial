@@ -73,10 +73,10 @@ elif [[ $type == "pir" ]]; then
 # Verilog tests that report to gdocs (https://docs.google.com/spreadsheets/d/1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM/edit#gid=1748974351)
 elif [[ $type == "vcs-gdocs" ]]; then
   export GDOCS=1
-  export FRINGE_PACKAGE="vcs-gdocs"
   make resources
   hash=`git rev-parse HEAD`
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
+  export FRINGE_PACKAGE="vcs-gdocs-${branchname}"
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash

@@ -10,7 +10,7 @@ import fringe.targets.zcu.ZCU
 import fringe.targets.zynq.Zynq
 
 class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
-    val addrWidth = log2Ceil(d)
+    val addrWidth = {1 max log2Ceil(d)}
     val clk = Input(Clock())
     val raddr = Input(UInt(addrWidth.W))
     val waddr = Input(UInt(addrWidth.W))
@@ -27,37 +27,37 @@ abstract class SRAMBlackBox[T<:Data](params: Map[String,Param]) extends BlackBox
 }
 
 class SRAMVerilogSim[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogAWS[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogAWS_URAM[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogAWS_BRAM[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogDE1SoC[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class GenericRAMIO[T<:Data](t: T, d: Int) extends Bundle {
-  val addrWidth = log2Ceil(d)
+  val addrWidth = {1 max log2Ceil(d)}
   val raddr = Input(UInt(addrWidth.W))
   val wen = Input(Bool())
   val waddr = Input(UInt(addrWidth.W))
@@ -71,7 +71,7 @@ class GenericRAMIO[T<:Data](t: T, d: Int) extends Bundle {
 }
 
 abstract class GenericRAM[T<:Data](val t: T, val d: Int) extends Module {
-  val addrWidth = log2Ceil(d)
+  val addrWidth = {1 max log2Ceil(d)}
   val io = IO(new GenericRAMIO(t, d))
 }
 

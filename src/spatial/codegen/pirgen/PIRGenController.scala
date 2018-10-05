@@ -93,7 +93,7 @@ trait PIRGenController extends PIRGenControl with PIRGenStream with PIRGenMemori
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
       inGen(out, "AccelMain.scala") {
-        //define(lhs, "Controller()")
+        define(lhs, "Controller(schedule=)")
         ret(func)
       }
 

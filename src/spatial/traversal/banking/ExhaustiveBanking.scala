@@ -72,7 +72,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Seq(Seq(ModBanking.Simple(1, Seq(1), 1)))
       else {
         dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
+          dbgs(s"Working on strategy $strategy")
           val banking = strategy.map{dims =>
+            dbgs(s"  Working on dims $dims")
             val selGrps = myGrps.flatMap{grp => 
 
               val grpViews = grp.map{mat => AccessView(dims, fullStrategy, mat)} 
@@ -111,6 +113,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                     } else {
                       dbgs(s"Making new group")
                       regrp += ArrayBuffer(current)
+                      placed = true
                     }
                   }
                 }
@@ -146,7 +149,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               }
             }
             val stagedDims = dims.map(mem.stagedDims.map(_.toInt))
-            dbgs(s"sellgrps are $selGrps")
             selGrps.zipWithIndex.foreach{case (grp,i) =>
               dbgs(s"Banking accesses:")
               dbgs(s"  Group #$i:")
@@ -321,7 +323,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
   protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int]): ModBanking = {
     val rank = dims.length
-    dbgs(s"finding banking on $grps, ${grps.map(_.size)}")
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = stagedDims.product max Nmin
     val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= Ncap).partition{i => isPow2(i) }

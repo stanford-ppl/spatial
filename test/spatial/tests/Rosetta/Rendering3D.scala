@@ -3,7 +3,7 @@ package spatial.tests.Rosetta
 import spatial.dsl._
 import spatial.targets._
 
-@spatial class Rendering3DTmp extends SpatialTest {
+@spatial class Rendering3DTmp2 extends SpatialTest {
 	override def runtimeArgs = "1 0"
 	//override val target = Zynq
 	// struct size of power of 2

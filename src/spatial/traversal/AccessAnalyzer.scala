@@ -77,6 +77,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   object Mod   { def unapply[W](x: Ind[W]): Option[(Ind[W], Int)] = x.op.collect{case FixMod(a,b) if b.isConst => (a,b.toInt)}}
   object Index { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x).filter(iters.contains) }
   object LU    { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x.op.collect{case RegRead(reg) if mostRecentWrite.contains(reg) => mostRecentWrite(reg).asInstanceOf[Ind[W]]}.getOrElse(x))}
+  object Read  { def unapply[W](x: Ind[W]): Option[Ind[W]] = x.op.collect{case RegRead(reg) if mostRecentWrite.contains(reg) => mostRecentWrite(reg).asInstanceOf[Ind[W]]}}
 
   private lazy val Zero = Sum.single(0)
   private lazy val One  = Prod.single(1)
@@ -142,6 +143,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       case Times(Offset(b1), Affine(a,b2,m)) if isAllInvariant(a.inds, b1.syms) && !m.set => Some(a * b1, b1 * b2, NotSet)
 
       //case Mod(Affine(a,b,m1), m2) => Some(a, b, m1 % Modulus(m2))
+
+      case Read(Affine(a,b,m)) => Some(a, b, m)
 
       //case Divide(Affine(a,b1,m), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && a.canBeDividedBy(b2) && b1.canBeDividedBy(b2) =>
       //  Some(a / b2, b1 / b2, m)
@@ -265,11 +268,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
         case Op(RegRead(reg)) if !reg.isRemoteMem => 
           val reachingWrite = reachingWritesToReg(lhs, reg.writers.toSet)
           if (reachingWrite.size == 1 && reachingWrite.head.accumType == AccumType.Unknown) {
-            dbgs(s"Creating reaching write subst rule for $lhs")
             val data = reachingWrite.head match {
               case Op(x: Enqueuer[_]) => x.data
               case _ => throw new Exception(s"Unexpected write to $reg: ${reachingWrite.head}")
             }
+            dbgs(s"Creating reaching write subst rule for $lhs = $data")
             mostRecentWrite += (reg -> data)
           }
         case _ =>

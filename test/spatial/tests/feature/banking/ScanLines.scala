@@ -31,7 +31,7 @@ import spatial.dsl._
     setArg(iters, 4)
 
     Accel{
-      val grid_sram = SRAM[Int](ROWS,COLS).flat
+      val grid_sram = SRAM[Int](ROWS,COLS).hierarchical
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
 
       Foreach(iters by 1) { iter =>

@@ -12,6 +12,13 @@ import spatial.metadata.memory._
 
 import spatial.metadata.types._
 import spatial.util.IntLike._
+import scala.collection.mutable.ArrayBuffer
+
+
+case class AccessView(val activeDims: Seq[Int], val fullDims: Seq[Int], val access: SparseMatrix[Idx]){
+  def activeAccess: SparseMatrix[Idx] = access.sliceDims(activeDims)
+  def complementAccess: SparseMatrix[Idx] = access.sliceDims(fullDims.diff(activeDims))
+}
 
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // TODO[4]: What should the cutoff be for starting with powers of 2 versus exact accesses?
@@ -66,32 +73,80 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       else {
         dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
           val banking = strategy.map{dims =>
-            val selGrps = myGrps.map{grp => 
-              val sliceCompPairs = grp.map{mat => (mat.sliceDims(dims), mat.sliceDims(fullStrategy.diff(dims)))} 
-              var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
+            val selGrps = myGrps.flatMap{grp => 
 
-              /** True if the sliced matrix at the given index should be kept
-                *   - If this slice is unique
-                *   - If it is not unique but its compliment collides
-                *   - If it is the first time we are seeing this slice
-                */
-              def isUniqueSlice(i: Int): Boolean = {
-                val current = sliceCompPairs(i)
-                val pairsExceptCurrent = sliceCompPairs.patch(i,Nil,1)
+              val grpViews = grp.map{mat => AccessView(dims, fullStrategy, mat)} 
+              
+              /**  Move accesses to another group if their "complement" guarantees they will never interfere **/
+              val regrp = ArrayBuffer[ArrayBuffer[AccessView]]()
 
-                val isUnique           = !pairsExceptCurrent.exists{case (keep, _) => keep == current._1 }
-                val complimentCollides = pairsExceptCurrent.exists{case (keep,drop) => keep == current._1 && drop == current._2 }
-                val firstTime          = !firstInstances.contains(current._1)
-
-                isUnique || complimentCollides || firstTime
+              grpViews.zipWithIndex.foreach{case (current,i) => 
+                if (regrp.isEmpty) regrp += ArrayBuffer(current)
+                else {
+                  // Find first group where current access may interfere with ANY of the complementary dimensions
+                  var grpId = 0
+                  var placed = false
+                  while (grpId < regrp.size & !placed) {
+                    val canConflict = regrp(grpId).exists{other => 
+                      val diff = current.complementAccess - other.complementAccess
+                      val conflictingMatrix = diff.rows.zipWithIndex.forall{case (row, dim) => 
+                        val patternForDim = (Seq(1)*SparseMatrix[Idx](Seq(row)) === 0)
+                        val conflictingRow = !patternForDim.andDomain.isEmpty
+                        // dbgs(s"Row $dim: \n  ISL problem:\n${patternForDim.andDomain}")
+                        if (!conflictingRow) {
+                          dbgs(s"Found nonconflicting complementary dimension: $dim")
+                        }
+                        conflictingRow
+                      }
+                      conflictingMatrix
+                    }
+                    if (canConflict) {
+                      dbgs(s"Placing in group $grpId")
+                      regrp(grpId) = regrp(grpId) ++ ArrayBuffer(current)
+                      placed = true
+                    }
+                    else if (grpId < regrp.size - 1) {
+                      dbgs(s"Cannot place in group $grpId because it has no conflicts in dim $dims")
+                      grpId += 1
+                    } else {
+                      dbgs(s"Making new group")
+                      regrp += ArrayBuffer(current)
+                    }
+                  }
+                }
               }
+              dbgs(s"regrouped $grpViews\n\n-->\n\n$regrp")
 
-              Seq(sliceCompPairs.zipWithIndex.collect{case (current,i) if isUniqueSlice(i) =>
-                firstInstances += current._1
-                current._1
-              }:_*)
+              regrp.map{newgrp => 
+                var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
+
+                /** True if the sliced matrix has any of the following:
+                  *   - If the access is identical to another within this group
+                  *   - If it is the first time we are seeing this "sliced matrix" within this group
+                  */
+                def isUniqueSliceInGroup(i: Int): Boolean = {
+                  // Current (sliced matrix, complement matrix) tuple
+                  val current = newgrp(i)
+
+                  // Others in group (Sequence of (sliced matrix, complement matrix) tuples)
+                  val pairsExceptCurrent = newgrp.patch(i,Nil,1)
+
+                  val totalCollision = pairsExceptCurrent.exists{other => other.access == current.access }
+                  val firstTime          = !firstInstances.contains(current.activeAccess)
+
+                  totalCollision || firstTime
+                }
+
+
+
+                Seq(newgrp.zipWithIndex.collect{case (current,i) if isUniqueSliceInGroup(i) =>
+                  firstInstances += current.activeAccess
+                  current.activeAccess
+                }:_*)
+              }
             }
             val stagedDims = dims.map(mem.stagedDims.map(_.toInt))
+            dbgs(s"sellgrps are $selGrps")
             selGrps.zipWithIndex.foreach{case (grp,i) =>
               dbgs(s"Banking accesses:")
               dbgs(s"  Group #$i:")
@@ -266,6 +321,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
   protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int]): ModBanking = {
     val rank = dims.length
+    dbgs(s"finding banking on $grps, ${grps.map(_.size)}")
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = stagedDims.product max Nmin
     val (n2,nx) = (Nmin to 8*Nmin).filter(_ <= Ncap).partition{i => isPow2(i) }

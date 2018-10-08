@@ -148,8 +148,8 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def expandInits(mem: Sym[_], inits: Seq[Sym[_]], name: String): String = {
-    val dims = if (name == "FF") List(1) else mem.constDims
-    val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+    val dims = if (name == "FF" | name == "FIFOReg") List(1) else mem.constDims
+    val padding = if (name == "FF" | name == "FIFOReg") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
     val pDims = dims.zip(padding).map{case (d:Int,p:Int) => d+p}
     val paddedInits = Seq.tabulate(pDims.product){i => 
       val coords = pDims.zipWithIndex.map{ case (b,j) =>

@@ -3,7 +3,7 @@ package spatial.tests.Rosetta
 import spatial.dsl._
 import spatial.targets._
 
-@spatial class SpamFiltering extends SpatialTest {
+@spatial class SpamFilteringTmp extends SpatialTest {
 	//override def runtimeArgs = "1 0"
 
     case class InferenceStats(tp : Int, tn : Int, fp : Int, fn : Int)

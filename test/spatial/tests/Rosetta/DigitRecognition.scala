@@ -116,7 +116,7 @@ import utils.implicits._
 						d4.bit(i).to[Int] 
 					  }.reduceTree(_ + _)
 		
-		println(r"sum 1s in ${x1.d1} = ${bits_d1}, ${x1.d2} = ${bits_d2}, ${x2.d3} = ${bits_d3}, ${x2.d4} = ${bits_d4},")
+		//println(r"sum 1s in ${x1.d1} = ${bits_d1}, ${x1.d2} = ${bits_d2}, ${x2.d3} = ${bits_d3}, ${x2.d4} = ${bits_d4},")
 		bits_d1 + bits_d2 + bits_d3 + bits_d4
 	}
 
@@ -143,10 +143,10 @@ import utils.implicits._
 			IntAndIndex(min_dists(p, k), k)
 		} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
 
-		println(r"dist = ${dist}, max_dist = ${max_dist.value}")
+		//println(r"dist = ${dist}, max_dist = ${max_dist.value}")
 		if (dist < max_dist.value.value) {
 			min_dists(p, max_dist.value.inx) = dist
-			println(r"knn_tmp_large_set($p, ${max_dist.value.inx}) = ${dist}")
+			//println(r"knn_tmp_large_set($p, ${max_dist.value.inx}) = ${dist}")
 			label_list(p, max_dist.value.inx) = train_label
 		}
 		
@@ -181,16 +181,16 @@ import utils.implicits._
 							  label_set_dram : DRAM1[LabelType]) = {
 		/* Rosetta sw version assumes unsigned long long => 64 bits. */
 
-		val training0_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_0.dat", ",", "\n")
-		val training1_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_1.dat", ",", "\n")
-		val training2_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_2.dat", ",", "\n")
-		val training3_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_3.dat", ",", "\n")
-		val training4_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_4.dat", ",", "\n")	
-		val training5_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_5.dat", ",", "\n")	
-		val training6_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_6.dat", ",", "\n")	
-		val training7_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_7.dat", ",", "\n")	
-		val training8_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_8.dat", ",", "\n")	
-		val training9_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/training_set_9.dat", ",", "\n")	
+		val training0_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_0.dat", ",", "\n")
+		val training1_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_1.dat", ",", "\n")
+		val training2_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_2.dat", ",", "\n")
+		val training3_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_3.dat", ",", "\n")
+		val training4_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_4.dat", ",", "\n")	
+		val training5_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_5.dat", ",", "\n")	
+		val training6_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_6.dat", ",", "\n")	
+		val training7_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_7.dat", ",", "\n")	
+		val training8_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_8.dat", ",", "\n")	
+		val training9_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/training_set_9.dat", ",", "\n")	
 
 		val training_list = List(training0_dat, training1_dat, training2_dat, training3_dat, training4_dat, training5_dat, 
 								 training6_dat, training7_dat, training8_dat, training9_dat)
@@ -227,7 +227,7 @@ import utils.implicits._
 
 	def initialize_test_data(test_set_dram_1 : DRAM1[DigitType1], 
 							 test_set_dram_2 : DRAM1[DigitType2]) = {
-		val test_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/test_set.dat", ",", "\n")
+		val test_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/test_set.dat", ",", "\n")
 
 		val test_actual_vector1 = Array.tabulate(test_set_dram_1.length) { i =>
 									val sample1 = test_dat.apply(i, 0).to[UInt64]
@@ -274,7 +274,7 @@ import utils.implicits._
 		initialize_train_data(training_set_dram_1, training_set_dram_2, label_set_dram)
 		initialize_test_data(test_set_dram_1, test_set_dram_2)		
 
-		val expected_results = loadCSV1D[LabelType](s"$DATA/rosetta/digitrecognition/expected.dat", "\n")
+		val expected_results = loadCSV1D[LabelType](s"$DATA/rosetta/digitrecognition/196data/expected.dat", "\n")
  
 		val test_dram = DRAM[Int](k_const)
 		Accel {
@@ -325,7 +325,7 @@ import utils.implicits._
 
 				val results_local 	= SRAM[LabelType](num_test_tile)
 				Sequential.Foreach(num_test_left by 1) { test_inx =>
-					println(r"test point ${test_inx}:")
+					//println(r"test point ${test_inx}:")
 					val vote_list		= 	RegFile[Int](10, Seq.fill(10)(0.to[Int])).buffer
 
 					/* initialize KNN */
@@ -340,22 +340,22 @@ import utils.implicits._
 
 					Sequential.Foreach(par_factor by 1 par par_factor) { p => 
 						Foreach(train_set_num_per_partition by 1) { train_inx =>
-							println(r"  training on ${train_inx}")
-							val curr_train_inx = p * train_set_num_per_partition + train_inx
+							//println(r"  training on ${train_inx}")
+							val curr_train_inx = p * train_set_num_per_partition + train_inx 
 							update_knn(test_local1, test_local2,
 									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
 						}
-						println("train result for $p")
-						'DEBUG2.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
+						//println("train result for $p")
+						//'DEBUG2.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
 						
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 
 
 					}
 					/* Do KNN */
 					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
-					println("debug3")
-					'DEBUG3.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
+					//println("debug3")
+					//'DEBUG3.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
 
 				}
 

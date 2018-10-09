@@ -24,7 +24,7 @@ trait PIRGenBit extends PIRGenBits {
   }
 
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Not(x)    => emit(src"val $lhs = !$x")
     case And(x,y)  => emit(src"val $lhs = $x && $y")
     case Or(x,y)   => emit(src"val $lhs = $x || $y")
@@ -35,6 +35,6 @@ trait PIRGenBit extends PIRGenBits {
     case BitRandom(Some(max)) => emit(src"val $lhs = Bool(java.util.concurrent.ThreadLocalRandom.current().nextBoolean() && $max)")
     case TextToBit(x)         => emit(src"val $lhs = Bool.from($x)")
     case BitToText(x)         => emit(src"val $lhs = $x.toString")
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 }

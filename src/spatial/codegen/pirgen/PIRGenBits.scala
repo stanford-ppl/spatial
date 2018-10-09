@@ -25,7 +25,7 @@ trait PIRGenBits extends PIRCodegen {
     case _ => throw new Exception(s"Don't know how to generate invalid for type $tp")
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case Mux(sel, a, b) => emit(src"val $lhs = if ($sel) $a else $b")
     case op @ OneHotMux(selects,datas) =>
       open(src"val $lhs = {")
@@ -47,6 +47,6 @@ trait PIRGenBits extends PIRCodegen {
       case BitType()        => emit(src"val $lhs = $v.head")
     }
 
-    case _ => super.gen(lhs,rhs)
+    case _ => super.genAccel(lhs,rhs)
   }
 }

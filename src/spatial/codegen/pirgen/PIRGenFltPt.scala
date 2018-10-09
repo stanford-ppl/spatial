@@ -28,7 +28,7 @@ trait PIRGenFltPt extends PIRGenBits {
     case _ => super.invalid(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FltIsPosInf(x) => emit(src"val $lhs = Bool($x.isPositiveInfinity, $x.valid)")
     case FltIsNegInf(x) => emit(src"val $lhs = Bool($x.isNegativeInfinity, $x.valid)")
     case FltIsNaN(x)    => emit(src"val $lhs = Bool($x.isNaN, $x.valid)")
@@ -89,7 +89,7 @@ trait PIRGenFltPt extends PIRGenBits {
     case FltSigmoid(x)     => emit(src"val $lhs = ${one(x.tp)} / (Number.exp(-$x) + ${one(x.tp)})")
 
 
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 
 }

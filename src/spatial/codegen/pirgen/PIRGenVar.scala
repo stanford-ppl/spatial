@@ -11,12 +11,12 @@ trait PIRGenVar extends PIRCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@VarNew(Some(init)) => emit(src"val $lhs: ${lhs.tp} = Ptr[${op.A}]($init)")
     case op@VarNew(None)       => emit(src"val $lhs: ${lhs.tp} = Ptr[${op.A}](null.asInstanceOf[${op.A}])")
     case VarRead(v)            => emit(src"val $lhs = $v.value")
     case VarAssign(v, x)       => emit(src"val $lhs = { $v.set($x) }")
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 
 }

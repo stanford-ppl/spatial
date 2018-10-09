@@ -7,6 +7,8 @@ import spatial.metadata.memory._
 
 import scala.collection.mutable
 
+trait PIRFormattedCodegen extends Codegen {
+
 case class Lhs(sym:Sym[_], postFix:Option[String]=None)
 trait Stm {
   val lhs:Lhs
@@ -14,8 +16,6 @@ trait Stm {
 }
 case class DefStm(lhs:Lhs, tp:String, args:Seq[Any], comment:String) extends Stm
 case class AliasStm(lhs:Lhs, alias:Lhs, comment:String) extends Stm
-
-trait PIRFormattedCodegen extends Codegen {
 
   implicit def sym_to_lhs(sym:Sym[_]) = Lhs(sym)
 
@@ -44,8 +44,10 @@ trait PIRFormattedCodegen extends Codegen {
 
   override def emitHeader(): Unit = {
     super.emitHeader()
-    emit(s"implicit class CtxHelper[T<:IR](x:T) { def ctx(c:String):T = { srcCtxOf(x) = c; x } }")
-    emitNameFunc
+    inGen(out, "AccelMain.scala") {
+      emit(s"implicit class CtxHelper[T<:IR](x:T) { def ctx(c:String):T = { srcCtxOf(x) = c; x } }")
+      emitNameFunc
+    }
   }
 
   def emitNameFunc = {
@@ -63,8 +65,8 @@ trait PIRFormattedCodegen extends Codegen {
     case None => s"None"
     case e: Sym[_] => quoteOrRemap(sym_to_lhs(e))
     case m: Type[_] => remap(m)
-    case x@Lhs(dsym,Some(postFix)) => s"${quote(dsym)}_$postFix" 
-    case x@Lhs(dsym,None) => quote(dsym)
+    case x@Lhs(sym,Some(postFix)) => s"${quote(sym)}_$postFix" 
+    case x@Lhs(sym,None) => quote(sym)
     case DefStm(lhs, tp, args, _) =>
       val argsString = args.map {
         case (k,v) => s"$k=${quoteRef(v)}"

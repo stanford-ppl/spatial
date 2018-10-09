@@ -2,7 +2,6 @@ package spatial.codegen.pirgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
-import spatial.codegen.naming.NamedCodegen
 import spatial.metadata.CLIArgs
 import spatial.metadata.memory._
 import spatial.lang._
@@ -11,19 +10,14 @@ import spatial.util.spatialConfig
 import scala.collection.mutable
 import spatial.traversal.AccelTraversal
 
-trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen with AccelTraversal with PIRFormattedCodegen {
+trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with PIRFormatGen with PIRGenHelper {
   override val lang: String = "pir"
   override val ext: String = "scala"
-  final val CODE_WINDOW: Int = 75
+  backend = "accel"
 
   def and(ens: Set[Bit]): String = if (ens.isEmpty) "true" else ens.map(quote).mkString(" & ")
 
   private var globalBlockID: Int = 0
-
-  // equivalent of quote
-  //override def named(s: Sym[_], id: Int): String = {
-    //super.named(s,id)
-  //}
 
   override def emitHeader(): Unit = {
     inGen(out, "AccelMain.scala") {
@@ -34,7 +28,6 @@ trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen with Ac
       emit("")
       open(s"""object ${spatialConfig.name} extends PIRApp {""")
     }
-
     super.emitHeader()
   }
 
@@ -47,7 +40,30 @@ trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen with Ac
     super.emitFooter()
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
+  override protected def quoteConst(tp: Type[_], c: Any): String = s"Const($c)"
+
+  override protected def quoteOrRemap(arg: Any): String = arg match {
+    case p: Set[_]   => 
+      s"Set(${p.map(quoteOrRemap).mkString(", ")})" 
+    case p: Iterable[_]   => 
+      s"List(${p.map(quoteOrRemap).mkString(", ")})" 
+    case e: Ref[_,_]   => quote(e)
+    case Lhs(sym, None) => s"${quote(sym)}"
+    case Lhs(sym, Some(post)) => s"${quote(sym)}_$post"
+    case l: Long       => l.toString + "L"
+    case None    => "None"
+    case Some(x) => "Some(" + quoteOrRemap(x) + ")"
+    case x => x.toString
+  }
+
+  final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genHost(lhs, rhs) else genAccel(lhs, rhs)
+
+  protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
+    emit(s"// $lhs = $rhs TODO: Unmatched Node")
+    rhs.blocks.foreach(ret)
+  }
+
+  protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {
     emit(s"// $lhs = $rhs TODO: Unmatched Node")
     rhs.blocks.foreach(ret)
   }
@@ -63,33 +79,6 @@ trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen with Ac
         emitPostMain()
       close(src"}")
     close(src"}")
-  }
-
-  override protected def postprocess[R](b: Block[R]): Block[R] = {
-    import scala.language.postfixOps
-    import scala.sys.process._
-    super.postprocess(b)
-    //TODO: make pir a submodule
-    //if (sys.env.get("PIR_HOME").isDefined && sys.env("PIR_HOME") != "") {
-      //val PIR_HOME = sys.env("PIR_HOME")
-      ////val dir = spatialConfig.pirsrc.getOrElse(s"$PIR_HOME/pir/apps/src")
-      //val dir = s"$PIR_HOME/pir/apps/src"
-      //var cmd = s"mkdir -p $dir"
-      //info(cmd)
-      //cmd.!
-
-      //cmd = s"cp ${config.genDir}/pir/main.scala $dir/${config.name}.scala"
-      //println(cmd)
-      //cmd.!
-
-      //cmd = s"rm $PIR_HOME/out/${config.name}/${config.name}.pir"
-      //println(cmd)
-      //cmd.!
-    //} else {
-      //warn("Set PIR_HOME environment variable to automatically copy app")
-    //}
-
-    b
   }
 
 }

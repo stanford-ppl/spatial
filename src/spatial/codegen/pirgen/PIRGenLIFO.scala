@@ -14,7 +14,7 @@ trait PIRGenLIFO extends PIRGenMemories {
     case _ => super.remap(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@LIFONew(size)    => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Stack[${op.A}]") }
     case LIFOIsEmpty(lifo,_) => emit(src"val $lhs = $lifo.isEmpty")
     case LIFOIsFull(lifo,_)  => emit(src"val $lhs = $lifo.size >= ${lifo.stagedSize} ")
@@ -43,6 +43,6 @@ trait PIRGenLIFO extends PIRGenMemories {
       }
       close("}")
 
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 }

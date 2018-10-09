@@ -22,7 +22,7 @@ trait PIRGenText extends PIRCodegen {
     case _ => emit(src"val $lhs = $x.toString")
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case e@GenericToText(x) => emitToString(lhs, x, e.A)
     case TextConcat(parts)  => emit(src"val $lhs = " + parts.map(quote).mkString(" + "))
     case TextEql(x,y)       => emit(src"val $lhs = $x == $y")
@@ -34,7 +34,7 @@ trait PIRGenText extends PIRCodegen {
 
     //case StringSlice(x,start,end) => emit(src"val $lhs = $x.substring($start,$end);")
     //case StringLength(x) => emit(src"val $lhs = $x.length();")
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 
 

@@ -17,7 +17,7 @@ trait PIRGenArray extends PIRCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@ArrayNew(size)      => emit(src"val $lhs = new ${op.R}($size)")
     case op@ArrayFromSeq(seq)   => emit(src"val $lhs = ${op.R}($seq)")
 
@@ -93,6 +93,6 @@ trait PIRGenArray extends PIRCodegen {
     case ArrayMkString(array,start,delim,end) =>
       emit(src"val $lhs = $array.mkString($start, $delim, $end)")
 
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 }

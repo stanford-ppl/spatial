@@ -12,7 +12,7 @@ trait PIRGenFileIO extends PIRCodegen {
     case _ => super.remap(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case OpenCSVFile(filename, write) =>
       open(src"val $lhs = {")
         emit(src"val file = new java.io.File($filename)")

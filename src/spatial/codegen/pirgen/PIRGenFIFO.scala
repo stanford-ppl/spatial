@@ -14,7 +14,7 @@ trait PIRGenFIFO extends PIRGenMemories {
     case _ => super.remap(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FIFONew(size)    => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Queue[${op.A}]") }
     case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.isEmpty")
     case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.size >= ${fifo.stagedSize} ")
@@ -43,6 +43,6 @@ trait PIRGenFIFO extends PIRGenMemories {
       ens.zipWithIndex.foreach{case (en,i) => emit(src"if (${and(en)}) $fifo.enqueue(${data(i)})") }
       close("}")
 
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 }

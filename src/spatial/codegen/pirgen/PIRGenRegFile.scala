@@ -11,7 +11,7 @@ trait PIRGenRegFile extends PIRGenMemories {
     case _ => super.remap(tp)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegFileNew(_, inits) => emitBankedInitMem(lhs, inits, op.A)
     case RegFileReset(rf, en)    => emit(src"val $lhs = if ($en) $rf.reset()")
     case RegFileShiftIn(rf,data,addr,en,axis) =>
@@ -31,7 +31,7 @@ trait PIRGenRegFile extends PIRGenMemories {
         emit(src"val $lhs = if (${and(e)}) $rf.shiftIn($ctx, Seq($a), $axis, $d)")
       }
 
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
 
 }

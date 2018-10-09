@@ -3,67 +3,57 @@ package spatial.codegen.pirgen
 import argon._
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.memory._
 
 trait PIRGenReg extends PIRCodegen with PIRGenMemories {
 
-  override protected def remap(tp: Type[_]): String = tp match {
-    case tp: Reg[_] => src"Array[${tp.A}]"
-    case _ => super.remap(tp)
-  }
-
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@RegNew(init)    =>
-      emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
-      emit(src"$lhs.initMem($init)")
-
+  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@ArgInNew(init)  =>
-      emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
-      emit(src"$lhs.initMem($init)")
-
+      stateStruct(lhs, lhs.asMem.A)(name => src"ArgIn(init=$init)")
+      genAccel(lhs, rhs)
     case op@HostIONew(init)  =>
-      emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
-      emit(src"$lhs.initMem($init)")
-
+      stateStruct(lhs, lhs.asMem.A)(name => src"HostIO(init=$init)")
+      genAccel(lhs, rhs)
     case op@ArgOutNew(init) =>
-      emitMemObject(lhs){ emit(src"object $lhs extends Ptr[${op.A}](null.asInstanceOf[${op.A}])") }
-      emit(src"$lhs.initMem($init)")
-
-    case RegReset(reg, ens) =>
-      val init = reg match {case Op(RegNew(i)) => i }
-      emit(src"val $lhs = if (${and(ens)}) $reg.set($init)")
-
-    case RegRead(reg)       => emit(src"val $lhs = $reg.value")
-    case RegWrite(reg,v,en) => emit(src"val $lhs = if (${and(en)}) $reg.set($v)")
-
+      stateStruct(lhs, lhs.asMem.A)(name => src"ArgOut(init=$init)")
+      genAccel(lhs, rhs)
     case SetReg(reg, v)  => emit(src"val $lhs = $reg.set($v)")
     case GetReg(reg)     => emit(src"val $lhs = $reg.value")
+    case rhs => super.genHost(lhs, rhs)
+  }
 
-    case RegAccumOp(reg,in,en,op,first) =>
-      open(src"val $lhs = {")
-        open(src"if (${and(en)}) {")
-          val input = op match {
-            case AccumAdd => src"$reg.value + $in"
-            case AccumMul => src"$reg.value * $in"
-            case AccumMax => src"Number.max($reg.value, $in)"
-            case AccumMin => src"Number.min($reg.value, $in)"
-            case AccumFMA => throw new Exception("This shouldn't happen!")
-            case AccumUnk => throw new Exception("This shouldn't happen!")
-          }
-          emit(src"$reg.set((if ($first) $in else $input))")
-        close("}")
-        emit(src"$reg.value")
-      close("}")
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op@RegNew(init)    =>
+      stateStruct(lhs, lhs.asMem.A)(name => src"Reg(init=$init)")
 
-    case RegAccumFMA(reg,m0,m1,en,first) =>
-      open(src"val $lhs = {")
-        open(src"if (${and(en)}) {")
-          val input = src"$m0 * $m1 + $reg.value"
-          emit(src"$reg.set((if ($first) $m0*$m1 else $input))")
-        close("}")
-        emit(src"$reg.value")
-      close("}")
+    case op@ArgInNew(init)  =>
+      stateStruct(lhs, lhs.asMem.A)(name => src"ArgIn(init=$init)")
 
-    case _ => super.gen(lhs, rhs)
+    case op@HostIONew(init)  =>
+      stateStruct(lhs, lhs.asMem.A)(name => src"HostIO(init=$init)")
+
+    case op@ArgOutNew(init) =>
+      stateStruct(lhs, lhs.asMem.A)(name => src"ArgOut(init=$init)")
+
+    case RegReset(reg, ens) =>
+      stateStruct(lhs, reg)(name => src"RegReset(reg=${Lhs(reg,name)}, ens=$ens)")
+
+    case RegRead(reg)       => 
+      stateRead(lhs, reg, None, None, Seq(Set.empty))
+
+    case RegWrite(reg,v,ens) => 
+      stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
+
+    case RegAccumOp(reg,in,ens,op,first) =>
+      state(lhs) {
+        src"RegAccumOpDef(op=$op, in=$in, first=$first, ens=$ens)"
+      }
+    case RegAccumFMA(reg,m0,m1,ens,first) =>
+      state(lhs) {
+        src"RegAccumFMADef(m0=$m0, m1=$m1, first=$first, ens=$ens)"
+      }
+
+    case _ => super.genAccel(lhs, rhs)
   }
 
 }

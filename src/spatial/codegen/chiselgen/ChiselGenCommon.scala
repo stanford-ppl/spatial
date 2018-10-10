@@ -50,6 +50,15 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
+    lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach { case (cc, idx) =>
+      val c = cc.s.get
+      controllerStack.push(c)
+      body(c,idx)
+      controllerStack.pop()
+    }
+  }
+
   var argHandleMap = scala.collection.mutable.HashMap[Sym[_], String]() // Map for tracking defs of nodes and if they get redeffed anywhere, we map it to a suffix
   def argHandle(d: Sym[_]): String = {
     if (argHandleMap.contains(d)) {

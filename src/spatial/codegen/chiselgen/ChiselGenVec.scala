@@ -6,7 +6,7 @@ import argon.node._
 trait ChiselGenVec extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case VecAlloc(elems) => emitGlobalWire(src"val $lhs = Vec($elems)")
+    case VecAlloc(elems) => emit(src"val $lhs = Vec($elems)")
 
     case VecSlice(vec, start, stop) =>
       emit(src"val $lhs = Wire(${lhs.tp})")

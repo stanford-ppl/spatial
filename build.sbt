@@ -68,7 +68,9 @@ lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 
-lazy val spatial = (project in file(".")).settings(common).dependsOn(forge, emul, argon, models, poly)
+lazy val spatial = (project in file(".")).settings(
+  common ++ Seq(scalaSource in Test := baseDirectory(_/"test").value)
+).dependsOn(forge, emul, argon, models, poly)
 lazy val apps = project.settings(common).dependsOn(spatial)
 
 /** Testing Projects **/

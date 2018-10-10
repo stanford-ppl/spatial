@@ -36,18 +36,14 @@
          }
        }.sum
      }
-
-     // printArray(node1_list, "node1_list:")
-     // printArray(node2_list, "node2_list:")
      printArray(edgeLens, "edgeLens: ")
      printArray(edgeIds, "edgeIds: ")
 
-     val par_load = 1 // Do not change
-     val par_store = 1 // Do not change
-     val tile_par = 1 // Do not change
-     val page_par = 2 (1 -> 1 -> tileSize)
+     val par_load = 1
+     val par_store = 1
+     val tile_par = 1
+     val page_par = 2
 
-     // Arguments
      val itersIN = args(0).to[Int]
      val dampIN = args(1).to[X]
 

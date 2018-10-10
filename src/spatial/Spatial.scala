@@ -9,6 +9,7 @@ import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
 import spatial.codegen.dotgen._
+import spatial.codegen.resourcegen._
 
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
@@ -99,6 +100,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
+    lazy val resourceReporter = ResourceReporter(state)
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
@@ -168,6 +170,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>
+        (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen)
     }
 
@@ -210,6 +213,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("dot").action( (_,_) =>
       spatialConfig.enableDot = true
     ).text("Enable dot graph generation [false]")
+
+    cli.opt[Unit]("reporter").action( (_,_) =>
+      spatialConfig.enableResourceReporter = true
+    ).text("Enable resource reporter [false]")
 
     cli.opt[Unit]("pir").action { (_,_) =>
       spatialConfig.enablePIR = true
@@ -272,6 +279,8 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable cheap fifos where accesses must be multiples of each other and not have lane-enables")
+
+    cli.opt[Int]("sramThreshold").action { (t,_) => spatialConfig.sramThreshold = t }.text("Minimum number of elements in memory to instantiate BRAM over Registers")
 
     cli.opt[Unit]("noOptimizeReduce").action { (_,_) => 
       spatialConfig.enableOptimizedReduce = false

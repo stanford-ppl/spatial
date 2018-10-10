@@ -22,6 +22,7 @@ class AWS_F1 extends DeviceTarget {
     //      topIO.dram <> fringe.io.dram
     io.M_AXI <> fringe.io.M_AXI
     fringe.io.memStreams <> accel.io.memStreams
+    fringe.io.heap <> accel.io.heap
 
     // Accel: Scalar and control connections
     accel.io.argIns := io.scalarIns

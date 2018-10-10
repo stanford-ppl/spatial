@@ -8,10 +8,10 @@ import spatial.node._
 trait PIRGenDRAM extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMNew(dims,zero) =>
+    case op@DRAMHostNew(dims,zero) =>
       state(lhs)(s"""DRAM()""")
 
-    case GetDRAMAddress(dram) =>
+    case DRAMAddress(dram) =>
       state(lhs)(src"DRAMAddress($dram)")
 
     // Fringe templates expect byte-based addresses and sizes, while PIR gen expects word-based
@@ -57,7 +57,7 @@ trait PIRGenDRAM extends PIRCodegen {
   }
 
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMNew(dims,zero) =>
+    case op@DRAMHostNew(dims,zero) =>
       genAccel(lhs, rhs)
 
     case op@SetMem(dram, data) =>

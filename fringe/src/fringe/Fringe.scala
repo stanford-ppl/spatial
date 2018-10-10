@@ -5,9 +5,10 @@ import chisel3.util._
 import fringe.globals._
 import fringe.targets.asic.ASIC
 import fringe.targets.vcs.VCS
-import fringe.utils.Depulser
+import fringe.utils._
 import fringe.templates.axi4._
 import fringe.templates.mag.MAGCore
+import fringe.templates.heap.DRAMHeap
 import fringe.templates.counters.FringeCounter
 import fringe.templates.memory.RegFile
 
@@ -25,6 +26,13 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val burstSizeBytes = 64
   val d = 64        // FIFO depth: Controls FIFO sizes for address, size, and wdata
   val regWidth = 64 // Force 64-bit registers
+
+  class StatusReg extends Bundle {
+    val sizeAddr = UInt((regWidth - 5).W)
+    val allocDealloc = UInt(3.W)
+    val timeout = Bool()
+    val done = Bool()
+  }
 
   val axiLiteParams = new AXI4BundleParameters(64, 512, 1)
 
@@ -49,6 +57,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
+    val heap = new HeapIO(numAllocators)
 
     // AXI Debuggers
     val TOP_AXI = new AXI4Probe(axiLiteParams)
@@ -95,6 +104,10 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     mag
   }
 
+  val heap = Module(new DRAMHeap(numAllocators))
+  heap.io.accel <> io.heap
+  val hostHeapReq = heap.io.host.req(0)
+  val hostHeapResp = heap.io.host.resp(0)
 
   val numDebugs = mags(debugChannelID).numDebugs
   val numRegs = NUM_ARGS + 2 - NUM_ARG_INS + numDebugs // (command, status registers)
@@ -115,10 +128,10 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   }
   
 
-  val command = regs.io.argIns(0)                       // commandReg = first argIn
-  val curStatus = regs.io.argIns(1)                     // current status
-  val localEnable = command(0) === 1.U & !curStatus(0)  // enable = LSB of first argIn
-  val localReset = command(1) === 1.U | reset.toBool    // reset = first argIn == 2
+  val command = regs.io.argIns(0)
+  val curStatus = regs.io.argIns(1).asTypeOf(new StatusReg)
+  val localEnable = command(0) === 1.U & !curStatus.done
+  val localReset = command(1) === 1.U | reset.toBool
   io.enable := localEnable
   io.reset := localReset
   regs.io.reset := localReset
@@ -138,16 +151,21 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val depulser = Module(new Depulser())
   depulser.io.in := io.done | timeoutCtr.io.done
   depulser.io.rst := ~command
-  val status = Wire(EnqIO(UInt(regWidth.W)))
-  status.bits := Cat(command(0) & timeoutCtr.io.done, command(0) & depulser.io.out.asUInt)
-  status.valid := depulser.io.out
+
+  val status = Wire(Valid(new StatusReg))
+  status.valid := depulser.io.out | pulse(hostHeapReq.valid)
+  status.bits.done := Mux(depulser.io.out, command(0) & depulser.io.out.asUInt, curStatus.done)
+  status.bits.timeout := Mux(depulser.io.out, command(0) & timeoutCtr.io.done, curStatus.timeout)
+  status.bits.allocDealloc := Mux(hostHeapReq.valid, Mux(hostHeapReq.bits.allocDealloc, 1.U, 2.U), 0.U)
+  status.bits.sizeAddr := Mux(hostHeapReq.valid, hostHeapReq.bits.sizeAddr, 0.U)
+
   regs.io.argOuts.zipWithIndex.foreach { case (argOutReg, i) =>
     // Manually assign bits and valid, because direct assignment with :=
     // is causing issues with chisel compilation due to the 'ready' signal
     // which we do not care about
     if (i == 0) { // statusReg: First argOut
-      argOutReg.bits := status.bits
       argOutReg.valid := status.valid
+      argOutReg.bits := status.bits.asUInt
     }
     else if (i <= numArgOuts) {
       argOutReg.bits := io.argOuts(i-1).bits
@@ -182,6 +200,12 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   mags(debugChannelID).io.DWIDTH_AXI <> io.DWIDTH_AXI
   mags(debugChannelID).io.PROTOCOL_AXI <> io.PROTOCOL_AXI
   mags(debugChannelID).io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
+
+  val alloc = curStatus.allocDealloc === 3.U
+  val dealloc = curStatus.allocDealloc === 4.U
+  hostHeapResp.valid := pulse(alloc | dealloc)
+  hostHeapResp.bits.allocDealloc := alloc
+  hostHeapResp.bits.sizeAddr := curStatus.sizeAddr
 
   // io.dbg <> mags(debugChannelID).io.dbg
 

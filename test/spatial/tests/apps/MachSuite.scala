@@ -798,46 +798,52 @@ import spatial.targets._
                                                                                                            
  */
 
+  // Create struct to hold score and ptr values
   @struct case class nw_tuple(score: Int16, ptr: Int16)
-
 
   def main(args: Array[String]): Unit = {
 
-    // FSM setup
-    val traverseState = 0
-    val padBothState = 1
-    val doneState = 2
-
+    // Convert chars to 8 bit integers
     val a = 'a'.to[Int8]
     val c = 'c'.to[Int8]
     val g = 'g'.to[Int8]
     val t = 't'.to[Int8]
     val d = '-'.to[Int8]
-    val dash = ArgIn[Int8]
-    setArg(dash,d)
     val underscore = '_'.to[Int8]
+    val dash = ArgIn[Int8]
 
+    // Expose dash to FPGA so it can use this value
+    setArg(dash,d)
+
+    // Set parallelization
     val par_load = 16
     val par_store = 16
     val row_par = 2 (1 -> 1 -> 8)
 
+    // Set up semantics for algorithm values
     val SKIPB = 0
     val SKIPA = 1
     val ALIGN = 2
     val MATCH_SCORE = 1
     val MISMATCH_SCORE = -1
     val GAP_SCORE = -1 
+
+    // Extract sequences from command line
     val seqa_string = args(0) //"tcgacgaaataggatgacagcacgttctcgtattagagggccgcggtacaaaccaaatgctgcggcgtacagggcacggggcgctgttcgggagatcgggggaatcgtggcgtgggtgattcgccggc"
     val seqb_string = args(1) //"ttcgagggcgcgtgtcgcggtccatcgacatgcccggtcggtgggacgtgggcgcctgatatagaggaatgcgattggaaggtcggacgggtcggcgagttgggcccggtgaatctgccatggtcgat"
+
+    // Pass dimensions to FPGA
     val measured_length = seqa_string.length
     val length = ArgIn[Int]
     val lengthx2 = ArgIn[Int]
     setArg(length, measured_length)
     setArg(lengthx2, measured_length*2)
+
+    // Allocate maximum size so FPGA can be statically synthesized
     val max_length = 512
     assert(max_length >= length.value, "Cannot have string longer than 512 elements")
 
-    // TODO: Support c++ types with 2 bits in dram
+    // Convert strings to int arrays
     val seqa_bin = seqa_string.map{c => c.to[Int8] }
     val seqb_bin = seqb_string.map{c => c.to[Int8] }
     val seqa_dram_raw = DRAM[Int8](length)
@@ -848,20 +854,27 @@ import spatial.targets._
     setMem(seqb_dram_raw, seqb_bin)
 
     Accel{
+      // Create memories for raw data and aligned data
       val seqa_sram_raw = SRAM[Int8](max_length)
       val seqb_sram_raw = SRAM[Int8](max_length)
       val seqa_fifo_aligned = FIFO[Int8](max_length*2)
       val seqb_fifo_aligned = FIFO[Int8](max_length*2)
 
+      // Load raw data
       seqa_sram_raw load seqa_dram_raw(0::length par par_load)
       seqb_sram_raw load seqb_dram_raw(0::length par par_load)
 
+      // Allocate score matrix
       val score_matrix = SRAM[nw_tuple](max_length+1,max_length+1)
 
       // Build score matrix
       Foreach(length+1 by 1 par row_par){ r =>
+
+        // If running multiple rows in parallel, ensure a later row does not scan an element until previous row has populated it
         val this_body = r % row_par
-        Sequential.Foreach(-this_body until length+1 by 1) { c => // Bug #151, should be able to remove previous_result reg when fixed
+
+        // Compute cost for each element in row
+        Sequential.Foreach(-this_body until length+1 by 1) { c =>
           val previous_result = Reg[nw_tuple]
           val update = if (r == 0) (nw_tuple(-c.as[Int16], 0)) else if (c == 0) (nw_tuple(-r.as[Int16], 1)) else {
             val match_score = mux(seqa_sram_raw(c-1) == seqb_sram_raw(r-1), MATCH_SCORE.to[Int16], MISMATCH_SCORE.to[Int16])
@@ -871,44 +884,57 @@ import spatial.targets._
             mux(from_left >= from_top && from_left >= from_diag, nw_tuple(from_left, SKIPB), mux(from_top >= from_diag, nw_tuple(from_top,SKIPA), nw_tuple(from_diag, ALIGN)))
           }
           previous_result := update
+
+          // Predicated write to keep update in bounds
           if (c >= 0) {score_matrix(r,c) = update}
-          // score_matrix(r,c) = update
         }
       }
 
-      // Read score matrix
+      // Prepare to read score matrix
       val b_addr = Reg[Int](0)
       val a_addr = Reg[Int](0)
       Parallel{b_addr := length; a_addr := length}
       val done_backtrack = Reg[Bit](false)
+
+      // FSM state definitions
+      val traverseState = 0
+      val padBothState = 1
+      val doneState = 2
+
       FSM(0)(state => state != doneState) { state =>
         if (state == traverseState) {
+          // Take from A and B
           if (score_matrix(b_addr,a_addr).ptr == ALIGN.to[Int16]) {
             seqa_fifo_aligned.enq(seqa_sram_raw(a_addr-1), !done_backtrack)
             seqb_fifo_aligned.enq(seqb_sram_raw(b_addr-1), !done_backtrack)
             done_backtrack := b_addr == 1.to[Int] || a_addr == 1.to[Int]
             b_addr :-= 1
             a_addr :-= 1
+          // Take from B, skip A
           } else if (score_matrix(b_addr,a_addr).ptr == SKIPA.to[Int16]) {
             seqb_fifo_aligned.enq(seqb_sram_raw(b_addr-1), !done_backtrack)  
             seqa_fifo_aligned.enq(dash, !done_backtrack)          
             done_backtrack := b_addr == 1.to[Int]
             b_addr :-= 1
+          // Take from A, skip B
           } else {
             seqa_fifo_aligned.enq(seqa_sram_raw(a_addr-1), !done_backtrack)
             seqb_fifo_aligned.enq(dash, !done_backtrack)          
             done_backtrack := a_addr == 1.to[Int]
             a_addr :-= 1
           }
+        // Pad the rest of the result FIFOs
         } else if (state == padBothState) {
           seqa_fifo_aligned.enq(underscore, !seqa_fifo_aligned.isFull) // I think this FSM body either needs to be wrapped in a body or last enq needs to be masked or else we are full before FSM sees full
           seqb_fifo_aligned.enq(underscore, !seqb_fifo_aligned.isFull)
         } else {}
       } { state => 
+        // Determine next state based on a and b pointers
         mux(state == traverseState && ((b_addr == 0.to[Int]) || (a_addr == 0.to[Int])), padBothState, 
-          mux(seqa_fifo_aligned.isFull || seqb_fifo_aligned.isFull, doneState, state))// Safe to assume they fill at same time?
+          mux(seqa_fifo_aligned.isFull || seqb_fifo_aligned.isFull, doneState, state))
       }
 
+      // Store result
       Parallel{
         Sequential{seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned}
         Sequential{seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned}
@@ -916,12 +942,13 @@ import spatial.targets._
 
     }
 
+    // Inspect results
     val seqa_aligned_result = getMem(seqa_dram_aligned)
     val seqb_aligned_result = getMem(seqb_dram_aligned)
     val seqa_aligned_string = charArrayToString(seqa_aligned_result.map(_.to[U8]))
     val seqb_aligned_string = charArrayToString(seqb_aligned_result.map(_.to[U8]))
 
-    // Pass if >75% match
+    // Assume algorithm worked if >75% match
     val matches = seqa_aligned_result.zip(seqb_aligned_result){(a,b) => if ((a == b) || (a == d) || (b == d)) 1 else 0}.reduce{_+_}
     val cksum = matches.to[Float] > 0.75.to[Float]*measured_length.to[Float]*2
 

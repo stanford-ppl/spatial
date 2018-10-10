@@ -39,6 +39,7 @@ abstract class SimTarget extends DeviceTarget {
       }
     }
     fringe.io.memStreams <> accel.io.memStreams
+    fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
     accel.io.reset := fringe.io.reset

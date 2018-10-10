@@ -53,6 +53,7 @@ class FringeZynq(
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
+    val heap = new HeapIO(numAllocators)
 
     // External enable
     val externalEnable = Input(Bool()) // For AWS, enable comes in as input to top module
@@ -109,6 +110,7 @@ class FringeZynq(
   // fringeCommon.io.argIOOuts <> io.argIOOuts
 
   io.memStreams <> fringeCommon.io.memStreams
+  io.heap <> fringeCommon.io.heap
 
   // AXI bridge
   io.M_AXI.zipWithIndex.foreach { case (maxi, i) =>

@@ -26,8 +26,8 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
     case "aws-sim"   => new targets.aws.AWS_Sim
     case "zynq" | "Zynq"      => new targets.zynq.Zynq
     case "zcu"  | "ZCU"       => new targets.zcu.ZCU
-    case "arria10"   => new targets.arria10.Arria10
-    case "asic"      => new targets.asic.ASIC
+    case "arria10" | "Arria10"   => new targets.arria10.Arria10
+    case "asic" | "ASIC"     => new targets.asic.ASIC
     case _           => throw new Exception(s"Unknown target '$targetName'")
   }
 

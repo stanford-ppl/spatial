@@ -96,14 +96,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
       emitt(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(src"${swap(controllerStack.head, DatapathEn)} & ${swap(controllerStack.head, IIDone)}", lhs.fullDelay)}""")
 
-    case DRAMNew(dims, _) => 
-      drams += (lhs -> drams.toList.length)
-
-    case GetDRAMAddress(dram) =>
-      val id = argHandle(dram)
-      emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-      emit(src"""$lhs.r := io.argIns(api.${id}_ptr)""")
-
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasTileLoad
       if (cmdStream.isAligned) appPropertyStats += HasAlignedLoad
@@ -228,7 +220,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     inAccel{
       val intersect = loadsList.distinct.intersect(storesList.distinct)
 
-      val num_unusedDrams = drams.toList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
+      val num_unusedDrams = hostDrams.toList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
 
       inGen(out, "Instantiator.scala") {
         emit ("")
@@ -268,11 +260,11 @@ trait ChiselGenInterface extends ChiselGenCommon {
         emit("\n// ArgIns")
         argIns.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = $id")}
         emit("\n// DRAM Ptrs:")
-        drams.foreach {case (d, id) => emit(src"val ${argHandle(d)}_ptr = ${id+argIns.toList.length}")}
+        hostDrams.foreach {case (d, id) => emit(src"val ${argHandle(d)}_ptr = ${id+argIns.toList.length}")}
         emit("\n// ArgIOs")
-        argIOs.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+drams.toList.length}")}
+        argIOs.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+hostDrams.toList.length}")}
         emit("\n// ArgOuts")
-        argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+drams.toList.length+argIOs.toList.length}")}
+        argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+hostDrams.toList.length+argIOs.toList.length}")}
         close("}")
       }
     }

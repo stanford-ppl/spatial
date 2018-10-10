@@ -4,10 +4,10 @@ val paradise_version  = "2.1.0"
 val scalatestVersion  = "3.0.5"
 
 name := "spatial"
-organization := "edu.stanford.ppl"
 trapExit := false
 
 val common = Seq(
+  organization := "edu.stanford.ppl",
   scalaVersion := scala_version,
   version := spatial_version,
 
@@ -55,7 +55,7 @@ val common = Seq(
   addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
 
   /** Release **/
-  publishArtifact := false
+  publishArtifact := true
 )
 
 

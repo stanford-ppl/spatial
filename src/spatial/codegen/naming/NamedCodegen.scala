@@ -24,7 +24,8 @@ trait NamedCodegen extends Codegen {
 
       case _: IfThenElse[_]    => s"${s}_IfThenElse"
 
-      case DRAMNew(_,_) => s"${s}_${s.nameOr("dram")}"
+      case DRAMHostNew(_,_) => s"${s}_${s.nameOr("dramhost")}"
+      case DRAMAccelNew(_) => s"${s}_${s.nameOr("dramaccel")}"
       case ArgInNew(_)  => s"${s}_${s.nameOr("argIn")}"
       case ArgOutNew(_) => s"${s}_${s.nameOr("argOut")}"
       case RegNew(_)    => s"${s}_${s.nameOr("reg")}"

@@ -8,6 +8,7 @@ import spatial.node._
 import spatial.util.spatialConfig
 import spatial.codegen.naming.NamedCodegen
 import spatial.traversal.AccelTraversal
+import spatial.util.modeling.scrubNoise
 
 case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
   override val ext: String = "html"
@@ -36,6 +37,10 @@ case class TreeGen(IR: State) extends NamedCodegen with AccelTraversal {
     emit(s"""<TD><font size = "6">${lhs.schedule} $isFSM<font size = "4"> (${lhs.level})</font>""")
     emit(s"""<br><font size = "2">${lhs.ctx}</font>""")
     emit(s"""<br><font size = "2">$line</font>""")
+    val ii = scrubNoise(lhs.II).toInt
+    val lat = scrubNoise(lhs.bodyLatency.sum).toInt
+    val attentionII = if (ii > 1) src"<b>II=$ii</b>" else src"II=$ii"
+    if (lhs.isInnerControl) emit(s"""<p><mark style="border:1px; border-style:solid; border-color:black; padding: 1px; background: #ccc"><font size = "2">Latency=${lat},  ${attentionII}</font></mark></p>""")
     emit(s"""<br><font size = "1"><b>${lhs}${lhs._name} = $rhs</b></font>""")
     if (cchain.isDefined) emit(s"""<br><font size = "1">Counter: ${cchain.get}</font>""")
 

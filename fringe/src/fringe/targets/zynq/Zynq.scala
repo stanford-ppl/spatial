@@ -41,6 +41,7 @@ abstract class ZynqLike extends DeviceTarget {
     // }
     fringe.io.externalEnable := false.B
     fringe.io.memStreams <> accel.io.memStreams
+    fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
     fringe.reset := !reset.toBool

@@ -129,4 +129,9 @@ package object utils {
     })
   }
 
+  def pulse(in: Bool) = {
+    val r = RegNext(in, false.B)
+    in & (r ^ in)
+  }
+
 }

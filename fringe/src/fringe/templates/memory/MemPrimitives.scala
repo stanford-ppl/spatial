@@ -267,13 +267,18 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
       // Figure out which read port was active in xBar
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if i < entry._1 => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
-      val xBarCandidatesEns = xBarIds.map(io.xBarR.flatMap(_.en).toList(_))
-      val xBarCandidatesBanks = xBarIds.map(io.xBarR.flatMap(_.banks).toList.grouped(p.banks.length).toList(_))
-      val xBarCandidatesOffsets = xBarIds.map(io.xBarR.flatMap(_.ofs).toList(_))
+      val xBarCandidatesEns = xBarIds.map(io.xBarR.flatMap(_.en).toList(_)).toList
+      val xBarCandidatesFlows = xBarIds.map(io.xBarR.flatMap(_.flow).toList(_)).toList
+      val xBarCandidatesBanks = xBarIds.map(io.xBarR.flatMap(_.banks).toList.grouped(p.banks.length).toList(_)).toList
+      val xBarCandidatesOffsets = xBarIds.map(io.xBarR.flatMap(_.ofs).toList(_)).toList
       val sel = m.map{ mem =>
-        if (xBarCandidatesEns.nonEmpty) (xBarCandidatesEns, xBarCandidatesBanks, xBarCandidatesOffsets).zipped.map {case(en,banks,ofs) =>
-          banks.zip(mem._2).map{case (b, coord) => getRetimed(b, globals.target.sramload_latency) === coord.U}.reduce{_&&_} &&
-            getRetimed(en, globals.target.sramload_latency)
+        if (xBarCandidatesEns.nonEmpty) xBarCandidatesEns.size.indices{j => 
+          val en = xBarCandidatesEns(j)
+          val banks = xBarCandidatesBanks(j)
+          val ofs = xBarCandidatesOffsets(j)
+          val flow = xBarCandidatesFlows(j)
+          banks.zip(mem._2).map{case (b, coord) => getRetimed(b, globals.target.sramload_latency, flow) === coord.U}.reduce{_&&_} &&
+            getRetimed(en, globals.target.sramload_latency, flow)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -282,13 +287,18 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     } else {
       // Figure out which read port was active in direct
       val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i - p.xBarOutputs < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i - p.xBarOutputs }
-      val directCandidatesEns = directIds.map(io.directR.flatMap(_.en).toList(_))
-      val directCandidatesBanks = directIds.map(io.directR.flatMap(_.banks).toList(_))
-      val directCandidatesOffsets = directIds.map(io.directR.flatMap(_.ofs).toList(_))
+      val directCandidatesEns = directIds.map(io.directR.flatMap(_.en).toList(_)).toList
+      val directCandidatesBanks = directIds.map(io.directR.flatMap(_.banks).toList(_)).toList
+      val directCandidatesOffsets = directIds.map(io.directR.flatMap(_.ofs).toList(_)).toList
+      val directCandidatesFlows = directIds.map(io.directR.flatMap(_.flow).toList(_)).toList
       // Create bit vector to select which bank was activated by this io
       val sel = m.map{ mem =>
-        if (directCandidatesEns.nonEmpty) (directCandidatesEns, directCandidatesBanks, directCandidatesOffsets).zipped.map {case(en,banks,ofs) =>
-          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency)
+        if (directCandidatesEns.nonEmpty) directCandidatesEns.size.indices{j => 
+          val en = directCandidatesEns(j)
+          val banks = directCandidatesBanks(j)
+          val ofs = directCandidatesOffsets(j)
+          val flow = directCandidatesFlows(j)
+          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency, flow)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -765,14 +775,15 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     if (size <= globals.target.SramThreshold) {
       val m = (0 until size).map{ i =>
         val reg = RegInit(0.U(bitWidth.W))
-        reg := Mux(io.w.en.head & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
+        reg := Mux(io.w.en.head & wInBound & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
         (i.U(addrWidth.W) -> reg)
       }
       val radder = getRetimed(io.r.ofs.head,1,io.flow)
       io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.flow)
     } else {
       val m = Module(new SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
-      m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      else           m.io.raddr     := 0.U
       m.io.waddr     := io.w.ofs.head
       m.io.wen       := io.w.en.head & wInBound & io.wMask
       m.io.wdata     := io.w.data.head
@@ -794,13 +805,13 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     }
   }
 
-  if (globals.regression_testing == "1") {
-    io.debug.invalidRAddr := ~rInBound
-    io.debug.invalidWAddr := ~wInBound
-    io.debug.rwOn := io.w.en.head & io.r.en.head & io.wMask & io.rMask
-    io.debug.error := !rInBound | !wInBound | (io.w.en.head & io.r.en.head & io.wMask & io.rMask)
-    // io.debug.addrProbe := m(0.U)
-  }
+  // if (globals.regression_testing == "1") {
+  //   io.debug.invalidRAddr := ~rInBound
+  //   io.debug.invalidWAddr := ~wInBound
+  //   io.debug.rwOn := io.w.en.head & io.r.en.head & io.wMask & io.rMask
+  //   io.debug.error := !rInBound | !wInBound | (io.w.en.head & io.r.en.head & io.wMask & io.rMask)
+  //   // io.debug.addrProbe := m(0.U)
+  // }
 }
 
 

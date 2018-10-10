@@ -32,7 +32,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent
-          val invEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+          val invEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
           emit(src"${dram}.io.appReq($id).valid := $invEnable")
           emit(src"${dram}.io.appReq($id).bits.allocDealloc := true.B")
           val d = dims.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
@@ -55,7 +55,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent
-          val invEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
+          val invEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
           emit(src"${dram}.io.appReq($id).valid := $invEnable")
           emit(src"${dram}.io.appReq($id).bits.allocDealloc := false.B")
           requesters += (lhs -> id)

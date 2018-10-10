@@ -159,27 +159,15 @@ trait ChiselGenMath extends ChiselGenCommon {
         case None => "4096"
       }
       emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
-      emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
+      emit(src"val ${lhs}_rng = Module(new PRNG($seed))")
       val en = if (lhs.parent.s.isDefined) src"${lhs.parent.s.get}.datapathEn" else "true.B"
-      emitGlobalModule(src"${lhs}_rng.io.en := $en")
+      emit(src"${lhs}_rng.io.en := $en")
       emit(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     case FltRandom(None) if lhs.parent.s.isDefined => 
       val FltPtType(m,e) = lhs.tp
       emit(src"val $lhs = Wire(${lhs.tp})")
       emit(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, ${lhs.parent.s.get}.datapathEn).r")
     case FltRandom(x) => throw new Exception(s"Can only generate random float with no bounds right now!")
-      // emit(src"val $lhs = Wire(${lhs.tp})")
-      // val seed = (scala.math.random*1000).toInt
-      // val size = x match{
-      //   case Some(Const(xx)) => s"$xx"
-      //   case Some(_) => s"$x"
-      //   case None => "4096"
-      // }
-      // emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
-      // emitGlobalModule(src"val ${lhs}_rng = Module(new PRNG($seed))")
-      // val en = if (lhs.parent.s.isDefined) src"${lhs.parent.s.get}.datapathEn" else "true.B"
-      // emitGlobalModule(src"${lhs}_rng.io.en := $en")
-      // emit(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
 
     case FixAbs(x) =>
       emit(src"val $lhs = Wire(${lhs.tp})")

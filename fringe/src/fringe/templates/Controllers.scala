@@ -48,13 +48,13 @@ case class ControlParams(
   val stateWidth: Int = 32, 
   val cases: Int = 1, 
   val latency: Int = 0,
-  val name: String = "Controller"
+  val myName: String = "Controller"
 ){}
 
-abstract class GeneralControl(p: ControlParams) extends Module {
+abstract class GeneralControl(val p: ControlParams) extends Module {
   val io = IO(new ControlInterface(p))
 
-  override def desiredName = p.name
+  override def desiredName = p.myName
 }
 
 sealed trait Sched
@@ -65,7 +65,7 @@ object Fork extends Sched // Fork extends Sched { override def toString = "Fork"
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
 class OuterControl(p: ControlParams) extends GeneralControl(p) {
-  def this(sched: Sched, depth: Int, isFSM: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, name: String = "OuterControl") = this(ControlParams(sched, depth, isFSM, false, stateWidth, cases, latency, name))
+  def this(sched: Sched, depth: Int, isFSM: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "OuterControl") = this(ControlParams(sched, depth, isFSM, false, stateWidth, cases, latency, myName))
   def this(tup: (Sched, Int, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
 
   // Create SRFF arrays for stages' actives and dones
@@ -240,7 +240,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
 
 class InnerControl(p: ControlParams) extends GeneralControl(p) {
-  def this(sched: Sched, isFSM: Boolean = false, isPassthrough: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, name: String = "InnerControl") = this(ControlParams(sched, cases, isFSM, isPassthrough, stateWidth, cases, latency, name))
+  def this(sched: Sched, isFSM: Boolean = false, isPassthrough: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "InnerControl") = this(ControlParams(sched, cases, isFSM, isPassthrough, stateWidth, cases, latency, myName))
   def this(tup: (Sched, Boolean, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
 
   // Create state SRFFs

@@ -22,22 +22,26 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case HostIONew(init)  => 
       inAccel{
         inGen(out, "ArgInterface.scala") {
-          forceEmit(src"val ${swap(lhs, DataOptions)} = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
-          forceEmit(src"val ${swap(lhs, EnOptions)} = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
-          argIOs += (lhs -> argIOs.toList.length)
+          forceEmit(src"object ${lhs} {")
+          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
+          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
+          forceEmit(src"}")
         }
-        forceEmit(src"""top.io.argOuts(${argIOs(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""")
-        forceEmit(src"""top.io.argOuts(${argIOs(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""")
+        argIOs += (lhs -> argIOs.toList.length)
+        forceEmit(src"""top.io.argOuts(${argIOs(lhs)}).bits := chisel3.util.Mux1H(${lhs}.en_options, ${lhs}.data_options)""")
+        forceEmit(src"""top.io.argOuts(${argIOs(lhs)}).valid := ${lhs}.en_options.reduce{_|_}""")
       }
     case ArgOutNew(init) => 
       inAccel{
         inGen(out, "ArgInterface.scala") {
-          forceEmit(src"val ${swap(lhs, DataOptions)} = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
-          forceEmit(src"val ${swap(lhs, EnOptions)} = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
-          argOuts += (lhs -> argOuts.toList.length)
+          forceEmit(src"object ${lhs} {")
+          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
+          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
+          forceEmit(src"}")
         }
-        forceEmit(src"""top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).bits := chisel3.util.Mux1H(${swap(lhs, EnOptions)}, ${swap(lhs, DataOptions)}) // ${lhs.name.getOrElse("")}""")
-        forceEmit(src"""top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).valid := ${swap(lhs, EnOptions)}.reduce{_|_}""")
+        argOuts += (lhs -> argOuts.toList.length)
+        forceEmit(src"""top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).bits := chisel3.util.Mux1H(${lhs}.en_options, ${lhs}.data_options)""")
+        forceEmit(src"""top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).valid := ${lhs}.en_options.reduce{_|_}""")
       }
 
     // case GetReg(reg) if (reg.isArgOut) =>
@@ -74,18 +78,18 @@ trait ChiselGenInterface extends ChiselGenCommon {
           if (s) {
             val pad = 64 - d - f
             if (pad > 0) {
-              emit(src"""${swap(reg, DataOptions)}($id) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+              emit(src"""${reg}.data_options($id) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
             } else {
-              emit(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
+              emit(src"""${reg}.data_options($id) := ${v}.r""")
             }
           } else {
-            emit(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
+            emit(src"""${reg}.data_options($id) := ${v}.r""")
           }
         case _ =>
-          emit(src"""${swap(reg, DataOptions)}($id) := ${v}.r""")
+          emit(src"""${reg}.data_options($id) := ${v}.r""")
       }
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emit(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(src"${controllerStack.head}.datapathEn & ${controllerStack.head}.iiDone", lhs.fullDelay)}""")
+      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${controllerStack.head}.datapathEn & ${controllerStack.head}.iiDone", lhs.fullDelay)}""")
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
       val id = lhs.port.muxPort
@@ -95,10 +99,10 @@ trait ChiselGenInterface extends ChiselGenCommon {
           src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
         case _ => src"$v.r"
       }
-      emit(src"""${swap(reg, DataOptions)}($id) := $padded""")
+      emit(src"""${reg}.data_options($id) := $padded""")
 
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emit(src"""${swap(reg, EnOptions)}($id) := ${enStr} & ${DL(src"${controllerStack.head}.datapathEn & ${controllerStack.head}.iiDone", lhs.fullDelay)}""")
+      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${controllerStack.head}.datapathEn & ${controllerStack.head}.iiDone", lhs.fullDelay)}""")
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasTileLoad

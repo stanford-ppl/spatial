@@ -60,17 +60,6 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-
-
-  protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
-    lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach { case (cc, idx) =>
-      val c = cc.s.get
-      controllerStack.push(c)
-      body(c,idx)
-      controllerStack.pop()
-    }
-  }
-
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
@@ -148,9 +137,11 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.isOuterControl && lhs.children.size > 1) {
         emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.size}, ${w}))""")
         emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
-        forEachChild(lhs){case (c, i) if (i > 0) => 
-          emit(src"""${iter}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
-          emit(src"""val ${iter}_chain_read_$i = ${iter}_chain.read($i).FP(true,${w},0)""")
+        forEachChild(lhs){case (c, i) => 
+          if (i > 0) {
+            emit(src"""${iter}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
+            emit(src"""val ${iter}_chain_read_$i = ${iter}_chain.read($i).FP(true,${w},0)""")
+          }
         }
       }
     }
@@ -159,11 +150,31 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.isOuterControl && lhs.children.size > 1) {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.size}, 1))""")
         emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
-        forEachChild(lhs){case (c, i) if (i > 0) => 
-          emit(src"""${v}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
-          emit(src"""val ${v}_chain_read_$i: Bool = ${v}_chain.read($i).apply(0)""")
+        forEachChild(lhs){case (c, i) => 
+          if (i > 0) {
+            emit(src"""${v}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
+            emit(src"""val ${v}_chain_read_$i: Bool = ${v}_chain.read($i).apply(0)""")
+          }
         }
       }
+    }
+  }
+
+  final private def emitItersAndValidsStream(lhs: Sym[_]) = {
+    val cchain = lhs.cchains.head
+    val iters = lhs.toScope.iters
+    val valids = lhs.toScope.valids
+    val Op(CounterChainNew(counters)) = cchain
+    forEachChild(lhs){case (c, i) => 
+      iters.zipWithIndex.foreach{ case (iter, id) =>
+        val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
+        val w = bitWidth(counters(i).typeArgs.head)
+        emit(src"val ${iter}_copy$c = ${cchain}_copy$c.cchain.io.output.counts($id).FP(true, $w, 0)")
+      }
+      valids.zipWithIndex.foreach{ case (v,id) => 
+        emit(src"val ${v}_copy$c = ~${cchain}_copy$c.cchain.io.output.oobs($id)")
+      }
+
     }
   }
 
@@ -270,7 +281,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit("top: AccelTop")
         closeopen(src"): $ret = {")
           // Wire signals to SM object
-          if (!lhs.isOuterStreamLoop) {
+          if (!lhs.isOuterStreamControl) {
             if (lhs.cchains.nonEmpty && !lhs.cchains.head.isForever) {
               emitItersAndValids(lhs)
               val ctr = lhs.cchains.head
@@ -289,7 +300,20 @@ trait ChiselGenController extends ChiselGenCommon {
             } else {
               emit(src"""${lhs}.sm.io.ctrDone := risingEdge(${lhs}.sm.io.ctrInc)""")
             }
+          }
+          else {
+            if (lhs.isOuterStreamLoop) emitItersAndValidsStream(lhs)
+            forEachChild(lhs){case (c, idx) =>
+              if (lhs.isOuterStreamLoop) {
+                val ctr = lhs.cchains.head
+                emit(src"""${ctr}_copy${c}.en := ${c}.done""")
+                emit(src"""${ctr}_copy${c}.reset := ${DLo(src"${lhs}.sm.io.ctrRst", 1, true)}""")
+                emit(src"""${lhs}.sm.io.ctrCopyDone(${idx}) := ${c}.done""")
+              } else if (lhs.isOuterStreamControl) {
+                emit(src"""${lhs}.sm.io.ctrCopyDone(${idx}) := ${c}.done""")
+              }
 
+            }
           }
           contents
         close(s"}")
@@ -324,7 +348,6 @@ trait ChiselGenController extends ChiselGenCommon {
       emit(src"datapathEn := parent.get._1.datapathEn")
       emit("super.configure()")
     close("}")
-
   }
 
   private def createSMObject(lhs:Sym[_], isFSM: Boolean): Unit = {
@@ -368,6 +391,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit(src"val parent = ${parentAndSlot(lhs)}")
       if (lhs.isSwitch) emitSwitchAddition(lhs)
     }
+
     emit(src"${lhs}.en := ${lhs}.baseEn & top.rr & ${getForwardPressure(lhs.toCtrl)}")
     emit(src"${lhs}.flow := ${getBackPressure(lhs.toCtrl)}")
     emit(src"${lhs}.configure()")

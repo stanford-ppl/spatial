@@ -26,7 +26,13 @@ trait ChiselGenCounter extends ChiselGenCommon {
     }
   }
 
-  private def createCChain(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
+  private def createStreamCChain(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
+    forEachChild(lhs.owner){case (c,i) => 
+      createCChain(lhs, ctrs, src"_copy${c}")
+    }
+  }
+
+  private def createCChain(lhs: Sym[_], ctrs: Seq[Sym[_]], suffix: String = ""): Unit = {
     var isForever = lhs.isForever
     val counter_data = ctrs.map{
       case c@Op(CounterNew(start, end, step, par)) => 
@@ -63,16 +69,16 @@ trait ChiselGenCounter extends ChiselGenCommon {
       emit(src"""lazy val starts = List(${counter_data.map{_._1}}) """)
       emit(src"""val cchain = Module(new CounterChain(List(${counter_data.map(_._4)}), """ + 
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
-                       src"""List(${counter_data.map(_._8)}), List(${ctrs.map(c => bitWidth(c.tp.typeArgs.head))}), myName = "${lhs}_cchain"))""")
+                       src"""List(${counter_data.map(_._8)}), List(${ctrs.map(c => bitWidth(c.tp.typeArgs.head))}), myName = "${lhs}${suffix}_cchain"))""")
 
       emit(src"""cchain.io.input.isStream := ${streamCopyWatchlist.contains(lhs)}.B""")
     }
-    emit(src"${lhs}.configure()")
+    emit(src"${lhs}${suffix}.configure()")
 
   }
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case CounterNew(start,end,step,par) => 
-    case CounterChainNew(ctrs) => createCChain(lhs,ctrs)
+    case CounterChainNew(ctrs) => if (lhs.owner.isOuterStreamLoop) createStreamCChain(lhs,ctrs) else createCChain(lhs,ctrs)
     case ForeverNew() => 
       emit("// $lhs = Forever")
 

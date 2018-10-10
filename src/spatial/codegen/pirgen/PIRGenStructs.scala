@@ -12,10 +12,13 @@ trait PIRGenStructs extends PIRCodegen {
     case e: StructAlloc[_] => 
       val elems = e.elems.toMap
       stateStruct(lhs, lhs.tp) { name => elems(name.get) }
+
     //case FieldUpdate(struct, field, value) => 
       //state(lhs, tp=Some("Unit"))(src"""$struct("$field") = $value""")
+      
     case FieldApply(struct, field)         => 
       alias(lhs)(Lhs(struct, Some(field)))
+
     case _ => super.genAccel(lhs, rhs)
   }
 

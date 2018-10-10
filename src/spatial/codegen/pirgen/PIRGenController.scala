@@ -10,14 +10,14 @@ import spatial.node._
 
 trait PIRGenController extends PIRCodegen {
 
-  override protected def quoteOrRemap(arg: Any): String = arg match {
-    case x:CtrlLevel => x.toString
-    case x:CtrlSchedule => x.toString
-    case _ => super.quoteOrRemap(arg)
-  }
-
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case AccelScope(func) => inAccel { gen(lhs, rhs) }
+    case AccelScope(func) => 
+      emit("runAccel()")
+      openAccel {
+        inAccel { 
+          gen(lhs, rhs)
+        }
+      }
 
     case _ => super.genHost(lhs, rhs)
   }
@@ -40,10 +40,8 @@ trait PIRGenController extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
-      inGen(out, "AccelMain.scala") {
-        emitController(lhs, None, Set())
-        ret(func)
-      }
+      emitController(lhs, None, Set())
+      ret(func)
 
     case UnitPipe(ens, func) =>
       emitController(lhs, None, ens)

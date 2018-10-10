@@ -9,13 +9,6 @@ import scala.collection.mutable
 
 trait PIRSplitGen extends PIRCodegen {
 
-  override def emitHeader(): Unit = {
-    super.emitHeader
-    emit(s"val nameSpace = scala.collection.mutable.Map[String,Any]()")
-    emit(s"def lookup[T](name:String) = nameSpace(name).asInstanceOf[T]")
-    emit(s"def save[T](name:String, x:T) = { nameSpace(name) = x; x }")
-  }
-
   private var splitting = false
   private var lineCount = 0
 
@@ -49,13 +42,20 @@ trait PIRSplitGen extends PIRCodegen {
     emit(s"}; split${splitCount}")
   }
 
-  override protected def emitEntry(block: Block[_]): Unit = {
+  override def emitAccelHeader = {
+    super.emitAccelHeader
+    emit(s"val nameSpace = scala.collection.mutable.Map[String,Any]()")
+    emit(s"def lookup[T](name:String) = nameSpace(name).asInstanceOf[T]")
+    emit(s"def save[T](name:String, x:T) = { nameSpace(name) = x; x }")
     splitting = true
     splitCount = 0
     splitStart
-    super.emitEntry(block)
+  }
+
+  override def emitAccelFooter = { 
     splitEnd
     splitting = false
+    super.emitAccelFooter
   }
 
   override protected def quoteOrRemap(arg: Any): String = arg match {

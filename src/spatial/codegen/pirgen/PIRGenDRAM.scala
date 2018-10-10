@@ -9,7 +9,7 @@ trait PIRGenDRAM extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMNew(dims,zero) =>
-      state(lhs, tp=Some("DRAM"))(s"""drams("${quote(lhs)}")""")
+      state(lhs)(s"""DRAM()""")
 
     case GetDRAMAddress(dram) =>
       state(lhs)(src"DRAMAddress($dram)")
@@ -58,7 +58,6 @@ trait PIRGenDRAM extends PIRCodegen {
 
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMNew(dims,zero) =>
-      state(lhs)(src"DRAM(dims=$dims, zeros=$zero)")
       genAccel(lhs, rhs)
 
     case op@SetMem(dram, data) =>

@@ -4,7 +4,7 @@ import argon._
 import argon.node._
 import spatial.lang._
 
-trait PIRGenVec extends PIRGenBits with PIRGenText {
+trait PIRGenVec extends PIRCodegen {
 
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case VecAlloc(elems)     => emit(src"val $lhs = Array($elems)")

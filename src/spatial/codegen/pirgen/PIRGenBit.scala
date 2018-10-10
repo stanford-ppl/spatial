@@ -6,26 +6,10 @@ import spatial.lang._
 
 import emul.Bool
 
-trait PIRGenBit extends PIRGenBits {
-
-  override protected def remap(tp: Type[_]): String = tp match {
-    case _:Bit => "Bool"
-    case _ => super.remap(tp)
-  }
-
-  override protected def quoteConst(tp: Type[_], c: Any): String = (tp, c) match {
-    case (_:Bit, c:Bool) => s"Bool(${c.value},${c.valid})"
-    case _ => super.quoteConst(tp,c)
-  }
-
-  override def invalid(tp: Type[_]): String = tp match {
-    case _:Bit => "Bool(false,false)"
-    case _ => super.invalid(tp)
-  }
-
+trait PIRGenBit extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case Not(x)    => emit(src"val $lhs = !$x")
+    case Not(x)    => genOp(lhs, rhs)
     case And(x,y)  => emit(src"val $lhs = $x && $y")
     case Or(x,y)   => emit(src"val $lhs = $x || $y")
     case Xor(x,y)  => emit(src"val $lhs = $x !== $y")

@@ -9,8 +9,10 @@ import spatial.util.spatialConfig
 
 import scala.collection.mutable
 import spatial.traversal.AccelTraversal
+import spatial.codegen.scalagen.ScalaCodegen
+import scala.language.reflectiveCalls
 
-trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with PIRFormatGen with PIRGenHelper {
+trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with PIRFormatGen with PIRGenHelper { self =>
   override val lang: String = "pir"
   override val ext: String = "scala"
   backend = "accel"
@@ -19,25 +21,61 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   private var globalBlockID: Int = 0
 
-  override def emitHeader(): Unit = {
-    inGen(out, "AccelMain.scala") {
-      emit("import pir._")
-      emit("import pir.node._")
-      emit("import arch._")
-      emit("import prism.enums._")
-      emit("")
-      open(s"""object ${spatialConfig.name} extends PIRApp {""")
-    }
-    super.emitHeader()
+  override def entryFile: String = s"Main.$ext"
+
+  val hostGen = new spatial.codegen.scalagen.ScalaGenSpatial(IR) {
+    override protected def gen(block: Block[_], withReturn: Boolean = false): Unit = self.gen(block, withReturn)
+    def genHost(lhs: Sym[_], rhs: Op[_]): Unit = gen(lhs, rhs)
   }
 
-  override def emitFooter():Unit = {
-    inGen(out, "AccelMain.scala") {
-      emit(s"")
-      close("}")
-    }
+  final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genAccel(lhs, rhs) else genHost(lhs, rhs)
 
+  val hostFile = "HostMain.scala"
+  val accelFile = "AccelMain.scala"
+
+  def openHost(blk: => Unit) = inGen(out, hostFile)(blk)
+
+  def openAccel(blk: => Unit) = inGen(out, accelFile)(blk)
+
+  final override def emitHeader(): Unit = {
+    super.emitHeader()
+    openHost { emitHostHeader }
+    openAccel { emitAccelHeader }
+    emit(s"object ${spatialConfig.name} extends Host with Accel")
+  }
+
+  final override def emitFooter():Unit = {
+    openHost { emitHostFooter }
+    openAccel { emitAccelFooter }
     super.emitFooter()
+  }
+
+  def emitHostHeader = {
+    hostGen.emitHeader
+    open(src"object HostMain {")
+      open(src"def main(args: Array[String]): Unit = {")
+  }
+
+  def emitHostFooter = {
+      close(s"""}""")
+      hostGen.emitHelp
+    close(s"""}""")
+    hostGen.emitFooter
+  }
+
+  def emitAccelHeader = {
+    emit("import pir._")
+    emit("import pir.node._")
+    emit("import arch._")
+    emit("import prism.enums._")
+    emit("")
+    open(s"""trait Accel extends PIRApp {""")
+    open(src"def accel(top:Controller): Unit = {")
+  }
+
+  def emitAccelFooter = {
+    close("}")
+    close("}")
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"Const($c)"
@@ -56,11 +94,10 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case x => x.toString
   }
 
-  final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genHost(lhs, rhs) else genAccel(lhs, rhs)
-
   protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
-    emit(s"// $lhs = $rhs TODO: Unmatched Node")
-    rhs.blocks.foreach(ret)
+    //emit(s"// $lhs = $rhs TODO: Unmatched Node")
+    //rhs.blocks.foreach(ret)
+    hostGen.genHost(lhs, rhs)
   }
 
   protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {
@@ -68,17 +105,10 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     rhs.blocks.foreach(ret)
   }
 
-  def emitPreMain(): Unit = { }
-  def emitPostMain(): Unit = { }
-
   override protected def emitEntry(block: Block[_]): Unit = {
-    open(src"object Host {")
-      open(src"def main(args: Array[String]): Unit = {")
-        emitPreMain()
-        gen(block)
-        emitPostMain()
-      close(src"}")
-    close(src"}")
+    openHost {
+      gen(block)
+    }
   }
 
 }

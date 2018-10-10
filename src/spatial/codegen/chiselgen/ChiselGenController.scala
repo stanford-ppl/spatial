@@ -134,7 +134,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
       val w = bitWidth(counters(i).typeArgs.head)
       emit(src"val $iter = ${cchain}.cchain.io.output.counts($id).FP(true, $w, 0)")
-      if (lhs.isOuterControl && lhs.children.size > 1) {
+      if (lhs.isOuterPipeLoop && lhs.children.size > 1) {
         emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.size}, ${w}))""")
         emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
@@ -147,7 +147,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
     valids.zipWithIndex.foreach{ case (v,id) => 
       emit(src"val $v = ~${cchain}.cchain.io.output.oobs($id)")
-      if (lhs.isOuterControl && lhs.children.size > 1) {
+      if (lhs.isOuterPipeLoop && lhs.children.size > 1) {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.size}, 1))""")
         emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
@@ -238,7 +238,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val isInner = lhs.isInnerControl
 
     dbgs(s"${stm(lhs)}")
-    val chainPassedInputs = inputs.map{case x if (x.isBound && getSlot(lhs) > 0) => src"${x}_chain_read_${getSlot(lhs)}"; case x => src"$x" }
+    val chainPassedInputs = inputs.map{case x if (x.isBound && getSlot(lhs) > 0 && lhs.isOuterPipeLoop) => src"${x}_chain_read_${getSlot(lhs)}"; case x => src"$x" }
     inputs.foreach{in => dbgs(s" - ${stm(in)}") }
     chainPassedInputs.foreach{in => dbgs(s" - ${in}") }
 

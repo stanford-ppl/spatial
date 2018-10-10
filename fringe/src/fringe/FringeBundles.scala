@@ -1,7 +1,7 @@
 package fringe
 
 import chisel3._
-import chisel3.util.Decoupled
+import chisel3.util._
 import fringe.utils._
 
 /**
@@ -178,6 +178,23 @@ class DebugSignals extends Bundle {
   val wdata_deq1_1 = Output(UInt(32.W))
   val wdata_deq1_15 = Output(UInt(32.W))
 
+}
+
+class HeapReq extends Bundle {
+  val allocDealloc = Bool()
+  val sizeAddr = UInt(64.W)
+}
+
+class HeapResp extends Bundle {
+  val allocDealloc = Bool()
+  val sizeAddr = UInt(64.W)
+}
+
+class HeapIO(numAlloc: Int) extends Bundle {
+  val req = Vec(numAlloc, Flipped(Valid(new HeapReq)))
+  val resp = Vec(numAlloc, Valid(new HeapResp))
+
+  override def cloneType(): this.type = new HeapIO(numAlloc).asInstanceOf[this.type]
 }
 
 //class StreamOutAccel(p: StreamParInfo) extends Bundle {

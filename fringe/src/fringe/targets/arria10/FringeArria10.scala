@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import fringe.globals._
 import fringe.templates.axi4._
-import fringe.{Fringe, StreamParInfo, AppStreams}
+import fringe.{Fringe, StreamParInfo, AppStreams, HeapIO}
 import fringe.utils.log2Up
 
 /** Top module for Arria 10 FPGA shell
@@ -46,7 +46,8 @@ class FringeArria10 (
     val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(w.W)))
 
     // Accel memory IO
-    val memStreams = new AppStreams(loadStreamInfo, storeStreamInfo)
+    val heap = new HeapIO(numAllocators)
+    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
     // TODO: need to add memory stream support
 
     // External enable
@@ -87,6 +88,7 @@ class FringeArria10 (
 
   // Memory interface
   io.memStreams <> fringeCommon.io.memStreams
+  io.heap <> fringeCommon.io.heap
 
   // AXI bridge
   io.M_AXI.zipWithIndex.foreach { case (maxi, i) =>

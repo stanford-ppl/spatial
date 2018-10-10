@@ -87,14 +87,14 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
     case op: MemDenseAlias[_,_,_]    if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
     case op: MemSparseAlias[_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
 
-    case op @ GetDRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
+    case op @ DRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
       implicit val ba: Bits[_] = op.A
-      val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]])) }
+      val addrs = mems.map{mem => stage(DRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]])) }
       oneHotMux(conds, addrs)
 
-    case op @ GetDRAMAddress(Op(MemSparseAlias(F(conds), F(mems), F(ranges), F(size)))) =>
+    case op @ DRAMAddress(Op(MemSparseAlias(F(conds), F(mems), F(ranges), F(size)))) =>
       implicit val ba: Bits[_] = op.A
-      val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]]))}
+      val addrs = mems.map{mem => stage(DRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]]))}
       oneHotMux(conds, addrs)
 
 

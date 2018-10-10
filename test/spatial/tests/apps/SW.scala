@@ -41,11 +41,6 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
 
-    // FSM setup
-    val traverseState = 0
-    val padBothState = 1
-    val doneState = 2
-
     val a = 'a'.to[Int8]
     val c = 'c'.to[Int8]
     val g = 'g'.to[Int8]
@@ -114,12 +109,14 @@ import spatial.dsl._
           previous_result := update
           if ((c == length.value | r == length.value) && possible_entry_point.score < update.score) possible_entry_point := entry_tuple(r, c, update.score)
           if (c >= 0) {score_matrix(r,c) = sw_tuple(max(0, update.score),update.ptr)}
-          // score_matrix(r,c) = update
         }
         possible_entry_point
       }{(a,b) => mux(a.score > b.score, a, b)}
 
-      // Read score matrix
+      val traverseState = 0
+      val padBothState = 1
+      val doneState = 2
+
       val b_addr = Reg[Int](0)
       val a_addr = Reg[Int](0)
       Parallel{b_addr := entry_point.row; a_addr := entry_point.col}

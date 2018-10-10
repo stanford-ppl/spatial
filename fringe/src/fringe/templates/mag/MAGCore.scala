@@ -37,7 +37,6 @@ class MAGCore(
   val axiParams: AXI4BundleParameters,
   val isDebugChannel: Boolean = false
 ) extends Module {
-  Console.println(s"making magcore with $w and $v")
 
   val numRdataDebug = 0
   val numRdataWordsDebug = 16
@@ -137,7 +136,7 @@ class MAGCore(
   cmdArbiter.io.config := cmdFifoConfig
   cmdArbiter.io.forceTag.valid := false.B
 
-  connectDbgSig(debugFF(chisel3.util.Cat(0x7F.U(32.W), io.app.loads.head.cmd.bits.addr(31,0)), io.app.loads.head.cmd.valid ).io.out, "Last load addr issued from app")  
+  connectDbgSig(debugFF(chisel3.util.Cat(0x7F.U(32.W), io.app.loads.head.cmd.bits.addr(31,0)), io.app.loads.head.cmd.valid ).io.out, "[ACCEL] Last load addr enqueued")  
 
   val sizeCounter = Module(new FringeCounter(sizeWidth)) // Must be able to capture any size command
   val cmds = io.app.loads.map { _.cmd } ++ io.app.stores.map {_.cmd }
@@ -219,12 +218,12 @@ class MAGCore(
     i.bits.size := size.burstTag + (size.burstOffset != 0.U)
     i.bits.isWr := cmdHead.isWr
     if (id < loadStreamInfo.length && id == 0) {
-      connectDbgSig(debugFF(dramCmdMux.io.out.bits.tag.streamId, dramCmdMux.io.out.valid & !dramCmdMux.io.out.bits.isWr ).io.out, "Last load streamId (tag) sent")
-      connectDbgSig(debugFF(dramCmdMux.io.out.bits.addr, dramCmdMux.io.out.valid & !dramCmdMux.io.out.bits.isWr ).io.out, "Last load addr sent")
-      connectDbgSig(debugFF(dramCmdMux.io.out.bits.size, dramCmdMux.io.out.valid & !dramCmdMux.io.out.bits.isWr ).io.out, "Last load size sent")
+      connectDbgSig(debugFF(dramCmdMux.io.out.bits.tag.streamId, dramCmdMux.io.out.valid & !dramCmdMux.io.out.bits.isWr ).io.out, "[FRINGE] Last load streamId (tag) sent")
+      connectDbgSig(debugFF(dramCmdMux.io.out.bits.addr, dramCmdMux.io.out.valid & !dramCmdMux.io.out.bits.isWr ).io.out, "[FRINGE] Last load addr sent")
+      connectDbgSig(debugFF(dramCmdMux.io.out.bits.size, dramCmdMux.io.out.valid & !dramCmdMux.io.out.bits.isWr ).io.out, "[FRINGE] Last load size sent")
     } else if (id == loadStreamInfo.length) {
-      connectDbgSig(debugFF(cmdArbiter.io.tag, cmdWrite ).io.out, "Last store streamId (tag) sent")
-      connectDbgSig(debugFF(cmdHead.size, cmdWrite ).io.out, "Last store size sent")
+      connectDbgSig(debugFF(cmdArbiter.io.tag, cmdWrite ).io.out, "[FRINGE] Last store streamId (tag) sent")
+      connectDbgSig(debugFF(cmdHead.size, cmdWrite ).io.out, "[FRINGE] Last store size sent")
     }
 
   }
@@ -247,8 +246,8 @@ class MAGCore(
 
   val gatherLoadSkip = debugCounter(gatherLoadSkipMux.io.out)
   if (sparseLoads.size > 0) {
-    connectDbgSig(gatherLoadIssue.io.out, "Gather load issue")
-    connectDbgSig(gatherLoadSkip.io.out, "Gather load skip")
+    connectDbgSig(gatherLoadIssue.io.out, "[FRINGE] Gather load issue")
+    connectDbgSig(gatherLoadSkip.io.out, "[FRINGE] Gather load skip")
   }
 
   val scatterLoadIssueMux = Module(new MuxN(Bool(), numStreams))
@@ -272,10 +271,10 @@ class MAGCore(
   val scatterStoreSkip = debugCounter(scatterStoreSkipMux.io.out)
 
   if (sparseStores.size > 0) {
-    connectDbgSig(scatterLoadSkip.io.out, "Scatter load skip")
-    connectDbgSig(scatterStoreIssue.io.out, "Scatter store issue")
-    connectDbgSig(scatterLoadIssue.io.out, "Scatter load issue")
-    connectDbgSig(scatterStoreSkip.io.out, "Scatter store skip")
+    connectDbgSig(scatterLoadSkip.io.out, "[FRINGE] Scatter load skip")
+    connectDbgSig(scatterStoreIssue.io.out, "[FRINGE] Scatter store issue")
+    connectDbgSig(scatterLoadIssue.io.out, "[FRINGE] Scatter load issue")
+    connectDbgSig(scatterStoreSkip.io.out, "[FRINGE] Scatter store skip")
   }
 
   val gatherBuffers = sparseLoads.map { case (s, i) =>
@@ -326,12 +325,12 @@ class MAGCore(
     stream.rdata.valid := ~m.io.empty
     m.io.deqVld := stream.rdata.ready
 
-    connectDbgSig(debugCounter(m.io.enqVld).io.out, s"rdataFifo $i # enqs")
-    connectDbgSig(debugCounter(!m.io.empty).io.out, s"rdataFifo $i # cycles ~empty (= data valid)")
-    connectDbgSig(debugCounter(stream.rdata.ready).io.out, s"load stream $i # cycles ready")
-    connectDbgSig(debugCounter(!m.io.empty && stream.rdata.ready).io.out, s"load stream $i # handshakes")
+    connectDbgSig(debugCounter(m.io.enqVld).io.out, s"[FRINGE DENSELD] rdataFifo $i # enqs")
+    connectDbgSig(debugCounter(!m.io.empty).io.out, s"[FRINGE DENSELD] rdataFifo $i # cycles ~empty (= data valid)")
+    connectDbgSig(debugCounter(stream.rdata.ready).io.out, s"[FRINGE DENSELD] load stream $i # cycles ready")
+    connectDbgSig(debugCounter(!m.io.empty && stream.rdata.ready).io.out, s"[FRINGE DENSELD] load stream $i # handshakes")
 
-    connectDbgSig(debugCounter(m.io.empty & m.io.deqVld).io.out, s"number of bad elements (IF =!= 0, LOOK HERE FOR BUGS)")
+    connectDbgSig(debugCounter(m.io.empty & m.io.deqVld).io.out, s"[FRINGE DENSELD] number of bad elements (IF =!= 0, LOOK HERE FOR BUGS)")
 
     val sDeq_latch = Module(new SRFF())
     sDeq_latch.io.input.set := m.io.deqVld
@@ -344,8 +343,8 @@ class MAGCore(
     sEnq_latch.io.input.asyn_reset := reset.toBool | io.reset
 
 
-    connectDbgSig(debugFF(m.io.deq, !sDeq_latch.io.output.data & risingEdge(m.io.deqVld)).io.out, s"m.io.deq")
-    connectDbgSig(debugFF(m.io.enq, !sEnq_latch.io.output.data & risingEdge(m.io.enqVld)).io.out, s"m.io.enq")
+    connectDbgSig(debugFF(m.io.deq, !sDeq_latch.io.output.data & risingEdge(m.io.deqVld)).io.out, s"[FRINGE DENSELD] m.io.deq")
+    connectDbgSig(debugFF(m.io.enq, !sEnq_latch.io.output.data & risingEdge(m.io.enqVld)).io.out, s"[FRINGE DENSELD] m.io.enq")
 
     m
   }
@@ -483,9 +482,9 @@ class MAGCore(
     stream.wresp.valid := ~wrespFIFO.io.empty
     wrespFIFO.io.deqVld := stream.wresp.ready
 
-    connectDbgSig(debugCounter(wrespFIFO.io.enqVld).io.out, s"wrespFifo $i enq")
-    connectDbgSig(debugCounter(!wrespFIFO.io.empty).io.out, s"wrespFifo $i ~empty (stream.wresp.valid)")
-    connectDbgSig(debugCounter(stream.wresp.ready).io.out, s"wrespFifo $i deq (stream.wresp.ready)")
+    connectDbgSig(debugCounter(wrespFIFO.io.enqVld).io.out, s"[FRINGE DENSEST] wrespFifo $i enq")
+    connectDbgSig(debugCounter(!wrespFIFO.io.empty).io.out, s"[FRINGE DENSEST] wrespFifo $i ~empty (stream.wresp.valid)")
+    connectDbgSig(debugCounter(stream.wresp.ready).io.out, s"[FRINGE DENSEST] wrespFifo $i deq (stream.wresp.ready)")
 
     m
   }
@@ -554,10 +553,10 @@ class MAGCore(
 
   // rdata enq values
   for (i <- 0 until numRdataDebug) {
-    connectDbgSig(debugFF(io.dram.cmd.bits.addr, io.dram.rresp.ready & io.dram.rresp.valid & (rdataEnqCount.io.out === (i+42).U) ).io.out, s"raddr_from_dram${(i+42)}")  
-    connectDbgSig(debugFF(io.dram.cmd.bits.size, io.dram.rresp.ready & io.dram.rresp.valid & (rdataEnqCount.io.out === (i+42).U) ).io.out, s"raddr_from_dram${(i+42)}")  
+    connectDbgSig(debugFF(io.dram.cmd.bits.addr, io.dram.rresp.ready & io.dram.rresp.valid & (rdataEnqCount.io.out === (i+42).U) ).io.out, s"[FRINGE] raddr_from_dram${(i+42)}")  
+    connectDbgSig(debugFF(io.dram.cmd.bits.size, io.dram.rresp.ready & io.dram.rresp.valid & (rdataEnqCount.io.out === (i+42).U) ).io.out, s"[FRINGE] raddr_from_dram${(i+42)}")  
     for (j <- 0 until numRdataWordsDebug) {
-      connectDbgSig(debugFF(io.dram.rresp.bits.rdata(j), io.dram.rresp.ready & io.dram.rresp.valid & (rdataEnqCount.io.out === (i+42).U)).io.out, s"""rdata_from_dram${(i+42)}_$j""")
+      connectDbgSig(debugFF(io.dram.rresp.bits.rdata(j), io.dram.rresp.ready & io.dram.rresp.valid & (rdataEnqCount.io.out === (i+42).U)).io.out, s"""[FRINGE] rdata_from_dram${(i+42)}_$j""")
     }
   }
 
@@ -565,81 +564,81 @@ class MAGCore(
   if (io.app.stores.nonEmpty) {
     // wdata enq values
     for (i <- 0 until numWdataDebug) {
-      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb, io.dram.wdata.ready & io.dram.wdata.valid & (wdataCount.io.out === (i).U)).io.out, s"""wstrb_from_dram${(i)}""")
+      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb, io.dram.wdata.ready & io.dram.wdata.valid & (wdataCount.io.out === (i).U)).io.out, s"""[FRINGE] wstrb_from_dram${(i)}""")
       for (j <- 0 until numWdataWordsDebug) {
-        connectDbgSig(debugFF(io.dram.wdata.bits.wdata(j), io.dram.wdata.ready & io.dram.wdata.valid & (wdataCount.io.out === (i).U)).io.out, s"""wdata_from_dram${(i)}_$j""")
+        connectDbgSig(debugFF(io.dram.wdata.bits.wdata(j), io.dram.wdata.ready & io.dram.wdata.valid & (wdataCount.io.out === (i).U)).io.out, s"""[FRINGE] wdata_from_dram${(i)}_$j""")
       }
       // connectDbgSig(debugFF(wdataMux.io.out.bits.wdata, io.dram.wdata.ready & io.dram.wdata.valid & (wdataCount.io.out === i.U)).io.out, s"""Actual values on wdata.bits""")
     }
   }
 
-  connectDbgSig(debugCounter(io.enable & dramReady & io.dram.cmd.valid).io.out, "# DRAM Commands Issued")
-  connectDbgSig(debugCounter(io.enable & !cmdArbiter.io.empty & !(dramReady & io.dram.cmd.valid)).io.out, "Total cycles w/ 1+ cmds queued up")
-  connectDbgSig(debugCounter(io.enable & dramReady & io.dram.cmd.valid & !cmdHead.isWr).io.out, "# Read Commands Sent")
+  connectDbgSig(debugCounter(io.enable & dramReady & io.dram.cmd.valid).io.out, "[FRINGE] # DRAM Commands Issued")
+  connectDbgSig(debugCounter(io.enable & !cmdArbiter.io.empty & !(dramReady & io.dram.cmd.valid)).io.out, "[FRINGE] Total cycles w/ 1+ cmds queued up")
+  connectDbgSig(debugCounter(io.enable & dramReady & io.dram.cmd.valid & !cmdHead.isWr).io.out, "[FRINGE] # Read Commands Sent")
   // Count number of load commands issued from accel per stream
   io.app.loads.zipWithIndex.foreach { case (load, i) =>
     val loadCounter = debugCounter(io.enable & load.cmd.valid)
     val loadCounterHandshake = debugCounter(io.enable & load.cmd.valid & load.cmd.ready)
-    connectDbgSig(loadCounterHandshake.io.out, s" # from Accel load stream $i")
-    val signal = s" # from Fringe load stream $i"
+    connectDbgSig(loadCounterHandshake.io.out, s"[ACCEL] # from load stream $i")
+    val signal = s"[FRINGE] # from load stream $i"
     connectDbgSig(debugCounter(io.dram.cmd.valid & dramReady & (cmdArbiter.io.tag === i.U)).io.out, signal)
-    connectDbgSig(loadCounter.io.out, s" # attempted from Accel load stream (cycles valid) $i")
+    connectDbgSig(loadCounter.io.out, s"[ACCEL]  # attempted from Accel load stream (cycles valid) $i")
   }
   connectDbgSig(debugCounter(io.enable & dramReady & io.dram.cmd.valid & cmdHead.isWr).io.out, "# Write Commands Sent")
   // Count number of store commands issued from accel per stream
   io.app.stores.zipWithIndex.foreach { case (store, i) =>
     val storeCounter = debugCounter(io.enable & store.cmd.valid)
     val storeCounterHandshake = debugCounter(io.enable & store.cmd.valid & store.cmd.ready)
-    connectDbgSig(storeCounterHandshake.io.out, s" # from Accel store stream $i")
-    val signal = s" # from Fringe store stream ${i}"
+    connectDbgSig(storeCounterHandshake.io.out, s"[ACCEL] # from store stream $i")
+    val signal = s"[FRINGE] # from store stream ${i}"
     connectDbgSig(debugCounter(io.dram.cmd.valid & dramReady & (cmdArbiter.io.tag === (i+loadStreamInfo.length).U)).io.out, signal)
-    connectDbgSig(storeCounter.io.out, s" # attempted from Accel store stream (cycles valid) $i")
+    connectDbgSig(storeCounter.io.out, s"[ACCEL]  # attempted from Accel store stream (cycles valid) $i")
   }
 
-  connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready).io.out, "# Read Responses Acknowledged")
-  connectDbgSig(debugCounter(io.enable & io.dram.rresp.valid & !io.dram.rresp.ready).io.out, "# RResp rejected by ready")
-  connectDbgSig(debugCounter(io.enable & !io.dram.rresp.valid & io.dram.rresp.ready).io.out, "Cycles RResp ready and idle (~valid)")
+  connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready).io.out, "[FRINGE] # Read Responses Acknowledged")
+  connectDbgSig(debugCounter(io.enable & io.dram.rresp.valid & !io.dram.rresp.ready).io.out, "[FRINGE] # RResp rejected by ready")
+  connectDbgSig(debugCounter(io.enable & !io.dram.rresp.valid & io.dram.rresp.ready).io.out, "[FRINGE] Cycles RResp ready and idle (~valid)")
   loadStreamInfo.indices.foreach{i =>
-    val signal = s" # from load stream $i"
+    val signal = s"[FRINGE]  # from load stream $i"
     connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready & (rrespTag.streamId === i.U)).io.out, signal)
   }
-  connectDbgSig(debugCounter(io.dram.wresp.valid & io.dram.wresp.ready).io.out, "# Write Responses Acknowledged")
-  connectDbgSig(debugCounter(io.enable & io.dram.wresp.valid & !io.dram.wresp.ready).io.out, "# WResp rejected by ready")
-  connectDbgSig(debugCounter(io.enable & !io.dram.wresp.valid & io.dram.wresp.ready).io.out, "Cycles WResp ready and idle (~valid)")
+  connectDbgSig(debugCounter(io.dram.wresp.valid & io.dram.wresp.ready).io.out, "[FRINGE] # Write Responses Acknowledged")
+  connectDbgSig(debugCounter(io.enable & io.dram.wresp.valid & !io.dram.wresp.ready).io.out, "[FRINGE] # WResp rejected by ready")
+  connectDbgSig(debugCounter(io.enable & !io.dram.wresp.valid & io.dram.wresp.ready).io.out, "[FRINGE] Cycles WResp ready and idle (~valid)")
   storeStreamInfo.indices.foreach{i =>
-    val signal = s" # from store stream $i"
+    val signal = s"[FRINGE]  # from store stream $i"
     connectDbgSig(debugCounter(io.dram.wresp.valid & io.dram.wresp.ready & (wrespTag.streamId === (i+loadStreamInfo.length).U)).io.out, signal)
   }
 
   denseLoadBuffers.zipWithIndex foreach { case (b,i) =>
-    connectDbgSig(debugCounter(b.io.full).io.out, "(load) fifo converter " + i + " # cycles full")
-    connectDbgSig(debugCounter(b.io.almostFull).io.out, "(load) fifo converter " + i + " # cycles almostFull")
-    connectDbgSig(debugCounter(b.io.empty).io.out, "(load) fifo converter " + i + " # cycles empty")
-    connectDbgSig(debugCounter(b.io.almostEmpty).io.out, "(load) fifo converter " + i + " # cycles almostEmpty")
-    connectDbgSig(debugCounter(b.io.enqVld).io.out, "(load) fifo converter " + i + " # cycles enqVld")
-    connectDbgSig(debugCounter(rrespTag.streamId === i.U).io.out, "(load) fifo converter " + i + " # cycles streamId == " + i)
-    connectDbgSig(debugCounter(io.dram.rresp.valid).io.out, "(load) # cycles rresp == valid")
+    connectDbgSig(debugCounter(b.io.full).io.out, "[FRINGE] (load) fifo converter " + i + " # cycles full")
+    connectDbgSig(debugCounter(b.io.almostFull).io.out, "[FRINGE] (load) fifo converter " + i + " # cycles almostFull")
+    connectDbgSig(debugCounter(b.io.empty).io.out, "[FRINGE] (load) fifo converter " + i + " # cycles empty")
+    connectDbgSig(debugCounter(b.io.almostEmpty).io.out, "[FRINGE] (load) fifo converter " + i + " # cycles almostEmpty")
+    connectDbgSig(debugCounter(b.io.enqVld).io.out, "[FRINGE] (load) fifo converter " + i + " # cycles enqVld")
+    connectDbgSig(debugCounter(rrespTag.streamId === i.U).io.out, "[FRINGE] (load) fifo converter " + i + " # cycles streamId == " + i)
+    connectDbgSig(debugCounter(io.dram.rresp.valid).io.out, "[FRINGE] (load) # cycles rresp == valid")
   }
   connectDbgSig(debugCounter(rrespTag.streamId >= denseLoadBuffers.length.U).io.out, "(load) # cycles streamId >= last")
   connectDbgSig(debugFF(rrespTag.streamId, io.dram.rresp.valid).io.out, "(load) last streamId")
   
   denseStoreBuffers.zipWithIndex.foreach{ case (b,i) =>
-    connectDbgSig(debugCounter(b.io.enqVld).io.out, "(store) fifo converter " + i + " # enq")
-    connectDbgSig(debugCounter(!b.io.full).io.out, "(store) fifo converter " + i + " # cycles ~full (= ready)")
-    connectDbgSig(debugCounter(!b.io.full & b.io.enqVld).io.out, s"(store) fifo converter $i # enq while not full")
-    connectDbgSig(debugCounter(b.io.full & b.io.enqVld).io.out, s"(store) fifo converter $i # enq while full")
-    connectDbgSig(debugCounter(b.io.full).io.out, "(store) fifo converter " + i + " # cycles full")
-    connectDbgSig(debugCounter(b.io.almostFull).io.out, "(store) fifo converter " + i + " # cycles almostFull")
-    connectDbgSig(debugCounter(b.io.empty).io.out, "(store) fifo converter " + i + " # cycles empty")
-    connectDbgSig(debugCounter(b.io.almostEmpty).io.out, "(store) fifo converter " + i + " # cycles almostEmpty")
+    connectDbgSig(debugCounter(b.io.enqVld).io.out, "[FRINGE] (store) fifo converter " + i + " # enq")
+    connectDbgSig(debugCounter(!b.io.full).io.out, "[FRINGE] (store) fifo converter " + i + " # cycles ~full (= ready)")
+    connectDbgSig(debugCounter(!b.io.full & b.io.enqVld).io.out, s"[FRINGE] (store) fifo converter $i # enq while not full")
+    connectDbgSig(debugCounter(b.io.full & b.io.enqVld).io.out, s"[FRINGE] (store) fifo converter $i # enq while full")
+    connectDbgSig(debugCounter(b.io.full).io.out, "[FRINGE] (store) fifo converter " + i + " # cycles full")
+    connectDbgSig(debugCounter(b.io.almostFull).io.out, "[FRINGE] (store) fifo converter " + i + " # cycles almostFull")
+    connectDbgSig(debugCounter(b.io.empty).io.out, "[FRINGE] (store) fifo converter " + i + " # cycles empty")
+    connectDbgSig(debugCounter(b.io.almostEmpty).io.out, "[FRINGE] (store) fifo converter " + i + " # cycles almostEmpty")
   }
 
-  connectDbgSig(debugCounter(io.dram.rresp.valid & denseLoadBuffers.map {_.io.enqVld}.reduce{_|_}).io.out, "RResp valid enqueued somewhere")
-  connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready).io.out, "Rresp valid and ready")
-  connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready & denseLoadBuffers.map {_.io.enqVld}.reduce{_|_}).io.out, "Resp valid and ready and enqueued somewhere")
-  connectDbgSig(debugCounter(io.dram.rresp.valid & !io.dram.rresp.ready).io.out, "Resp valid and not ready")
+  connectDbgSig(debugCounter(io.dram.rresp.valid & denseLoadBuffers.map {_.io.enqVld}.reduce{_|_}).io.out, "[FRINGE] RResp valid enqueued somewhere")
+  connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready).io.out, "[FRINGE] Rresp valid and ready")
+  connectDbgSig(debugCounter(io.dram.rresp.valid & io.dram.rresp.ready & denseLoadBuffers.map {_.io.enqVld}.reduce{_|_}).io.out, "[FRINGE] Resp valid and ready and enqueued somewhere")
+  connectDbgSig(debugCounter(io.dram.rresp.valid & !io.dram.rresp.ready).io.out, "[FRINGE] Resp valid and not ready")
 
-  connectDbgSig(wdataCount.io.out, "num wdata transferred (wvalid & wready)")
+  connectDbgSig(wdataCount.io.out, "[FRINGE] num wdata transferred (wvalid & wready)")
 
   // Connect AXI loopback debuggers
   // TOP

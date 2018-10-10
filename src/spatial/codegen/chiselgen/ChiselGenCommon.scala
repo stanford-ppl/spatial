@@ -36,7 +36,8 @@ trait ChiselGenCommon extends ChiselCodegen {
   var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argOutLoopbacks = scala.collection.mutable.HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
-  var drams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var accelDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var hostDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
   /* List of break or exit nodes */
   var earlyExits: List[Sym[_]] = List()
 
@@ -202,11 +203,11 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => println(s"forwpressure $z");emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => println(s"backpressure $z");emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 

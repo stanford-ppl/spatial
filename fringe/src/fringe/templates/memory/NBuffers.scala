@@ -688,7 +688,7 @@ class NBufMem(
 
 
 
-class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module { 
+class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") extends Module { 
 
   val io = IO( new Bundle {
     val sEn = Vec(numBufs, Input(Bool()))
@@ -713,6 +713,8 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int) extends Module {
     }
   })
 
+  override def desiredName = myName
+  
   val wMap = NBufXMap(0 -> XMap((0,0,0) -> (1, None)))
   val rMap = NBufXMap((0 until numBufs).map{i => i -> XMap((0,0,0) -> (1, None)) }.toArray:_*)
 

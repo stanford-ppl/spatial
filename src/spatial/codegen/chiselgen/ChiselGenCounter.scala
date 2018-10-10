@@ -18,9 +18,9 @@ import spatial.util.spatialConfig
 trait ChiselGenCounter extends ChiselGenCommon {
 
 
-  private def emitCChainObject(lhs: Sym[_])(contents: => Unit): Unit = {
+  private def emitCChainObject(lhs: Sym[_], suffix: String)(contents: => Unit): Unit = {
     inGen(out, "CounterChains.scala"){
-      open(src"object $lhs extends CChainObject{")
+      open(src"object $lhs$suffix extends CChainObject{")
         contents
       close("}")
     }
@@ -39,25 +39,26 @@ trait ChiselGenCounter extends ChiselGenCommon {
         val w = bitWidth(c.tp.typeArgs.head)
         val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); 
                                                       case Expect(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); 
-                                                      case _ => val n = quote(start); (n + {if (n.startsWith("x")) ".get" else ""}, "None")}
+                                                      case _ => val n = quote(start); (n + {if (n.startsWith("x") | n.startsWith("b")) ".get" else ""}, "None")}
         val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); 
                                                       case Expect(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); 
-                                                      case _ => val n = quote(end); (n + {if (n.startsWith("x")) ".get" else ""}, "None")}
+                                                      case _ => val n = quote(end); (n + {if (n.startsWith("x") | n.startsWith("b")) ".get" else ""}, "None")}
         val (stride_wire, stride_constr) = step match {case Final(st) => (src"${st}.FP(true, $w, 0)", src"Some($st)"); 
                                                       case Expect(st) => (src"${st}.FP(true, $w, 0)", src"Some($st)"); 
-                                                      case _ => val n = quote(step); (n + {if (n.startsWith("x")) ".get" else ""}, "None")}
+                                                      case _ => val n = quote(step); (n + {if (n.startsWith("x") | n.startsWith("b")) ".get" else ""}, "None")}
         val par_wire = {src"$par"}.split('.').take(1)(0).replaceAll("L","") // TODO: What is this doing?
         (start_wire, end_wire, stride_wire, par_wire, start_constr, end_constr, stride_constr, "Some(0)")
       case Op(ForeverNew()) => 
         isForever = true
         ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
     }
-    val passValues = {counter_data.map(_._3) ++ counter_data.map(_._2) ++ counter_data.map(_._1)}.collect{case x if (x.startsWith("x")) => x}
+    val passValues = {counter_data.map(_._3) ++ counter_data.map(_._2) ++ counter_data.map(_._1)}.collect{case x if (x.startsWith("x") | x.startsWith("b")) => x}
     passValues.foreach{vv => 
       val v = vv.replace(".get","")
-      emit(src"$lhs.set_$v($v)")
+      val outside_name = appendSuffix(lhs.owner, v)
+      emit(src"$lhs.set_$v(${outside_name})")
     }
-    emitCChainObject(lhs) {
+    emitCChainObject(lhs, suffix) {
       emit(src"// Owner = ${lhs.owner}")
       passValues.foreach{vv => 
         val v = vv.replace(".get","")

@@ -84,8 +84,8 @@ trait ChiselGenController extends ChiselGenCommon {
       val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
       val w = bitWidth(counters(i).typeArgs.head)
       emit(src"val $iter = ${cchain}.cchain.io.output.counts($id).FP(true, $w, 0)")
-      if (lhs.isOuterPipeLoop && lhs.children.size > 1) {
-        emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.size}, ${w}, myName = "${iter}_chain"))""")
+      if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
+        emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain"))""")
         emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
           emit(src"""${iter}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
@@ -95,8 +95,8 @@ trait ChiselGenController extends ChiselGenCommon {
     }
     valids.zipWithIndex.foreach{ case (v,id) => 
       emit(src"val $v = ~${cchain}.cchain.io.output.oobs($id)")
-      if (lhs.isOuterPipeLoop && lhs.children.size > 1) {
-        emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.size}, 1, myName = "${v}_chain"))""")
+      if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
+        emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain"))""")
         emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
           emit(src"""${v}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
@@ -140,7 +140,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val useMap = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
     scoped --= useMap.map(_._1)
 
-    inGen(out, src"kernel_$lhs.scala"){
+    inGen(out, src"sm_$lhs.scala"){
       emitHeader()
 
       val ret = if (lhs.op.exists(_.R.isBits)) src"${lhs.op.get.R.tp}" else "Unit"
@@ -245,16 +245,16 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""iiCtr.io.input.reset := sm.io.parentAck""")
         emit(src"""iiDone := iiCtr.io.output.done | ~mask""")
       }
-      emit(src"override val children = List[SMObject](${lhs.children.map(_.s.get).map(quote).mkString(",")})")
+      emit(src"override val children = List[SMObject](${lhs.children.filter(_.s.get != lhs).map(_.s.get).map(quote).mkString(",")})")
       if (lhs.cchains.nonEmpty && !lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.cchains.head})")
-      else if (lhs.cchains.nonEmpty && lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.children.map{c => src"${lhs.cchains.head}_copy${c.s.get}"}.mkString(",")})")
+      else if (lhs.cchains.nonEmpty && lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}.mkString(",")})")
       emit(src"val parent = ${parentAndSlot(lhs)}")
       if (lhs.isSwitch) emitSwitchAddition(lhs)
     }
 
     emit(src"${lhs}.en := ${lhs}.baseEn & top.rr & ${getForwardPressure(lhs.toCtrl)}")
     emit(src"${lhs}.flow := ${getBackPressure(lhs.toCtrl)}")
-    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.head.s.get}" else ""
+    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
     val noop = if (lhs.cchains.nonEmpty) src"~${lhs.cchains.head}$suffix.cchain.io.output.noop" else "true.B"
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
     emit(src"${lhs}.mask := $noop & $parentMask")
@@ -344,9 +344,21 @@ trait ChiselGenController extends ChiselGenCommon {
     case StateMachine(ens,start,notDone,action,nextState) =>
       appPropertyStats += HasFSM
       enterCtrl(lhs)
-      createSMObject(lhs, false)
+      createSMObject(lhs, true)
       createKernel(lhs, ens, notDone, action, nextState) {
-        // ctrl.bodies.flatMap{_.blocks.map(_._2)}.foreach{b => visitBlock(b); ()}
+        val state = notDone.input
+        emit(src"val $state = Wire(${state.tp})")
+        emit(src"val ${lhs}_doneCondition = Wire(Bool())")
+        emit(src"${state}.r := ${lhs}.sm.io.state.r")
+
+        visitBlock(notDone)
+        visitBlock(action)
+        visitBlock(nextState)
+
+        emit(src"${lhs}.sm.io.nextState := ${nextState.result}.r.asSInt ")
+        emit(src"${lhs}.sm.io.initState := ${start}.r.asSInt")
+        emit(src"${lhs}.doneCondition := ~${notDone.result}")
+        emit(src"${lhs}.sm.io.doneCondition := ${lhs}.doneCondition")
       }
       exitCtrl(lhs)
 

@@ -15,7 +15,7 @@ trait ChiselGenStream extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
       val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
-      inGen(out, src"stream_${lhs}.scala") {
+      inGen(out, src"bus_${lhs}.scala") {
         emitHeader()
         forceEmit(src"object ${lhs} {")
         forceEmit(src"  val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
@@ -28,7 +28,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 
     case StreamOutNew(bus) =>
       val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
-      inGen(out, src"stream_${lhs}.scala") {
+      inGen(out, src"bus_${lhs}.scala") {
         emitHeader()
         forceEmit(src"object ${lhs} {")
         forceEmit(src"  val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")

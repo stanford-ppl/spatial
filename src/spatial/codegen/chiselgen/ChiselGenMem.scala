@@ -168,7 +168,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def emitMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"mem_${lhs}.scala"){
+    inGen(out, src"m_${lhs}.scala"){
       emitHeader()
       open(src"object $lhs {")
         contents
@@ -392,12 +392,12 @@ trait ChiselGenMem extends ChiselGenCommon {
     
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, "FIFO", None)
-    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
-    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@FIFOPeek(fifo,_) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
+    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.empty")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostFull")
+    case op@FIFOPeek(fifo,_) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.m.io.output.data(0)")
+    case FIFONumel(fifo,_)   => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
 

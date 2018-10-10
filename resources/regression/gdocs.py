@@ -376,7 +376,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		alink=apphash
 		count_success="=sum ( COUNTIF ( J3:3, \"=1\" ) )"
 		count_fail="=sum ( COUNTIF ( J3:3, \"=0\" ) )"
-		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) )"
+		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)

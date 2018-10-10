@@ -420,7 +420,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""val done_latch = Module(new SRFF())""")
           if (earlyExits.nonEmpty) {
             appPropertyStats += HasBreakpoint
-            emit(s"""val breakpoints = Wire(Vec(${earlyExits.length}, Bool()))""")
+            inGen(out, "ArgInterface.scala"){emit(s"""val breakpoints = Wire(Vec(${earlyExits.length}, Bool()))""")}
             emit(src"""done_latch.io.input.set := ${lhs}.done | breakpoints.reduce{_|_}""")        
           } else {
             emit(src"""done_latch.io.input.set := ${lhs}.done""")                

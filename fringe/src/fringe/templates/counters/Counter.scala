@@ -106,7 +106,7 @@ class IncDincCtr(inc: Int, dinc: Int, stop: Int, width: Int = 32) extends Module
 /**
   * IICounter: 1-dimensional counter. Basically a cheap, wrapping for reductions
   */
-class IICounter(val ii: Int, val width: Int = 32) extends Module {
+class IICounter(val ii: Int, val width: Int = 32, val myName: String = "iiCtr") extends Module {
   val io = IO(new Bundle {
     val input = new Bundle {
       val enable = Input(Bool())
@@ -116,6 +116,8 @@ class IICounter(val ii: Int, val width: Int = 32) extends Module {
       val done   = Output(Bool())
     }
   })
+
+  override def desiredName = myName
 
   val cnt = RegInit((ii-1).S(width.W))
   val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
@@ -439,11 +441,13 @@ count(0) 1   2  3    4   5
             outermost (slowest) to innermost (fastest) counter.
   * @param w: Word width
   */
-class Counter(val par: List[Int], val starts: List[Option[Int]], val stops: List[Option[Int]],
-              val strides: List[Option[Int]], val gaps: List[Option[Int]], val widths: List[Int]) extends Module {
+class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops: List[Option[Int]],
+              val strides: List[Option[Int]], val gaps: List[Option[Int]], val widths: List[Int], val myName: String = "CChain") extends Module {
   def this(par: List[Int], sts: List[Option[Int]], stps: List[Option[Int]], strs: List[Option[Int]], gps: List[Option[Int]]) = this(par, sts, stps, strs, gps, List.fill(par.length){32})
   def this(tuple: (List[Int], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
 
+  override def desiredName = myName
+  
   val depth = par.length
   val numWires = par.reduce{_+_}
   val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).sum}

@@ -13,7 +13,7 @@ import spatial.util.spatialConfig
 
 trait ChiselGenCommon extends ChiselCodegen { 
 
-  /* Set of controllers that we've already emitted control signals for.  Sometimes a RegRead
+  /* Set of controllers that we've already emited control signals for.  Sometimes a RegRead
    * can sit in an outer controller and be used by a controller that is a descendent of the 
    * other controllers in this outer controller 
   **/
@@ -95,75 +95,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
-  protected def emitControlSignals(lhs: Sym[_]): Unit = {
-    if (!initializedControllers.contains(lhs)) {
-      emitGlobalWireMap(src"""${swap(lhs, Done)}""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${swap(lhs, En)}""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${swap(lhs, BaseEn)}""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${swap(lhs, IIDone)}""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${swap(lhs, Flow)}""", """Wire(Bool())""")
-      // emitGlobalWireMap(src"""${swap(lhs, Inhibitor)}""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${lhs}_mask""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${lhs}_resetter""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${lhs}_datapath_en""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${lhs}_ctr_trivial""", """Wire(Bool())""")
-      initializedControllers += lhs
-    }
-  }
-
-  def emitCounterChain(lhs: Sym[_]): Unit = {
-    if (lhs.cchains.nonEmpty) {
-      val cchain = lhs.cchains.head
-      var isForever = cchain.isForever
-      val w = bitWidth(cchain.counters.head.typeArgs.head)
-      val counter_data = cchain.counters.map{
-        case Op(CounterNew(start, end, step, par)) => 
-          val (start_wire, start_constr) = start match {case Final(s) => (src"${s}.FP(true, $w, 0)", src"Some($s)"); case _ => (quote(start), "None")}
-          val (end_wire, end_constr) = end match {case Final(e) => (src"${e}.FP(true, $w, 0)", src"Some($e)"); case _ => (quote(end), "None")}
-          val (stride_wire, stride_constr) = step match {case Final(st) => (src"${st}.FP(true, $w, 0)", src"Some($st)"); case _ => (quote(step), "None")}
-          val par_wire = {src"$par"}.split('.').take(1)(0).replaceAll("L","") // TODO: What is this doing?
-          (start_wire, end_wire, stride_wire, par_wire, start_constr, end_constr, stride_constr, "Some(0)")
-        case Op(ForeverNew()) => 
-          isForever = true
-          ("0.S", "999.S", "1.S", "1", "None", "None", "None", "Some(0)") 
-      }
-      emitGlobalWireMap(src"""${cchain}_done""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${cchain}_en""", """Wire(Bool())""")
-      emitGlobalWireMap(src"""${cchain}_resetter""", """Wire(Bool())""")
-      emitGlobalModule(src"""val ${cchain}_strides = List(${counter_data.map(_._3)}) // TODO: Safe to get rid of this and connect directly?""")
-      emitGlobalModule(src"""val ${cchain}_stops = List(${counter_data.map(_._2)}) // TODO: Safe to get rid of this and connect directly?""")
-      emitGlobalModule(src"""val ${cchain}_starts = List(${counter_data.map{_._1}}) """)
-      emitGlobalModule(src"""val ${cchain} = Module(new counters.Counter(List(${counter_data.map(_._4)}), """ + 
-                       src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
-                       src"""List(${counter_data.map(_._8)}), List(${cchain.counters.map(c => bitWidth(c.typeArgs.head))})))""")
-
-      emitt(src"""${cchain}.io.input.stops.zip(${cchain}_stops).foreach { case (port,stop) => port := stop.r.asSInt }""")
-      emitt(src"""${cchain}.io.input.strides.zip(${cchain}_strides).foreach { case (port,stride) => port := stride.r.asSInt }""")
-      emitt(src"""${cchain}.io.input.starts.zip(${cchain}_starts).foreach { case (port,start) => port := start.r.asSInt }""")
-      emitt(src"""${cchain}.io.input.gaps.foreach { gap => gap := 0.S }""")
-      emitt(src"""${cchain}.io.input.saturate := true.B""")
-      emitt(src"""${cchain}.io.input.enable := ${swap(src"${cchain}", En)}""")
-      emitt(src"""${swap(src"${cchain}", Done)} := ${cchain}.io.output.done""")
-      emitt(src"""${cchain}.io.input.reset := ${swap(src"${cchain}", Resetter)}""")
-      if (streamCopyWatchlist.contains(cchain)) emitt(src"""${cchain}.io.input.isStream := true.B""")
-      else emitt(src"""${cchain}.io.input.isStream := false.B""")      
-      emitt(src"""val ${cchain}_maxed = ${cchain}.io.output.saturated""")
-    }
-  }
-
   protected def enableRetimeMatch(en: Sym[_], lhs: Sym[_]): Double = { 
-    // val last_def_delay = en match {
-    //   case Def(And(_,_)) => latencyOption("And", None)
-    //   case Def(Or(_,_)) => latencyOption("Or", None)
-    //   case Def(Not(_)) => latencyOption("Not", None)
-    //   case Const(_) => 0.0
-    //   case Def(DelayLine(size,_)) => size.toDouble // Undo subtraction
-    //   case Def(RegRead(_)) => latencyOption("RegRead", None)
-    //   case Def(FixEql(a,_)) => latencyOption("FixEql", Some(bitWidth(a.tp)))
-    //   case b: Bound[_] => 0.0
-    //   case _ => throw new Exception(s"Node enable $en not yet handled in partial retiming")
-    // }
-    // if (spatialConfig.enableRetiming) symDelay(en) + last_def_delay else 0.0
     if (spatialConfig.enableRetiming) lhs.fullDelay else 0.0
   }
 
@@ -203,43 +135,43 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emit(src"$z = Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emitGlobalWireMap(quote(z),"Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emit(src"$z = Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
   }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
     if (c.hasStreamAncestor) and(getReadStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
+      case fifo @ Op(StreamInNew(bus)) => src"${fifo}.valid"
     }) else "true.B"
   }
 
   def getStreamBackPressure(c: Sym[_]): String = { 
     if (c.hasStreamAncestor) and(getWriteStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
+      case fifo @ Op(StreamOutNew(bus)) => src"${fifo}.ready"
     }) else "true.B"
   }
 
   def getForwardPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
-      case fifo@Op(StreamInNew(bus)) => src"${swap(fifo, Valid)}"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].empty"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.io.empty"
+      case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.m.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"~${fifo}.m.io.asInstanceOf[FIFOInterface].empty"
+      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.m.io.empty"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
-      case fifo@Op(StreamOutNew(bus)) => src"${swap(fifo, Ready)}"
+      case fifo@Op(StreamOutNew(bus)) => src"${fifo}.ready"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].full | (~${FIFOBackwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.m.io.asInstanceOf[FIFOInterface].full | (~${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"~${fifo}.m.io.asInstanceOf[FIFOInterface].full"
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.io.full($way)"
+            src"~${merge}.m.io.full($way)"
         }
     }) else "true.B"
   }
@@ -252,15 +184,15 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val backpressure = if (controllerStack.nonEmpty) swap(controllerStack.head, SM) + ".io.flow" else "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+    val backpressure = if (controllerStack.nonEmpty) src"${controllerStack.head}.sm.io.flow" else "true.B"
+    if (isBit) src"(${name}).DS(${latency}.toInt, top.rr, $backpressure)"
     else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
-  // DL for when we are visiting children but emitting DL on signals that belong to parent
+  // DL for when we are visiting children but emiting DL on signals that belong to parent
   def DLo[T](name: String, latency: T, isBit: Boolean = false): String = {
     val backpressure = "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
+    if (isBit) src"(${name}).DS(${latency}.toInt, top.rr, $backpressure)"
     else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
@@ -314,12 +246,13 @@ trait ChiselGenCommon extends ChiselCodegen {
   override protected def quote(s: Sym[_]): String = s.rhs match {
     case Def.Bound(id)  => 
       val base = wireMap(super.quote(s) + alphaconv.getOrElse(super.quote(s), ""))
-      val (pipelineRemap, pmod) = appendChainPass(s, base)
-      val (streamRemap, smod) = appendStreamSuffix(s, base)
-      if (pmod & smod) throw new Exception(s"ERROR: Seemingly impossible bound sym that is both part of a pipeline and a stream pipe!")
-      if (smod) wireMap(streamRemap)
-      else if (pmod) wireMap(pipelineRemap)
-      else base
+      // val (pipelineRemap, pmod) = appendChainPass(s, base)
+      // val (streamRemap, smod) = appendStreamSuffix(s, base)
+      // if (pmod & smod) throw new Exception(s"ERROR: Seemingly impossible bound sym that is both part of a pipeline and a stream pipe!")
+      // if (smod) wireMap(streamRemap)
+      // else if (pmod) wireMap(pipelineRemap)
+      // else base
+      base
     case Def.Node(_,_) => // Specifically places suffix on ctrchains
       val base = wireMap(super.quote(s) + alphaconv.getOrElse(super.quote(s), ""))
       val (streamRemap, smod) = appendStreamSuffix(s, base)

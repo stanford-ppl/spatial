@@ -21,19 +21,19 @@ trait ChiselGenDebug extends ChiselGenCommon {
 
     case ExitIf(en) => 
     	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")
-	    emitt(s"breakpoints(${earlyExits.length}) := ${ens} & (${swap(quote(lhs.parent.s.get), DatapathEn)}).D(${lhs.fullDelay})")
+	    emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${swap(quote(lhs.parent.s.get), DatapathEn)}).D(${lhs.fullDelay})")
 	    earlyExits = earlyExits :+ lhs
 
     case AssertIf(en,cond,_) => 
     	if (inHw) {
 	    	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")
-	        emitt(s"breakpoints(${earlyExits.length}) := ${ens} & (${swap(quote(lhs.parent.s.get), DatapathEn)}).D(${lhs.fullDelay}) & ~${quote(cond)}")
+	        emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${swap(quote(lhs.parent.s.get), DatapathEn)}).D(${lhs.fullDelay}) & ~${quote(cond)}")
 	        earlyExits = earlyExits :+ lhs
 	    }
 
     case BreakpointIf(en) => 
     	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")
-        emitt(s"breakpoints(${earlyExits.length}) := ${ens} & (${swap(quote(lhs.parent.s.get), DatapathEn)}).D(${lhs.fullDelay})")
+        emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${swap(quote(lhs.parent.s.get), DatapathEn)}).D(${lhs.fullDelay})")
         earlyExits = earlyExits :+ lhs
 
 	case _ => super.gen(lhs, rhs)

@@ -6,56 +6,71 @@ import fringe.templates.memory.{SRFF,FF}
 import fringe.utils.{getRetimed, risingEdge}
 import fringe.utils.implicits._
 
+class ControlInterface(p: ControlParams) extends Bundle {
+  // Control signals
+  val enable = Input(Bool())
+  val done = Output(Bool())
+  val rst = Input(Bool())
+  val ctrDone = Input(Bool())
+  val datapathEn = Output(Bool())
+  val ctrInc = Output(Bool())
+  val ctrRst = Output(Bool())
+  val parentAck = Input(Bool())
+  val flow = Input(Bool())
+
+  // Signals from children
+  val doneIn = Vec(p.depth, Input(Bool()))
+  val maskIn = Vec(p.depth, Input(Bool()))
+
+  // Signals to children
+  val enableOut = Vec(p.depth, Output(Bool())) // Only for outer
+  val childAck = Vec(p.depth, Output(Bool()))
+
+  // Switch signals
+  val selectsIn = Vec(p.cases, Input(Bool()))
+  val selectsOut = Vec(p.cases, Output(Bool()))
+
+  // FSM signals
+  val nextState = Input(SInt(p.stateWidth.W))
+  val initState = Input(SInt(p.stateWidth.W))
+  val doneCondition = Input(Bool())
+  val state = Output(SInt(p.stateWidth.W))
+
+  // Signals for Streaming
+  val ctrCopyDone = Vec(p.depth, Input(Bool()))
+}
+
+case class ControlParams(
+  val sched: Sched, 
+  val depth: Int, 
+  val isFSM: Boolean = false, 
+  val isPassthrough: Boolean = false,
+  val stateWidth: Int = 32, 
+  val cases: Int = 1, 
+  val latency: Int = 0,
+  val name: String = "Controller"
+){}
+
+abstract class GeneralControl(p: ControlParams) extends Module {
+  val io = IO(new ControlInterface(p))
+
+  override def desiredName = p.name
+}
+
 sealed trait Sched
-// Easier to just let codegen use their toString and catch those names here
 object Sequenced extends Sched // Seq extends Sched { override def toString = "Sequenced" }
 object Pipelined extends Sched // Pipe extends Sched { override def toString = "Pipelined" }
 object Streaming extends Sched // Streaming extends Sched { override def toString = "Streaming" }
 object Fork extends Sched // Fork extends Sched { override def toString = "Fork" }
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
-class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
-  // Overloaded construters
-  // Tuple unpacker
-  def this(tuple: (Sched, Int, Boolean)) = this(tuple._1,tuple._2,tuple._3)
-
-  val io = IO( new Bundle {
-    // Control signals
-    val enable = Input(Bool())
-    val done = Output(Bool())
-    val rst = Input(Bool())
-    val ctrDone = Input(Bool())
-    val datapathEn = Output(Bool())
-    val ctrInc = Output(Bool())
-    val ctrRst = Output(Bool())
-    val parentAck = Input(Bool())
-    val flow = Input(Bool())
-
-    // Signals from children
-    val doneIn = Vec(depth, Input(Bool()))
-    val maskIn = Vec(depth, Input(Bool()))
-
-    // Signals to children
-    val enableOut = Vec(depth, Output(Bool()))
-    val childAck = Vec(depth, Output(Bool()))
-
-    // Switch signals
-    val selectsIn = Vec(cases, Input(Bool()))
-    val selectsOut = Vec(cases, Output(Bool()))
-
-    // FSM signals
-    val nextState = Input(SInt(stateWidth.W))
-    val initState = Input(SInt(stateWidth.W))
-    val doneCondition = Input(Bool())
-    val state = Output(SInt(stateWidth.W))
-
-    // Signals for Streaming
-    val ctrCopyDone = Vec(depth, Input(Bool()))
-  })
+class OuterControl(p: ControlParams) extends GeneralControl(p) {
+  def this(sched: Sched, depth: Int, isFSM: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, name: String = "OuterControl") = this(ControlParams(sched, depth, isFSM, false, stateWidth, cases, latency, name))
+  def this(tup: (Sched, Int, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
 
   // Create SRFF arrays for stages' actives and dones
-  val active = List.tabulate(depth){i => Module(new SRFF())}
-  val done = List.tabulate(depth){i => Module(new SRFF())}
+  val active = List.tabulate(p.depth){i => Module(new SRFF())}
+  val done = List.tabulate(p.depth){i => Module(new SRFF())}
 
   // Collect when all stages are done with all iters
   val allDone = done.map(_.io.output.data).reduce{_&&_} // TODO: Retime tree
@@ -67,13 +82,13 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
   // Create SRFFs that synchronize children on each iter
   val synchronize = Wire(Bool())
-  val iterDone = List.tabulate(depth){i => Module(new SRFF())} 
+  val iterDone = List.tabulate(p.depth){i => Module(new SRFF())} 
   iterDone.foreach(_.io.input.asyn_reset := false.B)
   iterDone.foreach(_.io.input.reset := synchronize | io.rst | io.parentAck)
 
   // Wire up stage communication
-  sched match {
-    case Pipelined if (!isFSM) => 
+  p.sched match {
+    case Pipelined if (!p.isFSM) => 
       // Define rule for when ctr increments
       io.ctrInc := iterDone(0).io.output.data & synchronize & io.flow
 
@@ -88,8 +103,8 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       done(0).io.input.set := io.ctrDone & !io.rst
 
       // Define logic for the rest of the stages
-      for (i <- 1 until depth) {
-        val extension = if (latency == 0) (synchronize & iterDone(i-1).io.output.data).D(1) else false.B // Hack for when retiming is turned off, in case mask turns on at the same time as the next iter should begin
+      for (i <- 1 until p.depth) {
+        val extension = if (p.latency == 0) (synchronize & iterDone(i-1).io.output.data).D(1) else false.B // Hack for when retiming is turned off, in case mask turns on at the same time as the next iter should begin
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
         active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable & io.flow
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck
@@ -111,7 +126,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       done(0).io.input.set := io.ctrDone & !io.rst
 
       // Define logic for the rest of the stages
-      for (i <- 1 until depth) {
+      for (i <- 1 until p.depth) {
         active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & !io.doneIn(i) & io.enable & io.flow)) & !synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & !io.maskIn(i) & io.enable & io.flow)) & !synchronize
@@ -126,7 +141,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       synchronize := iterDone.map(_.io.output.data).reduce{_&_}
 
       // Define logic for all stages
-      for (i <- 0 until depth) {
+      for (i <- 0 until p.depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & !io.doneIn(i) & !done(i).io.output.data & !io.ctrDone & io.enable & io.flow
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := io.doneIn(i) | (!io.maskIn(i) & io.enable & io.flow)
@@ -141,7 +156,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       synchronize := false.B // iterDone.map(_.io.output.data).reduce{_&_}
 
       // Define logic for all stages
-      for (i <- 0 until depth) {
+      for (i <- 0 until p.depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & !io.doneIn(i) & !done(i).io.output.data & !io.ctrDone & io.enable & io.flow & !io.ctrCopyDone(i)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | !io.maskIn(i).D(1)) & io.enable & io.flow
@@ -158,7 +173,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       synchronize := io.doneIn.reduce{_|_}
 
       // Define logic for all stages
-      for (i <- 0 until depth) {
+      for (i <- 0 until p.depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & !io.doneIn(i) & !done(i).io.output.data & !io.ctrDone & io.enable & io.flow & io.selectsIn(i) & !io.done
         active(i).io.input.reset := io.doneIn(i) | io.rst
         iterDone(i).io.input.set := io.doneIn(i)
@@ -180,7 +195,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
       done(0).io.input.set := io.ctrDone & ~io.rst
 
       // Define logic for the rest of the stages
-      for (i <- 1 until depth) {
+      for (i <- 1 until p.depth) {
         active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & ~io.doneIn(i) & io.enable & io.flow)) & ~synchronize
         active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
         iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & ~io.maskIn(i).D(1) & io.enable & io.flow)) & ~synchronize
@@ -197,8 +212,8 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
   io.ctrRst := getRetimed(risingEdge(allDone), 1)
   
   // Connect output signals
-  if (isFSM) {
-    val stateFSM = Module(new FF(stateWidth))
+  if (p.isFSM) {
+    val stateFSM = Module(new FF(p.stateWidth))
     val doneReg = Module(new SRFF())
 
     stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
@@ -216,7 +231,7 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
   }
   else {
     io.datapathEn := io.enable & ~allDone
-    io.done := getRetimed(risingEdge(allDone), latency + 1, io.enable)
+    io.done := getRetimed(risingEdge(allDone), p.latency + 1, io.enable)
   }
 
 
@@ -224,54 +239,26 @@ class OuterControl(val sched: Sched, val depth: Int, val isFSM: Boolean = false,
 
 
 
-class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrough: Boolean = false, val stateWidth: Int = 32, val cases: Int = 1, val latency: Int = 0) extends Module {
-
-  // Overloaded construters
-  // Tuple unpacker
-  def this(tuple: (Sched, Boolean, Int)) = this(tuple._1,tuple._2,stateWidth = tuple._3)
-
-  // Module IO
-  val io = IO(new Bundle {
-    // Control signals
-    val enable = Input(Bool())
-    val done = Output(Bool())
-    val rst = Input(Bool())
-    val datapathEn = Output(Bool())
-    val ctrDone = Input(Bool())
-    val ctrInc = Output(Bool())
-    val ctrRst = Output(Bool())
-    val parentAck = Input(Bool())
-    val flow = Input(Bool())
-
-    // Switch signals
-    val selectsIn = Vec(cases, Input(Bool()))
-    val selectsOut = Vec(cases, Output(Bool()))
-    val childAck = Vec(cases, Output(Bool()))
-    val doneIn = Vec(cases, Input(Bool()))
-
-    // FSM signals
-    val nextState = Input(SInt(stateWidth.W))
-    val initState = Input(SInt(stateWidth.W))
-    val doneCondition = Input(Bool())
-    val state = Output(SInt(stateWidth.W))
-  })
+class InnerControl(p: ControlParams) extends GeneralControl(p) {
+  def this(sched: Sched, isFSM: Boolean = false, isPassthrough: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, name: String = "InnerControl") = this(ControlParams(sched, cases, isFSM, isPassthrough, stateWidth, cases, latency, name))
+  def this(tup: (Sched, Boolean, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
 
   // Create state SRFFs
   val active = Module(new SRFF())
   val done = Module(new SRFF())
 
-  if (!isFSM) {
+  if (!p.isFSM) {
     active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data
     active.io.input.reset := io.ctrDone | io.rst | io.parentAck
     active.io.input.asyn_reset := false.B
-    sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone)}
+    p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone)}
     done.io.input.reset := io.rst | io.parentAck
     done.io.input.asyn_reset := false.B
 
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     io.ctrRst := !active.io.output.data | io.rst 
-    if (isPassthrough) { // pass through signals
+    if (p.isPassthrough) { // pass through signals
       io.datapathEn := io.enable  & io.flow// & ~io.done & ~io.parentAck
       io.ctrInc := io.enable & io.flow
     }
@@ -279,23 +266,23 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
       io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable & io.flow
       io.ctrInc := active.io.output.data & io.enable & io.flow
     }
-    val doneLag = if (cases > 1) 0 else latency
+    val doneLag = if (p.cases > 1) 0 else p.latency
     io.done := risingEdge(getRetimed(done.io.output.data, doneLag, true.B))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner
-    val stateFSM = Module(new FF(stateWidth))
+    val stateFSM = Module(new FF(p.stateWidth))
     val doneReg = Module(new SRFF())
 
-    // // With retime turned off (i.e latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
+    // // With retime turned off (i.e p.latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
     // val depulser = RegInit(true.B) 
-    // if (latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
+    // if (p.latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
     // else depulser := true.B
 
     stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
     stateFSM.io.xBarW(0).init.head := io.initState.asUInt
     stateFSM.io.xBarW(0).en.head := io.enable & io.ctrDone
-    // if (latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
+    // if (p.latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
     // else stateFSM.io.xBarW(0).en := io.enable
     stateFSM.io.xBarW(0).reset.head := reset.toBool | ~io.enable
     io.state := stateFSM.io.output.data(0).asSInt
@@ -308,7 +295,7 @@ class InnerControl(val sched: Sched, val isFSM: Boolean = false, val isPassthrou
     doneReg.io.input.asyn_reset := false.B
     io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone & io.flow
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & io.flow
-    io.done := risingEdge(getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable & io.flow), latency + 1, true.B))
+    io.done := risingEdge(getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable & io.flow), p.latency + 1, true.B))
 
   }
 }

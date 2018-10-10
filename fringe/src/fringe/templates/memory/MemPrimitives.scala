@@ -686,15 +686,15 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
             xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
             directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, isBuf: Boolean = false, myName: String = "LUT") = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, myName = myName))
+            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, myName: String) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, myName = myName))
 
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, "LUT")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, "LUT")
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "LUT") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, myName)
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)

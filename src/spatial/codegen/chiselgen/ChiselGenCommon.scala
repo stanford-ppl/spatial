@@ -194,7 +194,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def getSlot(lhs: Sym[_]): Int = {
-    lhs.parent.s.get.children.map(_.s.get).indexOf(lhs)
+    lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)
   }
   protected def parentAndSlot(lhs: Sym[_]): String = {
     if (lhs.parent.s.isDefined) {

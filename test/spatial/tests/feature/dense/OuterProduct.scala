@@ -13,7 +13,7 @@ import spatial.dsl._
     "op" -> 1 (1 -> 4)
   )
 
-  def outerproduct[T:Num](a: Array[T], b: Array[T]): Array[T] = {
+  def outerproduct[T:Num](a: Array[T], b: Array[T]): Matrix[T] = {
     val tileSizeA = params("ts1")
     val tileSizeB = params("ts2")
     val outerPar  = params("op")
@@ -52,7 +52,7 @@ import spatial.dsl._
         out(i::i+tileSizeA, j::j+tileSizeB par 16) store outTile
       }
     }
-    getMem(out)
+    getMatrix(out)
   }
 
 
@@ -64,11 +64,13 @@ import spatial.dsl._
 
     val result = outerproduct(a, b)
 
-    val gold = Array.tabulate(M){i => Array.tabulate(N){j => a(i) * b(j) }}.flatten
-    val gold_cksum = gold.map(a => a).reduce{_+_}
-    val result_cksum = result.map(a => a).reduce{_+_}
+    val gold = (0::M, 0::N){(i,j) =>  a(i) * b(j) }
+    val gold_cksum = gold.flatten.reduce{_+_}
+    val result_cksum = result.flatten.reduce{_+_}
     println("expected cksum: " + gold_cksum)
     println("result cksum:   " + result_cksum)
+    printMatrix(gold, "Gold")
+    printMatrix(result, "Result")
     // (0 until M*N) foreach { i => assert(result(i) == gold(i)) }
 
     val cksum = result_cksum == gold_cksum

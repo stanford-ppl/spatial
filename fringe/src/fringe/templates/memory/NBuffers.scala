@@ -81,8 +81,11 @@ class NBufMem(
   val bankingMode: BankingMode,
   val inits: Option[List[Double]] = None,
   val syncMem: Boolean = false,
-  val fracBits: Int = 0
+  val fracBits: Int = 0,
+  val myName: String = "NBuf"
 ) extends Module {
+
+  override def desiredName = myName
 
   // Overloaded constructers
   // Tuple unpacker
@@ -173,7 +176,7 @@ class NBufMem(
                         banks, strides, 
                         combinedXBarWMux, combinedXBarRMux,
                         flatDirectWMux, flatDirectRMux,
-                        bankingMode, inits, syncMem, fracBits))
+                        bankingMode, inits, syncMem, fracBits, "SRAM"))
       }
       // Route NBuf IO to SRAM IOs
       srams.zipWithIndex.foreach{ case (f,i) => 
@@ -295,7 +298,7 @@ class NBufMem(
       }
     case FFType => 
       val ffs = (0 until numBufs).map{ i => 
-        Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits)) 
+        Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, "FF")) 
       }
       ffs.foreach(_.io.reset := io.reset)
       // Route NBuf IO to FF IOs
@@ -361,7 +364,7 @@ class NBufMem(
         Module(new ShiftRegFile(logicalDims, bitWidth, 
                         combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
-                        inits, syncMem, fracBits, isBuf = {i != 0}))
+                        inits, syncMem, fracBits, isBuf = {i != 0}, "sr"))
       }
       rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(i).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{case(a,b) => a:=b}; rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap}
       rfs.foreach(_.io.reset := io.reset)
@@ -488,7 +491,7 @@ class NBufMem(
                                List(numrows,banks(1)), strides,
                                combinedXBarWMux, combinedXBarRMux,
                                flatDirectWMux, flatDirectRMux,
-                               bankingMode, inits, syncMem, fracBits))
+                               bankingMode, inits, syncMem, fracBits, "lb"))
 
       
       val numWriters = numXBarW + numDirectW

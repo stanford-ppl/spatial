@@ -239,6 +239,31 @@ trait ChiselGenCommon extends ChiselCodegen {
     (result, modified)
   }
 
+  protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {
+    y match {
+      case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop) => src"${x}_chain_read_${getSlot(ctrl)}"
+      case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop) => src"${x}_copy$ctrl"
+      case x => src"$x" 
+    }
+  }
+
+  protected def appendSuffix(ctrl: Sym[_], y: => String): String = {
+    y match {
+      case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop) => src"${x}_chain_read_${getSlot(ctrl)}"
+      case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop) => src"${x}_copy$ctrl"
+      case x => src"$x" 
+    }
+  }
+
+  protected def getSlot(lhs: Sym[_]): Int = {
+    lhs.parent.s.get.children.map(_.s.get).indexOf(lhs)
+  }
+  protected def parentAndSlot(lhs: Sym[_]): String = {
+    if (lhs.parent.s.isDefined) {
+      src"Some(${lhs.parent.s.get}, ${getSlot(lhs)})"
+    } else "None"
+  }
+
   final protected def getCtrSuffix(ctrl: Sym[_]): String = {
     if (ctrl.parent != Ctrl.Host) {
       if (ctrl.parent.isStreamControl) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}

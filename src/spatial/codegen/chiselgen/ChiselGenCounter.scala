@@ -72,7 +72,7 @@ trait ChiselGenCounter extends ChiselGenCommon {
                        src"""List(${counter_data.map(_._5)}), List(${counter_data.map(_._6)}), List(${counter_data.map(_._7)}), """ + 
                        src"""List(${counter_data.map(_._8)}), List(${ctrs.map(c => bitWidth(c.tp.typeArgs.head))}), myName = "${lhs}${suffix}_cchain"))""")
 
-      emit(src"""cchain.io.input.isStream := ${streamCopyWatchlist.contains(lhs)}.B""")
+      emit(src"""cchain.io.input.isStream := ${lhs.isOuterStreamLoop}.B""")
     }
     emit(src"${lhs}${suffix}.configure()")
 

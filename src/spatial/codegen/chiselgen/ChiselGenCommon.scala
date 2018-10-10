@@ -21,12 +21,7 @@ trait ChiselGenCommon extends ChiselCodegen {
 
 
   // Statistics counters
-  var pipeChainPassMap = new scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]
-  var pipeChainPassMapBug41Hack = new scala.collection.mutable.HashMap[Sym[_], Sym[_]]
-  var streamCopyWatchlist = List[Sym[_]]()
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
-  var validPassMap = new scala.collection.mutable.HashMap[Sym[_], Seq[Sym[_]]] // Map from a valid bound sym to its ctrl node, for computing suffix on a valid before we enter the ctrler
-  var accumsWithIIDlay = new scala.collection.mutable.ListBuffer[Sym[_]]
   var widthStats = new scala.collection.mutable.ListBuffer[Int]
   var depthStats = new scala.collection.mutable.ListBuffer[Int]
   var appPropertyStats = Set[AppProperties]()
@@ -104,41 +99,6 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
-  protected def enableRetimeMatch(en: Sym[_], lhs: Sym[_]): Double = { 
-    if (spatialConfig.enableRetiming) lhs.fullDelay else 0.0
-  }
-
-
-  def remappedEns(node: Sym[_], ens: List[Sym[_]]): String = {
-    var previousLevel: Sym[_] = node
-    var nextLevel: Option[Sym[_]] = Some(node.parent.s.get)
-    var result = ens.map(quote)
-    while (nextLevel.isDefined) {
-      if (nextLevel.get.isStreamControl) {
-        nextLevel.get match {
-          case Op(op: UnrolledForeach) =>
-            ens.foreach{ my_en_exact =>
-              val my_en = my_en_exact match { case Op(DelayLine(_,node)) => node; case _ => my_en_exact}
-              op.ens.foreach{ their_en =>
-                if (src"${my_en}" == src"${their_en}" & !src"${my_en}".contains("true")) {
-                  // Hacky way to avoid double-suffixing
-                  if (!src"$my_en".contains(src"_copy${previousLevel}") && !src"$my_en".contains("(") /* hack for remapping */) {  
-                    result = result.filter{a => !src"$a".contains(src"$my_en")} :+ swap(src"${my_en}_copy${previousLevel}", Blank)
-                  }
-                }
-              }
-            }
-          case _ => // do nothing
-        }
-        nextLevel = None
-      } else {
-        previousLevel = nextLevel.get
-        if (nextLevel.get.parent.s.isDefined) nextLevel = Some(nextLevel.get.parent.s.get)
-        else nextLevel = None
-      }
-    }
-    result.mkString("&")
-  }
 
   // Hack for gather/scatter/unaligned load/store, we want the controller to keep running
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
@@ -215,42 +175,20 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => 0
   }
 
-  final protected def appendChainPass(s: Sym[_], rawname: String): (String, Boolean) = {
-    var result = rawname
-    var modified = false
-    if (pipeChainPassMap.contains(s)) {
-      val siblings = pipeChainPassMap(s)
-      var nextLevel: Option[Sym[_]] = Some(controllerStack.head)
-      while (nextLevel.isDefined) {
-        if (siblings.contains(nextLevel.get)) {
-          if (siblings.indexOf(nextLevel.get) > 0) {result = result + s"_chain_read_${siblings.indexOf(nextLevel.get)}"}
-          modified = true
-          nextLevel = None
-        }
-        else if (pipeChainPassMapBug41Hack.contains(s) && pipeChainPassMapBug41Hack(s) == nextLevel.get) {
-          result = result + s"_chain_read_${siblings.length-1}"
-          modified = true
-          nextLevel = None
-        } else {
-          nextLevel = nextLevel.get.parent.s
-        }
-      }
-    }
-    (result, modified)
-  }
-
   protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {
+    val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
     y match {
-      case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop) => src"${x}_chain_read_${getSlot(ctrl)}"
-      case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop) => src"${x}_copy$ctrl"
+      case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
+      case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
       case x => src"$x" 
     }
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: => String): String = {
+    val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
     y match {
-      case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop) => src"${x}_chain_read_${getSlot(ctrl)}"
-      case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop) => src"${x}_copy$ctrl"
+      case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
+      case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x)) => src"${x}_copy$ctrl"
       case x => src"$x" 
     }
   }
@@ -264,34 +202,9 @@ trait ChiselGenCommon extends ChiselCodegen {
     } else "None"
   }
 
-  final protected def getCtrSuffix(ctrl: Sym[_]): String = {
-    if (ctrl.parent != Ctrl.Host) {
-      if (ctrl.parent.isStreamControl) {src"_copy${ctrl}"} else {getCtrSuffix(ctrl.parent.s.get)}
-    } else {
-      throw new Exception(s"Could not find LCA stream schedule for a bound sym that is definitely in a stream controller.  This error should be impossibru!")
-    }
-  }
-
-  final protected def appendStreamSuffix(s: Sym[_], rawname: String): (String, Boolean) = {
-    if (streamCopyWatchlist.contains(s)) (rawname + getCtrSuffix(controllerStack.head), true)
-    else                           (rawname,                                      false)
-  }
-
   override protected def quote(s: Sym[_]): String = s.rhs match {
-    case Def.Bound(id)  => 
-      val base = wireMap(super.quote(s) + alphaconv.getOrElse(super.quote(s), ""))
-      // val (pipelineRemap, pmod) = appendChainPass(s, base)
-      // val (streamRemap, smod) = appendStreamSuffix(s, base)
-      // if (pmod & smod) throw new Exception(s"ERROR: Seemingly impossible bound sym that is both part of a pipeline and a stream pipe!")
-      // if (smod) wireMap(streamRemap)
-      // else if (pmod) wireMap(pipelineRemap)
-      // else base
-      base
-    case Def.Node(_,_) => // Specifically places suffix on ctrchains
-      val base = wireMap(super.quote(s) + alphaconv.getOrElse(super.quote(s), ""))
-      val (streamRemap, smod) = appendStreamSuffix(s, base)
-      if (smod) wireMap(streamRemap)
-      else DLTrace(s).getOrElse(base)
+    case Def.Bound(id)  => super.quote(s)
+    case Def.Node(_,_) => DLTrace(s).getOrElse(super.quote(s))
     case _ => super.quote(s)
   }
 
@@ -301,42 +214,6 @@ trait ChiselGenCommon extends ChiselCodegen {
   def or(ens: => Set[String]): String = or(ens.toSeq)
   def and(ens: Seq[String]): String = if (ens.isEmpty) "true.B" else ens.mkString(" & ")
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
-    
-  def swap(tup: (Sym[_], RemapSignal)): String = swap(tup._1, tup._2)
-  def swap(lhs: Sym[_], s: RemapSignal): String = swap(src"$lhs", s)
-  def swap(lhs: Ctrl, s: RemapSignal): String = swap(src"${lhs.s.get}", s)
-
-  def swap(lhs: => String, s: RemapSignal): String = s match {
-    case En           => wireMap(src"${lhs}_en")
-    case Done         => wireMap(src"${lhs}_done")
-    case DoneCondition => wireMap(src"${lhs}_doneCondition")
-    case BaseEn       => wireMap(src"${lhs}_base_en")
-    case Mask         => wireMap(src"${lhs}_mask")
-    case Resetter     => wireMap(src"${lhs}_resetter")
-    case DatapathEn   => wireMap(src"${lhs}_datapath_en")
-    case CtrTrivial   => wireMap(src"${lhs}_ctr_trivial")
-    case IIDone       => wireMap(src"${lhs}_II_done")
-    case RstEn        => wireMap(src"${lhs}_rst_en")
-    case CtrEn        => wireMap(src"${lhs}_ctr_en")
-    case Ready        => wireMap(src"${lhs}_ready")
-    case Valid        => wireMap(src"${lhs}_valid")
-    case NowValid     => wireMap(src"${lhs}_now_valid")
-    case Inhibitor    => wireMap(src"${lhs}_inhibitor")
-    case Wren         => wireMap(src"${lhs}_wren")
-    case Chain        => wireMap(src"${lhs}_chain")
-    case Blank        => wireMap(src"$lhs")
-    case DataOptions  => wireMap(src"${lhs}_data_options")
-    case ValidOptions => wireMap(src"${lhs}_valid_options")
-    case ReadyOptions => wireMap(src"${lhs}_ready_options")
-    case EnOptions    => wireMap(src"${lhs}_en_options")
-    case RVec         => wireMap(src"${lhs}_rVec")
-    case WVec         => wireMap(src"${lhs}_wVec")
-    case Latency      => wireMap(src"${lhs}_latency")
-    case II           => wireMap(src"${lhs}_ii")
-    case SM           => wireMap(src"${lhs}_sm")
-    case Inhibit      => wireMap(src"${lhs}_inhibit")
-    case Flow      => wireMap(src"${lhs}_flow")
-  }
 
 }
 

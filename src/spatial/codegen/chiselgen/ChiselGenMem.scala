@@ -34,7 +34,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
     val parent = lhs.parent.s.get 
-    if (mem.isFIFOReg) src"${swap(parent, Done)}"
+    if (mem.isFIFOReg) src"${parent}.done"
     else               src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
   }
 
@@ -44,7 +44,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
-      val parent = lhs.parent
+      val parent = lhs.parent.s.get
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ mem

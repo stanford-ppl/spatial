@@ -9,10 +9,10 @@ trait PIRGenStream extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@StreamInNew(bus)  =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"StreamIn()")
+      stateMem(lhs, "StreamIn", None)
 
     case op@StreamOutNew(bus) =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"StreamOut()")
+      stateMem(lhs, "StreamOut", None)
 
     case op@StreamInBankedRead(strm, ens) =>
       stateRead(lhs, strm, None, None, ens)

@@ -6,7 +6,7 @@ import spatial.lang._
 import spatial.node._
 import emul.FixedPoint
 
-trait PIRGenFixPt extends PIRGenOp {
+trait PIRGenFixPt extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixInv(x)            => genOp(lhs, rhs)

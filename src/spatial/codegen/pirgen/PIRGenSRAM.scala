@@ -9,8 +9,7 @@ trait PIRGenSRAM extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op: SRAMNew[_,_] => 
-      val dims = lhs.constDims.zip(lhs.padding).map { case (d,p) => d + p }
-      stateStruct(lhs, lhs.asMem.A)(name => src"SRAM(dims=${dims})")
+      stateMem(lhs, "SRAM", None)
     case op@SRAMBankedRead(sram,bank,ofs,ens)       => 
       stateRead(lhs, sram, Some(bank), Some(ofs), ens)
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => 

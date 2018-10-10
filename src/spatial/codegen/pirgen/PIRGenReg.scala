@@ -5,32 +5,17 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
 
-trait PIRGenReg extends PIRCodegen with PIRGenMemories {
-
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@ArgInNew(init)  =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"ArgIn(init=$init)")
-      genAccel(lhs, rhs)
-    case op@HostIONew(init)  =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"HostIO(init=$init)")
-      genAccel(lhs, rhs)
-    case op@ArgOutNew(init) =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"ArgOut(init=$init)")
-      genAccel(lhs, rhs)
-    case SetReg(reg, v)  => emit(src"val $lhs = $reg.set($v)")
-    case GetReg(reg)     => emit(src"val $lhs = $reg.value")
-    case rhs => super.genHost(lhs, rhs)
-  }
+trait PIRGenReg extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegNew(init)    =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"Reg(init=$init)")
+      stateMem(lhs, "ArgIn", None)
 
     case op@ArgInNew(init)  =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"ArgIn(init=$init)")
+      stateMem(lhs, "HostIO", None)
 
     case op@HostIONew(init)  =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"HostIO(init=$init)")
+      stateMem(lhs, "ArgOut", None)
 
     case op@ArgOutNew(init) =>
       stateStruct(lhs, lhs.asMem.A)(name => src"ArgOut(init=$init)")

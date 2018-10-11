@@ -184,7 +184,7 @@ class NBufMem(
         xBarWMux.foreach { case (bufferPort, portMapping) =>
           val bufferBase = xBarWMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
           val sramXBarWPorts = portMapping.accessPars.length
-          val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (globals.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+          val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, 0 /*1*/) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramXBarWPorts).foreach {k => 
             f.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en.map(_ & wMask)
             f.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
@@ -197,7 +197,7 @@ class NBufMem(
         directWMux.foreach { case (bufferPort, portMapping) =>
           val bufferBase = directWMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
           val sramDirectWPorts = portMapping.accessPars.length
-          val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (globals.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+          val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, 0 /*1*/) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramDirectWPorts).foreach {k => 
             f.io.directW(bufferBase + k).en := io.directW(bufferBase + k).en.map(_ & wMask)
             f.io.directW(bufferBase + k).data := io.directW(bufferBase + k).data
@@ -232,8 +232,8 @@ class NBufMem(
           val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
           val outputBufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
           val sramXBarRPorts = portMapping.accessPars.length
-          val rMask = getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (globals.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-          val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (globals.retime) 1 else 0}) }
+          val rMask = getRetimed(ctrl.io.statesInR(bufferPort) === i.U, 0 /*1*/) // Check if ctrl is routing this bufferPort to this sram
+          val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, 0 /*1*/) }
           (0 until sramXBarRPorts).foreach {k => 
             val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
             val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
@@ -256,8 +256,8 @@ class NBufMem(
           val outputBufferBase = directRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
           val outputXBarRBase = xBarRMux.accessPars.sum
           val sramDirectRPorts = portMapping.accessPars.length
-          val rMask = getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (globals.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-          val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (globals.retime) 1 else 0}) }
+          val rMask = getRetimed(ctrl.io.statesInR(bufferPort) === i.U, 0 /*1*/) // Check if ctrl is routing this bufferPort to this sram
+          val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, 0 /*1*/) }
           (0 until sramDirectRPorts).foreach {k => 
             val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
             val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
@@ -280,7 +280,7 @@ class NBufMem(
         val outputXBarRBase = xBarRMux.accessPars.sum
         val outputDirectRBase = directRMux.accessPars.sum
         val sramXBarRPorts = broadcastRMux.accessPars.length
-        val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR.head === a.U, {if (globals.retime) 1 else 0}) }
+        val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR.head === a.U, 0 /*1*/) }
         (0 until sramXBarRPorts).foreach {k => 
           val port_width = broadcastRMux.accessPars(k)
           val k_base = broadcastRMux.accessPars.take(k).sum
@@ -307,7 +307,7 @@ class NBufMem(
         xBarWMux.foreach { case (bufferPort, portMapping) =>
           val bufferBase = xBarWMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
           val sramXBarWPorts = portMapping.accessPars.sum
-          val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (globals.retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
+          val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, 0 /*1*/) // Check if ctrl is routing this bufferPort to this sram
           (0 until sramXBarWPorts).foreach {k => 
             f.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en.map(_ & wMask)
             f.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
@@ -329,14 +329,14 @@ class NBufMem(
       xBarRMux.foreach { case (bufferPort, portMapping) => 
         val bufferBase = xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
         val sramXBarRPorts = portMapping.accessPars.sum
-        val sel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (globals.retime) 1 else 0}) }
+        val sel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, 0 /*1*/) }
         (0 until sramXBarRPorts).foreach {k => io.output.data(bufferBase+k) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data(0)})}
       }
 
       // TODO: BroadcastR connections?
       val xBarRBase = xBarRMux.accessPars.sum
       val sramBroadcastRPorts = broadcastRMux.accessPars.sum
-      val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR.head === a.U, {if (globals.retime) 1 else 0})}
+      val outSel = (0 until numBufs).map{ a => getRetimed(ctrl.io.statesInR.head === a.U, 0 /*1*/)}
       (0 until sramBroadcastRPorts).foreach {k => io.output.data(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output.data(0)}) }
       
     case FIFORegType => throw new Exception("NBuffered FIFOReg should be impossible?")

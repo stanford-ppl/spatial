@@ -104,6 +104,11 @@ package object access {
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
+    def parOrElse1: Int = a match {
+      case x: Writer[_] => x.ens.size
+      case x: Reader[_,_] => x.ens.size
+      case _ => 1
+    }
     def isPeek: Boolean = a match {
       case Op(_:FIFOPeek[_]) => true
       case _ => false

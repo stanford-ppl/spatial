@@ -157,7 +157,7 @@ trait ChiselGenController extends ChiselGenCommon {
               val ctr = lhs.cchains.head
               emit(src"""${ctr}.en := ${lhs}.sm.io.ctrInc & ${lhs}.iiDone & ${getForwardPressure(lhs.toCtrl)}""")
               if (getReadStreams(lhs.toCtrl).nonEmpty) emit(src"""${ctr}.reset := ${DL(src"${lhs}.done", 1, true)} // Do not use rst_en for stream kiddo""")
-              emit(src"""${ctr}.reset := ${lhs}.resetChildren""")
+              else emit(src"""${ctr}.reset := ${lhs}.resetChildren""")
               emit(src"""${lhs}.sm.io.ctrDone := ${DL(src"${ctr}.done", 1, true)}""")
             } else if (lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).nonEmpty & (lhs match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
               emit(src"""${lhs}.sm.io.ctrDone := ${lhs.children.filter(_.s.get != lhs).head.s.get}.done""")
@@ -182,16 +182,6 @@ trait ChiselGenController extends ChiselGenCommon {
     }
     scoped ++= useMap
     emit(src"${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top)")
-  }
-
-  private def emitSMObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, "Controllers.scala"){
-      // (0 until controllerStack.size).foreach{_ => state.incGenTab}
-      open(src"object $lhs extends SMObject{")
-        contents
-      close("}")
-      // (0 until controllerStack.size).foreach{_ => state.decGenTab}
-    }
   }
 
   private def emitSwitchAddition(lhs: Sym[_]): Unit = {
@@ -272,8 +262,8 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
           emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-          emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.accelReset; retime_counter.io.input.enable := true.B;""")
-          emit(src"""top.retime_released := ${DL("retime_counter.io.output.done",1)} // break up critical path by delaying this """)
+          emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
+          emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
 
           emit(src"""${lhs}.sm.io.parentAck := top.io.done""")
           visitBlock(func)

@@ -167,15 +167,6 @@ trait ChiselGenMem extends ChiselGenCommon {
     paddedInits.mkString("Some(List(",",","))")
   }
 
-  private def emitMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"m_${lhs}.scala"){
-      emitHeader()
-      open(src"object $lhs {")
-        contents
-      close("}")
-    }
-  }
-
   private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
     if (mem.dephasedAccesses.nonEmpty) appPropertyStats += HasDephasedAccess
     val inst = mem.instance

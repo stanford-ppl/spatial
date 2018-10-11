@@ -18,14 +18,6 @@ import spatial.util.spatialConfig
 trait ChiselGenCounter extends ChiselGenCommon {
 
 
-  private def emitCChainObject(lhs: Sym[_], suffix: String)(contents: => Unit): Unit = {
-    inGen(out, "CounterChains.scala"){
-      open(src"object $lhs$suffix extends CChainObject{")
-        contents
-      close("}")
-    }
-  }
-
   private def createStreamCChain(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
     forEachChild(lhs.owner){case (c,i) => 
       createCChain(lhs, ctrs, src"_copy${c}")
@@ -56,7 +48,7 @@ trait ChiselGenCounter extends ChiselGenCommon {
     passValues.foreach{vv => 
       val v = vv.replace(".get","")
       val outside_name = appendSuffix(lhs.owner, v)
-      emit(src"$lhs.set_$v(${outside_name})")
+      emit(src"$lhs$suffix.set_$v(${outside_name})")
     }
     emitCChainObject(lhs, suffix) {
       emit(src"// Owner = ${lhs.owner}")

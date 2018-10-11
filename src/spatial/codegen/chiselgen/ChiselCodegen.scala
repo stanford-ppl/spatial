@@ -16,7 +16,9 @@ import scala.collection.mutable
 trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTraversal {
   override val lang: String = "chisel"
   override val ext: String = "scala"
-  final val CODE_WINDOW: Int = 75
+  backend = "accel"
+  
+  final val CODE_WINDOW: Int = 50
 
   protected val scoped: mutable.Map[Sym[_],String] = new mutable.HashMap[Sym[_],String]()
   private var globalBlockID: Int = 0
@@ -57,6 +59,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
+    println(s"gen block $b, ${b.stms.length}")
     if (b.stms.length < CODE_WINDOW) {
       visitBlock(b)
     }
@@ -182,7 +185,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           emit("done := sm.io.done")
           emit("sm.io.enable := en")
           emit("resetChildren := sm.io.ctrRst")
-          emit("children.zipWithIndex.foreach{case (c, i) => c.baseEn := sm.io.enableOut(i); c.sm.io.parentAck := sm.io.childAck(i)}")
+          emit("children.zipWithIndex.foreach{case (c, i) => c.baseEn := sm.io.enableOut(i).D(1) && ~c.done.D(1); c.sm.io.parentAck := sm.io.childAck(i)}")
           emit("parent.foreach{case(p, idx) => p.sm.io.doneIn(idx) := done; p.sm.io.maskIn(idx) := mask}")
           emit("if (sm.p.sched == Streaming && cchains.nonEmpty) cchains.zipWithIndex.foreach{case (cc, i) => sm.io.ctrCopyDone(i) := cc.done; cc.reset := sm.io.ctrRst.D(1)}")
           emit("else if (sm.p.sched == Streaming) children.zipWithIndex.foreach{case (c, i) => sm.io.ctrCopyDone(i) := c.done}")

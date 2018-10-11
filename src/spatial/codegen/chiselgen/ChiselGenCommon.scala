@@ -104,11 +104,23 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedDeq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emit(src"$z = Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{
+      case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.deqActive_$a"
+        // "(" + or(x.enss.map{sigs => 
+        //   val lookedUpSigs = sigs.map{case b if (quote(b).startsWith("b")) => src"$b"; case b if (!quote(b).startsWith("b") & chunking) => src"""findBool("$b")"""; case b => src"$b"}
+        //   "(" + and(lookedUpSigs) + ")"
+        // }) + ")"
+    })
   }
 
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{case Op(x: FIFOBankedEnq[_]) => x.enss.map{y => y.filter(!_.trace.isConst).map{z => emit(src"$z = Wire(Bool())")}}; "(" + or(x.enss.map("(" + and(_) + ")")) + ")"})
+    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{
+      case a@Op(x: FIFOBankedEnq[_]) => src"${fifo}.enqActive_$a"
+        // "(" + or(x.enss.map{sigs => 
+        //   val lookedUpSigs = sigs.map{case b if (quote(b).startsWith("b")) => src"$b"; case b if (!quote(b).startsWith("b") & chunking) => src"""findBool("$b")"""; case b => src"$b"}
+        //   "(" + and(lookedUpSigs) + ")"
+        // }) + ")"
+    })
   }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
@@ -180,6 +192,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     y match {
       case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
       case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
+      case x if (x.isBranch) => src"${x}.data"
       case x => src"$x" 
     }
   }

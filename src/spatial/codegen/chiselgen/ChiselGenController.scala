@@ -127,6 +127,7 @@ trait ChiselGenController extends ChiselGenCommon {
   private def createKernel(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
+    chunking = willChunk(func:_*)
     val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }}.filterNot(_.isCounterChain)
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain)
     val inputs: Seq[Sym[_]] = (used diff made).filterNot{s => s.isMem || s.isValue }.toSeq
@@ -143,7 +144,7 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, src"sm_$lhs.scala"){
       emitHeader()
 
-      val ret = if (lhs.op.exists(_.R.isBits)) src"${lhs.op.get.R.tp}" else "Unit"
+      val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp)}" else "Unit"
       emit(src"/** BEGIN ${lhs.name} $lhs **/")
       open(src"object ${lhs}_kernel {")
         open(src"def run(")
@@ -181,13 +182,16 @@ trait ChiselGenController extends ChiselGenCommon {
       emitFooter()
     }
     scoped ++= useMap
-    emit(src"${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top)")
+    if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.data.r := ${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top).r")
+    else emit(src"${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top)")
+    chunking = false
   }
 
   private def emitSwitchAddition(lhs: Sym[_]): Unit = {
     open("override def configure(): Unit = {")
-      emit(src"datapathEn := parent.get._1.datapathEn")
+      emit("datapathEn := parent.get._1.datapathEn")
       emit("super.configure()")
+      emit("children.zipWithIndex.foreach{case (c,i) => c.baseEn := sm.io.selectsOut(i)}")
     close("}")
   }
 
@@ -235,10 +239,11 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""iiCtr.io.input.reset := sm.io.parentAck""")
         emit(src"""iiDone := iiCtr.io.output.done | ~mask""")
       }
+      if (lhs.op.exists(_.R.isBits)) emit(src"val data = Wire(${lhs.op.head.R})")
+      emit(src"val parent = ${parentAndSlot(lhs)}")
       emit(src"override val children = List[SMObject](${lhs.children.filter(_.s.get != lhs).map(_.s.get).map(quote).mkString(",")})")
       if (lhs.cchains.nonEmpty && !lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.cchains.head})")
       else if (lhs.cchains.nonEmpty && lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}.mkString(",")})")
-      emit(src"val parent = ${parentAndSlot(lhs)}")
       if (lhs.isSwitch) emitSwitchAddition(lhs)
     }
 
@@ -266,7 +271,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
 
           emit(src"""${lhs}.sm.io.parentAck := top.io.done""")
-          visitBlock(func)
+          gen(func)
 
           emit(src"""val done_latch = Module(new SRFF())""")
           if (earlyExits.nonEmpty) {
@@ -287,7 +292,7 @@ trait ChiselGenController extends ChiselGenCommon {
       enterCtrl(lhs)
       createSMObject(lhs, false)
       createKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {
-        ctrl.bodies.flatMap{_.blocks.map(_._2)}.foreach{b => visitBlock(b); ()}
+        ctrl.bodies.flatMap{_.blocks.map(_._2)}.foreach{b => gen(b); ()}
       }
       exitCtrl(lhs)
 
@@ -308,10 +313,10 @@ trait ChiselGenController extends ChiselGenCommon {
       }
 
       createKernel(lhs, Set(), body) {
-        visitBlock(body)
+        gen(body)
         if (op.R.isBits) {
           emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
-          selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
+          selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}.data") }
           emit(src"Mux1H(${lhs}_onehot_selects, ${lhs}_data_options)")
         }
       }
@@ -324,7 +329,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
       createKernel(lhs, Set(), body) {
         emit(s"// Controller Stack: ${controllerStack.tail}")
-        visitBlock(body)
+        gen(body)
         if (op.R.isBits) {
           emit(src"${body.result}")
         }
@@ -341,9 +346,9 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"val ${lhs}_doneCondition = Wire(Bool())")
         emit(src"${state}.r := ${lhs}.sm.io.state.r")
 
-        visitBlock(notDone)
-        visitBlock(action)
-        visitBlock(nextState)
+        gen(notDone)
+        gen(action)
+        gen(nextState)
 
         emit(src"${lhs}.sm.io.nextState := ${nextState.result}.r.asSInt ")
         emit(src"${lhs}.sm.io.initState := ${start}.r.asSInt")
@@ -358,15 +363,15 @@ trait ChiselGenController extends ChiselGenCommon {
       // emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
 
       // emit("// Emitting notDone")
-      // visitBlock(notDone)
+      // gen(notDone)
 
       // emit("// Emitting action")
       // inSubGen(src"${lhs}", src"${parent_kernel}") {
       //   emit(s"// Controller Stack: ${controllerStack.tail}")
-      //   visitBlock(action)
+      //   gen(action)
       // }
       // emit("// Emitting nextState")
-      // visitBlock(nextState)
+      // gen(nextState)
       // emit(src"${lhs}.sm.io.enable := ${lhs}.en ")
       // emit(src"${lhs}.sm.io.nextState := ${nextState.result}.r.asSInt ")
       // emit(src"${lhs}.sm.io.initState := ${start}.r.asSInt")

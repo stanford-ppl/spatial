@@ -15,8 +15,8 @@ trait ChiselGenMem extends ChiselGenCommon {
   private var nbufs: List[Sym[_]] = List()
   private var memsWithReset: List[Sym[_]] = List()
 
-  val zipThreshold = 100 // Max number of characters before deciding to split line into many
   private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
+    val zipThreshold = 100 max payload.map(_.size).sorted.headOption.getOrElse(0) // Max number of characters before deciding to split line into many
     val totalPayload = payload.mkString(src"List[$tp](", ",", ")")
     if (totalPayload.length < zipThreshold) {
       val rdPayload = totalPayload + suffix
@@ -262,6 +262,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     emitMemObject(mem) {
       emit(src"""val m = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $BXBarW $BXBarR $bankingMode, $initStr, ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}, myName = "$mem"))""")
+      if (name == "FIFO") {
+        mem.writers.foreach{x => emit(src"val enqActive_$x = Wire(Bool())")}
+        mem.readers.foreach{x => emit(src"val deqActive_$x = Wire(Bool())")}
+      }
       if (mem.resetters.isEmpty) emit(src"m.io.reset := false.B")
     }
   }
@@ -389,17 +393,21 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostFull")
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.m.io.output.data(0)")
     case FIFONumel(fifo,_)   => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
-    case op@FIFOBankedDeq(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
-    case FIFOBankedEnq(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
+    case op@FIFOBankedDeq(fifo, ens) => 
+      emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
+      emit(src"$fifo.deqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})")
+    case FIFOBankedEnq(fifo, data, ens) => 
+      emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
+      emit(src"$fifo.enqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})")
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, "LIFO", None)
-    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
-    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
-    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
-    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@LIFOPeek(fifo,_) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
+    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.empty")
+    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostFull")
+    case op@LIFOPeek(fifo,_) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.m.io.output.data(0)")
+    case LIFONumel(fifo,_)   => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     

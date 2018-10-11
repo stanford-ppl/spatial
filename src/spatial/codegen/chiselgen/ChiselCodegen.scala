@@ -22,6 +22,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   protected val scoped: mutable.Map[Sym[_],String] = new mutable.HashMap[Sym[_],String]()
   private var globalBlockID: Int = 0
+  protected var chunking: Boolean = false
 
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {
@@ -29,7 +30,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         case _: AccelScope       => s"RootController"
         case DelayLine(size, data) => data match {
           case Const(_) => src"$data"
-          case _ => src"${data}_D$size"
+          case _ => super.named(s, id)
         }
         case _ => super.named(s, id)
       }
@@ -57,9 +58,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     super.emitHeader()
   }
 
+  protected def willChunk(b: Block[_]*): Boolean = b.toSeq.map(_.stms.length).sum >= CODE_WINDOW
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    println(s"gen block $b, ${b.stms.length}")
     if (b.stms.length < CODE_WINDOW) {
       visitBlock(b)
     }
@@ -81,12 +82,20 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           chunk.foreach{s => visit(s) }
           val live = chunk.filter(isLive)
           emit("Map[String,Any](" + live.map{s => src""""$s" -> $s""" }.mkString(", ") + ")")
-          scoped ++= live.map{s => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${s.tp}]"""}
+          scoped ++= live.map{s => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${arg(s.tp)}]"""}
           close("}")
         close("}")
         emit(src"val block${blockID}chunk$chunkID: Map[String, Any] = block${blockID}Chunker$chunkID.gen()")
         chunkID += 1
       }
+      // open("def findBool(x: String): Bool = {")
+      //   Seq.tabulate(chunkID){i => 
+      //     if (i == 0)           emit(src"""if (block${blockID}chunk${i}.contains(x)) block${blockID}chunk${i}(x).asInstanceOf[Bool]""")
+      //     else if (i < chunkID) emit(src"""else if (block${blockID}chunk${i}.contains(x)) block${blockID}chunk${i}(x).asInstanceOf[Bool]""")
+      //     else                  emit(src"""else block${blockID}chunk${i}(x).asInstanceOf[Bool]""")
+      //   }
+      //   emit(src"")
+      // close("}")
     }
     if (withReturn) emit(src"${b.result}")
   }
@@ -378,6 +387,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case FltPtType(m,e) => s"FloatingPoint"
     case BitType() => "Bool"
     case tp: Vec[_] => src"Vec[${arg(tp.typeArgs.head)}]"
+    case _: Struct[_] => s"UInt"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => super.remap(tp)
   }

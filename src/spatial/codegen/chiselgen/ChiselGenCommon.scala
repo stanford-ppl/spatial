@@ -188,23 +188,27 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {
-    val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
-    y match {
-      case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
-      case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
-      case x if (x.isBranch) => src"${x}.data"
-      case x => src"$x" 
-    }
+    if (ctrl.parent.s.exists) {
+      val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
+      y match {
+        case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
+        case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
+        case x if (x.isBranch) => src"${x}.data"
+        case x => src"$x" 
+      }
+    } else src"$y"
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: => String): String = {
-    val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
-    y match {
-      case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
-      case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x)) => src"${x}_copy$ctrl"
-      case x => src"$x" 
+    if (ctrl.parent.s.exists) {
+      val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
+      y match {
+        case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
+        case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x)) => src"${x}_copy$ctrl"
+        case x => src"$x" 
+      }
     }
-  }
+  } else src"$y"
 
   protected def getSlot(lhs: Sym[_]): Int = {
     lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)

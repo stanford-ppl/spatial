@@ -207,8 +207,8 @@ trait ChiselGenCommon extends ChiselCodegen {
         case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x)) => src"${x}_copy$ctrl"
         case x => src"$x" 
       }
-    }
-  } else src"$y"
+    } else src"$y"
+  }
 
   protected def getSlot(lhs: Sym[_]): Int = {
     lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)

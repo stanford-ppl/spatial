@@ -13,8 +13,6 @@ import spatial.util.spatialConfig
 trait ChiselGenMath extends ChiselGenCommon {
 
   // Cut back on code size by replacing long strings
-  var ensigs = new scala.collection.mutable.ListBuffer[String]
-
   private def newEnsig(code: String): String = {
     emit(s"val ensig${ensigs.size} = Wire(Bool())")
     emit(s"ensig${ensigs.size} := $code")
@@ -68,7 +66,7 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixNeg(x)   => emit(src"$lhs.r := Math.neg($x,$lat, $backpressure).r")
       case FixAdd(x,y) => emit(src"$lhs.r := Math.add($x,$y,$lat, $backpressure, Truncate, Wrapping).r")
       case FixSub(x,y) => emit(src"$lhs.r := Math.sub($x,$y,$lat, $backpressure, Truncate, Wrapping).r")
-      case FixAnd(x,y)  => println(s"TRYNA EMIT $lhs");emit(src"$lhs.r := Math.and($x,$y,$lat, $backpressure).r")
+      case FixAnd(x,y)  => emit(src"$lhs.r := Math.and($x,$y,$lat, $backpressure).r")
       case FixOr(x,y)   => emit(src"$lhs.r := Math.or($x,$y,$lat, $backpressure).r")
       case FixXor(x,y)  => emit(src"$lhs.r := Math.xor($x,$y,$lat, $backpressure).r")
       case SatAdd(x,y) => emit(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")

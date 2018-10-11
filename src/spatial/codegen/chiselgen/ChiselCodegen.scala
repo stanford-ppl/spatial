@@ -25,6 +25,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected val scoped: mutable.Map[Sym[_],String] = new mutable.HashMap[Sym[_],String]()
   private var globalBlockID: Int = 0
   protected var chunking: Boolean = false
+  protected var ensigs = new scala.collection.mutable.ListBuffer[String]
 
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {
@@ -75,7 +76,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    if (willChunk(b)) {
+    if (!willChunk(b)) {
       visitBlock(b)
     }
     else {
@@ -90,14 +91,15 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       // Memories are always global in scala generation right now
       def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists(_._1.nestedInputs.contains(s)))
       while (remain.nonEmpty) {
+        ensigs = new scala.collection.mutable.ListBuffer[String]
         val num_stm = weightedWindow(remain.map(_._2).toList, CODE_WINDOW)
         chunk = remain.take(num_stm)
         remain = remain.drop(num_stm)
-        open(src"object block${blockID}Chunker$chunkID { // ${chunk.size} nodes")
+        open(src"object block${blockID}Chunker$chunkID { // ${chunk.size} nodes, ${chunk.map(_._2).sum} weight")
           open(src"def gen(): Map[String, Any] = {")
           chunk.foreach{s => visit(s._1) }
           val live = chunk.map(_._1).filter(isLive)
-          emit("Map[String,Any](" + live.map{s => src""""$s" -> $s""" }.mkString(", ") + ")")
+          emit("Map[String,Any](" + live.map{case s if (s.isBranch) => src""""$s" -> $s.data"""; case s => src""""$s" -> $s""" }.mkString(", ") + ")")
           scoped ++= live.map{s => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${arg(s.tp)}]"""}
           close("}")
         close("}")

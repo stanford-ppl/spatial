@@ -34,21 +34,24 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
     val parent = lhs.parent.s.get 
-    if (mem.isFIFOReg) src"${parent}.done"
-    else               src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
+    val sfx = if (parent.isBranch) "_obj" else ""
+    if (mem.isFIFOReg) src"${parent}$sfx.done"
+    else               src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {
     val parent = lhs.parent.s.get 
-    val flowEnable = src"${parent}.sm.io.flow"
-    src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)} & $flowEnable"""
+    val sfx = if (parent.isBranch) "_obj" else ""
+    val flowEnable = src"${parent}$sfx.sm.io.flow"
+    src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       val parent = lhs.parent.s.get
+      val sfx = if (parent.isBranch) "_obj" else ""
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ mem
-        val invisibleEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
+        val invisibleEnable = src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
         emit(src"${mem}.m.io.reset := ${invisibleEnable} & ${and(en)}")
       }
   }
@@ -59,9 +62,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get 
+    val sfx = if (parent.isBranch) "_obj" else ""
     // if (lhs.parent.stage == -1) emitControlSignals(parent)
     val invisibleEnable = invisibleEnableRead(lhs,mem)
-    val flowEnable = src",${parent}.flow"
+    val flowEnable = src",${parent}$sfx.flow"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -106,8 +110,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
     val parent = lhs.parent.s.get
+    val sfx = if (parent.isBranch) "_obj" else ""
     // if (lhs.parent.stage == -1) emitControlSignals(parent)
-    val flowEnable = src"${parent}.flow"
+    val flowEnable = src"${parent}$sfx.flow"
     val invisibleEnable = invisibleEnableWrite(lhs)
     val ofsWidth = if (!mem.isLineBuffer) 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
                    else 1 max Math.ceil(scala.math.log(paddedDims(mem,name).last / mem.instance.nBanks.last) / scala.math.log(2)).toInt
@@ -349,21 +354,23 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegAccumOp(reg, data, ens, t, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val parent = lhs.parent.s.get
+      val sfx = if (parent.isBranch) "_obj" else ""
       val invisibleEnable = invisibleEnableRead(lhs,reg)
       emit(src"${reg}.m.io.input1($index) := $data.r")
       emit(src"${reg}.m.io.enable($index) := ${and(ens)} && $invisibleEnable")
-      emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}.sm.io.ctrDone", lhs.fullDelay, true)}")
+      emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}$sfx.sm.io.ctrDone", lhs.fullDelay, true)}")
       emit(src"${reg}.m.io.first($index) := ${first}")
       emit(src"val ${lhs} = Wire(${lhs.tp})")
       emit(src"${lhs}.r := ${reg}.m.io.output")
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val parent = lhs.parent.s.get
+      val sfx = if (parent.isBranch) "_obj" else ""
       val invisibleEnable = invisibleEnableRead(lhs,reg)
       emit(src"${reg}.m.io.input1($index) := $data1.r")
       emit(src"${reg}.m.io.input2($index) := $data2.r")
       emit(src"${reg}.m.io.enable($index) := ${and(ens)} && $invisibleEnable")
-      emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}.sm.io.ctrDone", lhs.fullDelay, true)}")
+      emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}$sfx.sm.io.ctrDone", lhs.fullDelay, true)}")
       emit(src"${reg}.m.io.first($index) := ${first}")
       emit(src"val ${lhs} = Wire(${lhs.tp})")
       emit(src"${lhs}.r := ${reg}.m.io.output")
@@ -470,7 +477,8 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def connectBufSignals(mem: Sym[_]): Unit = {
     val info = bufferControlInfo(mem)
     info.zipWithIndex.foreach{ case (node, port) => 
-      emit(src"""${mem}.m.connectStageCtrl(${DL(src"${node}.done", 1, true)}, ${node}.baseEn, ${port})""")
+      val sfx = if (node.isBranch) "_obj" else ""
+      emit(src"""${mem}.m.connectStageCtrl(${DL(src"${node}$sfx.done", 1, true)}, ${node}$sfx.baseEn, ${port})""")
     }
   }
 

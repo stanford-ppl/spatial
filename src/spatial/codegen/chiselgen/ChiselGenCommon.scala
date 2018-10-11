@@ -165,7 +165,8 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val backpressure = if (controllerStack.nonEmpty) src"${controllerStack.head}.sm.io.flow" else "true.B"
+    val sfx = if (controllerStack.nonEmpty && controllerStack.head.isBranch) "_obj" else ""
+    val backpressure = if (controllerStack.nonEmpty) src"${controllerStack.head}$sfx.sm.io.flow" else "true.B"
     if (isBit) src"(${name}).DS(${latency}.toInt, top.rr, $backpressure)"
     else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
@@ -193,7 +194,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       y match {
         case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
         case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
-        case x if (x.isBranch) => src"${x}.data"
+        // case x if (x.isBranch) => src"${x}.data"
         case x => src"$x" 
       }
     } else src"$y"
@@ -215,7 +216,8 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def parentAndSlot(lhs: Sym[_]): String = {
     if (lhs.parent.s.isDefined) {
-      src"Some(${lhs.parent.s.get}, ${getSlot(lhs)})"
+      val sfx = if (lhs.parent.s.get.isBranch) "_obj" else ""
+      src"Some(${lhs.parent.s.get}$sfx, ${getSlot(lhs)})"
     } else "None"
   }
 
@@ -253,7 +255,8 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def emitSMObject(lhs: Sym[_])(contents: => Unit): Unit = {
     inGen(out, "Controllers.scala"){
       // (0 until controllerStack.size).foreach{_ => state.incGenTab}
-      open(src"object $lhs extends SMObject{")
+      val suffix = if (lhs.isBranch) "_obj" else ""
+      open(src"object $lhs$suffix extends SMObject{")
         contents
       close("}")
       // (0 until controllerStack.size).foreach{_ => state.decGenTab}

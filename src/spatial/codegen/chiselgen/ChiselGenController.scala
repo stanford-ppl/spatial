@@ -128,8 +128,8 @@ trait ChiselGenController extends ChiselGenCommon {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
     chunking = willChunk(func:_*)
-    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }}.filterNot(_.isCounterChain)
-    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain)
+    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }}.filterNot(_.isCounterChain).filterNot(_.isCounter)
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).filterNot(_.isCounter)
     val inputs: Seq[Sym[_]] = (used diff made).filterNot{s => s.isMem || s.isValue }.toSeq
     val isInner = lhs.isInnerControl
 
@@ -191,7 +191,7 @@ trait ChiselGenController extends ChiselGenCommon {
     open("override def configure(): Unit = {")
       emit("datapathEn := parent.get._1.datapathEn")
       emit("super.configure()")
-      emit("children.zipWithIndex.foreach{case (c,i) => c.baseEn := sm.io.selectsOut(i)}")
+      if (lhs.isInnerControl) emit("children.zipWithIndex.foreach{case (c,i) => c.baseEn := sm.io.selectsOut(i)}")
     close("}")
   }
 

@@ -5,8 +5,10 @@ import argon.codegen.FileDependencies
 import emul.{Bool, FloatPoint, FixedPoint}
 import spatial.codegen.naming._
 import spatial.lang._
-import spatial.metadata.memory._
 import spatial.node._
+import spatial.metadata.memory._
+import spatial.metadata.control._
+import spatial.metadata.access._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 
@@ -58,29 +60,43 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     super.emitHeader()
   }
 
-  protected def willChunk(b: Block[_]*): Boolean = b.toSeq.map(_.stms.length).sum >= CODE_WINDOW
+  /** Returns list of stms that are not in a broadcast path, and the "weight" of the stm */
+  protected def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.filter(!_.isBroadcastAddr).map{x => (x, x.parOrElse1)}
+  protected def willChunk(b: Block[_]*): Boolean = printableStms(b.toSeq.flatMap(_.stms)).map(_._2).sum >= CODE_WINDOW
+  protected def weightedWindow(l: List[Int], limit: Int): Int = {
+    @annotation.tailrec
+    def take0(list: List[Int], accList: List[Int], accSum: Int) : List[Int] =
+      list match {
+        case h :: t if accSum + h < limit =>  
+          take0(t, h :: accList, h + accSum)
+        case _ => accList
+      }
+    take0(l, Nil, 0).size
+  }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    if (b.stms.length < CODE_WINDOW) {
+    if (willChunk(b)) {
       visitBlock(b)
     }
     else {
+      val stmsToEmit = printableStms(b.stms)
       globalBlockID += 1
       // TODO: More hierarchy? What if the block is > CODE_WINDOW * CODE_WINDOW size?
       val blockID: Int = globalBlockID
       var chunkID: Int = 0
-      var chunk: Seq[Sym[_]] = Nil
-      var remain: Seq[Sym[_]] = b.stms
+      var chunk: Seq[(Sym[_], Int)] = Nil
+      var remain: Seq[(Sym[_], Int)] = stmsToEmit
       // TODO: Other ways to speed this up?
       // Memories are always global in scala generation right now
-      def isLive(s: Sym[_]): Boolean = !s.isMem && (b.result == s || remain.exists(_.nestedInputs.contains(s)))
+      def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists(_._1.nestedInputs.contains(s)))
       while (remain.nonEmpty) {
-        chunk = remain.take(CODE_WINDOW)
-        remain = remain.drop(CODE_WINDOW)
-        open(src"object block${blockID}Chunker$chunkID {")
+        val num_stm = weightedWindow(remain.map(_._2).toList, CODE_WINDOW)
+        chunk = remain.take(num_stm)
+        remain = remain.drop(num_stm)
+        open(src"object block${blockID}Chunker$chunkID { // ${chunk.size} nodes")
           open(src"def gen(): Map[String, Any] = {")
-          chunk.foreach{s => visit(s) }
-          val live = chunk.filter(isLive)
+          chunk.foreach{s => visit(s._1) }
+          val live = chunk.map(_._1).filter(isLive)
           emit("Map[String,Any](" + live.map{s => src""""$s" -> $s""" }.mkString(", ") + ")")
           scoped ++= live.map{s => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${arg(s.tp)}]"""}
           close("}")

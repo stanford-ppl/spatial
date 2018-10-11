@@ -188,7 +188,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {
-    if (ctrl.parent.s.exists) {
+    if (ctrl.parent.s.isDefined) {
       val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
       y match {
         case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
@@ -200,7 +200,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: => String): String = {
-    if (ctrl.parent.s.exists) {
+    if (ctrl.parent.s.isDefined) {
       val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
       y match {
         case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x)) => src"${x}_chain_read_${getSlot(ctrl)}"

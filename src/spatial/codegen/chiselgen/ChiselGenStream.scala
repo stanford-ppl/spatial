@@ -15,28 +15,22 @@ trait ChiselGenStream extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
       val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
-      inGen(out, src"bus_${lhs}.scala") {
-        emitHeader()
-        forceEmit(src"object ${lhs} {")
-        forceEmit(src"  val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
-        forceEmit(src"  val ready = ready_options.reduce{_|_}")
-        forceEmit(src"  val now_valid = Wire(Bool())")
-        forceEmit(src"  val valid = Wire(Bool())")
-        forceEmit(src"  val m = Wire(${lhs.readers.toList.head.tp})")
-        forceEmit(src"}")
+      emitBusObject(lhs){
+        forceEmit(src"val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
+        forceEmit(src"val ready = ready_options.reduce{_|_}")
+        forceEmit(src"val now_valid = Wire(Bool())")
+        forceEmit(src"val valid = Wire(Bool())")
+        forceEmit(src"val m = Wire(${lhs.readers.toList.head.tp})")
       }
 
     case StreamOutNew(bus) =>
       val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
-      inGen(out, src"bus_${lhs}.scala") {
-        emitHeader()
-        forceEmit(src"object ${lhs} {")
-        forceEmit(src"  val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
-        forceEmit(src"  val valid = valid_options.reduce{_|_}")
-        forceEmit(src"  val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
-        forceEmit(src"  val m = Vec((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
-        forceEmit(src"  val ready = Wire(Bool())")
-        forceEmit(src"}")
+      emitBusObject(lhs){
+        forceEmit(src"val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
+        forceEmit(src"val valid = valid_options.reduce{_|_}")
+        forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
+        forceEmit(src"val m = Vec((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
+        forceEmit(src"val ready = Wire(Bool())")
       }	    
 
     case StreamOutBankedWrite(stream, data, ens) =>

@@ -215,6 +215,43 @@ trait ChiselGenCommon extends ChiselCodegen {
   def and(ens: Seq[String]): String = if (ens.isEmpty) "true.B" else ens.mkString(" & ")
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
 
+  protected def emitMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
+    inGen(out, src"m_${lhs}.scala"){
+      emitHeader()
+      open(src"object $lhs {")
+        contents
+      close("}")
+    }
+  }
+
+  protected def emitBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
+    inGen(out, src"bus_${lhs}.scala"){
+      emitHeader()
+      open(src"object $lhs {")
+        contents
+      close("}")
+    }
+  }
+
+  protected def emitSMObject(lhs: Sym[_])(contents: => Unit): Unit = {
+    inGen(out, "Controllers.scala"){
+      // (0 until controllerStack.size).foreach{_ => state.incGenTab}
+      open(src"object $lhs extends SMObject{")
+        contents
+      close("}")
+      // (0 until controllerStack.size).foreach{_ => state.decGenTab}
+    }
+  }
+
+  protected def emitCChainObject(lhs: Sym[_], suffix: String)(contents: => Unit): Unit = {
+    inGen(out, "CounterChains.scala"){
+      open(src"object $lhs$suffix extends CChainObject{")
+        contents
+      close("}")
+    }
+  }
+
+
 }
 
 

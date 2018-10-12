@@ -26,7 +26,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   private var globalBlockID: Int = 0
   protected var chunking: Boolean = false
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
-  protected var noscope = false
 
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {
@@ -41,8 +40,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case _ => super.named(s, id)
     }
 
-    // If we are emitting for an object file (Counter, Controller, Mem, etc.), do not look up val in "scoped"
-    if (!noscope) scoped.getOrElse(s, name) else name
+    scoped.getOrElse(s, name)
   }
 
   override def emitHeader(): Unit = {
@@ -77,15 +75,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     take0(l, Nil, 0).size
   }
 
-  /** Because chisel gen emits all counters when it visits the CounterChainNew, we need to 
-    * forward the nestedInputs of the CounterNews through to the CounterChainNew.  
-    * TODO: Generate CounterNew and CounterChainNew properly so this isn't a thing
-    */
-  protected def nestedInputsCtr(s: Sym[_]): Set[Sym[_]] = s match {
-    case Op(CounterChainNew(ctrs)) => s.nestedInputs ++ ctrs.flatMap(_.nestedInputs).toSet
-    case _ => s.nestedInputs
-  }
-
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
     if (!willChunk(b)) {
       visitBlock(b)
@@ -100,7 +89,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       var remain: Seq[(Sym[_], Int)] = stmsToEmit
       // TODO: Other ways to speed this up?
       // Memories are always global in scala generation right now
-      def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists{r => nestedInputsCtr(r._1).contains(s)})
+      def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists(_._1.nestedInputs.contains(s)))
       while (remain.nonEmpty) {
         ensigs = new scala.collection.mutable.ListBuffer[String]
         val num_stm = weightedWindow(remain.map(_._2).toList, CODE_WINDOW)
@@ -261,19 +250,35 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     inGen(out, "CounterChains.scala"){
       emitHeader()
 
+      open(s"abstract trait CtrObject {")
+        emit("var start: Either[Option[Int],FixedPoint] = Left(None)")
+        emit("var stop: Either[Option[Int],FixedPoint] = Left(None)")
+        emit("var step: Either[Option[Int],FixedPoint] = Left(None)")
+        emit("val par: Int")
+        emit("val width: Int")
+        emit("")
+        emit("def fixedStart: Option[Int] = start match {case Left(x) => x; case Right(x) => None}")
+        emit("def fixedStop: Option[Int] = stop match {case Left(x) => x; case Right(x) => None}")
+        emit("def fixedStep: Option[Int] = step match {case Left(x) => x; case Right(x) => None}")
+        emit("def set_start(x: Int): Unit = {start = Left(Some(x))}")
+        emit("def set_stop(x: Int): Unit = {stop = Left(Some(x))}")
+        emit("def set_step(x: Int): Unit = {step = Left(Some(x))}")
+        emit("def set_start(x: FixedPoint): Unit = {start = Right(x)}")
+        emit("def set_stop(x: FixedPoint): Unit = {stop = Right(x)}")
+        emit("def set_step(x: FixedPoint): Unit = {step = Right(x)}")
+      close("}")
+
       open(s"abstract trait CChainObject {")
         emit("val done = Wire(Bool())")
         emit("val en = Wire(Bool())")
         emit("val reset = Wire(Bool())")
-        emit("val strides: List[FixedPoint]")
-        emit("val stops: List[FixedPoint]")
-        emit("val starts: List[FixedPoint]")
+        emit("val ctrs: List[CtrObject] = Nil")
         emit("val cchain: CounterChain")
         emit("")
         open("def configure(): Unit = {")
-          emit("cchain.io.input.stops.zip(stops).foreach{case (port,stop) => port := stop.r.asSInt}")
-          emit("cchain.io.input.strides.zip(strides).foreach{case (port,stride) => port := stride.r.asSInt}")
-          emit("cchain.io.input.starts.zip(starts).foreach{case (port,start) => port := start.r.asSInt}")
+          emit("cchain.io.input.stops.zip(ctrs.map(_.stop)).foreach{case (port,Right(stop)) => port := stop.r.asSInt; case (_,_) => }")
+          emit("cchain.io.input.strides.zip(ctrs.map(_.step)).foreach{case (port,Right(stride)) => port := stride.r.asSInt; case (_,_) => }")
+          emit("cchain.io.input.starts.zip(ctrs.map(_.start)).foreach{case (port,Right(start)) => port := start.r.asSInt; case (_,_) => }")
           emit("cchain.io.input.saturate := true.B")
           emit("cchain.io.input.enable := en")
           emit("done := cchain.io.output.done")

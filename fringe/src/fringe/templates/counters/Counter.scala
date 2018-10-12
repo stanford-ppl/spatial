@@ -263,7 +263,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     else if (gap.isDefined) { io.input.stride * par.S(width.W) + gap.get.S(width.W)}
     else { io.input.stride * par.S(width.W) + io.input.gap}
     val newvals = counts.map( _ + delta)
-    val isMax = Mux(io.input.stride >= 0.S(width.W),
+    val isMax = Mux({if (stride.isDefined) stride.get.S(width.W) else io.input.stride} >= 0.S(width.W),
       newvals(0) >= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop},
       newvals(0) <= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop}
     )

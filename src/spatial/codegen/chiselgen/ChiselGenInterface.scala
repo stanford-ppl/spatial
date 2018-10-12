@@ -271,6 +271,14 @@ trait ChiselGenInterface extends ChiselGenCommon {
       argIOs.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+hostDrams.toList.length}")}
       emit("\n// ArgOuts")
       argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+hostDrams.toList.length+argIOs.toList.length}")}
+      emit("\n// Instrumentation Counters")
+      instrumentCounters.zipWithIndex.foreach{case ((s,_), i) => 
+        emit(src"val ${quote(s).toUpperCase}_cycles_arg = ${argIOs.toList.length + argOuts.toList.length + 2*i}")
+        emit(src"val ${quote(s).toUpperCase}_iters_arg = ${argIOs.toList.length + argOuts.toList.length + 2*i + 1}")
+      }
+      earlyExits.foreach{x => 
+        emit(src"val ${quote(x).toUpperCase}_exit_arg = ${argOuts.toList.length + argIOs.toList.length + instrumentCounters.toList.length}")
+      }
       close("}")
     }
     super.emitPostMain()

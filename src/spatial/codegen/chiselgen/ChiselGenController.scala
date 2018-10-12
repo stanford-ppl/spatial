@@ -20,49 +20,10 @@ trait ChiselGenController extends ChiselGenCommon {
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
   private var memsWithReset: List[Sym[_]] = List()
 
-  var instrumentCounters: List[(Sym[_], Int)] = List()
-
-  /* For every iter we generate, we track the children it may be used in.
-     Given that we are quoting one of these, look up if it has a map entry,
-     and keep getting parents of the currentController until we find a match or 
-     get to the very top
-  */
-
-
-  def createBreakpoint(lhs: Sym[_], id: Int): Unit = {
-    // emitInstrumentation(src"top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + top.io_numArgOuts_instr + $id).bits := 1.U")
-    // emitInstrumentation(src"top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + top.io_numArgOuts_instr + $id).valid := breakpoints($id)")
-  }
-
-  def createInstrumentation(lhs: Sym[_]): Unit = {
-    if (spatialConfig.enableInstrumentation) {
-      // val ctx = s"${lhs.ctx}"
-      // emitInstrumentation(src"""// Instrumenting $lhs, context: ${ctx}, depth: ${controllerStack.length}""")
-      // val id = instrumentCounters.length
-      // if (spatialConfig.compressWires == 1 || spatialConfig.compressWires == 2) {
-      //   emitInstrumentation(src"ic(${id*2}).io.enable := ${lhs}.en; ic(${id*2}).reset := accelReset")
-      //   emitInstrumentation(src"ic(${id*2+1}).io.enable := risingEdge(${lhs}.done); ic(${id*2+1}).reset := accelReset")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id}).bits := ic(${id*2}).io.count""")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id}).valid := ${hwblock.get}.en""")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id} + 1).bits := ic(${id*2+1}).io.count""")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id} + 1).valid := ${hwblock.get}.en""")        
-      // } else {
-      //   emitInstrumentation(src"""val ${lhs}_cycles = Module(new InstrumentationCounter())""")
-      //   emitInstrumentation(src"${lhs}_cycles.io.enable := ${lhs}.en; ${lhs}_cycles.reset := accelReset")
-      //   emitInstrumentation(src"""val ${lhs}_iters = Module(new InstrumentationCounter())""")
-      //   emitInstrumentation(src"${lhs}_iters.io.enable := risingEdge(${lhs}.done); ${lhs}_iters.reset := accelReset")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id}).bits := ${lhs}_cycles.io.count""")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id}).valid := ${hwblock.get}.en""")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id} + 1).bits := ${lhs}_iters.io.count""")
-      //   emitInstrumentation(src"""top.io.argOuts(top.io_numArgOuts_reg + top.io_numArgIOs_reg + 2 * ${id} + 1).valid := ${hwblock.get}.en""")        
-      // }
-      // instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    }
-  }
-
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
+    if (spatialConfig.enableInstrumentation) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
     if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
@@ -226,8 +187,6 @@ trait ChiselGenController extends ChiselGenCommon {
       case _ => ""
     }
 
-    createInstrumentation(lhs)
-
     // Create controller
     emitSMObject(lhs) {
       emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm"))""")
@@ -388,18 +347,32 @@ trait ChiselGenController extends ChiselGenCommon {
 
   override def emitPostMain(): Unit = {
 
+    inGen(out, "Instrument.scala"){
+      emitHeader()
+      open("object Instrument {")
+        open("def connect(top: AccelTop): Unit = {")
+          instrumentCounters.zipWithIndex.foreach{case ((s,d), i) => 
+            val sfx = if (s.isBranch) "_obj" else ""
+            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).bits := ${s}$sfx.cycles.io.count""")
+            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).valid := ${hwblock.get}.en""")
+            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).bits := ${s}$sfx.iters.io.count""")
+            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).valid := ${hwblock.get}.en""")        
+          }
+          emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
+          earlyExits.zipWithIndex.foreach{case (e, i) => 
+            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).bits := 1.U")
+            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).valid := breakpoints($i)")
+          }
+        close("}")
+      close("}")
+    }
     inGen(out, "Instantiator.scala") {
       emit ("")
       emit ("// Instrumentation")
       emit (s"val numArgOuts_instr = ${instrumentCounters.length*2}")
-      instrumentCounters.zipWithIndex.foreach { case(p,i) =>
-        val depth = " "*p._2
-        emit (src"""// ${depth}${quote(p._1)}""")
-      }
       emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
       emit ("""/* Breakpoint Contexts:""")
       earlyExits.zipWithIndex.foreach {case (p,i) => 
-        createBreakpoint(p, i)
         emit (s"breakpoint ${i}: ${p.ctx}")
       }
       emit ("""*/""")

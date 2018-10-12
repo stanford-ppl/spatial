@@ -34,7 +34,9 @@ trait ChiselGenCommon extends ChiselCodegen {
   var accelDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
   var hostDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
   /* List of break or exit nodes */
-  var earlyExits: List[Sym[_]] = List()
+  protected var earlyExits: List[Sym[_]] = List()
+  /* List of instrumentation counters */
+  protected var instrumentCounters: List[(Sym[_], Int)] = List()
 
   def latencyOption(op: String, b: Option[Int]): Double = {
     if (spatialConfig.enableRetiming) {

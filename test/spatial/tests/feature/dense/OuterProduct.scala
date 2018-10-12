@@ -6,7 +6,7 @@ import spatial.dsl._
   override def runtimeArgs: Args = "640 640"
   type X = FixPt[TRUE,_32,_0]
 
-  def outerproduct[T:Num](a: Array[T], b: Array[T]): Array[T] = {
+  def outerproduct[T:Num](a: Array[T], b: Array[T]): Matrix[T] = {
     val tsA = loadParam("tsA", 32 (64 -> 64 -> 38400))
     val tsB = loadParam("tsB", 32 (64 -> 64 -> 38400))
     val ip = loadParam("ip", 8 (1 -> 256))

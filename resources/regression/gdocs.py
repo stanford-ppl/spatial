@@ -374,12 +374,16 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
 		alink=apphash
+		count_success="=sum ( COUNTIF ( J3:3, \"=1\" ) )"
+		count_fail="=sum ( COUNTIF ( J3:3, \"=0\" ) )"
+		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
 			worksheet = sh.worksheet('index', x)
 			if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
-				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
+				if (worksheet.title == "Runtime" and isPerf): worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1], count_success, count_fail, count_crash ])
+				else: worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
 				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
 				# worksheet.update_cell(id,2, alink)

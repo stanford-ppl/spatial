@@ -103,7 +103,6 @@ case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencie
       emitMem(lhs, "reg", lhs.constDims, Seq(0), 1)
 
     case FixInv(x) => fixOp += 1
-    // case FixNeg(x) => fixOp += 1
     case FixAdd(x, y) => fixOp += 1
     case FixSub(x, y) => fixOp += 1
     case FixMul(x, y) => fixOp += 1
@@ -130,7 +129,6 @@ case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencie
     case FixEql(x, y) => fixOp += 1
     case FixMax(x, y) => fixOp += 1
     case FixMin(x, y) => fixOp += 1
-    //case FixToFix(x, fmt)     => fixOp += 1
     case FixToFlt(x, fmt) => fixOp += 1
     case FixToText(x) => fixOp += 1
     case TextToFix(x, _) => fixOp += 1

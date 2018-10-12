@@ -123,6 +123,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     case AccelScope(func) =>
       emitControlObject(lhs, Set.empty, func){
         open("try {")
+        emit("StatTracker.pushState(true)")
         globalMems = true
         if (!lhs.willRunForever) {
           gen(func)
@@ -148,6 +149,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
         bufferedOuts.foreach{buff => emit(src"$buff.close()") }
         globalMems = false
+        emit("StatTracker.popState()")
         close("}")
         open("catch {")
           emit(src"""case x: Exception if x.getMessage == "exit" =>  """)

@@ -26,6 +26,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   private var globalBlockID: Int = 0
   protected var chunking: Boolean = false
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
+  protected var noscope = false
 
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {
@@ -40,7 +41,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case _ => super.named(s, id)
     }
 
-    scoped.getOrElse(s, name)
+    // If we are emitting for an object file (Counter, Controller, Mem, etc.), do not look up val in "scoped"
+    if (!noscope) scoped.getOrElse(s, name) else name
   }
 
   override def emitHeader(): Unit = {
@@ -75,6 +77,15 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     take0(l, Nil, 0).size
   }
 
+  /** Because chisel gen emits all counters when it visits the CounterChainNew, we need to 
+    * forward the nestedInputs of the CounterNews through to the CounterChainNew.  
+    * TODO: Generate CounterNew and CounterChainNew properly so this isn't a thing
+    */
+  protected def nestedInputsCtr(s: Sym[_]): Set[Sym[_]] = s match {
+    case Op(CounterChainNew(ctrs)) => s.nestedInputs ++ ctrs.flatMap(_.nestedInputs).toSet
+    case _ => s.nestedInputs
+  }
+
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
     if (!willChunk(b)) {
       visitBlock(b)
@@ -89,7 +100,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       var remain: Seq[(Sym[_], Int)] = stmsToEmit
       // TODO: Other ways to speed this up?
       // Memories are always global in scala generation right now
-      def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists(_._1.nestedInputs.contains(s)))
+      def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists{r => nestedInputsCtr(r._1).contains(s)})
       while (remain.nonEmpty) {
         ensigs = new scala.collection.mutable.ListBuffer[String]
         val num_stm = weightedWindow(remain.map(_._2).toList, CODE_WINDOW)
@@ -410,7 +421,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   protected def arg(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => s"FixedPoint"
-    // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
+    case _: Var[_] => "String"
     case FltPtType(m,e) => s"FloatingPoint"
     case BitType() => "Bool"
     case tp: Vec[_] => src"Vec[${arg(tp.typeArgs.head)}]"

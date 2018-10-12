@@ -10,14 +10,14 @@ import spatial.metadata.retiming._
 trait ChiselGenDebug extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-	case FixToText(_)  => emit(src"val $lhs = Unit")
-    case TextConcat(_) =>  emit(src"val $lhs = Unit")
-    case PrintIf(_,_) =>  emit(src"val $lhs = Unit")
-    case BitToText(_) =>  emit(src"val $lhs = Unit")
-    case GenericToText(_) => emit(src"val $lhs = Unit")
-    case VarNew(_) =>  emit(src"val $lhs = Unit")
-    case VarRead(_) =>  emit(src"val $lhs = Unit")
-    case VarAssign(_,_) =>  emit(src"val $lhs = Unit")
+	case FixToText(_)  => emit(src"""val $lhs = "" """)
+    case TextConcat(_) =>  emit(src"""val $lhs = "" """)
+    case PrintIf(_,_) =>  emit(src"""val $lhs = "" """)
+    case BitToText(_) =>  emit(src"""val $lhs = "" """)
+    case GenericToText(_) => emit(src"""val $lhs = "" """)
+    case VarNew(_) =>  emit(src"""val $lhs = "" """)
+    case VarRead(_) =>  emit(src"""val $lhs = "" """)
+    case VarAssign(_,_) =>  emit(src"""val $lhs = "" """)
 
     case ExitIf(en) => 
     	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")

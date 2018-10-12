@@ -205,6 +205,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val children = List[SMObject]()")
         emit("val parent: Option[(SMObject, Int)]")
         emit("val cchains = List[CChainObject]()")
+        if (spatialConfig.enableInstrumentation) {
+          emit(src"""val cycles = Module(new InstrumentationCounter())""")
+          emit(src"""val iters = Module(new InstrumentationCounter())""")          
+        }
         emit("")
         open("def configure(): Unit = {")
           emit("sm.io.flow := flow")
@@ -212,6 +216,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           emit("done := sm.io.done")
           emit("sm.io.enable := en")
           emit("resetChildren := sm.io.ctrRst")
+          if (spatialConfig.enableInstrumentation) {
+            emit(src"cycles.io.enable := en")
+            emit(src"iters.io.enable := risingEdge(done)")
+          }
           emit("children.zipWithIndex.foreach{case (c, i) => c.baseEn := sm.io.enableOut(i).D(1) && ~c.done.D(1); c.sm.io.parentAck := sm.io.childAck(i)}")
           emit("parent.foreach{case(p, idx) => p.sm.io.doneIn(idx) := done; p.sm.io.maskIn(idx) := mask}")
           emit("if (sm.p.sched == Streaming && cchains.nonEmpty) cchains.zipWithIndex.foreach{case (cc, i) => sm.io.ctrCopyDone(i) := cc.done; cc.reset := sm.io.ctrRst.D(1)}")
@@ -347,6 +355,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val rr = retime_released // Shorthand")
         emit("val accelReset = reset.toBool | io.reset")
         emit("Main.main(this)")
+        emit("Instrument.connect(this)")
       close("}")
     }
 

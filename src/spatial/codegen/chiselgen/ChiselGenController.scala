@@ -49,7 +49,8 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain"))""")
         emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
-          emit(src"""${iter}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
+          val sfx = if (c.isBranch) "_obj" else ""
+          emit(src"""${iter}_chain.connectStageCtrl(${c}$sfx.done, ${c}$sfx.en, $i)""")
           if (i > 0) emit(src"""val ${iter}_chain_read_$i = ${iter}_chain.read($i).FP(true,${w},0)""")
         }
       }
@@ -60,7 +61,8 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain"))""")
         emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
-          emit(src"""${v}_chain.connectStageCtrl(${c}.done, ${c}.en, $i)""")
+          val sfx = if (c.isBranch) "_obj" else ""
+          emit(src"""${v}_chain.connectStageCtrl(${c}$sfx.done, ${c}$sfx.en, $i)""")
           if (i > 0) emit(src"""val ${v}_chain_read_$i: Bool = ${v}_chain.read($i).apply(0)""")
         }
       }

@@ -238,46 +238,46 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   protected def emitMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
     inGen(out, src"m_${lhs}.scala"){
-      noscope = true
       emitHeader()
       open(src"object $lhs {")
         contents
       close("}")
-      noscope = false
     }
   }
 
   protected def emitBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
     inGen(out, src"bus_${lhs}.scala"){
-      noscope = true
       emitHeader()
       open(src"object $lhs {")
         contents
       close("}")
-      noscope = false
     }
   }
 
   protected def emitSMObject(lhs: Sym[_])(contents: => Unit): Unit = {
     inGen(out, "Controllers.scala"){
-      noscope = true
       // (0 until controllerStack.size).foreach{_ => state.incGenTab}
       val suffix = if (lhs.isBranch) "_obj" else ""
       open(src"object $lhs$suffix extends SMObject{")
         contents
       close("}")
       // (0 until controllerStack.size).foreach{_ => state.decGenTab}
-      noscope = false
     }
   }
 
   protected def emitCChainObject(lhs: Sym[_], suffix: String)(contents: => Unit): Unit = {
     inGen(out, "CounterChains.scala"){
-      noscope = true
       open(src"object $lhs$suffix extends CChainObject{")
         contents
       close("}")
-      noscope = false
+    }
+  }
+
+  protected def emitCtrObject(lhs: Sym[_])(contents: => Unit): Unit = {
+    inGen(out, "CounterChains.scala"){
+      open(src"object $lhs extends CtrObject{")
+        contents
+      close("}")
     }
   }
 

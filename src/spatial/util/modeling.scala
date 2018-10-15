@@ -108,11 +108,13 @@ object modeling {
       case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
       case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
       case reader @ BankedReader(mem,_,_,_) => AccessPair(mem, reader)
+      case reader @ VectorReader(mem,_,_) => AccessPair(mem, reader)
     }
     val writers = scope.collect{
       case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
       case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
       case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
+      case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
     }
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))

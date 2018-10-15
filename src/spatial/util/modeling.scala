@@ -75,7 +75,6 @@ object modeling {
                                   .groupBy(_.memory)
                                   .map{case (mem, cycs) => cycs.toList.map{c => c.length}.sum}.toList
                                   .sorted.reverse.headOption.getOrElse(0.0)
-    dbgs(s"cycles are $cycles, interval is $interval")
     // Look across cycles from different segments
     val compilerII = scala.math.max(interval, segmentedInterval)
     (latency, compilerII)

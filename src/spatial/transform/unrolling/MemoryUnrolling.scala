@@ -193,7 +193,6 @@ trait MemoryUnrolling extends UnrollingBase {
         }
         val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
 
-        implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
 
         val broadcast = port.broadcast.map(_ > 0)
 
@@ -205,19 +204,22 @@ trait MemoryUnrolling extends UnrollingBase {
           val segmentMapping = lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}
           if (segmentMapping.size > 1) {
             dbgs(s"Fracturing access $lhs into more than 1 segment:")
-            segmentMapping.map{case (segment, lanesInSegment) => 
+            segmentMapping.collect{case (segment, lanesInSegment) if (lanesInSegment.forall(laneIds.contains)) => 
               val vecsInSegment = lanesInSegment.map(laneIdToVecId)
               dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
               val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
               val bank3 = vecsInSegment.map(bank.getOrElse(Nil)(_))
               val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
               val ens3 = vecsInSegment.map(ens2(_))
+              implicit val vT: Type[Vec[A]] = Vec.bits[A](vecsInSegment.size)
               (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
             }.toSeq
           } else {
+            implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
             Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
           }
         } else {
+          implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
           Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
         }
 
@@ -253,6 +255,7 @@ trait MemoryUnrolling extends UnrollingBase {
               register(lhs -> elem)
               elem
             }
+
           case (URead(v), _, _)        => lanes.unifyLanes(laneIds)(lhs, v)
           case (UWrite(write), _, _)   => lanes.unifyLanes(laneIds)(lhs, write)
           case (UMultiWrite(vs), _, _) => lanes.unifyLanes(laneIds)(lhs, vs.head.s.head)

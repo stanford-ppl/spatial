@@ -5,6 +5,7 @@ import argon._
 import utils.implicits.collections._
 import spatial.lang._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
 /** A wrapper class representing a (optionally unrolled) access and its corresponding address space
@@ -60,6 +61,11 @@ case class AccessMatrix(
   def isDirectlyBanked(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): Boolean = {
     val bank = alpha*matrix 
     bank.cols.forall{case (k,v) => (v/B.head /*?*/) % N.head /*?*/ == 0}
+  }
+
+  /** Get segments that each unroll belongs to */
+  def segmentAssignments: Seq[Int] = {
+    unroll.map{i => access.segmentMapping.getOrElse(i, 0)}
   }
 }
 

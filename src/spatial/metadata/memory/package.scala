@@ -154,6 +154,8 @@ package object memory {
       case _: Reg[_] => mem.isArgOut || mem.isArgIn || mem.isHostIO
       case _ => false
     }
+
+    def asMem[C[_]]:Mem[_,C] = mem.asInstanceOf[Mem[_,C]]
     def isMem: Boolean = isLocalMem || isRemoteMem
     def isDenseAlias: Boolean = mem.op.exists{
       case _: MemDenseAlias[_,_,_] => true

@@ -82,7 +82,7 @@ trait NamedCodegen extends Codegen {
       case FixMul(_,_)  => s"${s}_${s.nameOr("mul")}"
 
       case DelayLine(size, data) if data.isConst => src"$data"
-      case DelayLine(size, data)                 => s"${s}_D$size"
+      // case DelayLine(size, data)                 => s"${s}_D$size"
 
       case _ => super.named(s,id)
     }

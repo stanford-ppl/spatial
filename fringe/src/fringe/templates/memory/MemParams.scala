@@ -19,7 +19,8 @@ case class MemParams(
   inits: Option[List[Double]] = None,
   syncMem: Boolean = false,
   fracBits: Int = 0,
-  isBuf: Boolean = false
+  isBuf: Boolean = false,
+  myName: String = "mem"
 ) {
   def depth: Int = logicalDims.product
   def hasXBarW: Boolean = xBarWMux.accessPars.sum > 0

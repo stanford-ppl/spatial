@@ -8,195 +8,79 @@ import spatial.metadata.types._
 import spatial.lang._
 import spatial.node._
 
-trait PIRGenController extends PIRGenControl with PIRGenStream with PIRGenMemories {
+trait PIRGenController extends PIRCodegen {
 
-  // In PIR simulation, run a pipe until its read fifos and streamIns are empty
-  def getReadStreamsAndFIFOs(ctrl: Ctrl): Set[Sym[_]] = {
-    ctrl.children.flatMap(getReadStreamsAndFIFOs).toSet ++
-    LocalMemories.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
-                     .filter{mem => mem.isStreamIn || mem.isFIFO }
-                     .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case AccelScope(func) => 
+      emit("runAccel()")
+      openAccel {
+        inAccel { 
+          gen(lhs, rhs)
+        }
+      }
+
+    case _ => super.genHost(lhs, rhs)
   }
 
-  def emitControlBlock(lhs: Sym[_], block: Block[_]): Unit = {
-    if (lhs.isOuterStreamControl) {
-      val children = lhs.children
-      block.stms.foreach { stm =>
-        val isChild = children.exists{child => child.s.contains(stm) }
-
-        if (isChild) {
-          val contents = block.nestedStms.toSet
-          val inputs = getReadStreamsAndFIFOs(stm.toCtrl) diff contents  // Don't check things we declare inside
-          if (inputs.nonEmpty) {
-            // HACK: Run streaming children to completion (exhaust inputs) before moving on to the next
-            // Note that this won't work for cases with feedback, but this is disallowed for now anyway
-            emit(src"def hasItems_${lhs}_$stm: Boolean = " + inputs.map(quote).map(_ + ".nonEmpty").mkString(" || "))
-            open(src"while (hasItems_${lhs}_$stm) {")
-            visit(stm)
-            close("}")
-          }
-          else {
-            visit(stm)
-          }
-        }
-        else visit(stm)
+  def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Sym[_]]], valids:Seq[Seq[Sym[_]]]) = {
+    iters.zipWithIndex.foreach { case (iters, i) =>
+      iters.zipWithIndex.foreach { case (iter, j) =>
+        state(iter, tp=Some("IterDef"))(src"$lhs.iters($i)($j)")
       }
     }
-    else {
-      gen(block)
-    }
-  }
-
-  private def emitUnrolledLoop(
-    lhs:    Sym[_],
-    cchain: CounterChain,
-    iters:  Seq[Seq[I32]],
-    valids: Seq[Seq[Bit]]
-  )(func: => Unit): Unit = {
-
-    val ctrs = cchain.counters
-
-    for (i <- iters.indices) {
-      if (ctrs(i).isForever) {
-        val inputs = getReadStreamsAndFIFOs(lhs.toCtrl)
-        if (inputs.nonEmpty) {
-          emit(src"def hasItems_$lhs: Boolean = " + inputs.map(quote).map(_ + ".nonEmpty").mkString(" || "))
-        }
-        else {
-          emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
-          emit(src"val ${lhs}_iters_$i = Console.readLine.toInt")
-          emit(src"var ${lhs}_ctr_$i = 0")
-          emit(src"def hasItems_$lhs: Boolean = { val has = ${lhs}_ctr_$i < ${lhs}_iters_$i ; ${lhs}_ctr_$i += 1; has }")
-        }
-
-        open(src"while(hasItems_$lhs) {")
-        iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = FixedPoint.fromInt(1)") }
-        valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = Bool(true,true)") }
-      }
-      else {
-        open(src"$cchain($i).foreach{case (is,vs) => ")
-        iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = is($j)") }
-        valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = vs($j)") }
+    valids.zipWithIndex.foreach { case (valids, i) =>
+      valids.zipWithIndex.foreach { case (valid, j) =>
+        state(valid, tp=Some("ValidDef"))(src"$lhs.valids($i)($j)")
       }
     }
-
-    func
-    iters.reverse.foreach{is =>
-      emitControlIncrement(lhs, is)
-      close("}")
-    }
+  }
+  def emitController(lhs:Sym[_], cchain:Option[Sym[_]], ens:Set[Bit]) = {
+    state(lhs, tp=Some("Controller"))(src"createController(cchain=$cchain, ens=${ens}, schedule=${lhs.schedule})")
   }
 
-  //inGen(kernel(lhs)){ // open another file
-  //}
-  private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
-  }
-
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
-      emitControlObject(lhs, Set.empty, func){
-        open("try {")
-        globalMems = true
-        if (!lhs.willRunForever) {
-          gen(func)
-        }
-        else {
-          if (streamIns.nonEmpty) {
-            emit(src"def hasItems = " + streamIns.map(quote).map(_ + ".nonEmpty").mkString(" || "))
-          }
-          else {
-            emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
-            emit(src"val ${lhs}_iters = Console.readLine.toInt")
-            emit(src"var ${lhs}_ctr = 0")
-            emit(src"def hasItems: Boolean = { val has = ${lhs}_ctr < ${lhs}_iters ; ${lhs}_ctr += 1; has }")
-          }
-          open(src"while(hasItems) {")
-            emitControlBlock(lhs, func)
-          close("}")
-        }
-        // HACK: Print out streams after block finishes running
-        streamOuts.foreach{case x@Op(StreamOutNew(bus)) =>
-          if (!bus.isInstanceOf[DRAMBus[_]]) emit(src"$x.dump()")
-        }
-        emitControlDone(lhs)
-        bufferedOuts.foreach{buff => emit(src"$buff.close()") }
-        globalMems = false
-        close("}")
-        open("catch {")
-          emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
-          emit(src"""case t: Throwable => throw t""")
-        close("}")
-      }
+      emitController(lhs, None, Set())
+      ret(func)
 
     case UnitPipe(ens, func) =>
-      emitControlObject(lhs, ens, func) {
-        emitControlBlock(lhs, func)
-        emitControlDone(lhs)
-      }
-
+      emitController(lhs, None, ens)
+      ret(func)
 
     case ParallelPipe(ens, func) =>
-      emitControlObject(lhs, ens, func){
-        gen(func)
-        emitControlDone(lhs)
-      }
+      emitController(lhs, None, ens)
+      ret(func)
 
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
-      emitControlObject(lhs, ens, func) {
-        emitUnrolledLoop(lhs, cchain, iters, valids) {
-          emitControlBlock(lhs, func)
-        }
-        emitControlDone(lhs)
-      }
+      emitController(lhs, Some(cchain), ens)
+      emitIterValids(lhs, iters, valids)
+      ret(func)
 
     case UnrolledReduce(ens,cchain,func,iters,valids) =>
-      emitControlObject(lhs, ens, func) {
-        emitUnrolledLoop(lhs, cchain, iters, valids) {
-          emitControlBlock(lhs, func)
-        }
-        emitControlDone(lhs)
-      }
+      emitController(lhs, Some(cchain), ens)
+      emitIterValids(lhs, iters, valids)
+      ret(func)
 
     case op@Switch(selects, body) =>
-      emitControlObject(lhs, Set.empty, body){
-        selects.indices.foreach { i =>
-          open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
-          ret(op.cases(i).body)
-          close("}")
-        }
-        if (op.R.isBits)      emit(src"else { ${invalid(op.R)} }")
-        else if (op.R.isVoid) emit(src"else ()")
-        else                  emit(src"else { null.asInstanceOf[${op.R}]")
-        emitControlDone(lhs)
-      }
+      emit(s"//TODO: ${qdef(lhs)}")
+      ret(body)
 
     case SwitchCase(body) => // Controlled by Switch
+      emit(s"//TODO: ${qdef(lhs)}")
+      ret(body)
 
     case StateMachine(ens, start, notDone, action, nextState) =>
-      emitControlObject(lhs, ens, notDone, action, nextState){
-        val stat = notDone.input
-        emit(src"var $stat: ${stat.tp} = $start")
-        open(src"def notDone() = {")
-          ret(notDone)
-        close("}")
-        open(src"while( notDone() ){")
-          gen(action)
-          gen(nextState)
-          emit(src"$stat = ${nextState.result}")
-        close("}")
-        emitControlDone(lhs)
-      }
+      emit(s"//TODO: ${qdef(lhs)}")
+      ret(notDone)
+      ret(action)
+      ret(nextState)
 
     case IfThenElse(cond, thenp, elsep) =>
-      emitControlObject(lhs, Set.empty, thenp, elsep){
-        open(src"if ($cond) { ")
-          ret(thenp)
-        close("}")
-        open("else {")
-          ret(elsep)
-        close("}")
-      }
+      emit(s"//TODO: ${qdef(lhs)}")
+      ret(thenp)
+      ret(elsep)
 
-    case _ => super.gen(lhs, rhs)
+    case _ => super.genAccel(lhs, rhs)
   }
+
 }

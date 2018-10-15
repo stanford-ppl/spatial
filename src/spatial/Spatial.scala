@@ -227,7 +227,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
-      spatialConfig.enableDot = true
+      //spatialConfig.enableDot = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
     }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
@@ -290,9 +290,18 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRuntimeModel = true
     }.text("Enable application runtime estimation")
 
-    cli.opt[String]("param-path").action{(x,_) => 
+    cli.opt[String]("load-param").action{(x,_) => 
       loadParams(x)
     }.text("Set path to load application parameter")
+
+    cli.opt[String]("save-param").action{(x,_) => 
+      spatialConfig.paramSavePath = Some(x)
+    }.text("Set path to store application parameter")
+  }
+
+  override def postprocess(block: Block[_]): Unit = {
+    spatialConfig.paramSavePath.foreach(path => saveParams(path))
+    super.postprocess(block)
   }
 
   override def settings(): Unit = {

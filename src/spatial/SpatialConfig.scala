@@ -52,4 +52,6 @@ class SpatialConfig extends Config {
 
   var enablePIR = false
 
+  var paramSavePath:Option[String] = None
+
 }

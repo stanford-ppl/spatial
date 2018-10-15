@@ -19,7 +19,7 @@ trait DSLRunnable { self =>
     state
   }
 
-  var name: String = self.getClass.getName.replace("class ", "").replace("$","")
+  var name: String = self.getClass.getSimpleName.replace("class ", "").replace("$","")
 
   /** Override to create a custom Config instance */
   def initConfig(): Config = new Config

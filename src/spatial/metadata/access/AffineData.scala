@@ -64,9 +64,7 @@ case class AccessMatrix(
   }
 
   /** Get segments that each unroll belongs to */
-  def segmentAssignments: Seq[Int] = {
-    unroll.map{i => access.segmentMapping.getOrElse(i, 0)}
-  }
+  def segmentAssignments: Seq[Int] = access.segmentMapping.map(_._2).toSeq
 }
 
 /** The unrolled access patterns of an optionally parallelized memory access represented as affine matrices.

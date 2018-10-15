@@ -5,6 +5,7 @@ import argon._
 import utils.implicits.collections._
 import spatial.lang._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
 /** A wrapper class representing a (optionally unrolled) access and its corresponding address space
@@ -61,6 +62,9 @@ case class AccessMatrix(
     val bank = alpha*matrix 
     bank.cols.forall{case (k,v) => (v/B.head /*?*/) % N.head /*?*/ == 0}
   }
+
+  /** Get segments that each unroll belongs to */
+  def segmentAssignments: Seq[Int] = access.segmentMapping.map(_._2).toSeq
 }
 
 /** The unrolled access patterns of an optionally parallelized memory access represented as affine matrices.

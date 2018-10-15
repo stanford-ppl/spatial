@@ -78,7 +78,8 @@ import spatial.dsl._
   ): Array[Float] = {
     val B  = loadParam("ts", 4 (96 -> 96 -> 19200))
     val op = loadParam("op", 1 (1 -> 2))
-    val ip = loadParam("ip", 2000 (1 -> 96))
+    val ip = loadParam("ip", 16 (1 -> 96))
+    val lp = loadParam("lp", 4 (1 -> 16))
 
     val size = stypes.length; bound(size) = 9995328
 
@@ -110,19 +111,19 @@ import spatial.dsl._
         val optpriceBlk = SRAM[Float](B)
 
         Parallel {
-          typeBlk   load types(i::i+B par ip)
-          priceBlk  load prices(i::i+B par ip)
-          strikeBlk load strike(i::i+B par ip)
-          rateBlk   load rate(i::i+B par ip)
-          volBlk    load vol(i::i+B par ip)
-          timeBlk   load times(i::i+B par ip)
+          typeBlk   load types(i::i+B par lp)
+          priceBlk  load prices(i::i+B par lp)
+          strikeBlk load strike(i::i+B par lp)
+          rateBlk   load rate(i::i+B par lp)
+          volBlk    load vol(i::i+B par lp)
+          timeBlk   load times(i::i+B par lp)
         }
 
         Foreach(B par ip){ j =>
           val price = BlkSchlsEqEuroNoDiv(priceBlk(j), strikeBlk(j), rateBlk(j), volBlk(j), timeBlk(j), typeBlk(j))
           optpriceBlk(j) = price
         }
-        optprice(i::i+B par ip) store optpriceBlk
+        optprice(i::i+B par lp) store optpriceBlk
       }
     }
     getMem(optprice)

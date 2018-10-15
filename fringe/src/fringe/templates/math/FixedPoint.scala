@@ -12,6 +12,7 @@ import scala.math.BigInt
 class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigInt] = None) extends Bundle {
   def this(fmt: emul.FixFormat) = this(fmt.sign, fmt.ibits, fmt.fbits)
 
+  assert(d >= 0 && f >= 0, s"Cannot make FixedPoint($s,$d,$f)")
   lazy val fmt: emul.FixFormat = emul.FixFormat(s, d, f)
 
   def apply(msb: Int, lsb: Int): UInt = this.number(msb,lsb)

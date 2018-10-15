@@ -14,23 +14,16 @@ import spatial.dsl._
   val D = dim
   val A = 1
 
-  val innerPar = 16
-  val outerPar = 10
-
-  val tileSize = 64
-
-
   def logreg[T:Num](xIn: Array[T], yIn: Array[T], tt: Array[T], n: Int, it: Int): Array[T] = {
     val iters = ArgIn[Int]
     val N     = ArgIn[Int]
     setArg(iters, it)
     setArg(N, n)
 
-    val BN = tileSize (96 -> 96 -> 9600)
-    val PX = 1 (1 -> 1)
-    val P1 = innerPar (1 -> 2)
-    val P2 = innerPar (1 -> 96)
-    val P3 = outerPar (1 -> 96)
+    val ts = loadParam("ts", 64 (96 -> 96 -> 9600))
+    val op = loadParam("op", 1 (1 -> 2))
+    val mp = loadParam("mp", 10 (1 -> 96))
+    val ip = loadParam("ip", 16 (1 -> 96))
 
     val x = DRAM[T](N, D)
     val y = DRAM[T](N)
@@ -45,22 +38,22 @@ import spatial.dsl._
 
       Sequential.Foreach(iters by 1) { epoch =>
 
-        Sequential.MemReduce(btheta)(1 by 1){ xx =>
+        Sequential.MemReduce(btheta par ip)(1 by 1){ xx =>
           val gradAcc = SRAM[T](D)
-          Foreach(N by BN){ i =>
-            val logregX = SRAM[T](BN, D)
-            val logregY = SRAM[T](BN)
+          Foreach(N by ts par op){ i =>
+            val logregX = SRAM[T](ts, D)
+            val logregY = SRAM[T](ts)
             Parallel {
-              logregX load x(i::i+BN, 0::D par P2)
-              logregY load y(i::i+BN par P2)
+              logregX load x(i::i+ts, 0::D par ip)
+              logregY load y(i::i+ts par ip)
             }
-            MemReduce(gradAcc)(BN par P3){ ii =>
+            MemReduce(gradAcc par ip)(ts par mp){ ii =>
               val pipe2Res = Reg[T]
               val subRam   = SRAM[T](D)
 
-              val dotAccum = Reduce(Reg[T])(D par P2){j => logregX(ii,j) * btheta(j) }{_+_}  // read
+              val dotAccum = Reduce(Reg[T])(D par ip){j => logregX(ii,j) * btheta(j) }{_+_}  // read
               Pipe { pipe2Res := (logregY(ii) - sigmoid(dotAccum.value)) }
-              Foreach(D par P2) {j => subRam(j) = logregX(ii,j) - pipe2Res.value }
+              Foreach(D par ip) {j => subRam(j) = logregX(ii,j) - pipe2Res.value }
               subRam
             }{_+_}
           }
@@ -68,9 +61,9 @@ import spatial.dsl._
         }{(b,g) => b+g*A.to[T]}
 
         // Flush gradAcc
-        //Foreach(D by 1 par P2){i => gradAcc(i) = 0.to[T] }
+        //Foreach(D by 1 par ip){i => gradAcc(i) = 0.to[T] }
       }
-      theta(0::D par P2) store btheta // read
+      theta(0::D par ip) store btheta // read
     }
     getMem(theta)
   }

@@ -4,7 +4,7 @@ import spatial.dsl._
 import spatial.targets._
 
 
-@spatial class DigitRecognition extends SpatialTest {
+@spatial class DigitRecognitionTmp extends SpatialTest {
 
     type LabelType	 		= UInt8
 

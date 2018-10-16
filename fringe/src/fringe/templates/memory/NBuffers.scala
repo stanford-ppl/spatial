@@ -358,15 +358,27 @@ class NBufMem(
       io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
 
     case ShiftRegFileType => 
+      def posMod(n: Int, d: Int): Int = ((n % d) + d) % d
+      val isShift = xBarWMux.mergeXMaps.values.map(_._2).exists(_.isDefined)
+      var shiftEntryBuf: Option[Int] = None
       val rfs = (0 until numBufs).map{ i => 
         val combinedXBarWMux = xBarWMux.getOrElse(i,XMap()).merge(broadcastWMux)
         val combinedXBarRMux = xBarRMux.getOrElse(i,XMap()).merge(broadcastRMux)
+        val isShiftEntry = isShift && combinedXBarWMux.nonEmpty
+        if (isShiftEntry) shiftEntryBuf = Some(i)
         Module(new ShiftRegFile(logicalDims, bitWidth, 
                         combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
-                        inits, syncMem, fracBits, isBuf = {i != 0}, "sr"))
+                        inits, syncMem, fracBits, isBuf = !isShiftEntry, "sr"))
       }
-      rfs.drop(1).zipWithIndex.foreach{case (rf, i) => rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(i).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{case(a,b) => a:=b}; rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap}
+      rfs.zipWithIndex.foreach{case (rf, i) => 
+        if (!shiftEntryBuf.exists(_ == i)) {
+          rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(posMod((i-1),numBufs)).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{
+            case(a,b) => a:=b
+          }
+          rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap
+        }
+      }
       rfs.foreach(_.io.reset := io.reset)
 
       // Route NBuf IO to SRAM IOs

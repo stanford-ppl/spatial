@@ -18,7 +18,7 @@ val settings = Seq(
     "org.scalatest" %% "scalatest" % scalatest_version,	           // Testing
     "edu.berkeley.cs" %% "chisel3" % chisel3_version,              // Chisel
     "edu.berkeley.cs" %% "chisel-iotesters" % testers_version,     // Chisel testing
-    "edu.stanford.cs.dawn" %% "emul" % "1.0"                           // Numeric emulation
+    "edu.stanford.cs.dawn" %% "emul" % "1.0-SNAPSHOT"              // Numeric emulation
   ),
 
   /** Scalac Options **/
@@ -48,7 +48,7 @@ val settings = Seq(
   /** Macro Paradise **/
   resolvers += Resolver.sonatypeRepo("snapshots"),
   resolvers += Resolver.sonatypeRepo("releases"),
-  resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository/",
+  // resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository/",
   addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
 
   /** Release **/

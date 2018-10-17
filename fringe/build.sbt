@@ -1,4 +1,4 @@
-val fringe_version    = "1.0"
+val fringe_version    = "1.0-SNAPSHOT"
 val scala_version     = "2.11.7"
 val paradise_version  = "2.1.0"
 val scalatest_version = "3.0.5"
@@ -8,7 +8,8 @@ val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAP
 name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")
 scalaVersion := scala_version
 version := fringe_version
-organization := "edu.stanford.ppl"
+organization := "edu.stanford.cs.dawn"
+isSnapshot := true
 
 val settings = Seq(
   /** External Libraries (e.g. maven dependencies) **/
@@ -17,7 +18,7 @@ val settings = Seq(
     "org.scalatest" %% "scalatest" % scalatest_version,	           // Testing
     "edu.berkeley.cs" %% "chisel3" % chisel3_version,              // Chisel
     "edu.berkeley.cs" %% "chisel-iotesters" % testers_version,     // Chisel testing
-    "edu.stanford.ppl" %% "emul" % "1.0"                           // Numeric emulation
+    "edu.stanford.cs.dawn" %% "emul" % "1.0"                           // Numeric emulation
   ),
 
   /** Scalac Options **/
@@ -47,10 +48,41 @@ val settings = Seq(
   /** Macro Paradise **/
   resolvers += Resolver.sonatypeRepo("snapshots"),
   resolvers += Resolver.sonatypeRepo("releases"),
+  resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository/",
   addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
 
   /** Release **/
   publishArtifact   := true,
+  isSnapshot := true,
+
+  homepage := Some(url("https://spatial.stanford.edu")),
+  scmInfo := Some(ScmInfo(url("https://github.com/stanford-ppl/spatial"),
+                              "git@github.com:stanford-ppl/spatial.git")),
+  developers := List(Developer("mattfel1",
+                               "Matthew Feldman",
+                               "mattfel@stanford.edu",
+                               url("https://github.com/mattfel1")),
+                     Developer("dkoeplin",
+                               "David Koeplinger",
+                               "dkoeplin@stanford.edu",
+                               url("https://github.com/dkoeplin")),
+                     Developer("raghup17",
+                               "Raghu Prabhakar",
+                               "raghup17@stanford.edu",
+                               url("https://github.com/raghup17")),
+                     Developer("yaqiz",
+                               "Yaqi Zhang",
+                               "yaqiz@stanford.edu",
+                               url("https://github.comyaqiz/"))
+                    ),
+  publishTo := Some(
+    if (isSnapshot.value)
+      Opts.resolver.sonatypeSnapshots
+    else
+      Opts.resolver.sonatypeStaging
+  ),
+
+
   publishMavenStyle := true
 )
 

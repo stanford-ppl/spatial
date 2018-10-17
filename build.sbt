@@ -1,13 +1,14 @@
-val spatial_version   = "1.0"
+val spatial_version   = "1.0-SNAPSHOT"
 val scala_version     = "2.12.6"
 val paradise_version  = "2.1.0"
 val scalatestVersion  = "3.0.5"
 
 name := "spatial"
 trapExit := false
+isSnapshot := true
 
 val common = Seq(
-  organization := "edu.stanford.ppl",
+  organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
   version := spatial_version,
 
@@ -55,7 +56,37 @@ val common = Seq(
   addCompilerPlugin("org.scalamacros" % "paradise" % paradise_version cross CrossVersion.full),
 
   /** Release **/
-  publishArtifact := true
+  publishArtifact := true,
+  isSnapshot := true,
+
+  homepage := Some(url("https://spatial.stanford.edu")),
+  scmInfo := Some(ScmInfo(url("https://github.com/stanford-ppl/spatial"),
+                              "git@github.com:stanford-ppl/spatial.git")),
+  developers := List(Developer("mattfel1",
+                               "Matthew Feldman",
+                               "mattfel@stanford.edu",
+                               url("https://github.com/mattfel1")),
+                     Developer("dkoeplin",
+                               "David Koeplinger",
+                               "dkoeplin@stanford.edu",
+                               url("https://github.com/dkoeplin")),
+                     Developer("raghup17",
+                               "Raghu Prabhakar",
+                               "raghup17@stanford.edu",
+                               url("https://github.com/raghup17")),
+                     Developer("yaqiz",
+                               "Yaqi Zhang",
+                               "yaqiz@stanford.edu",
+                               url("https://github.comyaqiz/"))
+                    ),
+  publishTo := Some(
+    if (isSnapshot.value)
+      Opts.resolver.sonatypeSnapshots
+    else
+      Opts.resolver.sonatypeStaging
+  ),
+
+  publishMavenStyle := true
 )
 
 

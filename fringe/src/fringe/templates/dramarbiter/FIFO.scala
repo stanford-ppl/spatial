@@ -31,7 +31,7 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
   val readEn = io.out.valid & io.out.ready
 
   val counterW = log2Ceil(depth)
-	val enqCounter = Module(new Counter(counterW))
+  val enqCounter = Module(new Counter(counterW))
   enqCounter.io.enable := writeEn
   enqCounter.io.stride := 1.U
   val deqCounter = Module(new Counter(counterW))
@@ -46,34 +46,34 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
   if (t.getWidth == 1 || banked) {
     val m = Module(new FFRAM(t, depth))
 
-		m.io.raddr := deqCounter.io.out
-		m.io.wen := writeEn
-		m.io.waddr := enqCounter.io.out
-		m.io.wdata := io.in.bits
-		io.out.bits := m.io.rdata
+    m.io.raddr := deqCounter.io.out
+    m.io.wen := writeEn
+    m.io.waddr := enqCounter.io.out
+    m.io.wdata := io.in.bits
+    io.out.bits := m.io.rdata
 
     m.io.banks.zip(io.banks).foreach { case (a, b) =>
       a.wdata := b.wdata
       b.rdata.bits := a.rdata
     }
 
-		List.tabulate(depth) { i =>
-			val valid = RegInit(false.B)
-			io.banks(i).rdata.valid := valid
+    List.tabulate(depth) { i =>
+      val valid = RegInit(false.B)
+      io.banks(i).rdata.valid := valid
       val wen = writeEn & (enqCounter.io.out === i.U)
       val ren = readEn & (deqCounter.io.out === i.U)
-			when (wen | ren) {
-				valid := wen & !ren
-			}
-		}
+      when (wen | ren) {
+        valid := wen & !ren
+      }
+    }
   } else {
     val m = Module(new SRAM(t, depth, "VIVADO_SELECT"))
 
-		m.io.raddr := Mux(readEn, deqCounter.io.next, deqCounter.io.out)
-		m.io.wen := writeEn
-		m.io.waddr := enqCounter.io.out
-		m.io.wdata := io.in.bits
-		io.out.bits := m.io.rdata
+    m.io.raddr := Mux(readEn, deqCounter.io.next, deqCounter.io.out)
+    m.io.wen := writeEn
+    m.io.waddr := enqCounter.io.out
+    m.io.wdata := io.in.bits
+    io.out.bits := m.io.rdata
     m.io.flow := true.B
   }
 
@@ -85,6 +85,6 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
   io.in.ready := !full
 
   val ptrDiff = enqCounter.io.out - deqCounter.io.out
-	io.count := Cat(maybeFull && ptrMatch, ptrDiff)
+  io.count := Cat(maybeFull && ptrMatch, ptrDiff)
 }
 

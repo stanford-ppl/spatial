@@ -28,7 +28,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
   final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
   lazy val dimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) 
-                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank) Seq(FLAT_BANKS, NEST_BANKS) 
+                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
+                                         else if (mem.isHierarchicalBank) Seq(NEST_BANKS) 
+                                         else if (mem.isFlatBank) Seq(FLAT_BANKS) 
+                                         else if (mem.isNoBank) Seq() 
+                                         else Seq(FLAT_BANKS)
+  lazy val wrDimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) 
+                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
                                          else if (mem.isHierarchicalBank) Seq(NEST_BANKS) 
                                          else if (mem.isFlatBank) Seq(FLAT_BANKS) 
                                          else Seq(FLAT_BANKS)
@@ -454,11 +460,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         Right(bankings.map{case (instRdGroups, instBankings) => 
           val bankingCosts = instBankings.map{b => b -> cost(b,depth, instRdGroups, reachingWrGroups) }
           val duplicationCost = cost(Seq(), depth, instRdGroups, reachingWrGroups)
-          val (banking, bankCost) = bankingCosts.minBy(_._2)
+          val (banking, bankCost) = bankingCosts.sortBy(_._2).headOption.getOrElse(Nil, 999999L)
           dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
-          if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut && !mem.isRegFile) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
+          if (mem.isNoBank || (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut && !mem.isRegFile)) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
             dbgs(s"Choosing to duplicate $mem for $instRdGroups, $wrGroups.  ")
-            val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, dimGrps).head._2
+            val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, wrDimGrps).head._2
             val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}
             val (wrBanking, wrBankCost) = wrBankingsCosts.minBy(_._2)
             Seq.tabulate(instRdGroups.flatten.size){i => 

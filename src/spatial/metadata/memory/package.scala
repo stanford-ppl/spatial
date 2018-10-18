@@ -41,6 +41,9 @@ package object memory {
     def isFlatBank: Boolean = metadata[FlatBank](s).exists(_.flag)
     def isFlatBank_=(flag: Boolean): Unit = metadata.add(s, FlatBank(flag))
 
+    def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
+    def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
+
     def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
     def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
 

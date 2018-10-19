@@ -143,11 +143,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
       gathersList = gathersList :+ dram
 
       emit(src"${cmdStream}.ready := top.io.memStreams.gathers($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
-      emit(src"top.io.memStreams.gathers($id).cmd.bits.addr := ${cmdStream}.m(0).r")
-      emit(src"top.io.memStreams.gathers($id).cmd.bits.size := 1.U")
+      emit(src"top.io.memStreams.gathers($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b.r}")
       emit(src"top.io.memStreams.gathers($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"top.io.memStreams.gathers($id).cmd.bits.isWr := false.B")
-      emit(src"top.io.memStreams.gathers($id).cmd.bits.isSparse := 1.U")
 
       // Connect the streams to their IO interface signals
       emit(src"top.io.memStreams.gathers($id).rdata.ready := ${dataStream}.ready")
@@ -196,8 +193,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
       val par = 1//dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
-      Predef.assert(par == 1, s"Unsupported par '$par', only par=1 currently supported")
-
       val id = scattersList.length
       storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       scattersList = scattersList :+ dram
@@ -208,11 +203,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
       emit(src"top.io.memStreams.scatters($id).wdata.bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
       emit(src"top.io.memStreams.scatters($id).wdata.valid := ${cmdStream}.valid")
-      emit(src"top.io.memStreams.scatters($id).cmd.bits.addr := ${cmdStream}.m(0)($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
-      emit(src"top.io.memStreams.scatters($id).cmd.bits.size := 1.U")
+      emit(src"top.io.memStreams.scatters($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
       emit(src"top.io.memStreams.scatters($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"top.io.memStreams.scatters($id).cmd.bits.isWr := 1.U")
-      emit(src"top.io.memStreams.scatters($id).cmd.bits.isSparse := 1.U")
       emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).cmd.ready & top.io.memStreams.scatters($id).wdata.ready")
       emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")
       emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")

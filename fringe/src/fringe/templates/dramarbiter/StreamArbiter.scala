@@ -15,6 +15,7 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
 
   val cmdValids = io.app.map { _.cmd.valid }
   val cmdIdx = PriorityEncoder(cmdValids)
+  val cmdInDecoder = UIntToOH(cmdIdx)
 
   // some apps have many streams, so we need to pipeline these muxes to meet timing
   val cmdMux = Module(new MuxPipe(dramStream.cmd.bits, streamCount))
@@ -28,7 +29,7 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
   }
 
   val cmdStreamID = cmdMux.io.out.bits.getTag.streamID
-  val cmdDecoder = UIntToOH(cmdStreamID)
+  val cmdOutDecoder = UIntToOH(cmdStreamID)
   val wdataMux = Module(new MuxPipe(dramStream.wdata.bits, streamCount))
   wdataMux.io.in.valid := Vec(io.app.map { _.wdata.valid })(cmdStreamID)
   wdataMux.io.sel := cmdStreamID
@@ -49,8 +50,8 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
   wdataMux.io.out.ready := wdataIssue
 
   io.app.zipWithIndex.foreach { case (app, i) =>
-    app.cmd.ready := cmdMux.io.in.ready
-    app.wdata.ready := wdataMux.io.in.ready & cmdDecoder(i)
+    app.cmd.ready := cmdMux.io.in.ready & cmdInDecoder(i)
+    app.wdata.ready := wdataMux.io.in.ready & cmdOutDecoder(i)
 
     app.rresp.valid := io.dram.rresp.valid & rrespDecoder(i)
     app.rresp.bits := io.dram.rresp.bits

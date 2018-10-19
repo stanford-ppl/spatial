@@ -41,6 +41,8 @@ trait NodeParams {
     case _:SRAMRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMAsyncRead", Nil)
     case _:SRAMBankedRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMBankedAsyncRead", Nil)
 
+    case _@RegFileVectorRead(rf,_,_) => ("RegFileVectorRead", Seq("e" -> rf.constDims.product.toDouble))
+
     case op:Switch[_] if s.isBits => ("SwitchMux", Seq("n" -> op.selects.length, "b" -> nbits(s)))
     case op:Switch[_] => ("Switch", Seq("n" -> op.selects.length))
 

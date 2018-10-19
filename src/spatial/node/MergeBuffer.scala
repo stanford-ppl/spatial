@@ -10,8 +10,8 @@ import spatial.lang._
 }
 
 @op case class MergeBufferEnq[A:Bits](mem: MergeBuffer[A], way: Int, data: Bits[A], ens: Set[Bit]) extends Enqueuer[A]
-@op case class MergeBufferBound[A:Bits](mem: MergeBuffer[A], way: Int, data: Bits[A], ens: Set[Bit]) extends Enqueuer[A]
-@op case class MergeBufferInit[A:Bits,B:Bits](mem: MergeBuffer[A], data: Bits[B], ens: Set[Bit]) extends Enqueuer[B]
+@op case class MergeBufferBound[A:Bits](mem: MergeBuffer[A], way: Int, data: Bits[I32], ens: Set[Bit]) extends Enqueuer[I32]
+@op case class MergeBufferInit[A:Bits](mem: MergeBuffer[A], data: Bits[Bit], ens: Set[Bit]) extends Enqueuer[Bit]
 @op case class MergeBufferDeq[A:Bits](mem: MergeBuffer[A], ens: Set[Bit]) extends Dequeuer[A,A]
 
 @op case class MergeBufferBankedEnq[A:Bits](

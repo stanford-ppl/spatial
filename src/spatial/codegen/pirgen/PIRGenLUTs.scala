@@ -4,16 +4,14 @@ import argon._
 import spatial.lang._
 import spatial.node._
 
-trait PIRGenLUTs extends PIRGenMemories {
+trait PIRGenLUTs extends PIRCodegen {
 
-  override protected def remap(tp: Type[_]): String = tp match {
-    case tp: LUT[_,_] => src"Array[${tp.A}]"
-    case _ => super.remap(tp)
-  }
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@LUTNew(_,elems) => emitBankedInitMem(lhs,Some(elems),op.A)
-    case op@LUTBankedRead(lut,bank,ofs,ens) => emitBankedLoad(lhs,lut,bank,ofs,ens)(op.A)
-    case _ => super.gen(lhs, rhs)
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op@LUTNew(_,elems) => 
+      stateMem(lhs, "LUT", Some(elems))
+    case op@LUTBankedRead(lut,bank,ofs,ens) => 
+      stateRead(lhs, lut, Some(bank), Some(ofs), ens)
+    case _ => super.genAccel(lhs, rhs)
   }
 
 }

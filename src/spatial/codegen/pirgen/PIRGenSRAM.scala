@@ -3,18 +3,17 @@ package spatial.codegen.pirgen
 import argon._
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.memory._
 
-trait PIRGenSRAM extends PIRGenMemories {
+trait PIRGenSRAM extends PIRCodegen {
 
-  override protected def remap(tp: Type[_]): String = tp match {
-    case tp: SRAM[_,_] => src"Array[${tp.A}]"
-    case _ => super.remap(tp)
-  }
-
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op: SRAMNew[_,_] => emitBankedInitMem(lhs, None, op.A)
-    case op@SRAMBankedRead(sram,bank,ofs,ens)       => emitBankedLoad(lhs,sram,bank,ofs,ens)(op.A)
-    case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitBankedStore(lhs,sram,data,bank,ofs,ens)(op.A)
-    case _ => super.gen(lhs, rhs)
+  override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op: SRAMNew[_,_] => 
+      stateMem(lhs, "SRAM", None)
+    case op@SRAMBankedRead(sram,bank,ofs,ens)       => 
+      stateRead(lhs, sram, Some(bank), Some(ofs), ens)
+    case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => 
+      stateWrite(lhs, sram, Some(bank), Some(ofs), data, ens)
+    case _ => super.genAccel(lhs, rhs)
   }
 }

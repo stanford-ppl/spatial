@@ -12,6 +12,14 @@ case class ConstraintMatrix[K](rows: Set[SparseConstraint[K]], hasDomain: Boolea
     keys.map{k => isl.domain(k) }.fold(ConstraintMatrix.empty){_::_}
   }
 
+  def replaceKeys(keySwap: Map[K,K]): ConstraintMatrix[K] = {
+    val rows2 = rows.map{r => 
+      val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,k) -> v)}
+      SparseConstraint[K](cols2, r.c, r.tp)
+    }
+    ConstraintMatrix[K](rows2, hasDomain)
+  }
+
   def andDomain(implicit isl: ISL): ConstraintMatrix[K] = {
     if (this.hasDomain) this
     else ConstraintMatrix(this.domain.rows ++ rows, hasDomain = true)

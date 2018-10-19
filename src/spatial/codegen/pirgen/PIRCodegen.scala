@@ -2,94 +2,113 @@ package spatial.codegen.pirgen
 
 import argon._
 import argon.codegen.{Codegen, FileDependencies}
-import spatial.codegen.naming.NamedCodegen
 import spatial.metadata.CLIArgs
 import spatial.metadata.memory._
 import spatial.lang._
 import spatial.util.spatialConfig
 
 import scala.collection.mutable
+import spatial.traversal.AccelTraversal
+import spatial.codegen.scalagen.ScalaCodegen
+import scala.language.reflectiveCalls
 
-trait PIRCodegen extends Codegen with FileDependencies with NamedCodegen {
+trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with PIRFormatGen with PIRGenHelper { self =>
   override val lang: String = "pir"
   override val ext: String = "scala"
-  final val CODE_WINDOW: Int = 75
+  backend = "accel"
 
   def and(ens: Set[Bit]): String = if (ens.isEmpty) "true" else ens.map(quote).mkString(" & ")
 
   private var globalBlockID: Int = 0
 
-  // equivalent of quote
-  //override def named(s: Sym[_], id: Int): String = {
-    //super.named(s,id)
-  //}
+  override def entryFile: String = s"Main.$ext"
 
-  override def emitHeader(): Unit = {
+  val hostGen = new spatial.codegen.scalagen.ScalaGenSpatial(IR) {
+    override protected def gen(block: Block[_], withReturn: Boolean = false): Unit = self.gen(block, withReturn)
+    def genHost(lhs: Sym[_], rhs: Op[_]): Unit = gen(lhs, rhs)
+  }
+
+  final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genAccel(lhs, rhs) else genHost(lhs, rhs)
+
+  val hostFile = "HostMain.scala"
+  val accelFile = "AccelMain.scala"
+
+  def openHost(blk: => Unit) = inGen(out, hostFile)(blk)
+
+  def openAccel(blk: => Unit) = inGen(out, accelFile)(blk)
+
+  final override def emitHeader(): Unit = {
+    super.emitHeader()
+    openHost { emitHostHeader }
+    openAccel { emitAccelHeader }
+    emit(s"object ${spatialConfig.name} extends Host with Accel")
+  }
+
+  final override def emitFooter():Unit = {
+    openHost { emitHostFooter }
+    openAccel { emitAccelFooter }
+    super.emitFooter()
+  }
+
+  def emitHostHeader = {
+    hostGen.emitHeader
+    open(src"object HostMain {")
+      open(src"def main(args: Array[String]): Unit = {")
+  }
+
+  def emitHostFooter = {
+      close(s"""}""")
+      hostGen.emitHelp
+    close(s"""}""")
+    hostGen.emitFooter
+  }
+
+  def emitAccelHeader = {
     emit("import pir._")
     emit("import pir.node._")
     emit("import arch._")
     emit("import prism.enums._")
     emit("")
-
-    open(s"""object ${spatialConfig.name} extends PIRApp {""")
-    super.emitHeader()
+    open(s"""trait Accel extends PIRApp {""")
+    open(src"def accel(top:Controller): Unit = {")
   }
 
-  override def emitFooter():Unit = {
-    emit(s"")
+  def emitAccelFooter = {
     close("}")
-
-    super.emitFooter()
+    close("}")
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
+  override protected def quoteConst(tp: Type[_], c: Any): String = s"Const($c)"
+
+  override protected def quoteOrRemap(arg: Any): String = arg match {
+    case p: Set[_]   => 
+      s"Set(${p.map(quoteOrRemap).mkString(", ")})" 
+    case p: Iterable[_]   => 
+      s"List(${p.map(quoteOrRemap).mkString(", ")})" 
+    case e: Ref[_,_]   => quote(e)
+    case Lhs(sym, None) => s"${quote(sym)}"
+    case Lhs(sym, Some(post)) => s"${quote(sym)}_$post"
+    case l: Long       => l.toString + "L"
+    case None    => "None"
+    case Some(x) => "Some(" + quoteOrRemap(x) + ")"
+    case x => x.toString
+  }
+
+  protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
+    //emit(s"// $lhs = $rhs TODO: Unmatched Node")
+    //rhs.blocks.foreach(ret)
+    hostGen.genHost(lhs, rhs)
+  }
+
+  protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {
     emit(s"// $lhs = $rhs TODO: Unmatched Node")
-    warn(s"// $lhs = $rhs TODO: Unmatched Node")
     rhs.blocks.foreach(ret)
   }
 
-  override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    if (withReturn) emit(src"${b.result}")
-  }
-
-  def emitPreMain(): Unit = { }
-  def emitPostMain(): Unit = { }
-
   override protected def emitEntry(block: Block[_]): Unit = {
-    open(src"object Main {")
-      open(src"def main(args: Array[String]): Unit = {")
-        emitPreMain()
-        gen(block)
-        emitPostMain()
-      close(src"}")
-    close(src"}")
-  }
-
-  override protected def postprocess[R](b: Block[R]): Block[R] = {
-    import scala.language.postfixOps
-    import scala.sys.process._
-    super.postprocess(b)
-    //TODO: make pir a submodule
-    //if (sys.env.get("PIR_HOME").isDefined && sys.env("PIR_HOME") != "") {
-      //val PIR_HOME = sys.env("PIR_HOME")
-      ////val dir = spatialConfig.pirsrc.getOrElse(s"$PIR_HOME/pir/apps/src")
-      //val dir = s"$PIR_HOME/pir/apps/src"
-      //var cmd = s"mkdir -p $dir"
-      //info(cmd)
-      //cmd.!
-
-      //cmd = s"cp ${config.genDir}/pir/main.scala $dir/${config.name}.scala"
-      //println(cmd)
-      //cmd.!
-
-      //cmd = s"rm $PIR_HOME/out/${config.name}/${config.name}.pir"
-      //println(cmd)
-      //cmd.!
-    //} else {
-      //warn("Set PIR_HOME environment variable to automatically copy app")
-    //}
-
-    b
+    openHost {
+      gen(block)
+    }
   }
 
 }

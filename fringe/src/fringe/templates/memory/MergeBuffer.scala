@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import fringe._
 import fringe.utils._
-
+import fringe.templates.dramarbiter.{FIFO => SFIFO}
 
 class UpDownCounter(val w: Int) extends Module {
   val io = IO(new Bundle {
@@ -64,23 +64,23 @@ class FIFOPeek[T<:Data](val t: T) extends Module {
     val out = Decoupled(t.cloneType)
   })
 
-  val fifo = Module(new FIFOCore(t.cloneType, 128, 1))
+  val fifo = Module(new SFIFO(t.cloneType, 128))
 
   val ff = Module(new FringeFF(Valid(t.cloneType)))
 
   val deq = ~ff.io.out.valid | io.out.ready
   ff.io.enable := deq
-  ff.io.in.valid := ~fifo.io.empty
-  ff.io.in.bits := fifo.io.deq(0)
+  ff.io.in.valid := fifo.io.out.valid
+  ff.io.in.bits := fifo.io.out.bits
 
-  io.in.ready := ~fifo.io.full
+  io.in.ready := fifo.io.in.ready
 
-  fifo.io.enqVld := io.in.valid
-  fifo.io.deqVld := deq
-  fifo.io.enq(0) := io.in.bits
+  fifo.io.in.valid := io.in.valid
+  fifo.io.out.ready := deq
+  fifo.io.in.bits := io.in.bits
 
-  io.peek.valid := ~fifo.io.empty
-  io.peek.bits := fifo.io.deq(0)
+  io.peek.valid := fifo.io.out.valid
+  io.peek.bits := fifo.io.out.bits
 
   io.out.valid := ff.io.out.valid
   io.out.bits := ff.io.out.bits

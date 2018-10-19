@@ -74,31 +74,31 @@ object Arguments {
     (false,16,16)
     // (true, 8, 8)
   )
-  val Counter = List(
+  val CounterChain = List(
     (List(1,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8)),
     (List(2,2,2), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8)),
     (List(4,1,1), List(None, None, None),List(None, None, None),List(None, None, None),List(None, None, None), List(10,9,8))
   )
   val OuterControl = List(
-    (Sequenced, 1, false),
-    (Sequenced, 2, false),
-    (Sequenced, 5, false),
-    (Sequenced, 8, false),
-    (Pipelined, 1, false),
-    (Pipelined, 2, false),
-    (Pipelined, 5, false),
-    (Pipelined, 8, false),
-    (ForkJoin, 1, false),
-    (ForkJoin, 2, false),
-    (ForkJoin, 5, false),
-    (ForkJoin, 8, false)  
+    (Sequenced, 1, false, 32, 1, 0)
+    // (Sequenced, 2, false),
+    // (Sequenced, 5, false),
+    // (Sequenced, 8, false),
+    // (Pipelined, 1, false),
+    // (Pipelined, 2, false),
+    // (Pipelined, 5, false),
+    // (Pipelined, 8, false),
+    // (ForkJoin, 1, false),
+    // (ForkJoin, 2, false),
+    // (ForkJoin, 5, false),
+    // (ForkJoin, 8, false)  
     // (1, Stream, false),
     // (2, Stream, false),
     // (5, Stream, false),
     // (8, Stream, false),
   )
   val InnerControl = List(
-    (Sequenced, false, 32)
+    (Sequenced, false, false, 32, 1, 0)
   )
   val PRNG = List(
     1,
@@ -244,14 +244,6 @@ object Launcher {
     (s"FixedPointTester$i" -> { (backendName: String) =>
       Driver(() => new FixedPointTester(arg), "verilator") {
           (c) => new FixedPointTesterTests(c)
-        }
-      }) 
-  }.toMap
-
-  templates = templates ++ Arguments.Counter.zipWithIndex.map{ case(arg,i) => 
-    (s"Counter$i" -> { (backendName: String) =>
-      Driver(() => new Counter(arg), "verilator") {
-          (c) => new CounterTests(c)
         }
       }) 
   }.toMap

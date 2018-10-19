@@ -28,7 +28,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
   final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
   lazy val dimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) 
-                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank) Seq(FLAT_BANKS, NEST_BANKS) 
+                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
+                                         else if (mem.isHierarchicalBank) Seq(NEST_BANKS) 
+                                         else if (mem.isFlatBank) Seq(FLAT_BANKS) 
+                                         else if (mem.isNoBank) Seq() 
+                                         else Seq(FLAT_BANKS)
+  lazy val wrDimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) 
+                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
                                          else if (mem.isHierarchicalBank) Seq(NEST_BANKS) 
                                          else if (mem.isFlatBank) Seq(FLAT_BANKS) 
                                          else Seq(FLAT_BANKS)
@@ -185,7 +191,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // A conflict occurs if there are accesses on the same port with overlapping addresses
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
-          val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) }
+          val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)}
           samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")
@@ -454,11 +460,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         Right(bankings.map{case (instRdGroups, instBankings) => 
           val bankingCosts = instBankings.map{b => b -> cost(b,depth, instRdGroups, reachingWrGroups) }
           val duplicationCost = cost(Seq(), depth, instRdGroups, reachingWrGroups)
-          val (banking, bankCost) = bankingCosts.minBy(_._2)
+          val (banking, bankCost) = bankingCosts.sortBy(_._2).headOption.getOrElse(Nil, 999999L)
           dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
-          if (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut && !mem.isRegFile) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
+          if (mem.isNoBank || (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut && !mem.isRegFile)) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
             dbgs(s"Choosing to duplicate $mem for $instRdGroups, $wrGroups.  ")
-            val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, dimGrps).head._2
+            val wrBankings = strategy.bankAccesses(mem, rank, Set.empty, reachingWrGroups, wrDimGrps).head._2
             val wrBankingsCosts = wrBankings.map{b => b -> cost(b, depth, Set.empty, reachingWrGroups)}
             val (wrBanking, wrBankCost) = wrBankingsCosts.minBy(_._2)
             Seq.tabulate(instRdGroups.flatten.size){i => 
@@ -506,7 +512,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
-    val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b)
+    val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
     val trueConflict = concurrent && conflicting
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict

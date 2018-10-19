@@ -1,8 +1,8 @@
 module test;
   import "DPI" function void sim_init();
   import "DPI" function int tick();
-  import "DPI" function int sendDRAMRequest(longint addr, longint rawAddr, int size, int tag_uid, int tag_streamId, int isWr);
-  import "DPI" function int sendWdataStrb(int dramCmdValid, int dramReadySeen, int wdata0, int wdata1, int wdata2, int wdata3, int wdata4, int wdata5, int wdata6, int wdata7, int wdata8, int wdata9, int wdata10, int wdata11, int wdata12, int wdata13, int wdata14, int wdata15, int wdata16, int wdata17, int wdata18, int wdata19, int wdata20, int wdata21, int wdata22, int wdata23, int wdata24, int wdata25, int wdata26, int wdata27, int wdata28, int wdata29, int wdata30, int wdata31, int wdata32, int wdata33, int wdata34, int wdata35, int wdata36, int wdata37, int wdata38, int wdata39, int wdata40, int wdata41, int wdata42, int wdata43, int wdata44, int wdata45, int wdata46, int wdata47, int wdata48, int wdata49, int wdata50, int wdata51, int wdata52, int wdata53, int wdata54, int wdata55, int wdata56, int wdata57, int wdata58, int wdata59, int wdata60, int wdata61, int wdata62, int wdata63, int strb0, int strb1, int strb2, int strb3, int strb4, int strb5, int strb6, int strb7, int strb8, int strb9, int strb10, int strb11, int strb12, int strb13, int strb14, int strb15, int strb16, int strb17, int strb18, int strb19, int strb20, int strb21, int strb22, int strb23, int strb24, int strb25, int strb26, int strb27, int strb28, int strb29, int strb30, int strb31, int strb32, int strb33, int strb34, int strb35, int strb36, int strb37, int strb38, int strb39, int strb40, int strb41, int strb42, int strb43, int strb44, int strb45, int strb46, int strb47, int strb48, int strb49, int strb50, int strb51, int strb52, int strb53, int strb54, int strb55, int strb56, int strb57, int strb58, int strb59, int strb60, int strb61, int strb62, int strb63);
+  import "DPI" function int sendDRAMRequest(longint addr, longint rawAddr, int size, int tag, int isWr);
+  import "DPI" function int sendWdataStrb(int dramCmdValid, int wdata0, int wdata1, int wdata2, int wdata3, int wdata4, int wdata5, int wdata6, int wdata7, int wdata8, int wdata9, int wdata10, int wdata11, int wdata12, int wdata13, int wdata14, int wdata15, int wdata16, int wdata17, int wdata18, int wdata19, int wdata20, int wdata21, int wdata22, int wdata23, int wdata24, int wdata25, int wdata26, int wdata27, int wdata28, int wdata29, int wdata30, int wdata31, int wdata32, int wdata33, int wdata34, int wdata35, int wdata36, int wdata37, int wdata38, int wdata39, int wdata40, int wdata41, int wdata42, int wdata43, int wdata44, int wdata45, int wdata46, int wdata47, int wdata48, int wdata49, int wdata50, int wdata51, int wdata52, int wdata53, int wdata54, int wdata55, int wdata56, int wdata57, int wdata58, int wdata59, int wdata60, int wdata61, int wdata62, int wdata63, int strb0, int strb1, int strb2, int strb3, int strb4, int strb5, int strb6, int strb7, int strb8, int strb9, int strb10, int strb11, int strb12, int strb13, int strb14, int strb15, int strb16, int strb17, int strb18, int strb19, int strb20, int strb21, int strb22, int strb23, int strb24, int strb25, int strb26, int strb27, int strb28, int strb29, int strb30, int strb31, int strb32, int strb33, int strb34, int strb35, int strb36, int strb37, int strb38, int strb39, int strb40, int strb41, int strb42, int strb43, int strb44, int strb45, int strb46, int strb47, int strb48, int strb49, int strb50, int strb51, int strb52, int strb53, int strb54, int strb55, int strb56, int strb57, int strb58, int strb59, int strb60, int strb61, int strb62, int strb63);
   import "DPI" function void serviceWRequest();
   import "DPI" function void popDRAMReadQ();
   import "DPI" function void popDRAMWriteQ();
@@ -67,12 +67,10 @@ module test;
   wire [31:0] io_dram_0_cmd_bits_size;
   wire [63:0] io_dram_0_cmd_bits_rawAddr;
   wire  io_dram_0_cmd_bits_isWr;
-  wire  io_dram_0_cmd_bits_dramReadySeen;
   wire  io_dram_0_wdata_valid;
   wire  io_dram_0_wdata_bits_wlast;
   reg io_dram_0_wdata_ready;
-  wire [25:0] io_dram_0_cmd_bits_tag_uid;
-  wire [5:0] io_dram_0_cmd_bits_tag_streamId;
+  wire [31:0] io_dram_0_cmd_bits_tag;
   wire [7:0] io_dram_0_wdata_bits_wdata_0;
   wire [7:0] io_dram_0_wdata_bits_wdata_1;
   wire [7:0] io_dram_0_wdata_bits_wdata_2;
@@ -269,12 +267,10 @@ module test;
   reg [7:0] io_dram_0_rresp_bits_rdata_61;
   reg [7:0] io_dram_0_rresp_bits_rdata_62;
   reg [7:0] io_dram_0_rresp_bits_rdata_63;
-  reg  [25:0] io_dram_0_rresp_bits_tag_uid;
-  reg  [5:0] io_dram_0_rresp_bits_tag_streamId;
+  reg [31:0] io_dram_0_rresp_bits_tag;
   wire        io_dram_0_wresp_ready;
   reg         io_dram_0_wresp_valid;
-  reg  [25:0] io_dram_0_wresp_bits_tag_uid;
-  reg  [5:0] io_dram_0_wresp_bits_tag_streamId;
+  reg  [31:0] io_dram_0_wresp_bits_tag;
 
 //  wire        io_genericStreamIn_ready;
 //  reg         io_genericStreamIn_valid;
@@ -303,9 +299,7 @@ module test;
     .io_dram_0_cmd_bits_rawAddr(io_dram_0_cmd_bits_rawAddr),
     .io_dram_0_cmd_bits_size(io_dram_0_cmd_bits_size),
     .io_dram_0_cmd_bits_isWr(io_dram_0_cmd_bits_isWr),
-    .io_dram_0_cmd_bits_dramReadySeen(io_dram_0_cmd_bits_dramReadySeen),
-    .io_dram_0_cmd_bits_tag_uid(io_dram_0_cmd_bits_tag_uid),
-    .io_dram_0_cmd_bits_tag_streamId(io_dram_0_cmd_bits_tag_streamId),
+    .io_dram_0_cmd_bits_tag(io_dram_0_cmd_bits_tag),
     .io_dram_0_wdata_bits_wlast(io_dram_0_wdata_bits_wlast),
     .io_dram_0_wdata_bits_wdata_0(io_dram_0_wdata_bits_wdata_0),
     .io_dram_0_wdata_bits_wdata_1(io_dram_0_wdata_bits_wdata_1),
@@ -504,12 +498,10 @@ module test;
     .io_dram_0_rresp_bits_rdata_61(io_dram_0_rresp_bits_rdata_61),
     .io_dram_0_rresp_bits_rdata_62(io_dram_0_rresp_bits_rdata_62),
     .io_dram_0_rresp_bits_rdata_63(io_dram_0_rresp_bits_rdata_63),
-    .io_dram_0_rresp_bits_tag_uid(io_dram_0_rresp_bits_tag_uid),
-    .io_dram_0_rresp_bits_tag_streamId(io_dram_0_rresp_bits_tag_streamId),
+    .io_dram_0_rresp_bits_tag(io_dram_0_rresp_bits_tag),
     .io_dram_0_wresp_ready(io_dram_0_wresp_ready),
     .io_dram_0_wresp_valid(io_dram_0_wresp_valid),
-    .io_dram_0_wresp_bits_tag_uid(io_dram_0_wresp_bits_tag_uid),
-    .io_dram_0_wresp_bits_tag_streamId(io_dram_0_wresp_bits_tag_streamId)
+    .io_dram_0_wresp_bits_tag(io_dram_0_wresp_bits_tag)
 //    .io_genericStreamIn_ready(io_genericStreamIn_ready),
 //    .io_genericStreamIn_valid(io_genericStreamIn_valid),
 //    .io_genericStreamIn_bits_data(io_genericStreamIn_bits_data),
@@ -535,7 +527,7 @@ module test;
   endfunction
 
   function void stopVCD();
-    vcdon = 1;
+    vcdon = 0;
   endfunction
 
 
@@ -566,8 +558,7 @@ module test;
   endfunction
 
   function void pokeDRAMReadResponse(
-    input int tag_uid,
-    input int tag_streamId,
+    input int tag,
     input int rdata0,
     input int rdata1,
     input int rdata2,
@@ -634,8 +625,7 @@ module test;
     input int rdata63
   );
     io_dram_0_rresp_valid = 1;
-    io_dram_0_rresp_bits_tag_uid = tag_uid;
-    io_dram_0_rresp_bits_tag_streamId = tag_streamId;
+    io_dram_0_rresp_bits_tag = tag;
     io_dram_0_rresp_bits_rdata_0 = rdata0;
     io_dram_0_rresp_bits_rdata_1 = rdata1;
     io_dram_0_rresp_bits_rdata_2 = rdata2;
@@ -704,12 +694,10 @@ module test;
   endfunction
 
   function void pokeDRAMWriteResponse(
-    input int tag_uid,
-    input int tag_streamId
+    input int tag
   );
     io_dram_0_wresp_valid = 1;
-    io_dram_0_wresp_bits_tag_uid = tag_uid;
-    io_dram_0_wresp_bits_tag_streamId = tag_streamId;
+    io_dram_0_wresp_bits_tag = tag;
   endfunction
 
 
@@ -724,23 +712,19 @@ module test;
 //    io_genericStreamIn_bits_last = last;
   endfunction
 
-  reg stallForOneCycle = 0;
   // 1. If io_dram_0_cmd_valid, then send send DRAM request to CPP layer
   function void post_update_callbacks();
     if (io_dram_0_cmd_valid & ~reset) begin
-      io_dram_0_cmd_ready = 1;
+      io_dram_0_cmd_ready <= 1;
     end else begin
-      io_dram_0_cmd_ready = 0;
+      io_dram_0_cmd_ready <= 0;
     end
 
     // Lower the ready signal for a cycle after wlast goes high
-    if (io_dram_0_wdata_valid & ~reset & ~stallForOneCycle) begin
-      io_dram_0_wdata_ready = 1;
+    if (io_dram_0_wdata_valid & ~reset) begin
+      io_dram_0_wdata_ready <= 1;
     end else begin
-      io_dram_0_wdata_ready = 0;
-      if (stallForOneCycle) begin
-        stallForOneCycle = 0;
-      end
+      io_dram_0_wdata_ready <= 0;
     end
 
 //    if (io_genericStreamOut_valid & ~reset) begin
@@ -767,8 +751,7 @@ module test;
         io_dram_0_cmd_bits_addr,
         io_dram_0_cmd_bits_rawAddr,
         io_dram_0_cmd_bits_size,
-        io_dram_0_cmd_bits_tag_uid,
-        io_dram_0_cmd_bits_tag_streamId,
+        io_dram_0_cmd_bits_tag,
         io_dram_0_cmd_bits_isWr
       );
     end
@@ -776,7 +759,6 @@ module test;
     if (io_dram_0_wdata_valid & io_dram_0_wdata_ready) begin
       sendWdataStrb(
         io_dram_0_cmd_valid,
-        io_dram_0_cmd_bits_dramReadySeen,
         io_dram_0_wdata_bits_wdata_0,
         io_dram_0_wdata_bits_wdata_1,
         io_dram_0_wdata_bits_wdata_2,
@@ -906,11 +888,6 @@ module test;
         io_dram_0_wdata_bits_wstrb_62,
         io_dram_0_wdata_bits_wstrb_63
       );
-      if (io_dram_0_wdata_bits_wlast) begin
-        stallForOneCycle = 1;
-      end else begin
-        stallForOneCycle = 0;
-      end
     end
 
     serviceWRequest();

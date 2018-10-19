@@ -49,14 +49,6 @@ uint64_t globalID = 0;
 class DRAMRequest;
 class WData;
 
-typedef union DRAMTag {
-  struct {
-    unsigned int uid : 32;
-    unsigned int streamId : 32;
-  };
-  uint64_t tag;
-} DRAMTag;
-
 /**
  * DRAM Command received from the design
  * One object could potentially create multiple DRAMRequests
@@ -65,12 +57,12 @@ class DRAMCommand {
 public:
   uint64_t addr;
   uint32_t size;
-  DRAMTag tag;
+  uint64_t tag;
   uint64_t channelID;
   bool isWr;
   DRAMRequest **reqs = NULL;
 
-  DRAMCommand(uint64_t a, uint32_t sz, DRAMTag t, bool wr) {
+  DRAMCommand(uint64_t a, uint32_t sz, uint64_t t, bool wr) {
     addr = a;
     size = sz;
     tag = t;
@@ -120,7 +112,7 @@ public:
   uint64_t rawAddr;
   uint64_t smallAddr;
   uint32_t size;
-  DRAMTag tag;
+  uint64_t tag;
   uint64_t channelID;
   bool isWr;
   uint8_t *wdata = NULL;
@@ -130,7 +122,7 @@ public:
   bool completed;
   DRAMCommand *cmd;
 
-  DRAMRequest(uint64_t a, uint64_t ra, uint32_t sz, DRAMTag t, bool wr, uint64_t issueCycle) {
+  DRAMRequest(uint64_t a, uint64_t ra, uint32_t sz, uint64_t t, bool wr, uint64_t issueCycle) {
     id = globalID++;
     addr = remapper->getBig(a);
     smallAddr = a;
@@ -156,12 +148,12 @@ public:
   }
 
   void print() {
-    EPRINTF("[DRAMRequest CH=%lu] addr: %lx (%lx), sizeInBursts: %u, streamId: %x, tag: %lx, isWr: %d, issued=%lu \n", channelID, addr, rawAddr, size, tag.streamId, tag.uid, isWr, issued);
+    EPRINTF("[DRAMRequest CH=%lu] addr: %lx (%lx), sizeInBursts: %u, tag: %lx, isWr: %d, issued=%lu \n", channelID, addr, rawAddr, size, tag, isWr, issued);
   }
 
   void schedule() {
     if (!useIdealDRAM) {
-      mem->addTransaction(isWr, addr, tag.tag);
+      mem->addTransaction(isWr, addr, tag);
       channelID = mem->findChannelNumber(addr);
     } else {
       dramRequestQ[channelID].push_back(this);
@@ -193,19 +185,21 @@ bool DRAMCommand::hasCompleted() {
 
 struct AddrTag {
   uint64_t addr;
-  DRAMTag tag;
+  uint64_t tag;
 
-  AddrTag(uint64_t a, DRAMTag t) {
+  AddrTag(uint64_t a, uint64_t t) {
     addr = a;
     tag = t;
   }
 
+/*
   bool operator==(const AddrTag &o) const {
-      return addr == o.addr && tag.tag == o.tag.tag;
+      return addr == o.addr && tag.t == o.tag.t;
   }
+  */
 
   bool operator<(const AddrTag &o) const {
-      return addr < o.addr || (addr == o.addr && tag.tag < o.tag.tag);
+      return addr < o.addr || (addr == o.addr && tag < o.tag);
   }
 };
 
@@ -217,7 +211,7 @@ std::deque<WData*> wdataQ;
 std::deque<DRAMRequest*> wrequestQ;
 
 // Internal book-keeping data structures
-std::map<struct AddrTag, DRAMRequest*> addrToReqMap;
+std::map<struct AddrTag, std::deque<DRAMRequest*>> addrToReqMap;
 
 uint32_t getWordOffset(uint64_t addr) {
   return (addr & (burstSizeBytes - 1)) >> 2;   // TODO: Use parameters above!
@@ -232,7 +226,7 @@ void printQueueStats(int id) {
     int k = 0;
     while (it != dramRequestQ[id].end()) {
       DRAMRequest *r = *it;
-      EPRINTF("    %d. addr: %lx (%lx), tag: %lx, streamId: %d, completed: %d\n", k, r->addr, r->rawAddr, r->tag.uid, r->tag.streamId, r->completed);
+      EPRINTF("    %d. addr: %lx (%lx), tag: %lx, completed: %d\n", k, r->addr, r->rawAddr, r->tag, r->completed);
       it++;
       k++;
       //    if (k > 20) break;
@@ -251,7 +245,7 @@ void updateIdealDRAMQ(int id) {
       if (req->elapsed >= req->delay) {
         req->completed = true;
         if (debug) {
-          EPRINTF("[idealDRAM txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)req->addr, req->tag.uid, numCycles);
+          EPRINTF("[idealDRAM txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)req->addr, req->tag, numCycles);
         }
 
       }
@@ -374,11 +368,10 @@ bool checkQAndRespond(int id) {
 
 
         if (req->isWr) {
-          pokeDRAMWriteResponse(req->tag.uid, req->tag.streamId);
+          pokeDRAMWriteResponse(req->tag);
         } else {
           pokeDRAMReadResponse(
-            req->tag.uid,
-            req->tag.streamId,
+            req->tag,
             rdata[0],
             rdata[1],
             rdata[2],
@@ -502,19 +495,21 @@ void checkAndSendDRAMResponse() {
 class DRAMCallbackMethods {
 public:
   void txComplete(unsigned id, uint64_t addr, uint64_t tag, uint64_t clock_cycle) {
-    DRAMTag cmdTag;
-    cmdTag.tag = tag;
     if (debug) {
-      EPRINTF("[txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)addr, cmdTag.tag, numCycles);
+      EPRINTF("[txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)addr, tag, numCycles);
     }
 
     // Find transaction, mark it as done, remove entry from map
-    struct AddrTag at(addr, cmdTag);
-    std::map<struct AddrTag, DRAMRequest*>::iterator it = addrToReqMap.find(at);
-    ASSERT(it != addrToReqMap.end(), "address/tag tuple (%lx, %lx) not found in addrToReqMap!", addr, cmdTag.tag);
-    DRAMRequest* req = it->second;
+    struct AddrTag at(addr, tag);
+    auto it = addrToReqMap.find(at);
+    ASSERT(it != addrToReqMap.end(), "address/tag tuple (%lx, %lx) not found in addrToReqMap!", addr, tag);
+    auto &reqQueue = it->second;
+    DRAMRequest* req = reqQueue.front();
     req->completed = true;
-    addrToReqMap.erase(at);
+    reqQueue.pop_front();
+    if (reqQueue.empty()) {
+      addrToReqMap.erase(at);
+    }
   }
 };
 
@@ -660,7 +655,6 @@ extern "C" {
 
   int sendWdataStrb(
     int dramCmdValid,
-    int dramReadySeen,
     int wdata0, int wdata1, int wdata2, int wdata3, int wdata4, int wdata5, int wdata6, int wdata7, int wdata8, int wdata9, int wdata10, int wdata11, int wdata12, int wdata13, int wdata14, int wdata15, int wdata16, int wdata17, int wdata18, int wdata19, int wdata20, int wdata21, int wdata22, int wdata23, int wdata24, int wdata25, int wdata26, int wdata27, int wdata28, int wdata29, int wdata30, int wdata31, int wdata32, int wdata33, int wdata34, int wdata35, int wdata36, int wdata37, int wdata38, int wdata39, int wdata40, int wdata41, int wdata42, int wdata43, int wdata44, int wdata45, int wdata46, int wdata47, int wdata48, int wdata49, int wdata50, int wdata51, int wdata52, int wdata53, int wdata54, int wdata55, int wdata56, int wdata57, int wdata58, int wdata59, int wdata60, int wdata61, int wdata62, int wdata63, int strb0,
     int strb1, int strb2, int strb3, int strb4, int strb5, int strb6, int strb7, int strb8, int strb9, int strb10, int strb11, int strb12, int strb13, int strb14, int strb15, int strb16, int strb17, int strb18, int strb19, int strb20, int strb21, int strb22, int strb23, int strb24, int strb25, int strb26, int strb27, int strb28, int strb29, int strb30, int strb31, int strb32, int strb33, int strb34, int strb35, int strb36, int strb37, int strb38, int strb39, int strb40, int strb41, int strb42, int strb43, int strb44, int strb45, int strb46, int strb47, int strb48, int strb49, int strb50, int strb51, int strb52, int strb53, int strb54, int strb55, int strb56, int strb57, int strb58, int strb59, int strb60, int strb61, int strb62, int strb63
   ) {
@@ -832,8 +826,7 @@ extern "C" {
       long long addr,
       long long rawAddr,
       int size,
-      int tag_uid,
-      int tag_streamId,
+      int tag,
       int isWr
     ) {
     int dramReady = 1;  // 1 == ready, 0 == not ready (stall upstream)
@@ -841,19 +834,16 @@ extern "C" {
     // view addr as uint64_t without doing sign extension
     uint64_t cmdAddr = *(uint64_t*)&addr;
     uint64_t cmdRawAddr = *(uint64_t*)&rawAddr;
-    DRAMTag cmdTag;
-    cmdTag.uid = *(uint32_t*)&tag_uid;
-    cmdTag.streamId = *(uint32_t*)&tag_streamId;
     uint32_t cmdSize = (uint32_t)(*(uint32_t*)&size);
     bool cmdIsWr = isWr > 0;
 
     // Create a DRAM Command
-    DRAMCommand *cmd = new DRAMCommand(cmdAddr, cmdSize, cmdTag, cmdIsWr);
+    DRAMCommand *cmd = new DRAMCommand(cmdAddr, cmdSize, tag, cmdIsWr);
 
     // Create multiple DRAM requests, one per burst
     DRAMRequest **reqs = new DRAMRequest*[cmdSize];
     for (int i = 0; i<cmdSize; i++) {
-      reqs[i] = new DRAMRequest(cmdAddr + i*burstSizeBytes, cmdRawAddr + i*burstSizeBytes, cmdSize, cmdTag, cmdIsWr, numCycles);
+      reqs[i] = new DRAMRequest(cmdAddr + i*burstSizeBytes, cmdRawAddr + i*burstSizeBytes, cmdSize, tag, cmdIsWr, numCycles);
       reqs[i]->cmd = cmd;
     }
     cmd->reqs = reqs;
@@ -871,7 +861,12 @@ extern "C" {
         DRAMRequest *req = reqs[i];
         struct AddrTag at(req->addr, req->tag);
 
-        addrToReqMap[at] = req;
+        if (addrToReqMap.find(at) == addrToReqMap.end()) {
+          std::deque<DRAMRequest *> reqQueue { req };
+          addrToReqMap[at] = reqQueue;
+        } else {
+          addrToReqMap[at].push_back(req);
+        }
         skipIssue = false;
 
         // TODO: Re-examine gather-scatter flow
@@ -895,7 +890,7 @@ extern "C" {
     if (dramReady == 1) {
       for (int i=0; i<cmdSize; i++) {
         if (!useIdealDRAM) {
-          dramRequestQ[cmdTag.streamId].push_back(reqs[i]);
+          dramRequestQ[tag % MAX_NUM_Q].push_back(reqs[i]);
         }// else {
 //          dramRequestQ[reqs[i]->channelID].push_back(reqs[i]);
 //        }

@@ -1,12 +1,12 @@
 val scala_version = "2.12.6"
 
 name := "emul"
-organization := "edu.stanford.ppl"
+organization := "edu.stanford.cs.dawn"
 isSnapshot := true
 
 val common = Seq(
   scalaVersion := scala_version,
-  version := "1.0",
+  version := "1.0-SNAPSHOT",
   crossScalaVersions := Seq(scala_version, "2.11.7"),
 
   /** Scalac Options **/
@@ -37,7 +37,38 @@ val common = Seq(
 
   /** Release **/
   publishArtifact   := true,
+
+  isSnapshot := true,
+
+  homepage := Some(url("https://spatial.stanford.edu")),
+  scmInfo := Some(ScmInfo(url("https://github.com/stanford-ppl/spatial"),
+                              "git@github.com:stanford-ppl/spatial.git")),
+  developers := List(Developer("mattfel1",
+                               "Matthew Feldman",
+                               "mattfel@stanford.edu",
+                               url("https://github.com/mattfel1")),
+                     Developer("dkoeplin",
+                               "David Koeplinger",
+                               "dkoeplin@stanford.edu",
+                               url("https://github.com/dkoeplin")),
+                     Developer("raghup17",
+                               "Raghu Prabhakar",
+                               "raghup17@stanford.edu",
+                               url("https://github.com/raghup17")),
+                     Developer("yaqiz",
+                               "Yaqi Zhang",
+                               "yaqiz@stanford.edu",
+                               url("https://github.comyaqiz/"))
+                    ),
+  publishTo := Some(
+    if (isSnapshot.value)
+      Opts.resolver.sonatypeSnapshots
+    else
+      Opts.resolver.sonatypeStaging
+  ),
+
   publishMavenStyle := true
+
 )
 
 

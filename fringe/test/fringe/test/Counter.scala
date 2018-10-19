@@ -214,7 +214,7 @@ class CompactingCounterTests(c: CompactingCounter) extends PeekPokeTester(c) {
 }
 
 
-class CounterTests(c: Counter) extends PeekPokeTester(c) {
+class CounterChainTests(c: CounterChain) extends PeekPokeTester(c) {
 
   // Test triple nested counter
   val depth = 3

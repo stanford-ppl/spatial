@@ -13,7 +13,7 @@ import scala.collection.mutable.Queue
   val evMem: MergeBuffer[A] <:< LocalMem[A,MergeBuffer] = implicitly[MergeBuffer[A] <:< LocalMem[A,MergeBuffer]]
 
   @api def enq(way: Int, data: A): Void = stage(MergeBufferEnq(this, way, data, Set(true)))
-  @api def bound(way: Int, bound: A): Void = stage(MergeBufferBound(this, way, bound, Set(true)))
+  @api def bound(way: Int, bound: I32): Void = stage(MergeBufferBound(this, way, bound, Set(true)))
   @api def init(init: Bit): Void = stage(MergeBufferInit(this, init, Set(true)))
 
   @api def deq(): A = stage(MergeBufferDeq(this, Set(true)))

@@ -2,7 +2,7 @@
 all: apps
 
 ###-----------------------------------###
-## Publish spatial locally.            ##
+## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
 publish:
 	bash bin/make_poly.sh
@@ -16,10 +16,43 @@ publish:
 	sbt "; project argon; publishLocal"
 
 ###-----------------------------------###
+## Publish spatial locally to m2.      ##
+###-----------------------------------###
+publishM2Local: export FRINGE_PACKAGE=''
+publishM2Local: 
+	@echo $(FRINGE_PACKAGE)
+	sbt "; project emul; +publishM2"
+	sbt "; project fringe; publishM2"
+	sbt "; project argon; publishM2"
+	sbt "; project forge; publishM2"
+	sbt "; project spatial; publishM2"
+	sbt "; project models; publishM2"
+	sbt "; project poly; publishM2"
+	sbt "; project utils; publishM2"
+
+###-----------------------------------###
+## Publish spatial locally to m2.      ##
+###-----------------------------------###
+publishM2Remote: export FRINGE_PACKAGE="" 
+publishM2Remote: 
+	@echo $(FRINGE_PACKAGE)
+	sbt "; project emul; +publishSigned"
+	sbt "; project fringe; publishSigned"
+	sbt "; project argon; publishSigned"
+	sbt "; project forge; publishSigned"
+	sbt "; project spatial; publishSigned"
+	sbt "; project models; publishSigned"
+	sbt "; project poly; publishSigned"
+	sbt "; project utils; publishSigned"
+
+###-----------------------------------###
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
+	mkdir -p ${HOME}/bin
 	bash bin/make_poly.sh
+	cp poly/emptiness ${HOME}/bin
+	export PATH=${PATH}:${HOME}/bin
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 

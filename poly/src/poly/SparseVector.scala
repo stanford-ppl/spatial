@@ -17,7 +17,7 @@ case class SparseVector[K](cols: Map[K,Int], c: Int, lastIters: Map[K,Option[K]]
   final def m: Option[Int] = None
 
   def asMinConstraint(x: K): SparseConstraint[K] = SparseConstraint[K](cols.map{case (i,a) => i -> -a} ++ Map(x -> 1) , -c, GEQ_ZERO)
-  def asMaxConstraint(x: K): SparseConstraint[K] = SparseConstraint[K](cols ++ Map(x -> -1), c, GEQ_ZERO)
+  def asMaxConstraint(x: K): SparseConstraint[K] = SparseConstraint[K](cols ++ Map(x -> -1), c-1, GEQ_ZERO)
   def asConstraintEqlZero: SparseConstraint[K] = SparseConstraint[K](cols, c, EQL_ZERO)
   def asConstraintGeqZero: SparseConstraint[K] = SparseConstraint[K](cols, c, GEQ_ZERO)
 

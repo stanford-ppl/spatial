@@ -10,7 +10,7 @@ import fringe.targets.zcu.ZCU
 import fringe.targets.zynq.Zynq
 
 class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
-    val addrWidth = log2Ceil(d)
+    val addrWidth = {1 max log2Ceil(d)}
     val clk = Input(Clock())
     val raddr = Input(UInt(addrWidth.W))
     val waddr = Input(UInt(addrWidth.W))
@@ -27,64 +27,87 @@ abstract class SRAMBlackBox[T<:Data](params: Map[String,Param]) extends BlackBox
 }
 
 class SRAMVerilogSim[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogAWS[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogAWS_URAM[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogAWS_BRAM[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class SRAMVerilogDE1SoC[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
-  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam(log2Ceil(d))))
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
 }
 
 class GenericRAMIO[T<:Data](t: T, d: Int) extends Bundle {
-  val addrWidth = log2Ceil(d)
+  val addrWidth = {1 max log2Ceil(d)}
   val raddr = Input(UInt(addrWidth.W))
   val wen = Input(Bool())
   val waddr = Input(UInt(addrWidth.W))
-  val wdata = Input(t)
-  val rdata = Output(t)
+  val wdata = Input(t.cloneType)
+  val rdata = Output(t.cloneType)
   val flow = Input(Bool())
 
-  override def cloneType(): this.type = {
+  override def cloneType: this.type = {
     new GenericRAMIO(t, d).asInstanceOf[this.type]
   }
 }
 
 abstract class GenericRAM[T<:Data](val t: T, val d: Int) extends Module {
-  val addrWidth = log2Ceil(d)
-  val io = IO(new GenericRAMIO(t, d))
+  val addrWidth = {1 max log2Ceil(d)}
+  val io: GenericRAMIO[T]
 }
 
 class FFRAM[T<:Data](override val t: T, override val d: Int) extends GenericRAM(t, d) {
-  val rf = Module(new RegFilePure(t, d))
-  rf.io.raddr := RegNext(io.raddr, 5.U)
-  rf.io.wen := io.wen
-  rf.io.waddr := io.waddr
-  rf.io.wdata := io.wdata
-  io.rdata := rf.io.rdata
+  class FFRAMIO[T<:Data](t: T, d: Int) extends GenericRAMIO(t, d) {
+    class Bank[T<:Data](t: T, d: Int) extends Bundle {
+      val wdata = Flipped(Valid(t.cloneType))
+      val rdata = Output(t.cloneType)
+
+      override def cloneType: this.type = new Bank(t, d).asInstanceOf[this.type]
+    }
+
+    val banks = Vec(d, new Bank(t.cloneType, d))
+
+    override def cloneType: this.type = new FFRAMIO(t, d).asInstanceOf[this.type]
+  }
+
+  val io = IO(new FFRAMIO(t, d))
+
+  val regs = List.tabulate(d) { i =>
+    val r = RegInit((0.U).asTypeOf(t))
+    val bank = io.banks(i)
+    val wen = bank.wdata.valid
+    when (wen | (io.wen & (io.waddr === i.U))) {
+      r := Mux(wen, bank.wdata.bits, io.wdata)
+    }
+    bank.rdata := r
+    r
+  }
+
+  io.rdata := Vec(regs)(io.raddr)
 }
 
 class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: String) extends GenericRAM(t, d) {
+  val io = IO(new GenericRAMIO(t, d))
+
   // Customize SRAM here
   // TODO: Still needs some cleanup
   globals.target match {

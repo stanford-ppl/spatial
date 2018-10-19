@@ -41,7 +41,7 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
 
     val FFT_SIZE = 256
-    val numiter = (scala.math.log(FFT_SIZE) / scala.math.log(2)).to[Int]
+    val numiter = (scala.math.log(FFT_SIZE) / scala.math.log(2)).to[Int] // = 8
 
     val result_real_dram = DRAM[T](FFT_SIZE)
 
@@ -49,13 +49,12 @@ import spatial.dsl._
       val data_real_sram = SRAM[T](FFT_SIZE)
       Foreach(FFT_SIZE by 1){ i => data_real_sram(i) = 0 }
       val span = Reg[Int](FFT_SIZE)
-      Foreach(0 until numiter) { log => 
+      'NUMITER.Foreach(0 until numiter) { log => 
         span := span >> 1
         val num_sections = Reduce(Reg[Int](1))(0 until log){i => 2}{_*_}
-        Foreach(0 until num_sections) { section => 
-          val base = span*(2*section+1)
-          Sequential.Foreach(0 until span by 1) { offset => 
-            Pipe{data_real_sram(section) = data_real_sram(section) + 1}
+        'NUM_SECTION.Foreach(0 until num_sections) { section => 
+          'SPAN.Sequential.Foreach(0 until span by 1) { offset => 
+            data_real_sram(section) = data_real_sram(section) + 1
           }
         }
       }

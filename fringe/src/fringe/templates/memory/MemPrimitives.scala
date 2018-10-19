@@ -72,6 +72,8 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     case FIFOInterface => IO(new FIFOInterface(p))
   } 
 
+  override def desiredName = p.myName
+
   var usedMuxPorts = List[(String,(Int,Int,Int,Int))]() // Check if the muxPort, muxAddr, lane, castgrp is taken for this connection style (xBar or direct)
   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int)): Unit = {
     assert(p.hasXBarW)
@@ -152,7 +154,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
 
   def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, directWMux: DMap, directRMux: DMap,
-           bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(StandardInterface, logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits))
+           bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "sram") = this(MemParams(StandardInterface, logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits, myName = myName))
   def this(tuple: (List[Int], Int, List[Int], List[Int], XMap, XMap,
     DMap, DMap, BankingMode)) = this(MemParams(StandardInterface,tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9))
 
@@ -315,7 +317,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(StandardInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "FF") = this(MemParams(StandardInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
   // def this(logicalDims: List[Int], bitWidth: Int,
   //          banks: List[Int], strides: List[Int],
   //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
@@ -323,7 +325,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   //          bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, {if (init.isDefined) Some(init.get.map(_.toDouble)) else None}, syncMem, fracBits))
   def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
-  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
+  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, myName: String) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, myName)
 
   val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
   val anyReset: Bool = io.xBarW.flatMap{_.reset}.toList.reduce{_|_} | io.reset
@@ -339,7 +341,7 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "FIFOReg") = this(MemParams(FIFOInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
   // def this(logicalDims: List[Int], bitWidth: Int, 
   //          banks: List[Int], strides: List[Int], 
   //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
@@ -374,14 +376,14 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
 class FIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], xBarWMux: XMap, xBarRMux: XMap,
-           inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
+           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits, myName = "FIFO"))
 
-  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, None, false, 0)
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "FIFO") = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
 
   // Create bank counters
   val headCtr = Module(new CompactingCounter(p.numXBarW, p.depth, p.elsWidth))
@@ -453,13 +455,13 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int],
            xBarWMux: XMap, xBarRMux: XMap,
-           inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits))
-  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits, myName = "LIFO"))
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, None, false, 0)
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "LIFO") = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
 
   val pW = p.xBarWMux.accessPars.max
   val pR = p.xBarRMux.accessPars.max
@@ -558,15 +560,15 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
             xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
             directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, isBuf: Boolean = false) = this(MemParams(ShiftRegFileInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf))
+            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, myName: String) = this(MemParams(ShiftRegFileInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, myName = myName))
 
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, "SR")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, "SR")
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "SR") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, myName)
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
@@ -684,15 +686,15 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
             xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
             directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-            inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, isBuf: Boolean = false) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf))
+            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, myName: String) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, myName = myName))
 
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9)
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, "LUT")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, "LUT")
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "LUT") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, myName)
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
@@ -775,14 +777,15 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     if (size <= globals.target.SramThreshold) {
       val m = (0 until size).map{ i =>
         val reg = RegInit(0.U(bitWidth.W))
-        reg := Mux(io.w.en.head & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
+        reg := Mux(io.w.en.head & wInBound & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
         (i.U(addrWidth.W) -> reg)
       }
       val radder = getRetimed(io.r.ofs.head,1,io.flow)
       io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.flow)
     } else {
       val m = Module(new SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
-      m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      else           m.io.raddr     := 0.U
       m.io.waddr     := io.w.ofs.head
       m.io.wen       := io.w.en.head & wInBound & io.wMask
       m.io.wdata     := io.w.data.head
@@ -804,13 +807,13 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     }
   }
 
-  if (globals.regression_testing == "1") {
-    io.debug.invalidRAddr := ~rInBound
-    io.debug.invalidWAddr := ~wInBound
-    io.debug.rwOn := io.w.en.head & io.r.en.head & io.wMask & io.rMask
-    io.debug.error := !rInBound | !wInBound | (io.w.en.head & io.r.en.head & io.wMask & io.rMask)
-    // io.debug.addrProbe := m(0.U)
-  }
+  // if (globals.regression_testing == "1") {
+  //   io.debug.invalidRAddr := ~rInBound
+  //   io.debug.invalidWAddr := ~wInBound
+  //   io.debug.rwOn := io.w.en.head & io.r.en.head & io.wMask & io.rMask
+  //   io.debug.error := !rInBound | !wInBound | (io.w.en.head & io.r.en.head & io.wMask & io.rMask)
+  //   // io.debug.addrProbe := m(0.U)
+  // }
 }
 
 

@@ -37,7 +37,7 @@ class SpatialConfig extends Config {
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
   var compressWires = 0
-  var sramThreshold = 0 // Minimum number of elements to instantiate BRAM over Registers 
+  var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true
 
@@ -51,5 +51,7 @@ class SpatialConfig extends Config {
   var enableBufferCoalescing: Boolean = true
 
   var enablePIR = false
+
+  var paramSavePath:Option[String] = None
 
 }

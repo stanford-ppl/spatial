@@ -6,9 +6,6 @@ import spatial.dsl._
   override def runtimeArgs: Args = "10000"
 
   val margin = 0.5f // Validates true if within +/- margin
-  val innerPar = 4
-  val outerPar = 1
-  val tileSize = 2000
 
   final val inv_sqrt_2xPI = 0.39894228040143270286f
 
@@ -79,9 +76,10 @@ import spatial.dsl._
     svolatility: Array[Float],
     stimes:      Array[Float]
   ): Array[Float] = {
-    val B  = tileSize (96 -> 96 -> 19200)
-    val OP = outerPar (1 -> 2)
-    val IP = innerPar (1 -> 96)
+    val B  = loadParam("ts", 4 (96 -> 96 -> 19200))
+    val op = loadParam("op", 1 (1 -> 2))
+    val ip = loadParam("ip", 16 (1 -> 96))
+    val lp = loadParam("lp", 4 (1 -> 16))
 
     val size = stypes.length; bound(size) = 9995328
 
@@ -103,7 +101,7 @@ import spatial.dsl._
     setMem(times, stimes)
 
     Accel {
-      Foreach(N by B par OP) { i =>
+      Foreach(N by B par op) { i =>
         val typeBlk   = SRAM[Int](B)
         val priceBlk  = SRAM[Float](B)
         val strikeBlk = SRAM[Float](B)
@@ -113,19 +111,19 @@ import spatial.dsl._
         val optpriceBlk = SRAM[Float](B)
 
         Parallel {
-          typeBlk   load types(i::i+B par IP)
-          priceBlk  load prices(i::i+B par IP)
-          strikeBlk load strike(i::i+B par IP)
-          rateBlk   load rate(i::i+B par IP)
-          volBlk    load vol(i::i+B par IP)
-          timeBlk   load times(i::i+B par IP)
+          typeBlk   load types(i::i+B par lp)
+          priceBlk  load prices(i::i+B par lp)
+          strikeBlk load strike(i::i+B par lp)
+          rateBlk   load rate(i::i+B par lp)
+          volBlk    load vol(i::i+B par lp)
+          timeBlk   load times(i::i+B par lp)
         }
 
-        Foreach(B par IP){ j =>
+        Foreach(B par ip){ j =>
           val price = BlkSchlsEqEuroNoDiv(priceBlk(j), strikeBlk(j), rateBlk(j), volBlk(j), timeBlk(j), typeBlk(j))
           optpriceBlk(j) = price
         }
-        optprice(i::i+B par IP) store optpriceBlk
+        optprice(i::i+B par lp) store optpriceBlk
       }
     }
     getMem(optprice)

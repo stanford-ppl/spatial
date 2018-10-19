@@ -1,7 +1,7 @@
 package fringe.utils
 
 import chisel3._
-import chisel3.util.log2Ceil
+import chisel3.util._
 
 import fringe.templates.memory.FringeFF
 
@@ -16,17 +16,17 @@ class MuxN[T<:Data](val t: T, val numInputs: Int) extends Module {
   io.out := io.ins(io.sel)
 }
 
-class MuxNPipe[T<:Data](val t: T, val numInputs: Int, val stages: Int) extends Module {
+class MuxPipe[T<:Data](val t: T, val numInputs: Int) extends Module {
   val logInputs = log2Ceil(numInputs)
-  val pow2Inputs = scala.math.pow(2, logInputs).toInt
-  assert(stages >= 0 && stages <= logInputs)
 
   val io = IO(new Bundle {
-    val ins = Input(Vec(numInputs, t.cloneType))
+    val in = Flipped(Decoupled(Vec(numInputs, t.cloneType)))
     val sel = Input(Bits(logInputs.W))
-    val en = Input(Bool())
-    val out = Output(t.cloneType)
+    val out = Decoupled((t.cloneType))
   })
+
+  val enable = io.out.ready | !io.out.valid
+
 
   def splitMux(input: Vec[T], stages: Int): (T, Bits) = {
     def slice(v: Vec[T], start: Int, end: Int) = {
@@ -34,28 +34,29 @@ class MuxNPipe[T<:Data](val t: T, val numInputs: Int, val stages: Int) extends M
     }
 
     stages match {
-      case 0 => {
+      case 0 =>
+        (input(0), false.B)
+      case 1 =>
         val m = Module(new MuxN(t, input.length))
         m.io.ins := input
         val c = log2Ceil(input.length)
-        m.io.sel := io.sel(c - 1, 0)
-        val s = if (io.sel.getWidth > c) io.sel(io.sel.getWidth - 1, c) else 0.U
+        val sel = io.sel
+        m.io.sel := sel(c - 1, 0)
+        val s = if (sel.getWidth > c) sel(sel.getWidth - 1, c) else 0.U
         (m.io.out, s)
-      }
-      case _ => {
+      case _ =>
         val inL = slice(input, 0, (input.length / 2) - 1)
         val inH = slice(input, input.length / 2, input.length - 1)
         val (muxL, selL) = splitMux(inL, stages - 1)
         val (muxH, selH) = splitMux(inH, stages - 1)
 
-        val selFF = getFF(selL, io.en)
+        val selFF = getFF(selL, enable)
 
         val m = Module(new MuxN(t, 2))
-        m.io.ins := Vec(getFF(muxL, io.en), getFF(muxH, io.en))
+        m.io.ins := Vec(getFF(muxL, enable), getFF(muxH, enable))
         m.io.sel := selFF(0)
         val s = if (selFF.getWidth > 1) selFF(selFF.getWidth - 1, 1) else 0.U
         (m.io.out, s)
-      }
     }
   }
 
@@ -64,8 +65,11 @@ class MuxNPipe[T<:Data](val t: T, val numInputs: Int, val stages: Int) extends M
     Vec(for (i <- 0 until c) yield if (i < v.length) v(i) else v(0))
   }
 
-  val (m, s) = splitMux(pad(io.ins), stages)
-  io.out := m
+  val (m, s) = splitMux(pad(io.in.bits.data), logInputs)
+  val delay = (logInputs - 1).max(0)
+  io.out.valid := getRetimed(io.in.valid, delay, enable)
+  io.in.ready := enable
+  io.out.bits := m
 }
 
 class MuxNReg(val numInputs: Int, w: Int) extends Module {

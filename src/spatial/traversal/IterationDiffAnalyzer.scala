@@ -9,6 +9,7 @@ import spatial.metadata.control._
 import spatial.metadata.access._
 import spatial.metadata.memory._
 import spatial.metadata.bounds.Expect
+import utils.implicits.collections._
 
 case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
@@ -32,6 +33,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
         if (cycles.nonEmpty) {
           dbgs(s"\n\nFound cycles in $lhs ($iters): ")
           cycles.foreach{c => dbgs(s"  $c")}
+          val allWritePositions = cycles.map(_.write.affineMatrices.head.matrix.collapse.sorted.headOption.getOrElse(0))
           cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem && reader != writer) => 
 
             if (reader.affineMatrices.nonEmpty && writer.affineMatrices.nonEmpty) {
@@ -88,23 +90,24 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                                                         lat = 2 * single lane's latency 
                                                         segmentMapping = Map( 0 -> 0, 1 -> 0, 2 -> 1)
                       */
-                      val advancePerLane = (thisIterReads(1) - thisIterReads.head).collapse.max
-                      val diffPerLane = (write-read).collapse.max
-                      if (diffPerLane > 0) { // diffPerLane = 0 is a case of mem(i) = mem(i) + ...
-                        val dependsOnLane = List.tabulate(par){i => i * advancePerLane - diffPerLane}
-                        val segMapping = dependsOnLane.zipWithIndex.map{case(d,i) =>
-                          val segment = if (d < 0) 0 else {
-                            ((0 max dependsOnLane(i))/diffPerLane).toInt + 1
-                          }
+
+                      // Want to figure out if this read at an upper lane has any overlap with the write range of a previous lane
+
+                      val upperLaneStart = thisIterReads(1).collapse.max
+                      val overlapLimit = if (advancePerInc.collapse.max > 0) allWritePositions.max else allWritePositions.min
+                      // If the diff within a lane requires data from a previous lane, we must segment
+                      if ((advancePerInc.collapse.max > 0 && upperLaneStart <= overlapLimit) || (advancePerInc.collapse.max < 0 && upperLaneStart <= overlapLimit)) { 
+                        // Figure out how many times to rewind loop until the write bounds contain the upperLaneStart
+                        val dependsOnRelativeIter = (upperLaneStart - overlapLimit) / (advancePerInc.collapse.max/par) - 1
+                        val segMapping = List.tabulate(par){i =>
+                          val segment = 0 max {i + dependsOnRelativeIter + 1}
                           (i -> segment)
                         }.toMap
-                        dbgs(s"advancePerLane = $advancePerLane, diffPerLane = $diffPerLane, lane dependencies $dependsOnLane")
+                        dbgs(s"upperLaneStart = $upperLaneStart, advancePerInc = ${advancePerInc.collapse.max}, relativeIter = $dependsOnRelativeIter")
                         dbgs(s"segmentMapping = ${segMapping}")
                         reader.segmentMapping = segMapping
                         writer.segmentMapping = segMapping
                         mem.segmentMapping = segMapping
-                        // TODO: Tie this in to unrolling
-                        // if (segMapping.values.toList.distinct.length > 1) throw new Exception("Inter-lane access dependencies in cycles not yet supported")
                       }
                     }
                   }

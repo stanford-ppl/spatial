@@ -7,7 +7,6 @@ import fringe.templates.memory._
 class FIFOIO[T <: Data](t: T, depth: Int) extends Bundle {
   val in = Flipped(Decoupled(t.cloneType))
   val out = Decoupled(t.cloneType)
-  val count = Output(UInt(log2Ceil(depth + 1).W))
 
   class Bank[T <: Data] extends Bundle {
     val wdata = Flipped(Valid(t.cloneType))
@@ -83,8 +82,5 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
 
   io.out.valid := !empty
   io.in.ready := !full
-
-  val ptrDiff = enqCounter.io.out - deqCounter.io.out
-  io.count := Cat(maybeFull && ptrMatch, ptrDiff)
 }
 

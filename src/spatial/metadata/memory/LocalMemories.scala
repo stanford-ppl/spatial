@@ -5,8 +5,8 @@ import forge.tags.data
 
 /** Global set of all local memories.
   *
-  * Getter:  localMems.all
-  * Append:  localMems += (mem)
+  * Getter:  LocalMems.all
+  * Append:  LocalMems += (mem)
   * Default: empty set
   */
 case class LocalMemories(memories: Set[Sym[_]]) extends Data[LocalMemories](GlobalData.Flow)

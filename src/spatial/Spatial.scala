@@ -79,6 +79,12 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val accumAnalyzer      = AccumAnalyzer(state)
     lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
 
+    // --- DSE
+    lazy val paramAnalyzer        = ParameterAnalyzer(state)
+    // lazy val heuristicAnalyzer    = HeuristicAnalyzer(state)
+    // lazy val dsePass              = DSEAnalyzer(state)
+    // lazy val finalizeTransformer  = FinalizeTransformer(state)
+
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
     lazy val retimeReporter = RetimeReporter(state)
@@ -117,6 +123,8 @@ trait Spatial extends Compiler with ParamLoader {
         /** Black box lowering */
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
+        /** DSE */
+        (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
         blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
@@ -187,10 +195,10 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.note("")
     cli.note("Design Tuning:")
-    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce}.text("Enable default design tuning (bruteforce)")
-    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce }.text("Enable brute force tuning.")
-    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic }.text("Enable heuristic tuning.")
-    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment }.text("Enable DSE experimental mode.").hidden()
+    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true}.text("Enable default design tuning (bruteforce)")
+    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true }.text("Enable brute force tuning.")
+    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic; spatialConfig.enableArchDSE = true }.text("Enable heuristic tuning.")
+    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
 
     cli.note("")

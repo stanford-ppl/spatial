@@ -85,7 +85,7 @@ class GatherBuffer(
   meta.zipWithIndex.foreach { case (fifo, i) =>
     fifo.io.in.valid := addressSel.io.in(i).valid & addressSel.io.in(i).ready
     fifo.io.in.bits.done := false.B
-    fifo.io.in.bits.addr := issueAddr
+    fifo.io.in.bits.addr := addressSel.io.in(i).bits
     fifo.io.out.ready := io.rdata.valid & io.rdata.ready
 
     fifo.io.banks.foreach { case bank =>

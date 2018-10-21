@@ -266,7 +266,23 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     emitMemObject(mem) {
-      emit(src"""val m = Module(new $templateName $dimensions, $depth ${bitWidth(mem.tp.typeArgs.head)}, $numBanks, $strides, $XBarW, $XBarR, $DirectW, $DirectR, $BXBarW $BXBarR $bankingMode, $initStr, ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, ${fracBits(mem.tp.typeArgs.head)}, myName = "$mem"))""")
+      emit(src"""val m = Module(new $templateName 
+    $dimensions, 
+    $depth ${bitWidth(mem.tp.typeArgs.head)}, 
+    $numBanks, 
+    $strides, 
+    $XBarW, 
+    $XBarR, 
+    $DirectW, 
+    $DirectR, 
+    $BXBarW 
+    $BXBarR 
+    $bankingMode, 
+    $initStr, 
+    ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, 
+    ${fracBits(mem.tp.typeArgs.head)}, 
+    myName = "$mem"
+  ))""")
       if (name == "FIFO") {
         mem.writers.foreach{x => emit(src"val enqActive_$x = Wire(Bool())")}
         mem.readers.foreach{x => emit(src"val deqActive_$x = Wire(Bool())")}

@@ -3,67 +3,60 @@ package spatial.dse
 import argon._
 import spatial.metadata.control._
 import spatial.metadata.params._
+import spatial.metadata.memory._
 import spatial.node._
 import spatial.lang.I32
 import spatial.metadata.bounds._
 import spatial.metadata.types._
+import spatial.util.spatialConfig
 
 import java.io.PrintWriter
 import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
 
-trait DSEAnalyzer extends argon.passes.Traversal {// with SpaceGenerator with HyperMapperDSE {
+case class DSEAnalyzer(IR: State) extends argon.passes.Traversal with SpaceGenerator { //  with HyperMapperDSE {
 
-  // /*abstract class SearchMode
-  // case object BruteForceSearch extends SearchMode
-  // case object HeuristicSearch  extends SearchMode
-  // final val searchMode: SearchMode = HeuristicSearch*/
-  // def restricts: Set[Restrict]
-  // def tileSizes: Set[Param[Index]]
-  // def parFactors: Set[Param[Index]]
-  // def localMems: Seq[Exp[_]]
-  // def metapipes: Seq[Exp[_]]
-  // def top: Exp[_]
+  override protected def process[R](block: Block[R]): Block[R] = {
+    dbgs("Tile sizes: ")
+    TileSizes.all.foreach{t => dbgs(s"  $t (${t.ctx})")}
+    dbgs("Parallelization factors:")
+    ParParams.all.foreach{p => dbgs(s"  $p (${p.ctx})")}
+    dbgs("Metapipelining toggles:")
+    PipelineParams.all.foreach{m => dbgs(s"  $m (${m.ctx})")}
 
-  // override protected def process[S: Type](block: Block[S]): Block[S] = {
-  //   if (spatialConfig.enableDSE) {
-  //     report("Tile sizes: ")
-  //     tileSizes.foreach{t => report(u"  $t (${t.ctx})")}
-  //     report("Parallelization factors:")
-  //     parFactors.foreach{p => report(u"  $p (${p.ctx})")}
-  //     report("Metapipelining toggles:")
-  //     metapipes.foreach{m => report(u"  $m (${m.ctx})")}
+    val intParams = (TileSizes.all ++ ParParams.all).toSeq
+    val intSpace = createIntSpace(intParams, Restrictions.all)
+    val ctrlSpace = createCtrlSpace(PipelineParams.all.toSeq)
+    val params = intParams ++ PipelineParams.all.toSeq
+    val space = intSpace ++ ctrlSpace
 
-  //     val intParams = (tileSizes ++ parFactors).toSeq
-  //     val intSpace = createIntSpace(intParams, restricts)
-  //     val ctrlSpace = createCtrlSpace(metapipes)
-  //     val params = intParams ++ metapipes
-  //     val space = intSpace ++ ctrlSpace
+    dbgs("Space: ")
+    params.zip(space).foreach{case (p,d) => dbgs(s"  $p: $d (${p.ctx})") }
 
-  //     report("Space: ")
-  //     params.zip(space).foreach{case (p,d) => report(u"  $p: $d (${p.ctx})") }
-
-  //     if (spatialConfig.bruteForceDSE) bruteForceDSE(params, space, block)
-  //     else if (spatialConfig.heuristicDSE) heuristicDSE(params, space, restricts, block)
-  //     else if (spatialConfig.hyperMapperDSE) hyperMapperDSE(space, block)
-  //   }
-  //   dbg("Freezing parameters")
-  //   tileSizes.foreach{t => t.makeFinal() }
-  //   parFactors.foreach{p => p.makeFinal() }
-  //   block
-  // }
+    spatialConfig.dseMode match {
+      case DSEMode.Disabled => 
+      case DSEMode.Heuristic => heuristicDSE(params, space, Restrictions.all, block)
+      case DSEMode.Bruteforce => bruteForceDSE(params, space, block) 
+      case DSEMode.Experiment => //hyperMapperDSE(space, block)
+    }
+  
+    // dbg("Freezing parameters")
+    // TileSizes.all.foreach{t => t.makeFinal() }
+    // ParParams.all.foreach{p => p.makeFinal() }
+    block
+  }
 
 
 
-  // def heuristicDSE(params: Seq[Exp[_]], space: Seq[Domain[_]], restrictions: Set[Restrict], program: Block[_]): Unit = {
+  def heuristicDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], restrictions: Set[Restrict], program: Block[_]): Unit = {
   //   val EXPERIMENT = spatialConfig.experimentDSE
-  //   report("Intial Space Statistics: ")
-  //   report("-------------------------")
-  //   report(s"  # of parameters: ${space.size}")
-  //   report(s"  # of points:     ${space.map(d => BigInt(d.len)).product}")
-  //   report("")
+  //   dbgs("Intial Space Statistics: ")
+  //   dbgs("-------------------------")
+  //   dbgs(s"  # of parameters: ${space.size}")
+  //   dbgs(s"  # of points:     ${space.map(d => BigInt(d.len)).product}")
+  //   dbgs("")
 
-  //   report("Found the following space restrictions: ")
-  //   restrictions.foreach{r => report(s"  $r") }
+  //   dbgs("Found the following space restrictions: ")
+  //   restrictions.foreach{r => dbgs(s"  $r") }
 
   //   val prunedSpace = space.zip(params).map{
   //     case (domain, p: Param[_]) =>
@@ -79,9 +72,9 @@ trait DSEAnalyzer extends argon.passes.Traversal {// with SpaceGenerator with Hy
   //   val prods = List.tabulate(N){i => dims.slice(i+1,N).product }
   //   val NPts = dims.product
 
-  //   report("")
-  //   report("Pruned space: ")
-  //   params.zip(prunedSpace).foreach{case (p,d) => report(u"  $p: $d (${p.ctx})") }
+  //   dbgs("")
+  //   dbgs("Pruned space: ")
+  //   params.zip(prunedSpace).foreach{case (p,d) => dbgs(u"  $p: $d (${p.ctx})") }
 
   //   val restricts = restrictions.filter(_.deps.size > 1)
   //   def isLegalSpace(): Boolean = restricts.forall(_.evaluate())
@@ -109,7 +102,7 @@ trait DSEAnalyzer extends argon.passes.Traversal {// with SpaceGenerator with Hy
   //     val results = new LinkedBlockingQueue[Seq[Int]](T)
   //     val BLOCK_SIZE = Math.ceil(NPts.toDouble / T).toInt
   //     println(s"Number of candidate points is: ${NPts}")
-  //     report(s"Using $T threads with block size of $BLOCK_SIZE")
+  //     dbgs(s"Using $T threads with block size of $BLOCK_SIZE")
 
   //     workerIds.foreach{i =>
   //       val start = i * BLOCK_SIZE
@@ -183,136 +176,136 @@ trait DSEAnalyzer extends argon.passes.Traversal {// with SpaceGenerator with Hy
   //   else {
   //     error("Space size is greater than Int.MaxValue. Don't know what to do here yet...")
   //   }
-  // }
+  }
 
-  // // P: Total space size
-  // def threadBasedDSE(P: BigInt, params: Seq[Exp[_]], space: Seq[Domain[_]], program: Block[_], file: String = config.name+"_data.csv", overhead: Long = 0L)(pointGen: BlockingQueue[Seq[BigInt]] => Unit): Unit = {
-  //   val names = params.map{p => p.name.getOrElse(p.toString) }
-  //   val N = space.size
-  //   val T = spatialConfig.threads
-  //   val dir = if (config.resDir.startsWith("/")) config.resDir + "/" else config.cwd + s"/${config.resDir}/"
-  //   val filename = dir + file
-  //   val BLOCK_SIZE = Math.min(Math.ceil(P.toDouble / T).toInt, 500)
+  // P: Total space size
+  def threadBasedDSE(P: BigInt, params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_], file: String = config.name+"_data.csv", overhead: Long = 0L)(pointGen: BlockingQueue[Seq[BigInt]] => Unit): Unit = {
+    val names = params.map{p => p.name.getOrElse(p.toString) }
+    val N = space.size
+    val T = spatialConfig.threads
+    val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+    val filename = dir + file
+    val BLOCK_SIZE = Math.min(Math.ceil(P.toDouble / T).toInt, 500)
 
-  //   new java.io.File(dir).mkdirs()
+    new java.io.File(dir).mkdirs()
 
-  //   report("Space Statistics: ")
-  //   report("-------------------------")
-  //   report(s"  # of parameters: $N")
-  //   report(s"  # of points:     $P")
-  //   report("")
-  //   report(s"Using $T threads with block size of $BLOCK_SIZE")
-  //   report(s"Writing results to file $filename")
+    dbgs("Space Statistics: ")
+    dbgs("-------------------------")
+    dbgs(s"  # of parameters: $N")
+    dbgs(s"  # of points:     $P")
+    dbgs("")
+    dbgs(s"Using $T threads with block size of $BLOCK_SIZE")
+    dbgs(s"Writing results to file $filename")
 
-  //   val workQueue = new LinkedBlockingQueue[Seq[BigInt]](5000)  // Max capacity specified here
-  //   val fileQueue = new LinkedBlockingQueue[Array[String]](5000)
+    val workQueue = new LinkedBlockingQueue[Seq[BigInt]](5000)  // Max capacity specified here
+    val fileQueue = new LinkedBlockingQueue[Array[String]](5000)
 
-  //   val workerIds = (0 until T).toList
+    val workerIds = (0 until T).toList
 
-  //   val pool = Executors.newFixedThreadPool(T)
-  //   val writePool = Executors.newFixedThreadPool(1)
+    val pool = Executors.newFixedThreadPool(T)
+    val writePool = Executors.newFixedThreadPool(1)
 
-  //   val workers = workerIds.map{id =>
-  //     val threadState = new State
-  //     state.copyTo(threadState)
-  //     DSEThread(
-  //       threadId  = id,
-  //       params    = params,
-  //       space     = space,
-  //       accel     = top,
-  //       program   = program,
-  //       localMems = localMems,
-  //       workQueue = workQueue,
-  //       outQueue  = fileQueue
-  //     )(threadState)
-  //   }
-  //   report("Initializing models...")
+    // val workers = workerIds.map{id =>
+    //   val threadState = new State(state.app)
+    //   state.copyTo(threadState)
+    //   DSEThread(
+    //     threadId  = id,
+    //     params    = params,
+    //     space     = space,
+    //     accel     = TopCtrl.get,
+    //     program   = program,
+    //     localMems = LocalMemories.all.toSeq,
+    //     workQueue = workQueue,
+    //     outQueue  = fileQueue
+    //   )(threadState)
+    // }
+    // dbgs("Initializing models...")
 
-  //   // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
-  //   workers.foreach{worker => worker.init() }
+    // // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
+    // workers.foreach{worker => worker.init() }
 
-  //   //val superHeader = List.tabulate(names.length){i => if (i == 0) "INPUTS" else "" }.mkString(",") + "," +
-  //   //  List.tabulate(workers.head.areaHeading.length){i => if (i == 0) "OUTPUTS" else "" }.mkString(",") + ", ,"
-  //   val header = names.mkString(",") + "," + workers.head.areaHeading.mkString(",") + ", Cycles, Valid"
+    // //val superHeader = List.tabulate(names.length){i => if (i == 0) "INPUTS" else "" }.mkString(",") + "," +
+    // //  List.tabulate(workers.head.areaHeading.length){i => if (i == 0) "OUTPUTS" else "" }.mkString(",") + ", ,"
+    // val header = names.mkString(",") + "," + workers.head.areaHeading.mkString(",") + ", Cycles, Valid"
 
-  //   val writer = DSEWriterThread(
-  //     threadId  = T,
-  //     spaceSize = P,
-  //     filename  = filename,
-  //     header    = header,
-  //     workQueue = fileQueue
-  //   )
+    // val writer = DSEWriterThread(
+    //   threadId  = T,
+    //   spaceSize = P,
+    //   filename  = filename,
+    //   header    = header,
+    //   workQueue = fileQueue
+    // )
 
-  //   report("And aaaawaaaay we go!")
+    // dbgs("And aaaawaaaay we go!")
 
-  //   workers.foreach{worker => pool.submit(worker) }
-  //   writePool.submit(writer)
+    // workers.foreach{worker => pool.submit(worker) }
+    // writePool.submit(writer)
 
-  //   // Submit all the work to be done
-  //   // Work queue blocks this thread when it's full (since we'll definitely be faster than the worker threads)
-  //   val startTime = System.currentTimeMillis
-  //   workers.foreach{worker => worker.START = startTime - overhead }
+    // // Submit all the work to be done
+    // // Work queue blocks this thread when it's full (since we'll definitely be faster than the worker threads)
+    // val startTime = System.currentTimeMillis
+    // workers.foreach{worker => worker.START = startTime - overhead }
 
-  //   pointGen(workQueue)
-  //   /*var i = BigInt(0)
-  //   while (i < P) {
-  //     val len: Int = if (P - i < BLOCK_SIZE) (P - i).toInt else BLOCK_SIZE
-  //     if (len > 0) workQueue.put((i,len))
-  //     i += BLOCK_SIZE
-  //   }*/
+    // pointGen(workQueue)
+    // /*var i = BigInt(0)
+    // while (i < P) {
+    //   val len: Int = if (P - i < BLOCK_SIZE) (P - i).toInt else BLOCK_SIZE
+    //   if (len > 0) workQueue.put((i,len))
+    //   i += BLOCK_SIZE
+    // }*/
 
-  //   println("[Master] Ending work queue.")
+    // println("[Master] Ending work queue.")
 
-  //   // Poison the work queue (make sure to use enough to kill them all!)
-  //   workerIds.foreach{_ => workQueue.put(Seq.empty[BigInt]) }
+    // // Poison the work queue (make sure to use enough to kill them all!)
+    // workerIds.foreach{_ => workQueue.put(Seq.empty[BigInt]) }
 
-  //   println("[Master] Waiting for workers to complete...")
+    // println("[Master] Waiting for workers to complete...")
 
-  //   // Wait for all the workers to die (this is a fun metaphor)
-  //   pool.shutdown()
-  //   pool.awaitTermination(10L, TimeUnit.HOURS)
-  //   println("[Master] Waiting for file writing to complete...")
+    // // Wait for all the workers to die (this is a fun metaphor)
+    // pool.shutdown()
+    // pool.awaitTermination(10L, TimeUnit.HOURS)
+    // println("[Master] Waiting for file writing to complete...")
 
-  //   // Poison the file queue too and wait for the file writer to die
-  //   fileQueue.put(Array.empty[String])
-  //   writePool.shutdown()
-  //   writePool.awaitTermination(10L, TimeUnit.HOURS)
+    // // Poison the file queue too and wait for the file writer to die
+    // fileQueue.put(Array.empty[String])
+    // writePool.shutdown()
+    // writePool.awaitTermination(10L, TimeUnit.HOURS)
 
-  //   val endTime = System.currentTimeMillis()
-  //   val totalTime = (endTime - startTime)/1000.0
+    // val endTime = System.currentTimeMillis()
+    // val totalTime = (endTime - startTime)/1000.0
 
-  //   if (PROFILING) {
-  //     val bndTime = workers.map(_.bndTime).sum
-  //     val memTime = workers.map(_.memTime).sum
-  //     val conTime = workers.map(_.conTime).sum
-  //     val areaTime = workers.map(_.areaTime).sum
-  //     val cyclTime = workers.map(_.cyclTime).sum
-  //     val total = bndTime + memTime + conTime + areaTime + cyclTime
-  //     println("Profiling results: ")
-  //     println(s"Combined runtime: $total")
-  //     println(s"Scalar analysis:     $bndTime"  + " (%.3f)".format(100*bndTime.toDouble/total) + "%")
-  //     println(s"Memory analysis:     $memTime"  + " (%.3f)".format(100*memTime.toDouble/total) + "%")
-  //     println(s"Contention analysis: $conTime"  + " (%.3f)".format(100*conTime.toDouble/total) + "%")
-  //     println(s"Area analysis:       $areaTime" + " (%.3f)".format(100*areaTime.toDouble/total) + "%")
-  //     println(s"Runtime analysis:    $cyclTime" + " (%.3f)".format(100*cyclTime.toDouble/total) + "%")
-  //   }
+    // if (PROFILING) {
+    //   val bndTime = workers.map(_.bndTime).sum
+    //   val memTime = workers.map(_.memTime).sum
+    //   val conTime = workers.map(_.conTime).sum
+    //   val areaTime = workers.map(_.areaTime).sum
+    //   val cyclTime = workers.map(_.cyclTime).sum
+    //   val total = bndTime + memTime + conTime + areaTime + cyclTime
+    //   println("Profiling results: ")
+    //   println(s"Combined runtime: $total")
+    //   println(s"Scalar analysis:     $bndTime"  + " (%.3f)".format(100*bndTime.toDouble/total) + "%")
+    //   println(s"Memory analysis:     $memTime"  + " (%.3f)".format(100*memTime.toDouble/total) + "%")
+    //   println(s"Contention analysis: $conTime"  + " (%.3f)".format(100*conTime.toDouble/total) + "%")
+    //   println(s"Area analysis:       $areaTime" + " (%.3f)".format(100*areaTime.toDouble/total) + "%")
+    //   println(s"Runtime analysis:    $cyclTime" + " (%.3f)".format(100*cyclTime.toDouble/total) + "%")
+    // }
 
-  //   println(s"[Master] Completed space search in $totalTime seconds.")
-  // }
+    // println(s"[Master] Completed space search in $totalTime seconds.")
+  }
 
-  // def bruteForceDSE(params: Seq[Exp[_]], space: Seq[Domain[_]], program: Block[_]): Unit = {
-  //   val P = space.map{d => BigInt(d.len) }.product
-  //   val T = spatialConfig.threads
-  //   val BLOCK_SIZE = Math.min(Math.ceil(P.toDouble / T).toInt, 500)
+  def bruteForceDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_]): Unit = {
+    val P = space.map{d => BigInt(d.len) }.product
+    val T = spatialConfig.threads
+    val BLOCK_SIZE = Math.min(Math.ceil(P.toDouble / T).toInt, 500)
 
-  //   threadBasedDSE(P, params, space, program){queue =>
-  //     var i = BigInt(0)
-  //     while (i < P) {
-  //       val len: Int = if (P - i < BLOCK_SIZE) (P - i).toInt else BLOCK_SIZE
-  //       if (len > 0) queue.put(i until i + len)
-  //       i += BLOCK_SIZE
-  //     }
-  //   }
-  // }
+    threadBasedDSE(P, params, space, program){queue =>
+      var i = BigInt(0)
+      while (i < P) {
+        val len: Int = if (P - i < BLOCK_SIZE) (P - i).toInt else BLOCK_SIZE
+        if (len > 0) queue.put(i until i + len)
+        i += BLOCK_SIZE
+      }
+    }
+  }
 
 }

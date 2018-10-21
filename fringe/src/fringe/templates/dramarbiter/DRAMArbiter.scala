@@ -37,7 +37,16 @@ class DRAMArbiter(
 
   val numStreams = loadStreamInfo.size + storeStreamInfo.size +
                    gatherStreamInfo.size + scatterStreamInfo.size
-  if (numStreams > 0) {
+
+  // Print all debugging signals into a header file
+  val debugFileName = "cpp/generated_debugRegs.h"
+  val debugPW = new PrintWriter(new File(debugFileName))
+  if (isDebugChannel) {
+    debugPW.println(s"""#ifndef __DEBUG_REGS_H__""")
+    debugPW.println(s"""#define __DEBUG_REGS_H__""")
+  }
+
+  val signalLabels = if (numStreams > 0) {
     val streamTagWidth = log2Ceil(numStreams)
     assert(streamTagWidth <= (new DRAMTag(64)).streamID.getWidth)
 
@@ -213,21 +222,20 @@ class DRAMArbiter(
       connectDbgSig(debugFF(io.DWIDTH_AXI.WDATA, io.DWIDTH_AXI.WVALID & io.DWIDTH_AXI.WREADY & wdataCount === 1.U), "Second DWIDTH WDATA")
       connectDbgSig(debugFF(io.DWIDTH_AXI.WSTRB, io.DWIDTH_AXI.WVALID & io.DWIDTH_AXI.WREADY & wdataCount === 1.U), "Second DWIDTH WSTRB")
 
-      // Print all debugging signals into a header file
-      val debugFileName = "cpp/generated_debugRegs.h"
-      val debugPW = new PrintWriter(new File(debugFileName))
-      debugPW.println(s"""
-    #ifndef __DEBUG_REGS_H__
-    #define __DEBUG_REGS_H__
-    #define NUM_DEBUG_SIGNALS ${signalLabels.size}
-    const char *signalLabels[] = {
-    """)
+      signalLabels
+    } else ListBuffer[String]()
+  } else ListBuffer[String]()
 
-      debugPW.println(signalLabels.map { l => s"""\"${l}\"""" }.mkString(", "))
-      debugPW.println("};")
-      debugPW.println("#endif // __DEBUG_REGS_H__")
-      debugPW.close()
-    }
+  if (isDebugChannel) {
+    debugPW.println(s"""#define NUM_DEBUG_SIGNALS ${signalLabels.size}""")
+    debugPW.println(s"""const char *signalLabels[] = {""")
+
+    debugPW.println(signalLabels.map { l => s"""\"${l}\"""" }.mkString(", "))
+    debugPW.println("};")
+
+    debugPW.println("#endif // __DEBUG_REGS_H__")
+    debugPW.close()
   }
+
 }
 

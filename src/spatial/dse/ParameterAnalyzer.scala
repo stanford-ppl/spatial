@@ -161,6 +161,7 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
     case e: OpReduce[_] =>
       val pars = e.cchain.pars
       pars.foreach{x => dbgs(s"Found OpReduce par param in $lhs = $x"); ParParams += _}
+      dbgs(s"visit $lhs, ${lhs.isOuterControl}? ${lhs.level}")
       if (lhs.isOuterControl) PipelineParams += lhs
       super.visit(lhs, rhs)
 

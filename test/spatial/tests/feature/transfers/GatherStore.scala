@@ -7,7 +7,7 @@ import spatial.dsl._
   val numAddr = tileSize * 100
   val numData = tileSize * 1000
 
-  val P = param(1)
+  val P = param(2)
 
   def gatherStore[T:Num](addrs: Array[Int], offchip_data: Array[T]): Array[T] = {
 

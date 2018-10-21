@@ -47,7 +47,7 @@ class FringeArria10 (
 
     // Accel memory IO
     val heap = new HeapIO(numAllocators)
-    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
+    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     // TODO: need to add memory stream support
 
     // External enable
@@ -92,7 +92,7 @@ class FringeArria10 (
 
   // AXI bridge
   io.M_AXI.zipWithIndex.foreach { case (maxi, i) =>
-    val axiBridge = Module(new MAGToAXI4Bridge(axiParams, fringeCommon.mags(i).streamTagWidth))
+    val axiBridge = Module(new MAGToAXI4Bridge(axiParams))
     axiBridge.io.in <> fringeCommon.io.dram(i)
     maxi <> axiBridge.io.M_AXI
   }

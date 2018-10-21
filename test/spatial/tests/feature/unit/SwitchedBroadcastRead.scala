@@ -23,7 +23,7 @@ import spatial.dsl._
       // We should properly CSE (or at least broadcast) the two reads to sram1 as one physical read
       Foreach(0 :: sram1.rows, 0 :: sram2.cols){ (d0, d1) =>
         if (sram1(d0, d1) != 0.0f) {
-          sram2(d0, 0) = - sram1(d0, d1)
+          sram2(d0,d1) = - sram1(d0, d1)
         } else {
           sram2(d0,d1) = sram1(d0, d1)
         }
@@ -33,7 +33,7 @@ import spatial.dsl._
     }
 
     val golden = Matrix.tabulate(32,32){(i,j) =>
-      if (i == 0 && j == 0) 32 else i + j
+      if (i == 0 && j == 0) 32 else -(i + j)
     }
 
     val result = getMatrix(dram)

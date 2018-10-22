@@ -20,7 +20,7 @@ class AXICmdSplit(dram: DRAMStream) extends Module {
   val cmdSizeRemaining = io.in.cmd.bits.size - cmdSizeCounter.io.out
   val maxSize = target.maxBurstsPerCmd.U
   // this is the last command within a split command
-  val lastCmd = (cmdSizeRemaining < maxSize)
+  val lastCmd = (cmdSizeRemaining <= maxSize)
   val cmdSize = Mux(lastCmd, cmdSizeRemaining, maxSize)
   io.out.cmd.bits.size := cmdSize
 

@@ -94,6 +94,7 @@ class State(app: DSLRunnable) extends forge.AppState {
     case _ => Nil
   }
 
+  def resetErrors(): Unit = errors = 0
   def reset(): Unit = {
     config.reset()
     id = -1

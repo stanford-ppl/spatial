@@ -6,7 +6,7 @@ import fringe.globals
 import fringe.targets.DeviceTarget
 import fringe.{DRAMStream}
 
-class MAGToAXI4Bridge(val p: AXI4BundleParameters, val tagWidth: Int) extends Module {
+class MAGToAXI4Bridge(val p: AXI4BundleParameters) extends Module {
   Predef.assert(p.dataBits == 512, s"ERROR: Unsupported data width ${p.dataBits} in MAGToAXI4Bridge")
 
   val io = IO(new Bundle {

@@ -112,12 +112,12 @@ class DRAMStream(w: Int, v: Int) extends Bundle {
   override def cloneType(): this.type = new DRAMStream(w, v).asInstanceOf[this.type]
 }
 
-class DRAMAddress(addrWidth: Int) extends Bundle {
+class DRAMAddress(addrWidth: Int = 64) extends Bundle {
   val bits = UInt(addrWidth.W)
 
-	val burstSize = globals.target.burstSizeBytes
+  val burstSize = globals.target.burstSizeBytes
   def burstTag = bits(bits.getWidth - 1, log2Ceil(burstSize))
-  def burstOffset = bits(log2Ceil(burstSize) - 1, 0)
+  def wordOffset(w: Int) = bits(log2Ceil(burstSize) - 1, log2Ceil(w / 8))
   def burstAddr = Cat(burstTag, 0.U(log2Ceil(burstSize).W))
 
   override def cloneType(): this.type = {

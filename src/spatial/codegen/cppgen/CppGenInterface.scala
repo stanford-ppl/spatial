@@ -17,13 +17,13 @@ trait CppGenInterface extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArgInNew(init)  => 
-      argIns += (lhs -> argIns.toList.length)
+      argIns += lhs
       emit(src"${lhs.tp} $lhs = $init;")
     case HostIONew(init)  => 
-      argIOs += (lhs -> argIOs.toList.length)
+      argIOs += lhs
       emit(src"${lhs.tp} $lhs = $init;")
     case ArgOutNew(init) => 
-      argOuts += (lhs -> argOuts.toList.length)
+      argOuts += lhs
       emit(src"//${lhs.tp}* $lhs = new int32_t {0}; // Initialize cpp argout ???")
     // case HostIONew(init) => 
     //   argIOs += lhs.asInstanceOf[Sym[Reg[_]]]
@@ -33,7 +33,7 @@ trait CppGenInterface extends CppGenCommon {
     case RegWrite(reg,v,en) => 
       emit(src"// $lhs $reg $v $en reg write")
     case DRAMHostNew(dims, _) =>
-      drams += (lhs -> drams.toList.length)
+      drams += lhs
       emit(src"""uint64_t ${lhs} = c1->malloc(sizeof(${lhs.tp.typeArgs.head}) * ${dims.map(quote).mkString("*")});""")
       emit(src"c1->setArg(${argHandle(lhs)}_ptr, $lhs, false);")
       emit(src"""printf("Allocate mem of size ${dims.map(quote).mkString("*")} at %p\n", (void*)${lhs});""")
@@ -116,13 +116,13 @@ trait CppGenInterface extends CppGenCommon {
   override def emitFooter(): Unit = {
     inGen(out,"ArgAPI.hpp") {
       emit("\n// ArgIns")
-      argIns.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
+      argIns.zipWithIndex.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg $id")}
       emit("\n// DRAM Ptrs:")
-      drams.foreach {case (d, id) => emit(src"#define ${argHandle(d)}_ptr ${id+argIns.toList.length}")}
+      drams.zipWithIndex.foreach {case (d, id) => emit(src"#define ${argHandle(d)}_ptr ${id+argIns.length}")}
       emit("\n// ArgIOs")
-      argIOs.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.toList.length+drams.toList.length}")}
+      argIOs.zipWithIndex.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.length+drams.length}")}
       emit("\n// ArgOuts")
-      argOuts.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.toList.length+drams.toList.length+argIOs.toList.length}")}
+      argOuts.zipWithIndex.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.length+drams.length+argIOs.length}")}
 
     }
     super.emitFooter()

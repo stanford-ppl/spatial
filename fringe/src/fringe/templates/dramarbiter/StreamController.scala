@@ -94,7 +94,7 @@ class StreamControllerStore(
 
   val wresp = Module(new FIFO(Bool(), target.bufferDepth))
   wresp.io.in.valid := io.dram.wresp.valid
-  wresp.io.in.bits := io.dram.wresp.valid
+  wresp.io.in.bits := true.B
   io.dram.wresp.ready := wresp.io.in.ready
 
   io.store.wresp.valid := wresp.io.out.valid
@@ -113,6 +113,35 @@ class StreamControllerGather(
   }
 
   val io = IO(new StreamControllerGatherIO)
+
+  val cmd = List.tabulate(info.v) { i =>
+    val fifo = Module(new FIFO(new DRAMAddress, target.bufferDepth / info.v))
+    fifo.io.in.valid := io.gather.cmd.valid
+    fifo.io.in.bits := DRAMAddress(io.gather.cmd.bits.addr(i))
+    fifo
+  }
+  io.gather.cmd.ready := cmd.map { _.io.in.ready }.reduce { _ & _ }
+
+  val gatherBuffer = Module(new GatherBuffer(info.w, info.v, target.bufferDepth))
+  gatherBuffer.io.cmdAddr <> Vec(cmd.map { _.io.out })
+
+  gatherBuffer.io.rresp.valid := io.dram.rresp.valid
+  gatherBuffer.io.rresp.bits.burstTag := io.dram.rresp.bits.getTag.uid
+  gatherBuffer.io.rresp.bits.data := io.dram.rresp.bits.rdata.asTypeOf(gatherBuffer.io.rresp.bits.data)
+  io.dram.rresp.ready := gatherBuffer.io.rresp.ready
+
+  io.gather.rdata.valid := gatherBuffer.io.rdata.valid
+  io.gather.rdata.bits := gatherBuffer.io.rdata.bits
+  gatherBuffer.io.rdata.ready := io.gather.rdata.ready
+
+  io.dram.cmd.valid := gatherBuffer.io.issueAddr.valid
+  io.dram.cmd.bits.addr := gatherBuffer.io.issueAddr.bits.bits
+  val tag = Wire(new DRAMTag)
+  tag.uid := gatherBuffer.io.issueAddr.bits.burstTag
+  io.dram.cmd.bits.setTag(tag)
+  gatherBuffer.io.issueAddr.ready := io.dram.cmd.ready
+  io.dram.cmd.bits.size := 1.U
+  io.dram.cmd.bits.isWr := false.B
 }
 
 class StreamControllerScatter(

@@ -10,8 +10,6 @@ class FIFOVec[T <: Data](t: T, depth: Int, v: Int) extends Module {
   assert(isPow2(v))
   assert(depth % v == 0)
 
-  val addrWidth = log2Up(depth)
-
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(Vec(v, t.cloneType)))
     val out = Decoupled(Vec(v, t.cloneType))

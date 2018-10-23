@@ -1,17 +1,15 @@
-val spatial_version   = "1.0-SNAPSHOT"
 val scala_version     = "2.12.6"
 val paradise_version  = "2.1.0"
 val scalatestVersion  = "3.0.5"
 
 name := "spatial"
-organization := "edu.stanford.ppl"
 trapExit := false
-isSnapshot := true
 
 val common = Seq(
   organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
-  version := spatial_version,
+  version := "1.0-SNAPSHOT",
+  isSnapshot := version.endsWith("-SNAPSHOT"),
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
@@ -58,7 +56,6 @@ val common = Seq(
 
   /** Release **/
   publishArtifact := true,
-  isSnapshot := true,
 
   homepage := Some(url("https://spatial.stanford.edu")),
   scmInfo := Some(ScmInfo(url("https://github.com/stanford-ppl/spatial"),
@@ -78,7 +75,11 @@ val common = Seq(
                      Developer("yaqiz",
                                "Yaqi Zhang",
                                "yaqiz@stanford.edu",
-                               url("https://github.comyaqiz/"))
+                               url("https://github.com/yaqiz")),
+                     Developer("pyprogrammer",
+                               "Nathan Zhang",
+                               "stanfurd@stanford.edu",
+                               url("https://github.com/pyprogrammer"))
                     ),
   publishTo := Some(
     if (isSnapshot.value)

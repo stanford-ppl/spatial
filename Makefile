@@ -49,10 +49,7 @@ publishM2Remote:
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
-	mkdir -p ${HOME}/bin
-	bash bin/make_poly.sh
-	cp poly/emptiness ${HOME}/bin
-	export PATH=${PATH}:${HOME}/bin
+	make -C poly
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 

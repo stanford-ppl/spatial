@@ -23,7 +23,7 @@ class GatherAddressSelector(
   }
 
   // we issue loads out of order so force priority on unissued lanes to avoid starving them
-  val issueIdx = PriorityEncoder(issueMaskOut.map { ~_ })
+  val issueIdx = PriorityEncoder(issueMaskOut.zipWithIndex.map { case (out, i) => io.in(i).valid & ~out })
   val issueCmd = io.in(issueIdx)
 
   val issue = io.out.valid & io.out.ready
@@ -35,15 +35,15 @@ class GatherAddressSelector(
 
   issueMaskOut.zipWithIndex.foreach { case (reg, i) =>
     when (issue) {
-      reg := Mux(issueDone, false.B, issueMaskIn(i))
+      reg := Mux(issueDone, false.B, issueMaskIn(i) | reg)
     }
   }
 
   io.in.zipWithIndex.foreach { case (in, i) =>
     in.ready := issueMaskIn(i)
   }
-  io.out.valid := io.in.map { _.valid }.reduce { _|_ }
-  io.out.bits := issueCmd.bits
+  io.out.valid := issueCmd.valid
+  io.out.bits := DRAMAddress(issueCmd.bits.burstAddr)
 }
 
 class GatherBuffer(
@@ -79,9 +79,12 @@ class GatherBuffer(
 
   val addressSel = Module(new GatherAddressSelector(v))
   addressSel.io.in <> io.cmdAddr
+  addressSel.io.in.zipWithIndex.foreach { case (addr, i) =>
+    addr.valid := io.cmdAddr(i).valid & meta(i).io.in.ready
+  }
 
   val issueAddr = addressSel.io.out.bits
-  
+
   meta.zipWithIndex.foreach { case (fifo, i) =>
     fifo.io.in.valid := addressSel.io.in(i).valid & addressSel.io.in(i).ready
     fifo.io.in.bits.done := false.B
@@ -99,16 +102,15 @@ class GatherBuffer(
 
   val issueHit = meta.map { case fifo =>
     fifo.io.banks.map { case bank =>
-      val bankHit = bank.rdata.valid & !bank.rdata.bits.done &
-                    addressSel.io.out.valid & (bank.rdata.bits.addr.burstTag === issueAddr.burstTag)
+      val bankHit = bank.rdata.valid & !bank.rdata.bits.done & addressSel.io.out.valid &
+                    (bank.rdata.bits.addr.burstTag === issueAddr.burstTag)
       bankHit
     }.reduce { _|_ }
   }.reduce { _|_ }
 
-  io.issueAddr.valid := addressSel.io.out.valid & !issueHit
+  io.issueAddr.valid := Mux(issueHit, false.B, addressSel.io.out.valid)
   io.issueAddr.bits := issueAddr
-  val deqIssueAddr = Mux(issueHit, true.B, io.issueAddr.ready) & meta.map { _.io.in.ready }.reduce { _&_ }
-  addressSel.io.out.ready := deqIssueAddr
+  addressSel.io.out.ready := Mux(issueHit, true.B, io.issueAddr.ready)
 
   io.rdata.valid := meta.map { case fifo =>
     fifo.io.out.valid & fifo.io.out.bits.done

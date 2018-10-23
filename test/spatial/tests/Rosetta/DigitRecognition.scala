@@ -12,6 +12,8 @@ import utils.implicits._
 
 	@struct case class IntAndIndex(value : Int, inx : I32)
 
+	@struct case class Int16AndIndex(value : Int16, inx : I32)
+
 	@struct case class LabelAndIndex(dist : Int, label : LabelType, inx : I32)
     
     @struct case class DigitType(d1 : UInt64, d2 : UInt64, d3 : UInt64, d4 : UInt64)
@@ -27,9 +29,9 @@ import utils.implicits._
 	val class_size 	 = 1800 /* number of digits in training set that belong to each class */
 
 	/* Parameters to tune */
-	val k_const 				= 5 /* Number of nearest neighbors to handle */
-	val par_factor  			= 1
-	val parLoad 				= 1
+	val k_const 				= 3 /* Number of nearest neighbors to handle */
+	val par_factor  			= 20
+	val parLoad 				= 2
 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
@@ -89,28 +91,28 @@ import utils.implicits._
 	} 
 
 
-	def hamming_distance(x1 : 	DigitType1, x2 : DigitType2 ) : Int = {
+	def hamming_distance(x1 : 	DigitType1, x2 : DigitType2 ) : Int16 = {
 
 	
 		// simplest implementation for counting 1-bits in bitstring
 		val bits_d1 = List.tabulate(64){ i =>
 						val d1 = x1.d1 
-						d1.bit(i).to[Int]
+						d1.bit(i).to[Int16]
 					  }.reduceTree(_ + _)
 
 		val bits_d2 =  List.tabulate(64) { i =>
 						val d2 = x1.d2 
-						d2.bit(i).to[Int] 
+						d2.bit(i).to[Int16] 
 					  }.reduceTree(_+_)
 
 		val bits_d3 =  List.tabulate(64) { i =>
 						val d3 = x2.d3 
-						d3.bit(i).to[Int] 
+						d3.bit(i).to[Int16] 
 					  }.reduceTree(_ + _)
 		
 		val bits_d4 =  List.tabulate(64){ i =>
 						val d4 = x2.d4
-						d4.bit(i).to[Int] 
+						d4.bit(i).to[Int16] 
 					  }.reduceTree(_ + _)
 		
 		//println(r"sum 1s in ${x1.d1} = ${bits_d1}, ${x1.d2} = ${bits_d2}, ${x2.d3} = ${bits_d3}, ${x2.d4} = ${bits_d4},")
@@ -129,34 +131,26 @@ import utils.implicits._
 		val digit_xored1 = DigitType1(test_inst1.d1 ^ train_inst1.d1, test_inst1.d2 ^ train_inst1.d2)
 		val digit_xored2 = DigitType2(test_inst2.d3 ^ train_inst2.d3, test_inst2.d4 ^ train_inst2.d4)
 
-		val max_dist = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
+		val max_dist = Reg[Int16AndIndex](Int16AndIndex(0.to[Int16], 0.to[I32]))
+		val dist 	 = Reg[Int16](0.to[Int16])
+
 		//max_dist.reset()
-		Pipe { max_dist := IntAndIndex(0.to[Int], 0.to[I32]) }
+		max_dist := Int16AndIndex(0.to[Int16], 0.to[I32]) 
+		//val already_inserted = Reg[Boolean](false).buffer 
+		//already_inserted := false
 
-		//val already_inserted = Reg[Boolean](false)
-		//already_inserted.reset()
+		Parallel {
+			dist := hamming_distance(digit_xored1, digit_xored2)
 
-		val dist = hamming_distance(digit_xored1, digit_xored2)
-
-		Reduce(max_dist)(k_const by 1) { k =>
-			// println(r"checking dists ${min_dists(p,k)} for $k")
-			IntAndIndex(min_dists(p, k), k)
-		} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
+			Reduce(max_dist)(k_const by 1 par k_const) { k =>
+				// println(r"checking dists ${min_dists(p,k)} for $k")
+				Int16AndIndex(min_dists(p, k).to[Int16], k)
+			} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
+		}
 
 		//println(r"dist = ${dist}, max_dist = ${max_dist.value}")
 		if (dist < max_dist.value.value) {
-			/*Foreach(0 until k_const) { k =>
-				if ( min_dists(p, k) > dist && !already_inserted.value) {
-					Foreach(k until k_const - 1) { kk =>
-					 	min_dists(p, kk + 1) = min_dists(p, kk)
-					 	label_list(p, kk + 1) = label_list(p, kk)
-					}
-					min_dists(p, k)  = dist
-					label_list(p, k) = train_label
-					already_inserted := true
-				}
-			}*/
-			min_dists(p, max_dist.value.inx)  = dist
+			min_dists(p, max_dist.value.inx)  = dist.value.to[Int]
 			label_list(p, max_dist.value.inx) = train_label
 		}
 		
@@ -240,14 +234,14 @@ import utils.implicits._
 		val test_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/test_set.dat", ",", "\n")
 
 		val test_actual_vector1 = Array.tabulate(test_set_dram_1.length) { i =>
-									val sample1 = test_dat.apply(201, 0).to[UInt64]
-									val sample2 = test_dat.apply(201, 1).to[UInt64]
+									val sample1 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 0).to[UInt64]
+									val sample2 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 1).to[UInt64]
 									DigitType1(sample1, sample2)
 								}
 
-		val test_actual_vector2 = Array.tabulate(test_set_dram_2.length) { i =>
-									val sample3 = test_dat.apply(201, 2).to[UInt64]
-									val sample4 = test_dat.apply(201, 3).to[UInt64]
+		val test_actual_vector2 = Array.tabulate(test_set_dram_2.length) { i  =>
+									val sample3 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 2).to[UInt64]
+									val sample4 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 3).to[UInt64]
 									DigitType2(sample3, sample4)
 								}
 
@@ -274,7 +268,7 @@ import utils.implicits._
 
 		val test_set_dram_1	  =	 DRAM[DigitType1](max_num_test)
 		val test_set_dram_2	  =	 DRAM[DigitType2](max_num_test)
-
+	
 		/* output */
 		val results_dram	  =  DRAM[LabelType](max_num_test)
 
@@ -285,10 +279,8 @@ import utils.implicits._
 		initialize_test_data(test_set_dram_1, test_set_dram_2)
 
 		val expected_results = loadCSV1D[LabelType](s"$DATA/rosetta/digitrecognition/196data/expected.dat", "\n")
- 		println(expected_results(201))
 
-		//val test_dram = DRAM[Int](k_const)
-		val test_dram_2 = DRAM[LabelType](max_num_test, k_const)
+			//val test_dram = DRAM[Int](k_const)
 		Accel {
 
 			val train_set_local1 	= SRAM[DigitType1](num_train_tile)
@@ -299,6 +291,7 @@ import utils.implicits._
 			val test_set_local1 	= SRAM[DigitType1](num_test_tile)
 			val test_set_local2 	= SRAM[DigitType2](num_test_tile)
 
+			//val results_sram_2 		= SRAM[LabelType](num_test_tile)
 			/*
 			 //####### Debugging Sorting Functions  #############
 			val test_sort   = RegFile[Int](par_factor, k_const)
@@ -341,11 +334,10 @@ import utils.implicits._
 					test_set_local1 load test_set_dram_1(test_factor :: test_factor + num_test_left par parLoad)
 					test_set_local2 load test_set_dram_2(test_factor :: test_factor + num_test_left par parLoad)
 				}
-				val results_sram_2  = SRAM[LabelType](k_const)
 				val results_local 	= SRAM[LabelType](num_test_tile)
-				
-				Sequential.Foreach(num_test_left by 1) { test_inx =>
-					//println(r"test point ${test_inx}:")
+
+				Foreach(num_test_left by 1) { test_inx =>
+
 					val vote_list		= 	RegFile[Int](10, Seq.fill(10)(0.to[Int])).buffer
 
 					/* initialize KNN */
@@ -358,9 +350,9 @@ import utils.implicits._
 					val test_local1 = test_set_local1(test_inx)
 					val test_local2 = test_set_local2(test_inx)
 
-					Sequential.Foreach(par_factor by 1 par par_factor) { p => 
+					Foreach(par_factor by 1 par par_factor) { p => 
 						Foreach(train_set_num_per_partition by 1) { train_inx =>
-							//println(r"  training on ${train_inx}")
+
 							val curr_train_inx = p * train_set_num_per_partition + train_inx
 							update_knn(test_local1, test_local2,
 									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
@@ -368,25 +360,23 @@ import utils.implicits._
 						}
 						//println("train result for $p")
 						//'DEBUG2.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
-						Foreach(label_list_tmp.cols by 1){ i => results_sram_2(i) = label_list_tmp(0,i) }
+						//Foreach(label_list_tmp.cols by 1){ i => results_sram_2(i) = label_list_tmp(0,i) }
 
-						//network_sort(knn_tmp_large_set, label_list_tmp, p) 
+						network_sort(knn_tmp_large_set, label_list_tmp, p) 
 
 					}
-					test_dram_2(test_inx, 0 :: k_const) store results_sram_2
 
 					/* Do KNN */
-					//results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
-					//println("debug3")
+					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
 					//'DEBUG3.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
 
 				}
 
-				//results_dram(test_factor :: test_factor + num_test_left) store results_local 
+				results_dram(test_factor :: test_factor + num_test_left) store results_local 
 			} 
 
 		}
-		printMatrix(getMatrix(test_dram_2)) //For test sample #201, should be getting [1, 1, 1, 1, 1] 
+		//printMatrix(getMatrix(test_dram_2)) //For test sample #201, should be getting [1, 1, 1, 1, 1] 
 
 		val result_digits = getMem(results_dram)
     	printArray(result_digits)

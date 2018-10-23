@@ -49,4 +49,10 @@ trait PIRFormatGen extends Codegen {
     case None => src"$sym"
   }
 
+  def emitBlk(header:Any)(blk: => Unit) = {
+    open(src"$header {")
+    blk
+    close(src"}")
+  }
+
 }

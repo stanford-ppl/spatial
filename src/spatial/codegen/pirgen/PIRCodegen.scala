@@ -41,7 +41,6 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     super.emitHeader()
     openHost { emitHostHeader }
     openAccel { emitAccelHeader }
-    emit(s"object ${spatialConfig.name} extends Host with Accel")
   }
 
   final override def emitFooter():Unit = {
@@ -69,9 +68,14 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     emit("import arch._")
     emit("import prism.enums._")
     emit("")
-    open(s"""trait Accel extends PIRApp {""")
+    open(s"""object AccelMain extends PIRApp {""")
     open(src"def accel(top:Controller): Unit = {")
+    emitBlk(s"implicit class NodeHelper[T](x:T)") {
+      emitHelperFunction
+    }
   }
+
+  def emitHelperFunction = {}
 
   def emitAccelFooter = {
     close("}")

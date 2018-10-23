@@ -74,6 +74,9 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def hierarchical: C[A] = { this.isHierarchicalBank = true; me }
   /** Only attempt to bank memory in a flattened manner */
   def flat: C[A] = { this.isFlatBank = true; me }
+  /** Bank memory by duplication only */
+  def nobank: C[A] = { this.isNoBank = true; me }
+
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods

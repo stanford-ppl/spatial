@@ -79,11 +79,11 @@ class fix2fixBox(s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, r
       val expand = d2 - d1
       val sgn_extend: Bool = if (s1 & sign_extend) io.a.msb else false.B
       new_frac := tmp_frac
-      new_dec  := util.Cat(util.Fill(expand, sgn_extend), io.a(f1 + d1 - 1, f1))
+      if (d1 > 0) new_dec  := util.Cat(util.Fill(expand, sgn_extend), io.a(f1 + d1 - 1, f1))
     }
     else { // keep same
       new_frac := tmp_frac
-      new_dec := io.a(f1 + d1 - 1, f1)
+      if (d1 > 0) new_dec := io.a(f1 + d1 - 1, f1)
       // (0 until d2).map{ i => number(i + f)*scala.math.pow(2,i).toInt.U }.reduce{_+_}
     }
 

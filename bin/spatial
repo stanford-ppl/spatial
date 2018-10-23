@@ -17,59 +17,6 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-class SpatialArgumentParser(ArgumentParser):
-  
-  def print_help(self, file=None):
-    print("""
-Spatial
-Usage: spatial <app> [options]
-
-Help:
-  -h, --help            Prints this usage text
-
-Verbosity:
-  -q, --quiet           Disable all logging and printing
-  -v, --verbose         Enable logging
-  --vv                  Enable verbose logging
-
-Output:
-  -c, --clean           Reset output directory
-  -o, --out <value>     Location of output directory. [./gen/<appname>]
-  -d, --detail <value>  Dot graph detail (0: control only, 1: all nodes) [1]
-
-DSE:
-  --dse                 Enables design space exploration [false]
-  --threads <value>     Sets number of threads to use in DSE
-  --bruteforce          Enables bruteforce DSE
-  --heuristic           Enables heuristic DSE
-  --nonaming            Disables the debug name for all syms, using "x${s.id}" only'
-
-Backends:
-  --fpga <value>        Sets name of FPGA target [Default]
-  --sim                 Enables codegen to Scala (disables retiming by default) [false]
-  --synth               Enables codegen to chisel + cpp (Synthesis) [true]
-  --dot                 Enables dot graph generation
-  --retime              Force retiming for --sim
-  --noretime            Disables retiming for all targets
-  --multifile <value>   Sets file splitting [4]:
-                          0: <DEPRECATED> no splitting or scoping
-                          1: <DEPRECATED> no splitting but yes scoping on inner pipes
-                          2: <DEPRECATED> no splitting but yes scoping everywhere
-                          3: <DEPRECATED> splitting for inner pipes only
-                          4: all blocks
-                          5: java class file compression
-                          6: <EXPERIMENTAL, UNSTABLE> further compression
-
-Experimental:
-  --asyncMem            Enables asynchronous memories
-  --instrument          Enables counters for each loop to assist in balancing pipelines
-  --tightControl        Enables tighter timing between controllers at the expense of potentially failing timing
-  --cheapFifos          Enables cheap fifos; accesses must be multiples of each other and not have lane-enables
-  --runtime             Enables application runtime estimation
-      """)
-  #sys.exit(0)
-
-
 def getSrcCode(app, args):
   outdir = "gen/%s" % app 
   for arg in args:
@@ -159,7 +106,7 @@ def getFullyQualifiedClassName(app, errorIfNone):
 
 
 def main():
-  parser = SpatialArgumentParser()
+  parser = ArgumentParser(add_help=False)
   parser.add_argument('app', type=str, help='name of application to run')
 
   sbt_project = 'apps/'

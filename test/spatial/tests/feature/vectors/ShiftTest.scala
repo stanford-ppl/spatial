@@ -18,9 +18,9 @@ import spatial.dsl._
     setArg(x, neg14)
     setArg(m, two)
     Accel {
-      val lsh = x << m
-      val rsh = x >> m
-      val ursh = x >>> m
+      val lsh = x << m.value.to[I16]
+      val rsh = x >> m.value.to[I16]
+      val ursh = x >>> m.value.to[I16]
       t1 := lsh
       t3 := rsh
       t4 := ursh

@@ -35,7 +35,11 @@ trait PIRGenController extends PIRCodegen {
     }
   }
   def emitController(lhs:Sym[_], cchain:Option[Sym[_]], ens:Set[Bit]) = {
-    state(lhs, tp=Some("Controller"))(src"createController(cchain=$cchain, ens=${ens}, schedule=${lhs.schedule})")
+    val ctrs = cchain match {
+      case Some(cchain) => cchain
+      case _ => Nil
+    }
+    state(lhs, tp=Some("Controller"))(src"""createController(cchain=$ctrs, ens=${ens}, schedule="${lhs.schedule}")""")
   }
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

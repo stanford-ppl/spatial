@@ -14,6 +14,9 @@ trait PIRGenDRAM extends PIRCodegen {
     case DRAMAddress(dram) =>
       state(lhs)(src"DRAMAddress($dram)")
 
+    case DRAMIsAlloc(dram) =>
+      state(lhs)(src"Const(true)") //HACK for now
+
     // Fringe templates expect byte-based addresses and sizes, while PIR gen expects word-based
     case e@FringeDenseLoad(dram,cmdStream,dataStream) =>
       state(lhs)(

@@ -12,14 +12,13 @@ trait PIRCtxGen extends PIRCodegen {
   override def quoteRhs(lhs:Sym[_], rhs: => Any) = {
     var q = ""
     q += src"""${super.quoteRhs(lhs, rhs)}.ctx("${lhs.ctx}")"""
-    lhs.name.foreach { n => q += src""".name("${lhs.name}")""" }
+    lhs.name.foreach { n => q += src""".name("${n}")""" }
     q
   }
 
-  override def emitAccelHeader: Unit = {
-    super.emitAccelHeader
-    emit(s"implicit class CtxHelper[T<:IR](x:T) { def ctx(c:String):T = { srcCtxOf(x) = c; x } }")
-    emit(s"implicit class NameHelper[T<:IR](x:T) { def name(n:String):T = { nameOf(x) = n; x } }")
+  override def emitHelperFunction = {
+    emit(s"def ctx(c:String):T = x match { case x:IR => srcCtxOf(x) = c; x; case _ => x }")
+    emit(s"def name(n:String):T = x match { case x:IR => nameOf(x) = n; x; case _ => x }")
   }
 
 }

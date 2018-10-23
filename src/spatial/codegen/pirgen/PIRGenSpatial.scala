@@ -31,10 +31,10 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   {
 
   override def copyDependencies(out: String): Unit = {
-    //dependencies ::= FileDep("pirgen", "Makefile", "../")
-    //dependencies ::= FileDep("pirgen", "run.sh", "../")
-    //dependencies ::= FileDep("pirgen", "build.sbt", "../")
-    //dependencies ::= FileDep("pirgen/project", "build.properties", "../project/")
+    dependencies ::= FileDep("pirgen", "pir.Makefile", "../", Some("Makefile"))
+    dependencies ::= FileDep("pirgen", "run.sh", "../")
+    dependencies ::= FileDep("pirgen", "build.sbt", "../")
+    dependencies ::= FileDep("pirgen", "build.properties", "../project/")
     super.copyDependencies(out)
   }
 }

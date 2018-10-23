@@ -4,15 +4,16 @@ all: apps
 ###-----------------------------------###
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
-publish: 
+publish:
+	bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
-	sbt "; project argon; publishLocal"
 	sbt "; project forge; publishLocal"
 	sbt "; project spatial; publishLocal"
 	sbt "; project models; publishLocal"
 	sbt "; project poly; publishLocal"
 	sbt "; project utils; publishLocal"
+	sbt "; project argon; publishLocal"
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##

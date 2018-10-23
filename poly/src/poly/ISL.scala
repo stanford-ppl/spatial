@@ -1,13 +1,22 @@
 package poly
 
 import utils.process.BackgroundProcess
-
+import sys.process._
+import scala.language.postfixOps
 /**
   * Self-initializing object that runs external polyhedral ISL processes
   */
 trait ISL {
-  private lazy val HOME = sys.env.getOrElse("NOVA_HOME", ".")
-  private lazy val proc = BackgroundProcess(s"$HOME/poly/", "./emptiness")
+  private lazy val proc = {
+    val checkInPath = "which emptiness" !
+
+    if (checkInPath == 0) {
+      BackgroundProcess("", "emptiness")
+    } else {
+      val HOME = sys.env.getOrElse("NOVA_HOME", ".")
+      BackgroundProcess(s"$HOME/poly/", "./emptiness")    
+    }
+  }
   private var needsInit: Boolean = true
   implicit def isl: ISL = this
 

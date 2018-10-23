@@ -9,10 +9,10 @@ import emul.Bool
 trait CppGenCommon extends CppCodegen { 
 
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
-  var argOuts = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var drams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var argOuts = scala.collection.mutable.ArrayBuffer[Sym[_]]()
+  var argIOs = scala.collection.mutable.ArrayBuffer[Sym[_]]()
+  var argIns = scala.collection.mutable.ArrayBuffer[Sym[_]]()
+  var drams = scala.collection.mutable.ArrayBuffer[Sym[_]]()
 
   /* Represent a FixPt with nonzero number of f bits as a bit-shifted int */
   protected def toTrueFix(x: String, tp: Type[_]): String = {

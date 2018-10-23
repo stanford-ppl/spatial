@@ -15,6 +15,11 @@ trait ChiselGenInterface extends ChiselGenCommon {
   var loadParMapping = List[String]()
   var storeParMapping = List[String]()
 
+  var gathersList = List[Sym[_]]()
+  var scattersList = List[Sym[_]]()
+  var gatherParMapping = List[String]()
+  var scatterParMapping = List[String]()
+
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments() =>
     case ArgInNew(init)  => 
@@ -111,7 +116,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
 
       val id = loadsList.length
-      loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, false)"""
+      loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       loadsList = loadsList :+ dram
 
       emit(src"${cmdStream}.ready := top.io.memStreams.loads($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
@@ -121,8 +126,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"top.io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}.m(0)($addrMSB,$addrLSB)")
       emit(src"top.io.memStreams.loads($id).cmd.bits.size := ${cmdStream}.m(0)($sizeMSB,$sizeLSB)")
       emit(src"top.io.memStreams.loads($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"top.io.memStreams.loads($id).cmd.bits.isWr := ~${cmdStream}.m(0)($isLdMSB,$isLdLSB)")
-      emit(src"top.io.memStreams.loads($id).cmd.bits.isSparse := 0.U")
 
       // Connect the streams to their IO interface signals
       emit(src"top.io.memStreams.loads($id).rdata.ready := ${dataStream}.ready")
@@ -134,24 +137,19 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case FringeSparseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasGather
       val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      assert(par == 1, s"Unsupported par '$par' for sparse loads! Must be 1 currently")
 
-      val id = loadsList.length
-      // loadParMapping = loadParMapping :+ s"""StreamParInfo(if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArgs.head)}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
-      loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, true)"""
-      loadsList = loadsList :+ dram
+      val id = gathersList.length
+      gatherParMapping = gatherParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
+      gathersList = gathersList :+ dram
 
-      emit(src"${cmdStream}.ready := top.io.memStreams.loads($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
-      emit(src"top.io.memStreams.loads($id).cmd.bits.addr := ${cmdStream}.m(0).r")
-      emit(src"top.io.memStreams.loads($id).cmd.bits.size := 1.U")
-      emit(src"top.io.memStreams.loads($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"top.io.memStreams.loads($id).cmd.bits.isWr := false.B")
-      emit(src"top.io.memStreams.loads($id).cmd.bits.isSparse := 1.U")
+      emit(src"${cmdStream}.ready := top.io.memStreams.gathers($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
+      emit(src"top.io.memStreams.gathers($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b.r}")
+      emit(src"top.io.memStreams.gathers($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
 
       // Connect the streams to their IO interface signals
-      emit(src"top.io.memStreams.loads($id).rdata.ready := ${dataStream}.ready")
-      emit(src"""${dataStream}.m.zip(top.io.memStreams.loads($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
-      emit(src"""${dataStream}.now_valid := top.io.memStreams.loads($id).rdata.valid""")
+      emit(src"top.io.memStreams.gathers($id).rdata.ready := ${dataStream}.ready")
+      emit(src"""${dataStream}.m.zip(top.io.memStreams.gathers($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
+      emit(src"""${dataStream}.now_valid := top.io.memStreams.gathers($id).rdata.valid""")
       emit(src"""${dataStream}.valid := ${DL(src"${dataStream}.now_valid", src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
 
     case FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
@@ -163,7 +161,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       val par = dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
       val id = storesList.length
-      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, false)"""
+      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       storesList = storesList :+ dram
 
       // Connect streams to their IO interface signals
@@ -183,8 +181,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"top.io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}.m(0)($addrMSB,$addrLSB)")
       emit(src"top.io.memStreams.stores($id).cmd.bits.size := ${cmdStream}.m(0)($sizeMSB,$sizeLSB)")
       emit(src"top.io.memStreams.stores($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"top.io.memStreams.stores($id).cmd.bits.isWr := ~${cmdStream}.m(0)($isLdMSB,$isLdLSB)")
-      emit(src"top.io.memStreams.stores($id).cmd.bits.isSparse := 0.U")
 
       emit(src"${cmdStream}.ready := top.io.memStreams.stores($id).cmd.ready")
       emit(src"""${ackStream}.now_valid := top.io.memStreams.stores($id).wresp.valid""")
@@ -197,37 +193,27 @@ trait ChiselGenInterface extends ChiselGenCommon {
       // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
       val par = 1//dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
-      Predef.assert(par == 1, s"Unsupported par '$par', only par=1 currently supported")
-
-      val id = storesList.length
-      // storeParMapping = storeParMapping :+ s"""StreamParInfo({if (FringeGlobals.target == "zcu") 32 else ${bitWidth(dram.tp.typeArgs.head)}}, ${par}, ${transferChannel(parentOf(lhs).get)}, true)"""
-      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0, true)"""
-      storesList = storesList :+ dram
+      val id = scattersList.length
+      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
+      scattersList = scattersList :+ dram
 
       // Connect IO interface signals to their streams
       val (dataMSB, dataLSB)  = getField(cmdStream.tp.typeArgs.head, "_1")
       val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "_2")
 
-      emit(src"top.io.memStreams.stores($id).wdata.bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
-      emit(src"top.io.memStreams.stores($id).wdata.valid := ${cmdStream}.valid")
-      emit(src"top.io.memStreams.stores($id).cmd.bits.addr := ${cmdStream}.m(0)($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
-      emit(src"top.io.memStreams.stores($id).cmd.bits.size := 1.U")
-      emit(src"top.io.memStreams.stores($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"top.io.memStreams.stores($id).cmd.bits.isWr := 1.U")
-      emit(src"top.io.memStreams.stores($id).cmd.bits.isSparse := 1.U")
-      emit(src"${cmdStream}.ready := top.io.memStreams.stores($id).cmd.ready & top.io.memStreams.stores($id).wdata.ready")
-      emit(src"""${ackStream}.now_valid := top.io.memStreams.stores($id).wresp.valid""")
+      emit(src"top.io.memStreams.scatters($id).wdata.bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
+      emit(src"top.io.memStreams.scatters($id).wdata.valid := ${cmdStream}.valid")
+      emit(src"top.io.memStreams.scatters($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
+      emit(src"top.io.memStreams.scatters($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
+      emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).cmd.ready & top.io.memStreams.scatters($id).wdata.ready")
+      emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")
       emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
-      emit(src"""top.io.memStreams.stores($id).wresp.ready := ${ackStream}.ready""")
+      emit(src"""top.io.memStreams.scatters($id).wresp.ready := ${ackStream}.ready""")
 
     case _ => super.gen(lhs, rhs)
   }
 
   override def emitPostMain(): Unit = {
-    val intersect = loadsList.distinct.intersect(storesList.distinct)
-
-    val num_unusedDrams = hostDrams.toList.length - loadsList.distinct.length - storesList.distinct.length + intersect.length
-
     inGen(out, "Instantiator.scala") {
       emit ("")
       emit ("// Scalars")
@@ -242,8 +228,10 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit (s"// Memory streams")
       emit (src"""val loadStreamInfo = List(${loadParMapping.map(_.replace("FringeGlobals.",""))}) """)
       emit (src"""val storeStreamInfo = List(${storeParMapping.map(_.replace("FringeGlobals.",""))}) """)
-      emit (src"""val numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */""")
-      emit (src"""// $loadsList $storesList)""")
+      emit (src"""val gatherStreamInfo = List(${gatherParMapping.map(_.replace("FringeGlobals.",""))}) """)
+      emit (src"""val scatterStreamInfo = List(${scatterParMapping.map(_.replace("FringeGlobals.",""))}) """)
+      emit (src"""val numArgIns_mem = ${hostDrams.toList.length}""")
+      emit (src"""// $loadsList $storesList $gathersList $scattersList)""")
     }
 
     inGen(out, s"IOModule.$ext") {
@@ -255,7 +243,9 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit ("// Memory Streams")
       emit (src"""val io_loadStreamInfo = List($loadParMapping) """)
       emit (src"""val io_storeStreamInfo = List($storeParMapping) """)
-      emit (src"val io_numArgIns_mem = ${loadsList.distinct.length} /*from loads*/ + ${storesList.distinct.length} /*from stores*/ - ${intersect.length} /*from bidirectional ${intersect}*/ + ${num_unusedDrams} /* from unused DRAMs */")
+      emit (src"""val io_gatherStreamInfo = List($gatherParMapping) """)
+      emit (src"""val io_scatterStreamInfo = List($scatterParMapping) """)
+      emit (src"val io_numArgIns_mem = ${hostDrams.toList.length}")
       emit (src"val outArgMuxMap: scala.collection.mutable.Map[Int, Int] = scala.collection.mutable.Map[Int,Int]()")
 
     }

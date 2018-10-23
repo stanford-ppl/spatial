@@ -108,20 +108,12 @@ trait ChiselGenCommon extends ChiselCodegen {
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
     or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{
       case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.deqActive_$a"
-        // "(" + or(x.enss.map{sigs => 
-        //   val lookedUpSigs = sigs.map{case b if (quote(b).startsWith("b")) => src"$b"; case b if (!quote(b).startsWith("b") & chunking) => src"""findBool("$b")"""; case b => src"$b"}
-        //   "(" + and(lookedUpSigs) + ")"
-        // }) + ")"
     })
   }
 
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
     or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{
       case a@Op(x: FIFOBankedEnq[_]) => src"${fifo}.enqActive_$a"
-        // "(" + or(x.enss.map{sigs => 
-        //   val lookedUpSigs = sigs.map{case b if (quote(b).startsWith("b")) => src"$b"; case b if (!quote(b).startsWith("b") & chunking) => src"""findBool("$b")"""; case b => src"$b"}
-        //   "(" + and(lookedUpSigs) + ")"
-        // }) + ")"
     })
   }
 

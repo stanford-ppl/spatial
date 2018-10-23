@@ -62,8 +62,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   /** Returns list of stms that are not in a broadcast path, and the "weight" of the stm */
-  protected def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.filter(!_.isBroadcastAddr).map{x => (x, x.parOrElse1)}
-  protected def willChunk(b: Block[_]*): Boolean = printableStms(b.toSeq.flatMap(_.stms)).map(_._2).sum >= CODE_WINDOW
+  protected def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.collect{case x if !x.isBroadcastAddr => (x, x.parOrElse1)}
+  protected def chunkHierarchyDepth(b: Block[_]*): Int = {(scala.math.log(printableStms(b.toSeq.flatMap(_.stms)).map(_._2).sum) / scala.math.log(CODE_WINDOW)).toInt}
   protected def weightedWindow(l: List[Int], limit: Int): Int = {
     @annotation.tailrec
     def take0(list: List[Int], accList: List[Int], accSum: Int) : List[Int] =
@@ -76,26 +76,25 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    if (!willChunk(b)) {
+    val hierarchyDepth = chunkHierarchyDepth(b)
+    if (hierarchyDepth == 0) {
       visitBlock(b)
     }
-    else {
+    else if (hierarchyDepth == 1) {
       val stmsToEmit = printableStms(b.stms)
       globalBlockID += 1
-      // TODO: More hierarchy? What if the block is > CODE_WINDOW * CODE_WINDOW size?
       val blockID: Int = globalBlockID
       var chunkID: Int = 0
       var chunk: Seq[(Sym[_], Int)] = Nil
       var remain: Seq[(Sym[_], Int)] = stmsToEmit
       // TODO: Other ways to speed this up?
-      // Memories are always global in scala generation right now
       def isLive(s: Sym[_]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remain.exists(_._1.nestedInputs.contains(s)))
       while (remain.nonEmpty) {
         ensigs = new scala.collection.mutable.ListBuffer[String]
         val num_stm = weightedWindow(remain.map(_._2).toList, CODE_WINDOW)
         chunk = remain.take(num_stm)
         remain = remain.drop(num_stm)
-        open(src"object block${blockID}Chunker$chunkID { // ${chunk.size} nodes, ${chunk.map(_._2).sum} weight")
+        open(src"object Block${blockID}Chunker$chunkID { // ${chunk.size} nodes, ${chunk.map(_._2).sum} weight")
           open(src"def gen(): Map[String, Any] = {")
           chunk.foreach{s => visit(s._1) }
           val live = chunk.map(_._1).filter(isLive)
@@ -103,17 +102,54 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           scoped ++= live.map{s => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${arg(s.tp)}]"""}
           close("}")
         close("}")
-        emit(src"val block${blockID}chunk$chunkID: Map[String, Any] = block${blockID}Chunker$chunkID.gen()")
+        emit(src"val block${blockID}chunk$chunkID: Map[String, Any] = Block${blockID}Chunker$chunkID.gen()")
         chunkID += 1
       }
-      // open("def findBool(x: String): Bool = {")
-      //   Seq.tabulate(chunkID){i => 
-      //     if (i == 0)           emit(src"""if (block${blockID}chunk${i}.contains(x)) block${blockID}chunk${i}(x).asInstanceOf[Bool]""")
-      //     else if (i < chunkID) emit(src"""else if (block${blockID}chunk${i}.contains(x)) block${blockID}chunk${i}(x).asInstanceOf[Bool]""")
-      //     else                  emit(src"""else block${blockID}chunk${i}(x).asInstanceOf[Bool]""")
-      //   }
-      //   emit(src"")
-      // close("}")
+    }
+    else if (hierarchyDepth >= 2) { // TODO: Even more hierarchy
+      val stmsToEmit = printableStms(b.stms)
+      globalBlockID += 1
+      // TODO: More hierarchy? What if the block is > CODE_WINDOW * CODE_WINDOW * CODE_WINDOW size?
+      val blockID: Int = globalBlockID
+      var chunkID: Int = 0
+      var chunk: Seq[(Sym[_], Int)] = Nil
+      var remain: Seq[(Sym[_], Int)] = stmsToEmit
+      // TODO: Other ways to speed this up?
+      def isLiveIn(s: Sym[_], remaining: Seq[(Sym[_], Int)]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remaining.exists(_._1.nestedInputs.contains(s)))
+      while (remain.nonEmpty) {
+        var subChunkID: Int = 0
+        var subChunk: Seq[(Sym[_], Int)] = Nil
+        val num_stm = weightedWindow(remain.map(_._2).toList, CODE_WINDOW*CODE_WINDOW)
+        chunk = remain.take(num_stm)
+        remain = remain.drop(num_stm)
+        open(src"object Block${blockID}Chunker${chunkID} { // ${chunk.size} nodes, ${chunk.map(_._2).sum} weight")
+        open(src"def gen(): Map[String, Any] = {")
+        val live = chunk.map(_._1).filter(isLiveIn(_, remain))
+        while (chunk.nonEmpty) {
+          ensigs = new scala.collection.mutable.ListBuffer[String]
+          val subNum_stm = weightedWindow(chunk.map(_._2).toList, CODE_WINDOW)
+          subChunk = chunk.take(subNum_stm)
+          chunk = chunk.drop(subNum_stm)
+          open(src"object Block${blockID}Chunker${chunkID}Sub${subChunkID} { // ${subChunk.size} nodes, ${subChunk.map(_._2).sum} weight")
+            open(src"def gen(): Map[String, Any] = {")
+            subChunk.foreach{s => visit(s._1) }
+            val subLive = subChunk.map(_._1).filter(isLiveIn(_, chunk ++ remain))
+            emit("Map[String,Any](" + subLive.map{case s if (s.isBranch) => src""""$s" -> $s.data"""; case s => src""""$s" -> $s""" }.mkString(", ") + ")")
+            scoped ++= subLive.map{s => s -> src"""block${blockID}chunk${chunkID}sub${subChunkID}("$s").asInstanceOf[${arg(s.tp)}]"""}
+            close("}")
+          close("}")
+          emit(src"val block${blockID}chunk${chunkID}sub${subChunkID}: Map[String, Any] = Block${blockID}Chunker${chunkID}Sub${subChunkID}.gen()")
+          subChunkID += 1
+        }
+        // Create map from unscopedName -> subscopedName
+        val mapLHS = live.map{case x if (scoped.contains(x)) => val temp = scoped(x); scoped -= x; val n = quote(x); scoped += (x -> temp); n; case x => quote(x)}
+        emit("Map[String,Any](" + mapLHS.zip(live).map{case (n,s) if (s.isBranch) => src""""$n" -> $s.data"""; case (n,s) => src""""$n" -> $s""" }.mkString(", ") + ")")
+        scoped ++= mapLHS.zip(live).map{case (n,s) => s -> src"""block${blockID}chunk$chunkID("$n").asInstanceOf[${arg(s.tp)}]"""}
+        close("}")
+        close("}")
+        emit(src"val block${blockID}chunk${chunkID}: Map[String, Any] = Block${blockID}Chunker${chunkID}.gen()")
+        chunkID += 1
+      }
     }
     if (withReturn) emit(src"${b.result}")
   }

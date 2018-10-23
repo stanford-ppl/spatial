@@ -90,7 +90,6 @@ trait ChiselGenController extends ChiselGenCommon {
   private def createKernel(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
-    chunking = willChunk(func:_*)
     val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }}.filterNot(_.isCounterChain).filterNot(_.isCounter)
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).filterNot(_.isCounter)
     val inputs: Seq[Sym[_]] = (used diff made).filterNot{s => s.isMem || s.isValue }.toSeq
@@ -149,7 +148,6 @@ trait ChiselGenController extends ChiselGenCommon {
     scoped ++= useMap
     if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top).r")
     else emit(src"${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top)")
-    chunking = false
   }
 
   private def emitSwitchAddition(lhs: Sym[_]): Unit = {

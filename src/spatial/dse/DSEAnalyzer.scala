@@ -8,12 +8,14 @@ import spatial.node._
 import spatial.lang.I32
 import spatial.metadata.bounds._
 import spatial.metadata.types._
+import spatial.traversal._
+import poly.ISL
 import spatial.util.spatialConfig
 
 import java.io.PrintWriter
 import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
 
-case class DSEAnalyzer(IR: State) extends argon.passes.Traversal with SpaceGenerator { //  with HyperMapperDSE {
+case class DSEAnalyzer(IR: State)(implicit isl: ISL) extends argon.passes.Traversal with SpaceGenerator { //  with HyperMapperDSE {
 
   override protected def process[R](block: Block[R]): Block[R] = {
     dbgs("Tile sizes: ")
@@ -205,21 +207,22 @@ case class DSEAnalyzer(IR: State) extends argon.passes.Traversal with SpaceGener
     val pool = Executors.newFixedThreadPool(T)
     val writePool = Executors.newFixedThreadPool(1)
 
-    // val workers = workerIds.map{id =>
-    //   val threadState = new State(state.app)
-    //   state.copyTo(threadState)
-    //   DSEThread(
-    //     threadId  = id,
-    //     params    = params,
-    //     space     = space,
-    //     accel     = TopCtrl.get,
-    //     program   = program,
-    //     localMems = LocalMemories.all.toSeq,
-    //     workQueue = workQueue,
-    //     outQueue  = fileQueue
-    //   )(threadState)
-    // }
-    // dbgs("Initializing models...")
+    val workers = workerIds.map{id =>
+      val threadState = new State(state.app)
+      threadState.config = spatialConfig
+      state.copyTo(threadState)
+      DSEThread(
+        threadId  = id,
+        params    = params,
+        space     = space,
+        accel     = TopCtrl.get,
+        program   = program,
+        localMems = LocalMemories.all.toSeq,
+        workQueue = workQueue,
+        outQueue  = fileQueue
+      )(threadState, isl)
+    }
+    dbgs("Initializing models...")
 
     // // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
     // workers.foreach{worker => worker.init() }

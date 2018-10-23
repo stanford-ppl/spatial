@@ -116,6 +116,7 @@ public:
   uint64_t channelID;
   bool isWr;
   uint8_t *wdata = NULL;
+  uint8_t *wstrb = NULL;
   uint32_t delay;
   uint32_t elapsed;
   uint64_t issued;
@@ -145,6 +146,7 @@ public:
     issued = issueCycle;
     completed = false;
     wdata = NULL;
+    wstrb = NULL;
   }
 
   void print() {
@@ -168,6 +170,7 @@ public:
 
   ~DRAMRequest() {
     if (wdata != NULL) free(wdata);
+    if (wstrb != NULL) free(wstrb);
   }
 };
 
@@ -279,7 +282,11 @@ void popDRAMQ() {
       uint8_t *front_wdata = front->wdata;
       uint8_t *front_waddr = (uint8_t*) front->addr;
       for (int i=0; i<burstSizeWords; i++) {
-        front_waddr[i] = front_wdata[i];
+        if (front->wstrb) {
+          if (front->wstrb[i]) front_waddr[i] = front_wdata[i];
+        } else {
+          front_waddr[i] = front_wdata[i];
+        }
       }
       dramRequestQ[popWhenReady].pop_front();
       delete front;
@@ -333,7 +340,11 @@ bool checkQAndRespond(int id) {
         uint8_t *wdata = req->wdata;
         uint8_t *waddr = (uint8_t*) req->addr;
         for (int i=0; i<burstSizeWords; i++) {
-          waddr[i] = wdata[i];
+          if (req->wstrb) {
+            if (req->wstrb[i]) waddr[i] = wdata[i];
+          } else {
+            waddr[i] = wdata[i];
+          }
         }
         if (req->cmd->hasCompleted()) {
           pokeResponse = true;
@@ -551,10 +562,15 @@ extern "C" {
       } else {
         // Start with burst data
         uint8_t *wdata = (uint8_t*) malloc(burstSizeBytes);
-        uint8_t *raddr = (uint8_t*) req->addr;
+        uint8_t *wstrb = (uint8_t*) malloc(burstSizeBytes);
         for (int i=0; i<burstSizeWords; i++) {
-          wdata[i] = raddr[i];
+          wdata[i] = data->wdata[i];
+          wstrb[i] = data->wstrb[i];
         }
+
+        req->wdata = wdata;
+        req->wstrb = wstrb;
+        req->schedule();
 
         if (debug) {
           EPRINTF("[Servicing W Command (Strobed) ]   %u -> %u (%d), %u -> %u (%d), %u -> %u (%d), %u -> %u (%d)\n", data->wdata[0],  wdata[0],  data->wstrb[0],  data->wdata[1],  wdata[1],  data->wstrb[1],  data->wdata[2],  wdata[2],  data->wstrb[2],   data->wdata[3],  wdata[3],  data->wstrb[3]);
@@ -575,75 +591,6 @@ extern "C" {
           EPRINTF("                                   %u -> %u (%d), %u -> %u (%d), %u -> %u (%d), %u -> %u (%d)\n", data->wdata[60], wdata[60], data->wstrb[60], data->wdata[61], wdata[61], data->wstrb[61], data->wdata[62], wdata[62], data->wstrb[62],  data->wdata[63], wdata[63], data->wstrb[63]);
         }
 
-        // Fill in accel wdata
-        if (data->wstrb[0]) wdata[0] = data->wdata[0];
-        if (data->wstrb[1]) wdata[1] = data->wdata[1];
-        if (data->wstrb[2]) wdata[2] = data->wdata[2];
-        if (data->wstrb[3]) wdata[3] = data->wdata[3];
-        if (data->wstrb[4]) wdata[4] = data->wdata[4];
-        if (data->wstrb[5]) wdata[5] = data->wdata[5];
-        if (data->wstrb[6]) wdata[6] = data->wdata[6];
-        if (data->wstrb[7]) wdata[7] = data->wdata[7];
-        if (data->wstrb[8]) wdata[8] = data->wdata[8];
-        if (data->wstrb[9]) wdata[9] = data->wdata[9];
-        if (data->wstrb[10]) wdata[10] = data->wdata[10];
-        if (data->wstrb[11]) wdata[11] = data->wdata[11];
-        if (data->wstrb[12]) wdata[12] = data->wdata[12];
-        if (data->wstrb[13]) wdata[13] = data->wdata[13];
-        if (data->wstrb[14]) wdata[14] = data->wdata[14];
-        if (data->wstrb[15]) wdata[15] = data->wdata[15];
-        if (data->wstrb[16]) wdata[16] = data->wdata[16];
-        if (data->wstrb[17]) wdata[17] = data->wdata[17];
-        if (data->wstrb[18]) wdata[18] = data->wdata[18];
-        if (data->wstrb[19]) wdata[19] = data->wdata[19];
-        if (data->wstrb[20]) wdata[20] = data->wdata[20];
-        if (data->wstrb[21]) wdata[21] = data->wdata[21];
-        if (data->wstrb[22]) wdata[22] = data->wdata[22];
-        if (data->wstrb[23]) wdata[23] = data->wdata[23];
-        if (data->wstrb[24]) wdata[24] = data->wdata[24];
-        if (data->wstrb[25]) wdata[25] = data->wdata[25];
-        if (data->wstrb[26]) wdata[26] = data->wdata[26];
-        if (data->wstrb[27]) wdata[27] = data->wdata[27];
-        if (data->wstrb[28]) wdata[28] = data->wdata[28];
-        if (data->wstrb[29]) wdata[29] = data->wdata[29];
-        if (data->wstrb[30]) wdata[30] = data->wdata[30];
-        if (data->wstrb[31]) wdata[31] = data->wdata[31];
-        if (data->wstrb[32]) wdata[32] = data->wdata[32];
-        if (data->wstrb[33]) wdata[33] = data->wdata[33];
-        if (data->wstrb[34]) wdata[34] = data->wdata[34];
-        if (data->wstrb[35]) wdata[35] = data->wdata[35];
-        if (data->wstrb[36]) wdata[36] = data->wdata[36];
-        if (data->wstrb[37]) wdata[37] = data->wdata[37];
-        if (data->wstrb[38]) wdata[38] = data->wdata[38];
-        if (data->wstrb[39]) wdata[39] = data->wdata[39];
-        if (data->wstrb[40]) wdata[40] = data->wdata[40];
-        if (data->wstrb[41]) wdata[41] = data->wdata[41];
-        if (data->wstrb[42]) wdata[42] = data->wdata[42];
-        if (data->wstrb[43]) wdata[43] = data->wdata[43];
-        if (data->wstrb[44]) wdata[44] = data->wdata[44];
-        if (data->wstrb[45]) wdata[45] = data->wdata[45];
-        if (data->wstrb[46]) wdata[46] = data->wdata[46];
-        if (data->wstrb[47]) wdata[47] = data->wdata[47];
-        if (data->wstrb[48]) wdata[48] = data->wdata[48];
-        if (data->wstrb[49]) wdata[49] = data->wdata[49];
-        if (data->wstrb[50]) wdata[50] = data->wdata[50];
-        if (data->wstrb[51]) wdata[51] = data->wdata[51];
-        if (data->wstrb[52]) wdata[52] = data->wdata[52];
-        if (data->wstrb[53]) wdata[53] = data->wdata[53];
-        if (data->wstrb[54]) wdata[54] = data->wdata[54];
-        if (data->wstrb[55]) wdata[55] = data->wdata[55];
-        if (data->wstrb[56]) wdata[56] = data->wdata[56];
-        if (data->wstrb[57]) wdata[57] = data->wdata[57];
-        if (data->wstrb[58]) wdata[58] = data->wdata[58];
-        if (data->wstrb[59]) wdata[59] = data->wdata[59];
-        if (data->wstrb[60]) wdata[60] = data->wdata[60];
-        if (data->wstrb[61]) wdata[61] = data->wdata[61];
-        if (data->wstrb[62]) wdata[62] = data->wdata[62];
-        if (data->wstrb[63]) wdata[63] = data->wdata[63];
-
-
-        req->wdata = wdata;
-        req->schedule();
       }
     } else if (wdataQ.size() > 0 & wrequestQ.size() == 0) {
       if (debug) {

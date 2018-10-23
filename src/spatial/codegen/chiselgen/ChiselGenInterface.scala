@@ -190,11 +190,10 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case FringeSparseStore(dram,cmdStream,ackStream) =>
       appPropertyStats += HasScatter
       // Get parallelization of datastream
-      // emit(src"// This transfer belongs in channel ${transferChannel(parentOf(lhs).get)}")
-      val par = 1//dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
+      val par = cmdStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
 
       val id = scattersList.length
-      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
+      scatterParMapping = scatterParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       scattersList = scattersList :+ dram
 
       // Connect IO interface signals to their streams
@@ -203,7 +202,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
       emit(src"top.io.memStreams.scatters($id).wdata.bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
       emit(src"top.io.memStreams.scatters($id).wdata.valid := ${cmdStream}.valid")
-      emit(src"top.io.memStreams.scatters($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB) // TODO: Is this always a vec of size 1?")
+      emit(src"top.io.memStreams.scatters($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB)}")
       emit(src"top.io.memStreams.scatters($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
       emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).cmd.ready & top.io.memStreams.scatters($id).wdata.ready")
       emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")

@@ -5,7 +5,6 @@ all: apps
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
 publish:
-	bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project forge; publishLocal"
@@ -49,18 +48,14 @@ publishM2Remote:
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
-	mkdir -p ${HOME}/bin
-	bash bin/make_poly.sh
-	cp poly/emptiness ${HOME}/bin
-	export PATH=${PATH}:${HOME}/bin
+	make -C poly
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
-apps:  
-	bash bin/make_poly.sh
+apps:
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"
@@ -71,7 +66,6 @@ app: apps
 ## Make all tests and apps.            ##
 ###-----------------------------------###
 tests:
-	bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"

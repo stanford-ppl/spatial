@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Script to automate publishing maven project
+
+set -e # die if anything fails
+
+export FRINGE_PACKAGE=''
+
+if [[ $1 -eq "remoteSnapshot" ]]; then 
+	changes=`git ls-files -m | wc -l`
+	files=`git ls-files -m`
+	bash bin/update_resources.sh
+	if [[ $changes -ne 0 ]]; then
+		echo -e "Detected dirty files!  Cannot publish because files:\n${files[@]}"
+		exit 1
+	else
+		sbt "; project emul; +publishSigned"
+		sbt "; project fringe; publishSigned"
+		sbt "; project argon; publishSigned"
+		sbt "; project forge; publishSigned"
+		sbt "; project spatial; publishSigned"
+		sbt "; project models; publishSigned"
+		sbt "; project poly; publishSigned"
+		sbt "; project utils; publishSigned"
+	fi
+elif [[ $1 -eq "local" ]]; then
+	bash bin/update_resources.sh
+	sbt "; project emul; +publishM2"
+	sbt "; project fringe; publishM2"
+	sbt "; project argon; publishM2"
+	sbt "; project forge; publishM2"
+	sbt "; project spatial; publishM2"
+	sbt "; project models; publishM2"
+	sbt "; project poly; publishM2"
+	sbt "; project utils; publishM2"
+elif [[ $1 -eq "remoteRelease" ]]; then
+	echo "Publish release not yet implemented!"
+else
+	echo "Please publish remoteSnapshot, remoteRelease, or local"
+fi

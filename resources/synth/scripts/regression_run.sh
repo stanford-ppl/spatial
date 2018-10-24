@@ -22,7 +22,7 @@ if [[ $GDOCS -eq 1 ]]; then
 
 	if [[ ${timeout_wc} -gt 0 ]]; then
 		runtime="TIMEOUT"
-	elif [[ ! -z ${runtime_string} ]]
+	elif [[ ! -z ${runtime_string} ]]; then
 		runtime=$runtime_string
 	else
 		runtime=$scala_runtime_string
@@ -64,9 +64,11 @@ if [[ $GDOCS -eq 1 ]]; then
 		appname=$fullname
 		properties=`cat chisel/IOModule*.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
 	else 
+		appname=$(basename `pwd`)
 		properties="NA"
 	fi
 
+	echo "${basepath}/resources/regression/gdocs.py \"report_regression_results\" $1 $appname $pass $runtime $hash $branchname $spatialtime $synthtime \"$properties\" \"$2 $3 $4 $5 $6 $7 $8 $9\""
 	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $branchname $spatialtime $synthtime "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
 
 fi

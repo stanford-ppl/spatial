@@ -19,7 +19,7 @@ trait PIRSplitGen extends PIRCodegen {
   val scope = mutable.ListBuffer[Lhs]()
 
   override def emitStm(lhs:Lhs, tp:String, rhsStr:Any):Unit = {
-    emit(src"""val $lhs = save("$lhs", $rhsStr) // ${comment(lhs.sym)}""")
+    emit(src"""val $lhs = save("$lhs", $rhsStr) // ${comment(lhs, tp)}""")
     typeMap += lhs -> tp
 
     scope += lhs

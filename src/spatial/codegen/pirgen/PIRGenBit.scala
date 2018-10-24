@@ -9,7 +9,7 @@ import emul.Bool
 trait PIRGenBit extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case Not(x)    => genOp(lhs, rhs)
+    case Not(x)    => genOp(lhs)
     case And(x,y)  => emit(src"val $lhs = $x && $y")
     case Or(x,y)   => emit(src"val $lhs = $x || $y")
     case Xor(x,y)  => emit(src"val $lhs = $x !== $y")

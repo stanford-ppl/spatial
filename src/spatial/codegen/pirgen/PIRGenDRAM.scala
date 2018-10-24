@@ -44,7 +44,8 @@ trait PIRGenDRAM extends PIRCodegen {
         src"""FringeDenseStore($dram)""" +
         src""".offset(MemRead().mem(${Lhs(cmdStream,Some("offset"))}))""" + 
         src""".size(MemRead().mem(${Lhs(cmdStream,Some("size"))}))""" +
-        src""".data(MemRead().mem($dataStream))""" +
+        src""".data(MemRead().mem(${Lhs(dataStream, Some("_1"))}))""" +
+        src""".valid(MemRead().mem(${Lhs(dataStream, Some("_2"))}))""" +
         src""".ack(MemWrite().mem($ackStream).data)"""
       )
 

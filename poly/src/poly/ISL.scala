@@ -31,9 +31,9 @@ trait ISL {
 
       println(s"Pkg Config: $pkg_config")
 
-      val split_config = pkg_config.split("\\s")
+      val split_config = pkg_config.split("\\s+").filterNot(_ == "")
 
-      val compile_proc = BackgroundProcess("", List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc",  "-o", s"$emptiness_bin", "-") ++ split_config)
+      val compile_proc = new BackgroundProcess("", List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc",  "-o", s"$emptiness_bin", "-") ++ split_config)
       val source_string = scala.io.Source.fromInputStream(getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
       println(source_string)
       compile_proc send source_string

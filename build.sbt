@@ -101,6 +101,7 @@ val common = base ++ Seq(
 val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.0-SNAPSHOT_2017-10-06")
 val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAPSHOT")
 val fringe_settings = base ++ Seq(
+  name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse(""),
   scalaVersion := "2.11.7",
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % "2.11.7",

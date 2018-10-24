@@ -27,8 +27,16 @@ trait ISL {
           case _ : Throwable => java.nio.channels.FileChannel.open(emptiness_lock, WRITE)
         }
       }
-//      val channel = java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)
-      val lock = channel.tryLock()
+      val lock = {
+        try {
+          channel.tryLock()
+        } catch {
+          case _ : java.nio.channels.OverlappingFileLockException =>
+            null
+          case e : Throwable =>
+            throw e
+        }
+      }
       try {
         if (lock == null) {
           // Someone else is handling the compile. Wait for the file to become available.

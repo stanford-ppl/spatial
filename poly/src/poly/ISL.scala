@@ -41,8 +41,19 @@ trait ISL {
         if (lock == null) {
           // Someone else is handling the compile. Wait for the file to become available.
           println("Another process is making the emptiness bin.")
-          val wait = channel.lock()
-          wait.release()
+
+          // Spinlock, because testing is multithreaded, which has a whole host of other problems.
+          var continue = true
+          while (continue) {
+            try {
+              val wait = channel.lock()
+              wait.release()
+              continue = false
+            } catch {
+              case _ : java.nio.channels.OverlappingFileLockException => Unit
+            }
+          }
+
         } else {
           // compile emptiness
 

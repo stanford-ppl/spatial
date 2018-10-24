@@ -11,9 +11,9 @@ if [[ $GDOCS -eq 1 ]]; then
 	pass_line=`cat log | grep -a "Assertion" | wc -l`
 
 	if [[ ${pass_line} -gt 0 ]]; then
-		pass=0
+		pass=N
 	else
-		pass=1
+		pass=Y
 	fi
 
 	timeout_wc=`cat log | grep -a "TIMEOUT" | wc -l`

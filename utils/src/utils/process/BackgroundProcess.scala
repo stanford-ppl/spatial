@@ -3,7 +3,7 @@ package utils.process
 import java.io._
 import java.util.concurrent.TimeUnit
 
-case class BackgroundProcess(dir: String, args: String*) {
+case class BackgroundProcess(dir: String, args: List[String]) {
   private var reader: BufferedReader = _
   private var writer: BufferedWriter = _
   private var logger: BufferedReader = _
@@ -27,7 +27,8 @@ case class BackgroundProcess(dir: String, args: String*) {
   }
 
   def run(): Unit = if (p eq null) {
-    val pb = new ProcessBuilder(args:_*)
+    import scala.collection.JavaConverters._
+    val pb = new ProcessBuilder(args.asJava)
     if (dir.nonEmpty) pb.directory(new File(dir))
     //pb.redirectError(Redirect.INHERIT)
     p = pb.start()
@@ -56,4 +57,11 @@ case class BackgroundProcess(dir: String, args: String*) {
     if (!(p eq null)) p.destroy()
     if (wait > 0) p.waitFor(wait, TimeUnit.MILLISECONDS)
   }
+    writer.close()
+    p.waitFor()
+  }
+}
+
+object BackgroundProcess {
+  def apply(dir: String, varargs: String*) = new BackgroundProcess(dir, varargs.toList)
 }

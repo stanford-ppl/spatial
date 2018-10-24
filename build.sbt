@@ -5,15 +5,14 @@ val scalatestVersion  = "3.0.5"
 name := "spatial"
 trapExit := false
 
-val common = Seq(
+val base = Seq(
   organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
   version := "1.0-SNAPSHOT",
-  isSnapshot := version.endsWith("-SNAPSHOT"),
+  isSnapshot := version.value.endsWith("-SNAPSHOT"),
 
   /** External Libraries (e.g. maven dependencies) **/
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % scala_version,  // Reflection
     "org.scalatest" %% "scalatest" % scalatestVersion,	 // Testing
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
@@ -37,9 +36,7 @@ val common = Seq(
   scalacOptions += "-language:existentials",        // Globally enable existentials
   scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
   scalacOptions += "-Xfuture",                      // Enable "future language features"
-  scalacOptions += "-opt:l:method,inline",          // Enable method optimizations, inlining
-  scalacOptions += "-opt-warnings:none",            // Disable optimization warnings
-  scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
+
 
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,
@@ -91,11 +88,34 @@ val common = Seq(
   publishMavenStyle := true
 )
 
+val common = base ++ Seq(
+  libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
+
+  scalacOptions += "-opt:l:method,inline",          // Enable method optimizations, inlining
+  scalacOptions += "-opt-warnings:none",            // Disable optimization warnings
+  scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
+)
+
+
+val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.0-SNAPSHOT_2017-10-06")
+val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAPSHOT")
+val fringe_settings = base ++ Seq(
+  scalaVersion := "2.11.7",
+  libraryDependencies ++= Seq(
+    "org.scala-lang" % "scala-reflect" % "2.11.7",
+    "edu.berkeley.cs" %% "chisel3" % chisel3_version,              // Chisel
+    "edu.berkeley.cs" %% "chisel-iotesters" % testers_version,
+  ),
+
+
+  scalacOptions += "-language:reflectiveCalls",     // Globally enable reflective calls
+  scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"), // allow warnings in console
+)
 
 /** Projects **/
 lazy val utils  = project.settings(common)
 lazy val emul   = project.settings(common)
-lazy val fringe = project.settings(common).settings(scalaVersion := "2.11")
+lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)

@@ -48,7 +48,6 @@ publishM2Remote:
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
-	make -C poly
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 

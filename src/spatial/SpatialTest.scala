@@ -85,21 +85,14 @@ trait SpatialTest extends Spatial with DSLTest { self =>
 
   abstract class PIRBackEnd (name: String, paramField:String) extends Backend(
     name, 
-    args = s"--pir --dot",
-    make = "",
-    run  = "" 
+    args = 
+      s"--pir --dot " + 
+      s"--load-param=${files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField")} " +
+      s"--save-param=${files.buildPath(spatialConfig.genDir, "pir", "saved.param")} ",
+    make = "make",
+    run  = "bash run.sh" 
   ) {
     override def shouldRun: Boolean = checkFlag(s"test.${name}")
-    override def runBackend(): Unit = {
-      s"${name}" should s"compile for backend PIR" in {
-        loadParams(files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField"))
-        val result = compile().foldLeft[Result](Unknown){ case (result, generate) =>
-          result orElse generate()
-        }
-        saveParams(files.buildPath(spatialConfig.genDir, "pir", "saved.param"))
-        result orElse Pass
-      }
-    }
   }
 
   object PIRNoPar extends PIRBackEnd (

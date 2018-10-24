@@ -382,8 +382,8 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
 		alink=apphash
-		count_success="=sum ( COUNTIF ( J3:3, \"=1\" ) )"
-		count_fail="=sum ( COUNTIF ( J3:3, \"=0\" ) )"
+		count_success="=sum ( COUNTIF ( J3:3, \"=Y\" ) )"
+		count_fail="=sum ( COUNTIF ( J3:3, \"=N\" ) )"
 		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
@@ -455,11 +455,11 @@ def report_changes(backend):
 	for t in tests:
 		col = lol[0].index(t) + 1
 		if (len(lol[0]) > col): 
-			now_pass = lol[2][col] == '1'
-			now_fail = lol[2][col] == '0'
+			now_pass = lol[2][col] == 'Y'
+			now_fail = lol[2][col] == 'N'
 			now_nocompile = lol[2][col] == ''
-			b4_pass = lol[3][col] == '1'
-			b4_fail = lol[3][col] == '0'
+			b4_pass = lol[3][col] == 'Y'
+			b4_fail = lol[3][col] == 'N'
 			b4_nocompile = lol[3][col] == ''
 			if (now_pass): pass_list.append(t)
 			if (now_fail): fail_list.append(t)

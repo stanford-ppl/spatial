@@ -23,6 +23,10 @@ val base = Seq(
     //"commons-io" % "commons-io" % "2.5"
   ),
 
+  pgpPassphrase := {
+   Some(scala.io.Source.fromFile(Path.userHome / ".sbt" / "pgp.credentials").mkString.trim.toCharArray)
+  },
+
   /** Scalac Options **/
   scalacOptions += "-target:jvm-1.8",               // JVM 1.8
   scalacOptions ++= Seq("-encoding", "UTF-8"),      // Encoding using UTF-8
@@ -36,8 +40,6 @@ val base = Seq(
   scalacOptions += "-language:existentials",        // Globally enable existentials
   scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
   scalacOptions += "-Xfuture",                      // Enable "future language features"
-
-  credentials += Credentials(Path.userHome / ".sbt" / "pgp.credentials"),
 
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,

@@ -19,7 +19,14 @@ trait ISL {
 
     if (!emptiness_exists) {
       // Acquire a file lock
-      val channel = java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)
+      val channel = {
+        try {
+          java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE_NEW)
+        } catch {
+          case _ => java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)
+        }
+      }
+//      val channel = java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)
       val lock = channel.tryLock()
       try {
         if (lock == null) {

@@ -1,10 +1,12 @@
 package poly
 
+import java.nio.channels.{FileLock, OverlappingFileLockException}
 import java.nio.file.StandardOpenOption.{CREATE_NEW, WRITE}
 
 import utils.process.BackgroundProcess
 
 import scala.language.postfixOps
+
 /**
   * Self-initializing object that runs external polyhedral ISL processes
   */
@@ -17,19 +19,25 @@ trait ISL {
     val emptiness_lock = java.nio.file.Paths.get(emptiness_bin + ".lock")
     val emptiness_path = java.nio.file.Paths.get(emptiness_bin)
 
-
-    synchronized {
+    {
       // step 1: Acquire channel to emptiness_lock
       val channel = {
         try {
           java.nio.channels.FileChannel.open(emptiness_lock, CREATE_NEW, WRITE)
         } catch {
-          case _ : Throwable => java.nio.channels.FileChannel.open(emptiness_lock, WRITE)
+          case _: Throwable => java.nio.channels.FileChannel.open(emptiness_lock, WRITE)
         }
       }
 
-      // step 2: Acquire lock on emptiness_lock
-      val lock = channel.lock()
+      // step 2: Acquire lock on emptiness_lock, spin-wait otherwise.
+      var lock: FileLock = null
+      while (lock == null) {
+        try {
+          lock = channel.lock()
+        } catch {
+          case ofe: OverlappingFileLockException => Unit
+        }
+      }
 
       // step 3: check if emptiness exists
       val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
@@ -75,22 +83,29 @@ trait ISL {
     BackgroundProcess("", emptiness_bin)
   }
   private var needsInit: Boolean = true
+
   implicit def isl: ISL = this
 
   private def init(): Unit = if (needsInit) {
     proc.run()
     needsInit = false
   }
+
   def startup(): Unit = init()
-  def shutdown(wait: Long = 0): Unit = { proc.kill(wait) }
+
+  def shutdown(wait: Long = 0): Unit = {
+    proc.kill(wait)
+  }
 
   // This needs to be defined by the instantiator
   def domain[K](key: K): ConstraintMatrix[K]
 
   def nonEmpty[K](constraint: SparseConstraint[K]): Boolean = !isEmpty(constraint)
+
   def isEmpty[K](constraint: SparseConstraint[K]): Boolean = isEmpty(ConstraintMatrix(Set(constraint)))
 
   def nonEmpty[K](constraints: ConstraintMatrix[K]): Boolean = !isEmpty(constraints)
+
   def isEmpty[K](constraints: ConstraintMatrix[K]): Boolean = {
     val matrix = constraints.toDenseString
     //dbg(matrix)

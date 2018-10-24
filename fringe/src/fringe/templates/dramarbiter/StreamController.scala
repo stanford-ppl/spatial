@@ -155,4 +155,49 @@ class StreamControllerScatter(
   }
 
   val io = IO(new StreamControllerScatterIO)
+
+  val cmd = Module(new FIFOVec(new DRAMAddress, target.bufferDepth, info.v))
+  cmd.io.chainEnq := false.B
+  cmd.io.chainDeq := true.B
+  cmd.io.in.valid := io.scatter.cmd.valid
+  cmd.io.in.bits := io.scatter.cmd.bits.addr.map { DRAMAddress(_) }
+  io.scatter.cmd.ready := cmd.io.in.ready
+
+  io.dram.cmd.valid := cmd.io.out.valid
+  io.dram.cmd.bits.addr := cmd.io.out.bits(0).burstAddr
+  cmd.io.out.ready := io.dram.cmd.ready
+  io.dram.cmd.bits.size := 1.U
+  io.dram.cmd.bits.isWr := true.B
+
+  val wdata = Module(new FIFOVec(UInt(info.w.W), target.bufferDepth, info.v))
+  wdata.io.chainEnq := false.B
+  wdata.io.chainDeq := true.B
+  wdata.io.in.valid := io.scatter.wdata.valid
+  wdata.io.in.bits := io.scatter.wdata.bits
+  io.scatter.wdata.ready := wdata.io.in.ready
+
+  val wstrobe = Module(new FIFO(io.dram.wdata.bits.wstrb, target.bufferDepth))
+  wstrobe.io.in.valid := cmd.io.in.valid & cmd.io.in.ready
+  val strobeDecoder = UIntToOH(cmd.io.in.bits(0).wordOffset(info.w))
+  wstrobe.io.in.bits.zipWithIndex.foreach { case (strobe, i) =>
+    val offset = i / (info.w / 8)
+    strobe := strobeDecoder(offset)
+  }
+
+  io.dram.wdata.valid := wdata.io.out.valid & wstrobe.io.out.valid
+  io.dram.wdata.bits.wdata := Vec(List.fill(EXTERNAL_W * EXTERNAL_V / info.w) {
+    wdata.io.out.bits(0)
+  }).asTypeOf(io.dram.wdata.bits.wdata)
+  io.dram.wdata.bits.wstrb := wstrobe.io.out.bits
+  wdata.io.out.ready := io.dram.wdata.ready
+  wstrobe.io.out.ready := io.dram.wdata.ready
+
+  val wresp = Module(new FIFO(Bool(), target.bufferDepth))
+  wresp.io.in.valid := io.dram.wresp.valid
+  wresp.io.in.bits := true.B
+  io.dram.wresp.ready := wresp.io.in.ready
+
+  io.scatter.wresp.valid := wresp.io.out.valid
+  io.scatter.wresp.bits := wresp.io.out.bits
+  wresp.io.out.ready := io.scatter.wresp.ready
 }

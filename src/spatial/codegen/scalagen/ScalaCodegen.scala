@@ -52,7 +52,10 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
   }
 
   def emitPreMain(): Unit = { }
-  def emitPostMain(): Unit = { }
+  def emitPostMain(): Unit = {
+    emit("System.out.println(StatTracker)")
+    emit("System.out.println(DRAMTracker)")
+  }
 
   override protected def emitEntry(block: Block[_]): Unit = {
     open(src"object Main {")

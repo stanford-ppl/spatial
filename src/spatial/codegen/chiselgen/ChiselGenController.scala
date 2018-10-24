@@ -351,13 +351,31 @@ trait ChiselGenController extends ChiselGenCommon {
       emitHeader()
       open("object Instrument {")
         open("def connect(top: AccelTop): Unit = {")
-          instrumentCounters.zipWithIndex.foreach{case ((s,d), i) => 
+          val printableLines: Seq[(String, Int)] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val sfx = if (s.isBranch) "_obj" else ""
-            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).bits := ${s}$sfx.cycles.io.count""")
-            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).valid := ${hwblock.get}.en""")
-            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).bits := ${s}$sfx.iters.io.count""")
-            emit(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).valid := ${hwblock.get}.en""")        
+            Seq(
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).bits := ${s}$sfx.cycles.io.count""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).valid := ${hwblock.get}.en""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).bits := ${s}$sfx.iters.io.count""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).valid := ${hwblock.get}.en""",1)
+            )
           }
+          def isLive(s: String, remaining: Seq[String]): Boolean = false
+          def branchSfx(s: String, n: Option[String] = None): String = src""""${n.getOrElse(quote(s))}" -> $s"""
+          def initChunkState(): Unit = {}
+
+          val hierarchyDepth = (scala.math.log(printableLines.size) / scala.math.log(CODE_WINDOW)).toInt
+          globalBlockID = javaStyleChunk[String](
+            printableLines, 
+            CODE_WINDOW, 
+            hierarchyDepth, 
+            globalBlockID, 
+            isLive, 
+            branchSfx, 
+            arg, 
+            () => initChunkState
+          )(emit(_) )
+
           emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
           earlyExits.zipWithIndex.foreach{case (e, i) => 
             emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).bits := 1.U")
@@ -366,6 +384,7 @@ trait ChiselGenController extends ChiselGenCommon {
         close("}")
       close("}")
     }
+
     inGen(out, "Instantiator.scala") {
       emit ("")
       emit ("// Instrumentation")

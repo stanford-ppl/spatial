@@ -67,6 +67,14 @@ case class TopCtrl(r: Sym[_]) extends Data[TopCtrl](GlobalData.Flow)
   def set(r: Sym[_]): Unit = globals.add(TopCtrl(r))
 }
 
+/** Indentify Accel scope (top for DSE)
+  *
+  * Getter:  sym.contention
+  * Append:  sym.contention = (r)
+  * Default: 0
+  */
+case class MemoryContention(contention: Int) extends Data[MemoryContention](SetBy.Analysis.Self)
+
 /** Global set of all controllers that can be metapiped params.
   *
   * Getter:  Restrictions.all

@@ -6,7 +6,7 @@ import utils.io.NullOutputStream
 
 import scala.collection.mutable
 
-class State(app: DSLRunnable) extends forge.AppState {
+class State(val app: DSLRunnable) extends forge.AppState {
   /** Config */
   var config: Config = _
 

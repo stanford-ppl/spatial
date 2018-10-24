@@ -11,18 +11,21 @@ if [[ $GDOCS -eq 1 ]]; then
 	pass_line=`cat log | grep -a "Assertion" | wc -l`
 
 	if [[ ${pass_line} -gt 0 ]]; then
-		pass=0
+		pass=N
 	else
-		pass=1
+		pass=Y
 	fi
 
 	timeout_wc=`cat log | grep -a "TIMEOUT" | wc -l`
 	runtime_string=`cat log | grep -a "Design ran for" | sed "s/Design ran for //g" | sed "s/ cycles.*//g"`
+	scala_runtime_string=`cat log | grep -a "Total time: " | sed "s/.*Total time: //g" | sed "s/ s,.*//g"`
 
 	if [[ ${timeout_wc} -gt 0 ]]; then
 		runtime="TIMEOUT"
-	else 
+	elif [[ ! -z ${runtime_string} ]]; then
 		runtime=$runtime_string
+	else
+		runtime=$scala_runtime_string
 	fi
 
 	# Get synthtime
@@ -51,15 +54,21 @@ if [[ $GDOCS -eq 1 ]]; then
 	hash=`cat ${basepath}/reghash`
 	branchname=`cat ${basepath}/branchname`
 	#appname=`basename \`pwd\``
-	fullname=`cat chisel/IOModule*.scala | grep "Root controller for app" | sed "s/.*: //g"`
-	testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
-	testdirsarray=($testdirs)
-	for t in "${testdirsarray[@]}"; do
-		fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"`
-	done
-	appname=$fullname
-	properties=`cat chisel/IOModule*.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
+	if [[ -d chisel ]]; then
+		fullname=`cat chisel/IOModule*.scala | grep "Root controller for app" | sed "s/.*: //g"`
+		testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
+		testdirsarray=($testdirs)
+		for t in "${testdirsarray[@]}"; do
+			fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"`
+		done
+		appname=$fullname
+		properties=`cat chisel/IOModule*.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
+	else 
+		appname=$(basename `pwd`)
+		properties="NA"
+	fi
 
+	echo "${basepath}/resources/regression/gdocs.py \"report_regression_results\" $1 $appname $pass $runtime $hash $branchname $spatialtime $synthtime \"$properties\" \"$2 $3 $4 $5 $6 $7 $8 $9\""
 	python3 ${basepath}/resources/regression/gdocs.py "report_regression_results" $1 $appname $pass $runtime $hash $branchname $spatialtime $synthtime "$properties" "$2 $3 $4 $5 $6 $7 $8 $9"
 
 fi

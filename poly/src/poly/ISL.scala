@@ -23,7 +23,7 @@ trait ISL {
         try {
           java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE_NEW)
         } catch {
-          case _ => java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)
+          case _ : Throwable => java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)
         }
       }
 //      val channel = java.nio.channels.FileChannel.open(emptiness_lock, java.nio.file.StandardOpenOption.CREATE)

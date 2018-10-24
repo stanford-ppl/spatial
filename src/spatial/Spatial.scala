@@ -80,8 +80,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
 
     // --- DSE
-    lazy val paramAnalyzer        = ParameterAnalyzer(state)
-    lazy val dsePass              = DSEAnalyzer(state)
+    // lazy val paramAnalyzer        = ParameterAnalyzer(state)
+    // lazy val dsePass              = DSEAnalyzer(state)
     // lazy val finalizeTransformer  = FinalizeTransformer(state)
 
     // --- Reports
@@ -123,8 +123,8 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         /** DSE */
-        (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
-        (spatialConfig.enableArchDSE ? dsePass) ==> 
+        // (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
+        // (spatialConfig.enableArchDSE ? dsePass) ==> 
         blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>

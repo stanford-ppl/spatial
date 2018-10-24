@@ -1,35 +1,32 @@
-.PHONY: all resources apps test
+.PHONY: all resources apps test pir
 all: apps
 
 ###-----------------------------------###
 ## Publish spatial locally.            ##
 ###-----------------------------------###
 publish: 
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project argon; publishLocal"
-	sbt "; project forge; publishLocal"
-	sbt "; project spatial; publishLocal"
-	sbt "; project models; publishLocal"
-	sbt "; project poly; publishLocal"
-	sbt "; project utils; publishLocal"
+	sbt "; project emul; +publishLocal; project fringe; publishLocal; project argon; publishLocal; project forge; publishLocal; project spatial; publishLocal; project models; publishLocal; project poly; publishLocal; project utils; publishLocal"
 
 ###-----------------------------------###
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
 	bash bin/make_poly.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
+	sbt "; project emul; +publishLocal; project fringe; publishLocal"
+
+###-----------------------------------###
+## Update pir libs.                    ##
+###-----------------------------------###
+pir:
+	git submodule update --init
+	cd pir; sbt publishAll
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
 apps:  
 	bash bin/make_poly.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project apps; compile"
+	sbt "; project emul; +publishLocal; project fringe; publishLocal; project apps; compile"
 
 app: apps
 
@@ -38,10 +35,7 @@ app: apps
 ###-----------------------------------###
 tests:
 	bash bin/make_poly.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project apps; compile"
-	sbt test:compile
+	sbt "; project emul; +publishLocal; project fringe; publishLocal; project apps; compile; test:compile"
 
 test: tests
 
@@ -78,7 +72,4 @@ clear:
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
 clean:
-	sbt "; forge/clean; argon/clean; spatial/clean"
-	sbt clean
-
-
+	sbt "; forge/clean; argon/clean; spatial/clean; clean"

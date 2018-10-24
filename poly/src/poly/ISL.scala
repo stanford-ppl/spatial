@@ -88,7 +88,7 @@ trait ISL {
 
           println("Finished Compiling")
 
-          BackgroundProcess("", "mv", s"$emptiness_bin-dup", emptiness_bin)
+          BackgroundProcess("", "mv", s"$emptiness_bin-dup", emptiness_bin).waitFor()
           lock.release()
         }
       } finally {

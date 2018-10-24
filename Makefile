@@ -5,7 +5,6 @@ all: apps
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
 publish:
-	bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project forge; publishLocal"
@@ -56,8 +55,7 @@ install:
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
-apps:  
-	bash bin/make_poly.sh
+apps:
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"
@@ -68,7 +66,6 @@ app: apps
 ## Make all tests and apps.            ##
 ###-----------------------------------###
 tests:
-	bash bin/make_poly.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"

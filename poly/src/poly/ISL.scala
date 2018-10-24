@@ -1,6 +1,7 @@
 package poly
 
 import utils.process.BackgroundProcess
+
 import sys.process._
 import scala.language.postfixOps
 /**
@@ -8,14 +9,44 @@ import scala.language.postfixOps
   */
 trait ISL {
   private lazy val proc = {
-    val checkInPath = "which emptiness" !
+    // get path to emptiness
 
-    if (checkInPath == 0) {
-      BackgroundProcess("", "emptiness")
-    } else {
-      val HOME = sys.env.getOrElse("NOVA_HOME", ".")
-      BackgroundProcess(s"$HOME/poly/", "./emptiness")    
+    val emptiness_bin = s"""${sys.env.getOrElse("HOME", "")}/bin/emptiness"""
+    val emptiness_exists = java.nio.file.Files.exists(java.nio.file.Paths.get(emptiness_bin))
+    println(s"Emptiness: $emptiness_exists, $emptiness_bin")
+
+    if (!emptiness_exists) {
+      // compile emptiness
+
+      // gcc command: CC resources/emptiness.c -o emptiness  `pkg-config --cflags --libs isl`
+
+      {
+        import java.nio.file.Files
+        val create_path = java.nio.file.Paths.get(emptiness_bin).getParent
+        Files.createDirectories(create_path)
+      }
+
+      val pkg_config_proc = BackgroundProcess("", "pkg-config",  "--cflags", "--libs", "isl")
+      val pkg_config = pkg_config_proc.blockOnLine()
+
+      println(s"Pkg Config: $pkg_config")
+
+      val split_config = pkg_config.split("\\s")
+
+      val compile_proc = BackgroundProcess("", List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc",  "-o", s"$emptiness_bin", "-") ++ split_config)
+      val source_string = scala.io.Source.fromInputStream(getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
+      println(source_string)
+      compile_proc send source_string
+      val retcode = compile_proc.waitFor()
+      println(s"Compile Retcode: $retcode")
+      compile_proc.checkErrors()
+
+      println("Finished Compiling")
     }
+
+
+
+    BackgroundProcess("", emptiness_bin)
   }
   private var needsInit: Boolean = true
   implicit def isl: ISL = this

@@ -72,6 +72,11 @@ set_property top design_1_wrapper [current_fileset]
 #set_property STEPS.SYNTH_DESIGN.ARGS.RETIMING true [get_runs synth_1]
 set_property STEPS.SYNTH_DESIGN.ARGS.KEEP_EQUIVALENT_REGISTERS true [get_runs synth_1]
 
+if {[info exists env(DIRTY)]} {
+  set_property STEPS.ROUTE_DESIGN.ARGS.DIRECTIVE Quick [get_runs impl_1]
+  set_property STEPS.PLACE_DESIGN.ARGS.DIRECTIVE Quick [get_runs impl_1]
+}
+
 launch_runs synth_1 -jobs 6
 wait_on_run synth_1
 

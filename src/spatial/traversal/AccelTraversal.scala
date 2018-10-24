@@ -5,6 +5,7 @@ import spatial.metadata.control._
 
 trait AccelTraversal extends argon.passes.Traversal {
   protected var inHw: Boolean = false
+  protected var inReduce: Boolean = false
 
   protected def inAccel[A](blk: => A): A = {
     val saveHW = inHw

@@ -3,8 +3,18 @@ package spatial.metadata.bounds
 import argon._
 
 // TODO[2]: Bound is in terms of Int right now?
-abstract class Bound(x: Int) { def toInt: Int = x }
-case class Final(x: Int) extends Bound(x)
+abstract class Bound(x: Int) { 
+  def toInt: Int = x 
+
+  def meet(that: Bound): Bound = {
+    if (this.isInstanceOf[Expect] && that.isInstanceOf[Expect])
+      Expect(x max that.toInt)
+    else if (this.isInstanceOf[Final] && that.isInstanceOf[Final])
+      Final(x max that.toInt)
+    else UpperBound(x max that.toInt)
+  }
+}
+case class Final(x: Int) extends Bound(x) 
 case class Expect(x: Int) extends Bound(x)
 case class UpperBound(x: Int) extends Bound(x)
 
@@ -59,4 +69,8 @@ object Expect {
 
 object Upper {
   def unapply(x: Sym[_]): Option[Int] = x.getBound.map(_.toInt)
+}
+
+object Bounded {
+  def unapply(x: Sym[_]): Option[Bound] = x.getBound
 }

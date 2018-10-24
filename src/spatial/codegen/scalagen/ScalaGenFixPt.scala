@@ -5,6 +5,7 @@ import argon.node._
 import spatial.lang._
 import spatial.node._
 import emul.FixedPoint
+import spatial.util.spatialConfig
 
 trait ScalaGenFixPt extends ScalaGenBits {
 
@@ -58,7 +59,7 @@ trait ScalaGenFixPt extends ScalaGenBits {
            FixMax(_, _) |
            FixMin(_, _) |
            FixFMA(_, _, _)
-      => emit(
+      if (spatialConfig.enableResourceReporter) => emit(
         src"""StatTracker.change(("FixPt", ${
           lhs.tp match {
             case Bits(bT) => bT.nbits

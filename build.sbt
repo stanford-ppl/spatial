@@ -37,6 +37,7 @@ val base = Seq(
   scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
   scalacOptions += "-Xfuture",                      // Enable "future language features"
 
+  credentials += Credentials(Path.userHome / ".sbt" / "pgp.credentials"),
 
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,

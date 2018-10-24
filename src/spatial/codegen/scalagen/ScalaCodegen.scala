@@ -6,6 +6,7 @@ import spatial.codegen.naming.NamedCodegen
 import spatial.metadata.CLIArgs
 import spatial.metadata.memory._
 import spatial.lang._
+import spatial.util.spatialConfig
 
 import scala.collection.mutable
 
@@ -53,8 +54,8 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
 
   def emitPreMain(): Unit = { }
   def emitPostMain(): Unit = {
-    emit("System.out.println(StatTracker)")
-    emit("System.out.println(DRAMTracker)")
+    if (spatialConfig.enableResourceReporter) emit("System.out.println(StatTracker)")
+    if (spatialConfig.enableResourceReporter) emit("System.out.println(DRAMTracker)")
   }
 
   override protected def emitEntry(block: Block[_]): Unit = {
@@ -80,5 +81,11 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
       emit(s"""System.exit(0);""")
     close("}")
   }
+
+  override def copyDependencies(out: String): Unit = {
+    dependencies ::= DirDep("synth", "scripts", "../", Some("scripts/"))
+    super.copyDependencies(out)
+  }
+
 
 }

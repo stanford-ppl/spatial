@@ -95,7 +95,7 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   echo $branchname > ${curpath}/branchname
   echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"$branchname\" \"$timestamp\" \"scalasim\""
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "scalasim"
-  nice -n 20 sbt -Dmaxthreads=$threads -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "scalasim"
   python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "scalasim"
 else

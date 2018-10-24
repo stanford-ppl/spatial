@@ -5,6 +5,7 @@ import argon.node._
 import spatial.lang._
 import spatial.node._
 import emul.FloatPoint
+import spatial.util.spatialConfig
 
 trait ScalaGenFltPt extends ScalaGenBits {
 
@@ -49,7 +50,7 @@ trait ScalaGenFltPt extends ScalaGenBits {
         FltEql(_, _) |
         FltMax(_, _) |
         FltMin(_, _) |
-        FltFMA(_, _, _) => emit(
+        FltFMA(_, _, _) if (spatialConfig.enableResourceReporter) => emit(
         src"""StatTracker.change(("FltPt", ${
           lhs.tp match {
             case Bits(bT) => bT.nbits

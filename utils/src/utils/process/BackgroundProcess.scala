@@ -57,7 +57,10 @@ case class BackgroundProcess(dir: String, args: List[String]) {
     if (!(p eq null)) p.destroy()
     if (wait > 0) p.waitFor(wait, TimeUnit.MILLISECONDS)
   }
+
+  def waitFor(): Int = {
     writer.close()
+    p.getOutputStream.close()
     p.waitFor()
   }
 }

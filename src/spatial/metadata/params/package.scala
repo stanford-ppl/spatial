@@ -12,6 +12,10 @@ package object params {
     def paramDomain: (Int,Int,Int) = getParamDomain.getOrElse((1,1,1))
     def paramDomain_=(d: (Int,Int,Int)): Unit = metadata.add(p, ParamDomain(d._1,d._2,d._3))
 
+    def getContention: Option[Int] = metadata[MemoryContention](p).map{d => d.contention }
+    def contention: Int = getContention.getOrElse(0)
+    def contention_=(d: Int): Unit = metadata.add(p, MemoryContention(d))
+
     def getIntValue: Option[Int] = metadata[IntParamValue](p).map{d => d.v }
     @stateful def intValue: Int = getIntValue.getOrElse(1)
     @stateful def setIntValue(d: Int): Unit = metadata.add(p, IntParamValue(d))

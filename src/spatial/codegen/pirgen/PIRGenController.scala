@@ -10,13 +10,22 @@ import spatial.node._
 
 trait PIRGenController extends PIRCodegen {
 
+  override def emitAccelHeader = {
+    super.emitAccelHeader
+    emit("""
+    def controller(schedule:String):Controller = {
+      val tree = ControlTree(schedule)
+      beginState(tree)
+      new Controller()
+    }
+""")
+  }
+
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) => 
       emit("runAccel()")
-      openAccel {
-        inAccel { 
-          gen(lhs, rhs)
-        }
+      inAccel { 
+        genInAccel(lhs, rhs)
       }
 
     case _ => super.genHost(lhs, rhs)
@@ -25,64 +34,58 @@ trait PIRGenController extends PIRCodegen {
   def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Sym[_]]], valids:Seq[Seq[Sym[_]]]) = {
     iters.zipWithIndex.foreach { case (iters, i) =>
       iters.zipWithIndex.foreach { case (iter, j) =>
-        state(iter, tp=Some("IterDef"))(src"$lhs.iters($i)($j)")
+        state(iter, tp=Some("Output"))(src"$lhs.cchain.T($i).iters($j)")
       }
     }
     valids.zipWithIndex.foreach { case (valids, i) =>
       valids.zipWithIndex.foreach { case (valid, j) =>
-        state(valid, tp=Some("ValidDef"))(src"$lhs.valids($i)($j)")
+        state(valid, tp=Some("Output"))(src"$lhs.cchain.T($i).valids($j)")
       }
     }
   }
-  def emitController(lhs:Sym[_], cchain:Option[Sym[_]], ens:Set[Bit]) = {
-    val ctrs = cchain match {
-      case Some(cchain) => cchain
-      case _ => Nil
+
+  def emitController(lhs:Sym[_], iterValids:Option[(Sym[_], Seq[Seq[Sym[_]]], Seq[Seq[Sym[_]]])], ens:Set[Bit]) = {
+    val cchain = iterValids.map { _._1 }
+    state(lhs, tp=Some("Controller"))(
+      src"""controller(schedule="${lhs.schedule}")""" + 
+      cchain.ms(chain => src".cchain($chain)") +
+      (if (ens.isEmpty) "" else src".en($ens)")
+    )
+    iterValids match {
+      case Some((cchain, iters, valids)) => emitIterValids(lhs, iters, valids)
+      case _ =>
     }
-    state(lhs, tp=Some("Controller"))(src"""createController(cchain=$ctrs, ens=${ens}, schedule="${lhs.schedule}")""")
+    lhs.op.get.blocks.foreach(ret)
+    emit(src"endState[Ctrl]")
   }
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
       emitController(lhs, None, Set())
-      ret(func)
 
     case UnitPipe(ens, func) =>
       emitController(lhs, None, ens)
-      ret(func)
 
     case ParallelPipe(ens, func) =>
       emitController(lhs, None, ens)
-      ret(func)
 
     case UnrolledForeach(ens,cchain,func,iters,valids) =>
-      emitController(lhs, Some(cchain), ens)
-      emitIterValids(lhs, iters, valids)
-      ret(func)
+      emitController(lhs, Some((cchain, iters, valids)), ens)
 
     case UnrolledReduce(ens,cchain,func,iters,valids) =>
-      emitController(lhs, Some(cchain), ens)
-      emitIterValids(lhs, iters, valids)
-      ret(func)
+      emitController(lhs, Some((cchain, iters, valids)), ens)
 
     case op@Switch(selects, body) =>
       emit(s"//TODO: ${qdef(lhs)}")
-      ret(body)
 
     case SwitchCase(body) => // Controlled by Switch
       emit(s"//TODO: ${qdef(lhs)}")
-      ret(body)
 
     case StateMachine(ens, start, notDone, action, nextState) =>
       emit(s"//TODO: ${qdef(lhs)}")
-      ret(notDone)
-      ret(action)
-      ret(nextState)
 
     case IfThenElse(cond, thenp, elsep) =>
       emit(s"//TODO: ${qdef(lhs)}")
-      ret(thenp)
-      ret(elsep)
 
     case _ => super.genAccel(lhs, rhs)
   }

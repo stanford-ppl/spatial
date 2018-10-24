@@ -16,3 +16,4 @@ logBuffered in Test := false
 // Disable parallel execution when running te
 //  Running tests in parallel on Jenkins currently fails.
 parallelExecution in Test := false
+addCommandAlias("make", "compile")

@@ -21,7 +21,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   private var globalBlockID: Int = 0
 
-  override def entryFile: String = s"Main.$ext"
+  override def entryFile: String = s"HostMain.$ext.1"
 
   val hostGen = new spatial.codegen.scalagen.ScalaGenSpatial(IR) {
     override protected def gen(block: Block[_], withReturn: Boolean = false): Unit = self.gen(block, withReturn)
@@ -30,7 +30,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genAccel(lhs, rhs) else genHost(lhs, rhs)
 
-  val hostFile = "HostMain.scala"
+  val hostFile = "HostMain.scala.1"
   val accelFile = "AccelMain.scala"
 
   def openHost(blk: => Unit) = inGen(out, hostFile)(blk)
@@ -65,19 +65,32 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   def emitAccelHeader = {
     emit("import pir._")
     emit("import pir.node._")
-    emit("import arch._")
-    emit("import prism.enums._")
+    emit("import prism.graph._")
     emit("")
     open(s"""object AccelMain extends PIRApp {""")
-    open(src"def accel(top:Controller): Unit = {")
+    open(src"def staging = {")
     emitBlk(s"implicit class NodeHelper[T](x:T)") {
       emitHelperFunction
     }
+    emit("""
+    val top = Top()
+    beginState(top)
+    val topCtrl = ControlTree("sequenced")
+    beginState(topCtrl)
+    val argFringe = ArgFringe()
+    val hostInCtrl = ControlTree("sequenced")
+    val hostOutCtrl = ControlTree("sequenced")
+""")
   }
 
   def emitHelperFunction = {}
 
   def emitAccelFooter = {
+    emit("""
+    endState(top)
+    endState(topCtrl)
+    (top, topCtrl)
+""")
     close("}")
     close("}")
   }
@@ -108,6 +121,8 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     emit(s"// $lhs = $rhs TODO: Unmatched Node")
     rhs.blocks.foreach(ret)
   }
+
+  final def genInAccel(lhs: Sym[_], rhs: Op[_]): Unit = openAccel { genAccel(lhs, rhs) }
 
   override protected def emitEntry(block: Block[_]): Unit = {
     openHost {

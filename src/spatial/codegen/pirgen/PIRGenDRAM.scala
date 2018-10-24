@@ -7,12 +7,25 @@ import spatial.node._
 
 trait PIRGenDRAM extends PIRCodegen {
 
+  override def emitAccelHeader = {
+    super.emitAccelHeader
+    emit("""
+    def dramAddress(dram:DRAM) = {
+      within(argFringe, hostInCtrl) {
+        val mem = Reg()
+        MemWrite().mem(mem) // DRAMDef
+        mem
+      }
+    }
+""")
+  }
+
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMHostNew(dims,zero) =>
       state(lhs)(s"""DRAM()""")
 
     case DRAMAddress(dram) =>
-      state(lhs)(src"DRAMAddress($dram)")
+      state(lhs, tp=Some("Reg"))(src"dramAddress($dram)")
 
     case DRAMIsAlloc(dram) =>
       state(lhs)(src"Const(true)") //HACK for now
@@ -20,22 +33,34 @@ trait PIRGenDRAM extends PIRCodegen {
     // Fringe templates expect byte-based addresses and sizes, while PIR gen expects word-based
     case e@FringeDenseLoad(dram,cmdStream,dataStream) =>
       state(lhs)(
-        src"""FringeDenseLoad($dram, offset=$cmdStream("offset"), size=$cmdStream("size"), data=$dataStream)"""
+        src"""FringeDenseLoad($dram)""" +
+        src""".offset(MemRead().mem(${Lhs(cmdStream,Some("offset"))}))""" + 
+        src""".size(MemRead().mem(${Lhs(cmdStream,Some("size"))}))""" +
+        src""".data(MemWrite().mem($dataStream).data)"""
       )
 
     case e@FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
       state(lhs)(
-        src"""FringeDenseLoad($dram, offset=$cmdStream("offset"), size=$cmdStream("size"), data=$dataStream, ack=$ackStream)"""
+        src"""FringeDenseStore($dram)""" +
+        src""".offset(MemRead().mem(${Lhs(cmdStream,Some("offset"))}))""" + 
+        src""".size(MemRead().mem(${Lhs(cmdStream,Some("size"))}))""" +
+        src""".data(MemRead().mem($dataStream))""" +
+        src""".ack(MemWrite().mem($ackStream).data)"""
       )
 
     case e@FringeSparseLoad(dram,addrStream,dataStream) =>
       state(lhs)(
-        src"""FringeSparseLoad($dram, addr=$addrStream, data=$dataStream)"""
+        src"""FringeSparseLoad($dram)""" +
+        src""".addr(MemRead().mem($addrStream))""" + 
+        src""".data(MemWrite().mem($dataStream).data)"""
       )
 
     case e@FringeSparseStore(dram,cmdStream,ackStream) =>
       state(lhs)(
-        src"""FringeSparseStore($dram, data=$cmdStream("data"), addr=$cmdStream("addr"), ack=$ackStream)"""
+        src"""FringeDenseStore($dram)""" +
+        src""".addr(MemRead().mem(${Lhs(cmdStream,Some("addr"))}))""" + 
+        src""".data(MemRead().mem(${Lhs(cmdStream,Some("data"))}))""" +
+        src""".ack(MemWrite().mem($ackStream).data)"""
       )
 
     case MemDenseAlias(cond, mems, _) =>
@@ -61,16 +86,17 @@ trait PIRGenDRAM extends PIRCodegen {
 
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMHostNew(dims,zero) =>
-      genAccel(lhs, rhs)
+      super.genHost(lhs, rhs)
+      genInAccel(lhs, rhs)
 
-    case op@SetMem(dram, data) =>
+    //case op@SetMem(dram, data) =>
       //open(src"val $lhs = {")
       //open(src"for (i <- 0 until $data.length) {")
       //oobUpdate(op.A,dram,lhs,Nil){ oobApply(op.A,data,lhs,Nil){ emit(src"$dram(i) = $data(i)") } }
       //close("}")
       //close("}")
 
-    case op@GetMem(dram, data) =>
+    //case op@GetMem(dram, data) =>
       //open(src"val $lhs = {")
       //open(src"for (i <- 0 until $data.length) {")
       //oobUpdate(op.A,data,lhs,Nil){ oobApply(op.A,dram,lhs,Nil){ emit(src"$data(i) = $dram(i)") } }

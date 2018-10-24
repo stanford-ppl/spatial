@@ -5,9 +5,9 @@ import argon._
 case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenController
   with PIRGenArray
-  //with PIRGenBit
+  with PIRGenBits
   with PIRGenFixPt
-  //with PIRGenFltPt
+  with PIRGenFltPt
   with PIRGenStructs
   //with PIRGenText
   //with PIRGenVoid

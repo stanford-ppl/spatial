@@ -2,9 +2,11 @@ package spatial.dse
 
 import argon._
 import spatial.metadata._
+import poly.ISL
 import spatial.targets._
 import spatial.metadata.params._
 import spatial.metadata.bounds._
+import spatial.traversal._
 import java.util.concurrent.BlockingQueue
 import spatial.util.spatialConfig
 import models._
@@ -18,7 +20,7 @@ case class DSEThread(
   localMems: Seq[Sym[_]],
   workQueue: BlockingQueue[Seq[BigInt]],
   outQueue:  BlockingQueue[Array[String]]
-)(implicit val state: State) extends Runnable { thread =>
+)(implicit val state: State, val isl: ISL) extends Runnable { thread =>
   // --- Thread stuff
   private var isAlive: Boolean = true
   private var hasTerminated: Boolean = false
@@ -53,13 +55,11 @@ case class DSEThread(
   private val dims = space.map{d => BigInt(d.len) }
   private val prods = List.tabulate(N){i => dims.slice(i+1,N).product }
 
-  // private lazy val scalarAnalyzer = new ScalarAnalyzer { var IR: State = state }
-  // private lazy val memoryAnalyzer = new MemoryAnalyzer {
-  //   def localMems: Seq[Sym[_]] = thread.LocalMemories.all
-  //   var IR: State = state
-  // }
-  // private lazy val contentionAnalyzer = new ContentionAnalyzer { var IR: State = state; def top = accel }
-  // private lazy val areaAnalyzer  = target.areaAnalyzer(state)
+  private lazy val scalarAnalyzer = new ScalarAnalyzer(state)
+  private lazy val memoryAnalyzer = new MemoryAnalyzer(state)
+
+  private lazy val contentionAnalyzer = new ContentionAnalyzer(state)
+  private lazy val areaAnalyzer  = spatialConfig.target.areaAnalyzer(state)
   // private lazy val cycleAnalyzer = target.cycleAnalyzer(state)
 
   // def init(): Unit = {

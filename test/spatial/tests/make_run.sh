@@ -5,9 +5,9 @@ if [ $# -eq 0 ]; then
 else
     APP=$1
 fi
-
-
 rm -r gen/$APP
-bin/spatial $APP --debugResources --fpga=ZCU --instrument
+bin/spatial $APP
 cd gen/$APP
-make zcu 
+sh run.sh 1 0 
+cd ../../
+

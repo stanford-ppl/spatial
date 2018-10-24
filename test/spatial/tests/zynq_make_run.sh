@@ -8,7 +8,6 @@ fi
 
 
 rm -r gen/$APP
-bin/spatial $APP --debugResources  --fpga ZCU --instrument
+bin/spatial $APP --synth --syncMem --retime --instrumentation
 cd gen/$APP
-make vcs
-#bash run.sh 1 1
+make zcu 

@@ -99,6 +99,12 @@ def getDoc(title):
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
+	elif (title == "scalasim"):
+		try: 
+			sh = gc.open_by_key("1BAf6e1_ckRwrJNW-t09pjGDFixt2GsobCYyzaue0qcA")
+		except:
+			print("ERROR: Couldn't get sheet")
+			exit()
 	elif (title == "Zynq"):
 		try: 
 			sh = gc.open_by_key("1nFzTcIFbw182cLUFZiGnezeR43ofV2NOYsRp2aemhAA")
@@ -163,6 +169,8 @@ def isPerf(title):
 		perf=False
 	elif (title == "vcs"):
 		perf=True
+	elif (title == "scalasim"):
+		perf=True
 	elif (title == "vcs-noretime"):
 		perf=True
 	else:
@@ -174,7 +182,7 @@ def isPerf(title):
 
 
 
-def report_regression_results(branch, appname, passed, cycles, hash, apphash, spatialcompile, vcscompile, csv, args):
+def report_regression_results(branch, appname, passed, cycles, hash, apphash, spatialcompile, backendcompile, csv, args):
 	sh = getDoc(branch)
 	row = getRow(sh, hash, apphash)
 
@@ -196,10 +204,10 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, sp
 	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row, col, spatialcompile)
 
-	# Page 3 - VCS compile time
-	worksheet = sh.worksheet_by_title('VCSCompile')
+	# Page 3 - Backend compile time
+	worksheet = sh.worksheet_by_title('BackendCompile')
 	col = getColOrAppend(worksheet, appname)
-	write(worksheet, row, col, vcscompile)
+	write(worksheet, row, col, backendcompile)
 
 	# Page 4 - Properties
 	worksheet = sh.worksheet_by_title('Properties')
@@ -374,8 +382,8 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
 		alink=apphash
-		count_success="=sum ( COUNTIF ( J3:3, \"=1\" ) )"
-		count_fail="=sum ( COUNTIF ( J3:3, \"=0\" ) )"
+		count_success="=sum ( COUNTIF ( J3:3, \"=Y\" ) )"
+		count_fail="=sum ( COUNTIF ( J3:3, \"=N\" ) )"
 		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
@@ -447,11 +455,11 @@ def report_changes(backend):
 	for t in tests:
 		col = lol[0].index(t) + 1
 		if (len(lol[0]) > col): 
-			now_pass = lol[2][col] == '1'
-			now_fail = lol[2][col] == '0'
+			now_pass = lol[2][col] == 'Y'
+			now_fail = lol[2][col] == 'N'
 			now_nocompile = lol[2][col] == ''
-			b4_pass = lol[3][col] == '1'
-			b4_fail = lol[3][col] == '0'
+			b4_pass = lol[3][col] == 'Y'
+			b4_fail = lol[3][col] == 'N'
 			b4_nocompile = lol[3][col] == ''
 			if (now_pass): pass_list.append(t)
 			if (now_fail): fail_list.append(t)
@@ -506,7 +514,7 @@ def report_slowdowns(prop, backend):
 	elif (prop == "spatial"):
 		worksheet = sh.worksheet_by_title("SpatialCompile")
 	else:
-		worksheet = sh.worksheet_by_title("VCSCompile")
+		worksheet = sh.worksheet_by_title("BackendCompile")
 
 	lol = worksheet.get_all_values()
 	start = getCols(worksheet, "Test:")[0]
@@ -668,8 +676,8 @@ else:
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - combine_and_strip_prefixes(backend)")
 	print(" - report_changes(backend)")
-	print(" - report_slowdowns(property (runtime, spatial, vcs), backend)")
-	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
-	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - report_slowdowns(property (runtime, spatial, backend), backend)")
+	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
+	print(" - delete_app_column(appname (regex supported), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - merge_apps_columns(old appname, new appname, backend)")
 	exit()

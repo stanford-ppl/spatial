@@ -110,6 +110,8 @@ val fringe_settings = base ++ Seq(
 
   scalacOptions += "-language:reflectiveCalls",     // Globally enable reflective calls
   scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"), // allow warnings in console
+
+  name := "fringe" + sys.env.getOrElse("FRINGE_PACKAGE", "")
 )
 
 /** Projects **/

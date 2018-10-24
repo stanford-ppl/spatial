@@ -77,7 +77,7 @@ trait ISL {
           }
 
           val compile_proc = BackgroundProcess("",
-            List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin", "-") ++ split_config)
+            List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin-dup", "-") ++ split_config)
           val source_string = scala.io.Source.fromInputStream(
             getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
           println(source_string)
@@ -87,6 +87,8 @@ trait ISL {
           compile_proc.checkErrors()
 
           println("Finished Compiling")
+
+          BackgroundProcess("", "mv", s"$emptiness_bin-dup", emptiness_bin)
           lock.release()
         }
       } finally {

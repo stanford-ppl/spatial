@@ -88,19 +88,18 @@ trait ISL {
 
           println("Finished Compiling")
 
-          BackgroundProcess("", "mv", s"$emptiness_bin-dup", emptiness_bin).waitFor()
+          val mv = BackgroundProcess("", "mv", s"$emptiness_bin-dup", emptiness_bin)
+          println(s"MV retcode: ${mv.waitFor()}")
+          mv.checkErrors()
           lock.release()
         }
       } finally {
         if (lock != null) {
           lock.release()
-          channel.close()
         }
-
+        channel.close()
       }
     }
-
-
 
     BackgroundProcess("", emptiness_bin)
   }

@@ -1,5 +1,7 @@
 package poly
 
+import java.nio.file.StandardOpenOption.{CREATE_NEW, WRITE}
+
 import utils.process.BackgroundProcess
 
 import scala.language.postfixOps
@@ -14,12 +16,10 @@ trait ISL {
 
     val emptiness_lock = java.nio.file.Paths.get(emptiness_bin + ".lock")
     val emptiness_path = java.nio.file.Paths.get(emptiness_bin)
-    val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
-    println(s"Emptiness: $emptiness_exists, $emptiness_bin")
 
-    if (!emptiness_exists) {
-      // Acquire a file lock
-      import java.nio.file.StandardOpenOption._
+
+    synchronized {
+      // step 1: Acquire channel to emptiness_lock
       val channel = {
         try {
           java.nio.channels.FileChannel.open(emptiness_lock, CREATE_NEW, WRITE)
@@ -27,78 +27,49 @@ trait ISL {
           case _ : Throwable => java.nio.channels.FileChannel.open(emptiness_lock, WRITE)
         }
       }
-      val lock = {
-        try {
-          channel.tryLock()
-        } catch {
-          case _ : java.nio.channels.OverlappingFileLockException =>
-            null
-          case e : Throwable =>
-            throw e
+
+      // step 2: Acquire lock on emptiness_lock
+      val lock = channel.lock()
+
+      // step 3: check if emptiness exists
+      val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
+      println(s"Emptiness: $emptiness_exists, $emptiness_bin")
+
+      // step 4: if emptiness does not exist, compile it.
+      if (!emptiness_exists) {
+        val create_path = java.nio.file.Paths.get(emptiness_bin).getParent
+        java.nio.file.Files.createDirectories(create_path)
+
+        val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
+        val pkg_config = pkg_config_proc.blockOnLine()
+
+        println(s"Pkg Config: $pkg_config")
+
+        val split_config = pkg_config.split("\\s") map {
+          _.trim
+        } filter {
+          _.nonEmpty
         }
+
+        val compile_proc = BackgroundProcess("",
+          List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin", "-") ++ split_config)
+        val source_string = scala.io.Source.fromInputStream(
+          getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
+        println(source_string)
+        compile_proc send source_string
+        val retcode = compile_proc.waitFor()
+        println(s"Compile Retcode: $retcode")
+        compile_proc.checkErrors()
+
+        println("Finished Compiling")
       }
-      try {
-        if (lock == null) {
-          // Someone else is handling the compile. Wait for the file to become available.
-          println("Another process is making the emptiness bin.")
 
-          // Spinlock, because testing is multithreaded, which has a whole host of other problems.
-          var continue = true
-          while (continue) {
-            try {
-              val wait = channel.lock()
-              wait.release()
-              continue = false
-            } catch {
-              case _ : java.nio.channels.OverlappingFileLockException => Unit
-            }
-          }
+      // step 4: Now that emptiness is guaranteed to exist, release lock
+      lock.release()
 
-        } else {
-          // compile emptiness
 
-          // gcc command: CC resources/emptiness.c -o emptiness  `pkg-config --cflags --libs isl`
-
-          {
-            import java.nio.file.Files
-            val create_path = java.nio.file.Paths.get(emptiness_bin).getParent
-            Files.createDirectories(create_path)
-          }
-
-          val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
-          val pkg_config = pkg_config_proc.blockOnLine()
-
-          println(s"Pkg Config: $pkg_config")
-
-          val split_config = pkg_config.split("\\s") map {
-            _.trim
-          } filter {
-            _.nonEmpty
-          }
-
-          val compile_proc = BackgroundProcess("",
-            List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin-dup", "-") ++ split_config)
-          val source_string = scala.io.Source.fromInputStream(
-            getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
-          println(source_string)
-          compile_proc send source_string
-          val retcode = compile_proc.waitFor()
-          println(s"Compile Retcode: $retcode")
-          compile_proc.checkErrors()
-
-          println("Finished Compiling")
-
-          val mv = BackgroundProcess("", "mv", s"$emptiness_bin-dup", emptiness_bin)
-          println(s"MV retcode: ${mv.waitFor()}")
-          mv.checkErrors()
-          lock.release()
-        }
-      } finally {
-        if (lock != null) {
-          lock.release()
-        }
-        channel.close()
-      }
+      // close FileChannel
+      channel.close()
     }
 
     BackgroundProcess("", emptiness_bin)

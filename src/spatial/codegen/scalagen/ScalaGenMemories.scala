@@ -9,7 +9,7 @@ import utils.multiLoopWithIndex
 trait ScalaGenMemories extends ScalaGenBits {
   var globalMems: Boolean = false
 
-  var lineBufSwappers: Map[Sym[_], Sym[_]] = Map()
+  val lineBufSwappers: scala.collection.mutable.Map[Sym[_], Set[Sym[_]]] = scala.collection.mutable.Map.empty
 
   override def emitPreMain(): Unit = {
     emit(src"OOB.open()")

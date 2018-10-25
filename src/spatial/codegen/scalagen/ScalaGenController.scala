@@ -111,7 +111,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
           inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
         closeopen(src"): ${lhs.tp} = $gate{")
           contents
-          if (lineBufSwappers.contains(lhs)) {emit(src"${lineBufSwappers(lhs)}.swap()")}
+          lineBufSwappers.getOrElse(lhs, Set()).foreach{x => emit(src"$x.swap()")}
         close(s"} $els")
       close("}")
       emit(src"/** END ${lhs.op.get.name} $lhs **/")

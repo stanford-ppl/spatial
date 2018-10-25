@@ -11,11 +11,11 @@ trait PIRGenDRAM extends PIRCodegen {
     super.emitAccelHeader
     emit("""
     def dramAddress(dram:DRAM) = {
+      val mem = Reg()
       within(argFringe, hostInCtrl) {
-        val mem = Reg()
-        MemWrite().mem(mem) // DRAMDef
-        mem
+        MemWrite().mem(mem).data(hostWrite) // DRAMDef
       }
+      MemRead().mem(mem)
     }
 """)
   }

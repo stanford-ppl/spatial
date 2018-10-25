@@ -11,11 +11,11 @@ trait PIRGenReg extends PIRCodegen {
     super.emitAccelHeader
     emit("""
     def argIn() = {
+      val mem = Reg()
       within(argFringe, hostInCtrl) {
-        val mem = Reg()
         MemWrite().mem(mem)
-        mem
       }
+      mem
     }
     def argOut() = {
       within(argFringe, hostOutCtrl) {

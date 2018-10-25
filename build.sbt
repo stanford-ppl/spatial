@@ -24,7 +24,8 @@ val base = Seq(
   ),
 
   pgpPassphrase := {
-   Some(scala.io.Source.fromFile(Path.userHome / ".sbt" / "pgp.credentials").mkString.trim.toCharArray)
+   try {Some(scala.io.Source.fromFile(Path.userHome / ".sbt" / "pgp.credentials").mkString.trim.toCharArray)}
+   catch { case _ => None }
   },
 
   /** Scalac Options **/

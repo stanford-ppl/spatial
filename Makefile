@@ -5,6 +5,7 @@ all: apps
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
 publish:
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project forge; publishLocal"
@@ -30,6 +31,7 @@ publishM2Remote:
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 
@@ -37,6 +39,7 @@ install:
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
 apps:
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"
@@ -47,6 +50,7 @@ app: apps
 ## Make all tests and apps.            ##
 ###-----------------------------------###
 tests:
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"

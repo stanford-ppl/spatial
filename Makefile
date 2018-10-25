@@ -5,6 +5,7 @@ all: apps
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
 publish:
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project forge; publishLocal"
@@ -17,37 +18,20 @@ publish:
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Local: export FRINGE_PACKAGE=''
 publishM2Local: 
-	@echo $(FRINGE_PACKAGE)
-	sbt "; project emul; +publishM2"
-	sbt "; project fringe; publishM2"
-	sbt "; project argon; publishM2"
-	sbt "; project forge; publishM2"
-	sbt "; project spatial; publishM2"
-	sbt "; project models; publishM2"
-	sbt "; project poly; publishM2"
-	sbt "; project utils; publishM2"
+	bin/publish local
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Remote: export FRINGE_PACKAGE="" 
 publishM2Remote: 
-	@echo $(FRINGE_PACKAGE)
-	sbt "; project emul; +publishSigned"
-	sbt "; project fringe; publishSigned"
-	sbt "; project argon; publishSigned"
-	sbt "; project forge; publishSigned"
-	sbt "; project spatial; publishSigned"
-	sbt "; project models; publishSigned"
-	sbt "; project poly; publishSigned"
-	sbt "; project utils; publishSigned"
+	bin/publish remoteSnapshot
 
 ###-----------------------------------###
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 
@@ -55,6 +39,7 @@ install:
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
 apps:
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"
@@ -65,6 +50,7 @@ app: apps
 ## Make all tests and apps.            ##
 ###-----------------------------------###
 tests:
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project apps; compile"

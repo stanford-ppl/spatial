@@ -77,7 +77,7 @@ trait ScalaGenLineBuffer extends ScalaGenMemories {
   private def connectBufSignals(mem: Sym[_]): Unit = {
     val info = bufferControlInfo(mem)
     info.zipWithIndex.foreach{ case (node, port) => 
-      if (port == 0) lineBufSwappers += (node -> mem)
+      if (port == 0) lineBufSwappers += (node -> {lineBufSwappers.getOrElse(node, Set()) ++ Set(mem)})
     }
   }
 

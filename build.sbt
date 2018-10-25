@@ -23,6 +23,11 @@ val base = Seq(
     //"commons-io" % "commons-io" % "2.5"
   ),
 
+  pgpPassphrase := {
+   try {Some(scala.io.Source.fromFile(Path.userHome / ".sbt" / "pgp.credentials").mkString.trim.toCharArray)}
+   catch { case _ => None }
+  },
+
   /** Scalac Options **/
   scalacOptions += "-target:jvm-1.8",               // JVM 1.8
   scalacOptions ++= Seq("-encoding", "UTF-8"),      // Encoding using UTF-8
@@ -36,8 +41,6 @@ val base = Seq(
   scalacOptions += "-language:existentials",        // Globally enable existentials
   scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
   scalacOptions += "-Xfuture",                      // Enable "future language features"
-
-  credentials += Credentials(Path.userHome / ".sbt" / "pgp.credentials"),
 
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,
@@ -101,6 +104,7 @@ val common = base ++ Seq(
 val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.0-SNAPSHOT_2017-10-06")
 val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAPSHOT")
 val fringe_settings = base ++ Seq(
+  name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse(""),
   scalaVersion := "2.11.7",
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-reflect" % "2.11.7",

@@ -73,6 +73,7 @@ elif [[ $type == "vcs-gdocs" ]]; then
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="vcs-gdocs-${branchname}"
   make resources
+  make publish
   hash=`git rev-parse HEAD`
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -88,6 +89,7 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="scalasim-gdocs-${branchname}"
   make resources
+  make publish
   hash=`git rev-parse HEAD`
   export timestamp=`git show -s --format=%ci`
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

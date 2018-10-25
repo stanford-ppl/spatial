@@ -32,13 +32,10 @@ trait PIRGenHelper extends PIRFormatGen {
     A match {
       case a:Struct[_] =>
         a.fields.foreach { case (name, _) =>
-          rhsFunc(Some(name)) match {
-            case rhs:Lhs if (typeMap.contains(rhs)) => alias(Lhs(lhs, Some(name)))(rhs)
-            case rhs:Sym[_] if (typeMap.contains(rhs)) => alias(Lhs(lhs, Some(name)))(rhs)
-            case rhs => state(Lhs(lhs, Some(name)), tp=tp)(rhs)
-          }
+          stateOrAlias(Lhs(lhs, Some(name)), tp)(rhsFunc(Some(name)))
         }
-      case a => state(lhs, tp=tp)(rhsFunc(None))
+      case a => 
+        stateOrAlias(lhs, tp)(rhsFunc(None))
     }
   }
 

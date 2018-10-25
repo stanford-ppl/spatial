@@ -32,6 +32,14 @@ trait PIRFormatGen extends Codegen {
     emitStm(lhs, typeMap(rhs), rhs)
   }
 
+  def stateOrAlias(lhs:Lhs, tp:Option[String]=None)(rhs:Any):Unit = {
+    rhs match {
+      case rhs:Lhs if (typeMap.contains(rhs)) => alias(lhs)(rhs)
+      case rhs:Sym[_] => stateOrAlias(lhs,tp)(Lhs(rhs))
+      case rhs => state(lhs,tp)(rhs)
+    }
+  }
+
   def comment(lhs:Lhs, tp:String) = {
     lhs.sym match {
       case Def(op) => src"[$tp] $lhs = $op"

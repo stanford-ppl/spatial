@@ -6,6 +6,7 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenController
   with PIRGenArray
   with PIRGenBits
+  with PIRGenBit
   with PIRGenFixPt
   with PIRGenFltPt
   with PIRGenStructs

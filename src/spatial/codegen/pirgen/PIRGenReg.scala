@@ -20,7 +20,7 @@ trait PIRGenReg extends PIRCodegen {
     def argOut() = {
       within(argFringe, hostOutCtrl) {
         val mem = Reg()
-        MemRead().mem(mem)
+        hostRead.input(MemRead().mem(mem))
         mem
       }
     }

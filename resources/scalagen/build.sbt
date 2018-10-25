@@ -9,6 +9,11 @@ scalaSource in Test := baseDirectory.value / "scala"
 
 libraryDependencies += "edu.stanford.cs.dawn" %% "emul" % "1.0-SNAPSHOT"
 
+resolvers ++= Seq(
+  Resolver.sonatypeRepo("snapshots"),
+  Resolver.sonatypeRepo("releases")
+)
+
 // Recommendations from http://www.scalatest.org/user_guide/using_scalatest_with_sbt
 logBuffered in Test := false
 

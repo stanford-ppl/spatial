@@ -51,21 +51,21 @@ echo -e "$INFO Logging tests to $fileout"
 
 # Basic tests
 if [[ $type == "sim" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "vcs" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
 
 # Synthesis tests
 elif [[ $type == "zynq" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "aws" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.AWS=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.AWS=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "zcu" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "arria10" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "pir" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.PIR=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.PIR=true "testOnly $tests" 2>&1 | tee $fileout
 
 # Verilog tests that report to gdocs (https://docs.google.com/spreadsheets/d/1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM/edit#gid=1748974351)
 elif [[ $type == "vcs-gdocs" ]]; then
@@ -81,7 +81,7 @@ elif [[ $type == "vcs-gdocs" ]]; then
   echo $branchname > ${curpath}/branchname
   echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"$branchname\" \"$timestamp\" \"vcs\""
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs"
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 19 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs"
   python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs"
 elif [[ $type == "scalasim-gdocs" ]]; then

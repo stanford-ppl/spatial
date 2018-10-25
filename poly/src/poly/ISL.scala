@@ -12,9 +12,15 @@ import scala.language.postfixOps
   */
 trait ISL {
   private lazy val proc = {
-    // get path to emptiness
+    val user_bin = s"""${sys.env.getOrElse("HOME", "")}/bin"""
+    val bin_path = java.nio.file.Paths.get(user_bin)
+    val bin_exists = java.nio.file.Files.exists(bin_path)
+    if (!bin_exists) {
+      java.nio.file.Files.createDirectories(bin_path)
+    }
 
-    val emptiness_bin = s"""${sys.env.getOrElse("HOME", "")}/bin/emptiness"""
+
+    val emptiness_bin = s"""${user_bin}/emptiness"""
 
     val emptiness_lock = java.nio.file.Paths.get(emptiness_bin + ".lock")
     val emptiness_path = java.nio.file.Paths.get(emptiness_bin)
@@ -45,9 +51,6 @@ trait ISL {
 
       // step 4: if emptiness does not exist, compile it.
       if (!emptiness_exists) {
-        val create_path = java.nio.file.Paths.get(emptiness_bin).getParent
-        java.nio.file.Files.createDirectories(create_path)
-
         val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
         val pkg_config = pkg_config_proc.blockOnLine()
 

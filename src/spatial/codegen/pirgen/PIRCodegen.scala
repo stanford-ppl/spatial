@@ -74,12 +74,9 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     }
     emit("""
     val top = Top()
+    import top._
     beginState(top)
-    val topCtrl = ControlTree("sequenced")
     beginState(topCtrl)
-    val argFringe = ArgFringe()
-    val hostInCtrl = ControlTree("sequenced")
-    val hostOutCtrl = ControlTree("sequenced")
 """)
   }
 
@@ -89,7 +86,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     emit("""
     endState(top)
     endState(topCtrl)
-    (top, topCtrl)
+    top
 """)
     close("}")
     close("}")

@@ -6,16 +6,16 @@ Spatial is an Argon DSL for programming reconfigurable hardware from a parameter
 ```
     $ git clone https://github.com/stanford-ppl/spatial.git
     $ cd spatial
-    $ sbt compile
+    $ make install
 ```
 
 To run an app:
 
 ```
-	$ bin/spatial <app name> <options>
-	$ cd gen/<app name>
-	$ make <target>
-	$ bash run.sh <input args>
+    $ bin/spatial <app name> <options>
+    $ cd gen/<app name>
+    $ make
+    $ bash run.sh <input args>
 ```
 
 # Links

@@ -8,6 +8,7 @@ trait Struct[A] extends Top[A] with Ref[Nothing,A] {
   override val __neverMutable = false
   val box: A <:< Struct[A]
   private implicit lazy val A: Struct[A] = this.selfType
+
   @rig def field[F:Type](name: String): F = Struct.field[A,F](me, name)
 
   @rig private def __field[F](name: String, tp: Type[_]): Sym[F] = {
@@ -17,6 +18,9 @@ trait Struct[A] extends Top[A] with Ref[Nothing,A] {
 
   def fields: Seq[(String,ExpType[_,_])]
   @rig def fieldMap: Seq[(String,Exp[_,_])] = fields.map{case (name,tp) => (name, __field(name, tp)) }
+
+  @api override def neql(that: A): Bit = fieldMap.zip(box(that).fieldMap).map{case ((_, a: Bits[_]), (_,b: Bits[_])) => a !== b}.reduce{_|_}
+  @api override def eql(that: A): Bit = fieldMap.zip(box(that).fieldMap).map{case ((_, a: Bits[_]), (_,b: Bits[_])) => a === b}.reduce{_&_}
 }
 
 object Struct {

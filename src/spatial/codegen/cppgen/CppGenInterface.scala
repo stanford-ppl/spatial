@@ -90,7 +90,7 @@ trait CppGenInterface extends CppGenCommon {
         emit(src"c1->memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
       }
       else {
-        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${rawtp}));")
+        emit(src"c1->memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
       }
 
     case GetMem(dram, data) =>
@@ -105,7 +105,7 @@ trait CppGenInterface extends CppGenCommon {
         close("}")
       }
       else {
-        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${rawtp}));")
+        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
       }
 
     case _ => super.gen(lhs, rhs)

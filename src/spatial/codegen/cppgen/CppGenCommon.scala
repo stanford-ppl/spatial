@@ -55,16 +55,17 @@ trait CppGenCommon extends CppCodegen {
   override protected def remap(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => 
       val u = if (!s) "u" else ""
-      if (f > 0) {"double"} else {
-        if (d+f > 64) s"${u}int128_t"
-        else if (d+f > 32) s"${u}int64_t"
-        else if (d+f > 16) s"${u}int32_t"
-        else if (d+f > 8) s"${u}int16_t"
-        else if (d+f > 4) s"${u}int8_t"
-        else if (d+f > 2) s"${u}int8_t"
-        else if (d+f == 2) s"${u}int8_t"
+      if (f == 0) {
+        if (d > 64) s"${u}int128_t"
+        else if (d > 32) s"${u}int64_t"
+        else if (d > 16) s"${u}int32_t"
+        else if (d > 8) s"${u}int16_t"
+        else if (d > 4) s"${u}int8_t"
+        else if (d > 2) s"${u}int8_t"
+        else if (d == 2) s"${u}int8_t"
         else "bool"
       }
+      else { "double" } //s"numeric::Fixed<$d, $f>"
     case FloatType()  => "float"
     case DoubleType() => "double"
     case FltPtType(g,e) => "float"

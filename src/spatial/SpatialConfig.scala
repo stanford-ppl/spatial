@@ -55,4 +55,39 @@ class SpatialConfig extends Config {
 
   var paramSavePath:Option[String] = None
 
+  def copyTo(dst: SpatialConfig): Unit = {
+    dst.targetName = targetName
+    dst.target = target
+    dst.dseMode = dseMode
+    dst.threads = threads
+    dst.enableRuntimeModel = enableRuntimeModel
+    dst.inputs = inputs
+    dst.enableInterpret = enableInterpret
+    dst.enableSim = enableSim
+    dst.enableSynth = enableSynth
+    dst.enableResourceReporter = enableResourceReporter
+    dst.enableTree = enableTree
+    dst.enableDot = enableDot
+    dst.enableInstrumentation = enableInstrumentation
+    dst.enableTightControl = enableTightControl
+    dst.useCheapFifos = useCheapFifos
+    dst.enableOptimizedReduce = enableOptimizedReduce
+    dst.enableForceBanking = enableForceBanking
+    dst.enableSplitting = enableSplitting
+    dst.enableArchDSE = enableArchDSE
+    dst.addRetimeRegisters = addRetimeRegisters
+    dst.compressWires = compressWires
+    dst.sramThreshold = sramThreshold
+    dst.enableAsyncMem = enableAsyncMem
+    dst.enableRetiming = enableRetiming
+    dst.fuseAsFMA = fuseAsFMA
+    dst.enableBroadcast = enableBroadcast
+    dst.allowPrimitivesInOuterControl = allowPrimitivesInOuterControl
+    dst.ignoreParEdgeCases = ignoreParEdgeCases
+    dst.noInnerLoopUnroll = noInnerLoopUnroll
+    dst.enableBufferCoalescing = enableBufferCoalescing
+    dst.enablePIR = enablePIR
+    dst.paramSavePath = paramSavePath
+  }
+
 }

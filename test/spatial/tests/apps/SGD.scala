@@ -165,7 +165,7 @@ import spatial.dsl._
             cost(0 :: E) store cost_sram
             w(0 :: D par storePar) store w_k
 
-            breakpoint()
+            exit()
           }
         }
 

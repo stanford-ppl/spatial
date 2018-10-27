@@ -158,6 +158,20 @@ def getRow(sh, hash, apphash):
 	if (row == -1):	print("ERROR: Could not find row for %s, %s" % (hash, apphash))
 	return row
 
+def getRowByBranch(sh, branchname, start):
+	if (branchname == "any"): 
+		return start
+	else:
+		worksheet = sh.worksheet('index', 0)
+		lol = readAllVals(worksheet)
+		row = -1
+		for i in range(start, len(lol)):
+			if (lol[i][1] == branchname):
+				row = i + 1
+				break
+		if (row == -1):	print("ERROR: Could not find row for %s, starting from %s" % (branchname, start))
+		return row
+
 def isPerf(title):
 	if (title == "Zynq"):
 		perf=False
@@ -440,13 +454,16 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
 
-def report_changes(backend):
+def report_changes(backend, newbranch, oldbranch):
 	sh = getDoc(backend)
 
 	worksheet = sh.worksheet_by_title("Runtime")
 	lol = worksheet.get_all_values()
+
 	start = getCols(worksheet, "Test:")[0]
 	tests = list(filter(None, lol[0][start:]))
+	newrow = getRowByBranch(sh, newbranch, 2)
+	oldrow = getRowByBranch(sh, oldbranch, newrow+1)
 	pass_list = []
 	fail_list = []
 	nocompile_list = []
@@ -455,12 +472,12 @@ def report_changes(backend):
 	for t in tests:
 		col = lol[0].index(t) + 1
 		if (len(lol[0]) > col): 
-			now_pass = lol[2][col] == 'Y'
-			now_fail = lol[2][col] == 'N'
-			now_nocompile = lol[2][col] == ''
-			b4_pass = lol[3][col] == 'Y'
-			b4_fail = lol[3][col] == 'N'
-			b4_nocompile = lol[3][col] == ''
+			now_pass = (lol[newrow][col] == 'Y') or (lol[newrow][col] == '1')
+			now_fail = (lol[newrow][col] == 'N') or (lol[newrow][col] == '0')
+			now_nocompile = lol[newrow][col] == ''
+			b4_pass = (lol[oldrow][col] == 'Y') or (lol[oldrow][col] == '1')
+			b4_fail = (lol[oldrow][col] == 'N') or (lol[oldrow][col] == '0')
+			b4_nocompile = lol[oldrow][col] == ''
 			if (now_pass): pass_list.append(t)
 			if (now_fail): fail_list.append(t)
 			if (now_nocompile): nocompile_list.append(t)
@@ -485,6 +502,7 @@ def report_changes(backend):
 	print(sorted(improved_list))
 	print("Worsened:")
 	print(sorted(worsened_list))
+	print("Diffed rows %d (%s) and %d (%s)" % (newrow, newbranch, oldrow, oldbranch))
 
 def combine_and_strip_prefixes(backend):
 	sh = getDoc(backend)
@@ -648,8 +666,8 @@ elif (sys.argv[1] == "prepare_sheet"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
 	prepare_sheet(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 elif (sys.argv[1] == "report_changes"):
-	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s')" % (sys.argv[2]))
-	report_changes(sys.argv[2])
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	report_changes(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "report_slowdowns"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_slowdowns('%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	report_slowdowns(sys.argv[2], sys.argv[3])
@@ -675,7 +693,7 @@ else:
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - combine_and_strip_prefixes(backend)")
-	print(" - report_changes(backend)")
+	print(" - report_changes(backend, branch (master, misc_fixes, any, etc.))")
 	print(" - report_slowdowns(property (runtime, spatial, backend), backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")

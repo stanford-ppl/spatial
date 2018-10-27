@@ -54,7 +54,6 @@ trait CppGenCommon extends CppCodegen {
 
   override protected def remap(tp: Type[_]): String = tp match {
     case FixPtType(s,d,f) => 
-      if ((d + f) > 128) error(s"Cannot generate type in cpp with more than 128 bits!")
       val u = if (!s) "u" else ""
       if (f == 0) {
         if (d > 64) s"${u}int128_t"

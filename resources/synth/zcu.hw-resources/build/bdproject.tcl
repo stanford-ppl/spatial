@@ -29,7 +29,8 @@ switch $TARGET {
     set RST_FREQ [expr $CLOCK_FREQ_MHZ - 1]
 
     # Drop in ps-pl and Top
-    create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.1 zynq_ultra_ps_e_0
+    #create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.1 zynq_ultra_ps_e_0 # for 2017.4+?
+    create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.0 zynq_ultra_ps_e_0
     create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps8_0_${RST_FREQ}M
     ## Set freqs
     set_property -dict [list CONFIG.PSU__FPGA_PL1_ENABLE {1} CONFIG.PSU__CRL_APB__PL1_REF_CTRL__SRCSEL {IOPLL} CONFIG.PSU__CRL_APB__PL1_REF_CTRL__FREQMHZ {250}] [get_bd_cells zynq_ultra_ps_e_0]

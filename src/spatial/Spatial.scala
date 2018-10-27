@@ -80,8 +80,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
 
     // --- DSE
-    // lazy val paramAnalyzer        = ParameterAnalyzer(state)
-    // lazy val dsePass              = DSEAnalyzer(state)
+    lazy val paramAnalyzer        = ParameterAnalyzer(state)
+    lazy val dsePass              = DSEAnalyzer(state)
     // lazy val finalizeTransformer  = FinalizeTransformer(state)
 
     // --- Reports
@@ -123,8 +123,8 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         /** DSE */
-        // (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
-        // (spatialConfig.enableArchDSE ? dsePass) ==> 
+        (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
+        (spatialConfig.enableArchDSE ? dsePass) ==> 
         blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
@@ -199,6 +199,7 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true }.text("Enable brute force tuning.")
     cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic; spatialConfig.enableArchDSE = true }.text("Enable heuristic tuning.")
     cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
+    cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true }.text("Enable hypermapper dse.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
 
     cli.note("")

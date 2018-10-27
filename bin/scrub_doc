@@ -58,11 +58,46 @@ def fix_html():
 	delete_from_index("util")
 
 def prepare_scala():
+	gut_lang()
+	gut_lib()
+
+def gut_lang():
 	if (os.path.isdir("src/spatial/.lang")): shutil.rmtree("src/spatial/.lang")
 	shutil.move(os.path.abspath("src/spatial/lang"), os.path.abspath("src/spatial/.lang"))
 	shutil.copytree("src/spatial/.lang","src/spatial/lang")
 
 	for dname, dirs, files in os.walk("src/spatial/lang"):
+		for fname in files:
+			fpath    = os.path.join(dname, fname)
+			fpathdst = os.path.join(dname, "%s.dst" % fname)
+			dst = open(fpathdst,"w+")
+			with open(fpath) as f:
+				# print(fpath)
+				openbrackets = 0
+				openargs = 0
+				for num, line in enumerate(f, 1):
+					if (line.find("@api def") >= 0 or openargs >= 1):
+						openbrackets = openbrackets + line.count('{') - line.count('}')
+						openargs = openargs + line.count('(') - line.count(')')
+						matches = re.findall("[^<>]=[^>=].*?(?= = |\n)", line)
+						if (matches and openargs == 0):
+							dst.write(line.replace("@api","").replace(matches[-1],' = throw new Exception("dont care! woo!")'))
+						else:
+							dst.write(line)
+
+					elif (openbrackets >= 1):
+						openbrackets = openbrackets + line.count('{') - line.count('}')
+					else:
+						dst.write(line)
+
+			dst.close()
+			os.rename(os.path.abspath(fpathdst), os.path.abspath(fpath))
+
+def gut_lib():
+	if (os.path.isdir("src/spatial/.lib")): shutil.rmtree("src/spatial/.lib")
+	shutil.move(os.path.abspath("src/spatial/lib"), os.path.abspath("src/spatial/.lib"))
+	shutil.copytree("src/spatial/.lib","src/spatial/lib")
+	for dname, dirs, files in os.walk("src/spatial/lib"):
 		for fname in files:
 			fpath    = os.path.join(dname, fname)
 			fpathdst = os.path.join(dname, "%s.dst" % fname)
@@ -96,6 +131,11 @@ def replace_scala():
 		shutil.move(os.path.abspath("src/spatial/.lang"), os.path.abspath("src/spatial/lang"))	
 	else:
 		print(".lang does not exist!")
+	if (os.path.isdir("src/spatial/.lib")):
+		if (os.path.isdir("src/spatial/lib")): shutil.rmtree("src/spatial/lib")
+		shutil.move(os.path.abspath("src/spatial/.lib"), os.path.abspath("src/spatial/lib"))	
+	else:
+		print(".lib does not exist!")
 
 if (sys.argv[1] == "prep"):
 	prepare_scala()

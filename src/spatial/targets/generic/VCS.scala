@@ -5,25 +5,18 @@ import models._
 import argon._
 import forge.tags._
 
-object VCS extends HardwareTarget {
-  override val AFIELDS: Array[String] = Array()
-  val DSP_CUTOFF = 0
-  protected def makeAreaModel: AreaModel = new GenericAreaModel(this)
-  protected def makeLatencyModel: LatencyModel = new LatencyModel(xilinx.Zynq)
-
-  case object SRAM_RESOURCE extends MemoryResource("SRAM") {
-    @stateful def area(width: Int, depth: Int): Area = Area()
-    @stateful def summary(area: Area): Double = 0.0
-  }
-
-  val defaultResource: MemoryResource = SRAM_RESOURCE
-  val memoryResources: List[MemoryResource] = List(defaultResource)
-
+object VCS extends GenericDevice  {
+  import GenericDevice._
 
   val name = "VCS"
   def burstSize = 512
 
   override def capacity: Area = Area(
-    // Fill me in
+    SLICEL -> 54650,  // Can use any LUT
+    SLICEM -> 17600,  // Can only use specialized LUTs
+    Slices -> 54650,  // SLICEL + SLICEM
+    Regs   -> 437200,
+    BRAM   -> 545,    // 1 RAM36 or 2 RAM18s
+    DSPs   -> 900
   )
 }

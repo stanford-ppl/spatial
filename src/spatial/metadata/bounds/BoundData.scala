@@ -1,6 +1,7 @@
 package spatial.metadata.bounds
 
 import argon._
+import spatial.metadata.params._
 
 // TODO[2]: Bound is in terms of Int right now?
 abstract class Bound(x: Int) { 
@@ -64,7 +65,7 @@ object Final {
 
 object Expect {
   def unapply(x: Bound): Option[Int] = Some(x.toInt)
-  def unapply(x: Sym[_]): Option[Int] = x.getBound.map(_.toInt)
+  def unapply(x: Sym[_]): Option[Int] = if (x.getIntValue.isDefined) x.getIntValue else x.getBound.map(_.toInt)
 }
 
 object Upper {

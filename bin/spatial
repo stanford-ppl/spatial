@@ -127,7 +127,7 @@ def main():
   else:
     java_cmd = "sbt \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
 
-  print(java_cmd)
+  print("Running command: " + java_cmd)
 
   ecode = os.system(java_cmd)
 

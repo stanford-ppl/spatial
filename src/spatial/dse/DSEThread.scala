@@ -19,7 +19,8 @@ case class DSEThread(
   program:   Block[_],
   localMems: Seq[Sym[_]],
   workQueue: BlockingQueue[Seq[BigInt]],
-  outQueue:  BlockingQueue[Array[String]]
+  outQueue:  BlockingQueue[Array[String]],
+  PROFILING: Boolean
 )(implicit val state: State, val isl: ISL) extends Runnable { thread =>
   // --- Thread stuff
   private var isAlive: Boolean = true
@@ -28,7 +29,6 @@ case class DSEThread(
   var START: Long = 0
 
   // --- Profiling
-  private final val PROFILING = false
   private var clockRef = 0L
   private def resetClock(): Unit = { clockRef = System.currentTimeMillis }
 
@@ -59,7 +59,7 @@ case class DSEThread(
   private lazy val memoryAnalyzer = new MemoryAnalyzer(state)
 
   private lazy val contentionAnalyzer = new ContentionAnalyzer(state)
-  private lazy val areaAnalyzer  = spatialConfig.target.areaAnalyzer(state)
+  private lazy val areaAnalyzer  = target.areaAnalyzer(state)
   private lazy val cycleAnalyzer = target.cycleAnalyzer(state)
 
   def init(): Unit = {

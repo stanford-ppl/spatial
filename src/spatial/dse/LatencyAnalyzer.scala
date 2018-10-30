@@ -7,7 +7,7 @@ import spatial.util.spatialConfig
 import spatial.util.modeling._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
-import spatial.metadata.control._
+import spatial.metadata.params._
 import spatial.metadata.memory._
 import spatial.traversal._
 import spatial.targets._
@@ -23,6 +23,14 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
   override def silence(): Unit = {
     latencyModel.silence()
     super.silence()
+  }
+
+  override def rerun(e: Sym[_], blk: Block[_]): Unit = {
+    isRerun = true
+    preprocess(blk)
+    super.rerun(e, blk)
+    postprocess(blk)
+    isRerun = false
   }
 
   override protected def preprocess[A](b: Block[A]): Block[A] = {

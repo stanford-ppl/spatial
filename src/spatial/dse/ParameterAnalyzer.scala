@@ -7,6 +7,7 @@ import spatial.node._
 import spatial.lang.I32
 import spatial.metadata.bounds._
 import spatial.metadata.types._
+import spatial.metadata.memory._
 
 case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
 
@@ -34,8 +35,15 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
     dfs(Seq(x))
   }
 
+  private def copyBound(src: Sym[_], dst: Sym[_]): Unit = {
+    src.getBound.map(dst.bound = _)
+  }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case AccelScope(func) => TopCtrl.set(lhs); super.visit(lhs,rhs)
+
+    case SetReg(reg, x) if reg.isArgIn => 
+      reg.readers.foreach(copyBound(x,_))
 
     case FIFONew(c@Expect(_)) =>
       warn(s"FIFO $lhs has parametrized size. Tuning of FIFO depths is not yet supported.")

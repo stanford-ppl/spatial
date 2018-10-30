@@ -37,7 +37,9 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
   override def rerun(e: Sym[_], blk: Block[_]): Unit = {
     isRerun = true
+    preprocess(blk)
     super.rerun(e, blk)
+    postprocess(blk)
     isRerun = false
   }
 
@@ -62,7 +64,6 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
   def areaOf(e: Sym[_]): Area = areaModel.areaOf(e, inHw, inReduce)
   def requiresRegisters(x: Sym[_], inReduce: Boolean): Boolean = latencyModel.requiresRegisters(x, inReduce)
   def retimingDelay(x: Sym[_], inReduce: Boolean): Int = if (requiresRegisters(x,inReduce)) latencyOf(x).toInt else 0
-
 
   def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filterNot(_.isGlobal).filter{e => Bits.unapply(e.tp).isDefined }.toSeq
 

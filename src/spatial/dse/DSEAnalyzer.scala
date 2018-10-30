@@ -223,7 +223,8 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
         program   = program,
         localMems = LocalMemories.all.toSeq,
         workQueue = workQueue,
-        outQueue  = fileQueue
+        outQueue  = fileQueue,
+        PROFILING = PROFILING
       )(threadState, isl)
     }
     dbgs("Initializing models...")
@@ -243,7 +244,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
       workQueue = fileQueue
     )
 
-    dbgs("And aaaawaaaay we go!")
+    println("And aaaawaaaay we go!")
 
     workers.foreach{worker => pool.submit(worker) }
     writePool.submit(writer)

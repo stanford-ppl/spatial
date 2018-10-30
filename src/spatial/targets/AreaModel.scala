@@ -5,6 +5,7 @@ import argon.node._
 import forge.tags._
 import utils.math.{isPow2,log2}
 import utils.implicits.Readable._
+import utils.implicits.collections._
 import models._
 
 import spatial.lang._
@@ -123,7 +124,7 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
   }
   @stateful def areaOfAccess(access: Sym[_], mem: Sym[_]): Area = {
     val nbits: Int = wordWidth(mem)
-    val dims: Seq[Int] = mem.constDims
+    val dims: Seq[Int] = mem.constDims.mapOrElse[Int]{x => x}(1)
     val instances = mem.duplicates.zipWithIndex
                                   .filter{case (d,i) => access.dispatches.exists(_._2.contains(i)) }
                                   .map(_._1)
@@ -181,7 +182,8 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
     // LUTs
     case lut @ LUTNew(dims,_) => model("LUT")("s" -> dims.map(_.toInt).product, "b" -> lut.A.nbits)
 
-    case _:MemAlloc[_,_] if lhs.isLocalMem => areaOfMem(lhs)
+    case _:MemAlloc[_,_] if !lhs.isRemoteMem => areaOfMem(lhs)
+    case _:MemAlloc[_,_] if lhs.isRemoteMem => NoArea
     case op:Accessor[_,_]         => areaOfAccess(lhs, op.mem)
     case op:UnrolledAccessor[_,_] => areaOfAccess(lhs, op.mem)
     case op:StatusReader[_]       => NoArea

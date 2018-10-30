@@ -13,18 +13,30 @@ trait PIRGenReg extends PIRCodegen {
     def argIn() = {
       val mem = Reg()
       within(argFringe, hostInCtrl) {
-        MemWrite().mem(mem)
+        MemWrite().setMem(mem).data(hostWrite)
       }
       mem
     }
+    val argOuts = scala.collection.mutable.ListBuffer[Reg]()
     def argOut() = {
-      within(argFringe, hostOutCtrl) {
+      within(argFringe) {
         val mem = Reg()
-        hostRead.input(MemRead().mem(mem))
+        argOuts += mem
         mem
       }
     }
+    def readArgOuts = {
+      within(argFringe, hostOutCtrl) {
+        argOuts.foreach { mem =>
+          hostRead.input(MemRead().setMem(mem))
+        }
+      }
+    }
 """)
+  }
+  override def emitAccelFooter = {
+    emit(s"readArgOuts")
+    super.emitAccelFooter
   }
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

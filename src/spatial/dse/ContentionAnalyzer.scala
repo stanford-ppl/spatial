@@ -19,9 +19,14 @@ case class ContentionAnalyzer(IR: State) extends argon.passes.Traversal  {
 
   val isolatedContention = mutable.HashMap[Sym[_],Seq[Int]]()
 
+  def childrenAndTransfers(x: Sym[_]): Seq[Sym[_]] = {
+    val children = x.children.collect{case c if c.s.get != x => c.s.get}
+    val transfers = x.blocks.flatMap(_.stms).collect{case x if x.isTileTransfer => x}
+    children ++ transfers
+  }
   def outerContention(x: Sym[_], P: => Int): Int = {
-    if (!x.isInnerControl && x.children.nonEmpty) {
-      val ics = x.children.collect{case c if c.s.get != x => calcContention(c.s.get) * P}
+    if (childrenAndTransfers(x).nonEmpty) {
+      val ics = childrenAndTransfers(x).map{c => calcContention(c) * P}
       isolatedContention(x) = ics
       if (x.isPipeControl || x.isStreamControl) ics.sum else ics.max
     }
@@ -30,7 +35,7 @@ case class ContentionAnalyzer(IR: State) extends argon.passes.Traversal  {
 
   def calcContention(x: Sym[_]): Int = x match {
     case Def(_:AccelScope)            => outerContention(x, 1)
-    case Def(_:ParallelPipe)       => x.children.collect{case c if (c.s.get != x) => calcContention(c.s.get)}.sum
+    case Def(_:ParallelPipe)       => childrenAndTransfers(x).map{c => calcContention(c)}.sum
     case Def(_:UnitPipe)           => outerContention(x, 1)
     case Def(e:OpForeach)          => outerContention(x, e.cchain.constPars.product)
     case Def(e:OpReduce[_])        => outerContention(x, e.cchain.constPars.product)
@@ -42,19 +47,19 @@ case class ContentionAnalyzer(IR: State) extends argon.passes.Traversal  {
 
   def markPipe(x: Sym[_], parent: Int): Unit = {
     if (x.isPipeControl || x.isStreamControl) {
-      x.children.collect{case child if child.s.get != x => markContention(child.s.get,parent) }
+      childrenAndTransfers(x).map{c => markContention(c,parent) }
     }
-    else if (x.isSeqControl && x.children.exists(_.s.get != x)) {
+    else if (x.isSeqControl && childrenAndTransfers(x).nonEmpty) {
       val ics = isolatedContention(x)
       val mx = ics.max
       // Can just skip case where mx = 0 - no offchip memory accesses in this sequential anyway
-      if (mx > 0) x.children.zip(ics).collect{case (child,c) if child.s.get != x => markContention(child.s.get, (parent/mx)*c) }
+      if (mx > 0) childrenAndTransfers(x).zip(ics).collect{case (child,c) => markContention(child, (parent/mx)*c) }
     }
   }
 
   def markContention(x: Sym[_], parent: Int): Unit = x match {
     case Def(_:AccelScope)            => markPipe(x, parent)
-    case Def(_:ParallelPipe)       => x.children.collect{case child if child.s.get != x => markContention(child.s.get,parent)}
+    case Def(_:ParallelPipe)       => childrenAndTransfers(x).map{c => markContention(c,parent)}
     case Def(_:UnitPipe)           => markPipe(x, parent)
     case Def(_:OpForeach)          => markPipe(x, parent)
     case Def(_:OpReduce[_])        => markPipe(x, parent)

@@ -5,6 +5,8 @@ import spatial.node._
 import models._
 import forge.tags._
 import spatial.util.spatialConfig
+import spatial.metadata.params._
+import spatial.metadata.bounds._
 
 class GenericLatencyModel(target: HardwareTarget) extends LatencyModel(target) {
 
@@ -33,32 +35,32 @@ class GenericLatencyModel(target: HardwareTarget) extends LatencyModel(target) {
   }
 
   @stateful override def latencyOfNode(s: Sym[_]): Double = s match {
-    // case Op(op: DenseTransfer[_,_,_]) if op.isStore =>
-    //   val c = contentionOf(s)
-    //   val p = op.pars.last.bound.toInt
+    case Op(op: DenseTransfer[_,_,_]) if op.isStore =>
+      val c = s.contention
+      val p = op.pars.last.asInstanceOf[Sym[_]].getIntValue.getOrElse(1) // Can't figure out why this becomes a random new sym in DSE???
 
-    //   val dims = op.lens.map{x => x.bound.map(_.toInt).getOrElse{warn(x.ctx,u"No bound available for $x"); 96 }}
-    //   val size = dims.last
-    //   val iters = dims.dropRight(1).product
-    //   val baseCycles = size / p.toDouble
+      val dims = op.lens.map{x => x.asInstanceOf[Sym[_]].getBound.map(_.toInt).getOrElse{warn(x.ctx,s"No bound available for $x"); 96 }}
+      val size = dims.last
+      val iters = dims.dropRight(1).product
+      val baseCycles = size / p.toDouble
 
-    //   val oFactor = 0.02*c - 0.019
-    //   val smallOverhead = if (c < 8) 0.0 else 0.0175
-    //   val overhead = if (p < 8) 1.0 + smallOverhead*p else oFactor*p + (1 - (8*oFactor)) + smallOverhead*8
+      val oFactor = 0.02*c - 0.019
+      val smallOverhead = if (c < 8) 0.0 else 0.0175
+      val overhead = if (p < 8) 1.0 + smallOverhead*p else oFactor*p + (1 - (8*oFactor)) + smallOverhead*8
 
-    //   Math.ceil(baseCycles*overhead).toDouble * iters
+      Math.ceil(baseCycles*overhead).toDouble * iters
 
-    // case Op(op: DenseTransfer[_,_,_]) if op.isLoad =>
-    //   val c = contentionOf(s)
-    //   val dims = op.lens.map{x => x.bound.map(_.toInt).getOrElse{warn(x.ctx,u"No bound available for $x"); 96 }}
-    //   val size = dims.last
-    //   val b = size  // TODO - max of this and max command size
-    //   val r = 1.0   // TODO - number of commands needed (probably 1)
-    //   val p = op.pars.last.bound
+    case Op(op: DenseTransfer[_,_,_]) if op.isLoad =>
+      val c = s.contention
+      val dims = op.lens.map{x => x.asInstanceOf[Sym[_]].getBound.map(_.toInt).getOrElse{warn(x.ctx,s"No bound available for $x"); 96 }}
+      val size = dims.last
+      val b = size  // TODO - max of this and max command size
+      val r = 1.0   // TODO - number of commands needed (probably 1)
+      val p = op.pars.last.asInstanceOf[Sym[_]].getIntValue.getOrElse(1) // Can't figure out why this becomes a random new sym in DSE???
 
-    //   val iters = dims.dropRight(1).product
-    //   //System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
-    //   memoryModel(c,r.toInt,b.toInt,p.toInt) * iters
+      val iters = dims.dropRight(1).product
+      //System.out.println(s"Tile transfer $s: c = $c, r = $r, b = $b, p = $p")
+      memoryModel(c,r.toInt,b.toInt,p.toInt) * iters
 
     case _ => super.latencyOfNode(s)
   }

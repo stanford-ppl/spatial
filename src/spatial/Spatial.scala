@@ -82,7 +82,6 @@ trait Spatial extends Compiler with ParamLoader {
     // --- DSE
     lazy val paramAnalyzer        = ParameterAnalyzer(state)
     lazy val dsePass              = DSEAnalyzer(state)
-    // lazy val finalizeTransformer  = FinalizeTransformer(state)
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
@@ -201,6 +200,8 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true }.text("Enable hypermapper dse.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
+    cli.opt[Unit]("quitAtDSE").action{(_,_) => spatialConfig.quitAtDSE = true; spatialConfig.bootAtDSE = false}.text("Save state at start of DSE and quit")
+    cli.opt[Unit]("bootAtDSE").action{(_,_) => spatialConfig.bootAtDSE = true; spatialConfig.quitAtDSE = false}.text("Load state and enter at start of DSE")
 
     cli.note("")
     cli.note("Backends:")

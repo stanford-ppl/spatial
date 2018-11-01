@@ -33,6 +33,8 @@ class SpatialConfig extends Config {
 
   var enableSplitting: Boolean = false
   var enableArchDSE: Boolean = false
+  var quitAtDSE: Boolean = false
+  var bootAtDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
@@ -55,39 +57,45 @@ class SpatialConfig extends Config {
 
   var paramSavePath:Option[String] = None
 
-  def copyTo(dst: SpatialConfig): Unit = {
-    dst.targetName = targetName
-    dst.target = target
-    dst.dseMode = dseMode
-    dst.threads = threads
-    dst.enableRuntimeModel = enableRuntimeModel
-    dst.inputs = inputs
-    dst.enableInterpret = enableInterpret
-    dst.enableSim = enableSim
-    dst.enableSynth = enableSynth
-    dst.enableResourceReporter = enableResourceReporter
-    dst.enableTree = enableTree
-    dst.enableDot = enableDot
-    dst.enableInstrumentation = enableInstrumentation
-    dst.enableTightControl = enableTightControl
-    dst.useCheapFifos = useCheapFifos
-    dst.enableOptimizedReduce = enableOptimizedReduce
-    dst.enableForceBanking = enableForceBanking
-    dst.enableSplitting = enableSplitting
-    dst.enableArchDSE = enableArchDSE
-    dst.addRetimeRegisters = addRetimeRegisters
-    dst.compressWires = compressWires
-    dst.sramThreshold = sramThreshold
-    dst.enableAsyncMem = enableAsyncMem
-    dst.enableRetiming = enableRetiming
-    dst.fuseAsFMA = fuseAsFMA
-    dst.enableBroadcast = enableBroadcast
-    dst.allowPrimitivesInOuterControl = allowPrimitivesInOuterControl
-    dst.ignoreParEdgeCases = ignoreParEdgeCases
-    dst.noInnerLoopUnroll = noInnerLoopUnroll
-    dst.enableBufferCoalescing = enableBufferCoalescing
-    dst.enablePIR = enablePIR
-    dst.paramSavePath = paramSavePath
+  override def copyTo(dst: Config): Unit = {
+    if (dst.isInstanceOf[SpatialConfig]) {
+      val dstSC = dst.asInstanceOf[SpatialConfig]
+      dstSC.targetName = targetName
+      dstSC.target = target
+      dstSC.dseMode = dseMode
+      dstSC.threads = threads
+      dstSC.enableRuntimeModel = enableRuntimeModel
+      dstSC.inputs = inputs
+      dstSC.enableInterpret = enableInterpret
+      dstSC.enableSim = enableSim
+      dstSC.enableSynth = enableSynth
+      dstSC.enableResourceReporter = enableResourceReporter
+      dstSC.enableTree = enableTree
+      dstSC.enableDot = enableDot
+      dstSC.enableInstrumentation = enableInstrumentation
+      dstSC.enableTightControl = enableTightControl
+      dstSC.useCheapFifos = useCheapFifos
+      dstSC.enableOptimizedReduce = enableOptimizedReduce
+      dstSC.enableForceBanking = enableForceBanking
+      dstSC.enableSplitting = enableSplitting
+      dstSC.enableArchDSE = enableArchDSE
+      dstSC.addRetimeRegisters = addRetimeRegisters
+      dstSC.compressWires = compressWires
+      dstSC.sramThreshold = sramThreshold
+      dstSC.enableAsyncMem = enableAsyncMem
+      dstSC.enableRetiming = enableRetiming
+      dstSC.fuseAsFMA = fuseAsFMA
+      dstSC.enableBroadcast = enableBroadcast
+      dstSC.allowPrimitivesInOuterControl = allowPrimitivesInOuterControl
+      dstSC.ignoreParEdgeCases = ignoreParEdgeCases
+      dstSC.noInnerLoopUnroll = noInnerLoopUnroll
+      dstSC.enableBufferCoalescing = enableBufferCoalescing
+      dstSC.enablePIR = enablePIR
+      dstSC.paramSavePath = paramSavePath
+      super.copyTo(dst)
+    } else {
+      super.copyTo(dst)
+    }
   }
 
 }

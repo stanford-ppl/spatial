@@ -14,6 +14,8 @@ package object bounds {
     def bound: Bound = getBound.getOrElse{ throw new Exception(s"Symbol $s was not bounded") }
     def bound_=(bnd: Bound): Unit = metadata.add(s, SymbolBound(bnd))
 
+    def makeFinal: Unit = s.bound.isFinal = true
+
     def isGlobal: Boolean = s.isValue || metadata[Global](s).exists(_.flag)
     def isGlobal_=(flag: Boolean): Unit = metadata.add(s, Global(flag))
 

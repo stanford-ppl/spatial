@@ -90,8 +90,27 @@ clear:
 ###-----------------------------------###
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
-clean:
-	sbt "; forge/clean; argon/clean; spatial/clean"
+clean: clean-argon clean-forge clean-spatial
+
+###-----------------------------------###
+## Clean Spatial projects              ##
+###-----------------------------------###
+clean-spatial:
+	sbt "; spatial/clean"
+	sbt clean
+
+###-----------------------------------###
+## Clean Argon projects                ##
+###-----------------------------------###
+clean-argon:
+	sbt "; argon/clean"
+	sbt clean
+
+###-----------------------------------###
+## Clean Forge projects                ##
+###-----------------------------------###
+clean-forge:
+	sbt "; forge/clean"
 	sbt clean
 
 

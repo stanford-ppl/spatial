@@ -40,7 +40,6 @@ class LineBuffer[T:ClassTag](
       val ofs = (wrCounter + i) / banks(1)
       val addr = s"Bank: $bank0, $bank1; Ofs: $ofs "
       OOB.writeOrElse(name, addr, elems(i), ens(i).value){
-        Console.println(s"write ${elems(i)} to ${bank0.toInt}, ${flattenAddress(FixedPoint(bank1, row.fmt), FixedPoint(ofs, row.fmt)).toInt} (${bank1.toInt}, ${ofs.toInt})")
         if (ens(i).value) data.apply(bank0.toInt).update(flattenAddress(FixedPoint(bank1, row.fmt),FixedPoint(ofs, row.fmt)).toInt,elems(i))
       }
     }

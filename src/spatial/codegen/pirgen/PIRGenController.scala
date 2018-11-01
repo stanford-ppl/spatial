@@ -41,14 +41,22 @@ trait PIRGenController extends PIRCodegen {
   }
 
   def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Sym[_]]], valids:Seq[Seq[Sym[_]]]) = {
+    def quoteIdx(j:Int):String = {
+      if (lhs.isInnerControl) {
+        assert(j == 0, s"InnerControl $lhs is unrolled for pir backend")
+        s"None"
+      } else {
+        s"Some($j)"
+      }
+    }
     iters.zipWithIndex.foreach { case (iters, i) =>
       iters.zipWithIndex.foreach { case (iter, j) =>
-        state(iter)(src"CounterIter($i).counter($lhs.cchain.T($i)).resetParent($lhs)")
+        state(iter)(src"CounterIter(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs)")
       }
     }
     valids.zipWithIndex.foreach { case (valids, i) =>
       valids.zipWithIndex.foreach { case (valid, j) =>
-        state(valid)(src"CounterValid($j).counter($lhs.cchain.T($i)).resetParent($lhs)")
+        state(valid)(src"CounterValid(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs)")
       }
     }
   }

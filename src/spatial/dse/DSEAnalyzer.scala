@@ -27,6 +27,16 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs("Metapipelining toggles:")
     PipelineParams.all.foreach{m => dbgs(s"  $m (${m.ctx})")}
 
+    if (spatialConfig.quitAtDSE) {
+      val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+      val filename = dir + config.name+"_state"
+      new java.io.File(dir).mkdirs()
+      // saveToFile(IR, filename)
+      saveToFile(block, filename)
+      println(s"Saved state to $filename. Quitting Spatial...")
+      sys.exit(0)
+    }
+
     val intParams = (TileSizes.all ++ ParParams.all).toSeq
     val intSpace = createIntSpace(intParams, Restrictions.all)
     val ctrlSpace = createCtrlSpace(PipelineParams.all.toSeq)
@@ -44,9 +54,10 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
       case DSEMode.HyperMapper => hyperMapperDSE(space, block)
     }
   
-    // dbg("Freezing parameters")
-    // TileSizes.all.foreach{t => t.makeFinal() }
-    // ParParams.all.foreach{p => p.makeFinal() }
+    dbg("Freezing parameters")
+    // TODO: setIntValues and set schedValue for all params to the best values??
+    TileSizes.all.foreach{t => t.makeFinal }
+    ParParams.all.foreach{p => p.makeFinal }
     block
   }
 
@@ -112,8 +123,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
         val start = i * BLOCK_SIZE
         val size = Math.min(NPts.toInt - BLOCK_SIZE, BLOCK_SIZE)
         val threadState = new State(state.app)
-        state.copyTo(threadState)
-        state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config.asInstanceOf[SpatialConfig]) // Extra params
+        state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
         val worker = PruneWorker(
           start,
           size,
@@ -213,8 +223,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     val workers = workerIds.map{id =>
       val threadState = new State(state.app)
       threadState.config = new SpatialConfig
-      state.copyTo(threadState)
-      state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config.asInstanceOf[SpatialConfig]) // Extra params
+      state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
       DSEThread(
         threadId  = id,
         params    = params,
@@ -314,6 +323,27 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
         i += BLOCK_SIZE
       }
     }
+  }
+
+  import java.io._
+  def saveToFile(node:Serializable, path:String) = {
+    val oos = new ObjectOutputStream(new FileOutputStream(path))
+    println(s"Saving node $node to $path")
+    oos.writeObject(node)
+    oos.close
+  }
+
+  def loadFromFile[T](path:String) = {
+    println(s"Loading from $path")
+    val ois = new ObjectInputStream(new FileInputStream(path)) {
+      override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
+        try { Class.forName(desc.getName, false, getClass.getClassLoader) }
+        catch { case ex: ClassNotFoundException => super.resolveClass(desc) } // Magic. Don't know why this fix ClassNotFound exception
+      }
+    }
+    val obj = ois.readObject.asInstanceOf[T]
+    println(s"Loading $obj from $path")
+    obj
   }
 
 }

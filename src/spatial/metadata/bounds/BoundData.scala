@@ -7,6 +7,8 @@ import spatial.metadata.params._
 abstract class Bound(x: Int) { 
   def toInt: Int = x 
 
+  var isFinal: Boolean = false
+
   def meet(that: Bound): Bound = {
     if (this.isInstanceOf[Expect] && that.isInstanceOf[Expect])
       Expect(x max that.toInt)
@@ -55,10 +57,12 @@ case class FixedBits(flag: Boolean) extends Data[FixedBits](SetBy.Flow.Self)
 object Final {
   def unapply(x: Bound): Option[Int] = x match {
     case f: Final => Some(f.x)
+    // case f: Expect if f.isFinal => x.getIntValue //TODO
     case _ => None
   }
   def unapply(x: Sym[_]): Option[Int] = x.getBound match {
-    case Some(x: Final) => Some(x.toInt)
+    case Some(y: Final) => Some(y.toInt)
+    case Some(y: Expect) if y.isFinal => x.getIntValue
     case _ => None
   }
 }

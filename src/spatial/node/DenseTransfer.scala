@@ -45,6 +45,14 @@ import spatial.util.memops._
     @rig def lower(): Void = {
       DenseTransfer.transfer(dram,local,forceAlign,ens,isLoad)
     }
+    @rig def pars: Seq[I32] = {
+      val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+      (dram.sparsePars().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil }).toSeq
+    }
+    @rig def lens: Seq[I32] = {
+      val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+      (dram.sparseLens().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil}).toSeq
+    }
 }
 
 object DenseTransfer {

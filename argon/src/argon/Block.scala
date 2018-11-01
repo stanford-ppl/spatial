@@ -9,7 +9,7 @@ sealed class Block[R](
   val result:  Sym[R],      // The symbolic result of this block
   val effects: Effects,     // All external effects of this block
   val options: BlockOptions // Other settings for this block
-) {
+) extends Serializable{
   def tp: Type[R] = result.tp
   def temp: Freq = options.temp
 

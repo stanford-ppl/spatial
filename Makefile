@@ -4,22 +4,16 @@ all: apps
 ###-----------------------------------###
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
-publish:
-	bin/update_resources.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project forge; publishLocal"
-	sbt "; project spatial; publishLocal"
-	sbt "; project models; publishLocal"
-	sbt "; project poly; publishLocal"
-	sbt "; project utils; publishLocal"
-	sbt "; project argon; publishLocal"
+publish: publishLocal
+
+publishLocal:
+	bin/publish local
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
 publishM2Local: 
-	bin/publish local
+	bin/publish M2local
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##

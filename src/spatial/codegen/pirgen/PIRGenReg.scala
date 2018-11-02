@@ -62,10 +62,14 @@ trait PIRGenReg extends PIRCodegen {
       stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
 
     case RegAccumOp(reg,in,ens,op,first) =>
-      genOp(lhs, op=Some(s"RegAccumOp_$op"),inputs=Some(Seq(in, first, ens)))
+      state(Lhs(lhs,Some("read")))(src"MemRead().setMem($reg)")
+      genOp(lhs, op=Some(s"RegAccumOp_$op"),inputs=Some(Seq(in, Lhs(lhs,Some("read")), first)))
+      state(Lhs(lhs,Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs)")
 
     case RegAccumFMA(reg,m0,m1,ens,first) =>
-      genOp(lhs, inputs=Some(Seq(m0,m1,first,ens)))
+      state(Lhs(lhs,Some("read")))(src"MemRead().setMem($reg)")
+      genOp(lhs, op=Some(s"RegAccumFMA"),inputs=Some(Seq(m0, m1, Lhs(lhs,Some("read")), first)))
+      state(Lhs(lhs,Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs)")
 
     case _ => super.genAccel(lhs, rhs)
   }

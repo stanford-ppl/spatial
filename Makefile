@@ -18,7 +18,7 @@ install:
 ## Update pir libs.                    ##
 ###-----------------------------------###
 pir:
-	git submodule update --init
+	git submodule update --init --recursive
 	cd pir; sbt publishAll
 
 ###-----------------------------------###

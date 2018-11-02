@@ -34,6 +34,7 @@ trait DotGenSpatial extends DotCodegen {
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = super.nodeAttr(lhs) ++ (lhs match {
     case lhs:SRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:RegFile[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case lhs:LUT[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs if lhs.isReg => "color" -> "chartreuse2" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:FIFO[_]      => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:StreamIn[_]  => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
@@ -60,6 +61,8 @@ trait DotGenSpatial extends DotCodegen {
     case Def(SRAMBankedWrite(mem, data, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("data" -> data) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case Def(SRAMBankedRead(mem, bank, ofs, enss)) => 
+      super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
+    case Def(LUTBankedRead(mem, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case Def(StreamInBankedRead(mem, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.flatten)

@@ -31,7 +31,6 @@ class SpatialConfig extends Config {
   var enableOptimizedReduce: Boolean = true
   var enableForceBanking: Boolean = false
 
-  var enableSplitting: Boolean = false
   var enableArchDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic

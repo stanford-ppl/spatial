@@ -17,12 +17,12 @@ trait PIRGenController extends PIRCodegen {
     def create[T<:Controller](schedule:String)(newCtrler: => T):T = {
       val tree = ControlTree(schedule)
       beginState(tree)
-      val ctrler = newCtrler
+      val ctrler = newCtrler.valid(ControllerValid()).done(ControllerDone())
       tree.ctrler(ctrler)
       ctrlMap.get(tree.parent.get.as[ControlTree]).fold { 
         //ctrler.parentEn(hostWrite)
       } { pctrler =>
-        ctrler.parentEn(pctrler.valid)
+        ctrler.parentEn(pctrler.valid.T)
       }
       ctrlMap += tree -> ctrler
       ctrler
@@ -99,16 +99,19 @@ trait PIRGenController extends PIRCodegen {
       emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
 
     case op@Switch(selects, body) =>
-      emit(s"//TODO: ${qdef(lhs)}")
+      emitController(lhs) { ret(body) }
+      val cases = body.stms.collect{case sym@Op(op:SwitchCase[_]) => sym }
+      cases.zipWithIndex.foreach { case (c, i) =>
+        emit(s"$c.en(${selects(i)})")
+      }
 
     case SwitchCase(body) => // Controlled by Switch
-      emit(s"//TODO: ${qdef(lhs)}")
+      emitController(lhs) { ret(body) }
 
     case StateMachine(ens, start, notDone, action, nextState) =>
       emit(s"//TODO: ${qdef(lhs)}")
 
-    case IfThenElse(cond, thenp, elsep) =>
-      emit(s"//TODO: ${qdef(lhs)}")
+    //case IfThenElse(cond, thenp, elsep) =>
 
     case _ => super.genAccel(lhs, rhs)
   }

@@ -68,26 +68,16 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     emit("import prism.graph._")
     emit("")
     open(s"""object AccelMain extends PIRApp {""")
-    open(src"def staging = {")
+    open(src"def staging(top:Top) = {")
     emitBlk(s"implicit class NodeHelper[T](x:T)") {
       emitHelperFunction
     }
-    emit("""
-    val top = Top()
-    import top._
-    beginState(top)
-    beginState(topCtrl)
-""")
+    emit("""import top._""")
   }
 
   def emitHelperFunction = {}
 
   def emitAccelFooter = {
-    emit("""
-    endState(top)
-    endState(topCtrl)
-    top
-""")
     close("}")
     close("}")
   }

@@ -68,7 +68,7 @@ import spatial.dsl._
     printMatrix(gold2, "Parallel LCA Gold")
 
     val got3 = getMatrix(last_dram3)
-    val gold3 = (0::3,0::16){(i,j) => init(7 + (2-i), j)*2}
+    val gold3 = (0::3,0::16){(i,j) => init(7 + (2-i), j)}
     printMatrix(got3, "EnqAt LCA Got")
     printMatrix(gold3, "EnqAt LCA Gold")
 

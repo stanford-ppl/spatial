@@ -26,7 +26,7 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
 
-    val veldata = (0::16, 0::16){(i,j) => Velocity(i.to[Pixel],j.to[Pixel])}
+    val veldata = (0::16, 0::16){(i,j) => Velocity(i.to[Pixel] + 0.5.to[Pixel],j.to[Pixel])}
     val framdata = (0::16, 0::16){(i,j) => i.to[Frame]}
     val tridata = (0::16, 0::16){(i,j) => TriPixel(i.to[Pixel],j.to[Pixel], i.to[Pixel], j.to[UInt32])}
     val tensordata = (0::16, 0::16){(i,j) => Tensor(i.to[Pixel],j.to[Pixel], i.to[Pixel], j.to[Pixel], i.to[Pixel], j.to[Pixel], i.to[UInt64])}

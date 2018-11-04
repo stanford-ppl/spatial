@@ -105,6 +105,12 @@ trait ScalaGenFixPt extends ScalaGenBits {
 
       case FixToFix(x, fmt) =>
         emit(src"val $lhs = $x.toFixedPoint(FixFormat(${fmt.sign},${fmt.ibits},${fmt.fbits}))")
+      case FixToFixSat(x, fmt) => 
+        emit(src"val $lhs = FixedPoint.saturating($x.value, $x.valid, FixFormat(${fmt.sign},${fmt.ibits},${fmt.fbits}))")
+      case FixToFixUnb(x, fmt) => 
+        emit(src"val $lhs = FixedPoint.unbiased($x.value, $x.valid, FixFormat(${fmt.sign},${fmt.ibits},${fmt.fbits}))")
+      case FixToFixUnbSat(x, fmt) => 
+        emit(src"val $lhs = FixedPoint.unbiased($x.value, $x.valid, FixFormat(${fmt.sign},${fmt.ibits},${fmt.fbits}), saturate = true)")
 
       case FixToFlt(x, fmt) =>
         emit(src"val $lhs = $x.toFloatPoint(FltFormat(${fmt.mbits - 1},${fmt.ebits}))")

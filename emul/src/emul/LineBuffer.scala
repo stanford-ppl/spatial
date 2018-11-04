@@ -14,10 +14,15 @@ class LineBuffer[T:ClassTag](
   private var bufferRow: Int = 0
   private var readRow: Int = stride
   private var wrCounter: Int = 0
+  private var lastWrRow: Int = 0
   private val fullRows: Int = dims.head + (depth-1)*stride
 
   private def posMod(n: Int, d: Int): Int = ((n % d)+d) % d 
-  def swap(): Unit = {bufferRow = posMod(bufferRow - stride, fullRows) ; readRow = posMod(readRow - stride, fullRows) ; wrCounter = 0}
+  def swap(): Unit = {
+    bufferRow = posMod(bufferRow - stride, fullRows)
+    readRow = posMod(readRow - stride, fullRows)
+    wrCounter = 0
+  }
 
   def flattenAddress(colbank: FixedPoint, ofs: FixedPoint): FixedPoint = {
      colbank + ofs.toInt * banks(1)
@@ -34,7 +39,9 @@ class LineBuffer[T:ClassTag](
   }
 
   def update(ctx: String, row: FixedPoint, ens: Seq[Bool], elems: Seq[T]): Unit = {
-    val bank0 = posMod(row.toInt + bufferRow, fullRows)
+    val bank0 = posMod((stride-1-row.toInt) + bufferRow, fullRows)
+    if (bank0 != lastWrRow) wrCounter = 0
+    lastWrRow = bank0
     elems.indices.foreach{i => 
       val bank1 = posMod((wrCounter + i), banks(1))
       val ofs = (wrCounter + i) / banks(1)

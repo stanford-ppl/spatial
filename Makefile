@@ -18,13 +18,13 @@ publish:
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Local: 
+publishM2Local: clean
 	bin/publish local
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Remote: 
+publishM2Remote: clean
 	bin/publish remoteSnapshot
 
 ###-----------------------------------###

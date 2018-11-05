@@ -4,21 +4,27 @@ all: apps
 ###-----------------------------------###
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
-publish: publishLocal
+publish:
+	bin/update_resources.sh
+	sbt "; project emul; +publishLocal"
+	sbt "; project fringe; publishLocal"
+	sbt "; project forge; publishLocal"
+	sbt "; project spatial; publishLocal"
+	sbt "; project models; publishLocal"
+	sbt "; project poly; publishLocal"
+	sbt "; project utils; publishLocal"
+	sbt "; project argon; publishLocal"
 
-publishLocal:
+###-----------------------------------###
+## Publish spatial locally to m2.      ##
+###-----------------------------------###
+publishM2Local: clean
 	bin/publish local
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Local: 
-	bin/publish M2local
-
-###-----------------------------------###
-## Publish spatial locally to m2.      ##
-###-----------------------------------###
-publishM2Remote: 
+publishM2Remote: clean
 	bin/publish remoteSnapshot
 
 ###-----------------------------------###
@@ -84,8 +90,26 @@ clear:
 ###-----------------------------------###
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
-clean:
-	sbt "; forge/clean; argon/clean; spatial/clean"
+clean: clean-argon clean-forge clean-spatial
 	sbt clean
 
+###-----------------------------------###
+## Clean Spatial projects              ##
+###-----------------------------------###
+clean-spatial:
+	sbt "; spatial/clean"
+	sbt clean
 
+###-----------------------------------###
+## Clean Argon projects                ##
+###-----------------------------------###
+clean-argon:
+	sbt "; argon/clean"
+	sbt clean
+
+###-----------------------------------###
+## Clean Forge projects                ##
+###-----------------------------------###
+clean-forge:
+	sbt "; forge/clean"
+	sbt clean

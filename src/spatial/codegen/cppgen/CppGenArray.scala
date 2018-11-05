@@ -144,7 +144,7 @@ trait CppGenArray extends CppGenCommon {
             close("}")
             emit(src"${struct}(){} /* For creating empty array */")
             open(src"std::string toString(){")
-              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${f._1}) """}.mkString("+ \", \" + ")
+              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${toApproxFix(src"${f._1}", f._2.tp)})"""}.mkString("+ \", \" + ")
               emit(src"return $all;")
             close("}")
             st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = ${amp(f._2.tp)}${toTrueFix("x",f._2.tp)}; }")}

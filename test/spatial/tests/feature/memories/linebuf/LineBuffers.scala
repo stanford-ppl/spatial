@@ -9,6 +9,7 @@ import spatial.dsl._
     val init = (0::10,0::16){(i,j) => i*16 + j}
     val last_dram = DRAM[I32](3,16)
     val last_dram2 = DRAM[I32](3,16)
+    val last_dram3 = DRAM[I32](3,16)
     setMem(init_dram, init)
 
     Accel {
@@ -39,6 +40,21 @@ import spatial.dsl._
         }
       }
       last_dram2 store sram2
+
+      val lb3 = LineBuffer.strided[I32](3,16,2)
+      val sram3 = SRAM[I32](3,16)
+      Foreach(10 by 2){i => 
+        Foreach(2 by 1, 16 by 1 par 1){(r,j) => 
+          lb3.enqAt(r, (i+r)*16 + j)
+        }
+        Foreach(16 by 1 par 3){j => 
+          sram3(0,j) = lb3(0,j) // <--- newest data (highest #s in this app)
+          sram3(1,j) = lb3(1,j) 
+          sram3(2,j) = lb3(2,j) // <--- oldest data (lowest #s in this app)
+        }
+      }
+      last_dram3 store sram3
+
     }
 
     val got = getMatrix(last_dram)
@@ -50,10 +66,17 @@ import spatial.dsl._
     val gold2 = (0::3,0::16){(i,j) => init(7 + (2-i), j)*2}
     printMatrix(got2, "Parallel LCA Got")
     printMatrix(gold2, "Parallel LCA Gold")
+
+    val got3 = getMatrix(last_dram3)
+    val gold3 = (0::3,0::16){(i,j) => init(7 + (2-i), j)}
+    printMatrix(got3, "EnqAt LCA Got")
+    printMatrix(gold3, "EnqAt LCA Gold")
+
     println(r"Pass: ${got == gold}")
     println(r"Parallel Pass: ${got2 == gold2}")
+    println(r"EnqAt Pass: ${got3 == gold3}")
 
-    assert(got == gold && got2 == gold2)
+    assert(got == gold && got2 == gold2 && got3 == gold3)
 
   }
 }

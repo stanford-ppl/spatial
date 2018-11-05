@@ -20,6 +20,12 @@ import scala.collection.mutable.Queue
   /** Creates a load port to this LineBuffer at the given `row` and `col`. **/
   @api def apply(row: I32, col: I32): A = stage(LineBufferRead(this, Seq(row, col), Set.empty))
 
+  /** Creates an enqueue (write) port to this LineBuffer of `data`. **/
+  @api def enqAt(row: Idx, data: A): Void = this.enqAt(row, data, true)
+
+  /** Creates a conditional enqueue (write) port to this LineBuffer of `data` enabled by `en`. **/
+  @api def enqAt(row: Idx, data: A, en: Bit): Void = stage(LineBufferEnq(this,data,Seq(row, 0.to[I32]), Set(en)))
+
   /** Load 1D DRAM into row of LineBuffer. */
   @api def load(dram: DRAM1[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))

@@ -16,11 +16,4 @@ trait PIRCtxGen extends PIRCodegen {
     q
   }
 
-  override def emitHelperFunction = {
-    super.emitHelperFunction
-    emit(s"def sctx(c:String):T = x.to[PIRNode].fold(x) { xx => xx.srcCtx(c); x }")
-    emit(s"def name(c:String):T = x.to[PIRNode].fold(x) { xx => xx.name(c); x }")
-    emit(s"def setMem(m:Memory):T = x.to[Access].fold(x) { xx => xx.order := m.accesses.size; xx.mem(m) ; x }")
-  }
-
 }

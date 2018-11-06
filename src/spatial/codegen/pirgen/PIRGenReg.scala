@@ -7,44 +7,12 @@ import spatial.metadata.memory._
 
 trait PIRGenReg extends PIRCodegen {
 
-  override def emitAccelHeader = {
-    super.emitAccelHeader
-    emit("""
-    def argIn() = {
-      val mem = Reg()
-      within(argFringe, hostInCtrl) {
-        MemWrite().setMem(mem).data(hostWrite)
-      }
-      mem
-    }
-    val argOuts = scala.collection.mutable.ListBuffer[Reg]()
-    def argOut() = {
-      within(argFringe) {
-        val mem = Reg()
-        argOuts += mem
-        mem
-      }
-    }
-    def readArgOuts = {
-      within(argFringe, hostOutCtrl) {
-        argOuts.foreach { mem =>
-          hostRead.input(MemRead().setMem(mem))
-        }
-      }
-    }
-""")
-  }
-  override def emitAccelFooter = {
-    emit(s"readArgOuts")
-    super.emitAccelFooter
-  }
-
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegNew(init)    =>
       stateMem(lhs, "Reg()", Some(List(init)))
 
     case op@ArgInNew(init)  =>
-      stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(List(init)))
+      stateMem(lhs, s"""argIn("${lhs.name.get}")""", tp=Some("Reg"), inits=Some(List(init)))
 
     case op@HostIONew(init)  =>
       stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(List(init)))
@@ -62,14 +30,11 @@ trait PIRGenReg extends PIRCodegen {
       stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
 
     case RegAccumOp(reg,in,ens,op,first) =>
-      state(Lhs(lhs,Some("read")))(src"MemRead().setMem($reg)")
-      genOp(lhs, op=Some(s"RegAccumOp_$op"),inputs=Some(Seq(in, Lhs(lhs,Some("read")), first)))
-      state(Lhs(lhs,Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs)")
+      state(lhs)(s"""RegAccumOp("$op").in($in).en($ens).first($first)""")
 
     case RegAccumFMA(reg,m0,m1,ens,first) =>
-      state(Lhs(lhs,Some("read")))(src"MemRead().setMem($reg)")
-      genOp(lhs, op=Some(s"RegAccumFMA"),inputs=Some(Seq(m0, m1, Lhs(lhs,Some("read")), first)))
-      state(Lhs(lhs,Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs)")
+      genOp(Lhs(lhs,Some("mul")), op=Some(s"FixMul"),inputs=Some(Seq(m0, m1)))
+      state(lhs)(src"""RegAccumOp("AccumAdd").in(${Lhs(lhs, Some("mul"))}).en($ens).first($first)""")
 
     case _ => super.genAccel(lhs, rhs)
   }

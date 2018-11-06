@@ -7,22 +7,9 @@ import spatial.node._
 
 trait PIRGenDRAM extends PIRCodegen with PIRGenController {
 
-  override def emitAccelHeader = {
-    super.emitAccelHeader
-    emit("""
-    def dramAddress(dram:DRAM) = {
-      val mem = Reg()
-      within(argFringe, hostInCtrl) {
-        MemWrite().setMem(mem).data(hostWrite) // DRAMDef
-      }
-      MemRead().setMem(mem)
-    }
-""")
-  }
-
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMHostNew(dims,zero) =>
-      state(lhs)(s"""DRAM()""")
+      state(lhs)(s"""DRAM("${lhs.name.get}")""")
 
     case DRAMAddress(dram) =>
       state(lhs, tp=Some("Reg"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")

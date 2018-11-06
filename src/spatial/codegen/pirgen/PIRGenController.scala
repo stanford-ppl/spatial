@@ -10,26 +10,6 @@ import spatial.node._
 
 trait PIRGenController extends PIRCodegen {
 
-  override def emitAccelHeader = {
-    super.emitAccelHeader
-    emit("""
-    val ctrlMap = scala.collection.mutable.Map[ControlTree, Controller]()
-    def create[T<:Controller](schedule:String)(newCtrler: => T):T = {
-      val tree = ControlTree(schedule)
-      beginState(tree)
-      val ctrler = newCtrler.valid(ControllerValid()).done(ControllerDone())
-      tree.ctrler(ctrler)
-      ctrlMap.get(tree.parent.get.as[ControlTree]).fold { 
-        //ctrler.parentEn(hostWrite)
-      } { pctrler =>
-        ctrler.parentEn(pctrler.valid.T)
-      }
-      ctrlMap += tree -> ctrler
-      ctrler
-    }
-""")
-  }
-
   override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) => 
       emit("runAccel()")

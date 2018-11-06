@@ -42,11 +42,6 @@ trait PIRSplitGen extends PIRCodegen {
     emit(s"}; split${splitCount}")
   }
 
-  override def emitHelperFunction = {
-    super.emitHelperFunction
-    emit(s"def sname(c:String):T = x.to[PIRNode].fold(x) { case xx if xx.sname.isEmpty => xx.sname(c); x; case _ => x }")
-  }
-
   override def emitAccelHeader = {
     super.emitAccelHeader
     emit(s"val nameSpace = scala.collection.mutable.Map[String,Any]()")

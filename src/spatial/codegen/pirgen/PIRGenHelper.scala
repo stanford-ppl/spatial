@@ -42,29 +42,31 @@ trait PIRGenHelper extends PIRFormatGen {
   }
 
   def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
+    val bufferPort = lhs.port.bufferPort
     stateStruct(lhs, mem.asMem.A){ name => 
       (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
-          src"BankedRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)})"
+          src"BankedRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).port(${bufferPort})"
         case _ => 
-          src"MemRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)})"
+          src"MemRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).port(${bufferPort})"
       }
     }
   }
 
   def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
+    val bufferPort = lhs.port.bufferPort
     stateStruct(lhs, mem.asMem.A){ name => 
       (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
-          src"BankedWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)})"
+          src"BankedWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)}).port($bufferPort)"
         case _ => 
-          src"MemWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)})"
+          src"MemWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)}).port($bufferPort)"
       }
     }
   }
 
-  def genOp(lhs:Sym[_], op:Option[String]=None, inputs:Option[Seq[Any]]=None) = {
-    val rhs = lhs.op.get
+  def genOp(lhs:Lhs, op:Option[String]=None, inputs:Option[Seq[Any]]=None) = {
+    val rhs = lhs.sym.op.get
     val opStr = op.getOrElse(rhs.getClass.getSimpleName)
     val ins = inputs.getOrElse(rhs.productIterator.toList)
     state(lhs)(src"""OpDef(op="$opStr").input($ins)""")

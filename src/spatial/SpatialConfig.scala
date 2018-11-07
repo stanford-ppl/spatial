@@ -39,6 +39,7 @@ class SpatialConfig extends Config {
   var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true
+  var fuseAsFMA = true
 
   var enableBroadcast = true // Allow broadcasting reads
 

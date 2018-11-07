@@ -7,7 +7,7 @@ import fringe.targets.asic.ASIC
 import fringe.targets.vcs.VCS
 import fringe.utils._
 import fringe.templates.axi4._
-import fringe.templates.mag.MAGCore
+import fringe.templates.dramarbiter.DRAMArbiter
 import fringe.templates.heap.DRAMHeap
 import fringe.templates.counters.FringeCounter
 import fringe.templates.memory.RegFile
@@ -21,10 +21,6 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val statusReg = 1   //       Changing these values alone has no effect on the logic below.
 
   // Some constants (mostly MAG-related) that will later become module parameters
-  val v = WORDS_PER_STREAM
-  val numOutstandingBursts = 1024  // Picked arbitrarily
-  val burstSizeBytes = 64
-  val d = 64        // FIFO depth: Controls FIFO sizes for address, size, and wdata
   val regWidth = 64 // Force 64-bit registers
 
   class StatusReg extends Bundle {
@@ -55,7 +51,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(regWidth.W)))
 
     // Accel memory IO
-    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
+    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
     val heap = new HeapIO(numAllocators)
 
@@ -79,29 +75,28 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   println(s"[Fringe] loadStreamInfo: $LOAD_STREAMS, storeStreamInfo: $STORE_STREAMS")
   val assignment: List[List[Int]] = channelAssignment.assignments
   val debugChannelID = 0
-  val mags = List.tabulate(NUM_CHANNELS){ i =>
+  val dramArbs = List.tabulate(NUM_CHANNELS){ i =>
     val channelAssignment = assignment(i)
     val (loads, absStores) = channelAssignment.partition(_ < NUM_LOAD_STREAMS)
     val stores = absStores.map{ _ - NUM_LOAD_STREAMS } // Compute indices into stores array
 
-    println(s"[Fringe] Creating MAG $i, assignment: $channelAssignment, Loads: $loads, Stores: $stores")
+    println(s"[Fringe] Creating Stream Arbiter $i, assignment: $channelAssignment, Loads: $loads, Stores: $stores")
     val loadStreams = loads.map{ io.memStreams.loads(_) }
     val storeStreams = stores.map{ io.memStreams.stores(_) }
 
-    val mag = Module(new MAGCore(
-      w = DATA_WIDTH,
-      d = d,
-      v = WORDS_PER_STREAM,
-      loadStreamInfo  = LOAD_STREAMS,
-      storeStreamInfo = STORE_STREAMS,
-      numOutstandingBursts,
-      burstSizeBytes,
+    val dramArb = Module(new DRAMArbiter(
+      loadStreamInfo,
+      storeStreamInfo,
+      gatherStreamInfo,
+      scatterStreamInfo,
       axiParams,
       debugChannelID == i
     ))
-    mag.io.app.loads.zip(loadStreams).foreach{ case (l, ls) => l <> ls }
-    mag.io.app.stores.zip(storeStreams).foreach{ case (s, ss) => s <> ss }
-    mag
+    dramArb.io.app.loads.zip(loadStreams).foreach{ case (l, ls) => l <> ls }
+    dramArb.io.app.stores.zip(storeStreams).foreach{ case (s, ss) => s <> ss }
+    dramArb.io.app.gathers.zip(io.memStreams.gathers).foreach{ case (g, gs) => g <> gs }
+    dramArb.io.app.scatters.zip(io.memStreams.scatters).foreach{ case (s, ss) => s <> ss }
+    dramArb
   }
 
   val heap = Module(new DRAMHeap(numAllocators))
@@ -109,7 +104,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val hostHeapReq = heap.io.host.req(0)
   val hostHeapResp = heap.io.host.resp(0)
 
-  val numDebugs = mags(debugChannelID).numDebugs
+  val numDebugs = dramArbs(debugChannelID).numDebugs
   val numRegs = NUM_ARGS + 2 - NUM_ARG_INS + numDebugs // (command, status registers)
 
   // Scalar, command, and status register file
@@ -172,7 +167,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
       argOutReg.valid := io.argOuts(i-1).valid
     }
     else { // MAG debug regs
-      argOutReg.bits := mags(debugChannelID).io.debugSignals(i-numArgOuts-1)
+      argOutReg.bits := dramArbs(debugChannelID).io.debugSignals(i-numArgOuts-1)
       argOutReg.valid := 1.U
     }
   }
@@ -180,26 +175,21 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   io.argOutLoopbacks := regs.io.argOutLoopbacks
 
   // Memory address generator
-  val magConfig = Wire(MAGOpcode())
-  magConfig.scatterGather := false.B
-  mags.foreach { _.io.config := magConfig }
-  mags.foreach { _.io.reset := localReset }
-  mags.foreach { _.reset := localReset }
+  dramArbs.foreach { _.io.reset := localReset }
+  dramArbs.foreach { _.reset := localReset }
   if (target.isInstanceOf[targets.aws.AWS_F1]) {
-    mags.foreach { _.io.enable := io.aws_top_enable }
+    dramArbs.foreach { _.io.enable := io.aws_top_enable }
   }
   else {
-    mags.foreach { _.io.enable := localEnable }
+    dramArbs.foreach { _.io.enable := localEnable }
   }
 
-//  mag.io.app <> io.memStreams
+  dramArbs.zip(io.dram) foreach { case (dramarb, d) => dramarb.io.dram <> d }
 
-  mags.zip(io.dram) foreach { case (mag, d) => mag.io.dram <> d }
-
-  mags(debugChannelID).io.TOP_AXI <> io.TOP_AXI
-  mags(debugChannelID).io.DWIDTH_AXI <> io.DWIDTH_AXI
-  mags(debugChannelID).io.PROTOCOL_AXI <> io.PROTOCOL_AXI
-  mags(debugChannelID).io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
+  dramArbs(debugChannelID).io.TOP_AXI <> io.TOP_AXI
+  dramArbs(debugChannelID).io.DWIDTH_AXI <> io.DWIDTH_AXI
+  dramArbs(debugChannelID).io.PROTOCOL_AXI <> io.PROTOCOL_AXI
+  dramArbs(debugChannelID).io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   val alloc = curStatus.allocDealloc === 3.U
   val dealloc = curStatus.allocDealloc === 4.U

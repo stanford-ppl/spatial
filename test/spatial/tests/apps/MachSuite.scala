@@ -1785,6 +1785,72 @@ import spatial.targets._
   }
 }
 
+@spatial class Sort_Merge_Native extends SpatialTest {
+ /*                                                                                                  
+                              |     |                                                                                                                                                                                        
+                     |        |     |                                      |     |                                                                                                                                                                                     
+                     |  |     |     |  |                             |     |     |                                                                                                                                                                           
+                     |  |  |  |     |  |                          |  |     |     |     |                                                                                                                                                                     
+                     |  |  |  |  |  |  |                          |  |  |  |     |     |                                                                                                                                                                     
+                     |  |  |  |  |  |  |  |                       |  |  |  |  |  |     |                                                                                                                                                                      
+                     |  |  |  |  |  |  |  |                       |  |  |  |  |  |  |  |                                                                                                                                                                        
+                     |  |  |  |  |  |  |  |                       |  |  |  |  |  |  |  |                                                                                                                                                                      
+                                                                  |  |  |  |  |  |  |  |                      
+   Outer FSM iter 1:  ↖↗    ↖↗    ↖↗    ↖↗      Outer FSM iter 2:  ↖.....↖     ↖.....↖                                                                                                                      
+                     fifos numel = 1                               fifos numel = 2                                                            
+                                                                  
+                                                                                                     
+                            |           |                                           |  |                                                                                                   
+                         |  |           |                                        |  |  |                                                                                                   
+                      |  |  |        |  |                                  |  |  |  |  |                                                                                                  
+                   |  |  |  |        |  |                               |  |  |  |  |  |                                                                                                  
+                   |  |  |  |     |  |  |                            |  |  |  |  |  |  |                                                                                                  
+                   |  |  |  |  |  |  |  |                         |  |  |  |  |  |  |  |                                                                                                  
+                   |  |  |  |  |  |  |  |                         |  |  |  |  |  |  |  |                                                                                                  
+                   |  |  |  |  |  |  |  |                         |  |  |  |  |  |  |  |                                                                                                  
+ Outer FSM iter 3:  ↖...........↖               Outer FSM iter 4:                                                                                                     
+                   fifos numel = 4                                 Done
+                                                                                                                                                                                                                   
+                                                                                                                                                                           
+ */
+
+
+  import spatial.lib.Sort
+
+  def main(args: Array[String]): Unit = {
+
+    val numel = 2048
+    val START = 0
+    val STOP = numel
+    val levels = STOP-START //ArgIn[Int]
+    // setArg(levels, args(0).to[Int])
+
+    val raw_data = loadCSV1D[Int](s"$DATA/sort/sort_data.csv", "\n")
+
+    val data_dram = DRAM[Int](numel)
+    // val sorted_dram = DRAM[Int](numel)
+
+    setMem(data_dram, raw_data)
+
+    val result_dram = DRAM[Int](numel)
+
+    Accel{
+      Sort.mergeSort(data_dram, result_dram, 16, 2, numel)
+    }
+
+    val sorted_gold = loadCSV1D[Int](s"$DATA/sort/sort_gold.csv", "\n")
+    val sorted_result = getMem(result_dram)
+
+    printArray(sorted_gold, "Sorted Gold: ")
+    printArray(sorted_result, "Sorted Result: ")
+
+    val cksum = sorted_gold.zip(sorted_result){_==_}.reduce{_&&_}
+    // // Use the real way to check if list is sorted instead of using machsuite gold
+    // val cksum = Array.tabulate(STOP-1){ i => pack(sorted_result(i), sorted_result(i+1)) }.map{a => a._1 <= a._2}.reduce{_&&_}
+    println("PASS: " + cksum + " (Sort_Merge)")
+    assert(cksum)
+  }
+}
 
 @spatial class Sort_Radix extends SpatialTest {
  /*                                                                                                  

@@ -79,6 +79,11 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val accumAnalyzer      = AccumAnalyzer(state)
     lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
 
+    // --- DSE
+    // lazy val paramAnalyzer        = ParameterAnalyzer(state)
+    // lazy val dsePass              = DSEAnalyzer(state)
+    // lazy val finalizeTransformer  = FinalizeTransformer(state)
+
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
     lazy val retimeReporter = RetimeReporter(state)
@@ -117,6 +122,9 @@ trait Spatial extends Compiler with ParamLoader {
         /** Black box lowering */
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
+        /** DSE */
+        // (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
+        // (spatialConfig.enableArchDSE ? dsePass) ==> 
         blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
@@ -187,10 +195,10 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.note("")
     cli.note("Design Tuning:")
-    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce}.text("Enable default design tuning (bruteforce)")
-    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce }.text("Enable brute force tuning.")
-    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic }.text("Enable heuristic tuning.")
-    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment }.text("Enable DSE experimental mode.").hidden()
+    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true}.text("Enable default design tuning (bruteforce)")
+    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true }.text("Enable brute force tuning.")
+    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic; spatialConfig.enableArchDSE = true }.text("Enable heuristic tuning.")
+    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
 
     cli.note("")
@@ -232,6 +240,9 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableForceBanking = true
     }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
 
+    cli.note("")
+    cli.note("Experimental:")
+
     cli.opt[Unit]("retime").action{ (_,_) =>
       spatialConfig.enableRetiming = true
       overrideRetime = true
@@ -241,10 +252,9 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRetiming = false
       spatialConfig.enableOptimizedReduce = false
       overrideRetime = true
-    }.text("Disable retiming")
+    }.text("Disable retiming (NOTE: May generate buggy verilog)")
 
-    cli.note("")
-    cli.note("Experimental:")
+    cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c)")
 
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 

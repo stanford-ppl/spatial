@@ -2,16 +2,28 @@
 all: apps
 
 ###-----------------------------------###
-## Publish spatial locally.            ##
+## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
 publish: 
 	sbt "; project emul; +publishLocal; project fringe; publishLocal; project argon; publishLocal; project forge; publishLocal; project spatial; publishLocal; project models; publishLocal; project poly; publishLocal; project utils; publishLocal"
 
 ###-----------------------------------###
+## Publish spatial locally to m2.      ##
+###-----------------------------------###
+publishM2Local: clean
+	bin/publish local
+
+###-----------------------------------###
+## Publish spatial locally to m2.      ##
+###-----------------------------------###
+publishM2Remote: clean
+	bin/publish remoteSnapshot
+
+###-----------------------------------###
 ## Update fringe and emul libs.        ##
 ###-----------------------------------###
 install: 
-	bash bin/make_poly.sh
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal; project fringe; publishLocal"
 
 ###-----------------------------------###
@@ -25,7 +37,7 @@ pir:
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
 apps:  
-	bash bin/make_poly.sh
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal; project fringe; publishLocal; project apps; compile"
 
 app: apps
@@ -34,7 +46,7 @@ app: apps
 ## Make all tests and apps.            ##
 ###-----------------------------------###
 tests:
-	bash bin/make_poly.sh
+	bin/update_resources.sh
 	sbt "; project emul; +publishLocal; project fringe; publishLocal; project apps; compile; test:compile"
 
 test: tests
@@ -71,5 +83,26 @@ clear:
 ###-----------------------------------###
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
-clean:
-	sbt "; forge/clean; argon/clean; spatial/clean; clean"
+clean: clean-argon clean-forge clean-spatial
+	sbt clean
+
+###-----------------------------------###
+## Clean Spatial projects              ##
+###-----------------------------------###
+clean-spatial:
+	sbt "; spatial/clean"
+	sbt clean
+
+###-----------------------------------###
+## Clean Argon projects                ##
+###-----------------------------------###
+clean-argon:
+	sbt "; argon/clean"
+	sbt clean
+
+###-----------------------------------###
+## Clean Forge projects                ##
+###-----------------------------------###
+clean-forge:
+	sbt "; forge/clean"
+	sbt clean

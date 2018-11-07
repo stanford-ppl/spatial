@@ -138,16 +138,16 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
-            st.foreach{f => emit(src"${f._2.tp}${ptr(f._2.tp)} ${f._1};")}
+            st.foreach{f => emit(src"${asIntType(f._2.tp)}${ptr(f._2.tp)} ${f._1}; // ${f._2.tp}")}
             open(src"${struct}(${st.map{f => src"${f._2.tp}${ptr(f._2.tp)} ${f._1}_in"}.mkString(",")}){ /* Normal Constructor */")
               st.foreach{f => emit(src"set${f._1}(${ptr(f._2.tp)}${f._1}_in);")}
             close("}")
             emit(src"${struct}(){} /* For creating empty array */")
             open(src"std::string toString(){")
-              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${f._1}) """}.mkString("+ \", \" + ")
+              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${toApproxFix(src"${f._1}", f._2.tp)})"""}.mkString("+ \", \" + ")
               emit(src"return $all;")
             close("}")
-            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = ${amp(f._2.tp)}x; }")}
+            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = ${amp(f._2.tp)}${toTrueFix("x",f._2.tp)}; }")}
 
           try {
             val rawtp = asIntType(lhs.tp)

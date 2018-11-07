@@ -21,6 +21,7 @@ import spatial.lang._
     token: Lambda1[I32,Text])
   extends Op[Void] {
   override def effects: Effects = Effects.Writes(file)
+  override def binds = super.binds + token.input
 }
 
 
@@ -44,6 +45,7 @@ import spatial.lang._
   extends Op2[A,Void]{
   override val A: Num[A] = Num[A]
   override def effects: Effects = Effects.Writes(file)
+  override def binds = super.binds + value.input
 }
 
 

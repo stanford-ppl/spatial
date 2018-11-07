@@ -1,5 +1,5 @@
 all: 
-	sbt compile
+	sbt "runMain AccelMain"
 
 clean:
 	rm -rf target

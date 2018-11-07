@@ -21,16 +21,17 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   private var globalBlockID: Int = 0
 
-  override def entryFile: String = s"HostMain.$ext.1"
+  override def entryFile: String = s"Main.$ext"
 
   val hostGen = new spatial.codegen.scalagen.ScalaGenSpatial(IR) {
+    override def out = self.out
     override protected def gen(block: Block[_], withReturn: Boolean = false): Unit = self.gen(block, withReturn)
     def genHost(lhs: Sym[_], rhs: Op[_]): Unit = gen(lhs, rhs)
   }
 
   final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genAccel(lhs, rhs) else genHost(lhs, rhs)
 
-  val hostFile = "HostMain.scala.1"
+  val hostFile = "Main.scala.1"
   val accelFile = "AccelMain.scala"
 
   def openHost(blk: => Unit) = inGen(out, hostFile)(blk)
@@ -51,7 +52,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   def emitHostHeader = {
     hostGen.emitHeader
-    open(src"object HostMain {")
+    open(src"object Main {")
       open(src"def main(args: Array[String]): Unit = {")
   }
 
@@ -94,8 +95,6 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   }
 
   protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
-    //emit(s"// $lhs = $rhs TODO: Unmatched Node")
-    //rhs.blocks.foreach(ret)
     hostGen.genHost(lhs, rhs)
   }
 

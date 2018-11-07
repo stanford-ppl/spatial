@@ -15,7 +15,7 @@ import spatial.lib.Sort
     setMem(mem(0), data)
 
     Accel {
-      Sort.mergeSort(mem(0), mem(1), 16, 4)
+      Sort.mergeSort(mem(0), mem(1), 16, 4, n)
     }
 
     val result = getMem(mem(1))

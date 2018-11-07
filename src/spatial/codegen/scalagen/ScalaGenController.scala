@@ -7,6 +7,7 @@ import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.lang._
 import spatial.node._
+import spatial.util.spatialConfig
 
 trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaGenMemories {
 
@@ -110,6 +111,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
           inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
         closeopen(src"): ${lhs.tp} = $gate{")
           contents
+          lineBufSwappers.getOrElse(lhs, Set()).foreach{x => emit(src"$x.swap()")}
         close(s"} $els")
       close("}")
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
@@ -123,6 +125,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     case AccelScope(func) =>
       emitControlObject(lhs, Set.empty, func){
         open("try {")
+        if (spatialConfig.enableResourceReporter) emit("StatTracker.pushState(true)")
         globalMems = true
         if (!lhs.willRunForever) {
           gen(func)
@@ -148,6 +151,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
         bufferedOuts.foreach{buff => emit(src"$buff.close()") }
         globalMems = false
+        if (spatialConfig.enableResourceReporter) emit("StatTracker.popState()")
         close("}")
         open("catch {")
           emit(src"""case x: Exception if x.getMessage == "exit" =>  """)

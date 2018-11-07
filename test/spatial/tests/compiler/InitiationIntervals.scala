@@ -98,7 +98,7 @@ import spatial.metadata.control._
 
     val X = ArgIn[Int]
 
-    val num_tests = 11
+    val num_tests = 13
     val sum1 = ArgOut[Int]
     val sum2 = ArgOut[Int]
     val tests_run = ArgOut[Int]
@@ -127,6 +127,22 @@ import spatial.metadata.control._
         track := track.value ^ (1 << dstrow)
       }
 
+      def IIChecker2(start: scala.Int, stop: scala.Int, step: scala.Int, P: scala.Int, inits: List[I32], rhsoffset: scala.Int, numoffset: scala.Int, dstrow: scala.Int): Unit = {
+        // Merge sort variants ripped from DigitRecognition in Rosetta
+        val sram = RegFile[Int](16, inits.toSeq)
+        'FREACH2.Foreach(start until stop by step par P){ i => 
+          val a = sram(i)
+          val b = sram(i+1)
+          val lower = mux(a < b, a, b)
+          val upper = mux(a < b, b, a)
+          sram(i) = lower
+          sram(i+1) = upper
+        }
+        dram(dstrow.to[Int], 0::16) store sram
+        track := track.value ^ (1 << dstrow)
+
+      }
+
       // 0 2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 
       'TEST0.Pipe{ // II = 1
         val sram0 = SRAM[Int](16)
@@ -139,32 +155,60 @@ import spatial.metadata.control._
         track := track.value ^ (1 << 0)
       }
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST1.Pipe{IIChecker(1,  16,  1, 1, List(0),         -1, 1, 1)} // II = body latency
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = body latency
+       *   O   O   O   O      
+       *   |___^   ---> 
+       */
+      'TEST1.Pipe{IIChecker(1,  16,  1, 1, List(0),         -1, 1, 1)}
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST2.Pipe{IIChecker(2,  16,  1, 1, List(0,1),       -2, 2, 2)} // II = body latency / 2
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = body latency / 2
+       *   O   O   O   O      
+       *   |_______^   --->
+       */
+      'TEST2.Pipe{IIChecker(2,  16,  1, 1, List(0,1),       -2, 2, 2)}
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST3.Pipe{IIChecker(3,  16,  1, 1, List(0,1,2),     -3, 3, 3)} // II = body latency / 3
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = body latency / 3
+       *   O   O   O   O      
+       *   |___________^  --->
+       */
+      'TEST3.Pipe{IIChecker(3,  16,  1, 1, List(0,1,2),     -3, 3, 3)}
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST4.Pipe{IIChecker(1,  16,  1, 2, List(0),         -1, 1, 4)} // II = single lane latency * 2
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = single lane latency * 2, has double segmentation
+       *   O   O   O   O      
+       *   |___^|__^    --->
+       */
+      'TEST4.Pipe{IIChecker(1,  16,  1, 2, List(0),         -1, 1, 4)}
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST5.Pipe{IIChecker(2,  16,  1, 2, List(0,1),       -2, 2, 5)} // II = single lane latency * 1
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = single lane latency * 1
+       *   O   O   O   O        
+       *   |___|___^   ^  --->
+       *       |_______|
+       */
+      'TEST5.Pipe{IIChecker(2,  16,  1, 2, List(0,1),       -2, 2, 5)}
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST6.Pipe{IIChecker(2,  16,  1, 3, List(0,1),       -2, 2, 6)} // II = single lane latency * 2
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = single lane latency * 2, has triple segmentation
+       *   O   O   O   O      
+       *   |___^|__^|__^ --->
+       */
+      'TEST6.Pipe{IIChecker(2,  16,  1, 3, List(0,1),       -2, 2, 6)} 
 
-      // 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0
-      'TEST7.Pipe{IIChecker(0,  15,  1, 1, List.fill(16)(0),  1, 1, 7)} // II = 1
+      /* 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0  // II = 1
+       *   O   O   O   O 
+       *   ^___| --->
+       */
+      'TEST7.Pipe{IIChecker(0,  15,  1, 1, List.fill(16)(0),  1, 1, 7)} 
 
-      // 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
-      'TEST8.Pipe{IIChecker(14, -1, -1, 1, List(0),         1, 1, 8)} // II = body latency
+      /* 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0  // II = body latency
+       *  O   O   O   O      
+       *     <--- ^___|
+       */
+      'TEST8.Pipe{IIChecker(14, -1, -1, 1, List(0),         1, 1, 8)} 
 
-      // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-      'TEST9.Pipe{IIChecker(0, 16, 1, 1, List.tabulate(16){i => i-1}, 0, 1, 9)} // II = 1
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = 1
+       *   O   O   O   O      
+       *  |_^   --->
+       */
+      'TEST9.Pipe{IIChecker(0, 16, 1, 1, List.tabulate(16){i => i-1}, 0, 1, 9)} 
 
       'TEST10.Pipe{  // II = body latency
         val sram11 = SRAM[Int](16)
@@ -177,6 +221,20 @@ import spatial.metadata.control._
         dram(10.to[Int], 0::16) store sram11
         track := track.value ^ (1 << 10)
       }
+
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 20  // II = single lane latency * 1, has double segmentation
+       *   O   O   O   O      
+       *   |_X_|   |  --->
+       *       |_X_|
+       */
+      'TEST11.Pipe{IIChecker2(0, 15, 1, 2, List(20,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14), 0, 0, 11)} 
+
+      /* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15  // II = 1
+       *   O   O   O   O    
+       *   |_X_|   |_X_|  --->
+       */
+      'TEST12.Pipe{IIChecker2(0, 16, 2, 2, List(1,0,3,2,5,4,7,6,9,8,11,10,13,12,15,14), 0, 0, 12)} 
+
       tests_run := track
     }
 
@@ -186,6 +244,7 @@ import spatial.metadata.control._
       else if (i == 7) {if (j < 15) 1 else 0}
       else if (i == 8) 15-j
       else if (i == 10) 3
+      else if (i == 11 && j == 15) 20
       else j
     }
 

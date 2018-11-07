@@ -13,14 +13,15 @@ import scala.reflect.ClassTag
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
-    val ip = loadParam("ip", default=4 (1 -> 192))
+    val ip = loadParam("ip", default=696 (1 -> 192))
     val op = loadParam("op", default=2 (1 -> 6))
     val ts  = loadParam("ts", default=32 (32 -> 64 -> 19200))
+    val loadPar = loadParam("loadPar", default=4 (1 -> 1 -> 16))
 
     val B = ts
     val P1 = op
     val P2 = ip
-    val P3 = ip
+    val P3 = loadPar
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
 

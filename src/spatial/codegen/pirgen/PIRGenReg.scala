@@ -7,32 +7,12 @@ import spatial.metadata.memory._
 
 trait PIRGenReg extends PIRCodegen {
 
-  override def emitAccelHeader = {
-    super.emitAccelHeader
-    emit("""
-    def argIn() = {
-      val mem = Reg()
-      within(argFringe, hostInCtrl) {
-        MemWrite().mem(mem)
-      }
-      mem
-    }
-    def argOut() = {
-      within(argFringe, hostOutCtrl) {
-        val mem = Reg()
-        hostRead.input(MemRead().mem(mem))
-        mem
-      }
-    }
-""")
-  }
-
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegNew(init)    =>
       stateMem(lhs, "Reg()", Some(List(init)))
 
     case op@ArgInNew(init)  =>
-      stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(List(init)))
+      stateMem(lhs, s"""argIn("${lhs.name.get}")""", tp=Some("Reg"), inits=Some(List(init)))
 
     case op@HostIONew(init)  =>
       stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(List(init)))
@@ -50,10 +30,11 @@ trait PIRGenReg extends PIRCodegen {
       stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
 
     case RegAccumOp(reg,in,ens,op,first) =>
-      genOp(lhs, op=Some(s"RegAccumOp_$op"),inputs=Some(Seq(in, first, ens)))
+      state(lhs)(s"""RegAccumOp("$op").in($in).en($ens).first($first)""")
 
     case RegAccumFMA(reg,m0,m1,ens,first) =>
-      genOp(lhs, inputs=Some(Seq(m0,m1,first,ens)))
+      genOp(Lhs(lhs,Some("mul")), op=Some(s"FixMul"),inputs=Some(Seq(m0, m1)))
+      state(lhs)(src"""RegAccumOp("AccumAdd").in(${Lhs(lhs, Some("mul"))}).en($ens).first($first)""")
 
     case _ => super.genAccel(lhs, rhs)
   }

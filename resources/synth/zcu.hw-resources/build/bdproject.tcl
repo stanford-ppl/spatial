@@ -29,6 +29,7 @@ switch $TARGET {
     set RST_FREQ [expr $CLOCK_FREQ_MHZ - 1]
 
     # Drop in ps-pl and Top
+    #create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.1 zynq_ultra_ps_e_0 # for 2017.4+?
     create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.0 zynq_ultra_ps_e_0
     create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps8_0_${RST_FREQ}M
     ## Set freqs
@@ -720,6 +721,13 @@ set_property top design_1_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 # Copy required files here
+if { [file exists ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v] == 1} {               
+    file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v ./design_1.v
+} else {
+    file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/sim/design_1.v ./design_1.v
+}
+
+
 file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v ./design_1.v
 file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1_wrapper.v ./design_1_wrapper.v
 

@@ -54,13 +54,14 @@ import spatial.dsl._
             // number * kh(i,j)
             sr(i,j) * kh(i,j)
           }{_+_}
+          println("")
           val vert = Reduce(Reg[T])(Kh by 1, Kw by 1){ (i,j) =>
             // val number = mux((r < 2) || (c < 2) , 0.to[T], sr(i,j))
             // number * kv(i,j)
             sr(i,j) * kv(i,j)
           }{_+_}
 
-          lineOut(c) = mux( r < 2, 0.to[T], abs(horz.value) + abs(vert.value)) // Technically should be sqrt(horz**2 + vert**2)
+          lineOut(c) = mux( r < 2 || c < 2, 0.to[T], abs(horz.value) + abs(vert.value)) // Technically should be sqrt(horz**2 + vert**2)
         }
 
         imgOut(r, 0::C par 16) store lineOut

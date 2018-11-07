@@ -3,6 +3,7 @@ package spatial.codegen.pirgen
 import argon._
 import argon.codegen.Codegen
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.lang._
 import spatial.util.spatialConfig
 
@@ -19,9 +20,10 @@ trait PIRGenHelper extends PIRFormatGen {
     val padding = lhs.getPadding.getOrElse {
       lhs.constDims.map { _ => 0 }
     }
+    val constInits = inits.map { _.map { _.rhs.getValue.get } }
     stateStruct(lhs, lhs.asMem.A, tp=tp)(name => 
       src"$rhs" + 
-      inits.ms(inits => src".inits($inits)") + 
+      constInits.ms(constInits => src".inits($constInits)") + 
       src".depth(${lhs.instance.depth})" +
       src".dims(${lhs.constDims.zip(padding).map { case (d,p) => d + p }})" +
       src".banks(${lhs.instance.banking.map { b => b.nBanks}})" 
@@ -40,29 +42,31 @@ trait PIRGenHelper extends PIRFormatGen {
   }
 
   def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
+    val bufferPort = lhs.port.bufferPort
     stateStruct(lhs, mem.asMem.A){ name => 
       (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
-          src"BankedRead().mem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)})"
+          src"BankedRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).port(${bufferPort})"
         case _ => 
-          src"MemRead().mem(${Lhs(mem,name)}).en(${assertOne(ens)})"
+          src"MemRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).port(${bufferPort})"
       }
     }
   }
 
   def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
+    val bufferPort = lhs.port.bufferPort
     stateStruct(lhs, mem.asMem.A){ name => 
       (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
-          src"BankedWrite().mem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)})"
+          src"BankedWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)}).port($bufferPort)"
         case _ => 
-          src"MemWrite().mem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)})"
+          src"MemWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)}).port($bufferPort)"
       }
     }
   }
 
-  def genOp(lhs:Sym[_], op:Option[String]=None, inputs:Option[Seq[Any]]=None) = {
-    val rhs = lhs.op.get
+  def genOp(lhs:Lhs, op:Option[String]=None, inputs:Option[Seq[Any]]=None) = {
+    val rhs = lhs.sym.op.get
     val opStr = op.getOrElse(rhs.getClass.getSimpleName)
     val ins = inputs.getOrElse(rhs.productIterator.toList)
     state(lhs)(src"""OpDef(op="$opStr").input($ins)""")

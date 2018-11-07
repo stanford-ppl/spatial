@@ -31,7 +31,6 @@ class SpatialConfig extends Config {
   var enableOptimizedReduce: Boolean = true
   var enableForceBanking: Boolean = false
 
-  var enableSplitting: Boolean = false
   var enableArchDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
@@ -40,6 +39,7 @@ class SpatialConfig extends Config {
   var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true
+  var fuseAsFMA = true
 
   var enableBroadcast = true // Allow broadcasting reads
 

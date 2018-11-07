@@ -21,22 +21,24 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       val reqCount = lhs.consumers.collect {
         case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
       }.size
-      emitGlobalModule(src"""val $lhs = Module(new DRAMAllocator(${dim}, $reqCount))""")
+      emitMemObject(lhs){
+        emit(src"""val m = Module(new DRAMAllocator(${dim}, $reqCount))""")
+      }
       val id = accelDrams.size
-      emitt(src"io.heap.req($id) := $lhs.io.heapReq")
-      emitt(src"$lhs.io.heapResp := io.heap.resp($id)")
+      emit(src"top.io.heap.req($id) := $lhs.m.io.heapReq")
+      emit(src"$lhs.m.io.heapResp := top.io.heap.resp($id)")
       accelDrams += (lhs -> id)
 
     case DRAMAlloc(dram, dims) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
-          val parent = lhs.parent
-          val invEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-          emitt(src"${dram}.io.appReq($id).valid := $invEnable")
-          emitt(src"${dram}.io.appReq($id).bits.allocDealloc := true.B")
+          val parent = lhs.parent.s.get
+          val invEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
+          emit(src"${dram}.m.io.appReq($id).valid := $invEnable")
+          emit(src"${dram}.m.io.appReq($id).bits.allocDealloc := true.B")
           val d = dims.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-          emitt(src"${dram}.io.appReq($id).bits.dims.zip($d).foreach { case (l, r) => l := r }")
+          emit(src"${dram}.m.io.appReq($id).bits.dims.zip($d).foreach { case (l, r) => l := r }")
           requesters += (lhs -> id)
         case _ =>
       }
@@ -44,7 +46,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMIsAlloc(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = $dram.io.isAlloc")
+          emit(src"val $lhs = $dram.m.io.isAlloc")
         case _@Op(DRAMHostNew(_,_)) =>
           emit(src"val $lhs = true.B")
         case _ =>
@@ -54,10 +56,10 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
-          val parent = lhs.parent
-          val invEnable = src"""${DL(src"${swap(parent, DatapathEn)} & ${swap(parent, IIDone)}", lhs.fullDelay, true)}"""
-          emitt(src"${dram}.io.appReq($id).valid := $invEnable")
-          emitt(src"${dram}.io.appReq($id).bits.allocDealloc := false.B")
+          val parent = lhs.parent.s.get
+          val invEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
+          emit(src"${dram}.m.io.appReq($id).valid := $invEnable")
+          emit(src"${dram}.m.io.appReq($id).bits.allocDealloc := false.B")
           requesters += (lhs -> id)
         case _ =>
       }
@@ -65,29 +67,29 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMAddress(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = ${dram}.io.addr")
+          emit(src"val $lhs = ${dram}.m.io.addr")
         case _@Op(DRAMHostNew(_,_)) =>
           val id = argHandle(dram)
-          emitGlobalWireMap(src"$lhs", src"Wire(${lhs.tp})")
-          emit(src"""$lhs.r := io.argIns(api.${id}_ptr)""")
+          emit(src"val $lhs = Wire(${lhs.tp})")
+          emit(src"""$lhs.r := top.io.argIns(api.${id}_ptr)""")
         case _ =>
       }
 
     case _ => super.gen(lhs, rhs)
   }
 
-  override def emitFooter(): Unit = {
-  	inAccel{
-      inGenn(out, "IOModule", ext) {
-        emit("// Heap")
-        emit(src"val io_numAllocators = scala.math.max(1, ${accelDrams.size})")
-      }
+  override def emitPostMain(): Unit = {
 
-      inGen(out, "Instantiator.scala") {
-        emit(src"// Heap")
-        emit(src"val numAllocators = ${accelDrams.size}")
-      }
+    inGen(out, s"IOModule.$ext") {
+      emit("// Heap")
+      emit(src"val io_numAllocators = scala.math.max(1, ${accelDrams.size})")
     }
-    super.emitFooter()
+
+    inGen(out, "Instantiator.scala") {
+      emit(src"// Heap")
+      emit(src"val numAllocators = ${accelDrams.size}")
+    }
+  
+    super.emitPostMain()
   }
 }

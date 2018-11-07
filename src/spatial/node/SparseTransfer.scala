@@ -135,7 +135,7 @@ object SparseTransfer {
         Fringe.sparseStore(dram, cmdBus, ackBus)
         // Receive
         // TODO[4]: Assumes one ack per address
-        Foreach(iters by target.burstSize/A.nbits){i =>
+        Foreach(iters by 1){i =>
           val ack = ackBus.value()
         }
       }

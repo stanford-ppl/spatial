@@ -104,6 +104,10 @@ package object access {
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
+    def parOrElse1: Int = a match {
+      case Op(x: UnrolledAccessor[_,_]) => x.enss.size
+      case _ => 1
+    }
     def isPeek: Boolean = a match {
       case Op(_:FIFOPeek[_]) => true
       case _ => false
@@ -113,6 +117,20 @@ package object access {
     @stateful def enables: Set[Bit] = a match {
       case Op(d: Enabled[_]) => d.ens
       case _ => Set.empty
+    }
+
+    /** Returns the memory written to by this symbol, if applicable. */
+    @stateful def writtenMem: Option[Sym[_]] = a match {
+      case Op(d: Writer[_]) => Some(d.mem)
+      case Op(d: VectorWriter[_]) => Some(d.mem)
+      case _ => None
+    }
+
+    /** Returns the memory read from by this symbol, if applicable. */
+    @stateful def readMem: Option[Sym[_]] = a match {
+      case Op(d: Reader[_,_]) => Some(d.mem)
+      case Op(d: VectorReader[_]) => Some(d.mem)
+      case _ => None
     }
 
     /** Returns true if an execution of access a may occur before one of access b. */

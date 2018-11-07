@@ -5,27 +5,14 @@ import spatial.util.spatialConfig
 import spatial.lang._
 import spatial.node._
 
-trait PIRGenDRAM extends PIRCodegen {
-
-  override def emitAccelHeader = {
-    super.emitAccelHeader
-    emit("""
-    def dramAddress(dram:DRAM) = {
-      val mem = Reg()
-      within(argFringe, hostInCtrl) {
-        MemWrite().mem(mem).data(hostWrite) // DRAMDef
-      }
-      MemRead().mem(mem)
-    }
-""")
-  }
+trait PIRGenDRAM extends PIRCodegen with PIRGenController {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMHostNew(dims,zero) =>
-      state(lhs)(s"""DRAM()""")
+      state(lhs)(s"""DRAM("${lhs.name.get}")""")
 
     case DRAMAddress(dram) =>
-      state(lhs, tp=Some("Reg"))(src"dramAddress($dram)")
+      state(lhs, tp=Some("Reg"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")
 
     case DRAMIsAlloc(dram) =>
       state(lhs)(src"Const(true)") //HACK for now
@@ -34,34 +21,34 @@ trait PIRGenDRAM extends PIRCodegen {
     case e@FringeDenseLoad(dram,cmdStream,dataStream) =>
       state(lhs)(
         src"""FringeDenseLoad($dram)""" +
-        src""".offset(MemRead().mem(${Lhs(cmdStream,Some("offset"))}))""" + 
-        src""".size(MemRead().mem(${Lhs(cmdStream,Some("size"))}))""" +
-        src""".data(MemWrite().mem($dataStream).data)"""
+        src""".offset(MemRead().setMem(${Lhs(cmdStream,Some("offset"))}))""" + 
+        src""".size(MemRead().setMem(${Lhs(cmdStream,Some("size"))}))""" +
+        src""".data(MemWrite().setMem($dataStream).data)"""
       )
 
     case e@FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
       state(lhs)(
         src"""FringeDenseStore($dram)""" +
-        src""".offset(MemRead().mem(${Lhs(cmdStream,Some("offset"))}))""" + 
-        src""".size(MemRead().mem(${Lhs(cmdStream,Some("size"))}))""" +
-        src""".data(MemRead().mem(${Lhs(dataStream, Some("_1"))}))""" +
-        src""".valid(MemRead().mem(${Lhs(dataStream, Some("_2"))}))""" +
-        src""".ack(MemWrite().mem($ackStream).data)"""
+        src""".offset(MemRead().setMem(${Lhs(cmdStream,Some("offset"))}))""" + 
+        src""".size(MemRead().setMem(${Lhs(cmdStream,Some("size"))}))""" +
+        src""".data(MemRead().setMem(${Lhs(dataStream, Some("_1"))}))""" +
+        src""".valid(MemRead().setMem(${Lhs(dataStream, Some("_2"))}))""" +
+        src""".ack(MemWrite().setMem($ackStream).data)"""
       )
 
     case e@FringeSparseLoad(dram,addrStream,dataStream) =>
       state(lhs)(
         src"""FringeSparseLoad($dram)""" +
-        src""".addr(MemRead().mem($addrStream))""" + 
-        src""".data(MemWrite().mem($dataStream).data)"""
+        src""".addr(MemRead().setMem($addrStream))""" + 
+        src""".data(MemWrite().setMem($dataStream).data)"""
       )
 
     case e@FringeSparseStore(dram,cmdStream,ackStream) =>
       state(lhs)(
         src"""FringeDenseStore($dram)""" +
-        src""".addr(MemRead().mem(${Lhs(cmdStream,Some("addr"))}))""" + 
-        src""".data(MemRead().mem(${Lhs(cmdStream,Some("data"))}))""" +
-        src""".ack(MemWrite().mem($ackStream).data)"""
+        src""".addr(MemRead().setMem(${Lhs(cmdStream,Some("addr"))}))""" + 
+        src""".data(MemRead().setMem(${Lhs(cmdStream,Some("data"))}))""" +
+        src""".ack(MemWrite().setMem($ackStream).data)"""
       )
 
     case MemDenseAlias(cond, mems, _) =>

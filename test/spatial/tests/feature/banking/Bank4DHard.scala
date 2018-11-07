@@ -38,11 +38,19 @@ import spatial.dsl._
 
     val P1 = 1
     val P2 = 3
+    val P3 = 4
     val loadPar = 1
 
     // Memories
     val INPUT_DATA = DRAM[Int](5, 5, 32)
     val OUTPUT_DATA = DRAM[Int](5, 5, 32)
+
+    val MAXROWS = ArgIn[Int]
+    val MAXCOLS = ArgIn[Int]
+    val ARG = ArgIn[Int]
+    setArg(ARG, 1)
+    setArg(MAXROWS, 5)
+    setArg(MAXCOLS, 5)
 
     // Load data (placeholder)
     val input = (0::5, 0::5, 0::32) {(i,j,k) => ((i + j + k) % 64 - 8).to[Int]}
@@ -54,11 +62,19 @@ import spatial.dsl._
       val in_sram = SRAM[Int](3,3,32).hierarchical
       Foreach(5 by 1){row =>
         Foreach(5 by 1){col => 
+          val idx0 = row * ARG.value
+          val idx1 = col * ARG.value
           Foreach(0 until 3 by 1 par P1, 0 until 3 by 1 par P2){(i,j) => 
-            if (row - 1 + i >= 0 && row - 1 + i < 5 && col - 1 + j >= 0 && col - 1 + j < 5) in_sram(i::i+1,j::j+1,0::32) load INPUT_DATA(row-1+i::row+i, col-1+j::col+j, 0::32 par loadPar)
+            if (idx0 - 1 + i >= 0 && idx0 - 1 + i < MAXROWS.value && idx1 - 1 + j >= 0 && idx1 - 1 + j < MAXCOLS.value) in_sram(i::i+1,j::j+1,0::32) load INPUT_DATA(idx0-1+i::idx0+i, idx1-1+j::idx1+j, 0::32 par loadPar)
           }
           val out_sram = SRAM[Int](32)
-          Foreach(32 by 1){k => out_sram(k) = Reduce(Reg[Int])(3 by 1, 3 by 1){(i,j) => if (row - 1 + i >= 0 && row - 1 + i < 5 && col - 1 + j >= 0 && col - 1 + j < 5) in_sram(i,j,k) else 0}{_+_}}
+          Foreach(32 by 1 par P3){k => 
+            val data = List.tabulate(3){i => List.tabulate(3){j => 
+              if (row - 1 + i >= 0 && row - 1 + i < 5 && col - 1 + j >= 0 && col - 1 + j < 5) in_sram(i,j,k) else 0
+            }}.flatten.reduceTree{_+_} 
+
+            out_sram(k) = data
+          }
           OUTPUT_DATA(row,col,0::32) store out_sram
         }
       }

@@ -23,9 +23,11 @@ package object memory {
     def getIterDiff: Option[Int] = metadata[IterDiff](s).map(_.diff)
     def iterDiff: Int = metadata[IterDiff](s).map(_.diff).getOrElse(1)
     def iterDiff_=(diff: Int): Unit = metadata.add(s, IterDiff(diff))
+    def removeIterDiff: Unit = metadata.add(s,IterDiff(1))
 
     def segmentMapping: Map[Int,Int] = metadata[SegmentMapping](s).map(_.mapping).getOrElse(Map[Int,Int]())
     def segmentMapping_=(mapping: Map[Int,Int]): Unit = metadata.add(s, SegmentMapping(mapping))
+    def removeSegmentMapping: Unit = metadata.add(s,SegmentMapping(Map[Int,Int]()))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {

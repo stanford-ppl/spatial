@@ -200,24 +200,19 @@ trait MemoryUnrolling extends UnrollingBase {
         val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
         /** End withFlow **/
 
-        val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty) {
+        val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty && {lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}}.size > 1) {
           val segmentMapping = lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}
-          if (segmentMapping.size > 1) {
-            dbgs(s"Fracturing access $lhs into more than 1 segment:")
-            segmentMapping.collect{case (segment, lanesInSegment) if (lanesInSegment.forall(laneIds.contains)) => 
-              val vecsInSegment = lanesInSegment.map(laneIdToVecId)
-              dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
-              val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
-              val bank3 = vecsInSegment.map(bank.getOrElse(Nil)(_))
-              val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
-              val ens3 = vecsInSegment.map(ens2(_))
-              implicit val vT: Type[Vec[A]] = Vec.bits[A](vecsInSegment.size)
-              (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
-            }.toSeq
-          } else {
-            implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
-            Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
-          }
+          dbgs(s"Fracturing access $lhs into more than 1 segment:")
+          segmentMapping.collect{case (segment, lanesInSegment) if (lanesInSegment.forall(laneIds.contains)) => 
+            val vecsInSegment = lanesInSegment.map(laneIdToVecId)
+            dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
+            val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
+            val bank3 = vecsInSegment.map(bank.getOrElse(Nil)(_))
+            val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
+            val ens3 = vecsInSegment.map(ens2(_))
+            implicit val vT: Type[Vec[A]] = Vec.bits[A](vecsInSegment.size)
+            (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
+          }.toSeq
         } else {
           implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
           Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
@@ -231,8 +226,14 @@ trait MemoryUnrolling extends UnrollingBase {
           val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
           val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(port.castgroup) else port.castgroup
           val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(port.broadcast) else port.broadcast
-          val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,broadcast2)
-          s.addPort(dispatch=0, Nil, port2)
+          if (s.getPorts(0).isDefined) {
+            val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,s.port.broadcast.zip(broadcast2).map{case (a,b) => scala.math.min(a,b)})
+            s.addPort(dispatch=0, Nil, port2)
+          }
+          else {
+            val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,broadcast2)
+            s.addPort(dispatch=0, Nil, port2)
+          }
           s.addDispatch(Nil, 0)
           s.segmentMapping = Map(0 -> segment)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff

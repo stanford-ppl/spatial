@@ -18,12 +18,10 @@ trait MemReduceUnrolling extends ReduceUnrolling {
       val accum2 = accumHack(accum.asInstanceOf[c[a]], loadAcc)
 
       if (cchainMap.willFullyUnroll && cchainRed.willFullyUnroll) {
-        // fullyUnrollMemReduceAndMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed)
-        fullyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
+        fullyUnrollMemReduceAndMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed)
       }
       else if (cchainMap.willFullyUnroll) {
-        // fullyUnrollMemReduceMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
-        fullyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
+        fullyUnrollMemReduceMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
       }
       else if (cchainRed.willFullyUnroll) {
         fullyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
@@ -33,6 +31,60 @@ trait MemReduceUnrolling extends ReduceUnrolling {
       }
 
     case _ => super.unrollCtrl(lhs, rhs)
+  }
+
+  def fullyUnrollMemReduceAndMap[A,C[T]](
+    lhs:       Sym[_],                // Original pipe symbol
+    ens:       Set[Bit],              // Enables
+    cchainMap: CounterChain,          // Map counterchain
+    cchainRed: CounterChain,          // Reduction counterchain
+    accum:     C[A],                  // Accumulator (external)
+    ident:     Option[A],             // Optional identity value for reduction
+    fold:      Boolean,               // Optional value to fold with reduction
+    func:      Block[C[A]],           // Map function
+    loadRes:   Lambda1[C[A],A],       // Load function for intermediate values
+    loadAcc:   Lambda1[C[A],A],       // Load function for accumulator
+    reduce:    Lambda2[A,A,A],        // Reduction function
+    storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
+    itersMap:  Seq[I32],              // Bound iterators for map loop
+    itersRed:  Seq[I32]               // Bound iterators for reduce loop
+  )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
+    logs(s"Unrolling accum-fold $lhs -> $accum")
+
+    val mapLanes = FullUnroller(s"${lhs}_map", cchainMap, itersMap, isInnerLoop = false)
+    val redLanes = FullUnroller(s"${lhs}_red", cchainRed, itersRed, true)
+    val redType  = reduce.result.reduceType
+    val intermed = func.result
+
+
+    val blk = stageLambda1(accum){
+      logs(s"[Accum-fold $lhs] Unrolling map")
+      unrollWithoutResult(func, mapLanes)
+      val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
+
+      val mvalids = () => mapLanes.valids.map{_.andTree}
+
+      logs(s"[Accum-fold $lhs] Unrolling unit pipe reduction")
+      redLanes.foreach{p =>
+        logs(s"Lane #$p")
+        itersRed.foreach{i => logs(s"  $i -> ${f(i)}") }
+      }
+
+      stageWithFlow(UnitPipe(enables ++ ens, stageBlock{
+        unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes)
+      })){lhs2 =>
+        transferData(lhs,lhs2)
+      }
+    
+    }
+
+    val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
+      transferData(lhs,lhs2)
+    }
+    //accumulatesTo(lhs2) = accum
+
+    logs(s"[Accum-fold] Created reduce ${stm(lhs2)}")
+    lhs2
   }
 
   def fullyUnrollMemReduce[A,C[T]](
@@ -91,6 +143,62 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     }
 
     val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs)){lhs2 =>
+      transferData(lhs,lhs2)
+    }
+    //accumulatesTo(lhs2) = accum
+
+    logs(s"[Accum-fold] Created reduce ${stm(lhs2)}")
+    lhs2
+  }
+
+
+  def fullyUnrollMemReduceMap[A,C[T]](
+    lhs:       Sym[_],                // Original pipe symbol
+    ens:       Set[Bit],              // Enables
+    cchainMap: CounterChain,          // Map counterchain
+    cchainRed: CounterChain,          // Reduction counterchain
+    accum:     C[A],                  // Accumulator (external)
+    ident:     Option[A],             // Optional identity value for reduction
+    fold:      Boolean,               // Optional value to fold with reduction
+    func:      Block[C[A]],           // Map function
+    loadRes:   Lambda1[C[A],A],       // Load function for intermediate values
+    loadAcc:   Lambda1[C[A],A],       // Load function for accumulator
+    reduce:    Lambda2[A,A,A],        // Reduction function
+    storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
+    itersMap:  Seq[I32],              // Bound iterators for map loop
+    itersRed:  Seq[I32]               // Bound iterators for reduce loop
+  )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
+    logs(s"Unrolling accum-fold $lhs -> $accum")
+
+    val mapLanes = FullUnroller(s"${lhs}_map", cchainMap, itersMap, isInnerLoop = false)
+    val redLanes = PartialUnroller(s"${lhs}_red", cchainRed, itersRed, true)
+    val isRed2   = redLanes.indices
+    val mvs      = mapLanes.indexValids
+    val rvs      = redLanes.indexValids
+    val redType  = reduce.result.reduceType
+    val intermed = func.result
+
+    logs(s"  Reduction iterators: $isRed2")
+    redLanes.foreach{p =>
+      logs(s"    Lane #$p")
+      itersRed.foreach{i => logs(s"    $i -> ${f(i)}") }
+    }
+
+    val blk = stageLambda1(accum){
+      logs(s"[Accum-fold $lhs] Unrolling map")
+      unrollWithoutResult(func, mapLanes)
+
+      logs(s"[Accum-fold $lhs] Unrolling pipe-reduce reduction")
+
+      val rBlk = stageBlock{
+        logs(s"[Accum-fold $lhs] Unrolling map loads")
+        unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes)
+      }
+
+      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs))
+    }
+
+    val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
       transferData(lhs,lhs2)
     }
     //accumulatesTo(lhs2) = accum
@@ -177,12 +285,23 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     itersMap:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
     itersRed:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
     start:  Seq[I32],             // Start for each iterator
-    mapLanes: PartialUnroller,
+    mapLanes: Unroller,
     redLanes: Unroller
   )(implicit ctx: SrcCtx): Void = {
+    if (redLanes.isInstanceOf[FullUnroller]) {
+      logs(s"Unsetting iter diff analysis on $accum")
+      // TODO: Only want to unset metadata for readers/writers in the cycle inside the reduce function
+      accum.asInstanceOf[Sym[_]].removeSegmentMapping
+      accum.asInstanceOf[Sym[_]].removeIterDiff
+      storeAcc.result.asInstanceOf[Sym[_]].removeSegmentMapping
+      storeAcc.result.asInstanceOf[Sym[_]].removeIterDiff
+      logs(s"loadacc result ${loadAcc.result}")
+      loadAcc.result.asInstanceOf[Sym[_]].removeSegmentMapping
+      loadAcc.result.asInstanceOf[Sym[_]].removeIterDiff
+    }
+
     val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
     val mvalids = () => mapLanes.valids.map{_.andTree}
-    val isMap2   = mapLanes.indices
 
     val values: Seq[Seq[A]] = inReduce(redType,false){
       mapLanes.map{i =>
@@ -209,7 +328,13 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
       val result = inReduce(redType,true){
         val treeResult = unrollReduceTree(inputs, valids, ident, reduce.toFunction2)
-        val isFirst = isMap2.map(_.head).zip(start).map{case (i,st) => i === st }.andTree
+
+        val isFirst = if (mapLanes.isInstanceOf[PartialUnroller]) {
+          mapLanes.asInstanceOf[PartialUnroller].indices.map(_.head).zip(start).map{case (i,st) => i === st }.andTree  
+        } else {
+          Bit(true)
+        }
+        
 
         if (fold || spatialConfig.ignoreParEdgeCases) {
           // FOLD: On first iteration, use value of accumulator value rather than zero

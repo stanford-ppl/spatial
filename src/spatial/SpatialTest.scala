@@ -32,7 +32,7 @@ trait SpatialTest extends Spatial with DSLTest { self =>
     name = "Scala",
     args = "--sim",
     make = "make",
-    run  = "bash run.sh"
+    run  = "bash scripts/regression_run.sh scalasim"
   ) {
     def shouldRun: Boolean = checkFlag("test.Scala")
     override def parseRunError(line: String): Result = {

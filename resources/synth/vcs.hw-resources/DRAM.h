@@ -49,14 +49,6 @@ uint64_t globalID = 0;
 class DRAMRequest;
 class WData;
 
-typedef union DRAMTag {
-  struct {
-    unsigned int uid : 32;
-    unsigned int streamId : 32;
-  };
-  uint64_t tag;
-} DRAMTag;
-
 /**
  * DRAM Command received from the design
  * One object could potentially create multiple DRAMRequests
@@ -65,12 +57,12 @@ class DRAMCommand {
 public:
   uint64_t addr;
   uint32_t size;
-  DRAMTag tag;
+  uint64_t tag;
   uint64_t channelID;
   bool isWr;
   DRAMRequest **reqs = NULL;
 
-  DRAMCommand(uint64_t a, uint32_t sz, DRAMTag t, bool wr) {
+  DRAMCommand(uint64_t a, uint32_t sz, uint64_t t, bool wr) {
     addr = a;
     size = sz;
     tag = t;
@@ -120,17 +112,18 @@ public:
   uint64_t rawAddr;
   uint64_t smallAddr;
   uint32_t size;
-  DRAMTag tag;
+  uint64_t tag;
   uint64_t channelID;
   bool isWr;
   uint8_t *wdata = NULL;
+  uint8_t *wstrb = NULL;
   uint32_t delay;
   uint32_t elapsed;
   uint64_t issued;
   bool completed;
   DRAMCommand *cmd;
 
-  DRAMRequest(uint64_t a, uint64_t ra, uint32_t sz, DRAMTag t, bool wr, uint64_t issueCycle) {
+  DRAMRequest(uint64_t a, uint64_t ra, uint32_t sz, uint64_t t, bool wr, uint64_t issueCycle) {
     id = globalID++;
     addr = remapper->getBig(a);
     smallAddr = a;
@@ -153,15 +146,16 @@ public:
     issued = issueCycle;
     completed = false;
     wdata = NULL;
+    wstrb = NULL;
   }
 
   void print() {
-    EPRINTF("[DRAMRequest CH=%lu] addr: %lx (%lx), sizeInBursts: %u, streamId: %x, tag: %lx, isWr: %d, issued=%lu \n", channelID, addr, rawAddr, size, tag.streamId, tag.uid, isWr, issued);
+    EPRINTF("[DRAMRequest CH=%lu] addr: %lx (%lx), sizeInBursts: %u, tag: %lx, isWr: %d, issued=%lu \n", channelID, addr, rawAddr, size, tag, isWr, issued);
   }
 
   void schedule() {
     if (!useIdealDRAM) {
-      mem->addTransaction(isWr, addr, tag.tag);
+      mem->addTransaction(isWr, addr, tag);
       channelID = mem->findChannelNumber(addr);
     } else {
       dramRequestQ[channelID].push_back(this);
@@ -176,6 +170,7 @@ public:
 
   ~DRAMRequest() {
     if (wdata != NULL) free(wdata);
+    if (wstrb != NULL) free(wstrb);
   }
 };
 
@@ -193,19 +188,21 @@ bool DRAMCommand::hasCompleted() {
 
 struct AddrTag {
   uint64_t addr;
-  DRAMTag tag;
+  uint64_t tag;
 
-  AddrTag(uint64_t a, DRAMTag t) {
+  AddrTag(uint64_t a, uint64_t t) {
     addr = a;
     tag = t;
   }
 
+/*
   bool operator==(const AddrTag &o) const {
-      return addr == o.addr && tag.tag == o.tag.tag;
+      return addr == o.addr && tag.t == o.tag.t;
   }
+  */
 
   bool operator<(const AddrTag &o) const {
-      return addr < o.addr || (addr == o.addr && tag.tag < o.tag.tag);
+      return addr < o.addr || (addr == o.addr && tag < o.tag);
   }
 };
 
@@ -217,7 +214,7 @@ std::deque<WData*> wdataQ;
 std::deque<DRAMRequest*> wrequestQ;
 
 // Internal book-keeping data structures
-std::map<struct AddrTag, DRAMRequest*> addrToReqMap;
+std::map<struct AddrTag, std::deque<DRAMRequest*>> addrToReqMap;
 
 uint32_t getWordOffset(uint64_t addr) {
   return (addr & (burstSizeBytes - 1)) >> 2;   // TODO: Use parameters above!
@@ -232,7 +229,7 @@ void printQueueStats(int id) {
     int k = 0;
     while (it != dramRequestQ[id].end()) {
       DRAMRequest *r = *it;
-      EPRINTF("    %d. addr: %lx (%lx), tag: %lx, streamId: %d, completed: %d\n", k, r->addr, r->rawAddr, r->tag.uid, r->tag.streamId, r->completed);
+      EPRINTF("    %d. addr: %lx (%lx), tag: %lx, completed: %d\n", k, r->addr, r->rawAddr, r->tag, r->completed);
       it++;
       k++;
       //    if (k > 20) break;
@@ -251,7 +248,7 @@ void updateIdealDRAMQ(int id) {
       if (req->elapsed >= req->delay) {
         req->completed = true;
         if (debug) {
-          EPRINTF("[idealDRAM txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)req->addr, req->tag.uid, numCycles);
+          EPRINTF("[idealDRAM txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)req->addr, req->tag, numCycles);
         }
 
       }
@@ -285,7 +282,11 @@ void popDRAMQ() {
       uint8_t *front_wdata = front->wdata;
       uint8_t *front_waddr = (uint8_t*) front->addr;
       for (int i=0; i<burstSizeWords; i++) {
-        front_waddr[i] = front_wdata[i];
+        if (front->wstrb) {
+          if (front->wstrb[i]) front_waddr[i] = front_wdata[i];
+        } else {
+          front_waddr[i] = front_wdata[i];
+        }
       }
       dramRequestQ[popWhenReady].pop_front();
       delete front;
@@ -339,7 +340,11 @@ bool checkQAndRespond(int id) {
         uint8_t *wdata = req->wdata;
         uint8_t *waddr = (uint8_t*) req->addr;
         for (int i=0; i<burstSizeWords; i++) {
-          waddr[i] = wdata[i];
+          if (req->wstrb) {
+            if (req->wstrb[i]) waddr[i] = wdata[i];
+          } else {
+            waddr[i] = wdata[i];
+          }
         }
         if (req->cmd->hasCompleted()) {
           pokeResponse = true;
@@ -374,11 +379,10 @@ bool checkQAndRespond(int id) {
 
 
         if (req->isWr) {
-          pokeDRAMWriteResponse(req->tag.uid, req->tag.streamId);
+          pokeDRAMWriteResponse(req->tag);
         } else {
           pokeDRAMReadResponse(
-            req->tag.uid,
-            req->tag.streamId,
+            req->tag,
             rdata[0],
             rdata[1],
             rdata[2],
@@ -502,19 +506,21 @@ void checkAndSendDRAMResponse() {
 class DRAMCallbackMethods {
 public:
   void txComplete(unsigned id, uint64_t addr, uint64_t tag, uint64_t clock_cycle) {
-    DRAMTag cmdTag;
-    cmdTag.tag = tag;
     if (debug) {
-      EPRINTF("[txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)addr, cmdTag.tag, numCycles);
+      EPRINTF("[txComplete] addr = %p, tag = %lx, finished = %lu\n", (void*)addr, tag, numCycles);
     }
 
     // Find transaction, mark it as done, remove entry from map
-    struct AddrTag at(addr, cmdTag);
-    std::map<struct AddrTag, DRAMRequest*>::iterator it = addrToReqMap.find(at);
-    ASSERT(it != addrToReqMap.end(), "address/tag tuple (%lx, %lx) not found in addrToReqMap!", addr, cmdTag.tag);
-    DRAMRequest* req = it->second;
+    struct AddrTag at(addr, tag);
+    auto it = addrToReqMap.find(at);
+    ASSERT(it != addrToReqMap.end(), "address/tag tuple (%lx, %lx) not found in addrToReqMap!", addr, tag);
+    auto &reqQueue = it->second;
+    DRAMRequest* req = reqQueue.front();
     req->completed = true;
-    addrToReqMap.erase(at);
+    reqQueue.pop_front();
+    if (reqQueue.empty()) {
+      addrToReqMap.erase(at);
+    }
   }
 };
 
@@ -556,10 +562,15 @@ extern "C" {
       } else {
         // Start with burst data
         uint8_t *wdata = (uint8_t*) malloc(burstSizeBytes);
-        uint8_t *raddr = (uint8_t*) req->addr;
+        uint8_t *wstrb = (uint8_t*) malloc(burstSizeBytes);
         for (int i=0; i<burstSizeWords; i++) {
-          wdata[i] = raddr[i];
+          wdata[i] = data->wdata[i];
+          wstrb[i] = data->wstrb[i];
         }
+
+        req->wdata = wdata;
+        req->wstrb = wstrb;
+        req->schedule();
 
         if (debug) {
           EPRINTF("[Servicing W Command (Strobed) ]   %u -> %u (%d), %u -> %u (%d), %u -> %u (%d), %u -> %u (%d)\n", data->wdata[0],  wdata[0],  data->wstrb[0],  data->wdata[1],  wdata[1],  data->wstrb[1],  data->wdata[2],  wdata[2],  data->wstrb[2],   data->wdata[3],  wdata[3],  data->wstrb[3]);
@@ -580,75 +591,6 @@ extern "C" {
           EPRINTF("                                   %u -> %u (%d), %u -> %u (%d), %u -> %u (%d), %u -> %u (%d)\n", data->wdata[60], wdata[60], data->wstrb[60], data->wdata[61], wdata[61], data->wstrb[61], data->wdata[62], wdata[62], data->wstrb[62],  data->wdata[63], wdata[63], data->wstrb[63]);
         }
 
-        // Fill in accel wdata
-        if (data->wstrb[0]) wdata[0] = data->wdata[0];
-        if (data->wstrb[1]) wdata[1] = data->wdata[1];
-        if (data->wstrb[2]) wdata[2] = data->wdata[2];
-        if (data->wstrb[3]) wdata[3] = data->wdata[3];
-        if (data->wstrb[4]) wdata[4] = data->wdata[4];
-        if (data->wstrb[5]) wdata[5] = data->wdata[5];
-        if (data->wstrb[6]) wdata[6] = data->wdata[6];
-        if (data->wstrb[7]) wdata[7] = data->wdata[7];
-        if (data->wstrb[8]) wdata[8] = data->wdata[8];
-        if (data->wstrb[9]) wdata[9] = data->wdata[9];
-        if (data->wstrb[10]) wdata[10] = data->wdata[10];
-        if (data->wstrb[11]) wdata[11] = data->wdata[11];
-        if (data->wstrb[12]) wdata[12] = data->wdata[12];
-        if (data->wstrb[13]) wdata[13] = data->wdata[13];
-        if (data->wstrb[14]) wdata[14] = data->wdata[14];
-        if (data->wstrb[15]) wdata[15] = data->wdata[15];
-        if (data->wstrb[16]) wdata[16] = data->wdata[16];
-        if (data->wstrb[17]) wdata[17] = data->wdata[17];
-        if (data->wstrb[18]) wdata[18] = data->wdata[18];
-        if (data->wstrb[19]) wdata[19] = data->wdata[19];
-        if (data->wstrb[20]) wdata[20] = data->wdata[20];
-        if (data->wstrb[21]) wdata[21] = data->wdata[21];
-        if (data->wstrb[22]) wdata[22] = data->wdata[22];
-        if (data->wstrb[23]) wdata[23] = data->wdata[23];
-        if (data->wstrb[24]) wdata[24] = data->wdata[24];
-        if (data->wstrb[25]) wdata[25] = data->wdata[25];
-        if (data->wstrb[26]) wdata[26] = data->wdata[26];
-        if (data->wstrb[27]) wdata[27] = data->wdata[27];
-        if (data->wstrb[28]) wdata[28] = data->wdata[28];
-        if (data->wstrb[29]) wdata[29] = data->wdata[29];
-        if (data->wstrb[30]) wdata[30] = data->wdata[30];
-        if (data->wstrb[31]) wdata[31] = data->wdata[31];
-        if (data->wstrb[32]) wdata[32] = data->wdata[32];
-        if (data->wstrb[33]) wdata[33] = data->wdata[33];
-        if (data->wstrb[34]) wdata[34] = data->wdata[34];
-        if (data->wstrb[35]) wdata[35] = data->wdata[35];
-        if (data->wstrb[36]) wdata[36] = data->wdata[36];
-        if (data->wstrb[37]) wdata[37] = data->wdata[37];
-        if (data->wstrb[38]) wdata[38] = data->wdata[38];
-        if (data->wstrb[39]) wdata[39] = data->wdata[39];
-        if (data->wstrb[40]) wdata[40] = data->wdata[40];
-        if (data->wstrb[41]) wdata[41] = data->wdata[41];
-        if (data->wstrb[42]) wdata[42] = data->wdata[42];
-        if (data->wstrb[43]) wdata[43] = data->wdata[43];
-        if (data->wstrb[44]) wdata[44] = data->wdata[44];
-        if (data->wstrb[45]) wdata[45] = data->wdata[45];
-        if (data->wstrb[46]) wdata[46] = data->wdata[46];
-        if (data->wstrb[47]) wdata[47] = data->wdata[47];
-        if (data->wstrb[48]) wdata[48] = data->wdata[48];
-        if (data->wstrb[49]) wdata[49] = data->wdata[49];
-        if (data->wstrb[50]) wdata[50] = data->wdata[50];
-        if (data->wstrb[51]) wdata[51] = data->wdata[51];
-        if (data->wstrb[52]) wdata[52] = data->wdata[52];
-        if (data->wstrb[53]) wdata[53] = data->wdata[53];
-        if (data->wstrb[54]) wdata[54] = data->wdata[54];
-        if (data->wstrb[55]) wdata[55] = data->wdata[55];
-        if (data->wstrb[56]) wdata[56] = data->wdata[56];
-        if (data->wstrb[57]) wdata[57] = data->wdata[57];
-        if (data->wstrb[58]) wdata[58] = data->wdata[58];
-        if (data->wstrb[59]) wdata[59] = data->wdata[59];
-        if (data->wstrb[60]) wdata[60] = data->wdata[60];
-        if (data->wstrb[61]) wdata[61] = data->wdata[61];
-        if (data->wstrb[62]) wdata[62] = data->wdata[62];
-        if (data->wstrb[63]) wdata[63] = data->wdata[63];
-
-
-        req->wdata = wdata;
-        req->schedule();
       }
     } else if (wdataQ.size() > 0 & wrequestQ.size() == 0) {
       if (debug) {
@@ -660,7 +602,6 @@ extern "C" {
 
   int sendWdataStrb(
     int dramCmdValid,
-    int dramReadySeen,
     int wdata0, int wdata1, int wdata2, int wdata3, int wdata4, int wdata5, int wdata6, int wdata7, int wdata8, int wdata9, int wdata10, int wdata11, int wdata12, int wdata13, int wdata14, int wdata15, int wdata16, int wdata17, int wdata18, int wdata19, int wdata20, int wdata21, int wdata22, int wdata23, int wdata24, int wdata25, int wdata26, int wdata27, int wdata28, int wdata29, int wdata30, int wdata31, int wdata32, int wdata33, int wdata34, int wdata35, int wdata36, int wdata37, int wdata38, int wdata39, int wdata40, int wdata41, int wdata42, int wdata43, int wdata44, int wdata45, int wdata46, int wdata47, int wdata48, int wdata49, int wdata50, int wdata51, int wdata52, int wdata53, int wdata54, int wdata55, int wdata56, int wdata57, int wdata58, int wdata59, int wdata60, int wdata61, int wdata62, int wdata63, int strb0,
     int strb1, int strb2, int strb3, int strb4, int strb5, int strb6, int strb7, int strb8, int strb9, int strb10, int strb11, int strb12, int strb13, int strb14, int strb15, int strb16, int strb17, int strb18, int strb19, int strb20, int strb21, int strb22, int strb23, int strb24, int strb25, int strb26, int strb27, int strb28, int strb29, int strb30, int strb31, int strb32, int strb33, int strb34, int strb35, int strb36, int strb37, int strb38, int strb39, int strb40, int strb41, int strb42, int strb43, int strb44, int strb45, int strb46, int strb47, int strb48, int strb49, int strb50, int strb51, int strb52, int strb53, int strb54, int strb55, int strb56, int strb57, int strb58, int strb59, int strb60, int strb61, int strb62, int strb63
   ) {
@@ -832,8 +773,7 @@ extern "C" {
       long long addr,
       long long rawAddr,
       int size,
-      int tag_uid,
-      int tag_streamId,
+      int tag,
       int isWr
     ) {
     int dramReady = 1;  // 1 == ready, 0 == not ready (stall upstream)
@@ -841,19 +781,16 @@ extern "C" {
     // view addr as uint64_t without doing sign extension
     uint64_t cmdAddr = *(uint64_t*)&addr;
     uint64_t cmdRawAddr = *(uint64_t*)&rawAddr;
-    DRAMTag cmdTag;
-    cmdTag.uid = *(uint32_t*)&tag_uid;
-    cmdTag.streamId = *(uint32_t*)&tag_streamId;
     uint32_t cmdSize = (uint32_t)(*(uint32_t*)&size);
     bool cmdIsWr = isWr > 0;
 
     // Create a DRAM Command
-    DRAMCommand *cmd = new DRAMCommand(cmdAddr, cmdSize, cmdTag, cmdIsWr);
+    DRAMCommand *cmd = new DRAMCommand(cmdAddr, cmdSize, tag, cmdIsWr);
 
     // Create multiple DRAM requests, one per burst
     DRAMRequest **reqs = new DRAMRequest*[cmdSize];
     for (int i = 0; i<cmdSize; i++) {
-      reqs[i] = new DRAMRequest(cmdAddr + i*burstSizeBytes, cmdRawAddr + i*burstSizeBytes, cmdSize, cmdTag, cmdIsWr, numCycles);
+      reqs[i] = new DRAMRequest(cmdAddr + i*burstSizeBytes, cmdRawAddr + i*burstSizeBytes, cmdSize, tag, cmdIsWr, numCycles);
       reqs[i]->cmd = cmd;
     }
     cmd->reqs = reqs;
@@ -871,7 +808,12 @@ extern "C" {
         DRAMRequest *req = reqs[i];
         struct AddrTag at(req->addr, req->tag);
 
-        addrToReqMap[at] = req;
+        if (addrToReqMap.find(at) == addrToReqMap.end()) {
+          std::deque<DRAMRequest *> reqQueue { req };
+          addrToReqMap[at] = reqQueue;
+        } else {
+          addrToReqMap[at].push_back(req);
+        }
         skipIssue = false;
 
         // TODO: Re-examine gather-scatter flow
@@ -895,7 +837,7 @@ extern "C" {
     if (dramReady == 1) {
       for (int i=0; i<cmdSize; i++) {
         if (!useIdealDRAM) {
-          dramRequestQ[cmdTag.streamId].push_back(reqs[i]);
+          dramRequestQ[tag % MAX_NUM_Q].push_back(reqs[i]);
         }// else {
 //          dramRequestQ[reqs[i]->channelID].push_back(reqs[i]);
 //        }

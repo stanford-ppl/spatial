@@ -12,7 +12,7 @@ trait ScalaGenLUTs extends ScalaGenMemories {
   }
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@LUTNew(_,elems) => emitBankedInitMem(lhs,Some(elems),op.A)
-    case op@LUTBankedRead(lut,bank,ofs,ens) => emitBankedLoad(lhs,lut,bank,ofs,ens)(op.A)
+    case op@LUTBankedRead(lut,bank,ofs,ens) => emitVectorLoad(lhs,lut,bank,ens)(op.A)
     case _ => super.gen(lhs, rhs)
   }
 

@@ -16,9 +16,4 @@ trait PIRCtxGen extends PIRCodegen {
     q
   }
 
-  override def emitHelperFunction = {
-    emit(s"def sctx(c:String):T = x match { case n:PIRNode => n.srcCtx := c; x; case _ => x }")
-    emit(s"def name(c:String):T = x match { case n:PIRNode => n.name := c; x; case _ => x }")
-  }
-
 }

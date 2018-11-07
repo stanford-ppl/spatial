@@ -1,6 +1,8 @@
 package spatial.targets
 
 import models._
+import forge.tags.stateful
+import spatial.dse._
 
 abstract class HardwareTarget {
   import HardwareTarget._
@@ -40,6 +42,10 @@ abstract class HardwareTarget {
 
   val memoryResources: List[MemoryResource]
   val defaultResource: MemoryResource
+
+  @stateful final def areaAnalyzer: AreaAnalyzer = AreaAnalyzer(state, makeAreaModel, makeLatencyModel)
+  // @stateful final def cycleAnalyzer: LatencyAnalyzer = LatencyAnalyzer(state, makeLatencyModel)
+
 }
 
 object HardwareTarget {

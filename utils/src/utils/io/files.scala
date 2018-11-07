@@ -19,7 +19,7 @@ object files {
     files.foreach{filename =>
       val file = new File(path + java.io.File.separator + filename)
       if (file.isDirectory && recursive) {
-        deleteExts(filename, ext, recursive)
+        deleteExts(file.getPath, ext, recursive)
       }
       else if (filename.endsWith("."+ext)) {
         file.delete()

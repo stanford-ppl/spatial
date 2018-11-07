@@ -23,6 +23,7 @@ case class ScalaGenSpatial(IR: State) extends ScalaCodegen
   with ScalaGenVec
   with ScalaGenStream
   with ScalaGenRegFile
+  with ScalaGenLineBuffer
   with ScalaGenFileIO
   with ScalaGenDelays
   with ScalaGenLUTs {

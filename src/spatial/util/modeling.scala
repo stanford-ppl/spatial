@@ -75,7 +75,6 @@ object modeling {
                                   .groupBy(_.memory)
                                   .map{case (mem, cycs) => cycs.toList.map{c => c.length}.sum}.toList
                                   .sorted.reverse.headOption.getOrElse(0.0)
-    dbgs(s"cycles are $cycles, interval is $interval")
     // Look across cycles from different segments
     val compilerII = scala.math.max(interval, segmentedInterval)
     (latency, compilerII)
@@ -108,11 +107,13 @@ object modeling {
       case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
       case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
       case reader @ BankedReader(mem,_,_,_) => AccessPair(mem, reader)
+      case reader @ VectorReader(mem,_,_) => AccessPair(mem, reader)
     }
     val writers = scope.collect{
       case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
       case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
       case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
+      case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
     }
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
@@ -166,41 +167,50 @@ object modeling {
 
     accumReads.foreach{reader => cycles(reader) = Set(reader) }
 
-    def fullDFS(cur: Sym[_]): Double = cur match {
-      case Op(d) if scope.contains(cur) =>
-        // Handles effect scheduling, even though there's no data to pass
-        val deps = scope intersect cur.allDeps.toSet
+    def fullDFS(cur: Sym[_]): Double = {
+      def precedingWrites: Set[Sym[_]] = {
+        cur.readMem.map{mem => 
+          val parentScope = cur.parent.innerBlocks.flatMap(_._2.stms)
+          val writers = parentScope.filter(_.writtenMem == Some(mem)).toSet
+          parentScope.zipWithIndex.collect{case (x,i) if i < parentScope.indexOf(cur) => x}.toSet intersect writers
+        }.getOrElse(Set.empty)
+      }
+      cur match {
+        case Op(d) if scope.contains(cur) =>
+          // Handles effect scheduling, even though there's no data to pass
+          val deps = scope intersect (cur.allDeps.toSet ++ precedingWrites)
 
-        if (deps.nonEmpty) {
-          val dlys = deps.map{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
+          if (deps.nonEmpty) {
+            val dlys = deps.map{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
 
-          // Primitives are not allowed to be loops, so the latency of nested symbols
-          // must be some function of its blocks, e.g. the max of all or the sum of all
-          // (For now, all cases are just the max of all inputs)
-          val critical = d match {case _ => dlys.max }
+            // Primitives are not allowed to be loops, so the latency of nested symbols
+            // must be some function of its blocks, e.g. the max of all or the sum of all
+            // (For now, all cases are just the max of all inputs)
+            val critical = d match {case _ => dlys.max }
 
-          val cycleSyms = deps intersect cycles.keySet
-          if (cycleSyms.nonEmpty) {
-            cycles(cur) = cycleSyms.flatMap(cycles) + cur
-            debugs(s"cycle deps of $cur: ${cycles(cur)}")
+            val cycleSyms = deps intersect cycles.keySet
+            if (cycleSyms.nonEmpty) {
+              cycles(cur) = cycleSyms.flatMap(cycles) + cur
+              debugs(s"cycle deps of $cur: ${cycles(cur)}")
+            }
+
+            val inReduce = knownCycles.contains(cur)
+
+            // TODO[3]: + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
+            val delay = critical + latencyOf(cur, inReduce)
+
+            debugs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+            delay
+          }
+          else {
+            val inReduce = knownCycles.contains(cur)
+            val delay = latencyOf(cur, inReduce)
+            debugs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
+            delay
           }
 
-          val inReduce = knownCycles.contains(cur)
-
-          // TODO[3]: + inputDelayOf(cur) -- factor in delays which are external to reduction cycles
-          val delay = critical + latencyOf(cur, inReduce)
-
-          debugs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
-          delay
-        }
-        else {
-          val inReduce = knownCycles.contains(cur)
-          val delay = latencyOf(cur, inReduce)
-          debugs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
-          delay
-        }
-
-      case s => paths.getOrElse(s, 0) // Get preset out of scope delay, or assume 0 offset
+        case s => paths.getOrElse(s, 0) // Get preset out of scope delay, or assume 0 offset
+      }
     }
 
     // Perform backwards pass to push unnecessary delays out of reduction cycles

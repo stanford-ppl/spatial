@@ -4,13 +4,16 @@ import argon._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.util.spatialConfig
 import utils.tags.instrument
 
 trait ForeachUnrolling extends UnrollingBase {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case OpForeach(ens, cchain, func, iters) =>
-      if (cchain.willFullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
+      var fullyUnroll = cchain.willFullyUnroll
+      if (spatialConfig.enablePIR) fullyUnroll &= !lhs.isInnerControl
+      if (fullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
       else partiallyUnrollForeach(lhs, f(ens), f(cchain), func, iters)
 
     case _ => super.unrollCtrl(lhs,rhs)

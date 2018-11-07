@@ -1,0 +1,7 @@
+#!/bin/bash
+
+app=$1
+cd pir
+sbt "; publishAll"
+cd ../gen/$app
+sbt "; runMain AccelMain ${@:2}"

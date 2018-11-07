@@ -316,6 +316,16 @@ case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.
   * Setter:  sym.isFlatBank = (true | false)
   * Default: false
   */
+case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
+
+/** Flag set by the user to disable banking,
+  * Used in cases where it could be tricky or impossible to find any banking scheme scheme and
+  * the user does not want the compiler to waste time trying
+  *
+  * Getter:  sym.isFlatBank
+  * Setter:  sym.isFlatBank = (true | false)
+  * Default: false
+  */
 case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
 
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases

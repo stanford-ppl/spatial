@@ -22,9 +22,9 @@ trait CppGenAccel extends CppGenCommon {
       }
       controllerStack.pop()
       emit(s"// Register ArgIns and ArgIOs in case some are unused")
-      emit(s"c1->setNumArgIns(${argIns.toList.length} + ${drams.toList.length} + ${argIOs.toList.length});")
-      emit(s"c1->setNumArgIOs(${argIOs.toList.length});")
-      emit(s"c1->setNumArgOuts(${argOuts.toList.length});")
+      emit(s"c1->setNumArgIns(${argIns.length} + ${drams.length} + ${argIOs.length});")
+      emit(s"c1->setNumArgIOs(${argIOs.length});")
+      emit(s"c1->setNumArgOuts(${argOuts.length});")
       emit(s"c1->setNumArgOutInstrs(2*${if (spatialConfig.enableInstrumentation) instrumentCounters.length else 0});")
       emit(s"c1->setNumEarlyExits(${earlyExits.length});")
       emit(s"""c1->flushCache(1024);""")
@@ -40,7 +40,7 @@ trait CppGenAccel extends CppGenCommon {
          emit("bool early_exit = false;")
          val numInstrs = if (spatialConfig.enableInstrumentation) {2*instrumentCounters.length} else 0
          earlyExits.zipWithIndex.foreach{ case (b, i) =>
-           emit(src"long ${b}_act = c1->getArg(${argIOs.toList.length + argOuts.toList.length + drams.toList.length + argIns.toList.length + numInstrs + i}, false);")
+           emit(src"long ${b}_act = c1->getArg(${argIOs.length + argOuts.length + drams.length + argIns.length + numInstrs + i}, false);")
            val msg = b match {
              case Def(AssertIf(_,_,m)) => 
                val mm = m match {
@@ -59,9 +59,16 @@ trait CppGenAccel extends CppGenCommon {
          emit(src"""std::ofstream instrumentation ("./instrumentation.txt");""")
  
          emit(s"// Need to instrument ${instrumentCounters}")
-         val instrumentStart = argIOs.toList.length + argOuts.toList.length + drams.toList.length + argIns.toList.length // These "invisible" instrumentation argOuts start after the full range of IR interface args
+         val instrumentStart = argIOs.length + argOuts.length + drams.length + argIns.length // These "invisible" instrumentation argOuts start after the full range of IR interface args
          // In order to get niter / parent execution, we need to know the immediate parent of each controller and divide out that guy's niter
          val immediate_parent_niter_hashmap = scala.collection.mutable.HashMap[Int, Sym[_]]()
+         val ranWithArgIns = if (argIns.nonEmpty) argIns.mkString(" << \" \" << ") else " \" \" "
+         val ranWithArgIOs = if (argIOs.nonEmpty) argIOs.mkString(" << \" \" << ") else " \" \" "
+         emit(s"""std::cout << "ArgIns:" << ${ranWithArgIns} << ", ArgIOs:" << ${ranWithArgIOs} << std::endl;""")
+         open(s"if (instrumentation.is_open()) {")
+           emit(s"""instrumentation << "ArgIns:" << ${ranWithArgIns} << ", ArgIOs:" << ${ranWithArgIOs} << std::endl;""")
+         close("}")
+
          instrumentCounters.zipWithIndex.foreach{case (c, i) => 
            immediate_parent_niter_hashmap.update(c._2, c._1)
            emit(s""" // immediate parent hashmap now ${immediate_parent_niter_hashmap}, current node ${c._1} is at depth ${c._2}""")

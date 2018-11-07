@@ -4,9 +4,9 @@ import chisel3._
 import chisel3.util.Cat
 import fringe.globals
 import fringe.targets.DeviceTarget
-import fringe.{DRAMCommandTag, DRAMStream}
+import fringe.{DRAMStream}
 
-class MAGToAXI4Bridge(val p: AXI4BundleParameters, val tagWidth: Int) extends Module {
+class MAGToAXI4Bridge(val p: AXI4BundleParameters) extends Module {
   Predef.assert(p.dataBits == 512, s"ERROR: Unsupported data width ${p.dataBits} in MAGToAXI4Bridge")
 
   val io = IO(new Bundle {
@@ -67,6 +67,6 @@ class MAGToAXI4Bridge(val p: AXI4BundleParameters, val tagWidth: Int) extends Mo
   io.in.rresp.valid := io.M_AXI.RVALID // Used to be shift registered
   io.in.wresp.valid := io.M_AXI.BVALID // Used to be shift registered
 
-  io.in.rresp.bits.tag := io.M_AXI.RID.asTypeOf(new DRAMCommandTag)
-  io.in.wresp.bits.tag := io.M_AXI.BID.asTypeOf(new DRAMCommandTag)
+  io.in.rresp.bits.tag := io.M_AXI.RID
+  io.in.wresp.bits.tag := io.M_AXI.BID
 }

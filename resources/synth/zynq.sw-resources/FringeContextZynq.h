@@ -57,7 +57,7 @@ class FringeContextZynq : public FringeContextBase<void> {
   void* physToVirt(uint64_t physAddr) {
     std::map<uint64_t, void*>::iterator iter = physToVirtMap.find(physAddr);
     if (iter == physToVirtMap.end()) {
-      EPRINTF("Physical address '%x' not found in physToVirtMap\n. Was this allocated before?");
+      EPRINTF("Physical address '%llx' not found in physToVirtMap\n. Was this allocated before?", physAddr);
       exit(-1);
     }
     return iter->second;
@@ -160,7 +160,7 @@ public:
 //    return addr;
 //#endif
 
-    ASSERT(paddedSize <= fpgaFreeMemSize, "FPGA Out-Of-Memory: requested %u, available %u\n", paddedSize, fpgaFreeMemSize);
+    ASSERT(paddedSize <= fpgaFreeMemSize, "FPGA Out-Of-Memory: requested %u, available %lu\n", paddedSize, fpgaFreeMemSize);
 
     uint64_t virtAddr = (uint64_t) fpgaMallocPtr;
 
@@ -171,13 +171,13 @@ public:
     fpgaMallocPtr += paddedSize;
     fpgaFreeMemSize -= paddedSize;
     uint64_t physAddr = getFPGAPhys(virtAddr);
-    EPRINTF("[malloc] virtAddr = %lx, physAddr = %lx\n", virtAddr, physAddr);
+    EPRINTF("[malloc] virtAddr = %llx, physAddr = %llx\n", virtAddr, physAddr);
     return physAddr;
 
   }
 
   virtual void free(uint64_t buf) {
-    EPRINTF("[free] devmem = %lx\n", buf);
+    EPRINTF("[free] devmem = %llx\n", buf);
     // TODO: Freeing memory in a linear allocator is tricky. Just don't do anything until a more 'real' allocator is added
 //#ifdef USE_PHYS_ADDR
 //    std::free(physToVirt(buf));
@@ -187,14 +187,14 @@ public:
   }
 
   virtual void memcpy(uint64_t devmem, void* hostmem, size_t size) {
-    EPRINTF("[memcpy HOST -> FPGA] devmem = %lx, hostmem = %p, size = %u\n", devmem, hostmem, size);
+    EPRINTF("[memcpy HOST -> FPGA] devmem = %llx, hostmem = %p, size = %u\n", devmem, hostmem, size);
     void* dst = (void*) getFPGAVirt(devmem);
     std::memcpy(dst, hostmem, size); // Using alignedSize(bsb, size) causes corrupted memory in Viterbi???
 
   }
 
   virtual void memcpy(void* hostmem, uint64_t devmem, size_t size) {
-    EPRINTF("[memcpy FPGA -> HOST] hostmem = %p, devmem = %lx, size = %u\n", hostmem, devmem, size);
+    EPRINTF("[memcpy FPGA -> HOST] hostmem = %p, devmem = %llx, size = %u\n", hostmem, devmem, size);
     void *src = (void*) getFPGAVirt(devmem);
     std::memcpy(hostmem, src, size); // Using alignedSize(bsb, size) causes corrupted memory in Viterbi???
   }
@@ -204,7 +204,7 @@ public:
     int cacheSizeWords = kb * (1 << 10) / sizeof(int); // 512kB on Zynq, 1MB on ZCU
     int arraySize = cacheSizeWords * 10;
     int *dummyBuf = (int*) std::malloc(arraySize * sizeof(int));
-    EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", dummyBuf, getFPGAPhys((uint64_t) dummyBuf), arraySize);
+    EPRINTF("[memcpy] dummyBuf = %p, (phys = %llx), arraySize = %d\n", dummyBuf, getFPGAPhys((uint64_t) dummyBuf), arraySize);
     for (int i = 0; i<arraySize; i++) {
       if (i == 0) {
         dummyBuf[i] = 10;

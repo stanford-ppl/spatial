@@ -114,6 +114,21 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     }
   }
 
+  def combine(a1: Seq[AffineComponent], a2: Seq[AffineComponent]): Seq[AffineComponent] = {
+    val combined = a1 ++ a2
+    var remainingIndices = Seq.tabulate(combined.size){i => i}.toSet
+    combined.zipWithIndex.foreach{
+      case (a,i) if (remainingIndices.contains(i)) => 
+        val matches = combined.zipWithIndex.collect{case (x,j) if (-a == x) => j}.filter(remainingIndices.contains)
+        if (matches.nonEmpty) {
+          remainingIndices -= matches.head
+          remainingIndices -= i
+        }
+      case _ => 
+    }
+    remainingIndices.toSeq.sorted.map(combined)
+  }
+
   private object Affine {
     /** Recursively finds affine patterns in the dataflow graph starting from the given symbol x.
       * Examples of patterns:
@@ -130,10 +145,10 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       case Index(i) if isNullIndex(i)  => Some(Nil, Zero, NotSet)
 
       // Any affine component plus any other affine component (e.g. (4*i + 5) + (3*j + 2))
-      case Plus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set  => Some(a1 ++ a2, b1 + b2, NotSet)
+      case Plus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set  => Some(combine(a1, a2), b1 + b2, NotSet)
 
       // Any affine component minus any other affine component (e.g. j - 1)
-      case Minus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set => Some(a1 ++ (-a2), b1 - b2, NotSet)
+      case Minus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set => Some(combine(a1, -a2), b1 - b2, NotSet)
 
       // Product of an affine component with a loop independent value, e.g. 4*i or (i + j)*32
       // Note: the multiplier only has to be loop invariant w.r.t. to iterators in a.

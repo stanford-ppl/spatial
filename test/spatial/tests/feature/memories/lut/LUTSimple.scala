@@ -40,7 +40,43 @@ import spatial.dsl._
     println("result: " + result)
 
     val cksum = gold == result
-    println("PASS: " + cksum + " (InOutArg)")
+    println("PASS: " + cksum + " (LUTSimple)")
+    assert(gold == result)
+  }
+}
+
+@spatial class LUTFromFile extends SpatialTest {
+  override def runtimeArgs: Args = "2"
+
+  type T = FixPt[TRUE,_32,_0]
+
+  def main(args: Array[String]): Unit = {
+    // Declare SW-HW interface vals
+    val filename = "lut/data.csv"
+    val y = ArgOut[T]
+    val i = ArgIn[Int]
+    val ii = args(0).to[Int]
+
+    // Connect SW vals to HW vals
+    setArg(i, ii)
+
+    // Create HW accelerator
+    Accel {
+      val lut = LUT.fromFile[T](256)(s"${DATA}/$filename")
+      y := lut(i)
+    }
+
+
+    // Extract results from accelerator
+    val result = getArg(y)
+
+    val gold = loadCSV1D[T](s"${DATA}/$filename").apply(ii)
+
+    println("expected: " + gold)
+    println("result: " + result)
+
+    val cksum = gold == result
+    println("PASS: " + cksum + " (LUTFromFile)")
     assert(gold == result)
   }
 }

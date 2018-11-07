@@ -9,6 +9,8 @@ import utils.multiLoopWithIndex
 trait ScalaGenMemories extends ScalaGenBits {
   var globalMems: Boolean = false
 
+  val lineBufSwappers: scala.collection.mutable.Map[Sym[_], Set[Sym[_]]] = scala.collection.mutable.Map.empty
+
   override def emitPreMain(): Unit = {
     emit(src"OOB.open()")
     super.emitPreMain()
@@ -98,7 +100,7 @@ trait ScalaGenMemories extends ScalaGenBits {
     val dimensions = dims.map(_.toString).mkString("Seq(", ",", ")")
     val numBanks = inst.nBanks.map(_.toString).mkString("Seq(", ",", ")")
 
-    if (mem.isRegFile) {
+    if (mem.isRegFile || mem.isLUT) {
       val name = s""""${mem.fullname}""""
       val data = init match {
         case Some(elems) if elems.length >= size => src"Array[$tp](${elems.take(size)})"

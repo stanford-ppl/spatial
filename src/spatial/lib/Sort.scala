@@ -64,16 +64,16 @@ object Sort {
     src: DRAM1[T],
     dst: DRAM1[T],
     mergePar: scala.Int = 2,
-    ways: scala.Int = 2
+    ways: scala.Int = 2,
+    numel: scala.Int
   ): Unit = {
 
-    val n = 4096
     val sramBlockSize = 256
 
     // SRAM block sort
     Pipe {
       val sram = SRAM[T](sramBlockSize)
-      Sequential.Foreach(0 until n by sramBlockSize) { blockAddr =>
+      Sequential.Foreach(0 until numel by sramBlockSize) { blockAddr =>
         val blockRange = blockAddr::blockAddr + sramBlockSize par mergePar
         sram load src(blockRange)
         mergeSort(sram, mergePar, ways)
@@ -85,13 +85,13 @@ object Sort {
     Pipe {
       val blockSizeInit = sramBlockSize
       val mergeSizeInit = blockSizeInit * ways
-      val mergeCountInit = n / mergeSizeInit
+      val mergeCountInit = numel / mergeSizeInit
       // extra level for base case
-      val levelCount = log(n / blockSizeInit, ways)
+      val levelCount = log(numel / blockSizeInit, ways)
 
       val doubleBuf = Reg[Boolean]
       doubleBuf := true
-      val fifos = List.fill(ways) { FIFO[T](n) }
+      val fifos = List.fill(ways) { FIFO[T](numel) }
       val mergeBuf = MergeBuffer[T](ways, mergePar)
 
       val blockSize = Reg[I32](blockSizeInit)

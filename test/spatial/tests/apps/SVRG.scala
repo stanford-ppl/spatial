@@ -186,7 +186,7 @@ import spatial.dsl._
               cost(0 :: min((max_history-1).to[Int], getArg(E_ACTUAL))) store cost_sram
               w(0 :: D par storePar) store w_k_t
 
-              breakpoint()
+              exit()
             }
           }
 

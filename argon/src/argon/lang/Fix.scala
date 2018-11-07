@@ -53,9 +53,9 @@ object FixFmt {
   @api def *(that: Fix[S,I,F]): Fix[S,I,F] = stage(FixMul(this,that))
   @api def /(that: Fix[S,I,F]): Fix[S,I,F] = stage(FixDiv(this,that))
   @api def %(that: Fix[S,I,F]): Fix[S,I,F] = stage(FixMod(this,that))
-  @api def <<(that: Fix[S,I,_0]): Fix[S,I,F] = stage(FixSLA(this,that))
-  @api def >>(that: Fix[S,I,_0]): Fix[S,I,F] = stage(FixSRA(this,that))
-  @api def >>>(that: Fix[S,I,_0]): Fix[S,I,F] = stage(FixSRU(this,that))
+  @api def <<(that: Fix[TRUE,_16,_0]): Fix[S,I,F] = stage(FixSLA(this,that))
+  @api def >>(that: Fix[TRUE,_16,_0]): Fix[S,I,F] = stage(FixSRA(this,that))
+  @api def >>>(that: Fix[TRUE,_16,_0]): Fix[S,I,F] = stage(FixSRU(this,that))
 
   @api def <(that: Fix[S,I,F]): Bit = stage(FixLst(this,that))
   @api def <=(that: Fix[S,I,F]): Bit = stage(FixLeq(this,that))

@@ -52,7 +52,7 @@ class FringeZynq(
     val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(TARGET_W.W)))
 
     // Accel memory IO
-    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS)
+    val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     val heap = new HeapIO(numAllocators)
 
     // External enable
@@ -114,7 +114,7 @@ class FringeZynq(
 
   // AXI bridge
   io.M_AXI.zipWithIndex.foreach { case (maxi, i) =>
-    val axiBridge = Module(new MAGToAXI4Bridge(axiParams, fringeCommon.mags(i).streamTagWidth))
+    val axiBridge = Module(new MAGToAXI4Bridge(axiParams))
     axiBridge.io.in <> fringeCommon.io.dram(i)
     maxi <> axiBridge.io.M_AXI
   }

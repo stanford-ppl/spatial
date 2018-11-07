@@ -31,59 +31,58 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
     type T = Int64
 
-    val dram1 = DRAM[T](8)
-    val dram2 = DRAM[T](8)
-    val dram3 = DRAM[T](8)
-    val dram4 = DRAM[T](8)
-    val dram5 = DRAM[T](8)
-    val tile = 2
+    val tile = 8
+    val memsize = 64
+    val mapIters = 4
 
-    setMem(dram1, Array.tabulate[T](8){i => i.to[T]})
+    val dram1 = DRAM[T](memsize)
+    val dram2 = DRAM[T](memsize)
+    val dram3 = DRAM[T](memsize)
+    val dram4 = DRAM[T](memsize)
+    val dram5 = DRAM[T](memsize)
+
+    setMem(dram1, Array.tabulate[T](memsize){i => i.to[T]})
 
     Accel {
-      val x = SRAM[T](8)
+      val x = SRAM[T](memsize)
       x load dram1
-      // // unroll map and reduce
-      // val x1 = SRAM[T](tile,1)
-      // Foreach(8 by tile){i => 
-      //   x1 load dram1(i::i+tile)
-      //   MemReduce(x1(0::tile par tile))(2 by 1 par 2){j => x1}{_+_}
-      //   dram2(i::i+tile) store x1
-      // }
+      // unroll map and reduce
+      val x1 = SRAM[T](tile)
+      'UNROLLmr.Foreach(memsize by tile){i => 
+        MemReduce(x1(0::tile par tile))(mapIters by 1 par mapIters){j => x(i::i+tile)}{_+_}
+        dram2(i::i+tile) store x1
+      }
 
       // unroll reduce only
       val x2 = SRAM[T](tile)
-      Foreach(8 by tile){i => 
-        x2 load dram1(i::i+tile)
-        MemReduce(x2(0::tile par tile))(2 by 1){j => x(i::i+tile)}{_+_}
+      'UNROLLr.Foreach(memsize by tile){i => 
+        MemReduce(x2(0::tile par tile))(mapIters by 1){j => x(i::i+tile)}{_+_}
         dram3(i::i+tile) store x2
       }
 
-      // // unroll reduce only
-      // val x3 = SRAM[T](tile,1)
-      // Foreach(8 by tile){i => 
-      //   x3 load dram1(i::i+tile)
-      //   MemReduce(x3)(2 by 1 par 2){j => x3}{_+_}
-      //   dram4(i::i+tile) store x3
-      // }
+      // unroll map only
+      val x3 = SRAM[T](tile)
+      'UNROLLm.Foreach(memsize by tile){i => 
+        MemReduce(x3)(mapIters by 1 par mapIters){j => x(i::i+tile)}{_+_}
+        dram4(i::i+tile) store x3
+      }
 
       // no unrolling
       val x4 = SRAM[T](tile)
-      Foreach(8 by tile){i => 
-        x4 load dram1(i::i+tile)
-        MemReduce(x4)(2 by 1){j => x(i::i+tile)}{_+_}
-        dram4(i::i+tile) store x4
+      'UNROLLnone.Foreach(memsize by tile){i => 
+        MemReduce(x4)(mapIters by 1){j => x(i::i+tile)}{_+_}
+        dram5(i::i+tile) store x4
       }
 
 
     }
 
-    val gold = Array.tabulate[T](8){i => 2*i.to[T]}
-    printArray(gold, "Dumb Load SRC")
-    printArray(getMem(dram2), "Dumb Load (unroll both) DST1")
-    printArray(getMem(dram3), "Dumb Load (unroll reduce) DST1")
-    printArray(getMem(dram4), "Dumb Load (unroll map) DST1")
-    printArray(getMem(dram5), "Dumb Load (no unroll) DST1")
+    val gold = Array.tabulate[T](memsize){i => mapIters*i.to[T]}
+    printArray(gold, "gold")
+    printArray(getMem(dram2), r"unroll both. Pass: ${getMem(dram2) == gold}")
+    printArray(getMem(dram3), r"unroll reduce. Pass: ${getMem(dram3) == gold}")
+    printArray(getMem(dram4), r"unroll map. Pass: ${getMem(dram4) == gold}")
+    printArray(getMem(dram5), r"no unroll. Pass: ${getMem(dram5) == gold}")
     assert(gold == getMem(dram2))
     assert(gold == getMem(dram3))
     assert(gold == getMem(dram4))

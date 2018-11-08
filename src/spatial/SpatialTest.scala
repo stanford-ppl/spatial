@@ -100,8 +100,7 @@ trait SpatialTest extends Spatial with DSLTest { self =>
   object PIR extends PIRBackEnd (
     name="PIR"
   )(
-    args = "--pir --dot",
-    run = ""
+    args = "--pir --dot --vv"
   )
 
   object PIRNoPar extends PIRBackEnd (

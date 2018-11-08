@@ -95,7 +95,8 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   }
 
   protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
-    hostGen.genHost(lhs, rhs)
+    //hostGen.genHost(lhs, rhs)
+    rhs.blocks.foreach(ret)
   }
 
   protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {

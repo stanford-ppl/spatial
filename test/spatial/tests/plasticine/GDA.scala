@@ -18,8 +18,8 @@ import spatial.dsl._
 
   def gda[T: Num](xCPU: Array[T], yCPU: Array[Int], mu0CPU: Array[T], mu1CPU: Array[T]) = {
 
-    val R = ArgIn[Int]
-    setArg(R, yCPU.length); bound(yCPU.length) = self.R
+    //val R = ArgIn[Int]
+    //setArg(R, yCPU.length); bound(yCPU.length) = self.R
 
     val x = DRAM[T](R, C)
     val y = DRAM[Int](R)
@@ -45,7 +45,6 @@ import spatial.dsl._
       MemReduce(sigmaOut par ip)(R by ts par op){ r =>
         val gdaYtile = SRAM[Int](ts)
         val gdaXtile = SRAM[T](ts, C)
-        val blk = Reg[Int]
         Parallel {
           gdaYtile load y(r :: r + ts par ip)
           gdaXtile load x(r :: r + ts, 0 :: C par ip) // Load tile of x
@@ -99,6 +98,7 @@ import spatial.dsl._
 
     val cksum = gold.zip(result){ case (a,b) => a < b + margin && a > b - margin }.reduce{_&&_}
     println("PASS: " + cksum  + " (GDA)")
+    assert(cksum)
   }
 
 }

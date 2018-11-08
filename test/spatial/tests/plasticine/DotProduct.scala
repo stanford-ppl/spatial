@@ -6,15 +6,17 @@ import spatial.dsl._
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 
+  val N = 1024
+    
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     val ip = 16
     val op = 2
     val ts  = 32
 
-    val size = aIn.length; bound(size) = 1920000
+    //val size = aIn.length; bound(size) = 1920000
 
-    val N = ArgIn[Int]
-    setArg(N, size)
+    //val N = ArgIn[Int]
+    //setArg(N, size)
 
     val a = DRAM[T](N)
     val b = DRAM[T](N)
@@ -40,7 +42,6 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    val N = args(0).to[Int]
     val a = Array.fill(N){ random[X](4) }
     val b = Array.fill(N){ random[X](4) }
 

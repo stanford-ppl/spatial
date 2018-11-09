@@ -23,6 +23,7 @@ trait ChiselGenController extends ChiselGenCommon {
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
+    ensigs = new scala.collection.mutable.ListBuffer[String]
     if (spatialConfig.enableInstrumentation && inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
     if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }

@@ -18,10 +18,12 @@ import spatial.dsl._
 
   def outerproduct[T:Num](a: Array[T], b: Array[T]) = {
 
-    val sizeA = ArgIn[Int]
-    val sizeB = ArgIn[Int]
-    setArg(sizeA, a.length); bound(a.length) = M
-    setArg(sizeB, b.length); bound(b.length) = N
+    //val sizeA = ArgIn[Int]
+    //val sizeB = ArgIn[Int]
+    //setArg(sizeA, a.length); bound(a.length) = M
+    //setArg(sizeB, b.length); bound(b.length) = N
+    val sizeA = N
+    val sizeB = N
 
     val vec1 = DRAM[T](sizeA)
     val vec2 = DRAM[T](sizeB)
@@ -63,7 +65,7 @@ import spatial.dsl._
 
     val cksum = result_cksum == gold_cksum
     println("PASS: " + cksum + " (OuterProduct)")
-
+    assert(cksum)
 
   }
 }

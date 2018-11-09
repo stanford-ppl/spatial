@@ -19,13 +19,13 @@ import spatial.dsl._
   val margin = 1
 
   def sgdminibatch(x_in: Array[TX], y_in: Array[TX], alpha: TM, epochs: Int, nn: Int) = {
-    val E = ArgIn[Int]
-    val N = ArgIn[Int]
-    val A = ArgIn[TM]
+    //val E = ArgIn[Int]
+    //val N = ArgIn[Int]
+    //val A = ArgIn[TM]
 
-    setArg(E, epochs); bound(E) = self.E
-    setArg(N, nn); bound(N) = self.N
-    setArg(A, alpha)
+    //setArg(E, epochs); bound(E) = self.E
+    //setArg(N, nn); bound(N) = self.N
+    //setArg(A, alpha)
 
     val x = DRAM[TX](N,D)
     val y = DRAM[TX](N)
@@ -73,6 +73,7 @@ import spatial.dsl._
     printArray(result, "result: ")
     printArray(ideal_model, "gold: ")
     println("PASS: " + cksum  + " (SGD_minibatch)")
+    assert(cksum)
   }
 }
 

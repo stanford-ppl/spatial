@@ -213,5 +213,6 @@ import spatial.dsl._
     val margin = 1.882.to[T]
   	val cksum = gold.zip(output_no_extra){(a,b) => abs(a-b) < margin}.reduce{_&&_}
   	println("PASS: " + cksum)
+    assert(cksum)
   }
 }

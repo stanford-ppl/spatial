@@ -109,6 +109,7 @@ import spatial.util.spatialConfig
     val cksum = data_gold.zip(data_result){(a,b) => abs(a-b) <= margin}.reduce{_&&_}
 
     println("PASS: " + cksum + " (SPMV_ELL)")
+    assert(cksum)
 
   }
 }

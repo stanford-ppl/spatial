@@ -57,6 +57,19 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     stage(FixRecipSqrt(x))
   }
 
+  def fixShiftCombine[S,I,F](x: Fix[S,I,F], y: Int, dir: String): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = x.fmt.s
+    implicit val I: INT[I] = x.fmt.i
+    implicit val F: INT[F] = x.fmt.f
+    dir match {
+      case _ if y == 0 => x
+      case "sla" if y > 0 => stage(FixSLA(x,y))
+      case "sla" if y < 0 => stage(FixSRA(x,-y))
+      case "sra" if y > 0 => stage(FixSRA(x,y))
+      case _ /*"sra" if y < 0*/ => stage(FixSLA(x,-y))
+    }
+  }
+
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
@@ -99,6 +112,16 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     // Square root has already been mirrored, but should be removed if unused
     case FltRecip(F( Op(FltSqrt(b)) )) => fltRecipSqrt(b).asInstanceOf[Sym[A]]
     case FixRecip(F( Op(FixSqrt(b)) )) => fixRecipSqrt(b).asInstanceOf[Sym[A]]
+
+    // Multiple shitfies
+    case FixSLA(F(Op(FixSLA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
+      fixShiftCombine(x, (y1+y2).toInt, "sla").asInstanceOf[Sym[A]]
+    case FixSLA(F(Op(FixSRA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
+      fixShiftCombine(x, (-y1+y2).toInt, "sla").asInstanceOf[Sym[A]]
+    case FixSRA(F(Op(FixSRA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
+      fixShiftCombine(x, (y1+y2).toInt, "sra").asInstanceOf[Sym[A]]
+    case FixSRA(F(Op(FixSLA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
+      fixShiftCombine(x, (-y1+y2).toInt, "sra").asInstanceOf[Sym[A]]
 
     // m1*m2 + add --> fma(m1,m2,add)
     case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>

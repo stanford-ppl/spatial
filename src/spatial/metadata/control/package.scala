@@ -285,6 +285,11 @@ package object control {
       */
     @stateful def children: Seq[Ctrl.Node]
 
+    /** Returns a sequence of all controllers and subcontrollers which are siblings (children of parent) in the
+      * control hierarchy of this symbol or controller.
+      */
+    @stateful def siblings: Seq[Ctrl.Node]
+
     /** Returns all ancestors of the controller or symbol.
       * Ancestors are ordered outermost to innermost
       */
@@ -466,6 +471,11 @@ package object control {
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
+    @stateful def siblings: Seq[Ctrl.Node] = {
+      if (s.isControl) parent.children
+      else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
+    }
+
     def parent: Ctrl = s.rawParent
     def scope: Scope = s.rawScope
 
@@ -542,6 +552,7 @@ package object control {
     def isControl: Boolean = true
 
     @stateful def children: Seq[Ctrl.Node] = toCtrl.children
+    @stateful def siblings: Seq[Ctrl.Node] = toCtrl.siblings
     def parent: Ctrl = toCtrl.parent
     def scope: Scope = scp
 
@@ -588,6 +599,8 @@ package object control {
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
     }
+
+    @stateful def siblings: Seq[Ctrl.Node] = parent.children
 
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent

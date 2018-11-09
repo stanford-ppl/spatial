@@ -4,6 +4,7 @@ import argon._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds.Expect
+import spatial.metadata.access._
 import spatial.metadata.control._
 
 package object memory {
@@ -69,6 +70,29 @@ package object memory {
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
 
     def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}
+
+    /** Controllers just below the LCA who are responsible for swapping a buffered memory */
+    import forge.tags.stateful
+    @stateful def swappers: List[Sym[_]] = {
+      val accesses = s.accesses.filter(_.port.bufferPort.isDefined)
+      if (accesses.nonEmpty) {
+        val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses)
+        if (lca.isParallel){ // Assume memory analysis chose buffering based on lockstep of different bodies within this parallel, and just use one
+          val releventAccesses = accesses.toList.filter(_.ancestors.contains(lca.children.head)).toSet
+          val logickingLca = LCA(releventAccesses)
+          val (basePort, numPorts) = if (logickingLca.s.get.isInnerControl) (0,0) else LCAPortMatchup(releventAccesses.toList, logickingLca)
+          val info = if (logickingLca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => logickingLca.children.toList(port).s.get }
+          info.toList        
+        } else {
+          val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
+          val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
+          info.toList        
+        }
+      } else {
+        throw new Exception(s"Cannot create a buffer on $s, which has no accesses")
+      }
+    }
+
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {
@@ -208,6 +232,19 @@ package object memory {
     def isLUT: Boolean = mem match {
       case _: LUT[_,_] => true
       case _ => false
+    }
+
+    def memName: String = mem match {
+      case _: LUT[_,_] => "LUT"
+      case _: SRAM[_,_] => "BankedSRAM"
+      case _: Reg[_] => "FF"
+      case _: FIFOReg[_] => "FIFOReg"
+      case _: RegFile[_,_] => "ShiftRegFile"
+      case _: LineBuffer[_] => "LineBuffer"
+      case _: MergeBuffer[_] => "MergeBuffer"
+      case _: FIFO[_] => "FIFO"
+      case _: LIFO[_] => "LIFO"
+      case _ => "Unknown"
     }
 
     def hasInitialValues: Boolean = mem match {

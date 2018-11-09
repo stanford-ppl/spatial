@@ -172,7 +172,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     paddedInits.mkString("Some(List(",",","))")
   }
 
-  private def emitMem(mem: Sym[_], name: String, init: Option[Seq[Sym[_]]]): Unit = {
+  private def emitMem(mem: Sym[_], init: Option[Seq[Sym[_]]]): Unit = {
+    val name = mem.memName
     if (mem.dephasedAccesses.nonEmpty) appPropertyStats += HasDephasedAccess
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
@@ -303,19 +304,19 @@ trait ChiselGenMem extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     // SRAMs
-    case op: SRAMNew[_,_] => emitMem(lhs, "BankedSRAM", None)
+    case op: SRAMNew[_,_] => emitMem(lhs, None)
     case op@SRAMBankedRead(sram,bank,ofs,ens) => emitRead(lhs, sram, bank, ofs, ens)
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => emitWrite(lhs, sram, data, bank, ofs, ens)
 
     // FIFORegs
-    case FIFORegNew(init) => emitMem(lhs, "FIFOReg", Some(List(init)))
+    case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
     case FIFORegEnq(reg, data, ens) => emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
     case FIFORegDeq(reg) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
 
     // Registers
     case RegNew(init) => 
       lhs.optimizedRegType match {
-        case None            => emitMem(lhs, "FF", Some(List(init)))
+        case None            => emitMem(lhs, Some(List(init)))
         case Some(AccumAdd) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
           val opLatency = scala.math.max(1.0, latencyOption("FixAdd", Some(d+f)))
@@ -393,7 +394,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
-    case op@RegFileNew(_, inits) => emitMem(lhs, "ShiftRegFile", inits)
+    case op@RegFileNew(_, inits) => emitMem(lhs, inits)
     case RegFileReset(rf, en)    => emitReset(lhs, rf, en)
     case RegFileShiftInVector(rf,data,addr,en,axis)  => emitWrite(lhs,rf,data.elems.map(_.asInstanceOf[Sym[_]]).toSeq,Seq(addr),Seq(),Seq(en), Some(axis))
     case RegFileShiftIn(rf,data,addr,en,axis)        => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en), Some(axis))
@@ -404,12 +405,12 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
     // LineBuffers
-    case LineBufferNew(rows, cols, stride) => emitMem(lhs, "LineBuffer", None)
+    case LineBufferNew(rows, cols, stride) => emitMem(lhs, None)
     case LineBufferBankedEnq(lb, data, row, ens) => emitWrite(lhs,lb,data,Seq(row),Seq(),ens)
     case LineBufferBankedRead(lb, bank, ofs, ens) => emitRead(lhs,lb,bank,ofs,ens)
     
     // FIFOs
-    case FIFONew(depths) => emitMem(lhs, "FIFO", None)
+    case FIFONew(depths) => emitMem(lhs, None)
     case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.empty")
     case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
     case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
@@ -424,7 +425,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"$fifo.enqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})")
 
     // LIFOs
-    case LIFONew(depths) => emitMem(lhs, "LIFO", None)
+    case LIFONew(depths) => emitMem(lhs, None)
     case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.empty")
     case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
     case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
@@ -435,7 +436,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     
     // LUTs
-    case op@LUTNew(dims, init) => emitMem(lhs, "LUT", Some(init))
+    case op@LUTNew(dims, init) => emitMem(lhs, Some(init))
     case op@LUTBankedRead(lut,bank,ofs,ens) => emitRead(lhs,lut,bank,ofs,ens)
 
     // MergeBuffer
@@ -469,30 +470,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case _ => super.gen(lhs, rhs)
   }
 
-  protected def bufferControlInfo(mem: Sym[_]): List[Sym[_]] = {
-    val accesses = mem.accesses.filter(_.port.bufferPort.isDefined)
-    if (accesses.nonEmpty) {
-      val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses)
-      if (lca.isParallel){ // Assume memory analysis chose buffering based on lockstep of different bodies within this parallel, and just use one
-        val releventAccesses = accesses.toList.filter(_.ancestors.contains(lca.children.head)).toSet
-        val logickingLca = LCA(releventAccesses)
-        val (basePort, numPorts) = if (logickingLca.s.get.isInnerControl) (0,0) else LCAPortMatchup(releventAccesses.toList, logickingLca)
-        val info = if (logickingLca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => logickingLca.children.toList(port).s.get }
-        info.toList        
-      } else {
-        val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
-        val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
-        info.toList        
-      }
-    } else {
-      throw new Exception(s"Cannot create a buffer on $mem, which has no accesses")
-    }
-
-  }
-
   private def connectBufSignals(mem: Sym[_]): Unit = {
-    val info = bufferControlInfo(mem)
-    info.zipWithIndex.foreach{ case (node, port) => 
+    mem.swappers.zipWithIndex.foreach{ case (node, port) => 
       val sfx = if (node.isBranch) "_obj" else ""
       emit(src"""${mem}.m.connectStageCtrl(${DL(src"${node}$sfx.done", 1, true)}, ${node}$sfx.baseEn, ${port})""")
     }

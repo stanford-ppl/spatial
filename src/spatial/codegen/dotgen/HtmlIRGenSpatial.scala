@@ -3,6 +3,7 @@ package spatial.codegen.dotgen
 import argon._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
 
@@ -54,7 +55,7 @@ case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
 
   override def emitMeta(lhs: Sym[_]): Unit = lhs match {
     case lhs if lhs.blocks.nonEmpty =>
-      emit(elem("a", "dot<br>", "href"->s"$lhs.html"))
+      if (spatialConfig.enableDot) emit(elem("a", "dot<br>", "href"->s"$lhs.html"))
       super.emitMeta(lhs)
     case lhs =>
       val parent = lhs match {
@@ -62,7 +63,7 @@ case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
         case _ => lhs.blk.s
       }
       val parentFile = parent.map { sym => s"$sym" }.getOrElse("Top")
-      emit(elem("a", "dot<br>", "href"->s"$parentFile.html"))
+      if (spatialConfig.enableDot) emit(elem("a", "dot<br>", "href"->s"$parentFile.html"))
       super.emitMeta(lhs)
   }
 

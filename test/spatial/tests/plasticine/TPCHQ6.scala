@@ -19,8 +19,9 @@ import spatial.dsl._
   val ip = 16
 
   def tpchq6[T:Num](datesIn: Array[Int], quantsIn: Array[Int], disctsIn: Array[T], pricesIn: Array[T]): T = {
-    val dataSize = ArgIn[Int]
-    setArg(dataSize, datesIn.length); bound(datesIn.length) = N
+    //val dataSize = ArgIn[Int]
+    //setArg(dataSize, datesIn.length); bound(datesIn.length) = N
+    val dataSize = N
 
     val dates  = DRAM[Int](dataSize)
     val quants = DRAM[Int](dataSize)
@@ -94,6 +95,7 @@ import spatial.dsl._
 
     val cksum = (gold < result + margin && gold > result - margin)
     println("PASS: " + cksum + " (TPCHQ6)")
+    assert(cksum)
   }
 }
 

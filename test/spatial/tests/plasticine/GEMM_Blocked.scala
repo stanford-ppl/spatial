@@ -4,8 +4,10 @@ import spatial.dsl._
 
 @spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
                                                                                                   
-  val DIM = 128 // param [512]
-  val IDIM = 128 // param [256]
+  val dim = 128 // param [512]
+  val idim = 128 // param [256]
+  val DIM = dim
+  val IDIM = idim
 
   val ts = 64 // param [256] # (64, 256, 64)
   val its = 64 // param [128] # pmuSize / <ts>
@@ -20,10 +22,10 @@ import spatial.dsl._
 
   def gemm(a_data:Matrix[T], b_data:Matrix[T], c_init:Matrix[T]) = {
 
-    val dim = ArgIn[Int]
-    val idim = ArgIn[Int]
-    setArg(dim, a_data.rows); bound(dim) = DIM
-    setArg(idim, IDIM); bound(idim) = IDIM
+    //val dim = ArgIn[Int]
+    //val idim = ArgIn[Int]
+    //setArg(dim, a_data.rows); bound(dim) = DIM
+    //setArg(idim, IDIM); bound(idim) = IDIM
     val a_dram = DRAM[T](idim,dim)
     val b_dram = DRAM[T](dim,dim)
     val c_dram = DRAM[T](idim,dim)
@@ -82,6 +84,7 @@ import spatial.dsl._
     val margin = 0.5.to[T]
     val cksum = c_gold.zip(c_result){(a,b) => abs(a-b) < margin}.reduce{_&&_}
     println("PASS: " + cksum + " (GEMM_Blocked)")
+    assert(cksum)
   }
 }
 

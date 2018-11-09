@@ -8,15 +8,16 @@ import spatial.dsl._
   type X = Float //FixPt[TRUE,_16,_16]
 
   val margin = 5
-  val dim = 192
-  val D = dim
   val A = 1
+  val iters = 1 // param [4]
+  val D = 128 // param [128]
+  val N = 1024 // param [pmuSize / <D> * 16]
 
   def logreg[T:Num](xIn: Array[T], yIn: Array[T], tt: Array[T], n: Int, it: Int): Array[T] = {
-    val iters = ArgIn[Int]
-    val N     = ArgIn[Int]
-    setArg(iters, it)
-    setArg(N, n)
+    //val iters = ArgIn[Int]
+    //val N     = ArgIn[Int]
+    //setArg(iters, it)
+    //setArg(N, n)
 
     val ts = 64
     val op = 1

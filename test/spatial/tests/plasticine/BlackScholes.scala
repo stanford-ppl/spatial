@@ -132,6 +132,7 @@ import spatial.dsl._
 
     //val cksum = out.zip(gold){ case (o, g) => (g < (o + margin)) && g > (o - margin)}.reduce{_&&_}
     //println("PASS: " + cksum + " (BlackSholes)")
+    assert(true)
 
 
   }

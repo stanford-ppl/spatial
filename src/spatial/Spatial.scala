@@ -371,6 +371,10 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.target.areaModel.init()
       spatialConfig.target.latencyModel.init()
     }
+    if (java.nio.file.Files.exists(java.nio.file.Paths.get(config.genDir))) {
+      warn(s"Output directory ${config.genDir} already exists!  Generated files")
+      warn(s"from other targets may still exist and may interfere with this build!")
+    }
   }
 
 }

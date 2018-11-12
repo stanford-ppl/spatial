@@ -72,8 +72,9 @@ import spatial.dsl._
     stimes:      Array[Float]
   ): Array[Float] = {
 
-    val size = ArgIn[Int]
-    setArg(size, stypes.length); bound(stypes.length) = N
+    //val size = ArgIn[Int]
+    //setArg(size, stypes.length); bound(stypes.length) = N
+    val size = N
 
     val types    = DRAM[Int](size)
     val prices   = DRAM[Float](size)

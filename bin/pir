@@ -4,4 +4,5 @@ app=$1
 cd pir
 sbt "; publishAll"
 cd ../gen/PIR/$app
-sbt "; runMain AccelMain ${@:2}"
+args=${@:2}
+sbt "; runMain AccelMain $args"

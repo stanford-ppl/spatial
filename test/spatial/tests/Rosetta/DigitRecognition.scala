@@ -12,7 +12,7 @@ import utils.implicits._
 
 	@struct case class IntAndIndex(value : Int, inx : I32)
 
-	@struct case class Int16AndIndex(value : Int16, inx : I32)
+	@struct case class Int8AndIndex(value : Int16, inx : I32)
 
 	@struct case class LabelAndIndex(dist : Int, label : LabelType, inx : I32)
     
@@ -22,6 +22,8 @@ import utils.implicits._
 
     @struct case class DigitType2(d3 : UInt64, d4 : UInt64)
 
+    @struct case class LabelAndDist(dist : Int, label : LabelType)
+
 
 	val digit_length 		= 196
 	val digit_field_num 	= 4
@@ -30,7 +32,7 @@ import utils.implicits._
 
 	/* Parameters to tune */
 	val k_const 				= 3 /* Number of nearest neighbors to handle */
-	val par_factor  			= 20
+	val par_factor  			= 40
 	val parLoad 				= 2
 
 	def network_sort(knn_set 		: RegFile2[Int], 
@@ -39,7 +41,35 @@ import utils.implicits._
 		/* Odd-Even network sort on knn_set in-place */
 		val num_elems = k_const /* should be size of each knn_set */
 		val oe_par_factor = num_elems >> 1  // might not work if regfile size is even 
+	
+		val knn_val1 = LabelAndDist(knn_set(p,0), label_set(p,0))
+		val knn_val2 = LabelAndDist(knn_set(p,1), label_set(p,1))
+		val knn_val3 = LabelAndDist(knn_set(p,2), label_set(p,2))
 
+		val value_1 = knn_val1.dist 
+		val value_2 = knn_val2.dist
+		val smaller_set = mux(value_1 <  value_2, knn_val1, knn_val2)
+		val bigger_set  = mux(value_1 >= value_2, knn_val1, knn_val2)
+
+		val value_11 = bigger_set.dist 
+		val value_12 = knn_val3.dist 
+		val smaller_set_2 = mux(value_11 <  value_12, bigger_set, knn_val3)
+		val biggest_set   = mux(value_11 >= value_12, bigger_set, knn_val3)
+
+		val value_21 = smaller_set.dist 
+		val value_22 = smaller_set_2.dist
+		val smallest_set = mux(value_21 <  value_22, smaller_set, smaller_set_2)
+		val mid_set 	 = mux(value_21 >= value_22, smaller_set, smaller_set_2)
+
+		knn_set(p,0) = smallest_set.dist 
+		knn_set(p,1) = mid_set.dist 
+		knn_set(p,2) = biggest_set.dist 
+
+		label_set(p,0) = smallest_set.label 
+		label_set(p,1) = mid_set.label 
+		label_set(p,2) = biggest_set.label 
+
+		/*
 		Foreach(num_elems by 1) { i =>
 			val start_i = mux( (i & 1.to[I32]) == 1.to[I32], 0.to[I32], 1.to[I32] )
 			
@@ -59,8 +89,8 @@ import utils.implicits._
 
 				label_set(p, k)		 = first_label
 				label_set(p, k + 1)  = second_label
-			}
-		}
+			} 
+		} */
 	}
 
 	
@@ -115,7 +145,6 @@ import utils.implicits._
 						d4.bit(i).to[Int16] 
 					  }.reduceTree(_ + _)
 		
-		//println(r"sum 1s in ${x1.d1} = ${bits_d1}, ${x1.d2} = ${bits_d2}, ${x2.d3} = ${bits_d3}, ${x2.d4} = ${bits_d4},")
 		bits_d1 + bits_d2 + bits_d3 + bits_d4
 	}
 
@@ -131,27 +160,19 @@ import utils.implicits._
 		val digit_xored1 = DigitType1(test_inst1.d1 ^ train_inst1.d1, test_inst1.d2 ^ train_inst1.d2)
 		val digit_xored2 = DigitType2(test_inst2.d3 ^ train_inst2.d3, test_inst2.d4 ^ train_inst2.d4)
 
-		val max_dist = Reg[Int16AndIndex](Int16AndIndex(0.to[Int16], 0.to[I32]))
-		val dist 	 = Reg[Int16](0.to[Int16])
+		val dist = hamming_distance(digit_xored1, digit_xored2)
 
-		//max_dist.reset()
-		max_dist := Int16AndIndex(0.to[Int16], 0.to[I32]) 
-		//val already_inserted = Reg[Boolean](false).buffer 
-		//already_inserted := false
+		val max_dist_tmp = mux( min_dists(p,0) > min_dists(p, 1), Int8AndIndex(min_dists(p,0).to[Int16], 0.to[I32]),  Int8AndIndex(min_dists(p,1).to[Int16], 1.to[I32]) )
+		val max_dist = mux( max_dist_tmp.value.to[Int] > min_dists(p, 2), max_dist_tmp, Int8AndIndex(min_dists(p, 2).to[Int16], 2.to[I32]) ) //harcoding muxes here
 
-		Parallel {
-			dist := hamming_distance(digit_xored1, digit_xored2)
+	//		Reduce(max_dist)(k_const by 1 par k_const) { k =>
+			//	Int16AndIndex(min_dists(p, k).to[Int16], k)
+		//	} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
+		//}
 
-			Reduce(max_dist)(k_const by 1 par k_const) { k =>
-				// println(r"checking dists ${min_dists(p,k)} for $k")
-				Int16AndIndex(min_dists(p, k).to[Int16], k)
-			} {(dist1,dist2) => mux(dist1.value > dist2.value, dist1, dist2) }
-		}
-
-		//println(r"dist = ${dist}, max_dist = ${max_dist.value}")
-		if (dist < max_dist.value.value) {
-			min_dists(p, max_dist.value.inx)  = dist.value.to[Int]
-			label_list(p, max_dist.value.inx) = train_label
+		if (dist < max_dist.value) {
+			min_dists(p, max_dist.inx)  = dist.to[Int]
+			label_list(p, max_dist.inx) = train_label
 		}
 		
 	}
@@ -232,16 +253,17 @@ import utils.implicits._
 	def initialize_test_data(test_set_dram_1 : DRAM1[DigitType1], 
 							 test_set_dram_2 : DRAM1[DigitType2]) = {
 		val test_dat = loadCSV2D[UInt64](s"$DATA/rosetta/digitrecognition/196data/test_set.dat", ",", "\n")
+		val start_val = args(2).to[Int]
 
 		val test_actual_vector1 = Array.tabulate(test_set_dram_1.length) { i =>
-									val sample1 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 0).to[UInt64]
-									val sample2 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 1).to[UInt64]
+									val sample1 = test_dat.apply(if (i + start_val < 2000) i + start_val else 2000-1, 0).to[UInt64]
+									val sample2 = test_dat.apply(if (i + start_val < 2000) i + start_val else 2000-1, 1).to[UInt64]
 									DigitType1(sample1, sample2)
 								}
 
 		val test_actual_vector2 = Array.tabulate(test_set_dram_2.length) { i  =>
-									val sample3 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 2).to[UInt64]
-									val sample4 = test_dat.apply(if (i + 0 < 2000) i + 0 else 2000-1, 3).to[UInt64]
+									val sample3 = test_dat.apply(if (i + start_val < 2000) i + start_val else 2000-1, 2).to[UInt64]
+									val sample4 = test_dat.apply(if (i + start_val < 2000) i + start_val else 2000-1, 3).to[UInt64]
 									DigitType2(sample3, sample4)
 								}
 
@@ -272,7 +294,7 @@ import utils.implicits._
 		/* output */
 		val results_dram	  =  DRAM[LabelType](max_num_test)
 
-		val num_test_tile 		= 200
+		val num_test_tile 		= 20
 		val num_train_tile  	= 18000
 
 		initialize_train_data(training_set_dram_1, training_set_dram_2, label_set_dram)
@@ -280,7 +302,6 @@ import utils.implicits._
 
 		val expected_results = loadCSV1D[LabelType](s"$DATA/rosetta/digitrecognition/196data/expected.dat", "\n")
 
-			//val test_dram = DRAM[Int](k_const)
 		Accel {
 
 			val train_set_local1 	= SRAM[DigitType1](num_train_tile)
@@ -291,34 +312,6 @@ import utils.implicits._
 			val test_set_local1 	= SRAM[DigitType1](num_test_tile)
 			val test_set_local2 	= SRAM[DigitType2](num_test_tile)
 
-			//val results_sram_2 		= SRAM[LabelType](num_test_tile)
-			/*
-			 //####### Debugging Sorting Functions  #############
-			val test_sort   = RegFile[Int](par_factor, k_const)
-			val test_label  = RegFile[LabelType](par_factor, k_const)
-			val test_result = RegFile[LabelType](k_const)
-			val test_sram   = SRAM[Int](k_const)
-
-			Foreach(0 until par_factor, 0 until k_const) { (p,k) =>
-				test_sort(p,k) =  p.to[Int]*2.to[Int] + k.to[Int]
-				test_label(p,k) = k.to[LabelType] 
-			}
-			
-			Foreach(1 until k_const - 1) { k =>
-			 	test_sort(0, k + 1) = test_sort(0, k)
-			}
-			test_sort(0,1) = 10.to[Int]
-			
-			//test_sort(2,1) = 10.to[Int]
-			//merge_sorted_lists(test_sort, test_label, test_result)
-
-			Foreach(0 until k_const) { i =>
-				test_sram(i) = test_sort(0,i) //test_result(i).to[Int]
-			}
-
-			test_dram store test_sram
-			
-		*/
 
 			Parallel { 
 				train_set_local1 load training_set_dram_1(0::num_training) //for now do this
@@ -336,7 +329,7 @@ import utils.implicits._
 				}
 				val results_local 	= SRAM[LabelType](num_test_tile)
 
-				Foreach(num_test_left by 1) { test_inx =>
+				Sequential.Foreach(num_test_left by 1) { test_inx =>
 
 					val vote_list		= 	RegFile[Int](10, Seq.fill(10)(0.to[Int])).buffer
 
@@ -344,31 +337,47 @@ import utils.implicits._
 					val knn_tmp_large_set = RegFile[Int](par_factor, k_const, Seq.fill(par_factor*k_const)(256.to[Int])) // when parallelizing, size will need to be k_const * par_factor
 					val label_list_tmp 	= 	RegFile[LabelType](par_factor, k_const, Seq.fill(par_factor*k_const)(0.to[LabelType]))
 
+					Foreach(par_factor by 1  par par_factor, k_const by 1) { (p,k) => knn_tmp_large_set(p,k) = 256.to[Int]  }
+					Foreach(10 by 1 par 10) { v => vote_list(v) = 0.to[Int] }
+
 					/* Training Loop */
 					val train_set_num_per_partition = num_training / par_factor
 
 					val test_local1 = test_set_local1(test_inx)
 					val test_local2 = test_set_local2(test_inx)
+					
 
+					Foreach(num_training by par_factor) { train_inx  =>
+
+						Foreach(par_factor by 1 par par_factor) { p => 
+							val curr_train_inx = train_inx * par_factor + p
+							update_knn(test_local1, test_local2,
+									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
+									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx))	
+						}
+
+					}
+					
+					Foreach(par_factor by 1 par par_factor)  { p =>
+						network_sort(knn_tmp_large_set, label_list_tmp, p) 					
+					}
+					/*
 					Foreach(par_factor by 1 par par_factor) { p => 
-						Foreach(train_set_num_per_partition by 1) { train_inx =>
+						Pipe.II(1).Foreach(train_set_num_per_partition by 1) { train_inx =>
 
 							val curr_train_inx = p * train_set_num_per_partition + train_inx
 							update_knn(test_local1, test_local2,
 									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
 						}
-						//println("train result for $p")
-						//'DEBUG2.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
-						//Foreach(label_list_tmp.cols by 1){ i => results_sram_2(i) = label_list_tmp(0,i) }
+
 
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 
 
-					}
+					} */
 
 					/* Do KNN */
 					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
-					//'DEBUG3.Foreach(knn_tmp_large_set.rows by 1, knn_tmp_large_set.cols by 1){(i,j) => println(r"$i,$j = ${knn_tmp_large_set(i,j)}")}
 
 				}
 
@@ -376,7 +385,6 @@ import utils.implicits._
 			} 
 
 		}
-		//printMatrix(getMatrix(test_dram_2)) //For test sample #201, should be getting [1, 1, 1, 1, 1] 
 
 		val result_digits = getMem(results_dram)
     	printArray(result_digits)
@@ -386,7 +394,7 @@ import utils.implicits._
 		print(cksum)
 		println(" out of " + num_test + " correct.")
 
-		val passed = cksum >= 1800.0
+		val passed = cksum >= 1850.0
 		println("Pass? " + passed)
 	}
 

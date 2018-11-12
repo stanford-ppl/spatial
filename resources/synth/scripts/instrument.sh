@@ -24,8 +24,8 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 		math=`echo "$line" | sed "s/^.* (/(/g" | sed "s/ \// total cycles,/g" | sed "s/)/ total iters)/g" | sed "s/).*/)/g"`
 		perprnt=`echo "$line" | sed "s/^.*\[/\[/g" | sed "s/\].*/\]/g"`
 		if [[ ! -z $sym ]]; then
-			linenum=`awk "/<!--Begin $sym-->/{ print NR; exit }" info/controller_tree.html`
-			sed -i "${((linenum+2))}i <br><font color=\"red\"> $cycsper cycles/iter<br><font size=\"2\">$math<br>$perprnt</font></font>" info/controller_tree.html
+			linenum=`awk "/<!-- Begin $sym -->/{ print NR; exit }" info/controller_tree.html`
+			sed -i "$((linenum+3))i <br><font color=\"red\"> $cycsper cycles/iter<br><font size=\"2\">$math<br>$perprnt</font></font><br>" info/controller_tree.html
 			# perl -i -pe "s|(<b>$sym.*?</b>)|<b>$sym - <font color=\"red\"> $cycsper cycles/iter<br><font size=\"2\">$math<br>$perprnt</font></font></b>|" info/controller_tree.html
 		fi
 	fi

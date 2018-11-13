@@ -4,12 +4,13 @@ import argon._
 import spatial.util.spatialConfig
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.memory._
 
 trait PIRGenDRAM extends PIRCodegen with PIRGenController {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMHostNew(dims,zero) =>
-      state(lhs)(s"""DRAM("${lhs.name.get}")""")
+      state(lhs)(s"""DRAM("${lhs.name.get}").dims(${lhs.constDims})""")
 
     case DRAMAddress(dram) =>
       state(lhs, tp=Some("Reg"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")

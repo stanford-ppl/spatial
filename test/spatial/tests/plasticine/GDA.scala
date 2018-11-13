@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class GDA extends SpatialTest { self => // Regression (Dense) // Args: 64
+@spatial class GDA extends PlasticineTest { self => // Regression (Dense) // Args: 64
 
   type X = Float
 

@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class DotProduct extends SpatialTest {
+@spatial class DotProduct extends PlasticineTest {
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 

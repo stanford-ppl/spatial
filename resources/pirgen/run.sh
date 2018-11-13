@@ -1,3 +1,3 @@
 #!/bin/bash
 
-#sbt "runMain Main $@"
+sbt "runMain AccelMain $@"

@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class OuterProduct extends SpatialTest { // Regression (Dense) // Args: 640 640
+@spatial class OuterProduct extends PlasticineTest { // Regression (Dense) // Args: 640 640
 
   type X = FixPt[TRUE,_32,_0]
 

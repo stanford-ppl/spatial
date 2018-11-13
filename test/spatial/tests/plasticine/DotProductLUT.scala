@@ -4,7 +4,7 @@ import spatial.dsl._
 import spatial.util.spatialConfig
 import spatial.metadata.params._
 
-@spatial class DotProductLUT extends SpatialTest {
+@spatial class DotProductLUT extends PlasticineTest {
   type X = FixPt[TRUE,_32,_0]
 
   val N = 32

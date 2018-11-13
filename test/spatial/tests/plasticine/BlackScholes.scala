@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class BlackScholes extends SpatialTest {
+@spatial class BlackScholes extends PlasticineTest {
 
   val N = 1024 // param pmuSize * 16 # old number  pmuSize * 1024
   val ts = 32 // param pmuSize # (1024, pmuSize, 1024)

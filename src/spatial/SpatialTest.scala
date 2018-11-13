@@ -97,12 +97,6 @@ trait SpatialTest extends Spatial with DSLTest { self =>
     override def shouldRun: Boolean = checkFlag(s"test.${name}")
   }
 
-  object PIR extends PIRBackEnd (
-    name="PIR"
-  )(
-    args = "--pir --dot --vv"
-  )
-
   object PIRNoPar extends PIRBackEnd (
     name="PIRNoPar", 
     paramField="nopar"
@@ -123,6 +117,6 @@ trait SpatialTest extends Spatial with DSLTest { self =>
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, PIR, PIRNoPar, PIRSmallPar, PIRBigPar)
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, PIRNoPar, PIRSmallPar, PIRBigPar)
 
 }

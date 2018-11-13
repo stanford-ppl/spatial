@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class lenet extends SpatialTest {
+@spatial class lenet extends PlasticineTest {
 
   val batch_par = 1 // param [1]
   val conv1_par = 1 // param [2,4] | 20 % p == 0 

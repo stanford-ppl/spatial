@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class Kmeans extends SpatialTest { self => // Regression (Dense) // Args: 3 64
+@spatial class Kmeans extends PlasticineTest { self => // Regression (Dense) // Args: 3 64
   type X = Int
 
   val iters = 2 // param [2]

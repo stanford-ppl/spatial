@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class SGD_minibatch extends SpatialTest { self => // Regression (Dense) // Args: 40 64 0.0001
+@spatial class SGD_minibatch extends PlasticineTest { self => // Regression (Dense) // Args: 40 64 0.0001
 
   val D = 16 // param [64]
   val N = 1024 // param [pmuSize / <D> * 16]

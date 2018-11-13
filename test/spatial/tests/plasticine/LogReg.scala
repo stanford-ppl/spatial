@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class LogReg extends SpatialTest {
+@spatial class LogReg extends PlasticineTest {
   override def runtimeArgs: Args = "20 1024"
 
   type X = Float //FixPt[TRUE,_16,_16]

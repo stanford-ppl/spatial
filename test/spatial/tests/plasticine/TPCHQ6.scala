@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class TPCHQ6 extends SpatialTest { // Regression (Dense) // Args: 3840
+@spatial class TPCHQ6 extends PlasticineTest { // Regression (Dense) // Args: 3840
 
   val N = 1024 // param pmuSize * 16
   val ts = 32 // param [pmuSize] | <N> % p == 0

@@ -2,7 +2,7 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+@spatial class GEMM_Blocked extends PlasticineTest { // Regression (Dense) // Args: 128
                                                                                                   
   val dim = 128 // param [512]
   val idim = 128 // param [256]

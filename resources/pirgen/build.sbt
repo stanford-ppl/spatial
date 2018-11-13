@@ -17,3 +17,4 @@ logBuffered in Test := false
 //  Running tests in parallel on Jenkins currently fails.
 parallelExecution in Test := false
 addCommandAlias("make", "compile")
+excludeFilter in unmanagedSources := HiddenFileFilter || "*trace*"

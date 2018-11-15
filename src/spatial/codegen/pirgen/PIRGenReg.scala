@@ -30,13 +30,13 @@ trait PIRGenReg extends PIRCodegen {
       stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
 
     case RegAccumOp(reg,in,ens,op,first) =>
-      state(lhs)(src"""RegAccumOp("$op").in($in).en($ens).first($first)""")
+      state(lhs)(src"""RegAccumOp(op).in($in).en($ens).first($first)""")
       if (reg.readers.filterNot(_ == lhs).nonEmpty) { //HACK
         state(Lhs(lhs, Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs).port(Some(0))")
       }
 
     case RegAccumFMA(reg,m0,m1,ens,first) =>
-      genOp(Lhs(lhs,Some("mul")), op=Some(s"FixMul"),inputs=Some(Seq(m0, m1)))
+      genOp(Lhs(lhs,Some("mul")), op=Some("FixMul"),inputs=Some(Seq(m0, m1)))
       state(lhs)(src"""RegAccumOp("AccumAdd").in(${Lhs(lhs, Some("mul"))}).en($ens).first($first)""")
       if (reg.readers.filterNot(_ == lhs).nonEmpty) { //HACK
         state(Lhs(lhs, Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs).port(Some(0))")

@@ -67,6 +67,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     // --- Analysis
     lazy val cliNaming          = CLINaming(state)
+    lazy val breakAnalyzer      = BreakAnalyzer(state)
     lazy val useAnalyzer        = UseAnalyzer(state)
     lazy val accessAnalyzer     = AccessAnalyzer(state)
     lazy val memoryAnalyzer     = MemoryAnalyzer(state)
@@ -129,6 +130,7 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
+        breakAnalyzer       ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** CSE on regs */

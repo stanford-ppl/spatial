@@ -37,6 +37,22 @@ case class ControlLevel(level: CtrlLevel) extends Data[ControlLevel](SetBy.Flow.
   */
 case class CounterOwner(owner: Sym[_]) extends Data[CounterOwner](SetBy.Flow.Consumer)
 
+/** A break node's owning controller who should be broken when triggered.
+  *
+  * Getter:  sym.breakOwner
+  * Setter:  sym.breakOwner = Sym[_]
+  * Default: undefined
+  */
+case class BreakOwner(owner: Sym[_]) extends Data[BreakOwner](SetBy.Analysis.Self)
+
+/** A Seq of break nodes associated with a controller, along with the child who contains it (if outer controller)
+  *
+  * Getter:  sym.breakInfo
+  * Setter:  sym.addBreakInfo(Sym[_])
+  * Default: undefined
+  */
+case class BreakInfo(info: Seq[Sym[_]]) extends Data[BreakInfo](SetBy.Analysis.Self)
+
 
 /** The control schedule determined by the compiler.
   *

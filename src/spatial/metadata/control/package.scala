@@ -260,6 +260,12 @@ package object control {
       case _ => false
     }
 
+    /** True if this node is a breakpoint for a controller */
+    def isBreak: Boolean = op match {
+      case Some(op: BreakIf) => true
+      case _ => false
+    }
+
     /** True if this controller, counterchain, or counter is statically known to run forever.
       * Also true if any of this controller's descendants will run forever.
       */
@@ -508,6 +514,14 @@ package object control {
     def getOwner: Option[Sym[_]] = metadata[CounterOwner](s).map(_.owner)
     def owner: Sym[_] = getOwner.getOrElse{throw new Exception(s"Undefined counter owner for $s") }
     def owner_=(own: Sym[_]): Unit = metadata.add(s, CounterOwner(own))
+
+    def getBreakOwner: Option[Sym[_]] = metadata[BreakOwner](s).map(_.owner)
+    def breakOwner: Sym[_] = getBreakOwner.getOrElse{throw new Exception(s"Undefined counter breakOwner for $s") }
+    def breakOwner_=(own: Sym[_]): Unit = metadata.add(s, BreakOwner(own))
+
+    def getBreakInfo: Option[Seq[Sym[_]]] = metadata[BreakInfo](s).map(_.info)
+    def breakInfo: Seq[Sym[_]] = getBreakInfo.getOrElse{throw new Exception(s"Undefined counter breakInfo for $s") }
+    def addBreakInfo(node: Sym[_]): Unit = metadata.add(s, BreakInfo(getBreakInfo.getOrElse(Seq()) ++ Seq(node)))
 
     def rawParent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Ctrl.Host)
     def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))

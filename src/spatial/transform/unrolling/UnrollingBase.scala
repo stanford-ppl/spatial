@@ -317,6 +317,17 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def isCommon(e: Sym[_]): Boolean = contexts.map{p => f(e)}.forall{e2 => e2 == f(e)}
   }
 
+  protected def updateBreaks(oldCtrl: Sym[_], newCtrl: Sym[_]): Unit = {
+    if (oldCtrl.getBreakInfo.nonEmpty) {
+      println(s"$oldCtrl -> $newCtrl")
+      println(s"${oldCtrl.breakInfo}, ${oldCtrl.breakInfo.map{s => subst.getOrElse(s,s)}}")
+      oldCtrl.breakInfo.foreach{case b => 
+        println(s"setting ${subst.getOrElse(b,b)}")
+        b.breakOwner = newCtrl
+        newCtrl.addBreakInfo(b)
+      }
+    }
+  }
 
   case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     // HACK: Don't unroll inner loops for CGRA generation

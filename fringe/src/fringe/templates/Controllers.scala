@@ -17,6 +17,7 @@ class ControlInterface(p: ControlParams) extends Bundle {
   val ctrRst = Output(Bool())
   val parentAck = Input(Bool())
   val flow = Input(Bool())
+  val breaks = Vec(p.breaks, Input(Bool()))
 
   // Signals from children
   val doneIn = Vec(p.depth, Input(Bool()))
@@ -43,6 +44,7 @@ class ControlInterface(p: ControlParams) extends Bundle {
 case class ControlParams(
   val sched: Sched, 
   val depth: Int, 
+  val breaks: Int = 1,
   val isFSM: Boolean = false, 
   val isPassthrough: Boolean = false,
   val stateWidth: Int = 32, 
@@ -65,8 +67,8 @@ object Fork extends Sched // Fork extends Sched { override def toString = "Fork"
 object ForkJoin extends Sched // ForkJoin extends Sched { override def toString = "ForkJoin" }
 
 class OuterControl(p: ControlParams) extends GeneralControl(p) {
-  def this(sched: Sched, depth: Int, isFSM: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "OuterControl") = this(ControlParams(sched, depth, isFSM, false, stateWidth, cases, latency, myName))
-  def this(tup: (Sched, Int, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
+  def this(sched: Sched, depth: Int, breaks: Int = 1, isFSM: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "OuterControl") = this(ControlParams(sched, depth, breaks, isFSM, false, stateWidth, cases, latency, myName))
+  def this(tup: (Sched, Int, Int, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6, tup._7)
 
   // Create SRFF arrays for stages' actives and dones
   val active = List.tabulate(p.depth){i => Module(new SRFF())}
@@ -240,8 +242,8 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
 
 class InnerControl(p: ControlParams) extends GeneralControl(p) {
-  def this(sched: Sched, isFSM: Boolean = false, isPassthrough: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "InnerControl") = this(ControlParams(sched, cases, isFSM, isPassthrough, stateWidth, cases, latency, myName))
-  def this(tup: (Sched, Boolean, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
+  def this(sched: Sched, isFSM: Boolean = false, breaks: Int = 1, isPassthrough: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "InnerControl") = this(ControlParams(sched, cases, breaks, isFSM, isPassthrough, stateWidth, cases, latency, myName))
+  def this(tup: (Sched, Boolean, Int, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6, tup._7)
 
   // Create state SRFFs
   val active = Module(new SRFF())

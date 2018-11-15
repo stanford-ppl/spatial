@@ -39,7 +39,7 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
 
   @rig private def checkDims(given: Int): Unit = {
     if (given != rank) {
-      error(ctx, s"Expected a $rank-dimensional address, got a $given-dimensional address.")
+      error(ctx, s"Expected a $rank-dimensional address for $this (${this.name}), got a $given-dimensional address.")
       error(ctx)
     }
   }

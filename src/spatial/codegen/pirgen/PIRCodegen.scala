@@ -66,6 +66,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   def emitAccelHeader = {
     emit("import pir._")
     emit("import pir.node._")
+    emit("import spade.param._")
     emit("import prism.graph._")
     emit("")
     open(s"""object AccelMain extends PIRApp {""")

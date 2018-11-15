@@ -71,7 +71,7 @@ trait PIRGenHelper extends PIRFormatGen {
     val rhs = lhs.sym.op.get
     val opStr = op.getOrElse(rhs.getClass.getSimpleName)
     val ins = inputs.getOrElse(rhs.productIterator.toList)
-    state(lhs)(src"""OpDef(op="$opStr").input($ins)""")
+    state(lhs)(src"""OpDef(op=$opStr).input($ins)""")
   }
 
   implicit class OptionHelper[T](opt:Option[T]) {

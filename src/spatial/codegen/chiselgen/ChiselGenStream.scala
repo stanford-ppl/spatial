@@ -52,7 +52,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val muxPort = lhs.port.muxPort
       val base = strm.readers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${strm}.ready_options($base + $i) := $en & (${parent}.datapathEn & ${parent}.iiDone) // Do not delay ready because datapath includes a delayed _valid already """)}
       emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.m(i) }""")
 

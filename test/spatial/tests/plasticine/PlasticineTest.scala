@@ -36,7 +36,7 @@ trait PlasticineTest extends SpatialTest { test =>
     name="PIRAsicRun"
   )(
     args = "--pir",
-    run = s"bash run.sh --dot=true --load --run-psim --net=asic --trace=false --mapping=true"
+    run = s"bash run.sh --dot=true --load --run-psim --net=asic --trace=true --mapping=true"
   )
 
 }

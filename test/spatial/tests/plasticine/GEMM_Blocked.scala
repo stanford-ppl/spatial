@@ -15,7 +15,7 @@ import spatial.dsl._
   val loop_jj = 1 // param [1] #(1, <DIM> / <ts>, 2)
   val loop_kk = 1 // param [1] #(1, <DIM> / <ts>, 2)
   val loop_i = 1 // param [1] #(1, 6, 2)
-  val loop_k = 1 // param (8, 16, 8) | <ts> % p == 0
+  val loop_j = 16 // param (8, 16, 8) | <ts> % p == 0
 
   val ip = 16
   type T = FixPt[TRUE,_16,_16] // Fatter type so that ts is burst aligned
@@ -45,8 +45,8 @@ import spatial.dsl._
             Foreach(its by 1 par loop_i) { i => 
               val a_sram = SRAM[T](ts)
               a_sram load a_dram(ii+i, kk::kk+ts par ip)
-              Foreach(ts by 1 par ip) { j => 
-                val dot = Reduce(Reg[T])(ts by 1 par loop_k) { k =>
+              Foreach(ts by 1 par loop_j) { j => 
+                val dot = Reduce(Reg[T])(ts by 1 par ip) { k =>
                   b_sram(k, j) * a_sram(k)
                 } { _ + _ }
                 Pipe { c_col_partial(i,j) = dot }

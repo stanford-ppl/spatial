@@ -30,7 +30,7 @@ trait PIRGenReg extends PIRCodegen {
       stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
 
     case RegAccumOp(reg,in,ens,op,first) =>
-      state(lhs)(src"""RegAccumOp(op).in($in).en($ens).first($first)""")
+      state(lhs)(src"""RegAccumOp("$op").in($in).en($ens).first($first)""")
       if (reg.readers.filterNot(_ == lhs).nonEmpty) { //HACK
         state(Lhs(lhs, Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs).port(Some(0))")
       }

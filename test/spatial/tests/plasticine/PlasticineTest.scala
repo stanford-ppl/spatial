@@ -11,7 +11,6 @@ trait PlasticineTest extends SpatialTest {
     name="PIR"
   )(
     args = "--pir --dot --vv",
-    run = s"bash run.sh --dot=false --run-psim --net=asic"
+    run = s"bash run.sh --dot=false --run-psim --net=asic --trace=false --mapping=false"
   )
 }
-

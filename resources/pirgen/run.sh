@@ -1,3 +1,4 @@
 #!/bin/bash
 
-sbt "runMain AccelMain $@"
+args=$@
+sbt "runMain AccelMain $args"

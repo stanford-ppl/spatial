@@ -13,7 +13,7 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
       state(lhs)(s"""DRAM("${lhs.name.get}").dims(${lhs.constDims})""")
 
     case DRAMAddress(dram) =>
-      state(lhs, tp=Some("Reg"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")
+      state(lhs, tp=Some("MemRead"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")
 
     case DRAMIsAlloc(dram) =>
       state(lhs)(src"Const(true)") //HACK for now

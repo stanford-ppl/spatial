@@ -5,21 +5,12 @@ import argon.node.TextConcat
 
 import forge.tags._
 import utils.implicits.collections._
-import spatial.node.BreakIf
 
-trait DebuggingAPI_Internal extends argon.lang.api.DebuggingAPI_Internal {
-  @rig def breakIf(en: Set[Bit]): Void = stage(BreakIf(en))
-}
+trait DebuggingAPI_Internal extends argon.lang.api.DebuggingAPI_Internal 
 
 trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   with argon.lang.api.DebuggingAPI_Shadowing {
   this: StaticAPI_Shadowing =>
-
-  /** Break out of innermost loop that contains this statement when cond is true */
-  @api def breakWhen(cond: Bit): Void = breakIf(Set(cond))
-
-  /** Break out of innermost loop that contains this statement */
-  @api def break: Void = breakIf(Set.empty)
 
   // TODO: Does this still work?
   @api def sleep(cycles: I32): Void = Foreach(cycles by 1){_ =>  }

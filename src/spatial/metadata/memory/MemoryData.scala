@@ -29,6 +29,14 @@ case class Writers(writers: Set[Sym[_]]) extends Data[Writers](SetBy.Flow.Consum
   */
 case class Resetters(resetters: Set[Sym[_]]) extends Data[Resetters](SetBy.Flow.Consumer)
 
+/** Marks that a memory is a break for some controller
+  *
+  * Getter: sym.isBreaker
+  * Setter: sym.isBreaker = (true|false)
+  * Default: false
+  */
+case class Breaker(flag: Boolean) extends Data[Breaker](SetBy.Analysis.Self)
+
 
 /** Marks that a memory is never used (and can be removed)
   *

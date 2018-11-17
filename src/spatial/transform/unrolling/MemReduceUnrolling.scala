@@ -12,22 +12,23 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case op: OpMemReduce[a,c] =>
-      val OpMemReduce(en,cchainMap,cchainRed,accum,func,loadRes,loadAcc,reduce,storeAcc,zero,fold,itersMap,itersRed) = op
+      val OpMemReduce(en,cchainMap,cchainRed,accum,func,loadRes,loadAcc,reduce,storeAcc,zero,fold,itersMap,itersRed,stopWhen) = op
       implicit val A: Bits[a] = op.A
       implicit val C: LocalMem[a,c] = op.C
       val accum2 = accumHack(accum.asInstanceOf[c[a]], loadAcc)
+      val stopWhen2 = if (stopWhen.isDefined) Some(memories((stopWhen.get,0)).asInstanceOf[Reg[Bit]]) else stopWhen
 
       if (cchainMap.willFullyUnroll && cchainRed.willFullyUnroll) {
-        fullyUnrollMemReduceAndMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed)
+        fullyUnrollMemReduceAndMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed,stopWhen2)
       }
       else if (cchainMap.willFullyUnroll) {
-        fullyUnrollMemReduceMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
+        fullyUnrollMemReduceMap[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed,stopWhen2)
       }
       else if (cchainRed.willFullyUnroll) {
-        fullyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed) 
+        fullyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed,stopWhen2)
       }
       else {
-        partiallyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed)
+        partiallyUnrollMemReduce[a,c](lhs,f(en),f(cchainMap),f(cchainRed),accum2,f(zero),fold,func,loadRes,loadAcc,reduce,storeAcc,itersMap,itersRed,stopWhen2)
       }
 
     case _ => super.unrollCtrl(lhs, rhs)
@@ -47,7 +48,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
     itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32]               // Bound iterators for reduce loop
+    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    stopWhen:  Option[Reg[Bit]]
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
@@ -101,7 +103,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
     itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32]               // Bound iterators for reduce loop
+    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    stopWhen:  Option[Reg[Bit]]
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
@@ -142,7 +145,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     
     }
 
-    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs)){lhs2 =>
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs, stopWhen)){lhs2 =>
       transferData(lhs,lhs2)
     }
     //accumulatesTo(lhs2) = accum
@@ -166,7 +169,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
     itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32]               // Bound iterators for reduce loop
+    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    stopWhen:  Option[Reg[Bit]]
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
@@ -195,7 +199,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes)
       }
 
-      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs))
+      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, None))
     }
 
     val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
@@ -221,7 +225,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
     itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32]               // Bound iterators for reduce loop
+    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    stopWhen:  Option[Reg[Bit]]
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
@@ -258,10 +263,10 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, start, mapLanes, redLanes)
       }
 
-      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs))
+      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, stopWhen))
     }
 
-    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs)){lhs2 =>
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs, stopWhen)){lhs2 =>
       transferData(lhs,lhs2)
     }
     //accumulatesTo(lhs2) = accum

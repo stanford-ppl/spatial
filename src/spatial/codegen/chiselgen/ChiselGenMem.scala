@@ -35,15 +35,15 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
     val parent = lhs.parent.s.get 
     val sfx = if (parent.isBranch) "_obj" else ""
-    if (mem.isFIFOReg) src"${parent}$sfx.done"
-    else               src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
+    if (mem.isFIFOReg) src"~${parent}$sfx.break && ${parent}$sfx.done"
+    else               src"""~${parent}$sfx.break && ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {
     val parent = lhs.parent.s.get 
     val sfx = if (parent.isBranch) "_obj" else ""
-    val flowEnable = src"${parent}$sfx.sm.io.flow"
-    src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)} & $flowEnable"""
+    val flowEnable = src"~${parent}$sfx.break && ${parent}$sfx.sm.io.flow"
+    src"""~${parent}$sfx.break && ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       val parent = lhs.parent.s.get
@@ -288,7 +288,7 @@ trait ChiselGenMem extends ChiselGenCommon {
         mem.writers.foreach{x => emit(createWire(src"enqActive_$x","Bool()"))}
         mem.readers.foreach{x => emit(createWire(src"deqActive_$x","Bool()"))}
       }
-      if (mem.resetters.isEmpty) emit(src"m.io.reset := false.B")
+      if (mem.resetters.isEmpty && !mem.isBreaker) emit(src"m.io.reset := false.B")
     }
   }
 

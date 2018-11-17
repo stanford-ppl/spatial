@@ -11,7 +11,8 @@ protected class MemReduceAccum[A,C[T]](
   accum: C[A],
   ident: Option[A],
   fold:  Boolean,
-  opt:   CtrlOpt
+  opt:   CtrlOpt,
+  stopWhen: Option[Reg[Bit]]
 ) {
   /** 1 dimensional memory reduction */
   @api def apply(domain1: Counter[I32])(map: I32 => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
@@ -80,7 +81,8 @@ protected class MemReduceAccum[A,C[T]](
       ident,
       fold,
       itersMap,
-      itersRed)
+      itersRed,
+      stopWhen)
     ){pipe =>
       opt.set(pipe)
     }
@@ -88,12 +90,12 @@ protected class MemReduceAccum[A,C[T]](
   }
 }
 
-protected class MemReduceClass(opt: CtrlOpt) {
-  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = false, opt)
-  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = false, opt)
+protected class MemReduceClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) {
+  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = false, opt, stopWhen)
+  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = false, opt, stopWhen)
 }
 
-protected class MemFoldClass(opt: CtrlOpt) {
-  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = true, opt)
-  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = true, opt)
+protected class MemFoldClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) {
+  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = true, opt, stopWhen)
+  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = true, opt, stopWhen)
 }

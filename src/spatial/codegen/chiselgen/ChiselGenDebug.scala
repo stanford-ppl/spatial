@@ -36,11 +36,6 @@ trait ChiselGenDebug extends ChiselGenCommon {
         emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${quote(lhs.parent.s.get)}.datapathEn).D(${lhs.fullDelay})")
         earlyExits = earlyExits :+ lhs
 
-    case BreakIf(en) => 
-        val ens = and(en)
-        val breakOwner = lhs.breakOwner
-        emit(src"${breakOwner}.sm.connectBreak_$lhs($ens & (${quote(lhs.parent.s.get)}.datapathEn).D(${lhs.fullDelay}))")
-
 	case _ => super.gen(lhs, rhs)
   }
 }

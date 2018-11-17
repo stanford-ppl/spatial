@@ -117,7 +117,7 @@ trait ChiselGenController extends ChiselGenCommon {
         closeopen(src"): $ret = {")
           // Wire signals to SM object
           if (!lhs.isOuterStreamControl) {
-            if (lhs.cchains.nonEmpty && !lhs.cchains.head.isForever) {
+            if (lhs.cchains.nonEmpty /* && !lhs.cchains.head.isForever*/) {
               emitItersAndValids(lhs)
               val ctr = lhs.cchains.head
               emit(src"""${ctr}.en := ${lhs}$sfx.sm.io.ctrInc & ${lhs}$sfx.iiDone & ${getForwardPressure(lhs.toCtrl)}""")
@@ -159,11 +159,6 @@ trait ChiselGenController extends ChiselGenCommon {
     close("}")
   }
 
-  private def emitBreakAddition(lhs: Sym[_]): Unit = {
-    lhs.breakInfo.zipWithIndex.foreach{case (break, i) => 
-      emit(src"def connectBreak_$break(en: Bool): Unit = sm.io.breaks($i) := en")
-    }
-  }
 
   private def emitStreamChildAddition(lhs: Sym[_]): Unit = {
     open("override def configure(): Unit = {")
@@ -181,7 +176,6 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Construct controller args
     val constrArg = if (lhs.isInnerControl) {s"$isFSM"} else {s"${lhs.children.filter(_.s.get != lhs).length}, isFSM = ${isFSM}"}
-    val breakArg = if (lhs.getBreakInfo.isDefined) s"breaks = ${lhs.breakInfo.size}" else "breaks = 1"
     val isPassthrough = lhs match{
       case Op(_: Switch[_]) if isInner && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl => ",isPassthrough = true";
       case Op(_:SwitchCase[_]) if isInner && lhs.parent.s.get.parent.s.isDefined && lhs.parent.s.get.parent.s.get.isInnerControl => ",isPassthrough = true";
@@ -197,7 +191,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     // Create controller
     emitSMObject(lhs) {
-      emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString}, $breakArg $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm"))""")
+      emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm"))""")
       if (lhs.cchains.isEmpty) emit(src"""datapathEn := sm.io.datapathEn & mask""")
       else emit(src"""datapathEn := sm.io.datapathEn & mask & ~sm.io.ctrDone""")
 
@@ -214,7 +208,12 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.cchains.nonEmpty && !lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.cchains.head})")
       else if (lhs.cchains.nonEmpty && lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}.mkString(",")})")
       if (lhs.isSwitch) emitSwitchAddition(lhs)
-      if (lhs.getBreakInfo.nonEmpty) emitBreakAddition(lhs)
+
+      lhs match {
+        case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+        case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+        case _ => emit(src"sm.io.break := false.B") 
+      }
     }
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
     emit(src"${lhs}$swobj.en := ${lhs}$swobj.baseEn & top.rr & ${getForwardPressure(lhs.toCtrl)}")
@@ -236,7 +235,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""${lhs}.en := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
-          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0), false)) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
           emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
           emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
 
@@ -258,7 +257,7 @@ trait ChiselGenController extends ChiselGenCommon {
         exitCtrl(lhs)
       }
 
-    case ctrl: EnControl[_] if !lhs.isFSM=> 
+    case ctrl: EnControl[_] if !lhs.isFSM => 
       enterCtrl(lhs)
       createSMObject(lhs, false)
       createKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {

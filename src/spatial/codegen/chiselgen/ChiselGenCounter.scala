@@ -18,7 +18,6 @@ import spatial.util.spatialConfig
 trait ChiselGenCounter extends ChiselGenCommon {
 
   private def createCtr(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32): Unit = {
-    var isForever = lhs.isForever
     val w = bitWidth(lhs.tp.typeArgs.head)
     start match {case Final(s) => emit(src"${lhs}.set_start($s)")
                  case Expect(s) => emit(src"${lhs}.set_start($s)")
@@ -53,7 +52,7 @@ trait ChiselGenCounter extends ChiselGenCommon {
       emit(src"// Owner = ${lhs.owner}")
       emit(src"""override val ctrs = List[CtrObject](${ctrs.map(quote).mkString(",")})""")
       emit(src"""lazy val cchain = Module(new CounterChain(ctrs.map(_.par), ctrs.map(_.fixedStart), ctrs.map(_.fixedStop), ctrs.map(_.fixedStep), """ + 
-                       src"""List.fill(${ctrs.size})(Some(0)), ctrs.map(_.width), myName = "${lhs}${suffix}_cchain"))""")
+                       src"""List.fill(${ctrs.size})(Some(0)), ctrs.map(_.isForever), ctrs.map(_.width), myName = "${lhs}${suffix}_cchain"))""")
 
     }
     emit(src"${lhs}${suffix}.configure()")
@@ -64,7 +63,12 @@ trait ChiselGenCounter extends ChiselGenCommon {
     case CounterNew(start,end,step,par) => createCtr(lhs,start,end,step,par)
     case CounterChainNew(ctrs) => if (lhs.owner.isOuterStreamLoop) createStreamCChain(lhs,ctrs) else createCChain(lhs,ctrs)
     case ForeverNew() => 
-      emit("// $lhs = Forever")
+      emitCtrObject(lhs) {
+        emit(src"// Owner = ${lhs.owner}")
+        emit(src"val par = 1")
+        emit(src"val width = 32")
+        emit(src"override val isForever = true")
+      }
 
 	  case _ => super.gen(lhs, rhs)
   }

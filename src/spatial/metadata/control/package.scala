@@ -1,8 +1,9 @@
 package spatial.metadata
 
 import argon._
+import argon.lang.Ind
 import argon.node._
-import forge.tags.stateful
+import forge.tags.{stateful,rig}
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.access._
@@ -260,12 +261,6 @@ package object control {
       case _ => false
     }
 
-    /** True if this node is a breakpoint for a controller */
-    def isBreak: Boolean = op match {
-      case Some(op: BreakIf) => true
-      case _ => false
-    }
-
     /** True if this controller, counterchain, or counter is statically known to run forever.
       * Also true if any of this controller's descendants will run forever.
       */
@@ -515,14 +510,6 @@ package object control {
     def owner: Sym[_] = getOwner.getOrElse{throw new Exception(s"Undefined counter owner for $s") }
     def owner_=(own: Sym[_]): Unit = metadata.add(s, CounterOwner(own))
 
-    def getBreakOwner: Option[Sym[_]] = metadata[BreakOwner](s).map(_.owner)
-    def breakOwner: Sym[_] = getBreakOwner.getOrElse{throw new Exception(s"Undefined counter breakOwner for $s") }
-    def breakOwner_=(own: Sym[_]): Unit = metadata.add(s, BreakOwner(own))
-
-    def getBreakInfo: Option[Seq[Sym[_]]] = metadata[BreakInfo](s).map(_.info)
-    def breakInfo: Seq[Sym[_]] = getBreakInfo.getOrElse{throw new Exception(s"Undefined counter breakInfo for $s") }
-    def addBreakInfo(node: Sym[_]): Unit = metadata.add(s, BreakInfo(getBreakInfo.getOrElse(Seq()) ++ Seq(node)))
-
     def rawParent: Ctrl = metadata[ParentCtrl](s).map(_.parent).getOrElse(Ctrl.Host)
     def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
 
@@ -669,7 +656,7 @@ package object control {
     def start: Sym[F] = x.node.start
     def step: Sym[F] = x.node.step
     def end: Sym[F] = x.node.end
-    def ctrPar: I32 = x.node.par
+    def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
@@ -692,13 +679,19 @@ package object control {
 
       case _ => None
     }
-    def willFullyUnroll: Boolean = (nIters,ctrPar) match {
-      case (Some(Expect(nIter)), Expect(par)) => par >= nIter
-      case _ => false
+    def willFullyUnroll: Boolean = {
+      if (x.isForever) false
+      else (nIters,ctrPar) match {
+        case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+        case _ => false
+      }
     }
-    def isUnit: Boolean = nIters match {
-      case (Some(Final(1))) => true
-      case _ => false
+    def isUnit: Boolean = {
+      if (x.isForever) false 
+      else nIters match {
+        case (Some(Final(1))) => true
+        case _ => false
+      }
     }
   }
 
@@ -706,8 +699,8 @@ package object control {
     def ctrStart: Ind[W] = i.counter.start.unbox
     def ctrStep: Ind[W] = i.counter.step.unbox
     def ctrEnd: Ind[W] = i.counter.end.unbox
-    def ctrPar: I32 = i.counter.ctrPar
-    def ctrParOr1: Int = i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
+    @rig def ctrPar: I32 = if (i.counter.isForever) I32(1) else i.counter.ctrPar
+    def ctrParOr1: Int = if (i.counter.isForever) 1 else i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
   }
 
   implicit class IndexCounterOps[A](i: Num[A]) {

@@ -263,7 +263,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       dbgs(s"  end: ${end.accessPattern}")
       dbgs(s"  step: ${step.accessPattern}")
 
-    case Op(loop: Loop[_]) =>
+    case Op(loop: Loop[_]) if loop.cchains.forall(!_._1.isForever) =>
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
         scope.blocks.foreach{case (iters, block) =>
@@ -273,7 +273,18 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
           dbgs(s"  Blocks: $block")
           inLoop(lhs, iters, iterStarts, block)
         }
+      }
 
+    case Op(loop: Loop[_]) =>
+      loop.bodies.foreach{scope =>
+        dbgs(s"$lhs = $rhs [LOOP]")
+        scope.blocks.foreach{case (iters, block) =>
+          val iterStarts = iters.map{_ => I32(0)}
+          dbgs(s"  Iters:  $iters")
+          dbgs(s"  Starts:  $iterStarts")
+          dbgs(s"  Blocks: $block")
+          inLoop(lhs, iters, iterStarts, block)
+        }
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)

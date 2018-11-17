@@ -172,7 +172,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)
@@ -180,7 +180,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)

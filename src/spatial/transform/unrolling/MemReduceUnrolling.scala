@@ -323,7 +323,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     logs(s"[Accum-fold $lhs] Unrolling reduction trees and cycles")
     val results = redLanes.map{p =>
-      val laneValid = redLanes.valids(p).andTree
+      val laneValid = if (redLanes.valids(p).isEmpty) Bit(true) else redLanes.valids(p).andTree
 
       logs(s"Lane #$p:")
       val inputs = values.map(_.apply(p)) // The pth value of each vector load

@@ -32,12 +32,20 @@ class Stream(name: Option[String], stopWhen: Option[Reg[Bit]]) extends Directive
 
   @api def apply(wild: Wildcard)(func: => Any): Void = Stream.Foreach(*){_ => func }
 
+  /** "Stream" controller that will break immediately when `breakWhen` is true.
+      It will reset the value in `breakWhen` each time the controller finishes.
+      Note that this behavior is discouraged because it can lead to tricky 
+      behavior if you are not careful about how you use it.
+    */
   @api def apply(breakWhen: Reg[Bit]): Stream = new Stream(name, Some(breakWhen))
 }
 class Sequential(name: Option[String], stopWhen: Option[Reg[Bit]]) extends Directives(CtrlOpt(name,Some(Sequenced)), stopWhen) {
   /** "Sequential" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)
 
+  /** "Sequential" controller that will break immediately when `breakWhen` is true.
+      It will reset the value in `breakWhen` each time the controller finishes
+    */
   @api def apply(breakWhen: Reg[Bit]): Sequential = new Sequential(name, Some(breakWhen))
 }
 

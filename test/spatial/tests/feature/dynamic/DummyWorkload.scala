@@ -83,9 +83,9 @@ import spatial.dsl._
           //       doesn't recognize the dependency
           Pipe{ 
             if (packet == QS.value-1) {
-              worker1Queue.enq(done)
-              worker2Queue.enq(done)
-              worker3Queue.enq(done)
+              worker1Queue.enq(DONE)
+              worker2Queue.enq(DONE)
+              worker3Queue.enq(DONE)
             }
           }
         }
@@ -140,7 +140,7 @@ import spatial.dsl._
           val a = done1.deq()
           val b = done2.deq()
           val c = done3.deq()
-          if (a && b && c) status := 1
+          if (a && b && c) status := 1 // Be sure to use a,b,c to avoid DCE
         }
       }
     }

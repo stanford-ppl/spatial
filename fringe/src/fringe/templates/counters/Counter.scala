@@ -207,8 +207,8 @@ class InstrumentationCounter(val width: Int = 64) extends Module {
   * @param w: Word width
   */
 class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
-                    val stride: Option[Int], val gap: Option[Int], val width: Int = 32) extends Module {
-  def this(tuple: (Int, Option[Int], Option[Int], Option[Int], Option[Int], Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+                    val stride: Option[Int], val gap: Option[Int], val forever: Boolean, val width: Int = 32) extends Module {
+  def this(tuple: (Int, Option[Int], Option[Int], Option[Int], Option[Int], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7)
 
   val io = IO(new Bundle {
     val input = new Bundle {
@@ -234,13 +234,13 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
   })
 
-  if (par > 0) {
+  val bases = List.tabulate(par){i => Module(new FF(width))}
+  if (par > 0 && !forever) {
     val lock = Module(new SRFF())
     lock.io.input.set := io.input.enable  & !io.input.reset
     lock.io.input.reset := io.input.reset || io.output.done
     lock.io.input.asyn_reset := false.B
     val locked = lock.io.output.data// | io.input.enable
-    val bases = List.tabulate(par){i => Module(new FF(width))}
     val inits = List.tabulate(par){i =>
       getRetimed(
         if (start.isDefined & stride.isDefined) {(start.get + i*stride.get).S(width.W)}
@@ -314,7 +314,14 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     io.output.saturated := io.input.saturate & isMax
   }
   else { // Forever counter
-    io.output.count(0) := 0.S(width.W)
+    bases.foreach{ b =>
+      b.io.xBarW(0).init.head := 0.U
+      b.io.xBarW(0).reset.head := io.input.reset
+      b.io.xBarW(0).en.head := io.input.enable
+      b.io.xBarW(0).data.head := (b.io.output.data.head.asSInt + 1.S).asUInt
+    }
+
+    io.output.count(0) := bases.head.io.output.data.head.asSInt
     io.output.saturated := false.B
     io.output.noop := false.B
     io.output.done := false.B
@@ -442,9 +449,9 @@ count(0) 1   2  3    4   5
   * @param w: Word width
   */
 class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops: List[Option[Int]],
-              val strides: List[Option[Int]], val gaps: List[Option[Int]], val widths: List[Int], val myName: String = "CChain") extends Module {
-  def this(par: List[Int], sts: List[Option[Int]], stps: List[Option[Int]], strs: List[Option[Int]], gps: List[Option[Int]]) = this(par, sts, stps, strs, gps, List.fill(par.length){32})
-  def this(tuple: (List[Int], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
+              val strides: List[Option[Int]], val gaps: List[Option[Int]], val forevers: List[Boolean], val widths: List[Int], val myName: String = "CChain") extends Module {
+  def this(par: List[Int], sts: List[Option[Int]], stps: List[Option[Int]], strs: List[Option[Int]], gps: List[Option[Int]], frvrs: List[Boolean]) = this(par, sts, stps, strs, gps, frvrs, List.fill(par.length){32})
+  def this(tuple: (List[Int], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Boolean], List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7)
 
   override def desiredName = myName
   
@@ -473,7 +480,7 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
   })
 
   // Create counters
-  val ctrs = (0 until depth).map{ i => Module(new SingleCounter(par(i), starts(i), stops(i), strides(i), gaps(i), widths(i))) }
+  val ctrs = (0 until depth).map{ i => Module(new SingleCounter(par(i), starts(i), stops(i), strides(i), gaps(i), forevers(i), widths(i))) }
 
   // Wire up the easy inputs from IO
   ctrs.zipWithIndex.foreach { case (ctr, i) =>

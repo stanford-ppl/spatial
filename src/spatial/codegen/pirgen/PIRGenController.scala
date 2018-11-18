@@ -51,12 +51,12 @@ trait PIRGenController extends PIRCodegen {
       emitController(lhs, None, ens)
       ret(func)
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids,_) =>
       emitController(lhs, Some(cchain), ens)
       emitIterValids(lhs, iters, valids)
       ret(func)
 
-    case UnrolledReduce(ens,cchain,func,iters,valids) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
       emitController(lhs, Some(cchain), ens)
       emitIterValids(lhs, iters, valids)
       ret(func)

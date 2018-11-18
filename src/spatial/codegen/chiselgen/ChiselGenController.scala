@@ -117,7 +117,7 @@ trait ChiselGenController extends ChiselGenCommon {
         closeopen(src"): $ret = {")
           // Wire signals to SM object
           if (!lhs.isOuterStreamControl) {
-            if (lhs.cchains.nonEmpty && !lhs.cchains.head.isForever) {
+            if (lhs.cchains.nonEmpty /* && !lhs.cchains.head.isForever*/) {
               emitItersAndValids(lhs)
               val ctr = lhs.cchains.head
               emit(src"""${ctr}.en := ${lhs}$sfx.sm.io.ctrInc & ${lhs}$sfx.iiDone & ${getForwardPressure(lhs.toCtrl)}""")
@@ -158,6 +158,7 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.isInnerControl) emit("children.zipWithIndex.foreach{case (c,i) => c.baseEn := sm.io.selectsOut(i)}")
     close("}")
   }
+
 
   private def emitStreamChildAddition(lhs: Sym[_]): Unit = {
     open("override def configure(): Unit = {")
@@ -207,8 +208,14 @@ trait ChiselGenController extends ChiselGenCommon {
       if (lhs.cchains.nonEmpty && !lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.cchains.head})")
       else if (lhs.cchains.nonEmpty && lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}.mkString(",")})")
       if (lhs.isSwitch) emitSwitchAddition(lhs)
+
+      lhs match {
+        case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+        case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+        case _ => emit(src"sm.io.break := false.B") 
+      }
     }
-    if (lhs.op.exists(_.R.isBits)) emit(src"val $lhs = Wire(${lhs.op.head.R})")
+    if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
     emit(src"${lhs}$swobj.en := ${lhs}$swobj.baseEn & top.rr & ${getForwardPressure(lhs.toCtrl)}")
     emit(src"${lhs}$swobj.flow := ${getBackPressure(lhs.toCtrl)}")
     val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
@@ -228,7 +235,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""${lhs}.en := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
-          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0), false)) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
           emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
           emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
 
@@ -238,7 +245,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""val done_latch = Module(new SRFF())""")
           if (earlyExits.nonEmpty) {
             appPropertyStats += HasBreakpoint
-            inGen(out, "ArgInterface.scala"){emit(s"""val breakpoints = Wire(Vec(${earlyExits.length}, Bool()))""")}
+            inGen(out, "ArgInterface.scala"){emit(createWire("breakpoints", s"""Vec(${earlyExits.length}, Bool())"""))}
             emit(src"""done_latch.io.input.set := ${lhs}.done | breakpoints.reduce{_|_}""")        
           } else {
             emit(src"""done_latch.io.input.set := ${lhs}.done""")                
@@ -250,7 +257,7 @@ trait ChiselGenController extends ChiselGenCommon {
         exitCtrl(lhs)
       }
 
-    case ctrl: EnControl[_] if !lhs.isFSM=> 
+    case ctrl: EnControl[_] if !lhs.isFSM => 
       enterCtrl(lhs)
       createSMObject(lhs, false)
       createKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {
@@ -277,7 +284,8 @@ trait ChiselGenController extends ChiselGenCommon {
       createKernel(lhs, Set(), body) {
         gen(body)
         if (op.R.isBits) {
-          emit(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emit(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
+          emit(createWire(src"${lhs}_onehot_selects", src"Vec(${selects.length}, Bool())"))
+          emit(createWire(src"${lhs}_data_options", src"Vec(${selects.length}, ${lhs.tp})"))
           selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
           emit(src"Mux1H(${lhs}_onehot_selects, ${lhs}_data_options)")
         }
@@ -304,8 +312,8 @@ trait ChiselGenController extends ChiselGenCommon {
       createSMObject(lhs, true)
       createKernel(lhs, ens, notDone, action, nextState) {
         val state = notDone.input
-        emit(src"val $state = Wire(${state.tp})")
-        emit(src"val ${lhs}_doneCondition = Wire(Bool())")
+        emit(createWire(src"$state", src"${state.tp}"))
+        emit(createWire(src"${lhs}_doneCondition","Bool()"))
         emit(src"${state}.r := ${lhs}.sm.io.state.r")
 
         gen(notDone)

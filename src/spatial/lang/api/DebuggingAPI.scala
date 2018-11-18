@@ -6,7 +6,7 @@ import argon.node.TextConcat
 import forge.tags._
 import utils.implicits.collections._
 
-trait DebuggingAPI_Internal extends argon.lang.api.DebuggingAPI_Internal
+trait DebuggingAPI_Internal extends argon.lang.api.DebuggingAPI_Internal 
 
 trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   with argon.lang.api.DebuggingAPI_Shadowing {

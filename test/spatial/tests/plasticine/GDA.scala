@@ -6,10 +6,10 @@ import spatial.dsl._
 
   type X = Float
 
-  val C = 64 // param [128]
-  val R = 1024 // param [pmuSize / <C> * 8] # orignal size 38400
+  val C = 128 // param [128]
+  val R = 4096 // param [pmuSize / <C> * 8] # orignal size 38400
 
-  val ts = 32 // param [pmuSize / <C>]  # (pmuSize / <C> / 2, pmuSize / <C>, pmuSize / <C> / 2) | <R> % p == 0
+  val ts = 512 // param [pmuSize / <C>]  # (pmuSize / <C> / 2, pmuSize / <C>, pmuSize / <C> / 2) | <R> % p == 0
   val op = 2 // param [1] # (1, 5, 1) | <R> / <ts> % p == 0
   val mp1 = 2 // param [1] + (2, 8, 2) | <ts> % p == 0
   val mp2 = 2 // param [1] + (2, 8, 2) | <C> % p == 0 and <mp1> * p < 10
@@ -36,8 +36,8 @@ import spatial.dsl._
       val mu0Tile = SRAM[T](C)
       val mu1Tile = SRAM[T](C)
       Parallel {
-        mu0Tile load mu0(0 :: C par 16) // Load mu0
-        mu1Tile load mu1(0 :: C par 16) // Load mu1
+        mu0Tile load mu0(0 :: C par ip) // Load mu0
+        mu1Tile load mu1(0 :: C par ip) // Load mu1
       }
 
       val sigmaOut = SRAM[T](C, C)
@@ -67,7 +67,7 @@ import spatial.dsl._
         }{_+_}
       }{_+_}
 
-      sigma(0 :: C, 0 :: C par 16) store sigmaOut
+      sigma(0 :: C, 0 :: C par ip) store sigmaOut
     }
 
     getMem(sigma)

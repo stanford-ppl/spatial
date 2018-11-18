@@ -4,7 +4,7 @@ import spatial.dsl._
 
 
 class lenetNoPar extends lenet {
-  val batch_par = 2
+  val batch_par = 1
   val conv1_par = 1
   val conv2_par = 1
   val mat1_par = 1
@@ -26,6 +26,15 @@ class lenet2 extends lenet {
   val mat1_par = 1
   val mat2_par = 1
 }
+
+class lenet3 extends lenet {
+  val batch_par = 2
+  val conv1_par = 1
+  val conv2_par = 1
+  val mat1_par = 1
+  val mat2_par = 1
+}
+
 
 @spatial abstract class lenet extends PlasticineTest {
 

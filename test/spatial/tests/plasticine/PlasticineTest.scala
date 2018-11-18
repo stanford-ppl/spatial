@@ -32,6 +32,7 @@ trait PlasticineTest extends SpatialTest { test =>
     run = s"bash run.sh --dot=true --mapping=false --codegen=false --psim=false"
   )
 
+  //TODO: Specify check point path from PIRGen
   object PIRAsicRun extends PIRBackEnd (
     name="PIRAsicRun"
   )(

@@ -46,41 +46,6 @@ class LogReg1 extends LogReg {
     setMem(y, yIn)
     setMem(theta, tt)
 
-    //Accel {
-      //val btheta = SRAM[T](D)
-
-      //Sequential.Foreach(iters by 1) { epoch =>
-        //val gradAcc = SRAM[T](D)
-        //Foreach(N by ts par op){ i =>
-          //val logregX = SRAM[T](ts, D)
-          //val logregY = SRAM[T](ts)
-          //Parallel {
-            //logregX load x(i::i+ts, 0::D par ip)
-            //logregY load y(i::i+ts par ip)
-          //}
-          //MemReduce(gradAcc par ip)(ts par mp){ ii =>
-            //val pipe2Res = Reg[T]
-            //val subRam   = SRAM[T](D)
-
-            //val dotAccum = Reduce(Reg[T])(D par ip){j => logregX(ii,j) * btheta(j) }{_+_}  // read
-            //Pipe { pipe2Res := (logregY(ii) - sigmoid(dotAccum.value)) }
-            //Foreach(D par ip) {j => subRam(j) = logregX(ii,j) - pipe2Res.value }
-            //subRam
-          //}{_+_}
-        //}
-        //val bfifo = FIFO[T](5)
-        //Foreach(D par ip) { i =>
-          //bfifo.enq(btheta(i) + gradAcc(i) * A.to[T])
-        //}
-        //Foreach(D par ip) { i =>
-          //btheta(i) = bfifo.deq()
-        //}
-        //// Flush gradAcc
-        ////Foreach(D by 1 par ip){i => gradAcc(i) = 0.to[T] }
-      //}
-      //theta(0::D par ip) store btheta // read
-    //}
-
     Accel {
       val btheta = SRAM[T](D)
 

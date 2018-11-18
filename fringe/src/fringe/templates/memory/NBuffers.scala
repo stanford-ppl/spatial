@@ -508,7 +508,7 @@ class NBufMem(
       
       val numWriters = numXBarW + numDirectW
       val par = combinedXBarWMux.accessPars.sorted.headOption.getOrElse(0) max flatDirectWMux.accessPars.sorted.headOption.getOrElse(0)
-      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), Some(0)))
+      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), Some(0), false))
       val en = io.xBarW.map(_.en.reduce{_||_}).reduce{_||_} || io.directW.map(_.en.reduce{_||_}).reduce{_||_}
       writeCol.io.input.enable := en
       writeCol.io.input.reset := ctrl.io.swap

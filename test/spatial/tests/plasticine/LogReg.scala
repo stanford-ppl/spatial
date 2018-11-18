@@ -49,35 +49,37 @@ class LogReg1 extends LogReg {
     Accel {
       val btheta = SRAM[T](D)
 
+      btheta load theta(0::D par ip)
+
       Sequential.Foreach(iters by 1) { epoch =>
 
-        Sequential.MemReduce(btheta par ip)(1 by 1){ xx =>
-          val gradAcc = SRAM[T](D)
-          Foreach(N by ts par op){ i =>
-            val logregX = SRAM[T](ts, D)
-            val logregY = SRAM[T](ts)
-            Parallel {
-              logregX load x(i::i+ts, 0::D par ip)
-              logregY load y(i::i+ts par ip)
-            }
-            MemReduce(gradAcc par ip)(ts par mp){ ii =>
-              val pipe2Res = Reg[T]
-              val subRam   = SRAM[T](D)
-
-              val dotAccum = Reduce(Reg[T])(D par ip){j => logregX(ii,j) * btheta(j) }{_+_}  // read
-              Pipe { pipe2Res := (logregY(ii) - sigmoid(dotAccum.value)) }
-              Foreach(D par ip) {j => subRam(j) = logregX(ii,j) - pipe2Res.value }
-              subRam
-            }{_+_}
+        val grad = MemReduce(SRAM[T](D) par ip)(N by ts par op){ i =>
+          val xTile = SRAM[T](ts, D)
+          val yTile = SRAM[T](ts)
+          Parallel {
+            xTile load x(i::i+ts, 0::D par ip)
+            yTile load y(i::i+ts par ip)
           }
-          gradAcc
-        }{(b,g) => b+g*A.to[T]}
+          MemReduce(SRAM[T](D) par ip)(ts by 1 par mp) { ii =>
+            val dot = Reduce(Reg[T])(D by 1 par ip) { d => xTile(ii,d) * btheta(d) } { _ + _ }
+            val sub = Reg[T]
+            Pipe { 
+              sub := yTile(ii) - sigmoid[T](dot.value)
+            }
+            val gradRow = SRAM[T](D)
+            Foreach(D by 1 par ip) { d => gradRow(d) = xTile(ii, d) * sub.value }
+            gradRow
+          } { _ + _ }
+        } { _ + _ }
 
-        // Flush gradAcc
-        //Foreach(D by 1 par ip){i => gradAcc(i) = 0.to[T] }
+        Foreach(D by 1 par ip) { d => btheta(d) = btheta(d) + grad(d) * A.to[T] }
+
       }
+
       theta(0::D par ip) store btheta // read
     }
+
+
     getMem(theta)
   }
 

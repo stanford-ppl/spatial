@@ -30,8 +30,8 @@ install:
 ## Update pir libs.                    ##
 ###-----------------------------------###
 pir:
-	git submodule update --init --recursive
-	cd pir; sbt publishAll
+	#git submodule update --init --recursive
+	cd pir; git checkout new_spatial; git pull; sbt publishAll
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##

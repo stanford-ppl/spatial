@@ -36,6 +36,7 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
     dependencies ::= FileDep("pirgen", "run.sh", "../")
     dependencies ::= FileDep("pirgen", "build.sbt", "../")
     dependencies ::= FileDep("pirgen", "build.properties", "../project/")
+    dependencies ::= FileDep("pirgen", "run_trace.sh", "../")
     super.copyDependencies(out)
   }
 }

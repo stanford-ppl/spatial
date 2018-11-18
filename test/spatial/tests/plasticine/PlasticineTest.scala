@@ -22,7 +22,8 @@ trait PlasticineTest extends SpatialTest { test =>
     name="PIR"
   )(
     args = "--pir --dot",
-    run = s"bash run.sh --dot=false --run-psim --net=asic --trace=false --mapping=false"
+    //run = s"bash run.sh --dot=false --run-psim --net=asic --trace=true --mapping=false"
+    run = s"bash run.sh --dot=false --trace=false --mapping=true"
   )
 
   object PIRGen extends PIRBackEnd (

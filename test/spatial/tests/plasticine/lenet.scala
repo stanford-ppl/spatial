@@ -38,6 +38,7 @@ class lenet3 extends lenet {
 
 @spatial abstract class lenet extends PlasticineTest {
 
+  val BATCH_SIZE = 4
   val batch_par:Int
   val conv1_par:Int
   val conv2_par:Int
@@ -47,7 +48,6 @@ class lenet3 extends lenet {
   val ip = 16
 
   type T = FixPt[TRUE,_16,_16] // Use higher precision for more accuracy
-  val BATCH_SIZE = 3         // TODO: Make this an argin instead of hard-coded
   
   def lenet_Dec6[T:Num](
     i0: Array[T],

@@ -2,17 +2,35 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class GDA extends PlasticineTest { self => // Regression (Dense) // Args: 64
+class GDANoPar extends GDA {
+  val C = 128
+  val R = 4096
+  val ts = 256
+  val op = 1
+  val mp1 = 1
+  val mp2 = 1
+}
+
+class GDA1 extends GDA {
+  val C = 128
+  val R = 4096
+  val ts = 256
+  val op = 2
+  val mp1 = 2
+  val mp2 = 2
+}
+
+@spatial abstract class GDA extends PlasticineTest { self => // Regression (Dense) // Args: 64
 
   type X = Float
 
-  val C = 128 // param [128]
-  val R = 4096 // param [pmuSize / <C> * 8] # orignal size 38400
+  val C:Int
+  val R:Int
+  val ts:Int
+  val op:Int
+  val mp1:Int
+  val mp2:Int
 
-  val ts = 512 // param [pmuSize / <C>]  # (pmuSize / <C> / 2, pmuSize / <C>, pmuSize / <C> / 2) | <R> % p == 0
-  val op = 2 // param [1] # (1, 5, 1) | <R> / <ts> % p == 0
-  val mp1 = 2 // param [1] + (2, 8, 2) | <ts> % p == 0
-  val mp2 = 2 // param [1] + (2, 8, 2) | <C> % p == 0 and <mp1> * p < 10
   val ip = 16
   val margin = 1
 

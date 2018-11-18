@@ -2,13 +2,38 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class lenet extends PlasticineTest {
 
-  val batch_par = 1 // param [1]
-  val conv1_par = 1 // param [2,4] | 20 % p == 0 
-  val conv2_par = 2 // param [2,4] | 64 % p == 0
-  val mat1_par = 1 // param [1,2] | 128 % p == 0
-  val mat2_par = 1 // param [1,2] | 10 % p == 0
+class lenetNoPar extends lenet {
+  val batch_par = 2
+  val conv1_par = 1
+  val conv2_par = 1
+  val mat1_par = 1
+  val mat2_par = 1
+}
+
+class lenet1 extends lenet {
+  val batch_par = 1
+  val conv1_par = 1
+  val conv2_par = 1
+  val mat1_par = 2
+  val mat2_par = 2
+}
+
+class lenet2 extends lenet {
+  val batch_par = 1
+  val conv1_par = 2
+  val conv2_par = 2
+  val mat1_par = 1
+  val mat2_par = 1
+}
+
+@spatial abstract class lenet extends PlasticineTest {
+
+  val batch_par:Int
+  val conv1_par:Int
+  val conv2_par:Int
+  val mat1_par:Int
+  val mat2_par:Int
 
   val ip = 16
 

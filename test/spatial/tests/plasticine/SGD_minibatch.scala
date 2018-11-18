@@ -2,14 +2,30 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class SGD_minibatch extends PlasticineTest { self => // Regression (Dense) // Args: 40 64 0.0001
+class SGD_minibatchNoPar extends SGD_minibatch {
+  val D = 16
+  val N = 1024
+  val E = 1
+  val ts = 16
+  val mp1 = 1
+  val mp2 = 1
+}
+class SGD_minibatch1 extends SGD_minibatch {
+  val D = 16
+  val N = 1024
+  val E = 1
+  val ts = 16
+  val mp1 = 2
+  val mp2 = 2
+}
 
-  val D = 16 // param [64]
-  val N = 1024 // param [pmuSize / <D> * 16]
-  val E = 1 // param [2]
-  val ts = 16 // param [pmuSize / <D>]
-  val mp1 = 1 // param [4,8] | <ts> % p == 0
-  val mp2 = 1 // param [8,16] | <ts> % p == 0
+@spatial abstract class SGD_minibatch extends PlasticineTest { self => // Regression (Dense) // Args: 40 64 0.0001
+  val D:Int
+  val N:Int
+  val E:Int
+  val ts:Int
+  val mp1:Int
+  val mp2:Int
 
   val A = 0.0001f
   val ip = 16

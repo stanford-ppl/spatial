@@ -2,27 +2,41 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class LogReg extends PlasticineTest {
+class LogRegNoPar extends LogReg {
+  val iters = 1
+  val D = 128
+  val N = 1024
+  val ts = 64
+  val op = 1
+  val mp = 1
+}
+
+class LogReg1 extends LogReg {
+  val iters = 1
+  val D = 128
+  val N = 1024
+  val ts = 64
+  val op = 2
+  val mp = 2
+}
+
+@spatial abstract class LogReg extends PlasticineTest {
   override def runtimeArgs: Args = "20 1024"
 
   type X = Float //FixPt[TRUE,_16,_16]
 
+  val iters:Int
+  val D:Int
+  val N:Int
+  val ts:Int
+  val op:Int
+  val mp:Int
+
+  val ip = 16
   val margin = 5
   val A = 1
-  val iters = 1 // param [4]
-  val D = 128 // param [128]
-  val N = 1024 // param [pmuSize / <D> * 16]
 
   def logreg[T:Num](xIn: Array[T], yIn: Array[T], tt: Array[T], n: Int, it: Int): Array[T] = {
-    //val iters = ArgIn[Int]
-    //val N     = ArgIn[Int]
-    //setArg(iters, it)
-    //setArg(N, n)
-
-    val ts = 64
-    val op = 1
-    val mp = 1
-    val ip = 16
 
     val x = DRAM[T](N, D)
     val y = DRAM[T](N)

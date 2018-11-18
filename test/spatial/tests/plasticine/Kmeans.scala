@@ -2,21 +2,57 @@ package spatial.tests.plasticine
 
 import spatial.dsl._
 
-@spatial class Kmeans extends PlasticineTest { self => // Regression (Dense) // Args: 3 64
+class KmeansNoPar extends Kmeans {
+  val iters = 2
+  val K = 16
+  val D = 32
+  val N = 64
+  val ts = 16
+  val op = 1
+  val mp1 = 1
+  val mp2 = 1
+  val mp3 = 1
+}
+class Kmeans1 extends Kmeans {
+  val iters = 2
+  val K = 16
+  val D = 32
+  val N = 64
+  val ts = 16
+  val op = 1
+  val mp1 = 1
+  val mp2 = 2
+  val mp3 = 2
+}
+class Kmeans2 extends Kmeans {
+  val iters = 2
+  val K = 16
+  val D = 32
+  val N = 64
+  val ts = 16
+  val op = 2
+  val mp1 = 2
+  val mp2 = 1
+  val mp3 = 1
+}
+
+
+@spatial abstract class Kmeans extends PlasticineTest { self => // Regression (Dense) // Args: 3 64
   type X = Int
 
-  val iters = 2 // param [2]
-  val K = 16 // param [64]
-  val D = 32 // param [64] | <K> * p <= pmuSize 
-  val N = 64 // param [pmuSize / <D> * 8]
-  val ts = 16 // param [pmuSize / <D>]
-  val op = 1 // param [1] | <N> / <ts> % p == 0
-  val mp1 = 2 // param [4,8] | <ts> % p == 0
-  val mp2 = 1 // param [1] | <K> % p == 0
-  val mp3 = 1 // param [1] | <K> % p == 0
+  val iters:Int
+  val K:Int
+  val D:Int
+  val N:Int
+  val ts:Int
+  val op:Int
+  val mp1:Int
+  val mp2:Int
+  val mp3:Int
+
   val ip = 16
 
-  val DM1 = D - 1
+  def DM1 = D - 1
   val element_max = 10
   val margin = (element_max * 0.2).to[X]
 

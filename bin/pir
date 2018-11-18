@@ -3,5 +3,6 @@
 app=$1
 cd pir
 sbt "; publishAll"
-cd ../gen/$app
-sbt "; runMain AccelMain ${@:2}"
+cd ../gen/PIR/$app
+args=${@:2}
+sbt "; runMain AccelMain $args"

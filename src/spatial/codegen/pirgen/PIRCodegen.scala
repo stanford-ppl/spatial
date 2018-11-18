@@ -66,6 +66,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   def emitAccelHeader = {
     emit("import pir._")
     emit("import pir.node._")
+    emit("import spade.param._")
     emit("import prism.graph._")
     emit("")
     open(s"""object AccelMain extends PIRApp {""")
@@ -95,7 +96,8 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   }
 
   protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
-    hostGen.genHost(lhs, rhs)
+    //hostGen.genHost(lhs, rhs)
+    rhs.blocks.foreach(ret)
   }
 
   protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {

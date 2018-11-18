@@ -43,24 +43,26 @@ trait PIRGenHelper extends PIRFormatGen {
 
   def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
     val bufferPort = lhs.port.bufferPort
+    val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ name => 
       (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
-          src"BankedRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).port(${bufferPort})"
+          src"BankedRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).port($bufferPort).muxPort($muxPort)"
         case _ => 
-          src"MemRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).port(${bufferPort})"
+          src"MemRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).port($bufferPort).muxPort($muxPort)"
       }
     }
   }
 
   def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
     val bufferPort = lhs.port.bufferPort
+    val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ name => 
       (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
-          src"BankedWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)}).port($bufferPort)"
+          src"BankedWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)}).port($bufferPort).muxPort($muxPort)"
         case _ => 
-          src"MemWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)}).port($bufferPort)"
+          src"MemWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)}).port($bufferPort).muxPort($muxPort)"
       }
     }
   }
@@ -69,7 +71,7 @@ trait PIRGenHelper extends PIRFormatGen {
     val rhs = lhs.sym.op.get
     val opStr = op.getOrElse(rhs.getClass.getSimpleName)
     val ins = inputs.getOrElse(rhs.productIterator.toList)
-    state(lhs)(src"""OpDef(op="$opStr").input($ins)""")
+    state(lhs)(src"""OpDef(op=$opStr).input($ins)""")
   }
 
   implicit class OptionHelper[T](opt:Option[T]) {

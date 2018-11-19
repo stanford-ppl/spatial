@@ -111,6 +111,9 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       else if (line.contains("PASS: 0") || line.contains("PASS: false")) Fail
       else Unknown
     }
+    def genDir(name:String) = s"${IR.config.cwd}/gen/$backend/$name/"
+    def logDir(name:String) = s"${IR.config.cwd}/logs/$backend/$name/"
+    def repDir(name:String) = s"${IR.config.cwd}/reports/$backend/$name/"
 
     /** Run DSL compilation for the given application. */
     final def compile(expectErrors: Boolean = false): Iterator[() => Result] = {
@@ -125,9 +128,9 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
           val args = backArgs ++ stageArgs ++ Seq("-v", "--test")
           val f = Future{ scala.concurrent.blocking {
             init(args)
-            IR.config.genDir = s"${IR.config.cwd}/gen/$backend/$name/"
-            IR.config.logDir = s"${IR.config.cwd}/logs/$backend/$name/"
-            IR.config.repDir = s"${IR.config.cwd}/reports/$backend/$name/"
+            IR.config.genDir = genDir(name)
+            IR.config.logDir = logDir(name)
+            IR.config.repDir = repDir(name)
             compileProgram(args)
           }}
           Await.result(f, duration.Duration(backend.makeTimeout, "sec"))

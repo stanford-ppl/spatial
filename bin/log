@@ -1,0 +1,2 @@
+app=$1
+cat logs/P2P/$app/run.log

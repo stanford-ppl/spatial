@@ -89,7 +89,7 @@ def fix_js():
 		write_file.write(json.dumps(parsed))
 		write_file.write(";")
 		write_file.close()
-	# os.remove("target/scala-2.12/api/index.bakjs")
+	os.remove("target/scala-2.12/api/index.bakjs")
 
 
 

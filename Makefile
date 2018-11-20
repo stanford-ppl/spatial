@@ -97,6 +97,7 @@ clean: clean-argon clean-forge clean-spatial
 ## Clean Spatial projects              ##
 ###-----------------------------------###
 clean-spatial:
+	rm -f $(HOME)/bin/emptiness
 	sbt "; spatial/clean"
 	sbt clean
 
@@ -104,6 +105,7 @@ clean-spatial:
 ## Clean Argon projects                ##
 ###-----------------------------------###
 clean-argon:
+	rm -f $(HOME)/bin/emptiness
 	sbt "; argon/clean"
 	sbt clean
 
@@ -111,5 +113,6 @@ clean-argon:
 ## Clean Forge projects                ##
 ###-----------------------------------###
 clean-forge:
+	rm -f $(HOME)/bin/emptiness
 	sbt "; forge/clean"
 	sbt clean

@@ -19,7 +19,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 	if [[ x -eq 0 ]]; then
 		sed -i "s/Instrumentation Annotations/Instrumentation Annotations ($line)/g" info/controller_tree.html
 	else
-		sym=`echo "$line" | sed "s/^ \+//g" | sed "s/ - .*//g"`
+		sym=`echo "$line" | sed "s/^ \+//g" | sed "s/ - .*//g" | sed "s/_.*//g"`
 		cycsper=`echo "$line" | sed "s/^.* - //g" | sed "s/ (.*//g"`
 		math=`echo "$line" | sed "s/^.* (/(/g" | sed "s/ \// total cycles,/g" | sed "s/)/ total iters)/g" | sed "s/).*/)/g"`
 		perprnt=`echo "$line" | sed "s/^.*\[/\[/g" | sed "s/\].*/\]/g"`

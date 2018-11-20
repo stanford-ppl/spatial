@@ -150,9 +150,6 @@ lazy val denseTest = project.settings(
 lazy val featureTest = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),
 ).aggregate(denseTest).dependsOn(spatial)
-lazy val plasticineTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/plasticine/"),
-).dependsOn(spatial)
 
 lazy val tests = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,
 featureTest)
@@ -160,5 +157,3 @@ featureTest)
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
-
-addCommandAlias("make", "; project plasticineTest; test:compile")

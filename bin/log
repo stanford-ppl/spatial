@@ -1,2 +1,3 @@
-app=$1
-cat logs/P2P/$app/run.log
+backend=$1
+app=$2
+cat logs/$backend/$app/run.log

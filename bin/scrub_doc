@@ -4,6 +4,10 @@ import os
 import shutil
 import re
 import sys
+import json
+from shutil import copyfile
+import os.path
+
 
 def delete_from_index(package): 
 	for dname, dirs, files in os.walk("target/scala-2.12/api/"):
@@ -42,6 +46,12 @@ def delete_implicits():
 	        with open(fpath, "w") as f:
 	            f.write(s)
 
+def delete_from_js(parsed, regex):
+	kill = re.compile(regex)
+	for k in parsed.keys():
+		if (kill.match(k)):
+			parsed[k] = [{"name": "Not Available"}]
+
 def fix_html():
 	delete_implicits()
 	delete_from_index("traversal")
@@ -50,12 +60,38 @@ def fix_html():
 	delete_from_index("codegen")
 	delete_from_index("flows")
 	delete_from_index("issues")
-	delete_from_index("math")
 	delete_from_index("metadata")
 	delete_from_index("node")
 	delete_from_index("report")
 	delete_from_index("rewrites")
 	delete_from_index("util")
+
+def fix_js():
+	if (not os.path.exists("target/scala-2.12/api/index.bakjs")):
+		copyfile("target/scala-2.12/api/index.js", "target/scala-2.12/api/index.bakjs")
+
+	with open("target/scala-2.12/api/index.js", "r") as read_file:
+		raw = read_file.readline()
+		raw = raw.replace("Index.PACKAGES = ", "")[0:-1] # Remove last ; and annoying first part
+		parsed = json.loads(raw)
+
+	delete_from_js(parsed, 'spatial\.metadata\.*')
+	delete_from_js(parsed, 'spatial\.flows\.*')
+	delete_from_js(parsed, 'spatial\.codegen\.*')
+	delete_from_js(parsed, 'spatial\.rewrites\.*')
+	delete_from_js(parsed, 'spatial\.traversal\.*')
+	delete_from_js(parsed, 'spatial\.transform\.*')
+	delete_from_js(parsed, 'spatial\.issues\.*')
+	delete_from_js(parsed, 'spatial\.node\.*')
+
+	with open("target/scala-2.12/api/index.js", "w") as write_file:
+		write_file.write("Index.PACKAGES = ")
+		write_file.write(json.dumps(parsed))
+		write_file.write(";")
+		write_file.close()
+	# os.remove("target/scala-2.12/api/index.bakjs")
+
+
 
 def prepare_scala():
 	gut_lang()
@@ -141,6 +177,7 @@ if (sys.argv[1] == "prep"):
 	prepare_scala()
 elif (sys.argv[1] == "scrub"):
 	fix_html()
+	fix_js()
 elif (sys.argv[1] == "replace"):
 	replace_scala()
 else:

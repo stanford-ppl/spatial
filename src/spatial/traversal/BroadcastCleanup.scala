@@ -17,16 +17,23 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
       lhs.op.get.blocks.foreach{block =>
         block.stms.reverse.foreach{sym => 
           sym match {
-            case Op(_: BankedAccessor[_,_]) => 
+            case Op(_: BankedAccessor[_,_]) if sym.getPorts(0).isDefined => 
               val broadcast = sym.port.broadcast.exists(_>0)
               dbgs(s"Reader $sym is broadcast: $broadcast")
-              sym.inputs.foreach{in => 
+              sym.nestedInputs.foreach{in => 
                 dbgs(s"  - Propogating info to $in")
                 in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr & broadcast) else broadcast
               }
+            case Op(_: Writer[_]) if sym.getPorts(0).isDefined => 
+              val broadcast = sym.port.broadcast.exists(_>0)
+              dbgs(s"Reader $sym is broadcast: $broadcast")
+              sym.nestedInputs.foreach{in => 
+                dbgs(s"  - Propogating info to $in")
+                in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr & broadcast) else broadcast
+              }              
             case _ if (sym.getBroadcastAddr.isDefined) => 
               dbgs(s"Node $sym has BroadcastAddress metadata defined as ${sym.isBroadcastAddr} ")
-              sym.inputs.foreach{in => 
+              sym.nestedInputs.foreach{in => 
                 dbgs(s"  - Propogating info to $in")
                 in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr & sym.isBroadcastAddr) else sym.isBroadcastAddr
               }

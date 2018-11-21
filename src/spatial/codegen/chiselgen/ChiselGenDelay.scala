@@ -13,7 +13,7 @@ trait ChiselGenDelay extends ChiselGenCommon {
   private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-
+    case _ if lhs.isBroadcastAddr => // Do nothing
     case DelayLine(delay, data) =>
       if (delay > maxretime) maxretime = delay
 

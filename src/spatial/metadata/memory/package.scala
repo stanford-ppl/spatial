@@ -191,7 +191,7 @@ package object memory {
       case _ => false
     }
     def isSparseAlias: Boolean = mem.op.exists{
-      case _: MemSparseAlias[_,_,_,_] => true
+      case _: MemSparseAlias[_,_,_,_,_] => true
       case _ => false
     }
 

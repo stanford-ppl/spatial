@@ -7,7 +7,7 @@ DW_HOME=/cad/synopsys/dc_shell/J-2014.09-SP3/dw
 
 # Option for setting random seed: +ntb_random_seed=<number>
 VCS_OPTS=-full64 -quiet -timescale=1ns/1ps -sverilog -debug_pp -Mdir=${TOP}.csrc +v2k +vcs+lic+wait +vcs+initreg+random +define+CLOCK_PERIOD=1 +lint=TFIPC-L +libext++.v -y ${DW_HOME}/sim_ver +incdir+${DW_HOME}/dw02/src_ver
-CC_OPTS=-LDFLAGS "-L../ -ldramsim -lstdc++ -Wl,-rpath=../" -CFLAGS "-O0 -g -I${VCS_HOME}/include -I../../cpp/SW -I../../vcs.sw-resources -I../dramShim -I../DRAMSim2 -I../ -fPIC -std=c++11 -L../ -ldramsim -lstdc++ -Wl,-rpath=../"
+CC_OPTS=-LDFLAGS "-no-pie -L../ -ldramsim -lstdc++ -Wl,-rpath=../" -CFLAGS "-O0 -g -I${VCS_HOME}/include -I../../cpp/SW -I../../vcs.sw-resources -I../dramShim -I../DRAMSim2 -I../ -fPIC -std=c++11 -L../ -ldramsim -lstdc++ -Wl,-rpath=../"
 
 all: dram sim
 

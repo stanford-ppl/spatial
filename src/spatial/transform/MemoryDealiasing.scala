@@ -85,7 +85,7 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
     // These are still needed to track accumulators for Reduce, MemReduce
     // MemDenseAlias and MemSparseAlias are removed after unrolling in AliasCleanup
     case op: MemDenseAlias[_,_,_]    if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
-    case op: MemSparseAlias[_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
+    case op: MemSparseAlias[_,_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
 
     case op @ DRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
       implicit val ba: Bits[_] = op.A
@@ -109,7 +109,7 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       oneHotMux(conds, dims)
 
     case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.sparseRank.length)
-    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.sparseRank.length)
+    case MemRank(Op(op: MemSparseAlias[_,_,_,_,_])) => I32(op.sparseRank.length)
 
     case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
     case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes))), _) => oneHotMux(conds,sizes)

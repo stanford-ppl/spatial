@@ -92,9 +92,13 @@ val base = Seq(
   publishMavenStyle := true
 )
 
+val emul_settings = base ++ Seq(
+  libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
+  crossScalaVersions := Seq(scala_version, "2.11.7"),
+  scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
+)
 val common = base ++ Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
-
   scalacOptions += "-opt:l:method,inline",          // Enable method optimizations, inlining
   scalacOptions += "-opt-warnings:none",            // Disable optimization warnings
   scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
@@ -119,7 +123,7 @@ val fringe_settings = base ++ Seq(
 
 /** Projects **/
 lazy val utils  = project.settings(common)
-lazy val emul   = project.settings(common)
+lazy val emul   = project.settings(emul_settings)
 lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)

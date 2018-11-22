@@ -18,14 +18,20 @@ publish:
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Local: clean
+publishM2Local:
 	bin/publish local
 
 ###-----------------------------------###
-## Publish spatial locally to m2.      ##
+## Publish spatial to OSS repo  .      ##
 ###-----------------------------------###
-publishM2Remote: clean
+publishM2Snapshot:
 	bin/publish remoteSnapshot
+
+###-----------------------------------###
+## Publish spatial to OSS repo  .      ##
+###-----------------------------------###
+publishM2Release:
+	bin/publish remoteRelease
 
 ###-----------------------------------###
 ## Update fringe and emul libs.        ##

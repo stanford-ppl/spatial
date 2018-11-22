@@ -128,8 +128,8 @@ case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
       val size = dims.map(_.toInt).product
       if (elems.length != size) {
         // TODO[5]: This could be downgraded to a warning if we fill zeros in here
-        error(ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
-        error(ctx)
+        error(lhs.ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
+        error(lhs.ctx)
       }
 
     case _ => super.visit(lhs, rhs)

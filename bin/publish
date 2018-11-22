@@ -9,11 +9,40 @@ export FRINGE_PACKAGE=''
 if [[ $1 = "remoteSnapshot" ]]; then 
 	changes=`git ls-files -m | wc -l`
 	files=`git ls-files -m`
+	snapshot=`cat build.sbt | grep "version[ ]*:=.*-SNAPSHOT" | wc -l`
 	bash bin/update_resources.sh
 	if [[ $changes -ne 0 ]]; then
 		echo -e "Detected dirty files!  Cannot publish because files:\n${files[@]}"
 		exit 1
+	elif [[ $snapshot -ne 1 ]]; then
+		echo -e "build.sbt appears to be configured for a release, rather than snapshot!"
 	else
+		make clean
+		sbt "; project emul; +publishSigned"
+		sbt "; project fringe; publishSigned"
+		sbt "; project argon; publishSigned"
+		sbt "; project forge; publishSigned"
+		sbt "; project spatial; publishSigned"
+		sbt "; project models; publishSigned"
+		sbt "; project poly; publishSigned"
+		sbt "; project utils; publishSigned"
+	fi
+elif [[ $1 = "remoteRelease" ]]; then 
+	changes=`git ls-files -m | wc -l`
+	files=`git ls-files -m`
+	bash bin/update_resources.sh
+	snapshot=`cat build.sbt | grep "version[ ]*:=.*-SNAPSHOT" | wc -l`
+	if [[ $changes -ne 0 ]]; then
+		echo -e "Detected dirty files!  Publishing is dangerous because files:\n${files[@]}"
+		read -e -p "Publish anyway? [y/N] " YN
+		if [[ $YN != "y" && $YN != "Y" ]]; then
+			exit 1
+		fi
+	fi
+	if [[ $snapshot -ne 0 ]]; then
+		echo -e "build.sbt appears to be configured for a snapshot, rather than release!"
+	else
+		make clean
 		sbt "; project emul; +publishSigned"
 		sbt "; project fringe; publishSigned"
 		sbt "; project argon; publishSigned"
@@ -25,6 +54,7 @@ if [[ $1 = "remoteSnapshot" ]]; then
 	fi
 elif [[ $1 = "local" ]]; then 
 	bin/update_resources.sh
+	make clean
 	sbt "; project emul; +publishLocal"
 	sbt "; project fringe; publishLocal"
 	sbt "; project forge; publishLocal"
@@ -42,6 +72,7 @@ elif [[ $1 = "M2local" ]]; then
 		exit 1
 	else
 		bash bin/update_resources.sh
+		make clean
 		sbt "; project emul; +publishM2"
 		sbt "; project fringe; publishM2"
 		sbt "; project argon; publishM2"

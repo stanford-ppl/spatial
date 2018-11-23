@@ -1,8 +1,9 @@
 package spatial.metadata
 
 import argon._
+import argon.lang.Ind
 import argon.node._
-import forge.tags.stateful
+import forge.tags.{stateful,rig}
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.access._
@@ -285,6 +286,11 @@ package object control {
       */
     @stateful def children: Seq[Ctrl.Node]
 
+    /** Returns a sequence of all controllers and subcontrollers which are siblings (children of parent) in the
+      * control hierarchy of this symbol or controller.
+      */
+    @stateful def siblings: Seq[Ctrl.Node]
+
     /** Returns all ancestors of the controller or symbol.
       * Ancestors are ordered outermost to innermost
       */
@@ -466,6 +472,11 @@ package object control {
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
+    @stateful def siblings: Seq[Ctrl.Node] = {
+      if (s.isControl) parent.children
+      else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
+    }
+
     def parent: Ctrl = s.rawParent
     def scope: Scope = s.rawScope
 
@@ -542,6 +553,7 @@ package object control {
     def isControl: Boolean = true
 
     @stateful def children: Seq[Ctrl.Node] = toCtrl.children
+    @stateful def siblings: Seq[Ctrl.Node] = toCtrl.siblings
     def parent: Ctrl = toCtrl.parent
     def scope: Scope = scp
 
@@ -588,6 +600,8 @@ package object control {
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
     }
+
+    @stateful def siblings: Seq[Ctrl.Node] = parent.children
 
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent
@@ -642,7 +656,7 @@ package object control {
     def start: Sym[F] = x.node.start
     def step: Sym[F] = x.node.step
     def end: Sym[F] = x.node.end
-    def ctrPar: I32 = x.node.par
+    def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
@@ -665,13 +679,19 @@ package object control {
 
       case _ => None
     }
-    def willFullyUnroll: Boolean = (nIters,ctrPar) match {
-      case (Some(Expect(nIter)), Expect(par)) => par >= nIter
-      case _ => false
+    def willFullyUnroll: Boolean = {
+      if (x.isForever) false
+      else (nIters,ctrPar) match {
+        case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+        case _ => false
+      }
     }
-    def isUnit: Boolean = nIters match {
-      case (Some(Final(1))) => true
-      case _ => false
+    def isUnit: Boolean = {
+      if (x.isForever) false 
+      else nIters match {
+        case (Some(Final(1))) => true
+        case _ => false
+      }
     }
   }
 
@@ -679,8 +699,8 @@ package object control {
     def ctrStart: Ind[W] = i.counter.start.unbox
     def ctrStep: Ind[W] = i.counter.step.unbox
     def ctrEnd: Ind[W] = i.counter.end.unbox
-    def ctrPar: I32 = i.counter.ctrPar
-    def ctrParOr1: Int = i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
+    @rig def ctrPar: I32 = if (i.counter.isForever) I32(1) else i.counter.ctrPar
+    def ctrParOr1: Int = if (i.counter.isForever) 1 else i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
   }
 
   implicit class IndexCounterOps[A](i: Num[A]) {
@@ -761,11 +781,11 @@ package object control {
       val pathB = b.ancestors
       val ctrlIdxA = pathA.indexOf(ctrl)
       val ctrlIdxB = pathB.indexOf(ctrl)
-      logs(s"  PathA: " + pathA.mkString(", "))
-      logs(s"  PathB: " + pathB.mkString(", "))
-      logs(s"  Ctrl: $ctrl")
-      logs(s"  ctrlIdxA: $ctrlIdxA")
-      logs(s"  ctrlIdxB: $ctrlIdxB")
+      // logs(s"  PathA: " + pathA.mkString(", "))
+      // logs(s"  PathB: " + pathB.mkString(", "))
+      // logs(s"  Ctrl: $ctrl")
+      // logs(s"  ctrlIdxA: $ctrlIdxA")
+      // logs(s"  ctrlIdxB: $ctrlIdxB")
 
       if (ctrlIdxA < 0 || ctrlIdxB < 0) None        // ctrl is not common to a and b
       else if (ctrlIdxA >= pathA.length - 1) None   // implies ctrl == a
@@ -776,10 +796,10 @@ package object control {
         val topB = pathB(ctrlIdxB + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
-        logs(s"  A: $a, B: $b")
-        logs(s"  ${ctrl.children.mkString(" ")}")
-        logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
-        logs(s"  Dist = ${idxB - idxA}")
+        // logs(s"  A: $a, B: $b")
+        // logs(s"  ${ctrl.children.mkString(" ")}")
+        // logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
+        // logs(s"  Dist = ${idxB - idxA}")
         if (idxA < 0 || idxB < 0) None
         Some(idxB - idxA)
       }

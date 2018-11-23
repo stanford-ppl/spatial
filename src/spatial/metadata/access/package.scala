@@ -119,6 +119,20 @@ package object access {
       case _ => Set.empty
     }
 
+    /** Returns the memory written to by this symbol, if applicable. */
+    @stateful def writtenMem: Option[Sym[_]] = a match {
+      case Op(d: Writer[_]) => Some(d.mem)
+      case Op(d: VectorWriter[_]) => Some(d.mem)
+      case _ => None
+    }
+
+    /** Returns the memory read from by this symbol, if applicable. */
+    @stateful def readMem: Option[Sym[_]] = a match {
+      case Op(d: Reader[_,_]) => Some(d.mem)
+      case Op(d: VectorReader[_]) => Some(d.mem)
+      case _ => None
+    }
+
     /** Returns true if an execution of access a may occur before one of access b. */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
       val (ctrl,dist) = LCAWithDataflowDistance(b.parent, a.parent)
@@ -248,8 +262,8 @@ package object access {
     // Want: MemReduce(1,0) [STOP]
     // access.scopes(stop = mem.scope) = Accel Foreach(-1,-1) Foreach(0,0) MemReduce(-1) MemReduce(1)
     // access.scopes(stop = mem.scope.master) = MemReduce(1)
-    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters)
-    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters)
+    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.isForever)
+    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.isForever)
 
     accessIters diff memoryIters
   }

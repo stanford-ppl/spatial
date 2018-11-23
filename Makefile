@@ -18,14 +18,20 @@ publish:
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
-publishM2Local: 
+publishM2Local:
 	bin/publish local
 
 ###-----------------------------------###
-## Publish spatial locally to m2.      ##
+## Publish spatial to OSS repo  .      ##
 ###-----------------------------------###
-publishM2Remote: 
+publishM2Snapshot:
 	bin/publish remoteSnapshot
+
+###-----------------------------------###
+## Publish spatial to OSS repo  .      ##
+###-----------------------------------###
+publishM2Release:
+	bin/publish remoteRelease
 
 ###-----------------------------------###
 ## Update fringe and emul libs.        ##
@@ -91,11 +97,13 @@ clear:
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
 clean: clean-argon clean-forge clean-spatial
+	sbt clean
 
 ###-----------------------------------###
 ## Clean Spatial projects              ##
 ###-----------------------------------###
 clean-spatial:
+	rm -f $(HOME)/bin/emptiness
 	sbt "; spatial/clean"
 	sbt clean
 
@@ -103,6 +111,7 @@ clean-spatial:
 ## Clean Argon projects                ##
 ###-----------------------------------###
 clean-argon:
+	rm -f $(HOME)/bin/emptiness
 	sbt "; argon/clean"
 	sbt clean
 
@@ -110,7 +119,6 @@ clean-argon:
 ## Clean Forge projects                ##
 ###-----------------------------------###
 clean-forge:
+	rm -f $(HOME)/bin/emptiness
 	sbt "; forge/clean"
 	sbt clean
-
-

@@ -39,7 +39,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
     */
   @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
-    stage(RegFileRead[A,C](me,addr,Set.empty))
+    stage(RegFileRead[A,C](me,addr,ens))
   }
 
   /** Updates the value at `addr` to `data`.
@@ -47,12 +47,12 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
     */
   @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
-    stage(RegFileWrite[A,C](me,data,addr,Set.empty))
+    stage(RegFileWrite[A,C](me,data,addr,ens))
   }
 
   @rig private def checkDims(given: Int): Unit = {
     if (given != rank) {
-      error(ctx, s"Expected a $rank-dimensional address, got a $given-dimensional address.")
+      error(ctx, s"Expected a $rank-dimensional address for $this (${this.name}), got a $given-dimensional address.")
       error(ctx)
     }
   }

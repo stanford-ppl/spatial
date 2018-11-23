@@ -438,7 +438,7 @@ public:
   void dumpAllRegs() {
     int argIns = numArgIns == 0 ? 1 : numArgIns;
     int argOuts = (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0) ? 1 : numArgOuts;
-    int debugRegStart = 2 + argIns + argOuts + numArgOutInstrs;
+    int debugRegStart = 2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
     int totalRegs = argIns + argOuts + numArgOutInstrs + numArgEarlyExits + 2 + NUM_DEBUG_SIGNALS;
     for (int i=0; i<totalRegs; i++) {
       uint32_t value = readReg(i);

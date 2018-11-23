@@ -466,27 +466,16 @@ import spatial.targets._
       5.5075111389160156.to[T],5.1880970001220703.to[T],4.8259010314941406.to[T],4.2589011192321777.to[T],5.6381106376647949.to[T],
       3.4522385597229004.to[T],3.5920252799987793.to[T],4.2071061134338379.to[T],5.0856294631958008.to[T],6.0637059211730957.to[T])
 
-    val obs_vec = Array[Int](0,27,49,52,20,31,63,63,29,0,47,4,38,38,38,38,4,43,7,28,31,
-                         7,7,7,57,2,2,43,52,52,43,3,43,13,54,44,51,32,9,9,15,45,21,
-                         33,61,45,62,0,55,15,55,30,13,13,53,13,13,50,57,57,34,26,21,
-                         43,7,12,41,41,41,17,17,30,41,8,58,58,58,31,52,54,54,54,54,
-                         54,54,15,54,54,54,54,52,56,52,21,21,21,28,18,18,15,40,1,62,
-                         40,6,46,24,47,2,2,53,41,0,55,38,5,57,57,57,57,14,57,34,37,
-                         57,30,30,5,1,5,62,25,59,5,2,43,30,26,38,38)
+    val obs_vec_scalatypes = loadCSVNow[scala.Int](s"$DATA/viterbi/obs_vec.csv", ","){_.toInt}
+    val obs_vec = Array[Int](obs_vec_scalatypes.map(_.to[Int]):_*)
 
     val raw_transitions = loadCSV1D[T](s"$DATA/viterbi/viterbi_transition.csv", "\n")
     val raw_emissions = loadCSV1D[T](s"$DATA/viterbi/viterbi_emission.csv", "\n")
     val transitions = raw_transitions.reshape(N_STATES, N_STATES)
     val emissions = raw_emissions.reshape(N_STATES, N_TOKENS)
 
-    val correct_path = Array[Int](27,27,27,27,27,31,63,63,63,63,47,4,38,38,38,38,7,7,7,
-                                  7,7,7,7,7,2,2,2,43,52,52,43,43,43,43,43,44,44,32,9,9,
-                                  15,45,45,45,45,45,45,0,55,55,55,30,13,13,13,13,13,13,
-                                  57,57,21,21,21,21,7,41,41,41,41,17,17,30,41,41,58,58,
-                                  58,31,54,54,54,54,54,54,54,54,54,54,54,54,52,52,52,21,
-                                  21,21,28,18,18,40,40,40,40,40,40,46,46,2,2,2,53,53,53,
-                                  55,38,57,57,57,57,57,57,57,57,57,57,30,30,5,5,5,5,5,5,
-                                  5,5,30,30,26,38,38)
+    val correct_path_scalatypes = loadCSVNow[scala.Int](s"$DATA/viterbi/correct_path.csv", ","){_.toInt}
+    val correct_path = Array[Int](correct_path_scalatypes.map(_.to[Int]):_*)
     // Handle DRAMs
     val init_dram = DRAM[T](N_STATES)
     val obs_dram = DRAM[Int](N_OBS)
@@ -1785,6 +1774,72 @@ import spatial.targets._
   }
 }
 
+@spatial class Sort_Merge_Native extends SpatialTest {
+ /*                                                                                                  
+                              |     |                                                                                                                                                                                        
+                     |        |     |                                      |     |                                                                                                                                                                                     
+                     |  |     |     |  |                             |     |     |                                                                                                                                                                           
+                     |  |  |  |     |  |                          |  |     |     |     |                                                                                                                                                                     
+                     |  |  |  |  |  |  |                          |  |  |  |     |     |                                                                                                                                                                     
+                     |  |  |  |  |  |  |  |                       |  |  |  |  |  |     |                                                                                                                                                                      
+                     |  |  |  |  |  |  |  |                       |  |  |  |  |  |  |  |                                                                                                                                                                        
+                     |  |  |  |  |  |  |  |                       |  |  |  |  |  |  |  |                                                                                                                                                                      
+                                                                  |  |  |  |  |  |  |  |                      
+   Outer FSM iter 1:  ↖↗    ↖↗    ↖↗    ↖↗      Outer FSM iter 2:  ↖.....↖     ↖.....↖                                                                                                                      
+                     fifos numel = 1                               fifos numel = 2                                                            
+                                                                  
+                                                                                                     
+                            |           |                                           |  |                                                                                                   
+                         |  |           |                                        |  |  |                                                                                                   
+                      |  |  |        |  |                                  |  |  |  |  |                                                                                                  
+                   |  |  |  |        |  |                               |  |  |  |  |  |                                                                                                  
+                   |  |  |  |     |  |  |                            |  |  |  |  |  |  |                                                                                                  
+                   |  |  |  |  |  |  |  |                         |  |  |  |  |  |  |  |                                                                                                  
+                   |  |  |  |  |  |  |  |                         |  |  |  |  |  |  |  |                                                                                                  
+                   |  |  |  |  |  |  |  |                         |  |  |  |  |  |  |  |                                                                                                  
+ Outer FSM iter 3:  ↖...........↖               Outer FSM iter 4:                                                                                                     
+                   fifos numel = 4                                 Done
+                                                                                                                                                                                                                   
+                                                                                                                                                                           
+ */
+
+
+  import spatial.lib.Sort
+
+  def main(args: Array[String]): Unit = {
+
+    val numel = 2048
+    val START = 0
+    val STOP = numel
+    val levels = STOP-START //ArgIn[Int]
+    // setArg(levels, args(0).to[Int])
+
+    val raw_data = loadCSV1D[Int](s"$DATA/sort/sort_data.csv", "\n")
+
+    val data_dram = DRAM[Int](numel)
+    // val sorted_dram = DRAM[Int](numel)
+
+    setMem(data_dram, raw_data)
+
+    val result_dram = DRAM[Int](numel)
+
+    Accel{
+      Sort.mergeSort(data_dram, result_dram, 16, 2, numel)
+    }
+
+    val sorted_gold = loadCSV1D[Int](s"$DATA/sort/sort_gold.csv", "\n")
+    val sorted_result = getMem(result_dram)
+
+    printArray(sorted_gold, "Sorted Gold: ")
+    printArray(sorted_result, "Sorted Result: ")
+
+    val cksum = sorted_gold.zip(sorted_result){_==_}.reduce{_&&_}
+    // // Use the real way to check if list is sorted instead of using machsuite gold
+    // val cksum = Array.tabulate(STOP-1){ i => pack(sorted_result(i), sorted_result(i+1)) }.map{a => a._1 <= a._2}.reduce{_&&_}
+    println("PASS: " + cksum + " (Sort_Merge)")
+    assert(cksum)
+  }
+}
 
 @spatial class Sort_Radix extends SpatialTest {
  /*                                                                                                  

@@ -94,3 +94,34 @@ import spatial.dsl._
 
   }
 }
+
+@spatial class CrossRead extends SpatialTest {
+  /** This app tests parallel reads (one full row, one full column) to a RegFile, 
+    * where one of the elements is shared between the col and the row
+    */
+
+  def main(args: Array[String]): Unit = {
+    val dim = 8
+    val init_dram = DRAM[I32](dim,dim)
+    val init_data = (0::dim,0::dim){(i,j) => i*j}
+    setMem(init_dram, init_data)
+    val result = ArgOut[I32]
+
+    Accel {
+      val init_reg = RegFile[I32](dim,dim)
+      Foreach(dim by 1){j => 
+        List.tabulate(dim){i => init_reg(i,*) <<= i*j} // Shifts into col 0
+        val rowSum = List.tabulate(dim){i => init_reg(2, i)}.reduceTree{_+_}
+        val colSum = List.tabulate(dim){i => init_reg(i, 2)}.reduceTree{_+_}
+        result := rowSum + colSum
+      }
+    }
+
+    val got = getArg(result)
+    val gold = List.tabulate(dim){i => init_data(5, i)}.reduce{_+_} + List.tabulate(dim){i => init_data(i, 2)}.reduce{_+_}
+    println(r"Got $got, expected $gold")
+    println(r"Pass: ${got == gold}")
+    assert(got == gold)
+
+  }
+}

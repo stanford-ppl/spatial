@@ -9,6 +9,7 @@ val base = Seq(
   organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
   version := "1.0-SNAPSHOT",
+  licenses := Seq("MIT" -> url(s"https://github.com/sbt/${name.value}/blob/${version.value}/LICENSE")),
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
 
   /** External Libraries (e.g. maven dependencies) **/

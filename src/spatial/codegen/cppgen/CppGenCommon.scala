@@ -24,7 +24,7 @@ trait CppGenCommon extends CppCodegen {
   /* Represent a FixPt with nonzero number of f bits as a float */
   protected def toApproxFix(x: String, tp: Type[_]): String = {
     tp match {
-      case FixPtType(s,d,f) if (f != 0) => src"(${tp}) ($x / ((${asIntType(tp)})1 << $f))"
+      case FixPtType(s,d,f) if (f != 0) => src"(${tp}) ((${tp}) $x / ((${asIntType(tp)})1 << $f))"
       case _ => src"$x"
     }
   }

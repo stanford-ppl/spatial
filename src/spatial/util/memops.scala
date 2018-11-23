@@ -58,7 +58,7 @@ object memops {
     }
 
     @rig def addrs() = mem match {
-      case Op(op: MemSparseAlias[_,_,_,_]) =>
+      case Op(op: MemSparseAlias[_,_,_,_,_]) =>
         def addrAlias[Addr[T]](implicit Addr: Type[Addr[I32]]) = {
           val addr = op.addr.map{mem => mem.asInstanceOf[Addr[I32]]}
 

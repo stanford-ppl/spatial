@@ -7,7 +7,7 @@ import sys.process._
 import scala.language.postfixOps
 
 trait DotCodegen extends argon.codegen.Codegen {
-  override val lang: String = "dot"
+  override val lang: String = "info"
   override val ext: String = "dot"
 
   val stack = mutable.Stack[Scope]()

@@ -5,7 +5,7 @@ import argon._
 import forge.tags._
 import spatial.node._
 
-class ForeachClass(opt: CtrlOpt) {
+class ForeachClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) {
   @api def apply(ctr: Counter[I32])(func: I32 => Any): Void = {
     apply(Seq(ctr)){is => func(is.head) }
   }
@@ -25,8 +25,9 @@ class ForeachClass(opt: CtrlOpt) {
   @rig def apply(ctrs: Seq[Counter[I32]])(func: Seq[I32] => Any): Void = {
     val iters  = ctrs.map{_ => boundVar[I32] }
     val cchain = CounterChain(ctrs)
-    stageWithFlow(OpForeach(Set.empty, cchain, stageBlock{ func(iters); void }, iters)){pipe =>
+    stageWithFlow(OpForeach(Set.empty, cchain, stageBlock{ func(iters); void }, iters, stopWhen)){pipe =>
       opt.set(pipe)
     }
   }
+
 }

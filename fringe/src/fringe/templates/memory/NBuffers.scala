@@ -508,24 +508,25 @@ class NBufMem(
       
       val numWriters = numXBarW + numDirectW
       val par = combinedXBarWMux.accessPars.sorted.headOption.getOrElse(0) max flatDirectWMux.accessPars.sorted.headOption.getOrElse(0)
-      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), Some(0)))
+      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), Some(0), false))
       val en = io.xBarW.map(_.en.reduce{_||_}).reduce{_||_} || io.directW.map(_.en.reduce{_||_}).reduce{_||_}
       writeCol.io.input.enable := en
       writeCol.io.input.reset := ctrl.io.swap
       writeCol.io.input.saturate := false.B
 
-      val gotFirst = Module(new SRFF())
-      gotFirst.io.input.set := risingEdge(en)
-      gotFirst.io.input.reset := io.xBarW.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_} | ctrl.io.swap
-      gotFirst.io.input.asyn_reset := false.B
+      val rowChanged = io.xBarW.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_}
+      val gotFirstInRow = Module(new SRFF())
+      gotFirstInRow.io.input.set := risingEdge(en) || (en && rowChanged)
+      gotFirstInRow.io.input.reset :=  rowChanged | ctrl.io.swap
+      gotFirstInRow.io.input.asyn_reset := false.B
 
       val base = chisel3.util.PriorityMux(io.xBarW.map(_.en).flatten, writeCol.io.output.count)
       val colCorrection = Module(new FF(32))
       colCorrection.io.xBarW(0).data.head := base.asUInt
       colCorrection.io.xBarW(0).init.head := 0.U
-      colCorrection.io.xBarW(0).en.head := en & ~gotFirst.io.output.data
-      colCorrection.io.xBarW(0).reset.head := reset.toBool | risingEdge(!gotFirst.io.output.data)
-      val colCorrectionValue = Mux(en & ~gotFirst.io.output.data, base.asUInt, colCorrection.io.output.data(0))
+      colCorrection.io.xBarW(0).en.head := en & ~gotFirstInRow.io.output.data
+      colCorrection.io.xBarW(0).reset.head := reset.toBool | risingEdge(!gotFirstInRow.io.output.data)
+      val colCorrectionValue = Mux(en & ~gotFirstInRow.io.output.data, base.asUInt, colCorrection.io.output.data(0))
 
       val wCRN_width = 1 + log2Up(numrows)
       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))

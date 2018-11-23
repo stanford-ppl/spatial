@@ -79,6 +79,7 @@ elif [[ $type == "vcs-gdocs" ]]; then
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash
   echo $branchname > ${curpath}/branchname
+  rm -rf gen/VCS
   echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"$branchname\" \"$timestamp\" \"vcs\""
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs"
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
@@ -95,6 +96,7 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash
   echo $branchname > ${curpath}/branchname
+  rm -rf gen/Scala
   echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"$branchname\" \"$timestamp\" \"scalasim\""
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "scalasim"
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout

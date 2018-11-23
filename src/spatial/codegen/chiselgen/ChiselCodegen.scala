@@ -169,6 +169,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val children = List[SMObject]()")
         emit("val parent: Option[(SMObject, Int)]")
         emit("val cchains = List[CChainObject]()")
+        emit("val break = Wire(Bool())")
         if (spatialConfig.enableInstrumentation) {
           emit(src"""val cycles = Module(new InstrumentationCounter())""")
           emit(src"""val iters = Module(new InstrumentationCounter())""")          
@@ -178,6 +179,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           emit("sm.io.flow := flow")
           emit("sm.io.rst := resetMe")
           emit("done := sm.io.done")
+          emit("break := sm.io.break")
           emit("sm.io.enable := en")
           emit("resetChildren := sm.io.ctrRst")
           if (spatialConfig.enableInstrumentation) {
@@ -220,6 +222,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("var step: Either[Option[Int],FixedPoint] = Left(None)")
         emit("val par: Int")
         emit("val width: Int")
+        emit("val isForever: Boolean = false")
         emit("")
         emit("def fixedStart: Option[Int] = start match {case Left(x) => x; case Right(x) => None}")
         emit("def fixedStop: Option[Int] = stop match {case Left(x) => x; case Right(x) => None}")

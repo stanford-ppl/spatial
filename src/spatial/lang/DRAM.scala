@@ -84,28 +84,31 @@ object DRAM {
 
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
   @api def apply[W:INT](addrs: SRAM1[Ind[W]]): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,SRAM1,W,DRAM1,DRAMSparseTile](this,addrs,addrs.length))
+    stage(MemSparseAlias[A,SRAM1,W,DRAM1,DRAMSparseTile,_32](this,addrs,addrs.length))
   }
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */
-  @api def apply[W:INT](addrs: SRAM1[Ind[W]], size: I32): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,SRAM1,W,DRAM1,DRAMSparseTile](this,addrs,size))
+  @api def apply[W:INT,W2:INT](addrs: SRAM1[Ind[W]], size: Ind[W2]): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,SRAM1,W,DRAM1,DRAMSparseTile,W2](this,addrs,size))
   }
+  @api def apply[W:INT](addrs: SRAM1[Ind[W]], size: Int): DRAMSparseTile[A] = apply(addrs, size.to[I32])
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
   @api def apply[W:INT](addrs: FIFO[Ind[W]]): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,FIFO,W,DRAM1,DRAMSparseTile](this,addrs,addrs.numel))
+    stage(MemSparseAlias[A,FIFO,W,DRAM1,DRAMSparseTile,_32](this,addrs,addrs.numel))
   }
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */
-  @api def apply[W:INT](addrs: FIFO[Ind[W]], size: I32): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,FIFO,W,DRAM1,DRAMSparseTile](this,addrs,size))
+  @api def apply[W:INT,W2:INT](addrs: FIFO[Ind[W]], size: Ind[W2]): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,FIFO,W,DRAM1,DRAMSparseTile,W2](this,addrs,size))
   }
+  @api def apply[W:INT](addrs: FIFO[Ind[W]], size: Int): DRAMSparseTile[A] = apply(addrs, size.to[I32])
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
   @api def apply[W:INT](addrs: LIFO[Ind[W]]): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,LIFO,W,DRAM1,DRAMSparseTile](this,addrs,addrs.numel))
+    stage(MemSparseAlias[A,LIFO,W,DRAM1,DRAMSparseTile,_32](this,addrs,addrs.numel))
   }
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */
-  @api def apply[W:INT](addrs: LIFO[Ind[W]], size: I32): DRAMSparseTile[A] = {
-    stage(MemSparseAlias[A,LIFO,W,DRAM1,DRAMSparseTile](this,addrs,size))
+  @api def apply[W:INT,W2:INT](addrs: LIFO[Ind[W]], size: Ind[W2]): DRAMSparseTile[A] = {
+    stage(MemSparseAlias[A,LIFO,W,DRAM1,DRAMSparseTile,W2](this,addrs,size))
   }
+  @api def apply[W:INT](addrs: LIFO[Ind[W]], size: Int): DRAMSparseTile[A] = apply(addrs, size.to[I32])
 
   /** Creates a dense, burst transfer from the on-chip `local` to this DRAM's region of main memory. */
   @api def store[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = {

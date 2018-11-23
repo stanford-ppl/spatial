@@ -95,13 +95,14 @@ object MemDenseAlias {
   override def aliases: Set[Sym[_]] = syms(mem)
 }
 object MemSparseAlias {
-  @rig def apply[A,Addr[B],W,Src[T],Alias[T]](mem: Src[A], addr: Addr[Ind[W]], size: I32)(implicit
+  @rig def apply[A,Addr[B],W,Src[T],Alias[T],W2](mem: Src[A], addr: Addr[Ind[W]], size: Ind[W2])(implicit
     A:     Type[A],
     Addr:  Type[Addr[Ind[W]]],
     Src:   Type[Src[A]],
-    Alias: Type[Alias[A]]
+    Alias: Type[Alias[A]],
+    cast: Cast[Ind[W2],I32]
   ): MemSparseAlias[A,Addr,W,Src,Alias] = {
-    MemSparseAlias[A,Addr,W,Src,Alias](Seq(Bit(true)),Seq(mem),Seq(addr),Seq(size))
+    MemSparseAlias[A,Addr,W,Src,Alias](Seq(Bit(true)),Seq(mem),Seq(addr),Seq(size.to[I32]))
   }
 }
 

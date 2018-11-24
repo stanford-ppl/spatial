@@ -153,9 +153,13 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       import scala.concurrent.ExecutionContext.Implicits.global   // implicit execution context for Futures
 
       val cmdLog = new PrintStream(IR.config.logDir + s"/$pass.log")
+      val cmdFile = new PrintStream(IR.config.logDir + s"/$pass.sh")
       var cause: Result = Unknown
       Console.out.println(s"Backend $pass in ${IR.config.logDir}/$pass.log")
-      Console.out.println(args.mkString(" "))
+      val cmdStr = args.mkString(" ")
+      Console.out.println(cmdStr)
+      cmdFile.println(s"${cmdStr}")
+      cmdFile.close()
       val cmd = new Subprocess(args:_*)({case (lline,_) =>
         val line = lline.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt","")
         val err = parse(line)

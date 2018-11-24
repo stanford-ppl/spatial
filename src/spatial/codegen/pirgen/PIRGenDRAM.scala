@@ -10,7 +10,7 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@DRAMHostNew(dims,zero) =>
-      state(lhs)(s"""DRAM("${lhs.name.get}").dims(${lhs.constDims})""")
+      state(lhs)(s"""DRAM("${lhs.name.getOrElse(s"$lhs")}").dims(${lhs.constDims})""")
 
     case DRAMAddress(dram) =>
       state(lhs, tp=Some("MemRead"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")

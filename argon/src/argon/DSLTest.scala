@@ -111,9 +111,9 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       else if (line.contains("PASS: 0") || line.contains("PASS: false")) Fail
       else Unknown
     }
-    def genDir(name:String) = s"${IR.config.cwd}/gen/$backend/$name/"
-    def logDir(name:String) = s"${IR.config.cwd}/logs/$backend/$name/"
-    def repDir(name:String) = s"${IR.config.cwd}/reports/$backend/$name/"
+    def genDir(name:String):String = s"${IR.config.cwd}/gen/$backend/$name/"
+    def logDir(name:String):String = s"${IR.config.cwd}/logs/$backend/$name/"
+    def repDir(name:String):String = s"${IR.config.cwd}/reports/$backend/$name/"
 
     /** Run DSL compilation for the given application. */
     final def compile(expectErrors: Boolean = false): Iterator[() => Result] = {

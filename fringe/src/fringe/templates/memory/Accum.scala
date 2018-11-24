@@ -56,7 +56,7 @@ class FixFMAAccum(
   // Use log2Down to be consistent with latency model that truncates
   val drain_latency = (log(cycleLatency)/log(2)).toInt
 
-  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), false, cw))
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
   laneCtr.io.input.saturate := false.B
@@ -119,7 +119,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   // Use log2Down to be consistent with latency model that truncates
   val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
 
-  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), cw))
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), false, cw))
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + opLatency)
   laneCtr.io.input.saturate := false.B

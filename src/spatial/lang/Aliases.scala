@@ -108,7 +108,9 @@ trait ExternalAliases extends InternalAliases {
   lazy val LIFO = spatial.lang.LIFO
 
   type Reg[A] = spatial.lang.Reg[A]
+  type FIFOReg[A] = spatial.lang.FIFOReg[A]
   lazy val Reg = spatial.lang.Reg
+  lazy val FIFOReg = spatial.lang.FIFOReg
   lazy val ArgIn = spatial.lang.ArgIn
   lazy val ArgOut = spatial.lang.ArgOut
   lazy val HostIO = spatial.lang.HostIO

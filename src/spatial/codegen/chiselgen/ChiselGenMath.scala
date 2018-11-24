@@ -21,7 +21,7 @@ trait ChiselGenMath extends ChiselGenCommon {
   }
   // TODO: Clean this and make it nice
   private def MathDL(lhs: Sym[_], rhs: Op[_], nodelat: Double): Unit = {
-    emit(src"val $lhs = Wire(${lhs.tp})")
+    emit(createWire(quote(lhs),remap(lhs.tp)))
 
     val backpressure_raw = if (controllerStack.nonEmpty) getBackPressure(controllerStack.head.toCtrl) else "true.B"
     val backpressure = if (ensigs.contains(backpressure_raw) && backpressure_raw != "true.B") s"ensig${ensigs.indexOf(backpressure_raw)}"
@@ -110,7 +110,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixOr(x,y)   => MathDL(lhs, rhs, latencyOption("FixOr", Some(bitWidth(lhs.tp))))
     case FixXor(x,y)  => MathDL(lhs, rhs, latencyOption("FixXor", Some(bitWidth(lhs.tp))))
     case FixPow(x,y)  => throw new Exception(s"FixPow($x, $y) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
-    case VecApply(vector, i) => emit(src"""val $lhs = Wire(${lhs.tp})"""); emit(src"$lhs := $vector.apply($i)")
+    case VecApply(vector, i) => emit(createWire(quote(lhs),remap(lhs.tp))); emit(src"$lhs := $vector.apply($i)")
 
     case FixLst(x,y) => MathDL(lhs, rhs, latencyOption("FixLst", Some(bitWidth(lhs.tp))))
     case FixLeq(x,y) => MathDL(lhs, rhs, latencyOption("FixLeq", Some(bitWidth(lhs.tp))))
@@ -129,11 +129,11 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixMul(x,y) => MathDL(lhs, rhs, latencyOption("FixMul", Some(bitWidth(lhs.tp))))
     case FixDiv(x,y) => MathDL(lhs, rhs, latencyOption("FixDiv", Some(bitWidth(lhs.tp))))
     case FixRecipSqrt(a) => 
-      emit(src"val ${lhs}_one = Wire(${lhs.tp})")
+      emit(createWire(src"${lhs}_one", src"${lhs.tp}"))
       emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
       MathDL(lhs, rhs, latencyOption("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixRecip(y) => 
-      emit(src"val ${lhs}_one = Wire(${lhs.tp})")
+      emit(createWire(src"${lhs}_one", src"${lhs.tp}"))
       emit(src"${lhs}_one.r := 1.FP(${lhs}_one.s, ${lhs}_one.d, ${lhs}_one.f).r")
       MathDL(lhs, rhs, latencyOption("FixDiv", Some(bitWidth(lhs.tp)))) 
     case FixMod(x,y) => MathDL(lhs, rhs, latencyOption("FixMod", Some(bitWidth(lhs.tp)))) 
@@ -146,10 +146,10 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRU(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case BitRandom(None) if lhs.parent.s.isDefined => emit(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${lhs.parent.s.get}.datapathEn) === 1.U")
-    case FixRandom(None) if lhs.parent.s.isDefined => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${lhs.parent.s.get}.datapathEn).r")
+    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${lhs.parent.s.get}.datapathEn).r")
     case FixRandom(x) =>
       val FixPtType(s,d,f) = lhs.tp
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       val seed = (scala.math.random*1000).toInt
       val size = x match{
         case Some(Const(xx)) => s"$xx"
@@ -163,12 +163,12 @@ trait ChiselGenMath extends ChiselGenCommon {
       emit(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     case FltRandom(None) if lhs.parent.s.isDefined => 
       val FltPtType(m,e) = lhs.tp
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, ${lhs.parent.s.get}.datapathEn).r")
     case FltRandom(x) => throw new Exception(s"Can only generate random float with no bounds right now!")
 
     case FixAbs(x) =>
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux($x < 0.U, -$x, $x).r")
 
     case FixSqrt(x) => MathDL(lhs, rhs, latencyOption("FixSqrt", Some(bitWidth(lhs.tp))))
@@ -180,7 +180,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltFMA(x,y,z) => MathDL(lhs, rhs, latencyOption("FltFMA", Some(bitWidth(lhs.tp)))) 
 
     case FltNeg(x) =>
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := (-$x).r")
 
     case FltAdd(x,y) => MathDL(lhs, rhs, latencyOption("FltAdd", Some(bitWidth(lhs.tp))))
@@ -188,15 +188,15 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltMul(x,y) => MathDL(lhs, rhs, latencyOption("FltMul", Some(bitWidth(lhs.tp))))
     case FltDiv(x,y) => MathDL(lhs, rhs, latencyOption("FltDiv", Some(bitWidth(lhs.tp))))
     case FltMax(x,y) => 
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux($x > $y, ${x}.r, ${y}.r)")
 
     case FltMin(x,y) => 
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux($x < $y, ${x}.r, ${y}.r)")
 
     case FltAbs(x) => 
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := chisel3.util.Cat(false.B, ${x}(${x}.getWidth-1,0))")
 
     case FltPow(x,exp) => throw new Exception(s"FltPow($x, $exp) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
@@ -219,15 +219,15 @@ trait ChiselGenMath extends ChiselGenCommon {
     // case FltAtan(x) => throw new spatial.TrigInAccelException(lhs)
 
     case OneHotMux(sels, opts) => 
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux1H(List($sels), List(${opts.map{x => src"$x.r"}}))")
 
     case Mux(sel, a, b) => 
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux(($sel), $a.r, $b.r)")
 
-    case FixMin(a, b) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Mux(($a < $b), $a, $b).r")
-    case FixMax(a, b) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Mux(($a > $b), $a, $b).r")
+    case FixMin(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux(($a < $b), $a, $b).r")
+    case FixMax(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux(($a > $b), $a, $b).r")
     case FixToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFix", Some(bitWidth(lhs.tp))))
     case FixToFixSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixSat", Some(bitWidth(lhs.tp))))
     case FixToFixUnb(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnb", Some(bitWidth(lhs.tp))))
@@ -237,18 +237,18 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FltToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFix", Some(bitWidth(lhs.tp))))
     case FltRecip(x) => MathDL(lhs, rhs, latencyOption("FltRecip", Some(bitWidth(lhs.tp)))) 
     
-    case And(a, b) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := $a & $b")
-    case Not(a) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := ~$a")
-    case Or(a, b) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := $a | $b")
-    case Xor(a, b) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := $a ^ $b")
-    case Xnor(a, b) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs := ~($a ^ $b)")
+    case And(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := $a & $b")
+    case Not(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := ~$a")
+    case Or(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := $a | $b")
+    case Xor(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := $a ^ $b")
+    case Xnor(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := ~($a ^ $b)")
 
-    case FixFloor(a) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
-    case FixCeil(a) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
-    // case FltFloor(a) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
-    // case FltCeil(a) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
-    case DataAsBits(data) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.zipWithIndex.foreach{case (dab, i) => dab := $data(i)}")
-    case BitsAsData(data, fmt) => emit(src"val $lhs = Wire(${lhs.tp})");emit(src"$lhs.r := chisel3.util.Cat($data.reverse)")
+    case FixFloor(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
+    case FixCeil(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
+    // case FltFloor(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
+    // case FltCeil(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
+    case DataAsBits(data) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.zipWithIndex.foreach{case (dab, i) => dab := $data(i)}")
+    case BitsAsData(data, fmt) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := chisel3.util.Cat($data.reverse)")
     // case FltInvSqrt(x) => x.tp match {
     //   case DoubleType() => throw new Exception("DoubleType not supported for FltInvSqrt") 
     //   case HalfType() =>  emit(src"val $lhs = frsqrt($x)")

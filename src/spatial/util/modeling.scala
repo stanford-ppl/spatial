@@ -340,6 +340,19 @@ object modeling {
       }
     }
 
+    def pushBreakNodes(regWrite: Sym[_]): Unit = {
+      val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
+      val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
+      toPush.foreach{
+        case x if (paths.contains(x)) => 
+          dbgs(s"  $x - Originally at ${paths(x)}, but must push by ${paths(regWrite)}")
+          paths(x) = if (paths(x) < paths(regWrite)) paths(regWrite) + 1 else paths(x)
+        case _ => 
+
+      }
+
+    }
+
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet      
@@ -356,6 +369,8 @@ object modeling {
         debugs(s"  [${dly(node)}] ${stm(node)}")
       }
     }
+
+    scope.foreach{case x if x.isWriter && x.writtenMem.isDefined && x.writtenMem.get.isBreaker => pushBreakNodes(x); case _ => }
 
     pushSegmentationAccesses()
 

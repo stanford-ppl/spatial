@@ -18,6 +18,15 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
   @api def bit(i: Int): Bit = this.asBits.apply(i)
 
   /**
+    * Returns the most significant bit of this value.
+    */
+  @api def msb: Bit = this.asBits.apply(nbits-1)
+  /**
+    * Returns the least significant bit of this value.
+    */
+  @api def lsb: Bit = this.asBits.apply(0)
+
+  /**
     * Returns a slice of the bits in this word as a VectorN.
     * The range must be statically determinable with a stride of 1.
     * The range is inclusive for both the start and end.

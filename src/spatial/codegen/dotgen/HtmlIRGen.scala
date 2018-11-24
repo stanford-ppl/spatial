@@ -5,7 +5,7 @@ import utils.io.files._
 
 trait HtmlIRCodegen extends argon.codegen.Codegen {
 
-  val lang = "dot"
+  val lang = "info"
 
   def ext = "html"
 

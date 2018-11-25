@@ -12,7 +12,7 @@ def main():
     parser.add_argument('app', type=str, help='name of application to run')
     parser.add_argument('--thread', type=int, default=16, help='Number of threads to run')
     parser.add_argument('--backend', type=str, help='Testing Backend')
-    parser.add_argument('--project', type=str, default="plasticineTest", help='project name')
+    parser.add_argument('--project', type=str, default="denseTest", help='project name')
 
     (opts, args) = parser.parse_known_args()
 

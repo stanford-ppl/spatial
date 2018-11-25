@@ -222,14 +222,19 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     }
   }
 
+
   // Handle Reads
   m.foreach{ mem =>
     // Check all xBar r ports against this bank's coords
-    val xBarSelect = io.xBarR.flatMap(_.banks).grouped(p.banks.length).toList.zip(io.xBarR.flatMap(_.en)).map{ case(bids, en) =>
+    val xBarSelectEnsModule = Module(new StickySelects(io.xBarR.flatMap(_.en).size))
+    xBarSelectEnsModule.io.ins := io.xBarR.flatMap(_.banks).grouped(p.banks.length).toList.zip(io.xBarR.flatMap(_.en)).map{ case(bids, en) =>
       bids.zip(mem._2).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarR) en else false.B}
     }
+    val xBarSelect = xBarSelectEnsModule.io.outs
     // Check all direct r ports against this bank's coords
-    val directSelectEns = io.directR.flatMap(_.en).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectEnsModule = Module(new StickySelects(io.directR.flatMap(_.en).size))
+    directSelectEnsModule.io.ins := io.directR.flatMap(_.en).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectEns = directSelectEnsModule.io.outs
     val directSelectOffsets = io.directR.flatMap(_.ofs).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
     val directSelectFlows = io.directR.flatMap(_.flow).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 

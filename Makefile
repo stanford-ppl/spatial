@@ -80,8 +80,10 @@ doc:
 	sbt doc
 	bin/scrub_doc replace
 	bin/scrub_doc scrub
-	echo "Please publish to spatial-doc:"
-	echo "  cp -r target/scala-2.12/api/* ~/spatial-doc"
+	cat build.sbt | grep "version :="
+	echo "Please publish to spatial-doc, under appropriate version:"
+	echo "  cp -r target/scala-2.12/api/* ~/spatial-doc/<version>"
+
 
 ###-----------------------------------###
 ## Remove all generated files.	       ##

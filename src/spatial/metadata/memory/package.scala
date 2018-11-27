@@ -164,6 +164,12 @@ package object memory {
       }
     }
 
+    def getConstDims: Option[Seq[Int]] = {
+      if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
+        Some(stagedDims.collect{case Expect(c) => c.toInt })
+      } else None
+    }
+
     def readWidths: Set[Int] = mem.readers.map{
       case Op(read: UnrolledAccessor[_,_]) => read.width
       case _ => 1

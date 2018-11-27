@@ -272,7 +272,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
       
     }
     else rhs match {
-      case _:StateMachine[_] => withRetime(List(true,false,true), List(false,false,false), ctx){ super.transform(lhs, rhs) }
+      case _:StateMachine[_] => withRetime(List(true,false,false), List(false,false,false), ctx){ super.transform(lhs, rhs) }
       case _ => if (inHw) withRetime(Nil, Nil, ctx){ super.transform(lhs, rhs) } else super.transform(lhs, rhs)
     }
   }

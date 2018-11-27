@@ -112,7 +112,7 @@ import spatial.lang._
   override def bodies = Seq(
     InnerStage(Nil -> notDone),
     PseudoStage(Nil -> action),
-    InnerStage(Nil -> nextState)
+    PseudoStage(Nil -> nextState)
   )
 }
 

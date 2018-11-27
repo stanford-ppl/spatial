@@ -52,8 +52,8 @@ import spatial.dsl._
 
       val reg1 = Reg[Int](5) // Create register with initial value of 5
       val reg2 = Reg[T] // Default initial value for a Reg is 0
-      Pipe{reg1 := argin1} // Load from ArgIn
-      Pipe{reg2 := argin2} // Load from ArgIn
+      reg1 := argin1 // Load from ArgIn
+      reg2 := argin2 // Load from ArgIn
       argout1 := reg1 + reg2.value.to[Int] // Cast the value in reg2 to Int and add it to reg1
       io1 := reg1
     }

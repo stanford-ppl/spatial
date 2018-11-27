@@ -140,8 +140,10 @@ def main():
     java_cmd = ciArgs + "; sbt -Dci=true \"; testOnly " + name + "\""
   else:
     java_cmd = "sbt \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
-
+ 
+  print("**** SBT Command: ****")
   print(java_cmd)
+  print("**********************")
 
   ecode = os.system(java_cmd)
 

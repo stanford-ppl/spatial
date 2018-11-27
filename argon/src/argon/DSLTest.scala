@@ -279,7 +279,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     name should "compile" in { compile(args); sys.exit(0) }
   }
   else if (tests.isEmpty) {
-    ignore should "...nothing? (No backends enabled. Enable using -D<backend>=true)" in { () }
+    ignore should s"...nothing? (No backends enabled. Enable using -D<backend>=true). backends:\n${backends.mkString("\n")}" in { () }
   }
   else {
     // Otherwise run all the backend tests (if there are any enabled)

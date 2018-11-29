@@ -30,7 +30,21 @@ import spatial.dsl._
     val gold4 = (args(0).to[I8].as[I64] << 56) + (args(1).to[I8].as[I64] << 48) +  (args(2).to[I16].as[I64] << 32) + args(3).to[I32].as[I64]
     println(r"Want $gold2 $gold3 $gold4")
     println(r"Result ${gold2 == getArg(cat2)} ${gold3 == getArg(cat3)} ${gold4 == getArg(cat4)}")
-    println("Meow")
     assert(gold2 == getArg(cat2) && gold3 == getArg(cat3) && gold4 == getArg(cat4))
+    println("          .__....._             _.....__,")
+    println("             .\": o :':         ;': o :\".")
+    println("             `. `-' .'.       .'. `-' .'  ")
+    println("               `---'             `---' ")
+println("")
+    println("     _...----...      ...   ...      ...----..._")
+    println("  .-'__..-\"\"'----    `.  `\"`  .'    ----'\"\"-..__`-.")
+    println(" '.-'   _.--\"\"\"'       `-._.-'       '\"\"\"--._   `-.`")
+    println(" '  .-\"'                  :                  `\"-.  `")
+    println("   '   `.              _.'\"'._              .'   `")
+    println("         `.       ,.-'\"       \"'-.,       .'")
+    println("           `.                           .'")
+    println("      jgs    `-._                   _.-'")
+    println("                 `\"'--...___...--'\"`")
+    println("Meow")
   }
 }

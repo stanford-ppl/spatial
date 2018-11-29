@@ -6,7 +6,7 @@ import spatial.dsl._
   override def runtimeArgs: Args = "16"
 
   val tileSize = 256
-  val n = 3
+  val n = 4
 
   def main(args: Array[String]): Unit = {
     val numel = args(0).to[Int]
@@ -31,13 +31,13 @@ import spatial.dsl._
       // Cross-ring
       val fifs = List.tabulate(n){i => FIFO[Int](tileSize + 1)}
       fifs.foreach(_ load dram)
-      Foreach(10 by 1){i => 
+      Foreach(N by 1){i => 
         List.tabulate(n){th =>
           val dst = ((th - 1) % n + n) % n
           fifs(dst).enq(fifs(th).deq())
         }
       }
-      result2.zip(fifs).foreach(_ store _)
+      result2.zip(fifs).foreach{case (a,b) => a store b}
 
     }
 
@@ -47,10 +47,10 @@ import spatial.dsl._
     printArray(src, "Sent in: ")
     printArray(gold, "Wanted: ")
     printArray(getMem(result1), "Got1: ")
-    result2.foreach(printArray(getMem(_), "Got Arr"))
+    result2.foreach{x => printArray(getMem(x), "Got Arr")}
 
     val cksum1 = getMem(result1).zip(gold){_ == _}.reduce{_&&_}
-    val cksum2 = result2.map(getMem(_).zip(gold){_ == _}.reduce{_&&_}).reduce{_&&_}
+    val cksum2 = result2.map{case x => getMem(x).zip(gold){_ == _}.reduce{_&&_}}.reduce{_&&_}
     println("PASS: " + cksum1 + "," + cksum2 + " (FIFORing)")
     assert(cksum1 && cksum2)
   }

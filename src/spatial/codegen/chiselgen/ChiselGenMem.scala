@@ -311,7 +311,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     // FIFORegs
     case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
     case FIFORegEnq(reg, data, ens) => emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case FIFORegDeq(reg) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
+    case FIFORegDeq(reg, ens) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
 
     // Registers
     case RegNew(init) => 

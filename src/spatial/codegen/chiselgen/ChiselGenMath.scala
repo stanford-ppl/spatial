@@ -247,8 +247,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixCeil(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
     // case FltFloor(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Cat($a.raw_dec, 0.U(${fracBits(a)}.W))")
     // case FltCeil(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
-    case DataAsBits(data) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.zipWithIndex.foreach{case (dab, i) => dab := $data(i)}")
-    case BitsAsData(data, fmt) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := chisel3.util.Cat($data.reverse)")
+    case DataAsBits(data) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.reverse.zipWithIndex.foreach{case (dab, i) => dab := $data(i)}")
+    case BitsAsData(data, fmt) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := chisel3.util.Cat($data)")
     // case FltInvSqrt(x) => x.tp match {
     //   case DoubleType() => throw new Exception("DoubleType not supported for FltInvSqrt") 
     //   case HalfType() =>  emit(src"val $lhs = frsqrt($x)")

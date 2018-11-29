@@ -429,7 +429,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LIFOPeek[_]       => URead(stage(LIFOPeek(mem.asInstanceOf[LIFO[A]], enss.flatten.toSet)))
 
     case _:RegRead[_]        => URead(stage(RegRead(mem.asInstanceOf[Reg[A]])))
-    case _:FIFORegDeq[_]    => URead(stage(FIFORegDeq(mem.asInstanceOf[FIFOReg[A]])))
+    case _:FIFORegDeq[_]    => URead(stage(FIFORegDeq(mem.asInstanceOf[FIFOReg[A]], enss.head)))
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))
     case _:FIFORegEnq[_]   => UWrite[A](stage(FIFORegEnq(mem.asInstanceOf[FIFOReg[A]],data.head, enss.head)))
     case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))

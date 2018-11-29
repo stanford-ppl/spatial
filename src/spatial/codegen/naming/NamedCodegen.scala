@@ -42,7 +42,7 @@ trait NamedCodegen extends Codegen {
 
       case RegRead(reg)      => s"${s}_${s.nameOr(src"rd_$reg")}"
       case RegWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"
-      case FIFORegDeq(reg)      => s"${s}_${s.nameOr(src"deq_$reg")}"
+      case FIFORegDeq(reg,_)      => s"${s}_${s.nameOr(src"deq_$reg")}"
       case FIFORegEnq(reg,_,_) => s"${s}_${s.nameOr(src"enq_$reg")}"
 
       case _:SRAMBankedRead[_,_]  => s"${s}_${s.nameOr("rd")}"

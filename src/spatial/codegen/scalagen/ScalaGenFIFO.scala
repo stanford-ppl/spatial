@@ -21,11 +21,11 @@ trait ScalaGenFIFO extends ScalaGenMemories {
 
     case FIFOIsAlmostEmpty(fifo,_) =>
       val rPar = fifo.readWidths.maxOrElse(1)
-      emit(src"val $lhs = $fifo.size <= $rPar")
+      emit(src"val $lhs = $fifo.size <= $rPar && $fifo.size > 0")
 
     case FIFOIsAlmostFull(fifo,_) =>
       val wPar = fifo.writeWidths.maxOrElse(1)
-      emit(src"val $lhs = $fifo.size === ${fifo.stagedSize} - $wPar")
+      emit(src"val $lhs = ($fifo.size >= ${fifo.stagedSize} - $wPar) && ($fifo.size < ${fifo.stagedSize})")
 
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = if ($fifo.nonEmpty) $fifo.head else ${invalid(op.A)}")
     case FIFONumel(fifo,_)   => emit(src"val $lhs = FixedPoint($fifo.size,FixFormat(true,32,0))")

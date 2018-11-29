@@ -46,6 +46,10 @@ trait CppCodegen extends FileDependencies with AccelTraversal  {
         dependencies ::= DirDep("synth", "zynq.sw-resources", "../")
         dependencies ::= DirDep("synth", "zynq.hw-resources", "../")
         dependencies ::= FileDep("synth", "zynq.Makefile", "../", Some("Makefile"))
+      case ZedBoard => 
+        dependencies ::= DirDep("synth", "zedboard.sw-resources", "../")
+        dependencies ::= DirDep("synth", "zedboard.hw-resources", "../")
+        dependencies ::= FileDep("synth", "zedboard.Makefile", "../", Some("Makefile"))
       case ZCU => 
         dependencies ::= DirDep("synth", "zcu.sw-resources", "../")
         dependencies ::= DirDep("synth", "zcu.hw-resources", "../")

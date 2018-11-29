@@ -70,12 +70,20 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
           emit(src"def hasItems_$lhs: Boolean = { val has = ${lhs}_ctr_$i < ${lhs}_iters_$i ; ${lhs}_ctr_$i += 1; has }")
         }
 
-        open(src"while(hasItems_$lhs) {")
+        lhs match {
+          case Op(UnrolledForeach(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
+          case Op(UnrolledReduce(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
+          case _ => open(src"while(hasItems_$lhs) {")
+        }        
         iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = FixedPoint.fromInt(1)") }
         valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = Bool(true,true)") }
       }
       else {
-        open(src"$cchain($i).foreach{case (is,vs) => ")
+        lhs match {
+          case Op(UnrolledForeach(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => open(src"$cchain($i).takeWhile(!${stopWhen.get}.value){case (is,vs) => ")
+          case Op(UnrolledReduce(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => open(src"$cchain($i).takeWhile(!${stopWhen.get}.value){case (is,vs) => ")
+          case _ => open(src"$cchain($i).foreach{case (is,vs) => ")
+        }        
         iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = is($j)") }
         valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = vs($j)") }
       }

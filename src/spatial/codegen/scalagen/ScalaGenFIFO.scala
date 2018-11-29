@@ -43,6 +43,17 @@ trait ScalaGenFIFO extends ScalaGenMemories {
       ens.zipWithIndex.foreach{case (en,i) => emit(src"if (${and(en)}) $fifo.enqueue(${data(i)})") }
       close("}")
 
+    case op@FIFORegNew(init) => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Queue[${op.A}]") }
+    case FIFORegEnq(reg, data, ens) => 
+      open(src"val $lhs = {")
+      emit(src"if (${and(ens)}) $reg.enqueue(${data})") 
+      close("}")
+    case op@FIFORegDeq(reg, ens) => 
+      emit(src"val $lhs = if (${and(ens)} && $reg.nonEmpty) $reg.dequeue() else ${invalid(op.A)}")
+
+
+
+
     case _ => super.gen(lhs, rhs)
   }
 }

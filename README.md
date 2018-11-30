@@ -1,6 +1,12 @@
 # Spatial
 Spatial is an Argon DSL for programming reconfigurable hardware from a parameterized, high level abstraction.  
 
+# External Dependencies
+
+* [Scala SBT](http://www.scala-sbt.org/)
+* [Java JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
+* [Integer Set Library](http://isl.gforge.inria.fr/) (apt-get install libisl-dev)
+
 # Getting Started
 
 We recommend using [spatial-quickstart](https://github.com/stanford-ppl/spatial-quickstart) rather than this repo, if you only intend to develop applications without modifying the compiler.  

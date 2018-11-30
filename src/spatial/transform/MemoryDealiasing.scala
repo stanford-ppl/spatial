@@ -114,7 +114,7 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
     case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
     case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes),_)), _) => oneHotMux(conds,sizes)
 
-    case MemOrigin(Op(MemSparseAlias(F(conds),_,_,_,F(origins: Fix[s,w,f]))), _) => 
+    case MemOrigin(Op(MemSparseAlias(F(conds),_,_,_,F(origins: Seq[Fix[s,w,f]]))), _) => 
       implicit val T: Bits[Ind[w]] = origins.head.asInstanceOf[Bits[Ind[w]]]
       oneHotMux[Ind[w]](conds,origins.asInstanceOf[Seq[Ind[w]]])
 

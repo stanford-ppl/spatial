@@ -334,7 +334,12 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, myName: String) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, myName)
 
-  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
+  val ff = 
+    if (p.inits.isDefined) {
+      if (p.bitWidth == 1) RegInit(if (p.inits.get.head == 0.0) false.B else true.B)
+      else                 RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) 
+    }
+    else RegInit(io.xBarW(0).init.head)
   val anyReset: Bool = io.xBarW.flatMap{_.reset}.toList.reduce{_|_} | io.reset
   val anyEnable: Bool = io.xBarW.flatMap{_.en}.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.flatMap{_.en}.toList, io.xBarW.flatMap{_.data}.toList)

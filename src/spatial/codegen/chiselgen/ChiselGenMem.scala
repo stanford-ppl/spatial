@@ -15,6 +15,10 @@ trait ChiselGenMem extends ChiselGenCommon {
   private var nbufs: List[Sym[_]] = List()
   private var memsWithReset: List[Sym[_]] = List()
 
+  def and(owner: Sym[_], ens: Set[Bit]): String = {
+
+    and(ens.map{x => if (controllerStack.head.isOuterControl) appendSuffix(owner,x) else quote(x)})
+  }
   private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
     val zipThreshold = 100 max payload.map(_.size).sorted.headOption.getOrElse(0) // Max number of characters before deciding to split line into many
     val totalPayload = payload.mkString(src"List[$tp](", ",", ")")
@@ -52,7 +56,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       else {
         memsWithReset = memsWithReset :+ mem
         val invisibleEnable = src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
-        emit(src"${mem}.m.io.reset := ${invisibleEnable} & ${and(en)}")
+        emit(src"${mem}.m.io.reset := ${invisibleEnable} & ${and(parent, en)}")
       }
   }
 
@@ -99,8 +103,8 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"""${lhs}.toSeq.zip(${mem}.m.connectXBarRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     }
     val commonEns = ens.head.collect{case e if (ens.forall(_.contains(e)) && !e.isBroadcastAddr) => e}
-    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
-    zipAndConnect(lhs, mem, "en", "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})")
+    val enslist = ens.map{e => and(parent, e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
+    zipAndConnect(lhs, mem, "en", "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(parent, commonEns)})")
     if (ofs.nonEmpty) zipAndConnect(lhs, mem, "ofs", "UInt", ofs.filter(!_.isBroadcastAddr).map(quote(_) + ".r"), ".toSeq.map(_.rd)")
   }
 
@@ -140,8 +144,8 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"""${mem}.m.connectXBarWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     }
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
-    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)))}
-    zipAndConnect(lhs, mem, enport, "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})")
+    val enslist = ens.map{e => and(parent, e.filter(!commonEns.contains(_)))}
+    zipAndConnect(lhs, mem, enport, "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(parent, commonEns)})")
     if (ofs.nonEmpty) zipAndConnect(lhs, mem, "ofs", "UInt", ofs.map(quote(_) + ".r"), ".toSeq.map(_.rd)")
     zipAndConnect(lhs, mem, "data", "UInt", data.map(quote(_) + ".r"), "")
   }
@@ -374,7 +378,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       val sfx = if (parent.isBranch) "_obj" else ""
       val invisibleEnable = invisibleEnableRead(lhs,reg)
       emit(src"${reg}.m.io.input1($index) := $data.r")
-      emit(src"${reg}.m.io.enable($index) := ${and(ens)} && $invisibleEnable")
+      emit(src"${reg}.m.io.enable($index) := ${and(parent, ens)} && $invisibleEnable")
       emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}$sfx.sm.io.ctrDone", lhs.fullDelay, true)}")
       emit(src"${reg}.m.io.first($index) := ${first}")
       emit(createWire(quote(lhs),remap(lhs.tp)))
@@ -386,7 +390,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       val invisibleEnable = invisibleEnableRead(lhs,reg)
       emit(src"${reg}.m.io.input1($index) := $data1.r")
       emit(src"${reg}.m.io.input2($index) := $data2.r")
-      emit(src"${reg}.m.io.enable($index) := ${and(ens)} && $invisibleEnable")
+      emit(src"${reg}.m.io.enable($index) := ${and(parent, ens)} && $invisibleEnable")
       emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}$sfx.sm.io.ctrDone", lhs.fullDelay, true)}")
       emit(src"${reg}.m.io.first($index) := ${first}")
       emit(createWire(quote(lhs),remap(lhs.tp)))

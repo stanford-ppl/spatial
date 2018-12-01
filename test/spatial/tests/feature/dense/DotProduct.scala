@@ -74,6 +74,72 @@ import scala.reflect.ClassTag
   }
 }
 
+@spatial class DotProductStream extends SpatialTest {
+  override def runtimeArgs: Args = "640"
+  type X = FixPt[TRUE,_32,_0]
+
+  def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
+    // Can be overwritten using --param-path=fileName at command line
+    val ip = loadParam("ip", default=4 (1 -> 192))
+    val op = loadParam("op", default=1 (1 -> 6))
+    val ts  = loadParam("ts", default=32 (32 -> 64 -> 19200))
+    val loadPar = loadParam("loadPar", default=4 (1 -> 1 -> 16))
+
+    val B = ts
+    val P1 = op
+    val P2 = ip
+    val P3 = loadPar
+
+    //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
+
+    val size = aIn.length; bound(size) = 1920000
+
+    val N = ArgIn[Int]
+    setArg(N, size)
+
+    val a = DRAM[T](N)
+    val b = DRAM[T](N)
+    val out = ArgOut[T]
+    setMem(a, aIn)
+    setMem(b, bIn)
+
+    Accel {
+      val accO = Reg[T](0.to[T])
+      out := Stream.Reduce(accO)(N by 1 par P1){i =>
+        //val ts = Reg[Int](0)
+        //ts := min(B, N-i)
+        val aBlk = FIFO[T](B)
+        val bBlk = FIFO[T](B)
+        Parallel {
+          //aBlk load a(i::i+ts.value par P3)
+          //bBlk load b(i::i+ts.value par P3)
+          aBlk load a(0::N par P3)
+          bBlk load b(0::N par P3)
+        }
+        aBlk.deq() * bBlk.deq()
+      }{_+_}
+    }
+    getArg(out)
+  }
+
+
+  def main(args: Array[String]): Unit = {
+    val N = args(0).to[Int]
+    val a = Array.fill(N){ random[X](4) }
+    val b = Array.fill(N){ random[X](4) }
+
+    val result = dotproduct(a, b)
+    val gold = a.zip(b){_*_}.reduce{_+_}
+
+    println("expected: " + gold)
+    println("result: " + result)
+
+    val cksum = gold == result
+    println("PASS: " + cksum + " (DotProduct)")
+    assert(cksum)
+  }
+}
+
 @spatial class DotProductFlt extends SpatialTest {
   override def runtimeArgs: Args = "640"
   type X = Float //FixPt[TRUE,_32,_0]

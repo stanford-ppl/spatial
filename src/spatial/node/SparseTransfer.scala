@@ -58,8 +58,9 @@ object SparseTransfer {
     // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
     val iters: Reg[I32] = Reg[I32]
     Pipe{
-      iters := mux(requestLength < 16.to[I32], 16.to[I32],
-               mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) ))
+      iters := mux(requestLength == 0.to[I32], 0.to[I32], 
+               mux(requestLength < 16.to[I32], 16.to[I32],
+               mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) )))
     }
 
     Stream {

@@ -925,8 +925,8 @@ import spatial.targets._
 
       // Store result
       Parallel{
-        Sequential{seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned}
-        Sequential{seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned}
+        seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned
+        seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned
       }
 
     }

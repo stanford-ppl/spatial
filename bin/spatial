@@ -26,7 +26,9 @@ Usage: spatial <app> [options]
 
 Help
   -h, --help              Prints this message
-  --H, --HELP, --halp     Prints usage text for Spatial, will take a few seconds (ex. `spatial <app> --help`)
+  --H, --HELP, --halp     Prints usage text for Spatial, will take a few seconds. NOTE:
+                             You MUST include the app name in addition to this flag
+                             (ex. `spatial <app> --help`)
       """)
     return 0
   #sys.exit(0)

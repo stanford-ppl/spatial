@@ -29,12 +29,21 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
 
     if (spatialConfig.quitAtDSE) {
       val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
-      val filename = dir + config.name+"_state"
+      val filename_block = dir + config.name+"_block"
+      val filename_state = dir + config.name+"_state"
       new java.io.File(dir).mkdirs()
-      // saveToFile(IR, filename)
-      saveToFile(block, filename)
-      println(s"Saved state to $filename. Quitting Spatial...")
+      saveToFile(IR, filename_state)
+      saveToFile(block, filename_block)
+      println(s"Saved state to ${filename_state} and top level block to ${filename_block}. Quitting Spatial...")
       sys.exit(0)
+    } else if (spatialConfig.bootAtDSE) {
+      val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+      val filename_block = dir + config.name+"_block"
+      val filename_state = dir + config.name+"_state"
+      new java.io.File(dir).mkdirs()
+      val IR2 = loadFromFile(filename_state)
+      val block2 = loadFromFile(filename_block)
+      println(s"Loaded state from ${filename_state} and top level block from ${filename_block}.")
     }
 
     val intParams = (TileSizes.all ++ ParParams.all).toSeq

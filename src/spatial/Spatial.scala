@@ -113,7 +113,67 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
-    val result = {
+    val result = if (spatialConfig.bootAtDSE) {
+
+      block ==> /** Immediately toss out block in dsePass */
+        (spatialConfig.enableArchDSE ? dsePass) ==> 
+        blackboxLowering    ==> printer ==> transformerChecks ==>
+        switchTransformer   ==> printer ==> transformerChecks ==>
+        switchOptimizer     ==> printer ==> transformerChecks ==>
+        memoryDealiasing    ==> printer ==> transformerChecks ==>
+        /** Control insertion */
+        pipeInserter        ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
+        useAnalyzer         ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
+        /** Memory analysis */
+        retimingAnalyzer    ==>
+        accessAnalyzer      ==>
+        iterationDiffAnalyzer   ==>
+        memoryAnalyzer      ==>
+        memoryAllocator     ==> printer ==>
+        /** Unrolling */
+        unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
+        useAnalyzer         ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
+        /** Hardware Rewrites **/
+        rewriteAnalyzer     ==>
+        rewriteTransformer  ==> printer ==> transformerChecks ==>
+        /** Pipe Flattening */
+        flatteningTransformer ==> 
+        /** Update buffer depths */
+        bufferRecompute     ==> printer ==> transformerChecks ==>
+        /** Accumulation Specialization **/
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
+        (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
+        /** Retiming */
+        retiming            ==> printer ==> transformerChecks ==>
+        retimeReporter      ==>
+        /** Broadcast cleanup */
+        broadcastCleanup    ==> printer ==>
+        /** Schedule finalization */
+        initiationAnalyzer  ==>
+        /** Reports */
+        memoryReporter      ==>
+        finalIRPrinter      ==>
+        finalSanityChecks   ==>
+        /** Code generation */
+        treeCodegen         ==>
+        irCodegen           ==>
+        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableDot ? dotHierGen)      ==>
+        (spatialConfig.enableSim   ? scalaCodegen)  ==>
+        (spatialConfig.enableSynth ? chiselCodegen) ==>
+        (spatialConfig.enableSynth ? cppCodegen) ==>
+        (spatialConfig.enableResourceReporter ? resourceReporter) ==>
+        (spatialConfig.enablePIR ? pirCodegen)
+    } 
+    else {
       block ==> printer     ==>
         cliNaming           ==>
         friendlyTransformer ==> printer ==> transformerChecks ==>
@@ -200,8 +260,8 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true }.text("Enable hypermapper dse.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
-    cli.opt[Unit]("quitAtDSE").action{(_,_) => spatialConfig.quitAtDSE = true; spatialConfig.bootAtDSE = false}.text("Save state at start of DSE and quit")
-    cli.opt[Unit]("bootAtDSE").action{(_,_) => spatialConfig.bootAtDSE = true; spatialConfig.quitAtDSE = false}.text("Load state and enter at start of DSE")
+    cli.opt[Unit]("quitAtDSE").action{(_,_) => spatialConfig.quitAtDSE = true; spatialConfig.bootAtDSE = false; spatialConfig.enableArchDSE = true }.text("Save state at start of DSE and quit")
+    cli.opt[Unit]("bootAtDSE").action{(_,_) => spatialConfig.bootAtDSE = true; spatialConfig.quitAtDSE = false; spatialConfig.enableArchDSE = true }.text("Load state and enter at start of DSE")
 
     cli.note("")
     cli.note("Backends:")

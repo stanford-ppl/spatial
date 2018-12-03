@@ -139,7 +139,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, lhs.userII.getOrElse(ii))
 
-      case OpForeach(en, cchain, func, iters) if lhs.isInnerControl =>
+      case OpForeach(en, cchain, func, iters, _) if lhs.isInnerControl =>
         val N = nIters(cchain)
         val (latency, compilerII) = latencyAndInterval(func)
         val ii = lhs.userII.getOrElse(compilerII)
@@ -151,7 +151,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case OpReduce(en, cchain,accum,map,ld,reduce,store,_,_,iters) if lhs.isInnerControl =>
+      case OpReduce(en, cchain,accum,map,ld,reduce,store,_,_,iters, _) if lhs.isInnerControl =>
         val N = nIters(cchain)
         val P = cchain.constPars.product
 
@@ -178,7 +178,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case UnrolledForeach(en,cchain,func,iters,valids) if lhs.isInnerControl =>
+      case UnrolledForeach(en,cchain,func,iters,valids,_) if lhs.isInnerControl =>
         val N = nIters(cchain)
         val (pipe, compilerII) = latencyAndInterval(func)
         val ii = lhs.userII.getOrElse(compilerII)
@@ -190,7 +190,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case UnrolledReduce(en,cchain,func,iters,valids) if lhs.isInnerControl =>
+      case UnrolledReduce(en,cchain,func,iters,valids,_) if lhs.isInnerControl =>
         val N = nIters(cchain)
 
         val (body, compilerII) = latencyAndInterval(func)
@@ -234,7 +234,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
 
       // --- Metapipeline and Sequential
-      case OpForeach(en, cchain, func, _) =>
+      case OpForeach(en, cchain, func, _, _) =>
         val N = nIters(cchain)
         val (stages, iis) = latencyOfBlock(func)
         val compilerII = (1.0 +: iis).max
@@ -250,7 +250,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case OpReduce(en, cchain,accum,map,ld,reduce,store,_,_,iters) =>
+      case OpReduce(en, cchain,accum,map,ld,reduce,store,_,_,iters,_) =>
         val N = nIters(cchain)
         val P = cchain.constPars.product
 
@@ -273,7 +273,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case OpMemReduce(en, cchainMap,cchainRed,accum,map,ldRes,ldAcc,reduce,store,_,_,itersMap,itersRed) =>
+      case OpMemReduce(en, cchainMap,cchainRed,accum,map,ldRes,ldAcc,reduce,store,_,_,itersMap,itersRed,_) =>
         val Nm = nIters(cchainMap)
         val Nr = nIters(cchainRed)
         val Pm = cchainMap.constPars.product // Parallelization factor for map
@@ -300,7 +300,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case UnrolledForeach(en,cchain,func,iters,valids) =>
+      case UnrolledForeach(en,cchain,func,iters,valids,_) =>
         val N = nIters(cchain)
         val (stages, iis) = latencyOfBlock(func)
         val compilerII = (1.0 +: iis).max
@@ -314,7 +314,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
 
         (delay, 1.0)
 
-      case UnrolledReduce(en,cchain,func,iters,valids) =>
+      case UnrolledReduce(en,cchain,func,iters,valids,_) =>
         val N = nIters(cchain)
         val (stages, iis) = latencyOfBlock(func)
         val compilerII = (1.0 +: iis).max

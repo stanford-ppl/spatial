@@ -16,7 +16,7 @@ import spatial.dsl._
 
     // Create HW accelerator
     Accel {
-      y := x + 4
+      y:=x + 4
     }
 
     val result = getArg(y)

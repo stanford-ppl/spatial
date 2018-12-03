@@ -830,7 +830,7 @@ package object control {
     */
   @stateful def getCoarseDistance(ctrl: Ctrl, a: Ctrl, b: Ctrl): Option[Int] = {
     val dist = getStageDistance(ctrl, a, b)
-    if (ctrl.isOuterPipeLoop || ctrl.isOuterStreamLoop) dist else None
+    if (ctrl.isOuterPipeLoop) dist else None
   }
 
   @stateful def getCoarseDistance(ctrl: Ctrl, a: Sym[_], b: Sym[_]): Option[Int] = {

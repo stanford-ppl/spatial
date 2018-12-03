@@ -463,6 +463,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val (banking, bankCost) = bankingCosts.sortBy(_._2).headOption.getOrElse(Nil, 999999L)
           dbgs(s"Mem $mem: Cheapest banking cost = $bankCost, Cheapest duplication cost = $duplicationCost (segmenting ${ mem.segmentMapping} ")
           if ( mem.isNoBank || 
+               instBankings.isEmpty || 
               (bankCost > duplicationCost && mem.segmentMapping.size <= 1 && !spatialConfig.enableForceBanking 
                 && !mem.isLineBuffer && !mem.isStreamIn && !mem.isStreamOut && !mem.isRegFile && !mem.isReg)) { // TODO: Can duplicate for line buffer, but rules need to be hammered out more
             dbgs(s"Choosing to duplicate $mem for $instRdGroups, $wrGroups.  ")

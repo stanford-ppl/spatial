@@ -153,14 +153,14 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
-      case OpForeach(en, cchain, block, iters) =>
+      case OpForeach(en, cchain, block, iters, _) =>
         val P = cchain.constPars.product
         val body = areaOfBlock(block, lhs.isInnerControl, P)
         dbgs(s"Foreach: $lhs (P = $P)")
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
-      case op@OpReduce(en, cchain, accum, map, load, reduce, store, ident, fold, iters) =>
+      case op@OpReduce(en, cchain, accum, map, load, reduce, store, ident, fold, iters, _) =>
         val P = cchain.constPars.product
         val mapArea: Area = areaOfBlock(map, lhs.isInnerControl, P) // Map is duplicated P times
         /*
@@ -189,7 +189,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
         mapArea + treeArea + treeDelayArea + loadArea + cycleArea + storeArea + areaOf(lhs)
 
-      case op@OpMemReduce(en,cchainMap,cchainRed,accum,map,loadRes,loadAcc,reduce,storeAcc,ident,fold,itersMap,itersRed) =>
+      case op@OpMemReduce(en,cchainMap,cchainRed,accum,map,loadRes,loadAcc,reduce,storeAcc,ident,fold,itersMap,itersRed,_) =>
         val Pm = cchainMap.constPars.product
         val Pr = cchainRed.constPars.product
 

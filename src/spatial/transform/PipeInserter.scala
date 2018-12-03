@@ -29,8 +29,8 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
     def outer: Boolean = !inner
 
-    def dump(i: Int): Unit = {
-      dbgs(s"Stage #$i: " + (if (inner) "[Inner]" else "[Outer]"))
+    def dump(id: Int, i: Int): Unit = {
+      dbgs(s"Stage #$id, $i: " + (if (inner) "[Inner]" else "[Outer]"))
       nodes.foreach { s => dbgs(s"  ${stm(s)}") }
     }
 
@@ -98,9 +98,102 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
     }
   }
 
+  private def allStms(s: Stage): Set[Sym[_]] = {
+    s.nodes.flatMap(_.blocks.flatMap(_.nestedStms)).toSet ++ s.nodes.toSet
+  }
+
   protected def insertPipes[R](block: Block[R], parent: Sym[_], res: Option[Either[LocalMem[R,C forSome{type C[_]}],Var[R]]] = None, scoped: Boolean = true): Either[Block[R],Sym[Void]] = {
     val blk = stageScopeIf(scoped, f(block.inputs), block.options){
       val stages = ArrayBuffer[Stage]()
+      val boundStages = ArrayBuffer[ArrayBuffer[Stage]]()
+      def computeStages(): Unit = {
+        block.stms.foreach{
+          case Transient(s) =>
+            val i = stages.lastIndexWhere{stage => (stage.nodes intersect s.inputs).nonEmpty }
+            val stage = if (i >= 0) stages(i) else stages.head
+            stage.nodes += s
+
+          case Alloc(s)      => nextOuterStage.nodes += s
+          case Primitive(s)  => nextInnerStage.nodes += s
+          case Control(s)    => nextOuterStage.nodes += s
+          case FringeNode(s) => nextOuterStage.nodes += s
+        }
+      }
+      def bindStages(): Unit = {
+        if (parent.isParallel) {
+          dbgs(s"Binding stages $stages for Parallel execution:")
+          stages.dropRight(1).zipWithIndex.foreach{
+            case (stg,i) if stg.inner => 
+              dbgs(s" - Inner stage $stg $i")
+              val calculated = stg.nodes.toSet
+              val escaping = stg.nodes.filter{s =>
+                val used = s.consumers diff calculated
+                !s.tp.isVoid && (s == block.result || used.nonEmpty)
+              }
+
+              dbgs(s"   Stage nodes: ")
+              stg.nodes.foreach{x => dbgs(s"   - ${stm(x)}")}
+              dbgs(s"   Escaping: ")
+              escaping.foreach{x =>  dbgs(s"   - ${stm(x)}")}
+
+              val nextStageConsumes = escaping.flatMap(_.consumers).toSet intersect allStms(stages(i+1))
+              if (nextStageConsumes.nonEmpty && stages(i+1).outer) {
+                dbgs(s"Stage $i should bind with stage ${i+1}")
+                boundStages += ArrayBuffer(stg, stages(i+1))
+              }
+              else boundStages += ArrayBuffer(stg)
+            case (stg, i) if stg.outer => 
+              dbgs(s" - Outer stage $stg $i")
+              if (!boundStages.flatten.contains(stg)) boundStages += ArrayBuffer(stg)
+          }
+          dbgs(s" - Last stage ${stages.last}")
+          if (!boundStages.flatten.contains(stages.last)) boundStages += ArrayBuffer(stages.last)
+        } 
+        else {
+          stages.foreach{stg => boundStages += ArrayBuffer(stg)}
+        }
+      }
+
+      def wrapInner(stgs: ArrayBuffer[Stage], id: Int): Unit = {
+        stgs.zipWithIndex.foreach{
+          case (stg,i) if stg.inner =>
+            stg.dump(id,i)
+            val calculated = stg.nodes.toSet
+            val escaping = stg.nodes.filter{s =>
+              val used = s.consumers diff calculated
+              dbgs(s"  ${stm(s)}, stg $stg")
+              dbgs(s"    uses: $used")
+              dbgs(s"    nonVoid: ${!s.tp.isVoid}")
+              dbgs(s"    isResult: ${s == block.result}")
+              !s.tp.isVoid && (s == block.result || used.nonEmpty)
+            }
+
+            val escapingHolders = escaping.map{
+              case s if s == block.result && res.isDefined => res.get
+              case s => resFrom(s, parent)
+            }
+
+            Pipe {
+              isolateSubst() {
+                stg.nodes.foreach(visit)
+                escaping.zip(escapingHolders).foreach{case (s, r) => resWrite(r,s) }
+              }
+            }
+            dbgs(s"Escaping: ")
+            escaping.zip(escapingHolders).foreach{case (s,r) =>
+              val rd = resRead(r)
+              dbgs(s"  ${stm(s)}")
+              dbgs(s"  => ${stm(rd)}")
+              register(s, rd)
+            }
+
+          case (stg,i) if stg.outer =>
+            stg.dump(id,i)
+            stg.nodes.foreach(visit)
+        }
+      }
+
+
       def curStage: Stage = stages.last
       def nextInnerStage: Stage = {
         if (curStage.outer) { stages += Stage.inner }
@@ -112,55 +205,24 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
       }
       stages += Stage.outer
 
-      block.stms.foreach{
-        case Transient(s) =>
-          val i = stages.lastIndexWhere{stage => (stage.nodes intersect s.inputs).nonEmpty }
-          val stage = if (i >= 0) stages(i) else stages.head
-          stage.nodes += s
+      // Assign stms to stages
+      computeStages()
 
-        case Alloc(s)      => nextOuterStage.nodes += s
-        case Primitive(s)  => nextInnerStage.nodes += s
-        case Control(s)    => nextOuterStage.nodes += s
-        case FringeNode(s) => nextOuterStage.nodes += s
-      }
+      // Bind inserted pipes with existing controllers
+      bindStages()
 
-      stages.zipWithIndex.foreach{
-        case (stg,i) if stg.inner =>
-          stg.dump(i)
-          val calculated = stg.nodes.toSet
-          val escaping = stg.nodes.filter{s =>
-            val used = s.consumers diff calculated
-            dbgs(s"  ${stm(s)}, stg $stg")
-            dbgs(s"    uses: $used")
-            dbgs(s"    nonVoid: ${!s.tp.isVoid}")
-            dbgs(s"    isResult: ${s == block.result}")
-            !s.tp.isVoid && (s == block.result || used.nonEmpty)
-          }
-
-          val escapingHolders = escaping.map{
-            case s if s == block.result && res.isDefined => res.get
-            case s => resFrom(s, parent)
-          }
-
+      // Transform
+      boundStages.zipWithIndex.foreach{
+        case (stgs,id) if stgs.size > 1 => 
           implicit val ctx: SrcCtx = SrcCtx.empty
-          Pipe {
-            isolateSubst() {
-              stg.nodes.foreach(visit)
-              escaping.zip(escapingHolders).foreach{case (s, r) => resWrite(r,s) }
-            }
-          }
-          dbgs(s"Escaping: ")
-          escaping.zip(escapingHolders).foreach{case (s,r) =>
-            val rd = resRead(r)
-            dbgs(s"  ${stm(s)}")
-            dbgs(s"  => ${stm(rd)}")
-            register(s, rd)
-          }
-
-        case (stg,i) if stg.outer =>
-          stg.dump(i)
-          stg.nodes.foreach(visit)
+          Pipe{wrapInner(stgs,id)}
+        case (stgs,id) if stgs.size == 1 && stgs.head.inner => 
+          wrapInner(stgs,id)
+        case (stgs,id) if stgs.size == 1 && stgs.head.outer => 
+          stgs.head.dump(id,0)
+          stgs.head.nodes.foreach(visit)
       }
+
 
       (block.result match {
         case _:Void => void

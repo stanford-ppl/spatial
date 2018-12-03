@@ -76,42 +76,48 @@ trait ChiselGenInterface extends ChiselGenCommon {
 
 
     case RegWrite(reg, v, en) if reg.isHostIO =>
-      val id = lhs.port.muxPort
-      emit(src"val $id = $id")
-      v.tp match {
-        case FixPtType(s,d,f) =>
-          if (s) {
-            val pad = 64 - d - f
-            if (pad > 0) {
-              emit(src"""${reg}.data_options($id) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+      val isBroadcast = lhs.port.broadcast.exists(_>0)
+      if (!isBroadcast) {
+        val id = lhs.port.muxPort
+        emit(src"val $id = $id")
+        v.tp match {
+          case FixPtType(s,d,f) =>
+            if (s) {
+              val pad = 64 - d - f
+              if (pad > 0) {
+                emit(src"""${reg}.data_options($id) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+              } else {
+                emit(src"""${reg}.data_options($id) := ${v}.r""")
+              }
             } else {
               emit(src"""${reg}.data_options($id) := ${v}.r""")
             }
-          } else {
+          case _ =>
             emit(src"""${reg}.data_options($id) := ${v}.r""")
-          }
-        case _ =>
-          emit(src"""${reg}.data_options($id) := ${v}.r""")
+        }
+        val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
+        val parent = controllerStack.head
+        val sfx = if (parent.isBranch) "_obj" else ""
+        emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay)}""")
       }
-      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      val parent = controllerStack.head
-      val sfx = if (parent.isBranch) "_obj" else ""
-      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay)}""")
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
-      val id = lhs.port.muxPort
-      emit(src"val $id = $id")
-      val padded = v.tp match {
-        case FixPtType(s,d,f) if s && (64 > d + f) =>
-          src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
-        case _ => src"$v.r"
-      }
-      emit(src"""${reg}.data_options($id) := $padded""")
+      val isBroadcast = lhs.port.broadcast.exists(_>0)
+      if (!isBroadcast) {
+        val id = lhs.port.muxPort
+        emit(src"val $id = $id")
+        val padded = v.tp match {
+          case FixPtType(s,d,f) if s && (64 > d + f) =>
+            src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
+          case _ => src"$v.r"
+        }
+        emit(src"""${reg}.data_options($id) := $padded""")
 
-      val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      val parent = controllerStack.head
-      val sfx = if (parent.isBranch) "_obj" else ""
-      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay)}""")
+        val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
+        val parent = controllerStack.head
+        val sfx = if (parent.isBranch) "_obj" else ""
+        emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay)}""")
+      }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasTileLoad

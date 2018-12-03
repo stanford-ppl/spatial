@@ -11,11 +11,15 @@ case class BackgroundProcess(dir: String, args: List[String]) {
 
   def send(line: String): Unit = {
     if (p eq null) run()
-    writer.write(line)
-    writer.newLine()
-    writer.flush()
+    try {
+      writer.write(line + "\n")
+      writer.flush()
+    }
+    catch {case _:Throwable =>
+      checkErrors()
+    }
   }
-
+  
   def checkErrors(): Unit = if (logger.ready) {
     var errs: Seq[String] = Nil
     var line = ""

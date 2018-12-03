@@ -81,7 +81,8 @@ object MemDenseAlias {
     cond: Seq[Bit],
     mem:  Seq[Src[A]],
     addr: Seq[Addr[Ind[W]]],
-    size: Seq[I32]
+    size: Seq[I32],
+    origin: Seq[Ind[W]]
   )(implicit
     val A:     Type[A],
     val Addr:  Type[Addr[Ind[W]]],
@@ -95,14 +96,15 @@ object MemDenseAlias {
   override def aliases: Set[Sym[_]] = syms(mem)
 }
 object MemSparseAlias {
-  @rig def apply[A,Addr[B],W,Src[T],Alias[T],W2](mem: Src[A], addr: Addr[Ind[W]], size: Ind[W2])(implicit
+  @rig def apply[A,Addr[B],W,Src[T],Alias[T],W2](mem: Src[A], addr: Addr[Ind[W]], size: Ind[W2], origin: Ind[W])(implicit
     A:     Type[A],
     Addr:  Type[Addr[Ind[W]]],
     Src:   Type[Src[A]],
     Alias: Type[Alias[A]],
-    cast: Cast[Ind[W2],I32]
+    cast1: Cast[Ind[W],I64],
+    cast2: Cast[Ind[W2],I32]
   ): MemSparseAlias[A,Addr,W,Src,Alias] = {
-    MemSparseAlias[A,Addr,W,Src,Alias](Seq(Bit(true)),Seq(mem),Seq(addr),Seq(size.to[I32]))
+    MemSparseAlias[A,Addr,W,Src,Alias](Seq(Bit(true)),Seq(mem),Seq(addr),Seq(size.to[I32]), Seq(origin))
   }
 }
 
@@ -111,6 +113,7 @@ object MemSparseAlias {
 @op case class MemEnd(mem: Sym[_], d: Int) extends Transient[I32]
 @op case class MemPar(mem: Sym[_], d: Int) extends Transient[I32]
 @op case class MemLen(mem: Sym[_], d: Int) extends Transient[I32]
+@op case class MemOrigin[W:INT](mem: Sym[_], d: Int) extends Transient[Ind[W]]
 
 @op case class MemDim(mem: Sym[_], d: Int) extends Transient[I32]
 @op case class MemRank(mem: Sym[_]) extends Transient[I32]

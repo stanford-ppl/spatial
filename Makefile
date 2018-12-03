@@ -80,8 +80,10 @@ doc:
 	sbt doc
 	bin/scrub_doc replace
 	bin/scrub_doc scrub
-	echo "Please publish to spatial-doc:"
-	echo "  cp -r target/scala-2.12/api/* ~/spatial-doc"
+	cat build.sbt | grep "version :="
+	echo "Please publish to spatial-doc, under appropriate version:"
+	echo "  cp -r target/scala-2.12/api/* ~/spatial-doc/<version>"
+
 
 ###-----------------------------------###
 ## Remove all generated files.	       ##
@@ -96,7 +98,7 @@ clear:
 ###-----------------------------------###
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
-clean: clean-argon clean-forge clean-spatial
+clean: clean-argon clean-forge clean-spatial clean-emul
 	sbt clean
 
 ###-----------------------------------###
@@ -105,7 +107,6 @@ clean: clean-argon clean-forge clean-spatial
 clean-spatial:
 	rm -f $(HOME)/bin/emptiness
 	sbt "; spatial/clean"
-	sbt clean
 
 ###-----------------------------------###
 ## Clean Argon projects                ##
@@ -113,7 +114,6 @@ clean-spatial:
 clean-argon:
 	rm -f $(HOME)/bin/emptiness
 	sbt "; argon/clean"
-	sbt clean
 
 ###-----------------------------------###
 ## Clean Forge projects                ##
@@ -121,4 +121,10 @@ clean-argon:
 clean-forge:
 	rm -f $(HOME)/bin/emptiness
 	sbt "; forge/clean"
-	sbt clean
+
+###-----------------------------------###
+## Clean Emul projects                ##
+###-----------------------------------###
+clean-emul:
+	rm -f $(HOME)/bin/emptiness
+	sbt "; emul/clean"

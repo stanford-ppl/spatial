@@ -334,16 +334,18 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, myName: String) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, myName)
 
-  val ff = 
+  val init = 
     if (p.inits.isDefined) {
-      if (p.bitWidth == 1) RegInit(if (p.inits.get.head == 0.0) false.B else true.B)
-      else                 RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) 
+      if (p.bitWidth == 1) {if (p.inits.get.head == 0.0) false.B else true.B}
+      else                 (p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt
     }
-    else RegInit(io.xBarW(0).init.head)
+    else io.xBarW(0).init.head
+
+  val ff = RegInit(init)
   val anyReset: Bool = io.xBarW.flatMap{_.reset}.toList.reduce{_|_} | io.reset
   val anyEnable: Bool = io.xBarW.flatMap{_.en}.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.flatMap{_.en}.toList, io.xBarW.flatMap{_.data}.toList)
-  ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyEnable, wr_data, ff))
+  ff := Mux(anyReset, init, Mux(anyEnable, wr_data, ff))
   io.output.data.foreach(_ := ff)
 }
 
@@ -363,12 +365,20 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
-  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
+  val init = 
+    if (p.inits.isDefined) {
+      if (p.bitWidth == 1) {if (p.inits.get.head == 0.0) false.B else true.B}
+      else                 (p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt
+    }
+    else io.xBarW(0).init.head
+
+  val ff = RegInit(init)
+
   val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_} | io.reset
   val anyWrite: Bool = io.xBarW.map{_.en}.flatten.toList.reduce{_|_}
   val anyRead: Bool = io.xBarR.map{_.en}.flatten.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
-  ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyWrite, wr_data, ff))
+  ff := Mux(anyReset, init, Mux(anyWrite, wr_data, ff))
   io.output.data.foreach(_ := ff)
 
   val isValid = Module(new SRFF())

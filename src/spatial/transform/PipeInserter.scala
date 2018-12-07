@@ -120,7 +120,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
         }
       }
       def bindStages(): Unit = {
-        if (parent.isParallel) {
+        if (parent.isParallel || parent.isStreamControl) {
           dbgs(s"Binding stages $stages for Parallel execution:")
           stages.dropRight(1).zipWithIndex.foreach{
             case (stg,i) if stg.inner => 
@@ -200,7 +200,8 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
         curStage
       }
       def nextOuterStage: Stage = {
-        if (curStage.inner) { stages += Stage.outer }
+        // if (curStage.inner) { stages += Stage.outer }
+        stages += Stage.outer 
         curStage
       }
       stages += Stage.outer
@@ -210,6 +211,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
       // Bind inserted pipes with existing controllers
       bindStages()
+      dbgs(s"stage bindings: $boundStages")
 
       // Transform
       boundStages.zipWithIndex.foreach{

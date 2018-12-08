@@ -35,8 +35,22 @@ trait ChiselGenCommon extends ChiselCodegen {
   var hostDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
   /* List of break or exit nodes */
   protected var earlyExits: List[Sym[_]] = List()
-  /* List of instrumentation counters */
+  /* List of instrumentation counters and their respective depth in the hierarchy*/
   protected var instrumentCounters: List[(Sym[_], Int)] = List()
+
+  protected def instrumentCounterIndex(s: Sym[_]): Int = {
+    if (spatialConfig.enableInstrumentation) {
+      instrumentCounters.takeWhile(_._1 != s).map{x => 
+        2 + {if (hasBackPressure(x._1.toCtrl) || hasForwardPressure(x._1.toCtrl)) 2 else 0}
+      }.sum
+    } else 0
+  }
+  protected def instrumentCounterArgs(): Int = {
+    if (spatialConfig.enableInstrumentation) {
+      val last = instrumentCounters.last._1
+      instrumentCounterIndex(last) + 2 + {if (hasBackPressure(last.toCtrl) || hasForwardPressure(last.toCtrl)) 2 else 0}
+    } else 0
+  }
 
   def latencyOption(op: String, b: Option[Int]): Double = {
     if (spatialConfig.enableRetiming) {
@@ -132,6 +146,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     }) else "true.B"
   }
 
+  def hasForwardPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getReadStreams(sym).nonEmpty
+  def hasBackPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getWriteStreams(sym).nonEmpty
   def getForwardPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"

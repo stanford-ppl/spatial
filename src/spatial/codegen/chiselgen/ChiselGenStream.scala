@@ -17,9 +17,10 @@ trait ChiselGenStream extends ChiselGenCommon {
       val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
       emitBusObject(lhs){
         forceEmit(src"val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
-        forceEmit(src"val ready = ready_options.reduce{_|_}")
-        forceEmit(src"val now_valid = Wire(Bool())")
-        forceEmit(src"val valid = Wire(Bool())")
+        forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
+        forceEmit(src"ready := ready_options.reduce{_|_}")
+        forceEmit(src"""val now_valid = Wire(Bool()).suggestName("${lhs}_now_valid")""")
+        forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
         forceEmit(src"val m = Wire(${lhs.readers.toList.head.tp})")
       }
 
@@ -27,10 +28,11 @@ trait ChiselGenStream extends ChiselGenCommon {
       val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
       emitBusObject(lhs){
         forceEmit(src"val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
-        forceEmit(src"val valid = valid_options.reduce{_|_}")
+        forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
+        forceEmit(src"valid := valid_options.reduce{_|_}")
         forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
         forceEmit(src"val m = Vec((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
-        forceEmit(src"val ready = Wire(Bool())")
+        forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
       }	    
 
     case StreamOutBankedWrite(stream, data, ens) =>

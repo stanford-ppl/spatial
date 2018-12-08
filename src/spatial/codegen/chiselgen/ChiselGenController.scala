@@ -122,8 +122,8 @@ trait ChiselGenController extends ChiselGenCommon {
               val ctr = lhs.cchains.head
               emit(src"""${ctr}.en := ${lhs}$sfx.sm.io.ctrInc & ${lhs}$sfx.iiDone & ${getForwardPressure(lhs.toCtrl)}""")
               if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
-                emit(src"${lhs}$sfx.stalled.io.enable := ${lhs}$sfx.baseEn & ~${getBackPressure(lhs.toCtrl)}")
-                emit(src"${lhs}$sfx.idle.io.enable := ${lhs}$sfx.baseEn & ~${getForwardPressure(lhs.toCtrl)}")
+                emit(src"${lhs}$sfx.stalled.io.enable := ${lhs}$sfx.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+                emit(src"${lhs}$sfx.idle.io.enable := ${lhs}$sfx.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
               }
               emit(src"""${ctr}.reset := ${lhs}$sfx.resetChildren""")
               emit(src"""${lhs}$sfx.sm.io.ctrDone := ${DL(src"${ctr}.done", 1, true)}""")
@@ -221,8 +221,8 @@ trait ChiselGenController extends ChiselGenCommon {
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
     emit(src"${lhs}$swobj.en := ${lhs}$swobj.baseEn & top.rr & ${getForwardPressure(lhs.toCtrl)}")
     if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
-      emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~${getBackPressure(lhs.toCtrl)}")
-      emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~${getForwardPressure(lhs.toCtrl)}")
+      emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+      emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
     }
     emit(src"${lhs}$swobj.flow := ${getBackPressure(lhs.toCtrl)}")
     val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
@@ -242,8 +242,8 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""${lhs}.baseEn := top.io.enable""")
           emit(src"""${lhs}.en := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
           if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
-            emit(src"${lhs}.stalled.io.enable := ${lhs}.baseEn & ~${getBackPressure(lhs.toCtrl)}")
-            emit(src"${lhs}.idle.io.enable := ${lhs}.baseEn & ~${getForwardPressure(lhs.toCtrl)}")
+            emit(src"${lhs}.stalled.io.enable := ${lhs}.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+            emit(src"${lhs}.idle.io.enable := ${lhs}.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
           }
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")

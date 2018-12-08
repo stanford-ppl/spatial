@@ -271,12 +271,17 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit("\n// ArgOuts")
       argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+hostDrams.toList.length+argIOs.toList.length}")}
       emit("\n// Instrumentation Counters")
-      instrumentCounters.zipWithIndex.foreach{case ((s,_), i) => 
-        emit(src"val ${quote(s).toUpperCase}_cycles_arg = ${argIOs.toList.length + argOuts.toList.length + 2*i}")
-        emit(src"val ${quote(s).toUpperCase}_iters_arg = ${argIOs.toList.length + argOuts.toList.length + 2*i + 1}")
+      instrumentCounters.foreach{case (s,_) => 
+        val base = instrumentCounterIndex(s)
+        emit(src"val ${quote(s).toUpperCase}_cycles_arg = ${argIOs.toList.length + argOuts.toList.length + base}")
+        emit(src"val ${quote(s).toUpperCase}_iters_arg = ${argIOs.toList.length + argOuts.toList.length + base + 1}")
+        if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
+          emit(src"val ${quote(s).toUpperCase}_stalled_arg = ${argIOs.toList.length + argOuts.toList.length + base + 2}")
+          emit(src"val ${quote(s).toUpperCase}_idle_arg = ${argIOs.toList.length + argOuts.toList.length + base + 3}")
+        }
       }
       earlyExits.foreach{x => 
-        emit(src"val ${quote(x).toUpperCase}_exit_arg = ${argOuts.toList.length + argIOs.toList.length + instrumentCounters.toList.length}")
+        emit(src"val ${quote(x).toUpperCase}_exit_arg = ${argOuts.toList.length + argIOs.toList.length + instrumentCounterArgs()}")
       }
       close("}")
     }

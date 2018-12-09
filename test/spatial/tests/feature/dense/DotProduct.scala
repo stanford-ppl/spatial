@@ -121,9 +121,9 @@ import scala.reflect.ClassTag
 
         // Load data
         Foreach(n by dynBlockSize){blk => 
+          val thisblk = min(dynBlockSize.value, n-blk)
           Parallel {
             // Handle edge case
-            val thisblk = min(dynBlockSize.value, n-blk)
             aBlk load a(blk::blk + thisblk par P3)
             bBlk load b(blk::blk + thisblk par P3)
           }

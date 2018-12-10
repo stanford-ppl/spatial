@@ -8,7 +8,7 @@ import fringe.utils.log2Up
 class FIFOVec[T <: Data](t: T, depth: Int, v: Int) extends Module {
   assert(isPow2(depth))
   assert(isPow2(v))
-  assert(depth % v == 0)
+  assert(depth % v == 0, s"$depth, $v")
 
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(Vec(v, t.cloneType)))

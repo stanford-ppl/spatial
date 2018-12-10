@@ -226,15 +226,17 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   // Handle Reads
   m.foreach{ mem =>
     // Check all xBar r ports against this bank's coords
-    val xBarSelectEnsModule = Module(new StickySelects(io.xBarR.flatMap(_.en).size))
-    xBarSelectEnsModule.io.ins := io.xBarR.flatMap(_.banks).grouped(p.banks.length).toList.zip(io.xBarR.flatMap(_.en)).map{ case(bids, en) =>
+    val xBarSelectEnsRaw = io.xBarR.flatMap(_.banks).grouped(p.banks.length).toList.zip(io.xBarR.flatMap(_.en)).map{ case(bids, en) =>
       bids.zip(mem._2).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarR) en else false.B}
     }
-    val xBarSelect = xBarSelectEnsModule.io.outs
+    val xBarSelectEnsModule = Module(new StickySelects(xBarSelectEnsRaw.size))
+    xBarSelectEnsModule.io.ins.zip(xBarSelectEnsRaw).foreach{case (a,b) => a := b}
+    val xBarSelect = xBarSelectEnsModule.io.outs.map(_.toBool)
     // Check all direct r ports against this bank's coords
-    val directSelectEnsModule = Module(new StickySelects(io.directR.flatMap(_.en).size))
-    directSelectEnsModule.io.ins := io.directR.flatMap(_.en).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-    val directSelectEns = directSelectEnsModule.io.outs
+    val directSelectEnsRaw = io.directR.flatMap(_.en).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectEnsModule = Module(new StickySelects(directSelectEnsRaw.size))
+    directSelectEnsModule.io.ins.zip(directSelectEnsRaw).foreach{case (a,b) => a := b}
+    val directSelectEns = directSelectEnsModule.io.outs.map(_.toBool)
     val directSelectOffsets = io.directR.flatMap(_.ofs).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
     val directSelectFlows = io.directR.flatMap(_.flow).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 
@@ -332,11 +334,18 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, myName: String) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, myName)
 
-  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
+  val init = 
+    if (p.inits.isDefined) {
+      if (p.bitWidth == 1) {if (p.inits.get.head == 0.0) false.B else true.B}
+      else                 (p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt
+    }
+    else io.xBarW(0).init.head
+
+  val ff = RegInit(init)
   val anyReset: Bool = io.xBarW.flatMap{_.reset}.toList.reduce{_|_} | io.reset
   val anyEnable: Bool = io.xBarW.flatMap{_.en}.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.flatMap{_.en}.toList, io.xBarW.flatMap{_.data}.toList)
-  ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyEnable, wr_data, ff))
+  ff := Mux(anyReset, init, Mux(anyEnable, wr_data, ff))
   io.output.data.foreach(_ := ff)
 }
 
@@ -356,12 +365,20 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
   def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
   def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
 
-  val ff = if (p.inits.isDefined) RegInit((p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt) else RegInit(io.xBarW(0).init.head)
+  val init = 
+    if (p.inits.isDefined) {
+      if (p.bitWidth == 1) {if (p.inits.get.head == 0.0) false.B else true.B}
+      else                 (p.inits.get.head*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt
+    }
+    else io.xBarW(0).init.head
+
+  val ff = RegInit(init)
+
   val anyReset: Bool = io.xBarW.map{_.reset}.flatten.toList.reduce{_|_} | io.reset
   val anyWrite: Bool = io.xBarW.map{_.en}.flatten.toList.reduce{_|_}
   val anyRead: Bool = io.xBarR.map{_.en}.flatten.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.Mux1H(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
-  ff := Mux(anyReset, io.xBarW(0).init.head, Mux(anyWrite, wr_data, ff))
+  ff := Mux(anyReset, init, Mux(anyWrite, wr_data, ff))
   io.output.data.foreach(_ := ff)
 
   val isValid = Module(new SRFF())

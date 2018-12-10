@@ -211,7 +211,7 @@ import spatial.dsl._
     println(r"Worker3 processed: ${getArg(counter3)}")
     println(r"Total work sent: ${initWeights.map(_.payload).reduce{_+_}}")
     println(r"Total work done: ${getArg(counter1) + getArg(counter2) + getArg(counter3)}")
-    println(r"Pass: ${initWeights.reduce{_+_} == getArg(counter1) + getArg(counter2) + getArg(counter3)}")
+    // println(r"Pass: ${initWeights.reduce{_+_} == getArg(counter1) + getArg(counter2) + getArg(counter3)}")
     printArray(getMem(history), "Worker responsible for each packet")
     assert(getMem(history).map(_ != 0).reduce{_&&_}, "At least one packet apparently not processed!")
     assert(getArg(counter1) > 0)

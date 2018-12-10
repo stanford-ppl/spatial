@@ -3,10 +3,29 @@ package spatial.codegen.cppgen
 import argon._
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.control._
 import utils.escapeString
 import emul.Bool
+import spatial.util.spatialConfig
 
 trait CppGenCommon extends CppCodegen { 
+
+  var instrumentCounters: List[(Sym[_], Int)] = List()
+  var earlyExits: List[Sym[_]] = List()
+
+  protected def instrumentCounterIndex(s: Sym[_]): Int = {
+    if (spatialConfig.enableInstrumentation) {
+      instrumentCounters.takeWhile(_._1 != s).map{x => 
+        2 + {if (hasBackPressure(x._1.toCtrl) || hasForwardPressure(x._1.toCtrl)) 2 else 0}
+      }.sum
+    } else 0
+  }
+  protected def instrumentCounterArgs(): Int = {
+    if (spatialConfig.enableInstrumentation) {
+      val last = instrumentCounters.last._1
+      instrumentCounterIndex(last) + 2 + {if (hasBackPressure(last.toCtrl) || hasForwardPressure(last.toCtrl)) 2 else 0}
+    } else 0
+  }
 
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var argOuts = scala.collection.mutable.ArrayBuffer[Sym[_]]()
@@ -97,6 +116,9 @@ trait CppGenCommon extends CppCodegen {
     case _: Bit => "stoi"
     case _ => throw new Exception(s"Cannot convert string to $tp")
   }
+
+  def hasForwardPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getReadStreams(sym).nonEmpty
+  def hasBackPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getWriteStreams(sym).nonEmpty
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
     case (FixPtType(s,d,f), _) => c.toString + {if (f+d > 32) "L" else ""}

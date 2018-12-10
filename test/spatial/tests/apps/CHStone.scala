@@ -4,8 +4,6 @@ import spatial.dsl._
 import spatial.targets._
 
 @spatial class SHA1 extends SpatialTest {
-  type ULong = FixPt[FALSE, _32, _0]
-  @struct case class byte_pack(a: Int8, b: Int8, c: Int8, d: Int8)
 
 
   def main(args: Array[String]): Unit = {
@@ -25,7 +23,7 @@ import spatial.targets._
     val len = ArgIn[Int]
     setArg(len, data_text.length)
     val text_dram = DRAM[Int8](len)
-    val hash_dram = DRAM[ULong](5)
+    val hash_dram = DRAM[U32](5)
 
     // println("Hashing: " + charArrayToString(data_text) + " (len: " + data_text.length + ")")
     println("Hashing: " + raw_text + " (len: " + data_text.length + ")")
@@ -34,23 +32,23 @@ import spatial.targets._
 
     Accel{
       val buffer = SRAM[Int8](BLOCK_SIZE)
-      val sha_digest = RegFile[ULong](5, List(0x67452301L.to[ULong], 0xefcdab89L.to[ULong], 
-                                              0x98badcfeL.to[ULong], 0x10325476L.to[ULong], 
-                                              0xc3d2e1f0L.to[ULong])
+      val sha_digest = RegFile[U32](5, List(0x67452301L.to[U32], 0xefcdab89L.to[U32], 
+                                              0x98badcfeL.to[U32], 0x10325476L.to[U32], 
+                                              0xc3d2e1f0L.to[U32])
                                      )
-      val sha_data = SRAM[ULong](16)
+      val sha_data = SRAM[U32](16)
       val count_lo = Reg[Int](0)
       val count_hi = Reg[Int](0)
 
-      def asLong(r: Reg[ULong]): ULong = {r.value.bits(31::0).as[ULong]}
+      def asLong(r: Reg[U32]): U32 = {r.value.bits(31::0).as[U32]}
 
       def sha_transform(): Unit = {
-        val W = SRAM[ULong](80)
-        val A = Reg[ULong]
-        val B = Reg[ULong]
-        val C = Reg[ULong]
-        val D = Reg[ULong]
-        val E = Reg[ULong]
+        val W = SRAM[U32](80)
+        val A = Reg[U32]
+        val B = Reg[U32]
+        val C = Reg[U32]
+        val D = Reg[U32]
+        val E = Reg[U32]
 
         Foreach(80 by 1 par PX) { i =>
                   W(i) = if (i < 16) {sha_data(i)} else {W(i.as[I32]-3) ^ W(i.as[I32]-8) ^ W(i.as[I32]-14) ^ W(i.as[I32]-16)}
@@ -95,37 +93,35 @@ import spatial.targets._
           // TODO: Can make this one writer only
           if (numel == SHA_BLOCKSIZE) {Pipe{
             Foreach(SHA_BLOCKSIZE/4 by 1){ i => 
-                      sha_data(i) = (buffer(base + i.to[I32]*4).as[ULong]) | (buffer(base + i.to[I32]*4+1).as[ULong] << 8) | (buffer(base + i.to[I32]*4 + 2).as[ULong] << 16) | (buffer(base + i.to[I32]*4+3).as[ULong] << 24)
+              // sha_data(i) = (buffer(base + i.to[I32]*4).as[U32]) | (buffer(base + i.to[I32]*4+1).as[U32] << 8) | (buffer(base + i.to[I32]*4 + 2).as[U32] << 16) | (buffer(base + i.to[I32]*4+3).as[U32] << 24)
+              sha_data(i) = cat(buffer(base + i*4+3).as[U8].asBits, buffer(base + i*4+2).as[U8].asBits, buffer(base + i*4+1).as[U8].asBits, buffer(base + i*4).as[U8].asBits).as[U32]
             }
             sha_transform()
           }} else {
             Foreach(0 until numel by 1) { i => 
-                      sha_data(i) = (buffer(base + i.to[I32]*4).as[ULong]) | (buffer(base + i.to[I32]*4+1).as[ULong] << 8) | (buffer(base + i.to[I32]*4 + 2).as[ULong] << 16) | (buffer(base + i.to[I32]*4+3).as[ULong] << 24)
+              // sha_data(i) = (buffer(base + i.to[I32]*4).as[U32]) | (buffer(base + i.to[I32]*4+1).as[U32] << 8) | (buffer(base + i.to[I32]*4 + 2).as[U32] << 16) | (buffer(base + i.to[I32]*4+3).as[U32] << 24)
+              sha_data(i) = cat(buffer(base + i*4+3).as[U8].asBits, buffer(base + i*4+2).as[U8].asBits, buffer(base + i*4+1).as[U8].asBits, buffer(base + i*4).as[U8].asBits).as[U32]
             }         
           }
         }
 
       }
 
-      // Pipe{sha_digest(0) = 0x67452301L.to[ULong]}
-      // Pipe{sha_digest(1) = 0xefcdab89L.to[ULong]}
-      // Pipe{sha_digest(2) = 0x98badcfeL.to[ULong]}
-      // Pipe{sha_digest(3) = 0x10325476L.to[ULong]}
-      // Pipe{sha_digest(4) = 0xc3d2e1f0L.to[ULong]}
+      // Pipe{sha_digest(0) = 0x67452301L.to[U32]}
+      // Pipe{sha_digest(1) = 0xefcdab89L.to[U32]}
+      // Pipe{sha_digest(2) = 0x98badcfeL.to[U32]}
+      // Pipe{sha_digest(3) = 0x10325476L.to[U32]}
+      // Pipe{sha_digest(4) = 0xc3d2e1f0L.to[U32]}
 
       Sequential.Foreach(len by BLOCK_SIZE) { chunk => 
         val count = min(BLOCK_SIZE.to[Int], (len - chunk))
         buffer load text_dram(chunk::chunk+count)
         sha_update(count)
 
-        // def byte_reverse(x: ULong): ULong = {
-        //  byte_pack(x(31::24).as[Int8],x(23::16).as[Int8],x(15::8).as[Int8],x(7::0).as[Int8]).as[ULong]
-        // }
-
         // Final sha
         // TODO: This last bit is probably wrong for any input that is not size 8192
-        val lo_bit_count = count_lo.value.to[ULong]
-        val hi_bit_count = count_hi.value.to[ULong]
+        val lo_bit_count = count_lo.value.to[U32]
+        val hi_bit_count = count_hi.value.to[U32]
         val count_final = ((lo_bit_count.to[Int8] >> 3) & 0x3f.to[Int8]).to[Int]
         sha_data(count_final) = 0x80
         if (count_final > 56) {
@@ -145,7 +141,7 @@ import spatial.targets._
     }
 
     val hashed_result = getMem(hash_dram)
-    val hashed_gold = Array[ULong](1754467640L,1633762310L,3755791939L,3062269980L,2187536409L)
+    val hashed_gold = Array[U32](1754467640L,1633762310L,3755791939L,3062269980L,2187536409L)
     printArray(hashed_gold, "Expected: ")
     printArray(hashed_result, "Got: ")
 
@@ -261,7 +257,7 @@ import spatial.targets._
         val tmp = Reg[UInt16]
         Pipe{tmp1 := jpg_sram.deq()}
         Pipe{tmp2 := jpg_sram.deq()}
-        Pipe{tmp := (tmp1.value.as[UInt16] << 8) | (tmp2.value.as[UInt16])}
+        Pipe{tmp := cat(tmp1.value.asBits, tmp2.value.asBits).as[UInt16]}
         tmp.value
       }
       def read_byte(): UInt8 = {
@@ -1046,7 +1042,7 @@ import spatial.targets._
         val tmp = Reg[UInt16]
         Pipe{tmp1 := jpg_sram.deq()}
         Pipe{tmp2 := jpg_sram.deq()}
-        Pipe{tmp := (tmp1.value.as[UInt16] << 8) | (tmp2.value.as[UInt16])}
+        Pipe{tmp := cat(tmp1.value.asBits, tmp2.value.asBits).as[UInt16]}
         tmp.value
       }
       def read_byte(): UInt8 = {

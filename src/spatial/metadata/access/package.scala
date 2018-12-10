@@ -187,7 +187,7 @@ package object access {
       case Op(MergeBufferInit(_,_,_)) => 1
       case Op(RegWrite(_,_,_)) => 1
       case Op(RegRead(_))      => 1
-      case Op(FIFORegDeq(_))      => 1
+      case Op(FIFORegDeq(_,_))      => 1
       case Op(FIFORegEnq(_,_,_))      => 1
       case _ => -1
     }

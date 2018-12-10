@@ -35,8 +35,8 @@ trait ScalaGenVec extends ScalaGenBits with ScalaGenText {
 
     case VecConcat(vectors) =>
       // val v = concat(c(4::0), b(4::0), a(4::0))
-      // v(12) // should give a(2)
-      val concat = vectors.map(quote).mkString(" ++ ")
+      // v(12) // should give a(1)
+      val concat = vectors.map{x => src"$x"}.mkString(" ++ ")
       emit(src"val $lhs = $concat")
 
     // Other cases (Structs, Vectors) are taken care of using rewrite rules

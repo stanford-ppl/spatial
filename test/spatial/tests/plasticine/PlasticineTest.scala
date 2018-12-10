@@ -22,7 +22,7 @@ trait PlasticineTest extends SpatialTest { test =>
     name="PIR"
   )(
     args = "--pir --dot",
-    run = s"bash run.sh --dot=false --run-psim --net=asic --trace=true --mapping=false"
+    run = s"bash run.sh --dot=false --run-psim --net=asic --trace=false --mapping=false --tungsten=false"
     //run = s"bash run.sh --dot=false --trace=false --mapping=true"
   )
 
@@ -30,7 +30,7 @@ trait PlasticineTest extends SpatialTest { test =>
     name="PIRGen"
   )(
     args = "--pir",
-    run = s"bash run.sh --dot=true --mapping=false --codegen=false --psim=false"
+    run = s"bash run.sh --dot=true --mapping=false --codegen=false --psim=false --tungsten=false"
   )
 
   //TODO: Specify check point path from PIRGen
@@ -38,7 +38,7 @@ trait PlasticineTest extends SpatialTest { test =>
     name="PIRAsicRun"
   )(
     args = "--pir",
-    run = s"bash run.sh --dot=true --load --run-psim --net=asic --trace=true --mapping=true"
+    run = s"bash run.sh --dot=true --load --run-psim --net=asic --trace=true --mapping=true --tungsten=false"
   )
 
 }

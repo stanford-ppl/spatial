@@ -156,7 +156,7 @@ class CompactingIncDincCtr(inc: Int, dinc: Int, stop: Int, width: Int = 32) exte
   io.output.overwrite := cnt > stop.S((width+1).W)
   io.output.empty := cnt === 0.S((width+1).W)
   io.output.almostEmpty := cnt - dinc.S((width+1).W) === 0.S((width+1).W)
-  io.output.full := cnt === stop.S((width+1).W)
+  io.output.full := cnt > (stop-inc).S((width+1).W)
   io.output.almostFull := cnt + inc.S((width+1).W) === stop.S((width+1).W)
   io.output.numel := cnt
 }

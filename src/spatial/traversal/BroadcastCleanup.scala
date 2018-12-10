@@ -17,7 +17,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
       lhs.op.get.blocks.foreach{block =>
         block.stms.reverse.foreach{sym => 
           sym match {
-            case Op(_: BankedAccessor[_,_]) if sym.getPorts(0).isDefined => 
+            case Op(_: BankedReader[_]) if sym.getPorts(0).isDefined => 
               val broadcast = sym.port.broadcast.exists(_>0)
               dbgs(s"Reader $sym is broadcast: $broadcast")
               sym.nestedInputs.foreach{in => 

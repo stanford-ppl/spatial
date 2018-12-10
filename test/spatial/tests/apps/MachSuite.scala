@@ -925,8 +925,8 @@ import spatial.targets._
 
       // Store result
       Parallel{
-        Sequential{seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned}
-        Sequential{seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned}
+        seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned
+        seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned
       }
 
     }
@@ -2067,8 +2067,8 @@ import spatial.targets._
           val start_id = rowid_sram(i)
           val stop_id = rowid_sram(i+1)
           Parallel{
-            cols_sram load cols_dram(start_id :: stop_id par par_segment_load)
-            values_sram load values_dram(start_id :: stop_id par par_segment_load)
+            Pipe{cols_sram load cols_dram(start_id :: stop_id par par_segment_load)}
+            Pipe{values_sram load values_dram(start_id :: stop_id par par_segment_load)}
           }
           vec_sram gather vec_dram(cols_sram, stop_id - start_id)
           println("row " + {i + tile})

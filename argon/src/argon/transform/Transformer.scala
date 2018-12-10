@@ -194,14 +194,17 @@ abstract class Transformer extends Pass with TransformerInterface {
   }
   implicit class Lambda1Ops[A,R](lambda1: Lambda1[A,R]) {
     /** Inline all statements in the block into the current scope with the given input. */
-    def reapply(a: A): R = { val func = lambda1ToFunction1(lambda1); func(a) }
+    def reapply(a: A): R = { 
+      val func = lambda1ToFunction1(lambda1)
+      dbgs(s"Executing Function1 with inputs: $a")
+      func(a) 
+    }
     /** Turn this block into a callable Function1, where each call will reapply the Lambda. */
     def toFunction1: A => R = lambda1ToFunction1(lambda1)
   }
   implicit class Lambda2Ops[A,B,R](lambda2: Lambda2[A,B,R]) {
     /** Inline all statements in the block into the current scope with the given inputs. */
     def reapply(a: A, b: B): R = {
-      dbgs(s"Making Function2")
       val func = lambda2ToFunction2(lambda2)
       dbgs(s"Executing Function2 with inputs: $a and $b")
       func(a,b)
@@ -209,7 +212,11 @@ abstract class Transformer extends Pass with TransformerInterface {
     def toFunction2: (A, B) => R = lambda2ToFunction2(lambda2)
   }
   implicit class Lambda3Ops[A,B,C,R](lambda3: Lambda3[A,B,C,R]) {
-    def reapply(a: A, b: B, c: C): R = { val func = lambda3ToFunction3(lambda3); func(a,b,c) }
+    def reapply(a: A, b: B, c: C): R = { 
+      val func = lambda3ToFunction3(lambda3)
+      dbgs(s"Executing Function3 with inputs: $a, $b, and $c")
+      func(a,b,c)
+    }
     def toFunction3: (A, B, C) => R = lambda3ToFunction3(lambda3)
   }
 

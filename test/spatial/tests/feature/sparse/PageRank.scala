@@ -68,7 +68,7 @@
      setMem(OCedgeLens, edgeLens)
      setMem(OCedgeIds, edgeIds)
 
-     Accel {
+     Accel { 
        Sequential.Foreach(iters by 1) { iter =>
          // Step through each tile
          Foreach(NP by tileSize par tile_par) { page =>
@@ -118,7 +118,7 @@
              }{_+_}
 
              // Write new rank
-             local_pages(local_page) = pagerank * damp + (1.to[X] - damp)
+             local_pages(local_page) = pagerank * damp + (1.to[X] - damp) / NP.value.to[X]
            }
            OCpages(page :: page + pages_left par par_store) store local_pages
          }
@@ -145,7 +145,7 @@
          val these_counts = these_edges.map { j => edgeLens(j) }
          val pr = these_pages.zip(these_counts){(p, c) => p / c.to[X] }.sum
          // println("new pr for " + i + " is " + pr)
-         gold(i) = pr * dampIN + (1.to[X] - dampIN)
+         gold(i) = pr * dampIN + (1.to[X] - dampIN) / rows.to[X]
        }
      }
 

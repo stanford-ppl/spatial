@@ -57,6 +57,8 @@ object Reg {
   override val evMem: FIFOReg[A] <:< LocalMem[A,FIFOReg] = implicitly[FIFOReg[A] <:< LocalMem[A,FIFOReg]]
 
   @api def value: A = FIFOReg.deq(this)
+  @api def deq(): A = value
+  @api def enq(data: A): Void = FIFOReg.enq(this, data)
 
   // --- Typeclass Methods
   @rig def __sread(): A = FIFOReg.deq(this)

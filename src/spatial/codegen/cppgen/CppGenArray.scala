@@ -285,7 +285,7 @@ trait CppGenArray extends CppGenCommon {
 
     case ArrayUpdate(arr, id, data) => emitUpdate(arr, data, src"${id}", data.tp)
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) if (!inHw) => 
+    case UnrolledForeach(ens,cchain,func,iters,valids,_) if (!inHw) => 
       val starts = cchain.counters.map(_.start)
       val ends = cchain.counters.map(_.end)
       val steps = cchain.counters.map(_.step)

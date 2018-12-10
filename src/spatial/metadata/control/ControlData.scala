@@ -37,7 +37,6 @@ case class ControlLevel(level: CtrlLevel) extends Data[ControlLevel](SetBy.Flow.
   */
 case class CounterOwner(owner: Sym[_]) extends Data[CounterOwner](SetBy.Flow.Consumer)
 
-
 /** The control schedule determined by the compiler.
   *
   * Option:  sym.getRawSchedule

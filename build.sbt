@@ -8,7 +8,8 @@ trapExit := false
 val base = Seq(
   organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
-  version := "1.0-SNAPSHOT",
+  version := "1.1-SNAPSHOT",
+  licenses += ("MIT", url("https://opensource.org/licenses/MIT")),
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
 
   /** External Libraries (e.g. maven dependencies) **/
@@ -92,9 +93,13 @@ val base = Seq(
   publishMavenStyle := true
 )
 
+val emul_settings = base ++ Seq(
+  libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
+  crossScalaVersions := Seq(scala_version, "2.11.7"),
+  scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
+)
 val common = base ++ Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
-
   scalacOptions += "-opt:l:method,inline",          // Enable method optimizations, inlining
   scalacOptions += "-opt-warnings:none",            // Disable optimization warnings
   scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
@@ -119,7 +124,7 @@ val fringe_settings = base ++ Seq(
 
 /** Projects **/
 lazy val utils  = project.settings(common)
-lazy val emul   = project.settings(common)
+lazy val emul   = project.settings(emul_settings)
 lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
 lazy val models = project.settings(common)
 lazy val forge  = project.settings(common).dependsOn(utils)
@@ -150,9 +155,6 @@ lazy val denseTest = project.settings(
 lazy val featureTest = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),
 ).aggregate(denseTest).dependsOn(spatial)
-lazy val plasticineTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/plasticine/"),
-).dependsOn(spatial)
 
 lazy val tests = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,
 featureTest)
@@ -160,5 +162,3 @@ featureTest)
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
-
-addCommandAlias("make", "; project plasticineTest; test:compile")

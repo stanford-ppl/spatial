@@ -17,6 +17,7 @@ class ControlInterface(p: ControlParams) extends Bundle {
   val ctrRst = Output(Bool())
   val parentAck = Input(Bool())
   val flow = Input(Bool())
+  val break = Input(Bool())
 
   // Signals from children
   val doneIn = Vec(p.depth, Input(Bool()))
@@ -98,18 +99,18 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & !io.ctrDone & io.enable & io.flow
-      active(0).io.input.reset := io.ctrDone | io.parentAck
-      iterDone(0).io.input.set := io.doneIn(0) | (!io.maskIn(0).D(1) & io.enable & io.flow)
-      done(0).io.input.set := io.ctrDone & !io.rst
+      active(0).io.input.reset := io.ctrDone | io.parentAck | io.break
+      iterDone(0).io.input.set := io.doneIn(0) | (!io.maskIn(0).D(1) & io.enable & io.flow) | io.break
+      done(0).io.input.set := (io.ctrDone & !io.rst) | io.break
 
       // Define logic for the rest of the stages
       for (i <- 1 until p.depth) {
         val extension = if (p.latency == 0) (synchronize & iterDone(i-1).io.output.data).D(1) else false.B // Hack for when retiming is turned off, in case mask turns on at the same time as the next iter should begin
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
         active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable & io.flow
-        active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i))
-        done(i).io.input.set := done(i-1).io.output.data & synchronize & !io.rst
+        active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck | io.break
+        iterDone(i).io.input.set := (io.doneIn(i)) | io.break
+        done(i).io.input.set := (done(i-1).io.output.data & synchronize & !io.rst) | io.break
       }
     
     case Sequenced => 
@@ -121,16 +122,16 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
       
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & !io.ctrDone & io.enable & io.flow & ~iterDone(0).io.output.data & !io.doneIn(0)
-      active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone
-      iterDone(0).io.input.set := (io.doneIn(0) & !synchronize) | (!io.maskIn(0) & io.enable & io.flow)
-      done(0).io.input.set := io.ctrDone & !io.rst
+      active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone | io.break
+      iterDone(0).io.input.set := (io.doneIn(0) & !synchronize) | (!io.maskIn(0) & io.enable & io.flow) | io.break
+      done(0).io.input.set := (io.ctrDone & !io.rst) | io.break
 
       // Define logic for the rest of the stages
       for (i <- 1 until p.depth) {
         active(i).io.input.set := (io.doneIn(i-1) | (iterDone(i-1).io.output.data & ~iterDone(i).io.output.data & !io.doneIn(i) & io.enable & io.flow)) & !synchronize
-        active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | (iterDone(i-1).io.output.data & !io.maskIn(i) & io.enable & io.flow)) & !synchronize
-        done(i).io.input.set := io.ctrDone & !io.rst
+        active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck | io.break
+        iterDone(i).io.input.set := ((io.doneIn(i) | (iterDone(i-1).io.output.data & !io.maskIn(i) & io.enable & io.flow)) & !synchronize) | io.break
+        done(i).io.input.set := (io.ctrDone & !io.rst) | io.break
       }
 
     case ForkJoin => 
@@ -143,9 +144,9 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
       // Define logic for all stages
       for (i <- 0 until p.depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & !io.doneIn(i) & !done(i).io.output.data & !io.ctrDone & io.enable & io.flow
-        active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := io.doneIn(i) | (!io.maskIn(i) & io.enable & io.flow)
-        done(i).io.input.set := io.ctrDone & !io.rst
+        active(i).io.input.reset := io.doneIn(i) | io.rst | io.parentAck | io.break
+        iterDone(i).io.input.set := (io.doneIn(i) | (!io.maskIn(i) & io.enable & io.flow)) | io.break
+        done(i).io.input.set := (io.ctrDone & !io.rst) | io.break
       }
 
     case Streaming => 
@@ -158,10 +159,10 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
       // Define logic for all stages
       for (i <- 0 until p.depth) {
         active(i).io.input.set := ~iterDone(i).io.output.data & !io.doneIn(i) & !done(i).io.output.data & !io.ctrDone & io.enable & io.flow & !io.ctrCopyDone(i)
-        active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck
-        iterDone(i).io.input.set := (io.doneIn(i) | !io.maskIn(i).D(1)) & io.enable & io.flow
+        active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck | io.break
+        iterDone(i).io.input.set := ((io.doneIn(i) | !io.maskIn(i).D(1)) & io.enable & io.flow) | io.break
         iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
-        done(i).io.input.set := (io.ctrCopyDone(i) & !io.rst) | (!io.maskIn(i).D(1) & io.enable & io.flow)
+        done(i).io.input.set := ((io.ctrCopyDone(i) & !io.rst) | (!io.maskIn(i).D(1) & io.enable & io.flow)) | io.break
         done(i).io.input.reset := io.parentAck // Override done reset
       }
 
@@ -249,9 +250,9 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
 
   if (!p.isFSM) {
     active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data
-    active.io.input.reset := io.ctrDone | io.rst | io.parentAck
+    active.io.input.reset := io.ctrDone | io.rst | io.parentAck | io.break
     active.io.input.asyn_reset := false.B
-    p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone)}
+    p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone) | io.break}
     done.io.input.reset := io.rst | io.parentAck
     done.io.input.asyn_reset := false.B
 

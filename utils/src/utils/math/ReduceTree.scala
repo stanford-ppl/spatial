@@ -12,9 +12,9 @@ object ReduceTree {
   def apply[T](xs: T*)(reduce: (T,T) => T): T = levels(xs, reduce).head
 }
 
-/* (scaladoc broken here?) Generates all combinations choosing one element from each Seq, with
+/* (fix scaladoc!)  Generates all combinations choosing one element from each seq, with
   *  CSE built in to reuse as much as possible
-  *  For example, AllPairsMapTree(Seq( Seq(A,A'), Seq(B,B'), Seq(C,C'), Seq(D,D') ))(_*_)
+  *  For example, AllPairsMapTree(seq( seq(A,A'), seq(B,B'), seq(C,C'), seq(D,D') ))(_*_)
   *                            = ABCD + ABCD' + ABC'D + ABC'D' + AB'CD + AB'CD' + AB'C'D + AB'C'D' 
   *                               + A'BCD + A'BCD' + A'BC'D + A'BC'D' + A'B'CD + A'B'CD' + A'B'C'D + A'B'C'D'
   *        

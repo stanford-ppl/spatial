@@ -101,6 +101,9 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
+  protected def createWire(name: String, payload: String): String = {
+    src"""val $name = Wire($payload).suggestName("$name")"""
+  }
 
   // Hack for gather/scatter/unaligned load/store, we want the controller to keep running
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
@@ -206,7 +209,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def getSlot(lhs: Sym[_]): Int = {
-    lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)
+    lhs.siblings.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)
   }
   protected def parentAndSlot(lhs: Sym[_]): String = {
     if (lhs.parent.s.isDefined) {

@@ -5,6 +5,7 @@ import argon.lang._
 import argon.codegen.{Codegen, FileDependencies}
 import spatial.metadata._
 import spatial.metadata.memory._
+import spatial.node._
 
 import scala.collection.mutable
 
@@ -42,6 +43,7 @@ trait PIRFormatGen extends Codegen {
 
   def comment(lhs:Lhs, tp:String) = {
     lhs.sym match {
+      case Def(LUTNew(dims, elems)) => src"[$tp] $lhs = LUTNew($dims, elems)"
       case Def(op) => src"[$tp] $lhs = $op"
       case lhs => src"[$tp] $lhs"
     }

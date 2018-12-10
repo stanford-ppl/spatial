@@ -126,12 +126,12 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
     case ctrl: Control[_] => 
       lhs match {
-        case Op(OpMemReduce(_,_,_,accum,_,_,loadAcc,_,storeAcc,_,_,_,_)) => 
+        case Op(OpMemReduce(_,_,_,accum,_,_,loadAcc,_,storeAcc,_,_,_,_,_)) => 
           // Known that the accum cycle has iterDiff of 0 (touch-and-go)
           accum.asInstanceOf[Sym[_]].iterDiff = 0
           loadAcc.result.iterDiff = 0
           storeAcc.result.iterDiff = 0
-        case Op(OpReduce(_,_,accum,_,load,_,store,_,_,_)) =>
+        case Op(OpReduce(_,_,accum,_,load,_,store,_,_,_,_)) =>
           // Known that the accum cycle has iterDiff of 1 (always reading and writing to same place)
           accum.asInstanceOf[Sym[_]].iterDiff = 1
           load.result.iterDiff = 1

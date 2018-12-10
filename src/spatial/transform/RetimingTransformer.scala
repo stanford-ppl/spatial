@@ -202,6 +202,8 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     val scope = block.nestedStms
     val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_))
 
+    import spatial.metadata.access._
+    import spatial.metadata.memory._
     dbgs(s"Retiming block $block:")
     //scope.foreach{e => dbgs(s"  ${stm(e)}") }
     //dbgs(s"Result: ")

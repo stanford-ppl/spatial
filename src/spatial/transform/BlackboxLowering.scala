@@ -16,7 +16,7 @@ case class BlackboxLowering(IR: State) extends MutateTransformer with AccelTrave
     expandSLA[S,I,F](op.a, op.b)
   }
   def expandSLA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F], b:Fix[TRUE,_16,_0]): Fix[S,I,F] = (a,b) match {
-    case (_, Const(y)) => a << b
+    case (_, Const(y)) => f(a) << f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
       Foreach(abs(b.to[I32]) by 1){i =>
@@ -33,7 +33,7 @@ case class BlackboxLowering(IR: State) extends MutateTransformer with AccelTrave
     expandSRA[S,I,F](op.a, op.b)
   }
   def expandSRA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F], b:Fix[TRUE,_16,_0]): Fix[S,I,F] = (a,b) match {
-    case (_, Const(y)) => a >> b
+    case (_, Const(y)) => f(a) >> f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
       Foreach(abs(b.to[I32]) by 1){i =>
@@ -51,7 +51,7 @@ case class BlackboxLowering(IR: State) extends MutateTransformer with AccelTrave
     expandSRU[S,I,F](op.a, op.b)
   }
   def expandSRU[S:BOOL,I:INT,F:INT](a:Fix[S,I,F], b:Fix[TRUE,_16,_0]): Fix[S,I,F] = (a,b) match {
-    case (_, Const(y)) => a >>> b
+    case (_, Const(y)) => f(a) >>> f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
       Foreach(abs(b.to[I32]) by 1){i =>

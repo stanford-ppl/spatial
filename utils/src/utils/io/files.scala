@@ -3,6 +3,7 @@ package utils.io
 import java.io._
 import java.nio.file._
 import java.util.function.Consumer
+import java.nio.file.{Files,Paths}
 
 object files {
   def sep: String = java.io.File.separator
@@ -119,6 +120,11 @@ object files {
 
   def buildPath(parts:String*):String = {
     parts.mkString(sep)
+  }
+
+  def createDirectories(dir:String) = {
+    val path = Paths.get(dir)
+    if (!Files.exists(path)) Files.createDirectories(path)
   }
 
 }

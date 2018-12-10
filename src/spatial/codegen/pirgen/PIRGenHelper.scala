@@ -20,7 +20,9 @@ trait PIRGenHelper extends PIRFormatGen {
     val padding = lhs.getPadding.getOrElse {
       lhs.constDims.map { _ => 0 }
     }
-    val constInits = inits.map { _.map { _.rhs.getValue.get } }
+    val constInits = inits.map { _.map { _.rhs.getValue.get } }.flatMap { inits =>
+      if (inits.size > 16) None else Some(inits) //TODO: hack. prevent generating inits that are too large
+    }
     stateStruct(lhs, lhs.asMem.A, tp=tp)(name => 
       src"$rhs" + 
       constInits.ms(constInits => src".inits($constInits)") + 

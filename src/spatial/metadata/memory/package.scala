@@ -4,6 +4,7 @@ import argon._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds.Expect
+import spatial.metadata.access._
 import spatial.metadata.control._
 
 package object memory {
@@ -23,9 +24,11 @@ package object memory {
     def getIterDiff: Option[Int] = metadata[IterDiff](s).map(_.diff)
     def iterDiff: Int = metadata[IterDiff](s).map(_.diff).getOrElse(1)
     def iterDiff_=(diff: Int): Unit = metadata.add(s, IterDiff(diff))
+    def removeIterDiff: Unit = metadata.add(s,IterDiff(1))
 
     def segmentMapping: Map[Int,Int] = metadata[SegmentMapping](s).map(_.mapping).getOrElse(Map[Int,Int]())
     def segmentMapping_=(mapping: Map[Int,Int]): Unit = metadata.add(s, SegmentMapping(mapping))
+    def removeSegmentMapping: Unit = metadata.add(s,SegmentMapping(Map[Int,Int]()))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {
@@ -69,6 +72,29 @@ package object memory {
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
 
     def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}
+
+    /** Controllers just below the LCA who are responsible for swapping a buffered memory */
+    import forge.tags.stateful
+    @stateful def swappers: List[Sym[_]] = {
+      val accesses = s.accesses.filter(_.port.bufferPort.isDefined)
+      if (accesses.nonEmpty) {
+        val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses)
+        if (lca.isParallel){ // Assume memory analysis chose buffering based on lockstep of different bodies within this parallel, and just use one
+          val releventAccesses = accesses.toList.filter(_.ancestors.contains(lca.children.head)).toSet
+          val logickingLca = LCA(releventAccesses)
+          val (basePort, numPorts) = if (logickingLca.s.get.isInnerControl) (0,0) else LCAPortMatchup(releventAccesses.toList, logickingLca)
+          val info = if (logickingLca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => logickingLca.children.toList(port).s.get }
+          info.toList        
+        } else {
+          val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
+          val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
+          info.toList        
+        }
+      } else {
+        throw new Exception(s"Cannot create a buffer on $s, which has no accesses")
+      }
+    }
+
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {
@@ -138,6 +164,12 @@ package object memory {
       }
     }
 
+    def getConstDims: Option[Seq[Int]] = {
+      if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
+        Some(stagedDims.collect{case Expect(c) => c.toInt })
+      } else None
+    }
+
     def readWidths: Set[Int] = mem.readers.map{
       case Op(read: UnrolledAccessor[_,_]) => read.width
       case _ => 1
@@ -165,7 +197,7 @@ package object memory {
       case _ => false
     }
     def isSparseAlias: Boolean = mem.op.exists{
-      case _: MemSparseAlias[_,_,_,_] => true
+      case _: MemSparseAlias[_,_,_,_,_] => true
       case _ => false
     }
 
@@ -210,6 +242,19 @@ package object memory {
       case _ => false
     }
 
+    def memName: String = mem match {
+      case _: LUT[_,_] => "LUT"
+      case _: SRAM[_,_] => "BankedSRAM"
+      case _: Reg[_] => "FF"
+      case _: FIFOReg[_] => "FIFOReg"
+      case _: RegFile[_,_] => "ShiftRegFile"
+      case _: LineBuffer[_] => "LineBuffer"
+      case _: MergeBuffer[_] => "MergeBuffer"
+      case _: FIFO[_] => "FIFO"
+      case _: LIFO[_] => "LIFO"
+      case _ => "Unknown"
+    }
+
     def hasInitialValues: Boolean = mem match {
       case Op(RegNew(_)) => true
       case Op(RegFileNew(_,inits)) => inits.isDefined
@@ -236,6 +281,9 @@ package object memory {
 
     def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
     def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
+
+    def isBreaker: Boolean = metadata[Breaker](s).exists(_.flag)
+    def isBreaker_=(flag: Boolean): Unit = metadata.add(s, Breaker(flag))
 
     def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
     def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)

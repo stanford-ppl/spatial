@@ -72,10 +72,10 @@ trait PIRGenController extends PIRCodegen {
     case ParallelPipe(ens, func) =>
       emitController(lhs, ens=ens) { ret(func) }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids,_) =>
       emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
       emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
 
     case op@Switch(selects, body) =>

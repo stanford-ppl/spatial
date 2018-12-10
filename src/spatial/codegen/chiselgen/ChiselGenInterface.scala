@@ -94,7 +94,9 @@ trait ChiselGenInterface extends ChiselGenCommon {
           emit(src"""${reg}.data_options($id) := ${v}.r""")
       }
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${controllerStack.head}.datapathEn & ${controllerStack.head}.iiDone", lhs.fullDelay)}""")
+      val parent = controllerStack.head
+      val sfx = if (parent.isBranch) "_obj" else ""
+      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay)}""")
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
       val id = lhs.port.muxPort
@@ -107,7 +109,9 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"""${reg}.data_options($id) := $padded""")
 
       val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${controllerStack.head}.datapathEn & ${controllerStack.head}.iiDone", lhs.fullDelay)}""")
+      val parent = controllerStack.head
+      val sfx = if (parent.isBranch) "_obj" else ""
+      emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay)}""")
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasTileLoad

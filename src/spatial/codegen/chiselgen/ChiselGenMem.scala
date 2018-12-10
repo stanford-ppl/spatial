@@ -20,14 +20,15 @@ trait ChiselGenMem extends ChiselGenCommon {
     and(ens.map{x => if (controllerStack.head.isOuterControl) appendSuffix(owner,x) else quote(x)})
   }
   private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
-    val zipThreshold = 100 max payload.map(_.size).sorted.headOption.getOrElse(0) // Max number of characters before deciding to split line into many
+    val zipThreshold = 150 max payload.map(_.size).sorted.headOption.getOrElse(0) // Max number of characters before deciding to split line into many
     val totalPayload = payload.mkString(src"List[$tp](", ",", ")")
     if (totalPayload.length < zipThreshold) {
       val rdPayload = totalPayload + suffix
       emit(src"""${lhs}_port.$port.zip($rdPayload).foreach{case (left, right) => left.r := right}""")
     }
     else {
-      val groupSize = (payload.length / (totalPayload.length / zipThreshold)).toInt
+      val groupSize = 1 max (payload.length / (totalPayload.length / zipThreshold)).toInt
+      Console.println(s"chunking ${payload.length} / (${totalPayload.length} / $zipThreshold) = $groupSize")
       val groups = payload.grouped(groupSize).toList
       groups.zipWithIndex.foreach{case (group, i) => 
         val rdPayload = group.mkString(src"List[$tp](",",",")") + suffix

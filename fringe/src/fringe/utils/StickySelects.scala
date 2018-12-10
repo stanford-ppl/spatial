@@ -11,10 +11,14 @@ class StickySelects(n: Int) extends Module {
 
   if (n == 1) io.outs(0) := io.ins(0)
   else {
-	  val regs = Array.tabulate(n){i => RegInit(false.B)}
-	  regs.zipWithIndex.foreach{case(r,i) => 
-	  	r := Mux(io.ins(i), true.B, Mux(io.outs.patch(i,Nil,1).reduce{_||_}, false.B, r))
-	  }
-	  io.outs.zipWithIndex.foreach{case(o,i) => o := Mux(io.ins(i), true.B, regs(i))}
+	  val outs = Array.tabulate(n){i => 
+      val r = RegInit(false.B)
+      val elseActive = io.ins.patch(i,Nil,1).reduce{_||_}
+      val meActive = io.ins(i)
+      val next = Mux(elseActive, false.B, meActive | r)
+      r := next
+      next
+    }
+	  io.outs.zip(outs).foreach{case(o,i) => o := i}
   }
 }

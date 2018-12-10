@@ -17,6 +17,22 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+class SpatialArgumentParser(ArgumentParser):
+  
+  def print_help(self, file=None):
+    print("""
+Spatial
+Usage: spatial <app> [options]
+
+Help
+  -h, --help              Prints this message
+  --H, --HELP, --halp     Prints usage text for Spatial, will take a few seconds. NOTE:
+                             You MUST include the app name in addition to this flag
+                             (ex. `spatial <app> --help`)
+      """)
+    return 0
+  #sys.exit(0)
+
 def getSrcCode(app, args):
   outdir = "gen/%s" % app 
   for arg in args:
@@ -106,7 +122,7 @@ def getFullyQualifiedClassName(app, errorIfNone):
 
 
 def main():
-  parser = ArgumentParser(add_help=False)
+  parser = SpatialArgumentParser()
   parser.add_argument('app', type=str, help='name of application to run')
 
   sbt_project = 'apps/'
@@ -126,8 +142,12 @@ def main():
     java_cmd = ciArgs + "; sbt -Dci=true \"; testOnly " + name + "\""
   else:
     java_cmd = "sbt \"" + sbt_project + "runMain " + name + " --name " + opts.app + " " + ' '.join(args) + "\""
-
+ 
+  print("")
+  print("**** SBT Command: ****")
   print(java_cmd)
+  print("**********************")
+  print("")
 
   ecode = os.system(java_cmd)
 

@@ -48,7 +48,8 @@ object SparseTransfer {
     A:     Bits[A],
     Local: Type[Local[A]]
   ): Void = {
-    val addrs = dram.addrs()
+    val addrs = dram.addrs[_32]()
+    val origin = dram.sparseOrigins[_32]().values.head
     val p = addrs.sparsePars().values.head
     val requestLength = dram.sparseLens().values.head
 
@@ -57,8 +58,9 @@ object SparseTransfer {
     // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
     val iters: Reg[I32] = Reg[I32]
     Pipe{
-      iters := mux(requestLength < 16.to[I32], 16.to[I32],
-               mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) ))
+      iters := mux(requestLength == 0.to[I32], 0.to[I32], 
+               mux(requestLength < 16.to[I32], 16.to[I32],
+               mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) )))
     }
 
     Stream {
@@ -79,7 +81,7 @@ object SparseTransfer {
         Foreach(iters par p){i =>
           val lastAddr = Reg[I64]
           val cond = i < requestLength
-          val addr: I64 = mux(cond, (addrs.__read(Seq(i),Set(cond)) * bytesPerWord).to[I64] + dram.address, dram.address)
+          val addr: I64 = mux(cond, ((addrs.__read(Seq(i),Set(cond)) + origin) * bytesPerWord).to[I64] + dram.address, dram.address)
           if (cond) lastAddr := addr
           val addr_bytes = mux(cond, addr, lastAddr.value)
           addrBus := (addr_bytes, dram.isAlloc)
@@ -104,7 +106,7 @@ object SparseTransfer {
 
           val pad_addr = max(requestLength - 1, 0.to[I32])
           val cond     = i < requestLength
-          val curAddr: I64  = (addrs.__read(Seq(i), Set(cond)) * bytesPerWord).to[I64] + dram.address
+          val curAddr: I64  = ((origin + addrs.__read(Seq(i), Set(cond))) * bytesPerWord).to[I64] + dram.address
           val data     = local.__read(Seq(i), Set(cond))
           if (cond) lastAddr := curAddr
           if (cond) lastData := data

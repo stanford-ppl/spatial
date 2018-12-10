@@ -812,13 +812,11 @@ import spatial.dsl._
             val bias_sram = SRAM[T](INPUT_COLS_MAX) // / STRIDE?
             val accum_line = SRAM[T](INPUT_COLS_MAX).buffer
             if (ic == 0) bias_sram load BIAS_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
-            // Parallel{
-              Pipe{accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)}
-              Pipe{
-                if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
-                else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
-              }
-            // }
+            Parallel{
+              accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
+              if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
+              else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
+            }
             Foreach(INPUT_COLS by STRIDE par PX){ col =>
               val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
               val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)

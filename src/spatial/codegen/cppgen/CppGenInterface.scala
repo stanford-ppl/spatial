@@ -3,6 +3,7 @@ package spatial.codegen.cppgen
 import argon._
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.control._
 import spatial.metadata.memory._
 
 
@@ -123,6 +124,19 @@ trait CppGenInterface extends CppGenCommon {
       argIOs.zipWithIndex.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.length+drams.length}")}
       emit("\n// ArgOuts")
       argOuts.zipWithIndex.foreach{case (a, id) => emit(src"#define ${argHandle(a)}_arg ${id+argIns.length+drams.length+argIOs.length}")}
+      emit("\n// Instrumentation Counters")
+      instrumentCounters.foreach{case (s,_) => 
+        val base = instrumentCounterIndex(s)
+        emit(src"#define ${quote(s).toUpperCase}_cycles_arg ${argIns.length+drams.length+argIOs.length+argOuts.length + base}")
+        emit(src"#define ${quote(s).toUpperCase}_iters_arg ${argIns.length+drams.length+argIOs.length+argOuts.length + base + 1}")
+        if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
+          emit(src"#define ${quote(s).toUpperCase}_stalled_arg ${argIns.length+drams.length+argIOs.length+argOuts.length + base + 2}")
+          emit(src"#define ${quote(s).toUpperCase}_idle_arg ${argIns.length+drams.length+argIOs.length+argOuts.length + base + 3}")
+        }
+      }
+      earlyExits.foreach{x => 
+        emit(src"#define ${quote(x).toUpperCase}_exit_arg ${argOuts.toList.length + argIOs.toList.length + instrumentCounterArgs()}")
+      }
 
     }
     super.emitFooter()

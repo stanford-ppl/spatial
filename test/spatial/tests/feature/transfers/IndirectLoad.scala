@@ -20,7 +20,7 @@ import spatial.dsl._
         val start = id_sram(i)
         val end = id_sram(i+1)
         Parallel{
-          Pipe{data_sram load data_dram(start::end)}
+          data_sram load data_dram(start::end)
         }
         result_dram store data_sram
       }

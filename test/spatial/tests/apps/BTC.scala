@@ -171,14 +171,14 @@ import spatial.dsl._
         }
 
         DBL_INT_ADD(datalen.value.to[ULong] * 8.to[ULong])
-        Pipe{data(63) = (bitlen(0)).to[UInt8]}
-        Pipe{data(62) = (bitlen(0) >> 8).to[UInt8]}
-        Pipe{data(61) = (bitlen(0) >> 16).to[UInt8]}
-        Pipe{data(60) = (bitlen(0) >> 24).to[UInt8]}
-        Pipe{data(59) = (bitlen(1)).to[UInt8]}
-        Pipe{data(58) = (bitlen(1) >> 8).to[UInt8]}
-        Pipe{data(57) = (bitlen(1) >> 16).to[UInt8]}
-        Pipe{data(56) = (bitlen(1) >> 24).to[UInt8]}
+        Pipe{data(63) = bitlen(0).bits(7::0).as[UInt8]}
+        Pipe{data(62) = bitlen(0).bits(15::8).as[UInt8]}
+        Pipe{data(61) = bitlen(0).bits(23::16).as[UInt8]}
+        Pipe{data(60) = bitlen(0).bits(31::24).as[UInt8]}
+        Pipe{data(59) = bitlen(1).bits(7::0).as[UInt8]}
+        Pipe{data(58) = bitlen(1).bits(15::8).as[UInt8]}
+        Pipe{data(57) = bitlen(1).bits(23::16).as[UInt8]}
+        Pipe{data(56) = bitlen(1).bits(31::24).as[UInt8]}
         sha_transform()
 
         // Foreach(8 by 1){i => println(" " + state(i))}

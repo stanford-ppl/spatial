@@ -171,26 +171,43 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val cchains = List[CChainObject]()")
         emit("val break = Wire(Bool())")
         if (spatialConfig.enableInstrumentation) {
-          emit(src"""val cycles = Module(new InstrumentationCounter())""")
-          emit(src"""val iters = Module(new InstrumentationCounter())""")          
+          emit("""val cycles = Module(new InstrumentationCounter())""")
+          emit("""val stalled = Module(new InstrumentationCounter())""")
+          emit("""val idle = Module(new InstrumentationCounter())""")
+          emit("""val iters = Module(new InstrumentationCounter())""")          
         }
         emit("")
-        open("def configure(): Unit = {")
+        if (spatialConfig.enableInstrumentation) {
+          open("def configure_instrumentation(): Unit = {")
+            emit("cycles.io.enable := baseEn")
+            emit("iters.io.enable := risingEdge(done)")
+          close("}")
+        }
+        open("def configure(n: String): Unit = {")
           emit("sm.io.flow := flow")
           emit("sm.io.rst := resetMe")
           emit("done := sm.io.done")
           emit("break := sm.io.break")
           emit("sm.io.enable := en")
           emit("resetChildren := sm.io.ctrRst")
-          if (spatialConfig.enableInstrumentation) {
-            emit(src"cycles.io.enable := en")
-            emit(src"iters.io.enable := risingEdge(done)")
-          }
+          emit("""en.suggestName(n + "_en")""")
+          emit("""done.suggestName(n + "_done")""")
+          emit("""baseEn.suggestName(n + "_baseEn")""")
+          emit("""iiDone.suggestName(n + "_iiDone")""")
+          emit("""flow.suggestName(n + "_flow")""")
+          emit("""mask.suggestName(n + "_mask")""")
+          emit("""resetMe.suggestName(n + "_resetMe")""")
+          emit("""resetChildren.suggestName(n + "_resetChildren")""")
+          emit("""datapathEn.suggestName(n + "_datapathEn")""")
+          emit("""doneCondition.suggestName(n + "_doneCondition")""")
           emit("children.zipWithIndex.foreach{case (c, i) => c.baseEn := sm.io.enableOut(i).D(1) && ~c.done.D(1); c.sm.io.parentAck := sm.io.childAck(i)}")
           emit("parent.foreach{case(p, idx) => p.sm.io.doneIn(idx) := done; p.sm.io.maskIn(idx) := mask}")
           emit("if (sm.p.sched == Streaming && cchains.nonEmpty) cchains.zipWithIndex.foreach{case (cc, i) => sm.io.ctrCopyDone(i) := cc.done; cc.reset := sm.io.ctrRst.D(1)}")
           emit("else if (sm.p.sched == Streaming) children.zipWithIndex.foreach{case (c, i) => sm.io.ctrCopyDone(i) := c.done}")
           emit("if (parent.exists{pa => pa._1.sm.p.sched == Streaming && pa._1.cchains.size > 0}) {parent.get._1.cchains(parent.get._2).en := done}")
+          if (spatialConfig.enableInstrumentation) {
+            emit("configure_instrumentation()")
+          }
         close("}")
 
       close("}")

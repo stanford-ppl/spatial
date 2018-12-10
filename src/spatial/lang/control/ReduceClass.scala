@@ -73,23 +73,23 @@ protected class ReduceConstant[A](a: A, isFold: Boolean, opt: CtrlOpt, stopWhen:
   }
 }
 
-protected class ReduceClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) extends ReduceAccum(None, None, None, opt, stopWhen) {
+protected class ReduceClass(opt: CtrlOpt) extends ReduceAccum(None, None, None, opt, opt.stopWhen) {
   /** Reduction with implicit accumulator */
-  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt, stopWhen)
+  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt, opt.stopWhen)
   def apply[A](zero: Sym[A]): ReduceLike[A] = zero match {
-    case Op(RegRead(reg)) => new ReduceAccum(Some(reg),None,None,opt, stopWhen) // TODO[4]: Hack to get explicit accum
-    case _ => new ReduceConstant[A](zero.unbox, isFold = false, opt, stopWhen)
+    case Op(RegRead(reg)) => new ReduceAccum(Some(reg),None,None,opt, opt.stopWhen) // TODO[4]: Hack to get explicit accum
+    case _ => new ReduceConstant[A](zero.unbox, isFold = false, opt, opt.stopWhen)
   }
 
   /** Reduction with explicit accumulator */
-  def apply[T](accum: Reg[T]) = new ReduceAccum(Some(accum), None, None, opt, stopWhen)
+  def apply[T](accum: Reg[T]) = new ReduceAccum(Some(accum), None, None, opt, opt.stopWhen)
 }
 
-protected class FoldClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) {
+protected class FoldClass(opt: CtrlOpt) {
   /** Fold with implicit accumulator */
-  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = true, opt, stopWhen)
-  def apply[A](zero: Sym[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt, stopWhen)
+  def apply[A](zero: Lift[A]) = new ReduceConstant[A](zero.unbox, isFold = true, opt, opt.stopWhen)
+  def apply[A](zero: Sym[A]) = new ReduceConstant[A](zero.unbox, isFold = false, opt, opt.stopWhen)
 
   /** Fold with explicit accumulator */
-  def apply[A](accum: Reg[A]) = new MemFoldClass(opt, stopWhen).apply(accum)
+  def apply[A](accum: Reg[A]) = new MemFoldClass(opt).apply(accum)
 }

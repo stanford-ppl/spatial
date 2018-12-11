@@ -136,22 +136,21 @@ lazy val spatial = (project in file(".")).settings(
 lazy val apps = project.settings(common).dependsOn(spatial)
 
 /** Testing Projects **/
-lazy val appsTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/apps/"),
-).dependsOn(spatial)
-lazy val compilerTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/compiler/"),
-).dependsOn(spatial)
-lazy val RosettaTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/Rosetta/"),
-).dependsOn(spatial)
-lazy val syntaxTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax/"),
-).dependsOn(spatial)
-lazy val featureTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),
-).dependsOn(spatial)
-
+/*lazy val appsTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/apps/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val compilerTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/compiler/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val RosettaTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/Rosetta/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val syntaxTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val featureTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),*/
+/*).dependsOn(spatial)*/
 /*lazy val test = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,*/
 /*featureTest)*/
 lazy val test = project.settings(

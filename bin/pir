@@ -1,0 +1,8 @@
+#!/bin/bash
+
+app=$1
+cd pir
+sbt "; publishAll"
+cd ../gen/PIR/$app
+args=${@:2}
+sbt "; runMain AccelMain $args"

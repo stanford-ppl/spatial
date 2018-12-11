@@ -1,0 +1,6 @@
+[submodule "pir"]
+	path = pir
+  url = git@github.com:stanford-ppl/pir.git 
+[submodule "tungsten"]
+	path = tungsten
+	url = git@github.com:acrucker/tungsten.git

@@ -11,7 +11,7 @@ trait PIRGenFIFO extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FIFONew(size)    => 
-      stateMem(lhs, "FIFO", None)
+      stateMem(lhs, "FIFO()")
     //case FIFOIsEmpty(fifo,_) => 
     //case FIFOIsFull(fifo,_)  => 
 

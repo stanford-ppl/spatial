@@ -46,7 +46,6 @@ val base = Seq(
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,
   scalaSource in Compile := baseDirectory(_/"src").value,
-  //scalaSource in Test := baseDirectory(_/"test").value,
 
   /** Testing **/
   scalacOptions in Test ++= Seq("-Yrangepos"),
@@ -132,7 +131,7 @@ lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 
 lazy val spatial = (project in file(".")).settings(
-  common ++ Seq(scalaSource in Test := baseDirectory(_/"test").value)
+  common// ++ Seq(scalaSource in Test := baseDirectory(_/"test").value)
 ).dependsOn(forge, emul, argon, models, poly)
 lazy val apps = project.settings(common).dependsOn(spatial)
 
@@ -149,15 +148,15 @@ lazy val RosettaTest = project.settings(
 lazy val syntaxTest = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax/"),
 ).dependsOn(spatial)
-lazy val denseTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/dense/"),
-).dependsOn(spatial)
 lazy val featureTest = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),
-).aggregate(denseTest).dependsOn(spatial)
+).dependsOn(spatial)
 
-lazy val tests = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,
-featureTest)
+/*lazy val test = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,*/
+/*featureTest)*/
+lazy val test = project.settings(
+  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
+).dependsOn(spatial)
 
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt

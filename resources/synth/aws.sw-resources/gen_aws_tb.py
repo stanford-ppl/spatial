@@ -37,7 +37,7 @@ for line in src:
   elif '>>' in line and 'vector' in line:
     dst.write(line.replace('>>', '> >'))
   elif ' string x' in line:
-    dst.write(line.replace('string', 'std::string'))
+    dst.write(line.replace(' string', ' std::string'))
   elif 'vector<string>' in line:
     dst.write(line.replace('<string>', '<std::string>'))
   elif ' string(argv' in line:

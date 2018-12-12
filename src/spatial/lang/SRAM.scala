@@ -76,6 +76,8 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def flat: C[A] = { this.isFlatBank = true; me }
   /** Bank memory by duplication only */
   def nobank: C[A] = { this.isNoBank = true; me }
+  /** Bank memory and explicitly disable option to bank-by-duplication */
+  def noduplicate: C[A] = { this.isNoDuplicate = true; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

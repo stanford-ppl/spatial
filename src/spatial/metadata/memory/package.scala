@@ -47,6 +47,9 @@ package object memory {
     def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
     def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
 
+    def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
+    def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
+
     def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
     def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
 

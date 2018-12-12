@@ -319,6 +319,15 @@ case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.
   */
 case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
 
+/** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
+  * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
+  *
+  * Getter:  sym.isNoDuplicate
+  * Setter:  sym.isNoDuplicate = (true | false)
+  * Default: false
+  */
+case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
+
 /** Flag set by the user to disable banking,
   * Used in cases where it could be tricky or impossible to find any banking scheme scheme and
   * the user does not want the compiler to waste time trying

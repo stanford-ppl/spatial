@@ -232,7 +232,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
       //spatialConfig.enableBroadcast = false
-      spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
+      spatialConfig.noInnerLoopUnroll = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       //spatialConfig.enableDot = true

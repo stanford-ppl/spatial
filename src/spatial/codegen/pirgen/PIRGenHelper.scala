@@ -3,6 +3,7 @@ package spatial.codegen.pirgen
 import argon._
 import argon.codegen.Codegen
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.lang._
 import spatial.util.spatialConfig
 
@@ -15,44 +16,68 @@ trait PIRGenHelper extends PIRFormatGen {
     vec.head
   }
 
-  def stateMem(lhs:Sym[_], tp:String, inits:Option[Seq[Sym[_]]]) = {
-    val fields = mutable.ListBuffer[String]()
-    fields += src"tp=$tp"
-    fields += src"inits=$inits"
-    fields += src"depth=${lhs.instance.depth}" 
+  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Seq[Sym[_]]]=None, tp:Option[String]=None) = {
     val padding = lhs.getPadding.getOrElse {
       lhs.constDims.map { _ => 0 }
     }
-    fields += src"dims=${lhs.constDims.zip(padding).map { case (d,p) => d + p }}" 
-    fields += src"banks=${lhs.instance.banking.map { b => b.nBanks}}" 
-    stateStruct(lhs, lhs.asMem.A)(name => src"Mem(${fields.mkString(",")})")
+    val constInits = inits.map { _.map { _.rhs.getValue.get } }.flatMap { inits =>
+      if (inits.size > 16) None else Some(inits) //TODO: hack. prevent generating inits that are too large
+    }
+    stateStruct(lhs, lhs.asMem.A, tp=tp)(name => 
+      src"$rhs" + 
+      constInits.ms(constInits => src".inits($constInits)") + 
+      src".depth(${lhs.instance.depth})" +
+      src".dims(${lhs.constDims.zip(padding).map { case (d,p) => d + p }})" +
+      src".banks(${lhs.instance.banking.map { b => b.nBanks}})" 
+    )
   }
 
-  def stateStruct[C[_]](lhs:Sym[_], A:Type[_], tp:Option[String]=None)(rhs:Option[String] => Any):Unit = {
+  def stateStruct[C[_]](lhs:Sym[_], A:Type[_], tp:Option[String]=None)(rhsFunc:Option[String] => Any):Unit = {
     A match {
       case a:Struct[_] =>
         a.fields.foreach { case (name, _) =>
-          state(Lhs(lhs, Some(name)), tp=tp)(rhs(Some(name)))
+          stateOrAlias(Lhs(lhs, Some(name)), tp)(rhsFunc(Some(name)))
         }
-      case a => state(lhs)(rhs(None))
+      case a => 
+        stateOrAlias(lhs, tp)(rhsFunc(None))
     }
   }
 
   def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
+    val bufferPort = lhs.port.bufferPort
+    val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ name => 
-      src"ReadMem(${Lhs(mem,name)}, bank=${bank.map(assertOne)}, offset=${ofs.map(assertOne)}, ens=${assertOne(ens)})"
+      (bank, ofs) match {
+        case (Some(bank), Some(ofs)) =>
+          src"BankedRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).port($bufferPort).muxPort($muxPort)"
+        case _ => 
+          src"MemRead().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).port($bufferPort).muxPort($muxPort)"
+      }
     }
   }
 
   def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
+    val bufferPort = lhs.port.bufferPort
+    val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ name => 
-      src"WriteMem(${Lhs(mem,name)}, bank=${bank.map(assertOne)}, offset=${ofs.map(assertOne)}, data=${Lhs(assertOne(data), name)}, ens=${assertOne(ens)})"
+      (bank, ofs) match {
+        case (Some(bank), Some(ofs)) =>
+          src"BankedWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).bank(${assertOne(bank)}).offset(${assertOne(ofs)}).data(${Lhs(assertOne(data), name)}).port($bufferPort).muxPort($muxPort)"
+        case _ => 
+          src"MemWrite().setMem(${Lhs(mem,name)}).en(${assertOne(ens)}).data(${Lhs(assertOne(data), name)}).port($bufferPort).muxPort($muxPort)"
+      }
     }
   }
 
-  def genOp(lhs:Sym[_], rhs:Op[_]) = {
-    val op = rhs.getClass.getSimpleName
-    state(lhs)(src"OpDef(op=$op, inputs=${rhs.productIterator.toList})")
+  def genOp(lhs:Lhs, op:Option[String]=None, inputs:Option[Seq[Any]]=None) = {
+    val rhs = lhs.sym.op.get
+    val opStr = op.getOrElse(rhs.getClass.getSimpleName)
+    val ins = inputs.getOrElse(rhs.productIterator.toList)
+    state(lhs)(src"""OpDef(op=$opStr).input($ins)""")
+  }
+
+  implicit class OptionHelper[T](opt:Option[T]) {
+    def ms(func: T => String) = opt.fold("")(func)
   }
 
 }

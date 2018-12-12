@@ -1,6 +1,7 @@
 package spatial.tests.feature.banking
 
 import spatial.dsl._
+import argon.Block
 
 @spatial class Bank4DHard extends SpatialTest {
   override def compileArgs: Args = super.compileArgs and "--forceBanking"
@@ -31,6 +32,49 @@ import spatial.dsl._
   }
 }
 
+@spatial class BroadcastRandom extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
+  def main(args: Array[String]): Unit = {
+    val dram = DRAM[Int](64)
+    val data = Array.tabulate(64){i => i % 5}
+    setMem(dram,data)
+    val out = DRAM[Int](3,3,64)
+    Accel {
+      val x = SRAM[Int](64) // Assert there is only 1 copy of this
+      x load dram
+      val y = SRAM[Int](3,3,64)
+      val z = SRAM[Int](3,3)
+      Foreach(3 by 1, 3 by 1){(i,j) => z(i,j) = i+j}
+
+      Foreach(10 by 1){i => 
+        Foreach(3 by 1, 3 by 1, 64 by 1 par 16){ (j,k,l) => 
+          val cond1 = i % 2 == 0
+          val cond2 = i % 3 == 0
+          y(j,k,l) = x(mux(cond1, j, j*2) + mux(cond2, k, k*2)) + z(j,k)
+        }
+      }
+
+      out store y
+    }
+
+    printTensor3(getTensor3(out), "Got:")
+    val gold = (0::3, 0::3, 0::64){(j,k,l) => 
+      val a = j*2
+      val b = k
+      data(a + b) + (j + k)
+    }
+    printTensor3(gold, "Gold:")
+    assert(getTensor3(out) == gold)
+  }
+
+  override def checkIR(block: Block[_]): Result = {
+    // the IR should have only 3 SRAMNew nodes
+    super.checkIR(block)
+  }
+
+
+}
 
 @spatial class BankLines extends SpatialTest {
 

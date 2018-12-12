@@ -28,7 +28,6 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
     else {
       val groupSize = 1 max (payload.length / (totalPayload.length / zipThreshold)).toInt
-      Console.println(s"chunking ${payload.length} / (${totalPayload.length} / $zipThreshold) = $groupSize")
       val groups = payload.grouped(groupSize).toList
       groups.zipWithIndex.foreach{case (group, i) => 
         val rdPayload = group.mkString(src"List[$tp](",",",")") + suffix

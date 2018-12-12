@@ -83,39 +83,34 @@ trait SpatialTest extends Spatial with DSLTest { self =>
     override val makeTimeout: Long = 32400
   }
 
-  abstract class PIRBackEnd (name: String, paramField:String) extends Backend(
-    name, 
-    args = s"--pir --dot",
-    make = "",
-    run  = "" 
-  ) {
+  abstract class PIRBackEnd (
+    name: String, 
+    paramField:String=""
+  )(
+    args:String=
+      s"--pir --dot " + 
+      s"--load-param=${files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField")} " +
+      s"--save-param=${files.buildPath(spatialConfig.genDir, "pir", "saved.param")} ",
+    make:String = "make",
+    run:String = "bash run.sh"
+  ) extends Backend(name, args, make, run) {
     override def shouldRun: Boolean = checkFlag(s"test.${name}")
-    override def runBackend(): Unit = {
-      s"${name}" should s"compile for backend PIR" in {
-        loadParams(files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField"))
-        val result = compile().foldLeft[Result](Unknown){ case (result, generate) =>
-          result orElse generate()
-        }
-        saveParams(files.buildPath(spatialConfig.genDir, "pir", "saved.param"))
-        result orElse Pass
-      }
-    }
   }
 
   object PIRNoPar extends PIRBackEnd (
     name="PIRNoPar", 
     paramField="nopar"
-  )
+  )()
 
   object PIRSmallPar extends PIRBackEnd (
     name="PIRSmallPar", 
     paramField="smallpar"
-  )
+  )()
 
   object PIRBigPar extends PIRBackEnd (
     name="PIRBigPar", 
     paramField="bigpar"
-  )
+  )()
 
   class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)
   object RequireErrors {

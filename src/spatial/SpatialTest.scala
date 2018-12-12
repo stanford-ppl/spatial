@@ -87,10 +87,9 @@ trait SpatialTest extends Spatial with DSLTest { self =>
     name: String, 
     paramField:String=""
   )(
-    args:String=
-      s"--pir --dot " + 
-      s"--load-param=${files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField")} " +
-      s"--save-param=${files.buildPath(spatialConfig.genDir, "pir", "saved.param")} ",
+    args:String= s"--pir --dot ",// + 
+      //s"--load-param=${files.buildPath(DATA, "params", "pir", s"${self.name}.param:$paramField")} " +
+      //s"--save-param=${files.buildPath(spatialConfig.genDir, "pir", "saved.param")} ",
     make:String = "make",
     run:String = "bash run.sh"
   ) extends Backend(name, args, make, run) {

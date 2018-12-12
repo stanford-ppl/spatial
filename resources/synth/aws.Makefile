@@ -73,6 +73,7 @@ aws-sim-hw:
 	# Add all the static software files
 	cp -f cpp/TopHost.cpp $(AWS_HOME)/hdk/cl/examples/${app_name}/software/src/
 	cp -f cpp/*.h $(AWS_HOME)/hdk/cl/examples/${app_name}/software/include/
+	cp -f cpp/*.hpp $(AWS_HOME)/hdk/cl/examples/${app_name}/software/include/
 	cp -f aws.sw-resources/headers/* $(AWS_HOME)/hdk/cl/examples/${app_name}/software/include/
 	cp -rf cpp/datastructures $(AWS_HOME)/hdk/cl/examples/${app_name}/software/src/
 	# Add all the simulation Makefiles

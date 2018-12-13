@@ -894,6 +894,13 @@ always_ff @(posedge SCALAR_done[0]) begin
   $display("          # cycles done  = %d", performance_counter_2);
 end
 
+// // Status prints
+// always_ff @(posedge clk) begin
+//   if (performance_counter % 100 == 0) begin
+//     $display("[%t] %d cycles", $realtime, performance_counter);
+//   end
+// end
+
 //------------------------------------
 // END Instantiate Top
 //------------------------------------

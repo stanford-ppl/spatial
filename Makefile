@@ -38,7 +38,6 @@ install:
 pir:
 	git submodule update --init --recursive
 	bin/update_resources.sh
-	sbt "; project argon; publishLocal; project forge; publishLocal; project spatial; publishLocal; project models; publishLocal; project poly; publishLocal; project utils; publishLocal"
 	cd pir && make install
 
 ###-----------------------------------###

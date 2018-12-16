@@ -11,6 +11,8 @@ endif
 all: hw sw 
 
 help:
+	@echo "------- INFO -------"
+	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make           : ZCU SW + HW build"
 	@echo "make hw        : Build Chisel for ZCU"
@@ -30,6 +32,7 @@ hw:
 	sed -i "s/EPRINTF(/fprintf(stderr,/g" zcu.sw-resources/FringeContextZCU.h # Not sure why eprintf randomly crashes zcu
 
 	sbt "runMain top.Instantiator --verilog --testArgs zcu"
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZCU_V_DIR}/Top.v; fi
 	mv ${BIGIP_SCRIPT} ${ZCU_V_DIR}/
 	cat zcu.hw-resources/SRAMVerilogAWS.v >> ${ZCU_V_DIR}/Top.v
 	cp zcu.hw-resources/build/* ${ZCU_V_DIR}

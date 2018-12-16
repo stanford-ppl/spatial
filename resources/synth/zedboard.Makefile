@@ -11,6 +11,8 @@ endif
 all: hw sw 
 
 help:
+	@echo "------- INFO -------"
+	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make           : ZedBoard SW + HW build"
 	@echo "make hw        : Build Chisel for ZedBoard"
@@ -28,6 +30,7 @@ sw:
 hw:
 	echo "$$(date +%s)" > start.log
 	sbt "runMain top.Instantiator --verilog --testArgs zedboard"
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zedboard.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/Top.v
 	cp zedboard.hw-resources/build/* ${ZYNQ_V_DIR}

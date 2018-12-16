@@ -62,20 +62,32 @@ package object utils {
     out
   }
 
+  def fatMux(muxType: String, sels: Seq[Bool], payloads: Seq[UInt]*): Seq[UInt] = {
+    val numFields = payloads.size
+    val numOptions = payloads.head.size
+    val numSelects = sels.size
+    val fieldWidths = payloads.map(_.head.getWidth)
+    val fatPayloads = Seq.tabulate(numOptions){i => 
+      chisel3.util.Cat(payloads.map(_(i)))
+    }
+    val fatResult = if (numOptions == 2 && numSelects == 1) Mux(sels.head, fatPayloads(0), fatPayloads(1))
+                    else if (muxType == "PriorityMux")      chisel3.util.PriorityMux(sels, fatPayloads)
+                    else                                    chisel3.util.Mux1H(sels, fatPayloads)
+    fieldWidths.zipWithIndex.map{case (w, i) => 
+      val base = fieldWidths.drop(i).sum - w
+      fatResult(base + w-1, base)
+    }
+  }
+
   def getRetimed[T<:Data](sig: T, delay: Int, en: Bool = true.B, init: Long = 0): T = {
     if (delay == 0) {
       sig
     }
     else {
-      if (globals.regression_testing == "1") { // Major hack until someone helps me include the sv file in Driver (https://groups.google.com/forum/#!topic/chisel-users/_wawG_guQgE)
-        chisel3.util.ShiftRegister(sig, delay, en)
-      }
-      else {
-        val sr = Module(new RetimeWrapper(sig.getWidth, delay, init))
-        sr.io.in := sig.asUInt
-        sr.io.flow := en
-        sr.io.out.asTypeOf(sig)
-      }
+      val sr = Module(new RetimeWrapper(sig.getWidth, delay))
+      sr.io.in := sig.asUInt
+      sr.io.flow := en
+      sr.io.out.asTypeOf(sig)
     }
   }
 

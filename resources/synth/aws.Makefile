@@ -12,6 +12,8 @@ endif
 all: help
 
 help:
+	@echo "------- INFO -------"
+	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make aws-sim     : AWS simulation SW + HW build"
 	@echo "make aws-sim-hw  : Build Chisel for AWS simulation"
@@ -57,6 +59,7 @@ aws-sim-hw:
 	rm -rf ${AWS_V_SIM_DIR}
 	# First use chisel to create the verilog
 	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${AWS_V_DIR}/Top.v; fi
 	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/Top.v
 	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/Top.v
 	# Make a copy of the template directory

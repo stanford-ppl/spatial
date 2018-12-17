@@ -30,10 +30,10 @@ sw:
 hw:
 	echo "$$(date +%s)" > start.log
 	sbt "runMain top.Instantiator --verilog --testArgs zynq"
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zynq.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/Top.v
 	cp zynq.hw-resources/build/* ${ZYNQ_V_DIR}
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
 	mv ${ZYNQ_V_DIR}/fsbl.elf._ ${ZYNQ_V_DIR}/fsbl.elf
 	mv ${ZYNQ_V_DIR}/u-boot.elf._ ${ZYNQ_V_DIR}/u-boot.elf
 	make -C ${ZYNQ_V_DIR}

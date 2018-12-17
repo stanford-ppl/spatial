@@ -30,9 +30,9 @@ sw:
 hw:
 	echo "$$(date +%s)" > start.log
 	sbt "runMain top.Instantiator --verilog --testArgs zedboard"
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zedboard.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/Top.v
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
 	cp zedboard.hw-resources/build/* ${ZYNQ_V_DIR}
 	mv ${ZYNQ_V_DIR}/fsbl.elf._ ${ZYNQ_V_DIR}/fsbl.elf
 	mv ${ZYNQ_V_DIR}/u-boot.elf._ ${ZYNQ_V_DIR}/u-boot.elf

@@ -32,9 +32,9 @@ hw:
 	sed -i "s/EPRINTF(/fprintf(stderr,/g" zcu.sw-resources/FringeContextZCU.h # Not sure why eprintf randomly crashes zcu
 
 	sbt "runMain top.Instantiator --verilog --testArgs zcu"
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZCU_V_DIR}/Top.v; fi
 	mv ${BIGIP_SCRIPT} ${ZCU_V_DIR}/
 	cat zcu.hw-resources/SRAMVerilogAWS.v >> ${ZCU_V_DIR}/Top.v
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZCU_V_DIR}/Top.v; fi
 	cp zcu.hw-resources/build/* ${ZCU_V_DIR}
 	mv ${ZCU_V_DIR}/fsbl.elf._ ${ZCU_V_DIR}/fsbl.elf
 	mv ${ZCU_V_DIR}/u-boot.elf._ ${ZCU_V_DIR}/u-boot.elf

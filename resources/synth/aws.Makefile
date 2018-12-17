@@ -59,9 +59,9 @@ aws-sim-hw:
 	rm -rf ${AWS_V_SIM_DIR}
 	# First use chisel to create the verilog
 	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${AWS_V_DIR}/Top.v; fi
 	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/Top.v
 	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/Top.v
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${AWS_V_DIR}/Top.v; fi
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}

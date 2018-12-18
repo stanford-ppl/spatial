@@ -79,6 +79,15 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
   }
 
+  def static(iter: Num[_], y: scala.Int): Boolean = {
+    if (iter.counter.ctr.isStaticStartAndStep) {
+      val Final(step) = iter.counter.ctr.step
+      val par = iter.counter.ctr.ctrPar.toInt
+      val lane = iter.counter.lane
+      par*step >= y      
+    } else false
+  }
+
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
@@ -113,24 +122,36 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
 
     case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => 
-      if (x.getCounter.isDefined && x.counter.ctr.isStatic) {
-        val Final(step) = x.counter.ctr.step
-        val par = x.counter.ctr.ctrPar.toInt
-        val lane = x.counter.lane
-        if (par >= y) {
+      x match {
+        // Assume chained arithmetic will have been constant propped by now
+        case Op(FixAdd(F(xx), Final(yy))) if (xx.getCounter.isDefined && static(xx, y)) => 
+          val Final(step) = xx.counter.ctr.step
+          val par = xx.counter.ctr.ctrPar.toInt
+          val lane = xx.counter.lane
+          val r = lane * step + yy
+          val posMod = ((r % y) + y) % y
+          dbgs(s"Replace $xx + $yy % $y with ${posMod}")
+          transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
+        // Assume chained arithmetic will have been constant propped by now
+        case Op(FixSub(F(xx), Final(yy))) if (xx.getCounter.isDefined && static(xx, y)) => 
+          val Final(step) = xx.counter.ctr.step
+          val par = xx.counter.ctr.ctrPar.toInt
+          val lane = xx.counter.lane
+          val r = lane * step - yy
+          val posMod = ((r % y) + y) % y
+          dbgs(s"Replace $xx - $yy % $y with ${posMod}")
+          transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
+        case _ if (x.getCounter.isDefined && static(x, y)) =>
+          val Final(step) = x.counter.ctr.step
+          val par = x.counter.ctr.ctrPar.toInt
+          val lane = x.counter.lane
           dbgs(s"Replace $x % $y with ${lane * step}")
           transferDataToAllNew(lhs){ constMod(x, lane * step).asInstanceOf[Sym[A]] }
-        }
-        else {
+        case _ => 
           val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
+          dbgs(s"Cannot statically determine $x % $y")
           m.modulus = y
-          m
-        }
-      }
-      else {
-        val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-        m.modulus = y
-        m        
+          m        
       }
 
     // 1 / sqrt(b)  ==> invsqrt(b)

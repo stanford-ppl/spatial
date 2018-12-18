@@ -164,8 +164,8 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     // Multiple shitfies
     case FixSLA(F(Op(FixSLA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
       fixShiftCombine(x, (y1+y2).toInt, "sla").asInstanceOf[Sym[A]]
-    case FixSLA(F(Op(FixSRA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
-      fixShiftCombine(x, (-y1+y2).toInt, "sla").asInstanceOf[Sym[A]]
+    case FixSLA(F(Op(FixSRA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) =>   // For (x >> sr) << sl, ensure that the bits killed by >> stay killed
+      super.transform(lhs,rhs)
     case FixSRA(F(Op(FixSRA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
       fixShiftCombine(x, (y1+y2).toInt, "sra").asInstanceOf[Sym[A]]
     case FixSRA(F(Op(FixSLA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 

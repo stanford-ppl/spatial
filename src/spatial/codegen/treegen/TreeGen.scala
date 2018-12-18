@@ -26,8 +26,8 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
 
   val memColors = Seq("cce6ff", "ccb6ff", "99ddff", "99ff99", "e6b3cc", "ccffcc", "e0e0d1", "ffcccc",
                       "d1e0e0", "e699ff", "fff7e6", "f2ffcc", "d9b3ff", "cce0ff", "f2e6ff", "ecc6d9",
-                      "eefb21", "c5989e", "3add77", "128678", "ee6c56", "17eaf7", "204ac2", "22f5e2", 
-                      "9e65ec", "50d246", "e0b77a", "14fb82", "f4268f", "efc11b", "6223f8", "aed919") // List of colors I think looks nice
+                      "eefb21", "c5989e", "3add77", "128678", "ee6c56", "17eaf7", "22f5e2", 
+                      "50d246", "e0b77a", "14fb82", "f4268f", "efc11b", "6223f8", "aed919") // List of colors I think looks nice
   private val colorMap = HashMap[Sym[_], String]()
   private val nonBufMems = scala.collection.mutable.Set[Sym[_]]()
 
@@ -185,8 +185,8 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val lca = mem.swappers.head.parent.s.get
-        val hasXBarR = if (mem.readers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarR" else "<s>has XBarR</s>"
-        val hasXBarW = if (mem.writers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarW" else "<s>has XBarW</s>"
+        val hasXBarR = if (mem.readers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarR" else "<s>no XBarR</s>"
+        val hasXBarW = if (mem.writers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarW" else "<s>no XBarW</s>"
         printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, a = $alphas, p = $Ps", s"$hasXBarR, $hasXBarW")
       }
     }

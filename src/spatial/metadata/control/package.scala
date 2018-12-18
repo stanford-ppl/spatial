@@ -661,6 +661,10 @@ package object control {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
     }
+    def isStaticStartAndStep: Boolean = (start,step) match {
+      case (Final(_), Final(_)) => true
+      case _ => false
+    }
     def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
       case Some(Expect(_)) => true
       case _ => 

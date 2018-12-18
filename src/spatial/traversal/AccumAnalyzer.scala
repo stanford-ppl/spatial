@@ -104,7 +104,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
 
   private object IterAnd {
     def unapply(b: Bit): Option[Set[Idx]] = b match {
-      case Op(FixEql(i,v)) if i.isIdx && i.isBound && i.counter.start == v => Some(Set(i.asInstanceOf[Idx]))
+      case Op(FixEql(i,v)) if i.isIdx && i.isBound && i.counter.ctr.start == v => Some(Set(i.asInstanceOf[Idx]))
       case Op(And(IterAnd(i1), IterAnd(i2))) => Some(i1 ++ i2)
       case _ => None
     }

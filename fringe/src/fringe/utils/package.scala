@@ -84,7 +84,7 @@ package object utils {
       sig
     }
     else {
-      val sr = Module(new RetimeWrapper(sig.getWidth, delay))
+      val sr = Module(new RetimeWrapper(sig.getWidth, delay, init))
       sr.io.in := sig.asUInt
       sr.io.flow := en
       sr.io.out.asTypeOf(sig)

@@ -145,8 +145,10 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
           val Final(step) = x.counter.ctr.step
           val par = x.counter.ctr.ctrPar.toInt
           val lane = x.counter.lane
-          dbgs(s"Replace $x % $y with ${lane * step}")
-          transferDataToAllNew(lhs){ constMod(x, lane * step).asInstanceOf[Sym[A]] }
+          val r = lane * step
+          val posMod = ((r % y) + y) % y
+          dbgs(s"Replace $x % $y with ${posMod}")
+          transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
         case _ => 
           val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
           dbgs(s"Cannot statically determine $x % $y")

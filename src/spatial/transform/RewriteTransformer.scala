@@ -4,7 +4,9 @@ import argon._
 import argon.node._
 import argon.transform.MutateTransformer
 import spatial.metadata.bounds._
+import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.types._
 import spatial.metadata.rewrites._
 import spatial.metadata.math._
 import spatial.lang._
@@ -24,6 +26,13 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     if (log2(y.toDouble) == 0) x.from(0)
     // TODO: Consider making a node like case class BitRemap(data: Bits[_], remap: Seq[Int], outType: Bits[T]) that wouldn't add to retime latency
     else x & (scala.math.pow(2,log2(y.toDouble))-1).to[Fix[S,I,F]] 
+  }
+
+  def constMod[S,I,F](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
+    implicit val S: BOOL[S] = x.fmt.s
+    implicit val I: INT[I] = x.fmt.i
+    implicit val F: INT[F] = x.fmt.f
+    x.from(y)
   }
 
   def writeReg[A](lhs: Sym[_], reg: Reg[_], data: Bits[A], ens: Set[Bit]): Void = {
@@ -104,9 +113,25 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
 
     case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => 
-      val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-      m.modulus = y
-      m
+      if (x.getCounter.isDefined && x.counter.ctr.isStatic) {
+        val Final(step) = x.counter.ctr.step
+        val par = x.counter.ctr.ctrPar.toInt
+        val lane = x.counter.lane
+        if (par >= y) {
+          dbgs(s"Replace $x % $y with ${lane * step}")
+          transferDataToAllNew(lhs){ constMod(x, lane * step).asInstanceOf[Sym[A]] }
+        }
+        else {
+          val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
+          m.modulus = y
+          m
+        }
+      }
+      else {
+        val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
+        m.modulus = y
+        m        
+      }
 
     // 1 / sqrt(b)  ==> invsqrt(b)
     // Square root has already been mirrored, but should be removed if unused

@@ -93,8 +93,8 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(q), Const(r)) => R.from(q*r)
     case (_, Const(r)) if r.isPow2 && r > 0 => a << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
     case (_, Const(r)) if r.isPow2 && r < 0 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
-    case (Const(r), _) if r.isPow2 && r > 0 => a << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
-    case (Const(r), _) if r.isPow2 && r < 0 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case _ => super.rewrite
   }
 

@@ -696,17 +696,17 @@ package object control {
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
-    def ctrStart: Ind[W] = i.counter.start.unbox
-    def ctrStep: Ind[W] = i.counter.step.unbox
-    def ctrEnd: Ind[W] = i.counter.end.unbox
-    @rig def ctrPar: I32 = if (i.counter.isForever) I32(1) else i.counter.ctrPar
-    def ctrParOr1: Int = if (i.counter.isForever) 1 else i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
+    def ctrStart: Ind[W] = i.counter.ctr.start.unbox
+    def ctrStep: Ind[W] = i.counter.ctr.step.unbox
+    def ctrEnd: Ind[W] = i.counter.ctr.end.unbox
+    @rig def ctrPar: I32 = if (i.counter.ctr.isForever) I32(1) else i.counter.ctr.ctrPar
+    def ctrParOr1: Int = if (i.counter.ctr.isForever) 1 else i.getCounter.map(_.ctr.ctrPar.toInt).getOrElse(1)
   }
 
   implicit class IndexCounterOps[A](i: Num[A]) {
-    def getCounter: Option[Counter[A]] = metadata[IndexCounter](i).map(_.ctr.asInstanceOf[Counter[A]])
-    def counter: Counter[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
-    def counter_=(ctr: Counter[_]): Unit = metadata.add(i, IndexCounter(ctr))
+    def getCounter: Option[IndexCounterInfo[A]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[A]])
+    def counter: IndexCounterInfo[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
+    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
   }
 
 

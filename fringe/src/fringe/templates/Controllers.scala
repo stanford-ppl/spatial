@@ -268,7 +268,7 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
       io.ctrInc := active.io.output.data & io.enable & io.flow
     }
     val doneLag = if (p.cases > 1) 0 else p.latency
-    io.done := risingEdge(getRetimed(done.io.output.data, doneLag, true.B))
+    io.done := risingEdge(getRetimed(done.io.output.data, doneLag, io.flow))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
   } else { // FSM inner

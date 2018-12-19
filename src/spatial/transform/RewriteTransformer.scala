@@ -168,7 +168,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     case FixSRA(F(Op(FixSRA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
       fixShiftCombine(x, (y1+y2).toInt, "sra").asInstanceOf[Sym[A]]
     case FixSRA(F(Op(FixSLA(x: Fix[s,i,f],Const(y1)))), F(Const(y2))) => 
-      fixShiftCombine(x, (-y1+y2).toInt, "sra").asInstanceOf[Sym[A]]
+      super.transform(lhs,rhs)
 
     // m1*m2 + add --> fma(m1,m2,add)
     case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>

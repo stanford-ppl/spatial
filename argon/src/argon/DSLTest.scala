@@ -73,7 +73,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
   //      Backends     //
   //-------------------//
 
-  def backends: Seq[Backend]
+  def backends: Seq[Backend] = Nil
   def property(str: String): Option[String] = sys.props.get(str)
   def checkFlag(str: String): Boolean = property(str).exists(v => v.trim.toLowerCase == "true")
 

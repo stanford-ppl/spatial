@@ -30,12 +30,12 @@ class SpatialConfig extends Config {
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
   var enableForceBanking: Boolean = false
+  var allowInsanity: Boolean = false
 
   var enableArchDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
-  var compressWires = 0
   var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true

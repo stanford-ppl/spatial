@@ -45,7 +45,7 @@ trait SpatialTest extends Spatial with DSLTest { self =>
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --fpga VCS",
+    args = "--synth --insanity --fpga VCS",
     make = "make",
     run  = "bash scripts/regression_run.sh vcs"
   ) {
@@ -55,7 +55,7 @@ trait SpatialTest extends Spatial with DSLTest { self =>
 
   object Zynq extends ChiselBackend(
     name = "Zynq",
-    args = "--synth --fpga Zynq",
+    args = "--synth --insanity --fpga Zynq",
     make = "make",
     run  = "bash scripts/scrape.sh Zynq"
   ) {
@@ -65,7 +65,7 @@ trait SpatialTest extends Spatial with DSLTest { self =>
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth --fpga ZCU",
+    args = "--synth --insanity --fpga ZCU",
     make = "make",
     run  = "bash scripts/scrape.sh ZCU"
   ) {
@@ -75,7 +75,7 @@ trait SpatialTest extends Spatial with DSLTest { self =>
 
   object AWS extends ChiselBackend(
     name = "AWS",
-    args = "--synth --fpga AWS_F1",
+    args = "--synth --insanity --fpga AWS_F1",
     make = "make aws-F1-afi",
     run  = "bash scripts/scrape.sh AWS"
   ) {

@@ -61,9 +61,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val finalIRPrinter = IRPrinter(state, enable = true)
 
     // --- Checking
-    lazy val userSanityChecks  = UserSanityChecks(state)
-    lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog)
-    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = true)
+    lazy val userSanityChecks  = UserSanityChecks(state, enable = !spatialConfig.allowInsanity)
+    lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog && !spatialConfig.allowInsanity)
+    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = !spatialConfig.allowInsanity)
 
     // --- Analysis
     lazy val cliNaming          = CLINaming(state)
@@ -260,7 +260,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")
 
-    cli.opt[Int]("compressWires").action{(t,_) => spatialConfig.compressWires = t }.text("Enable string compression on chisel wires to shrink JVM bytecode")
+    cli.opt[Unit]("insanity").action{(_,_) => spatialConfig.allowInsanity = true }.text("Disable sanity checks, allows insanity to happen.  Not recommended!")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true

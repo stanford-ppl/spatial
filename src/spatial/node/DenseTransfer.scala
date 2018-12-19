@@ -235,7 +235,10 @@ object DenseTransfer {
             length := aligned.size
           }
           Foreach(length.value par p){i =>
-            val en = i >= startBound && i < endBound
+            val en = staticStart(dramAddr) match {
+                    case Left(x)  => i >= x && i < endBound
+                    case Right(_) => i >= startBound && i < endBound
+                  }
             val addr = staticStart(dramAddr) match {
                   case Left(x)  => localAddr(i - x)
                   case Right(_) => localAddr(i - startBound)
@@ -314,7 +317,10 @@ object DenseTransfer {
           size := cmd.size
         }
         Foreach(size par p){i =>
-          val en = i >= start && i < end
+          val en = staticStart(dramAddr) match {
+                  case Left(x)  => i >= x && i < end
+                  case Right(_) => i >= start && i < end
+                }
           val addr = staticStart(dramAddr) match {
                   case Left(x)  => localAddr(i - x)
                   case Right(_) => localAddr(i - start)

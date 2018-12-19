@@ -57,9 +57,9 @@ import spatial.dsl._
     assert(t3 == -4)
     assert(t4 == 1073741820)
     assert(t5 == args(0).to[Int] << 1)
-    assert(t6 == args(0).to[Int] >> 1)
+    assert(t6 == (args(0).to[Int] >> 3) << 2)
     assert(t7 == args(0).to[Int] << 5)
     assert(t8 == args(0).to[Int] >> 5)
-    assert(t9 == args(0).to[Int])
+    assert(t9 == (args(0).to[Int] >> 3) << 3)
   }
 }

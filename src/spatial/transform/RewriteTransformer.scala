@@ -88,6 +88,16 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     } else false
   }
 
+  def getPosMod(x: Num[_], ofs: Int, mod: Int): Int = {
+    val Final(start) = x.counter.ctr.start
+    val Final(step) = x.counter.ctr.step
+    val par = x.counter.ctr.ctrPar.toInt
+    val lane = x.counter.lane
+    val r = start + lane * step + ofs
+    val posMod = ((r % mod) + mod) % mod
+    dbgs(s"Replace $x + $ofs % $mod with ${posMod} (ctr start $start, step $step, lane $lane)")
+    posMod
+  }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
@@ -125,32 +135,18 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       x match {
         // Assume chained arithmetic will have been constant propped by now
         case Op(FixAdd(F(xx), Final(yy))) if (xx.getCounter.isDefined && static(xx, y)) => 
-          val Final(start) = xx.counter.ctr.start
-          val Final(step) = xx.counter.ctr.step
-          val par = xx.counter.ctr.ctrPar.toInt
-          val lane = xx.counter.lane
-          val r = start + lane * step + yy
-          val posMod = ((r % y) + y) % y
-          dbgs(s"Replace $xx + $yy % $y with ${posMod} (ctr start $start, step $step, lane $lane)")
+          val posMod = getPosMod(xx, yy, y)
+          transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
+        // Assume chained arithmetic will have been constant propped by now
+        case Op(FixAdd(Final(yy), F(xx))) if (xx.getCounter.isDefined && static(xx, y)) => 
+          val posMod = getPosMod(xx, yy, y)
           transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
         // Assume chained arithmetic will have been constant propped by now
         case Op(FixSub(F(xx), Final(yy))) if (xx.getCounter.isDefined && static(xx, y)) => 
-          val Final(start) = xx.counter.ctr.start
-          val Final(step) = xx.counter.ctr.step
-          val par = xx.counter.ctr.ctrPar.toInt
-          val lane = xx.counter.lane
-          val r = start + lane * step - yy
-          val posMod = ((r % y) + y) % y
-          dbgs(s"Replace $xx - $yy % $y with ${posMod} (ctr start $start, step $step, lane $lane)")
+          val posMod = getPosMod(xx, -yy, y)
           transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
         case _ if (x.getCounter.isDefined && static(x, y)) =>
-          val Final(start) = x.counter.ctr.start
-          val Final(step) = x.counter.ctr.step
-          val par = x.counter.ctr.ctrPar.toInt
-          val lane = x.counter.lane
-          val r = start + lane * step
-          val posMod = ((r % y) + y) % y
-          dbgs(s"Replace $x % $y with ${posMod} (ctr start $start, step $step, lane $lane)")
+          val posMod = getPosMod(x, 0, y)
           transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
         case _ => 
           val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }

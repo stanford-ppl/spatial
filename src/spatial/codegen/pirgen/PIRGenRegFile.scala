@@ -8,7 +8,7 @@ trait PIRGenRegFile extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegFileNew(_, inits) => 
-      stateMem(lhs, "RegFile", inits)
+      stateMem(lhs, "RegFile()", inits)
 
     //case RegFileReset(rf, en)    => 
       //emit(src"val $lhs = if ($en) $rf.reset()")

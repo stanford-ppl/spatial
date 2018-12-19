@@ -10,7 +10,9 @@ import spatial.metadata.bounds._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
 
-case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
+case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityChecks {
+
+  override def shouldRun: Boolean = enable
 
   def busWidthCheck(tp: Bits[_], bus: Bus, mem: String): Unit = {
     if (tp.nbits < bus.nbits) {

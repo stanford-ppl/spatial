@@ -283,6 +283,10 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       }
     }
 
+    // Done latch
+    val doneLatch = RegInit(false.B).suggestName("doneLatch")
+    doneLatch := Mux(io.input.reset, false.B, Mux(io.input.enable & isMax, true.B, doneLatch))
+
     // Connect oobies (Out Of Bound-ies)
     val defs = {if (start.isDefined) 0x4 else 0x0} | {if (stop.isDefined) 0x2 else 0x0} | {if (stride.isDefined) 0x1 else 0x0}
     (0 until par).foreach{ i =>
@@ -293,14 +297,14 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       }
       // Connections are a mouthful but it is historically unsafe to trust that chisel will optimize constants properly
       defs match {
-        case 0x7 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < start.get.S(width.W) || c >= stop.get.S(width.W) else io.output.oobs(i) := c > start.get.S(width.W) || c <= stop.get.S(width.W)
-        case 0x6 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= stop.get.S(width.W),                          c > start.get.S(width.W) || c <= stop.get.S(width.W))
-        case 0x5 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < start.get.S(width.W) || c >= io.input.stop       else io.output.oobs(i) := c > start.get.S(width.W) || c <= io.input.stop
-        case 0x4 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= io.input.stop,                                c > start.get.S(width.W) || c <= io.input.stop)
-        case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= stop.get.S(width.W) else io.output.oobs(i) := c > io.input.start       || c <= stop.get.S(width.W)
-        case 0x2 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
-        case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= io.input.stop       else io.output.oobs(i) := c > io.input.start       || c <= io.input.stop
-        case 0x0 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
+        case 0x7 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < start.get.S(width.W) || c >= stop.get.S(width.W)) else io.output.oobs(i) := doneLatch || (c > start.get.S(width.W) || c <= stop.get.S(width.W))
+        case 0x6 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= stop.get.S(width.W),                          c > start.get.S(width.W) || c <= stop.get.S(width.W))
+        case 0x5 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < start.get.S(width.W) || c >= io.input.stop)       else io.output.oobs(i) := doneLatch || (c > start.get.S(width.W) || c <= io.input.stop)
+        case 0x4 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= io.input.stop,                                c > start.get.S(width.W) || c <= io.input.stop)
+        case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < io.input.start       || c >= stop.get.S(width.W)) else io.output.oobs(i) := doneLatch || (c > io.input.start       || c <= stop.get.S(width.W))
+        case 0x2 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
+        case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < io.input.start       || c >= io.input.stop)       else io.output.oobs(i) := doneLatch || (c > io.input.start       || c <= io.input.stop)
+        case 0x0 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
       }
     }
 

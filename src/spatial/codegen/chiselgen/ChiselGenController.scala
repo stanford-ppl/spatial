@@ -45,7 +45,7 @@ trait ChiselGenController extends ChiselGenCommon {
     iters.zipWithIndex.foreach{ case (iter, id) =>
       val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
       val w = bitWidth(counters(i).typeArgs.head)
-      emit(src"val $iter = ${cchain}.cchain.io.output.counts($id).FP(true, $w, 0)")
+      emit(src"""val $iter = ${cchain}.cchain.io.output.counts($id).FP(true, $w, 0); $iter.suggestName("$iter")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
         emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain"))""")
         emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
@@ -57,7 +57,7 @@ trait ChiselGenController extends ChiselGenCommon {
       }
     }
     valids.zipWithIndex.foreach{ case (v,id) => 
-      emit(src"val $v = ~${cchain}.cchain.io.output.oobs($id)")
+      emit(src"""val $v = ~${cchain}.cchain.io.output.oobs($id); $v.suggestName("$v")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain"))""")
         emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
@@ -109,6 +109,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emitHeader()
 
       val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp)}" else "Unit"
+      emit(src"/** Hierarchy: ${controllerStack.mkString(" -> ")} **/")
       emit(src"/** BEGIN ${lhs.name} $lhs **/")
       open(src"object ${lhs}_kernel {")
         open(src"def run(")

@@ -27,7 +27,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   val memColors = Seq("cce6ff", "ccb6ff", "99ddff", "99ff99", "e6b3cc", "ccffcc", "e0e0d1", "ffcccc",
                       "d1e0e0", "e699ff", "fff7e6", "f2ffcc", "d9b3ff", "cce0ff", "f2e6ff", "ecc6d9",
                       "eefb21", "c5989e", "3add77", "ee6c56", "17eaf7", "22f5e2", 
-                      "50d246", "e0b77a", "14fb82", "f4268f", "efc11b", "6223f8", "aed919") // List of colors I think looks nice
+                      "50d246", "e0b77a", "14fb82", "f4268f", "efc11b", "aed919") // List of colors I think looks nice
   private val colorMap = HashMap[Sym[_], String]()
   private val nonBufMems = scala.collection.mutable.Set[Sym[_]]()
 

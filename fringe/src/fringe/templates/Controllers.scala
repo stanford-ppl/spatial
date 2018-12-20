@@ -110,7 +110,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
         active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable & io.flow
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck | io.break
-        iterDone(i).io.input.set := (io.doneIn(i)) | (!synchronize && (active(i-1).io.output.data || active(i).io.output.data) && !io.maskIn(i).D(1) & io.enable & io.flow) | io.break
+        iterDone(i).io.input.set := (io.doneIn(i)) | io.break
         done(i).io.input.set := (done(i-1).io.output.data & synchronize & !io.rst) | io.break
       }
     

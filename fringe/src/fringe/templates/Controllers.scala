@@ -255,7 +255,7 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
   val done = Module(new SRFF())
 
   if (!p.isFSM) {
-    active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data
+    active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data & io.flow
     active.io.input.reset := io.ctrDone | io.rst | io.parentAck | io.break
     active.io.input.asyn_reset := false.B
     p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone) | io.break}

@@ -26,7 +26,9 @@ case class MemParams(
   def hasXBarW: Boolean = xBarWMux.accessPars.sum > 0
   def hasXBarR: Boolean = xBarRMux.accessPars.sum > 0
   def numXBarW: Int = xBarWMux.accessPars.sum
+  def widestXBarW: Int = if (xBarWMux.nonEmpty) xBarWMux.sortByMuxPortAndCombine.accessPars.max else 0
   def numXBarR: Int = xBarRMux.accessPars.sum
+  def widestXBarR: Int = if (xBarRMux.nonEmpty) xBarRMux.sortByMuxPortAndCombine.accessPars.max else 0
   def numXBarWPorts: Int = xBarWMux.accessPars.size
   def numXBarRPorts: Int = xBarRMux.accessPars.size
   def hasDirectW: Boolean = directWMux.accessPars.sum > 0

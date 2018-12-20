@@ -288,7 +288,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     ${fracBits(mem.tp.typeArgs.head)}, 
     myName = "$mem"
   ))""")
-      if (name == "FIFO") {
+      if (name == "FIFO" || name == "FIFOReg") {
         mem.writers.foreach{x => emit(createWire(src"enqActive_$x","Bool()"))}
         mem.readers.foreach{x => emit(createWire(src"deqActive_$x","Bool()"))}
       }
@@ -314,8 +314,12 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // FIFORegs
     case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
-    case FIFORegEnq(reg, data, ens) => emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case FIFORegDeq(reg, ens) => emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
+    case FIFORegEnq(reg, data, ens) => 
+      emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
+      emit(src"$reg.enqActive_$lhs := ${and(ens)}") 
+    case FIFORegDeq(reg, ens) => 
+      emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
+      emit(src"$reg.deqActive_$lhs := ${and(ens)}") 
 
     // Registers
     case RegNew(init) => 
@@ -423,10 +427,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.deqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})")
+      emit(src"$fifo.deqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})") 
     case FIFOBankedEnq(fifo, data, ens) => 
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.enqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})")
+      emit(src"$fifo.enqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})") 
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, None)

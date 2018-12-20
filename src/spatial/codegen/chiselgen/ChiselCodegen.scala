@@ -186,7 +186,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           close("}")
         }
         open("def configure(n: String): Unit = {")
-          emit("sm.io.flow := flow")
+          emit("sm.io.flow := flow | sm.io.doneLatch")
           emit("sm.io.rst := resetMe")
           emit("done := sm.io.done")
           emit("break := sm.io.break")

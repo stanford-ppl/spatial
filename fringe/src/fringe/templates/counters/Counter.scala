@@ -129,7 +129,7 @@ class IICounter(val ii: Int, val width: Int = 32, val myName: String = "iiCtr") 
   io.output.done := isDone
 }
 
-class CompactingIncDincCtr(inc: Int, dinc: Int, stop: Int, width: Int = 32) extends Module {
+class CompactingIncDincCtr(inc: Int, dinc: Int, widest_inc: Int, widest_dinc: Int, stop: Int, width: Int = 32) extends Module {
   val io = IO(new Bundle {
     val input = new Bundle {
       val inc_en     = Vec(inc, Input(Bool()))
@@ -155,9 +155,9 @@ class CompactingIncDincCtr(inc: Int, dinc: Int, stop: Int, width: Int = 32) exte
   io.output.overread := cnt < 0.S((width+1).W)
   io.output.overwrite := cnt > stop.S((width+1).W)
   io.output.empty := cnt === 0.S((width+1).W)
-  io.output.almostEmpty := cnt - dinc.S((width+1).W) === 0.S((width+1).W)
-  io.output.full := cnt > (stop-inc).S((width+1).W)
-  io.output.almostFull := cnt + inc.S((width+1).W) === stop.S((width+1).W)
+  io.output.almostEmpty := cnt - widest_dinc.S((width+1).W) === 0.S((width+1).W)
+  io.output.full := cnt > (stop-widest_inc).S((width+1).W)
+  io.output.almostFull := cnt + widest_inc.S((width+1).W) === stop.S((width+1).W)
   io.output.numel := cnt
 }
 
@@ -283,10 +283,6 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       }
     }
 
-    // Done latch
-    val doneLatch = RegInit(false.B).suggestName("doneLatch")
-    doneLatch := Mux(io.input.reset, false.B, Mux(io.input.enable & isMax, true.B, doneLatch))
-
     // Connect oobies (Out Of Bound-ies)
     val defs = {if (start.isDefined) 0x4 else 0x0} | {if (stop.isDefined) 0x2 else 0x0} | {if (stride.isDefined) 0x1 else 0x0}
     (0 until par).foreach{ i =>
@@ -297,14 +293,14 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       }
       // Connections are a mouthful but it is historically unsafe to trust that chisel will optimize constants properly
       defs match {
-        case 0x7 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < start.get.S(width.W) || c >= stop.get.S(width.W)) else io.output.oobs(i) := doneLatch || (c > start.get.S(width.W) || c <= stop.get.S(width.W))
-        case 0x6 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= stop.get.S(width.W),                          c > start.get.S(width.W) || c <= stop.get.S(width.W))
-        case 0x5 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < start.get.S(width.W) || c >= io.input.stop)       else io.output.oobs(i) := doneLatch || (c > start.get.S(width.W) || c <= io.input.stop)
-        case 0x4 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= io.input.stop,                                c > start.get.S(width.W) || c <= io.input.stop)
-        case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < io.input.start       || c >= stop.get.S(width.W)) else io.output.oobs(i) := doneLatch || (c > io.input.start       || c <= stop.get.S(width.W))
-        case 0x2 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
-        case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      doneLatch || (c < io.input.start       || c >= io.input.stop)       else io.output.oobs(i) := doneLatch || (c > io.input.start       || c <= io.input.stop)
-        case 0x0 =>                      io.output.oobs(i) := doneLatch || Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
+        case 0x7 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < start.get.S(width.W) || c >= stop.get.S(width.W) else io.output.oobs(i) := c > start.get.S(width.W) || c <= stop.get.S(width.W)
+        case 0x6 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= stop.get.S(width.W),                          c > start.get.S(width.W) || c <= stop.get.S(width.W))
+        case 0x5 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < start.get.S(width.W) || c >= io.input.stop       else io.output.oobs(i) := c > start.get.S(width.W) || c <= io.input.stop
+        case 0x4 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < start.get.S(width.W) || c >= io.input.stop,                                c > start.get.S(width.W) || c <= io.input.stop)
+        case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= stop.get.S(width.W) else io.output.oobs(i) := c > io.input.start       || c <= stop.get.S(width.W)
+        case 0x2 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
+        case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= io.input.stop       else io.output.oobs(i) := c > io.input.start       || c <= io.input.stop
+        case 0x0 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
       }
     }
 
@@ -508,15 +504,6 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
     ctrs(i).io.input.saturate := io.input.saturate & ctrs.take(i).map{ ctr => ctr.io.output.saturated }.reduce{_&_}
   }
 
-  // Wire up the outputs
-  par.zipWithIndex.foreach { case (p, i) =>
-    val addr = par.take(i+1).sum - par(i) // i+1 to avoid reducing empty list
-    (0 until p).foreach { k =>
-      io.output.counts(addr+k) := ctrs(i).io.output.count(k)
-      io.output.oobs(addr+k) := ctrs(i).io.output.oobs(k)
-    }
-  }
-
   // // Wire up countBases for easy debugging
   // ctrs.zipWithIndex.map { case (ctr,i) =>
   //   io.output.countBases(i) := ctr.io.output.count(0)
@@ -530,5 +517,19 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
   io.output.noop := ctrs.map(_.io.output.noop).reduce{_&&_}
   io.output.done := Mux(io.input.isStream, true.B, io.input.enable) & isDone & !wasDone
   io.output.saturated := io.input.saturate & isSaturated
+
+  // Done latch
+  val doneLatch = RegInit(false.B)
+  doneLatch := Mux(io.input.reset, false.B, Mux(isDone, true.B, doneLatch))
+    
+  // Wire up the outputs
+  par.zipWithIndex.foreach { case (p, i) =>
+    val addr = par.take(i+1).sum - par(i) // i+1 to avoid reducing empty list
+    (0 until p).foreach { k =>
+      io.output.counts(addr+k) := ctrs(i).io.output.count(k)
+      io.output.oobs(addr+k) := ctrs(i).io.output.oobs(k) | doneLatch
+    }
+  }
+
 }
 

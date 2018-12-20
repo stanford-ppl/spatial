@@ -10,6 +10,7 @@ class ControlInterface(p: ControlParams) extends Bundle {
   // Control signals
   val enable = Input(Bool())
   val done = Output(Bool())
+  val doneLatch = Output(Bool())
   val rst = Input(Bool())
   val ctrDone = Input(Bool())
   val datapathEn = Output(Bool())
@@ -100,7 +101,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output.data & !io.ctrDone & io.enable & io.flow
       active(0).io.input.reset := io.ctrDone | io.parentAck | io.break
-      iterDone(0).io.input.set := io.doneIn(0) | (!io.maskIn(0).D(1) & io.enable & io.flow) | io.break
+      iterDone(0).io.input.set := io.doneIn(0) | (!synchronize && !done(0).io.output.data && !io.maskIn(0).D(1) & io.enable & io.flow) | io.break
       done(0).io.input.set := (io.ctrDone & !io.rst) | io.break
 
       // Define logic for the rest of the stages
@@ -109,7 +110,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
         // Start when previous stage receives its first done, stop when previous stage turns off and current stage is done
         active(i).io.input.set := ((synchronize & active(i-1).io.output.data)) & io.enable & io.flow
         active(i).io.input.reset := done(i-1).io.output.data & synchronize | io.parentAck | io.break
-        iterDone(i).io.input.set := (io.doneIn(i)) | io.break
+        iterDone(i).io.input.set := (io.doneIn(i)) | (!synchronize && (active(i-1).io.output.data || active(i).io.output.data) && !io.maskIn(i).D(1) & io.enable & io.flow) | io.break
         done(i).io.input.set := (done(i-1).io.output.data & synchronize & !io.rst) | io.break
       }
     
@@ -203,15 +204,15 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
         done(i).io.input.set := io.ctrDone & ~io.rst
       }
 
-
-
   }
-
 
   iterDone.zip(io.childAck).foreach{ case (id, ca) => ca := id.io.output.data }
   io.enableOut.zipWithIndex.foreach{case (eo,i) => eo := io.enable & active(i).io.output.data & ~iterDone(i).io.output.data & io.maskIn(i) & ~allDone & {if (i == 0) ~io.ctrDone else true.B}}
   io.ctrRst := getRetimed(risingEdge(allDone), 1)
-  
+
+  // Done latch
+  val doneLatchReg = RegInit(false.B)
+
   // Connect output signals
   if (p.isFSM) {
     val stateFSM = Module(new FF(p.stateWidth))
@@ -229,10 +230,15 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
     active.zip(io.doneIn).foreach{case (a,di) => a.io.input.reset := di | io.rst | io.parentAck | doneReg.io.output.data}
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition
     io.done := doneReg.io.output.data & io.enable
+    doneLatchReg := Mux(io.rst || io.parentAck, false.B, Mux(doneReg.io.output.data & io.enable, true.B, doneLatchReg))
+    io.doneLatch := doneLatchReg
   }
   else {
     io.datapathEn := io.enable & ~allDone
     io.done := getRetimed(risingEdge(allDone), p.latency + 1, io.enable)
+
+    doneLatchReg := Mux(io.rst || io.parentAck, false.B, Mux(getRetimed(risingEdge(allDone), p.latency, io.enable), true.B, doneLatchReg))
+    io.doneLatch := doneLatchReg
   }
 
 
@@ -258,7 +264,6 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
 
     // Set outputs
     io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
-    io.ctrRst := !active.io.output.data | io.rst 
     if (p.isPassthrough) { // pass through signals
       io.datapathEn := io.enable  & io.flow// & ~io.done & ~io.parentAck
       io.ctrInc := io.enable & io.flow
@@ -267,9 +272,16 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
       io.datapathEn := active.io.output.data & ~done.io.output.data & io.enable & io.flow
       io.ctrInc := active.io.output.data & io.enable & io.flow
     }
+
     val doneLag = if (p.cases > 1) 0 else p.latency
+    io.ctrRst := risingEdge(getRetimed(done.io.output.data, doneLag, io.flow)) | io.rst 
     io.done := risingEdge(getRetimed(done.io.output.data, doneLag, io.flow))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
+
+    // Done latch
+    val doneLatchReg = RegInit(false.B)
+    doneLatchReg := Mux(io.rst || io.parentAck, false.B, Mux(getRetimed(risingEdge(done.io.output.data), 0 max {doneLag-1}, io.flow), true.B, doneLatchReg))
+    io.doneLatch := doneLatchReg
 
   } else { // FSM inner
     val stateFSM = Module(new FF(p.stateWidth))
@@ -297,6 +309,11 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
     io.ctrInc := io.enable & ~doneReg.io.output.data & ~io.doneCondition & ~io.ctrDone & io.flow
     io.datapathEn := io.enable & ~doneReg.io.output.data & ~io.doneCondition & io.flow
     io.done := risingEdge(getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable & io.flow), p.latency + 1, true.B))
+
+    // Done latch
+    val doneLatchReg = RegInit(false.B)
+    doneLatchReg := Mux(io.rst || io.parentAck, false.B, Mux(risingEdge(getRetimed(doneReg.io.output.data | (io.doneCondition & io.enable & io.flow), p.latency, true.B)), true.B, doneLatchReg))
+    io.doneLatch := doneLatchReg
 
   }
 }

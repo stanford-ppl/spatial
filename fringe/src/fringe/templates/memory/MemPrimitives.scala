@@ -397,7 +397,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   tailCtr.io.input.dir := true.B
 
   // Create numel counter
-  val elements = Module(new CompactingIncDincCtr(p.numXBarW, p.numXBarR, p.depth, p.elsWidth))
+  val elements = Module(new CompactingIncDincCtr(p.numXBarW, p.numXBarR, p.widestXBarW, p.widestXBarR, p.depth, p.elsWidth))
   elements.io.input.inc_en.zip(io.xBarW.flatMap(_.en)).foreach{case(l,r) => l := r}
   elements.io.input.dinc_en.zip(io.xBarR.flatMap(_.en)).foreach{case(l,r) => l := r}
 

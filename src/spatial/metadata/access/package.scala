@@ -30,6 +30,7 @@ package object access {
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
       case _:FIFORegDeq[_] => true
+      case _:FIFOBankedDeq[_] => true
       case _:MergeBufferDeq[_] => true
       case _:MergeBufferBankedDeq[_] => true
       case _:LIFOPop[_] => true

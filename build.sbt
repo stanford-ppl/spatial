@@ -163,6 +163,8 @@ lazy val pirTest = project
   scalaSource in Test := baseDirectory.in(spatial).value/"pir/regression"
 ).dependsOn(spatial)
 
+lazy val pir = project in file("pir")
+
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)

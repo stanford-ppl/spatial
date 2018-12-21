@@ -38,11 +38,14 @@ package object memory {
     def isNonBuffer: Boolean = metadata[EnableNonBuffer](s).exists(_.flag)
     def isNonBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableNonBuffer(flag))
 
-    def isHierarchicalBank: Boolean = metadata[HierarchicalBank](s).exists(_.flag)
-    def isHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, HierarchicalBank(flag))
+    def isNoHierarchicalBank: Boolean = metadata[NoHierarchicalBank](s).exists(_.flag)
+    def isNoHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, NoHierarchicalBank(flag))
 
-    def isFlatBank: Boolean = metadata[FlatBank](s).exists(_.flag)
-    def isFlatBank_=(flag: Boolean): Unit = metadata.add(s, FlatBank(flag))
+    def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
+    def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
+
+    def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
+    def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
     def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
     def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))

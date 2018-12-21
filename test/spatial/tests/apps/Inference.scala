@@ -628,7 +628,7 @@ import spatial.dsl._
         val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
         Foreach(INPUT_ROWS by STRIDE){ row => 
           // val bias_srams = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX) // / STRIDE?
-          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.flat
+          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.nohierarchical
           Parallel {
             Foreach(OUTPUT_CHANS by 1 par P3) {oc => 
               if (ic == 0) accum_lines(oc::oc+1, 0::INPUT_COLS/STRIDE) load BIAS_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar)

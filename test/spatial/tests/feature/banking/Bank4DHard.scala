@@ -103,7 +103,7 @@ import argon.Block
     setMem(INPUT_DATA, input)
 
     Accel{
-      val in_sram = SRAM[Int](3,3,32).hierarchical
+      val in_sram = SRAM[Int](3,3,32).noflat
       Foreach(5 by 1){row =>
         Foreach(5 by 1){col => 
           val idx0 = row * ARG.value

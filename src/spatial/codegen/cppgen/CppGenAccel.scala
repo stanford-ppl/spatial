@@ -84,11 +84,9 @@ trait CppGenAccel extends CppGenCommon {
            if (hasBackPressure(c._1.toCtrl) || hasForwardPressure(c._1.toCtrl)) {
              emit(s"""long ${c._1}_stalled = c1->getArg(${quote(c._1).toUpperCase}_stalled_arg, false);""")
              emit(s"""long ${c._1}_idle = c1->getArg(${quote(c._1).toUpperCase}_idle_arg, false);""")
-             emit(s"""long ${c._1}_stalled_avg = ${c._1}_stalled / std::max((long)1,${c._1}_iters);""")
-             emit(s"""long ${c._1}_idle_avg = ${c._1}_idle / std::max((long)1,${c._1}_iters);""")
-             emit(s"""std::cout << " <stalled/iter: " << ${c._1}_stalled_avg << ", idle/iter: " << ${c._1}_idle_avg << " {totals " << ${c._1}_stalled << "," << ${c._1}_idle << "}>";""")
+             emit(s"""std::cout << " <# stalled: " << ${c._1}_stalled << ", #idle: " << ${c._1}_idle << ">";""")
              open(s"if (instrumentation.is_open()) {")
-               emit(s"""instrumentation << " <stalled/iter: " << ${c._1}_stalled_avg << ", idle/iter: " << ${c._1}_idle_avg << " {totals " << ${c._1}_stalled << "," << ${c._1}_idle << "}>";""")
+               emit(s"""instrumentation << " <# stalled: " << ${c._1}_stalled << ", # idle: " << ${c._1}_idle << ">";""")
              close("}")
 
            }

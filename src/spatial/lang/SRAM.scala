@@ -64,7 +64,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   }
 
   /** Indicate that the memory should be buffered and ignore
-    * ignore potential situation where result from running sequentially
+    * potential situation where result from running sequentially
     * does not match with resurt from running pipelined
     */
   def buffer: C[A] = { this.isWriteBuffer = true; me }

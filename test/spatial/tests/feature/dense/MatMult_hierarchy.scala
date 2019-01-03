@@ -167,7 +167,7 @@ import spatial.dsl._
 
     Accel {
       // **LAYER 1** ON-CHIP MEMORY
-      val tileC = SRAM[T](M, N)
+      val tileC = SRAM[T](M, N).buffer
       tileC load C_dram(0::M, 0::N par 16)
 
       Foreach(P by k_c) { k =>
@@ -196,7 +196,7 @@ import spatial.dsl._
 
 
             // **LAYER 3** ACCUMULATOR (REGISTER LEVEL)
-            val tileC_acc = RegFile[T](n_r,n_r).coalesce
+            val tileC_acc = RegFile[T](n_r,n_r).coalesce.buffer
             Foreach(m_c by n_r){ accum_m =>
               // DATA MOVEMENT
               Foreach(n_r by 1, n_r by 1 par n_r) { (copy_m, copy_n) =>

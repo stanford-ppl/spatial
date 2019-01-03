@@ -304,18 +304,18 @@ case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.Us
   * Used in cases where it could be tricky to find flattened scheme but hierarchical scheme 
   * is very simple
   *
-  * Getter:  sym.isHierarchicalBank
-  * Setter:  sym.isHierarchicalBank = (true | false)
+  * Getter:  sym.isNoHierarchicalBank
+  * Setter:  sym.isNoHierarchicalBank = (true | false)
   * Default: false
   */
-case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.User)
+case class NoHierarchicalBank(flag: Boolean) extends Data[NoHierarchicalBank](SetBy.User)
 
 /** Flag set by the user to disable hierarchical banking and only attempt flat banking,
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isFlatBank
-  * Setter:  sym.isFlatBank = (true | false)
+  * Getter:  sym.isNoBank
+  * Setter:  sym.isNoBank = (true | false)
   * Default: false
   */
 case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
@@ -333,11 +333,11 @@ case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
   * Used in cases where it could be tricky or impossible to find any banking scheme scheme and
   * the user does not want the compiler to waste time trying
   *
-  * Getter:  sym.isFlatBank
-  * Setter:  sym.isFlatBank = (true | false)
+  * Getter:  sym.isNoFlatBank
+  * Setter:  sym.isNoFlatBank = (true | false)
   * Default: false
   */
-case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
+case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
 
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
@@ -347,3 +347,12 @@ case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
   * Default: false
   */
 case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User)
+
+/** Flag set by the user to permit FIFOs where the enqs are technically not bankable,
+  * based on control structure analysis alone
+  *
+  * Getter:  sym.shouldIgnoreConflicts
+  * Setter:  sym.shouldIgnoreConflicts = (true | false)
+  * Default: false
+  */
+case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)

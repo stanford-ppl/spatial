@@ -314,6 +314,119 @@ import spatial.dsl._
   }
 }
 
+@spatial class Convolution extends SpatialTest {
+  override def runtimeArgs: Args = "128 64 32 16 2"
+  type T = FixPt[TRUE,_32,_0]
+
+  def main(args: Array[String]): Unit = {
+
+    // Set properties to be known at compile-time
+    val window = 9
+    val IN_CHANS_MAX = 256
+    val OUT_CHANS_MAX = 256
+
+    // Set parallelizations
+    val P1 = 1
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 16
+
+    // Create ArgIns/Outs
+    val IN_POINTS = ArgIn[Int]
+    val OUT_POINTS = ArgIn[Int]
+    val IN_CHANS = ArgIn[Int]
+    val OUT_CHANS = ArgIn[Int]
+    val STRIDE = ArgIn[Int]
+    val n_points_in = args(0).to[Int]
+    val n_points_out = args(1).to[Int]
+    val n_chans_in = args(2).to[Int]
+    val n_chans_out = args(3).to[Int]
+    val stride = args(4).to[Int]
+    setArg(IN_POINTS, n_points_in)
+    setArg(OUT_POINTS, n_points_out)
+    setArg(IN_CHANS, n_chans_in)
+    setArg(OUT_CHANS, n_chans_out)
+    setArg(STRIDE, stride)
+
+    // Create data structures
+    val in_data = (0::n_points_in,0::n_chans_in){(i,j) => (i+j).to[T]}
+    val kernel = (0::window, 0::n_chans_in, 0::n_chans_out){(i,j,k) => ((i+j+k)%3).to[T]}
+    val DATA = DRAM[T](IN_POINTS,IN_CHANS)
+    val KERNEL = DRAM[T](window, IN_CHANS, OUT_CHANS)
+    val RESULT = DRAM[T](OUT_POINTS,OUT_CHANS)
+    setMem(DATA, in_data)
+    setMem(KERNEL, kernel)
+    printMatrix(in_data.t, "Data: (n_points is leading dimension)")
+    printTensor3(kernel, "Kernel: (each matrix is in_chans x out_chans)")
+
+    Accel {
+      // Create local memory for kernel values
+      val kernel_sram = SRAM[T](window, IN_CHANS_MAX, OUT_CHANS_MAX)
+      kernel_sram load KERNEL
+
+      // Create stream controller to run once per output point (which includes all output channels per point)
+      Foreach(OUT_POINTS by 1){ pt =>
+
+        // Create FIFOs to hold input data (declare here so parallelizing stream results in duplication of these)
+        val in_fifos = List.tabulate(window){_ => FIFO[T](IN_CHANS_MAX)}
+        // Create FIFO to buffer output data
+        val line_out = FIFO[T](OUT_CHANS_MAX)
+        // Create signalling FIFO to mediate control
+        val store_ready = FIFO[Bit](8)
+        
+        val C = pt * STRIDE
+
+        // Fetch data
+        Parallel{
+          in_fifos.zipWithIndex.map{case (f, i) => 
+            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
+          }
+        }
+
+        // Allocate temp accumulator
+        val line_out_sram = SRAM[T](OUT_CHANS_MAX)
+        // Compute partial result for each IN_CHAN
+        MemReduce(line_out_sram(0::OUT_CHANS par P3))(IN_CHANS by 1 par P1){ic => 
+          val local_acc = SRAM[T](OUT_CHANS_MAX)
+          val data_raw = in_fifos.map{f => f.deq()}
+          // While we have input data, run it against each output channel's kernel
+          Foreach(OUT_CHANS by 1 par P2){oc => 
+            val filter = List.tabulate(window){lane => kernel_sram(lane, ic, oc)}
+            val data = List.tabulate(window){lane => mux(C - (window/2) + lane >= 0 && C - (window/2) + lane < IN_POINTS-1, data_raw(lane), 0.to[T])}
+            val acc = filter.zip(data).map{case (a,b) => a*b}.reduceTree{_+_}
+            local_acc(oc) = acc
+          }
+          local_acc
+        }{_+_}
+
+        // Store data out
+        RESULT(pt, 0::OUT_CHANS par SP) store line_out_sram
+        
+      }
+
+    }
+
+    // Compute gold
+    val gold = (0::n_points_out, 0::n_chans_out){(pt, oc) => 
+      val lane_prods = List.tabulate(window){lane => 
+        val C = pt * stride
+        Array.tabulate(n_chans_in){ic => 
+          val data = if (C - (window/2) + lane >= 0 && C - (window/2) + lane < IN_POINTS-1) in_data(C + lane - (window/2), ic) else 0.to[T]
+          data * kernel(lane, ic, oc)
+        }.reduce{_+_}
+      }
+      lane_prods.reduce{_+_}
+    }
+    val got = getMatrix(RESULT)
+    printMatrix(got.t, "Got")
+    printMatrix(gold.t, "Gold")
+
+    val cksum = gold == got
+    println("PASS: " + cksum + " (Convolution)")
+    assert(cksum)
+  }
+}
 
 @spatial class ConvolutionStream extends SpatialTest {
   override def runtimeArgs: Args = "128 64 32 16 2"
@@ -322,9 +435,16 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
 
     // Set properties to be known at compile-time
-    val window = 5
+    val window = 9
     val IN_CHANS_MAX = 256
     val OUT_CHANS_MAX = 256
+
+    // Set parallelizations
+    val P1 = 1
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 16
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -375,7 +495,7 @@ import spatial.dsl._
           // Quirk of compiler's Pipe insertion, guarantee that pt * STRIDE is computed locally
           'FETCH.Pipe{ 
             val C = pt * STRIDE
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS)
+            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
           }
         }
 
@@ -386,11 +506,11 @@ import spatial.dsl._
           // Allocate temp accumulator
           val line_out_sram = SRAM[T](OUT_CHANS_MAX)
           // Compute partial result for each IN_CHAN
-          MemReduce(line_out_sram(0::OUT_CHANS))(IN_CHANS by 1){ic => 
+          MemReduce(line_out_sram(0::OUT_CHANS par P3))(IN_CHANS by 1 par P1){ic => 
             val local_acc = SRAM[T](OUT_CHANS_MAX)
             val data_raw = in_fifos.map{f => f.deq()}
             // While we have input data, run it against each output channel's kernel
-            Foreach(OUT_CHANS by 1){oc => 
+            Foreach(OUT_CHANS by 1 par P2){oc => 
               val filter = List.tabulate(window){lane => kernel_sram(lane, ic, oc)}
               val data = List.tabulate(window){lane => mux(C - (window/2) + lane >= 0 && C - (window/2) + lane < IN_POINTS-1, data_raw(lane), 0.to[T])}
               val acc = filter.zip(data).map{case (a,b) => a*b}.reduceTree{_+_}
@@ -405,7 +525,7 @@ import spatial.dsl._
         // Store data out
         'STORE.Pipe{
           donttouch := store_ready.deq() // Do not want to begin issuing store commands too soon
-          RESULT(pt, 0::OUT_CHANS) store line_out  
+          RESULT(pt, 0::OUT_CHANS par SP) store line_out  
         }
         
       }
@@ -434,3 +554,142 @@ import spatial.dsl._
     assert(cksum)
   }
 }
+
+
+@spatial class ConvolutionStreamReclaim extends SpatialTest {
+  override def runtimeArgs: Args = "128 64 32 16 2"
+  type T = FixPt[TRUE,_32,_0]
+
+  def main(args: Array[String]): Unit = {
+
+    // Set properties to be known at compile-time
+    val window = 9
+    val IN_CHANS_MAX = 256
+    val OUT_CHANS_MAX = 256
+
+    // Set parallelizations
+    val P1 = 1
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 16
+
+    // Create ArgIns/Outs
+    val IN_POINTS = ArgIn[Int]
+    val OUT_POINTS = ArgIn[Int]
+    val IN_CHANS = ArgIn[Int]
+    val OUT_CHANS = ArgIn[Int]
+    val STRIDE = ArgIn[Int]
+    val donttouch = ArgOut[Bit]
+    val n_points_in = args(0).to[Int]
+    val n_points_out = args(1).to[Int]
+    val n_chans_in = args(2).to[Int]
+    val n_chans_out = args(3).to[Int]
+    val stride = args(4).to[Int]
+    setArg(IN_POINTS, n_points_in)
+    setArg(OUT_POINTS, n_points_out)
+    setArg(IN_CHANS, n_chans_in)
+    setArg(OUT_CHANS, n_chans_out)
+    setArg(STRIDE, stride)
+
+    // Create data structures
+    val in_data = (0::n_points_in,0::n_chans_in){(i,j) => (i+j).to[T]}
+    val kernel = (0::window, 0::n_chans_in, 0::n_chans_out){(i,j,k) => ((i+j+k)%3).to[T]}
+    val DATA = DRAM[T](IN_POINTS,IN_CHANS)
+    val KERNEL = DRAM[T](window, IN_CHANS, OUT_CHANS)
+    val RESULT = DRAM[T](OUT_POINTS,OUT_CHANS)
+    setMem(DATA, in_data)
+    setMem(KERNEL, kernel)
+    printMatrix(in_data.t, "Data: (n_points is leading dimension)")
+    printTensor3(kernel, "Kernel: (each matrix is in_chans x out_chans)")
+
+    Accel {
+      // Create local memory for kernel values
+      val kernel_sram = SRAM[T](window, IN_CHANS_MAX, OUT_CHANS_MAX)
+      kernel_sram load KERNEL
+
+      // Create stream controller to run once per output point (which includes all output channels per point)
+      Stream.Foreach(OUT_POINTS by 1){ pt =>
+
+        // Create FIFOs to hold input data (declare here so parallelizing stream results in duplication of these)
+        val in_fifos = List.tabulate(window){_ => FIFO[T](IN_CHANS_MAX).conflictable}
+        // Create FIFO to buffer output data
+        val line_out = FIFO[T](OUT_CHANS_MAX)
+        // Create signalling FIFO to mediate control
+        val store_ready = FIFO[Bit](8)
+
+        // Fetch data
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          // Quirk of compiler's Pipe insertion, guarantee that pt * STRIDE is computed locally
+          'FETCH.Pipe{ 
+            if (pt == 0 || (i >= (window-STRIDE.value))) {
+              val C = pt * STRIDE
+              f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
+            }
+          }
+        }
+
+        // Greedily consume data
+        // Quirk of compiler's Pipe insertion, guarantee that pt * STRIDE is computed locally
+        'COMPUTE.Pipe{ 
+          val C = pt * STRIDE
+          // Allocate temp accumulator
+          val line_out_sram = SRAM[T](OUT_CHANS_MAX)
+          // Compute partial result for each IN_CHAN
+          MemReduce(line_out_sram(0::OUT_CHANS par P3))(IN_CHANS by 1 par P1){ic => 
+            val local_acc = SRAM[T](OUT_CHANS_MAX)
+            val data_raw = in_fifos.map{f => f.deq()}
+            // While we have input data, run it against each output channel's kernel
+            Foreach(OUT_CHANS by 1 par P2){oc => 
+              val filter = List.tabulate(window){lane => kernel_sram(lane, ic, oc)}
+              val data = List.tabulate(window){lane => mux(C - (window/2) + lane >= 0 && C - (window/2) + lane < IN_POINTS-1, data_raw(lane), 0.to[T])}
+              val acc = filter.zip(data).map{case (a,b) => a*b}.reduceTree{_+_}
+              local_acc(oc) = acc
+            }
+            // Reclaim data
+            in_fifos.dropRight(2).zipWithIndex.foreach{case (f, i) => 
+              val s2data = data_raw(i+2)
+              val s1data = data_raw(i+1)
+              val data = mux(STRIDE.value == 1, s1data, s2data)
+              f.enq(data)
+            }
+            in_fifos.dropRight(1).last.enq(data_raw.last, STRIDE.value == 1)
+            local_acc
+          }{_+_}
+          // Quickly copy results to output FIFO and indicate data is ready
+          Foreach(OUT_CHANS by 1){oc => line_out.enq(line_out_sram(oc)); if (oc == 0) {store_ready.enq(true)}}
+        }
+
+        // Store data out
+        'STORE.Pipe{
+          donttouch := store_ready.deq() // Do not want to begin issuing store commands too soon
+          RESULT(pt, 0::OUT_CHANS par SP) store line_out  
+        }
+        
+      }
+
+    }
+
+    println(r"donttouch: $donttouch") // Guarantee compiler will not DCE
+
+    // Compute gold
+    val gold = (0::n_points_out, 0::n_chans_out){(pt, oc) => 
+      val lane_prods = List.tabulate(window){lane => 
+        val C = pt * stride
+        Array.tabulate(n_chans_in){ic => 
+          val data = if (C - (window/2) + lane >= 0 && C - (window/2) + lane < IN_POINTS-1) in_data(C + lane - (window/2), ic) else 0.to[T]
+          data * kernel(lane, ic, oc)
+        }.reduce{_+_}
+      }
+      lane_prods.reduce{_+_}
+    }
+    val got = getMatrix(RESULT)
+    printMatrix(got.t, "Got")
+    printMatrix(gold.t, "Gold")
+
+    val cksum = gold == got
+    println("PASS: " + cksum + " (ConvolutionStreamReclaim)")
+    assert(cksum)
+  }
+}
+

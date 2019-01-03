@@ -11,7 +11,7 @@ import spatial.dsl._
     val argout = ArgOut[Int]
     val dram = DRAM[Int](32)
     Accel{
-      val mem = SRAM[Int](32)
+      val mem = SRAM[Int](32).buffer
       Foreach(N by 1){i => 
         Foreach(0 until 1 by 1){j =>
           argout := mux(j == 0, i, mem(i))

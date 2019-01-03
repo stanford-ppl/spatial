@@ -28,15 +28,15 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
   final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
   lazy val dimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) 
-                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
-                                         else if (mem.isHierarchicalBank) Seq(NEST_BANKS) 
-                                         else if (mem.isFlatBank) Seq(FLAT_BANKS) 
+                                         else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
+                                         else if (mem.isNoHierarchicalBank) Seq(FLAT_BANKS) 
+                                         else if (mem.isNoFlatBank) Seq(NEST_BANKS) 
                                          else if (mem.isNoBank) Seq() 
                                          else Seq(FLAT_BANKS)
   lazy val wrDimGrps: Seq[Seq[Seq[Int]]] = if (mem.isLineBuffer) Seq(Seq(NEST_BANKS.last)) 
-                                         else if (rank > 1 && !mem.isHierarchicalBank && !mem.isFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
-                                         else if (mem.isHierarchicalBank) Seq(NEST_BANKS) 
-                                         else if (mem.isFlatBank) Seq(FLAT_BANKS) 
+                                         else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank && !mem.isNoBank) Seq(FLAT_BANKS, NEST_BANKS) 
+                                         else if (mem.isNoHierarchicalBank) Seq(FLAT_BANKS) 
+                                         else if (mem.isNoFlatBank) Seq(NEST_BANKS) 
                                          else Seq(FLAT_BANKS)
 
 

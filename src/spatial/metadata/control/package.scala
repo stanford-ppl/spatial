@@ -11,7 +11,7 @@ import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
-import spatial.issues.AmbiguousMetaPipes
+import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
 import scala.util.Try
 
@@ -912,7 +912,7 @@ package object control {
     else {
       val metapipeLCAs = findAllMetaPipes(readers, writers)
       val hierarchicalBuffer = metapipeLCAs.keys.size > 1
-      val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
+      val hierIssue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
 
       metapipeLCAs.keys.headOption match {
         case Some(metapipe) =>
@@ -927,10 +927,14 @@ package object control {
           val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
           val minDist = buffers.minOrElse(0)
           val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
+          val bufferHazards = ports.toList.collect{case (a, i) if (a.isWriter && i.getOrElse(0) > 0) => (a,i.getOrElse(0))}
+          val bufIssue = if (bufferHazards.nonEmpty && !mem.isWriteBuffer && !mem.isNonBuffer) Some(PotentialBufferHazard(mem, bufferHazards)) else None
+          val issue = if (hierIssue.isDefined) hierIssue else bufIssue
+
           (Some(metapipe), ports, issue)
 
         case None =>
-          (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+          (None, accesses.map{a => a -> Some(0)}.toMap, hierIssue)
       }
     }
   }

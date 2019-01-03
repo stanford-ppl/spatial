@@ -36,7 +36,7 @@ import spatial.dsl._
       }
       shiftregfile_dram store shiftregfile
 
-      val triplebuf = RegFile[I32](8,Seq.tabulate[I32](8){i => i})
+      val triplebuf = RegFile[I32](8,Seq.tabulate[I32](8){i => i}).buffer
       Foreach(8 by 1){i => 
         triplebuf_dram(i, 0::8) store triplebuf
         Pipe{dummy := i}

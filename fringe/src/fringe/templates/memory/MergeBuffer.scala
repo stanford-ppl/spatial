@@ -21,6 +21,8 @@ class UpDownCounter(val w: Int) extends Module {
   val en = io.en | io.reset
 
   val counter = Module(new FringeFF(UInt(w.W)))
+  counter.io <> DontCare
+  counter.io.reset := false.B
   counter.io.enable := en
 
   val count = Mux(io.incDec, counter.io.out + io.stride, counter.io.out - io.stride)(w - 1,0)
@@ -63,10 +65,13 @@ class FIFOPeek[T<:Data](val t: T) extends Module {
     val peek = Valid(t.cloneType)
     val out = Decoupled(t.cloneType)
   })
+  io <> DontCare
 
   val fifo = Module(new SFIFO(t.cloneType, 128))
+  fifo.io <> DontCare
 
   val ff = Module(new FringeFF(Valid(t.cloneType)))
+  ff.io <> DontCare
 
   val deq = ~ff.io.out.valid | io.out.ready
   ff.io.enable := deq
@@ -155,8 +160,10 @@ class MergeBufferIO(ways: Int, w: Int, v: Int) extends Bundle {
 class MergeBufferTwoWay(w: Int, v: Int) extends Module {
 
   val io = IO(new MergeBufferIO(2, w, v))
+  io <> DontCare
 
   val sortPipe = Module(new SortPipe(w, v))
+  sortPipe.io <> DontCare
   sortPipe.io.out.ready := io.out.ready
 
   val countEn = sortPipe.io.in.valid & sortPipe.io.in.ready
@@ -164,16 +171,18 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
   val counterW = log2Ceil(v)
   val headCounter = List.fill(2) { Module(new UpDownCounter(counterW)) }
   headCounter.zipWithIndex.foreach { case (hc, i) =>
+    hc.io <> DontCare
     hc.io.init := 0.U
     hc.io.incDec := true.B
     hc.io.en := countEn
   }
 
   val initMerge = Module(new FringeFF(Bool()))
+  initMerge.io <> DontCare
   initMerge.io.enable := io.initMerge.valid
   initMerge.io.in := io.initMerge.bits
 
-  val buffers = List.fill(2) { Module(new FIFOPeek(Vec(v, UInt(w.W)))) }
+  val buffers = List.fill(2) { val x = Module(new FIFOPeek(Vec(v, UInt(w.W)))); x.io <> DontCare; x }
   buffers.zipWithIndex.foreach { case (b, i) =>
     b.io.in.valid := io.in(i).valid
     b.io.in.bits := io.in(i).bits
@@ -185,6 +194,7 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
 
   val streamCounter = List.fill(2) { Module(new UpDownCounter(w)) }
   streamCounter.zipWithIndex.foreach { case (sc, i) =>
+  sc.io <> DontCare
     sc.io.init := io.inBound(i).bits
     sc.io.incDec := false.B
     sc.io.saturate := true.B
@@ -194,6 +204,7 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
 
   val shifters = List.fill(2) { Module(new BarrelShifter(Valid(UInt(w.W)), v)) }
   shifters.zipWithIndex.foreach { case (s, i) =>
+    s.io <> DontCare
     s.io.in.zipWithIndex.foreach { case (v, j) =>
       v.valid := buffers(i).io.out.valid
       v.bits := buffers(i).io.out.bits(j)

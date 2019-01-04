@@ -115,6 +115,7 @@ package object utils {
     val ff = Module(new FringeFF(sig))
     ff.io.init := 0.U(sig.getWidth.W).asTypeOf(sig)
     ff.io.in := sig
+    ff.io.reset := false.B
     ff.io.enable := en
     ff.io.out
   }

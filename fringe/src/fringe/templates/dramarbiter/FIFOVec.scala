@@ -22,9 +22,11 @@ class FIFOVec[T <: Data](t: T, depth: Int, v: Int) extends Module {
 
   val counterW = log2Ceil(v)
   val enqCounter = Module(new Counter(counterW))
+  enqCounter.io <> DontCare
   enqCounter.io.enable := writeEn & io.chainEnq
   enqCounter.io.stride := 1.U
   val deqCounter = Module(new Counter(counterW))
+  deqCounter.io <> DontCare
   deqCounter.io.enable :=  readEn & io.chainDeq
   deqCounter.io.stride := 1.U
 
@@ -36,6 +38,7 @@ class FIFOVec[T <: Data](t: T, depth: Int, v: Int) extends Module {
   val d = depth / v
   val fifos = List.tabulate(v) { i =>
     val m = Module(new FIFO(t, d))
+    m.io <> DontCare
     m.io.in.valid := Mux(io.chainEnq, enqDecoder(i), true.B) & writeEn
     m.io.in.bits := Mux(io.chainEnq, io.in.bits(0), io.in.bits(i))
     m.io.out.ready := Mux(io.chainDeq, deqDecoder(i), true.B) & readEn

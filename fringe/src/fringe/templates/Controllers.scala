@@ -6,7 +6,7 @@ import fringe.templates.memory.{SRFF,FF}
 import fringe.utils.{getRetimed, risingEdge}
 import fringe.utils.implicits._
 
-class ControlInterface(p: ControlParams) extends Bundle {
+class ControlInterface(val p: ControlParams) extends Bundle {
   // Control signals
   val enable = Input(Bool())
   val done = Output(Bool())
@@ -70,6 +70,8 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
   def this(sched: Sched, depth: Int, isFSM: Boolean = false, stateWidth: Int = 32, cases: Int = 1, latency: Int = 0, myName: String = "OuterControl") = this(ControlParams(sched, depth, isFSM, false, stateWidth, cases, latency, myName))
   def this(tup: (Sched, Int, Boolean, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4, tup._5, tup._6)
 
+  io.selectsOut <> DontCare
+  
   // Create SRFF arrays for stages' actives and dones
   val active = List.tabulate(p.depth){i => Module(new SRFF())}
   val done = List.tabulate(p.depth){i => Module(new SRFF())}
@@ -216,7 +218,9 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
   // Connect output signals
   if (p.isFSM) {
     val stateFSM = Module(new FF(p.stateWidth))
+    stateFSM.io <> DontCare
     val doneReg = Module(new SRFF())
+    doneReg.io <> DontCare
 
     stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
     stateFSM.io.xBarW(0).init.head := io.initState.asUInt
@@ -255,18 +259,20 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
   val active = Module(new SRFF())
   val done = Module(new SRFF())
 
+  active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data & io.flow
+  active.io.input.reset := io.ctrDone | io.rst | io.parentAck | io.break
+  active.io.input.asyn_reset := false.B
+  done.io.input.reset := io.rst | io.parentAck
+  done.io.input.asyn_reset := false.B
+  p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone) | io.break}
+
+  io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
   io.enableOut <> DontCare
+  val doneLag = if (p.cases > 1) 0 else p.latency
+  io.ctrRst := risingEdge(getRetimed(done.io.output.data, doneLag, io.flow)) | io.rst 
 
   if (!p.isFSM) {
-    active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data & io.flow
-    active.io.input.reset := io.ctrDone | io.rst | io.parentAck | io.break
-    active.io.input.asyn_reset := false.B
-    p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone) | io.break}
-    done.io.input.reset := io.rst | io.parentAck
-    done.io.input.asyn_reset := false.B
-
     // Set outputs
-    io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
     if (p.isPassthrough) { // pass through signals
       io.datapathEn := io.enable  & io.flow// & ~io.done & ~io.parentAck
       io.ctrInc := io.enable & io.flow
@@ -276,8 +282,6 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
       io.ctrInc := active.io.output.data & io.enable & io.flow
     }
 
-    val doneLag = if (p.cases > 1) 0 else p.latency
-    io.ctrRst := risingEdge(getRetimed(done.io.output.data, doneLag, io.flow)) | io.rst 
     io.done := risingEdge(getRetimed(done.io.output.data, doneLag, io.flow))
     io.childAck.zip(io.doneIn).foreach{case (a,b) => a := b.D(1) | io.ctrDone.D(1)}
 
@@ -285,11 +289,14 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
     val doneLatchReg = RegInit(false.B)
     doneLatchReg := Mux(io.rst || io.parentAck, false.B, Mux(getRetimed(risingEdge(done.io.output.data), 0 max {doneLag-1}, io.flow), true.B, doneLatchReg))
     io.doneLatch := doneLatchReg
+
     io.state := DontCare
 
   } else { // FSM inner
     val stateFSM = Module(new FF(p.stateWidth))
+    stateFSM.io <> DontCare
     val doneReg = Module(new SRFF())
+    doneReg.io <> DontCare
 
     // // With retime turned off (i.e p.latency == 0), this ensures mutations in the fsm body will be considered when jumping to next state
     // val depulser = RegInit(true.B) 

@@ -52,7 +52,7 @@ trait ChiselGenCounter extends ChiselGenCommon {
       emit(src"// Owner = ${lhs.owner}")
       emit(src"""override val ctrs = List[CtrObject](${ctrs.map(quote).mkString(",")})""")
       emit(src"""lazy val cchain = Module(new CounterChain(ctrs.map(_.par), ctrs.map(_.fixedStart), ctrs.map(_.fixedStop), ctrs.map(_.fixedStep), """ + 
-                       src"""List.fill(${ctrs.size})(Some(0)), ctrs.map(_.isForever), ctrs.map(_.width), myName = "${lhs}${suffix}_cchain"))""")
+                       src"""ctrs.map(_.isForever), ctrs.map(_.width), myName = "${lhs}${suffix}_cchain"))""")
 
     }
     emit(src"${lhs}${suffix}.configure()")

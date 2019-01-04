@@ -25,6 +25,7 @@ class FringeCounter(val w: Int) extends Module {
   val init = 0.U(w.W)
   reg.io.init := init
   reg.io.enable := io.reset | io.enable
+  reg.io.reset := io.reset
 
   val count = Cat(0.U(1.W), reg.io.out)
   val newval = count + io.stride

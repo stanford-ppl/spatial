@@ -47,7 +47,7 @@ trait ChiselGenController extends ChiselGenCommon {
       val w = bitWidth(counters(i).typeArgs.head)
       emit(src"""val $iter = ${cchain}.cchain.io.output.counts($id).FP(true, $w, 0); $iter.suggestName("$iter")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
-        emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain"))""")
+        emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain")); ${iter}_chain.io <> DontCare""")
         emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
           val sfx = if (c.isBranch) "_obj" else ""
@@ -59,7 +59,7 @@ trait ChiselGenController extends ChiselGenCommon {
     valids.zipWithIndex.foreach{ case (v,id) => 
       emit(src"""val $v = ~${cchain}.cchain.io.output.oobs($id); $v.suggestName("$v")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
-        emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain"))""")
+        emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain")); ${v}_chain.io <> DontCare""")
         emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
           val sfx = if (c.isBranch) "_obj" else ""
@@ -196,7 +196,7 @@ trait ChiselGenController extends ChiselGenCommon {
     // Create controller
     emitSMObject(lhs) {
       emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm"))""")
-      emit("sm.io <> DontCare; doneCondition := DontCare")
+      emit("sm.io <> DontCare; doneCondition := DontCare; resetMe := DontCare")
       if (lhs.cchains.isEmpty) emit(src"""datapathEn := sm.io.datapathEn & mask""")
       else emit(src"""datapathEn := sm.io.datapathEn & mask & ~sm.io.ctrDone""")
 
@@ -249,7 +249,7 @@ trait ChiselGenController extends ChiselGenCommon {
           }
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
-          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
           emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
           emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
 
@@ -327,7 +327,6 @@ trait ChiselGenController extends ChiselGenCommon {
       createKernel(lhs, ens, notDone, action, nextState) {
         val state = notDone.input
         emit(createWire(src"$state", src"${state.tp}"))
-        emit(createWire(src"${lhs}_doneCondition","Bool()"))
         emit(src"${state}.r := ${lhs}.sm.io.state.r")
 
         gen(notDone)

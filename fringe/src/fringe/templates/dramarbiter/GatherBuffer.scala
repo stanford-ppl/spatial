@@ -75,7 +75,7 @@ class GatherBuffer(
     val rdata = Decoupled(Vec(v, UInt(w.W)))
   })
 
-  val meta = List.fill(v) { Module(new FIFO(new MetaData, depth / v, true)) }
+  val meta = List.fill(v) { val x = Module(new FIFO(new MetaData, depth / v, true)); x.io <> DontCare; x }
 
   val addressSel = Module(new GatherAddressSelector(v))
   addressSel.io.in <> io.cmdAddr

@@ -12,7 +12,8 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
     val app = Vec(streamCount, Flipped(dramStream.cloneType))
     val dram = dramStream.cloneType
   })
-
+  io <> DontCare
+  
   val cmdValids = io.app.map { _.cmd.valid }
   val cmdIdx = PriorityEncoder(cmdValids)
   val cmdInDecoder = UIntToOH(cmdIdx)

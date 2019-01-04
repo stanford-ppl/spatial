@@ -90,15 +90,18 @@ trait ChiselGenMem extends ChiselGenCommon {
     val broadcastids = lhs.port.broadcast.mkString("List(",",",")")
     if (lhs.isDirectlyBanked & !isBroadcast) {
       emit(createWire(src"""${lhs}_port""", src"""new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList)"""))
+      emit(src"${lhs}_port := DontCare")
       emit(src"""${lhs}.toSeq.zip(${mem}.m.connectDirectRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else if (isBroadcast) {
       val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
+      emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emit(src"""${lhs}.toSeq.zip(${mem}.m.connectBroadcastRPort(${lhs}_port, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else {
       val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
+      emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emit(src"""${lhs}.toSeq.zip(${mem}.m.connectXBarRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     }
@@ -131,15 +134,18 @@ trait ChiselGenMem extends ChiselGenCommon {
     val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
     if (lhs.isDirectlyBanked && !isBroadcast) {
       emit(createWire(src"""${lhs}_port""", src"""new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width)"""))
+      emit(src"${lhs}_port := DontCare")
       emit(src"""${mem}.m.connectDirectWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     } else if (isBroadcast) {
       val banklist = bank.flatten.map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
+      emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emit(src"""${mem}.m.connectBroadcastWPort(${lhs}_port, ($muxPort, $muxOfs))""")        
     } else {
       val banklist = bank.flatten.map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
+      emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
       emit(src"""${mem}.m.connectXBarWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     }
@@ -288,6 +294,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     ${fracBits(mem.tp.typeArgs.head)}, 
     myName = "$mem"
   ))""")
+     emit(src"m.io${ifaceType(mem)} <> DontCare")
       if (name == "FIFO" || name == "FIFOReg") {
         mem.writers.foreach{x => emit(createWire(src"enqActive_$x","Bool()"))}
         mem.readers.foreach{x => emit(createWire(src"deqActive_$x","Bool()"))}
@@ -423,7 +430,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
     case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
     case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostFull")
-    case op@FIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io.output.data(0)")
+    case op@FIFOPeek(fifo,_) => 
+      emit(src"$fifo.deqActive_$lhs := false.B") 
+      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io.output.data(0)")
     case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
@@ -451,7 +460,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     case MergeBufferNew(ways, par) =>
       val readers = lhs.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.size
       emitMemObject(lhs){
-        emit(src"""val m = Module(new MergeBuffer(${ways.toInt}, ${par.toInt}, ${bitWidth(lhs.tp.typeArgs.head)}, $readers))""")
+        emit(src"""val m = Module(new MergeBuffer(${ways.toInt}, ${par.toInt}, ${bitWidth(lhs.tp.typeArgs.head)}, $readers)); m.io <> DontCare""")
       }
     case MergeBufferBankedEnq(merge, way, data, ens) =>
       val d = data.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")

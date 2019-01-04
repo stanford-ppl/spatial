@@ -56,7 +56,7 @@ class FixFMAAccum(
   // Use log2Down to be consistent with latency model that truncates
   val drain_latency = (log(cycleLatency)/log(2)).toInt
 
-  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), false, cw))
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), false, cw))
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
   laneCtr.io.input.saturate := false.B
@@ -80,6 +80,9 @@ class FixFMAAccum(
     fixadd.r := Mux(isFirstRound, 0.U, acc.io.output.data(0))
     val result = Wire(new FixedPoint(s,d,f))
     result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B).r
+    acc.io.xBarR <> DontCare
+    acc.io.directR <> DontCare
+    acc.io.directW <> DontCare
     acc.io.xBarW(0).data(0) := result.r
     acc.io.xBarW(0).en(0) := getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
     acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + fmaLatency)
@@ -119,7 +122,8 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   // Use log2Down to be consistent with latency model that truncates
   val drain_latency = ((log(cycleLatency)/log(2)).toInt * opLatency).toInt
 
-  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), Some(0), false, cw))
+  val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), false, cw))
+  laneCtr.io <> DontCare
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + opLatency)
   laneCtr.io.input.saturate := false.B
@@ -148,6 +152,11 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
       case Accum.Min => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
       case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
     }
+    acc.io.xBarW <> DontCare
+    acc.io.xBarR <> DontCare
+    acc.io.directW <> DontCare
+    acc.io.directR <> DontCare
+    acc.io.reset := false.B
     acc.io.xBarW(0).data(0) := result.r
     acc.io.xBarW(0).en(0) := getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
     acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + opLatency)

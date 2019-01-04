@@ -9,7 +9,7 @@ import fringe.targets.aws.AWS_F1
 import fringe.targets.zcu.ZCU
 import fringe.targets.zynq.Zynq
 
-class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
+class SRAMVerilogIO[T<:Data](val t: T, val d: Int) extends Bundle {
     val addrWidth = {1 max log2Ceil(d)}
     val clk = Input(Clock())
     val raddr = Input(UInt(addrWidth.W))
@@ -102,7 +102,7 @@ class FFRAM[T<:Data](override val t: T, override val d: Int) extends GenericRAM(
     r
   }
 
-  io.rdata := Vec(regs)(io.raddr)
+  io.rdata := VecInit(regs)(io.raddr)
 }
 
 class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: String) extends GenericRAM(t, d) {

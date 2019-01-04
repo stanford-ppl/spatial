@@ -353,7 +353,7 @@ public:
     startTime = (double) (ts1.tv_sec);
     startTime = (double) (startTime * 1000 + (double)(ts1.tv_nsec) / 1000000) ;
 #endif // F1
-    // aws_poke(BASE_ADDR + NUM_INST, 0x00000000);	// TODO: Move outside run()?
+    // aws_poke(BASE_ADDR + NUM_INST, 0x00000000);  // TODO: Move outside run()?
     uint32_t status;
     aws_poke(SCALAR_CMD_BASE_ADDR + CMD_REG_ADDR, 1);
     do {
@@ -405,10 +405,10 @@ public:
     uint64_t value;
     uint32_t value_32b;
     
-    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*arg,                      &value_32b);
+    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*(arg - numArgIns),                      &value_32b);
     value = (uint64_t)(value_32b);
     
-    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*arg + UINT64_C_AWS(0x20), &value_32b);
+    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*(arg - numArgIns) + UINT64_C_AWS(0x20), &value_32b);
     value = value | (uint64_t)((uint64_t)(value_32b) << 32);
     
     return value;

@@ -89,7 +89,7 @@ class StreamControllerStore(
 
   io.dram.wdata.valid := wdata.io.out.valid
   io.dram.wdata.bits.wdata := wdata.io.out.bits.data
-  io.dram.wdata.bits.wstrb := Vec(wdata.io.out.bits.strobe.toBools).reverse
+  io.dram.wdata.bits.wstrb := VecInit(wdata.io.out.bits.strobe.toBools).reverse
   wdata.io.out.ready := io.dram.wdata.ready
 
   val wresp = Module(new FIFO(Bool(), target.bufferDepth))
@@ -123,7 +123,7 @@ class StreamControllerGather(
   io.gather.cmd.ready := cmd.map { _.io.in.ready }.reduce { _ & _ }
 
   val gatherBuffer = Module(new GatherBuffer(info.w, info.v, target.bufferDepth))
-  gatherBuffer.io.cmdAddr <> Vec(cmd.map { _.io.out })
+  gatherBuffer.io.cmdAddr <> VecInit(cmd.map { _.io.out })
 
   gatherBuffer.io.rresp.valid := io.dram.rresp.valid
   gatherBuffer.io.rresp.bits.burstTag := io.dram.rresp.bits.getTag.uid
@@ -185,7 +185,7 @@ class StreamControllerScatter(
   }
 
   io.dram.wdata.valid := wdata.io.out.valid & wstrobe.io.out.valid
-  io.dram.wdata.bits.wdata := Vec(List.fill(EXTERNAL_W * EXTERNAL_V / info.w) {
+  io.dram.wdata.bits.wdata := VecInit(List.fill(EXTERNAL_W * EXTERNAL_V / info.w) {
     wdata.io.out.bits(0)
   }).asTypeOf(io.dram.wdata.bits.wdata)
   io.dram.wdata.bits.wstrb := wstrobe.io.out.bits

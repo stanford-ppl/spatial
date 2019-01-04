@@ -132,11 +132,11 @@ package object utils {
   }
 
   def vecSlice[T <: chisel3.core.Data](v: Vec[T], start: Int, end: Int) = {
-    Vec(for (i <- start to end) yield v(i))
+    VecInit(for (i <- start to end) yield v(i))
   }
 
   def vecJoin[T <: chisel3.core.Data](v1: Vec[T], v2: Vec[T]) = {
-    Vec(List.tabulate(v1.length + v2.length) { i =>
+    VecInit(List.tabulate(v1.length + v2.length) { i =>
       if (i < v1.length) v1(i) else v2(i - v1.length)
     })
   }

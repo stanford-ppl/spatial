@@ -31,7 +31,7 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
   val cmdStreamID = cmdMux.io.out.bits.getTag.streamID
   val cmdOutDecoder = UIntToOH(cmdStreamID)
   val wdataMux = Module(new MuxPipe(dramStream.wdata.bits, streamCount))
-  wdataMux.io.in.valid := Vec(io.app.map { _.wdata.valid })(cmdStreamID) & cmdMux.io.out.valid
+  wdataMux.io.in.valid := VecInit(io.app.map { _.wdata.valid })(cmdStreamID) & cmdMux.io.out.valid
   wdataMux.io.sel := cmdStreamID
   wdataMux.io.in.bits := io.app.map { _.wdata.bits }
 
@@ -61,6 +61,6 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
   }
 
   // if we can't meet timing, pipeline these muxes
-  io.dram.rresp.ready := Vec(io.app.map { _.rresp.ready })(rrespStream)
-  io.dram.wresp.ready := Vec(io.app.map { _.wresp.ready })(wrespStream)
+  io.dram.rresp.ready := VecInit(io.app.map { _.rresp.ready })(rrespStream)
+  io.dram.wresp.ready := VecInit(io.app.map { _.wresp.ready })(wrespStream)
 }

@@ -33,7 +33,7 @@ class ShuffleCompressNetwork[T <: Data](t: T, v: Int) extends Module {
 
   stageMap(v).zipWithIndex.foreach { case (stage, i) =>
     val in = if (i == 0) io.in else stages(i - 1)
-    val out = Vec(stage.flatMap { case (a, b) =>
+    val out = VecInit(stage.flatMap { case (a, b) =>
       val s = in(a).m
       if (a == b) List(in(a)) else List(
         Mux(s, in(a), in(b)),
@@ -53,6 +53,6 @@ object Shuffle {
       in.d := data(i)
       in.m := mask(i)
     }
-    (Vec(m.io.out.map { _.d }), Vec(m.io.out.map { _.m }))
+    (VecInit(m.io.out.map { _.d }), VecInit(m.io.out.map { _.m }))
   }
 }

@@ -35,7 +35,6 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
   globals.target.makeIO = { x: Data => IO(x) }
   val accel = accelGen()
   val io = globals.target.topInterface(reset, accel)
-
   // Accel
 
   // TBD: Accel <-> Fringe Memory connections

@@ -44,7 +44,7 @@ class BarrelShifter[T<:Data](val t: T, val v: Int) extends Module {
   })
 
   def barrelShifter(in: Vec[T], shiftSel: Bits, shift: Int): Vec[T] = {
-    val out = Vec(List.tabulate(in.length) { i =>
+    val out = VecInit(List.tabulate(in.length) { i =>
       val shiftIndex = i + shift
       val a = if (shiftIndex >= in.length) in(in.length - 1) else in(shiftIndex)
       val s = shiftSel(0)
@@ -215,8 +215,8 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
     (rBit, lBit, out)
   }.unzip3
 
-  val rValid = Vec(rBits).asUInt
-  val lValid = Vec(lBits).asUInt
+  val rValid = VecInit(rBits).asUInt
+  val lValid = VecInit(lBits).asUInt
   headCounter(0).io.stride := PopCount(rValid)
   headCounter(1).io.stride := PopCount(lValid)
   streamCounter(0).io.stride := PopCount(rValid)
@@ -225,7 +225,7 @@ class MergeBufferTwoWay(w: Int, v: Int) extends Module {
   val oneSided = ((rValid | lValid).andR & streamCounter.map { _.io.out < v.U }.reduce { _|_ })
   sortPipe.io.in.valid := oneSided | shifters.map { s => s.io.out.map { _.valid }.reduce { _&_ } }.reduce { _&_ }
 
-  sortPipe.io.in.bits := Vec(outBits)
+  sortPipe.io.in.bits := VecInit(outBits)
 
   io.outBound.valid := io.inBound.map { _.valid }.reduce{ _|_ }
   io.outBound.bits := io.inBound.map { _.bits }.reduce{ _+_ }

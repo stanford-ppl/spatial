@@ -52,6 +52,9 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
     val argOutLoopbacks = Output(Vec(1 max argOutLoopbacksMap.toList.length, UInt(w.W)))
   })
 
+  io.argOutLoopbacks <> DontCare
+  io.argOuts <> DontCare
+
   // Sanity-check module parameters
   Predef.assert(numArgIns >= 0, s"Invalid numArgIns ($numArgIns): must be >= 0.")
   Predef.assert(numArgOuts >= 0, s"Invalid numArgOuts ($numArgOuts): must be >= 0.")
@@ -84,7 +87,7 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
   }
 
   val rport = Module(new MuxN(UInt(w.W), d))
-  val regOuts = Vec(regs.map{_.io.out})
+  val regOuts = VecInit(regs.map{_.io.out})
   rport.io.ins := regOuts
   if (globals.target.isInstanceOf[fringe.targets.zcu.ZCU]) {
     rport.io.sel := io.raddr / 2.U(addrWidth.W)
@@ -99,5 +102,5 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
   }
   
 
-  io.argIns := Vec(regOuts.zipWithIndex.filter { case (arg, idx) => argInRange.contains(idx) }.map {_._1})
+  io.argIns := VecInit(regOuts.zipWithIndex.filter { case (arg, idx) => argInRange.contains(idx) }.map {_._1})
 }

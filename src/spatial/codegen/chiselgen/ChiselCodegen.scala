@@ -320,13 +320,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       close("}")
     }
     inGen(out, "Instantiator.scala") {
-      emit (s"""val w = if ("${spatialConfig.target.name}" == "zcu") 32 else if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 8 else 32""")
+      emit (s"""val w = if (this.target == "zcu") 32 else if (this.target == "VCS" || this.target == "ASIC") 8 else 32""")
       emit ("val numArgIns = numArgIns_mem  + numArgIns_reg + numArgIOs_reg")
       emit ("val numArgOuts = numArgOuts_reg + numArgIOs_reg + numArgOuts_instr + numArgOuts_breakpts")
       emit ("val numArgIOs = numArgIOs_reg")
       emit ("val numArgInstrs = numArgOuts_instr")
       emit ("val numArgBreakpts = numArgOuts_breakpts")
-      emit (s"""new Top("${spatialConfig.target.name}", () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
+      emit (s"""new Top(this.target, () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
       // emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
       close("}")
       emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
@@ -380,6 +380,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override protected def emitEntry(block: Block[_]): Unit = {
     open(src"object Main {")
       open(src"def main(top: AccelTop): Unit = {")
+        emit("top.io <> DontCare")
         emitPreMain()
         outsideAccel{gen(block)}
         emitPostMain()

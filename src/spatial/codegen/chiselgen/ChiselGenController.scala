@@ -196,6 +196,7 @@ trait ChiselGenController extends ChiselGenCommon {
     // Create controller
     emitSMObject(lhs) {
       emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm"))""")
+      emit("sm.io <> DontCare; doneCondition := DontCare")
       if (lhs.cchains.isEmpty) emit(src"""datapathEn := sm.io.datapathEn & mask""")
       else emit(src"""datapathEn := sm.io.datapathEn & mask & ~sm.io.ctrDone""")
 
@@ -248,7 +249,7 @@ trait ChiselGenController extends ChiselGenCommon {
           }
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
-          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0), false)) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), Some(0), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
           emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
           emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
 

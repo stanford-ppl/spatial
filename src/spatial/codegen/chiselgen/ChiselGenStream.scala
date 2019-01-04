@@ -31,7 +31,7 @@ trait ChiselGenStream extends ChiselGenCommon {
         forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
         forceEmit(src"valid := valid_options.reduce{_|_}")
         forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
-        forceEmit(src"val m = Vec((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
+        forceEmit(src"val m = VecInit((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
         forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
       }	    
 

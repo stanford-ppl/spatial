@@ -221,7 +221,7 @@ class NBufMem(
           val sramBroadcastRPorts = broadcastRMux.accessPars.length
           (0 until sramBroadcastRPorts).foreach {k => 
             f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
-            f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
+            // f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
             f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
             f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
           }
@@ -430,7 +430,7 @@ class NBufMem(
           (0 until sramBroadcastRPorts).foreach {k => 
             f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
             // f.io.xBarR(sramXBarRBase + k).shiftEn := io.broadcastR(k).shiftEn
-            f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
+            // f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
             f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
             f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
           }

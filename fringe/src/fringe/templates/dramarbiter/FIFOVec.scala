@@ -43,9 +43,9 @@ class FIFOVec[T <: Data](t: T, depth: Int, v: Int) extends Module {
   }
 
   val inReady = fifos.map { _.io.in.ready }
-  io.in.ready := Mux(io.chainEnq, Vec(inReady)(enqCounter.io.out), inReady.reduce { _&_ })
+  io.in.ready := Mux(io.chainEnq, VecInit(inReady)(enqCounter.io.out), inReady.reduce { _&_ })
   val outValid = fifos.map { _.io.out.valid }
-  io.out.valid := Mux(io.chainDeq, Vec(outValid)(deqCounter.io.out), outValid.reduce { _&_ })
+  io.out.valid := Mux(io.chainDeq, VecInit(outValid)(deqCounter.io.out), outValid.reduce { _&_ })
   val outBits = fifos.map { _.io.out.bits }
-  io.out.bits := Mux(io.chainDeq, Vec(List.fill(v) { Vec(outBits)(rAddr) }), Vec(outBits))
+  io.out.bits := Mux(io.chainDeq, VecInit(List.fill(v) { VecInit(outBits)(rAddr) }), VecInit(outBits))
 }

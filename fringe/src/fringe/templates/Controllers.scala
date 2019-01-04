@@ -234,6 +234,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
     io.doneLatch := doneLatchReg
   }
   else {
+    io.state := DontCare
     io.datapathEn := io.enable & ~allDone
     io.done := getRetimed(risingEdge(allDone), p.latency + 1, io.enable)
 
@@ -253,6 +254,8 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
   // Create state SRFFs
   val active = Module(new SRFF())
   val done = Module(new SRFF())
+
+  io.enableOut <> DontCare
 
   if (!p.isFSM) {
     active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output.data & io.flow
@@ -282,6 +285,7 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
     val doneLatchReg = RegInit(false.B)
     doneLatchReg := Mux(io.rst || io.parentAck, false.B, Mux(getRetimed(risingEdge(done.io.output.data), 0 max {doneLag-1}, io.flow), true.B, doneLatchReg))
     io.doneLatch := doneLatchReg
+    io.state := DontCare
 
   } else { // FSM inner
     val stateFSM = Module(new FF(p.stateWidth))

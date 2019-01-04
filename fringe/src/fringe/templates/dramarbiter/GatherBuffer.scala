@@ -115,7 +115,7 @@ class GatherBuffer(
   io.rdata.valid := meta.map { case fifo =>
     fifo.io.out.valid & fifo.io.out.bits.done
   }.reduce { _&_ }
-  io.rdata.bits := Vec(meta.map { _.io.out.bits.word })
+  io.rdata.bits := VecInit(meta.map { _.io.out.bits.word })
 
   io.rresp.ready := true.B
 

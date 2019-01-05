@@ -95,7 +95,7 @@ class StreamControllerStore(
 
   io.dram.wdata.valid := wdata.io.out.valid
   io.dram.wdata.bits.wdata := wdata.io.out.bits.data
-  io.dram.wdata.bits.wstrb := VecInit(wdata.io.out.bits.strobe.toBools).reverse
+  io.dram.wdata.bits.wstrb := VecInit(wdata.io.out.bits.strobe.asBools).reverse
   wdata.io.out.ready := io.dram.wdata.ready
 
   val wresp = Module(new FIFO(Bool(), target.bufferDepth))

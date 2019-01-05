@@ -100,7 +100,7 @@ package object utils {
       sr.io.in := done_catch.io.output.data & ready
       sr.io.flow := ready
       done_catch.io.input.asyn_reset := reset
-      done_catch.io.input.set := in_done.toBool & ready
+      done_catch.io.input.set := in_done.asBool & ready
       val out = sr.io.out
       val out_overlap = done_catch.io.output.data
       done_catch.io.input.reset := out & out_overlap & ready

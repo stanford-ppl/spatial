@@ -7,8 +7,8 @@ abstract class BigIP {
   case class Unimplemented(op: String) extends Exception(s"$op is not implemented for the given target.")
 
   def getConst[T<:Data](sig: T): Option[BigInt] = sig match {
-    case u: UInt => if (u.litArg.isDefined) Some(u.litArg.get.num) else None
-    case s: SInt => if (s.litArg.isDefined) Some(s.litArg.get.num) else None
+    case u: UInt => if (u.litOption.isDefined) Some(u.litOption.get) else None
+    case s: SInt => if (s.litOption.isDefined) Some(s.litOption.get) else None
     case _ => None
   }
 

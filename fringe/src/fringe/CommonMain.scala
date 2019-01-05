@@ -62,6 +62,13 @@ trait CommonMain {
       Driver.run(dut, cmd)(tester)
     } else if (splitArgs.chiselArgs.contains("--verilog")) {
       chisel3.Driver.execute(Array[String]("--target-dir", s"verilog-${target}"), dut)
+    } else if (splitArgs.chiselArgs.contains("--direct-verilog")) { // ???
+      val args = Array[String]("--target-dir", s"verilog-${target}",
+                               "--info-mode=ignore")
+      chisel3.Driver.execute(args, dut)
+    } else if (splitArgs.chiselArgs.contains("--proto")) { // Should have lower memory footprint
+      val c = chisel3.Driver.elaborate[DUTType](dut)
+      chisel3.Driver.dumpProto(c, None)
     } else {
       Driver.execute(splitArgs.chiselArgs, dut)(tester)
     }

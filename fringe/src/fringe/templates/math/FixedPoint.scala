@@ -164,14 +164,14 @@ object FixedPoint {
 
   /** Creates a FixedPoint wire from the given Bool wire. */
   def apply(s: Boolean, d: Int, f: Int, init: Bool): FixedPoint = {
-    val cst = Wire(new FixedPoint(s, d, f, init.litArg.map(_.num)))
+    val cst = Wire(new FixedPoint(s, d, f, init.litOption))
     cst.r := init
     cst
   }
 
   /** Creates a FixedPoint wire from the given UInt wire. */
   def apply(s: Boolean, d: Int, f: Int, init: UInt, sign_extend: Boolean = true): FixedPoint = {
-    val cst = Wire(new FixedPoint(s, d, f, init.litArg.map(_.num)))
+    val cst = Wire(new FixedPoint(s, d, f, init.litOption))
     val tmp = Wire(new FixedPoint(s, init.getWidth, 0))
     tmp.r := init
     cst.r := Math.fix2fix(tmp, s, d, f, None, true.B, Truncate, Wrapping).r

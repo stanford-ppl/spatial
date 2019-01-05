@@ -215,7 +215,7 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     m.io.out
   }
   override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
-    if (src.litArg.isEmpty) {
+    if (src.litOption.isEmpty) {
       val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
       fix2fixBox.io.a := src
       fix2fixBox.io.expect_neg := false.B
@@ -232,17 +232,17 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
       }
       val newlit = saturating match {
         case Wrapping =>
-          if (f_gain < 0 & d_gain >= 0)       (src.litArg.get.num + salt) >> -f_gain
-          else if (f_gain >= 0 & d_gain >= 0) (src.litArg.get.num) << f_gain
-          else if (f_gain >= 0 & d_gain < 0)  ((src.litArg.get.num + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
-          else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
+          if (f_gain < 0 & d_gain >= 0)       (src.litOption.get + salt) >> -f_gain
+          else if (f_gain >= 0 & d_gain >= 0) (src.litOption.get) << f_gain
+          else if (f_gain >= 0 & d_gain < 0)  ((src.litOption.get + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
+          else ((src.litOption.get) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
         case Saturating =>
-          if (src.litArg.get.num > BigInt((1 << (d2 + f2 + 1))-1)) BigInt((1 << (d2 + f2 + 1))-1)
+          if (src.litOption.get > BigInt((1 << (d2 + f2 + 1))-1)) BigInt((1 << (d2 + f2 + 1))-1)
           else {
-            if (f_gain < 0 & d_gain >= 0)       (src.litArg.get.num + salt) >> -f_gain
-            else if (f_gain >= 0 & d_gain >= 0) (src.litArg.get.num) << f_gain
-            else if (f_gain >= 0 & d_gain < 0)  ((src.litArg.get.num + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
-            else ((src.litArg.get.num) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
+            if (f_gain < 0 & d_gain >= 0)       (src.litOption.get + salt) >> -f_gain
+            else if (f_gain >= 0 & d_gain >= 0) (src.litOption.get) << f_gain
+            else if (f_gain >= 0 & d_gain < 0)  ((src.litOption.get + salt) >> -f_gain) & BigInt((1 << (d2 + f2 + 1)) - 1)
+            else ((src.litOption.get) << f_gain) & BigInt((1 << (d2 + f2 + 1)) -1)
           }
       }
       getRetimed(newlit.S((d2 + f2 + 1).W).asUInt.apply(d2 + f2 - 1, 0), latency, flow)

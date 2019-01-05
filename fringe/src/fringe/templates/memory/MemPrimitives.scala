@@ -224,11 +224,11 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     }
     val xBarSelectEnsModule = Module(new StickySelects(xBarSelectEnsRaw.size))
     xBarSelectEnsModule.io.ins.zip(xBarSelectEnsRaw).foreach{case (a,b) => a := b}
-    val xBarSelect = xBarSelectEnsRaw //xBarSelectEnsModule.io.outs.map(_.toBool)
+    val xBarSelect = xBarSelectEnsRaw //xBarSelectEnsModule.io.outs.map(_.asBool)
     val directSelectEnsRaw = io.directR.flatMap(_.en).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
     val directSelectEnsModule = Module(new StickySelects(directSelectEnsRaw.size))
     directSelectEnsModule.io.ins.zip(directSelectEnsRaw).foreach{case (a,b) => a := b}
-    val directSelectEns = directSelectEnsModule.io.outs.map(_.toBool)
+    val directSelectEns = directSelectEnsModule.io.outs.map(_.asBool)
     val directSelectOffsets = io.directR.flatMap(_.ofs).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
     val directSelectFlows = io.directR.flatMap(_.flow).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 

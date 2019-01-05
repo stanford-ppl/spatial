@@ -12,12 +12,17 @@ all: hw sw
 help:
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make           : VCS SW + HW build"
+	@echo "make proto     : VCS SW + HW for huge apps."
+	@echo "make hw-proto  : Build Chisel for VCS with proto chisel->firrtl compile"
 	@echo "make hw        : Build Chisel for VCS"
 	@echo "make sw        : Build software for VCS"
 	@echo "make hw-clean  : Delete all generated hw files"
 	@echo "make sw-clean  : Delete all generated sw files"
 	@echo "make clean     : Delete all compiled code"
 	@echo "------- END HELP -------"
+
+proto: hw-proto sw
+	tar -czf TopVCS.tar.gz -C verilog-vcs accel.bit.bin -C ../cpp Top
 
 sw:
 	cp scripts/vcs.mk cpp/Makefile
@@ -31,6 +36,19 @@ hw:
 	echo "$$(date +%s)" > start.log
 	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi 
 	sbt "runMain top.Instantiator --verilog --testArgs vcs"
+	cp -r vcs.hw-resources/* verilog-vcs
+	touch in.txt
+	make -C verilog-vcs
+	ln -sf verilog-vcs verilog
+	echo "$$(date +%s)" > end.log
+
+hw-proto:
+	echo "$$(date +%s)" > start.log
+	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi 
+	rm -rf verilog-vcs~ && mkdir verilog-vcs
+	sbt "runMain top.Instantiator --proto --testArgs vcs"
+	mv Top.pb verilog-vcs/
+	firrtl -i verilog-vcs/Top.pb -X verilog -o verilog-vcs/Top.v
 	cp -r vcs.hw-resources/* verilog-vcs
 	touch in.txt
 	make -C verilog-vcs

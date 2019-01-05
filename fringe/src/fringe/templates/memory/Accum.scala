@@ -57,6 +57,7 @@ class FixFMAAccum(
   val drain_latency = (log(cycleLatency)/log(2)).toInt
 
   val laneCtr = Module(new SingleCounter(1, Some(0), Some(cycleLatency.toInt), Some(1), false, cw))
+  laneCtr.io <> DontCare
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
   laneCtr.io.input.saturate := false.B
@@ -76,6 +77,7 @@ class FixFMAAccum(
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
   accums.foreach{case (acc, lane) => 
+    acc.io <> DontCare
     val fixadd = Wire(new FixedPoint(s,d,f))
     fixadd.r := Mux(isFirstRound, 0.U, acc.io.output.data(0))
     val result = Wire(new FixedPoint(s,d,f))

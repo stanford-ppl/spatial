@@ -131,8 +131,8 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
 
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
-    val result = Wire(new FloatingPoint(m, e))
     val fma = Module(new MulAddRecFN(e, m))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
     fma.io.c := recFNFromFN(e, m, b)
@@ -142,6 +142,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   def fsub(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
     fma.io.c := recFNFromFN(e, m, b)
@@ -150,6 +151,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
   def fmul(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, b)
     fma.io.c := recFNFromFN(e, m, FloatingPoint.bits(0.0f).S((m+e).W))

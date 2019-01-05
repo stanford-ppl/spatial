@@ -22,7 +22,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
       }.size
       emitMemObject(lhs){
-        emit(src"""val m = Module(new DRAMAllocator(${dim}, $reqCount))""")
+        emit(src"""val m = Module(new DRAMAllocator(${dim}, $reqCount)); m.io <> DontCare""")
       }
       val id = accelDrams.size
       emit(src"top.io.heap.req($id) := $lhs.m.io.heapReq")

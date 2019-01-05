@@ -202,7 +202,7 @@ trait PlasticineTest extends DSLTest { test =>
     val row:Int=14
     val col:Int=14
     override def shouldRun: Boolean = super.shouldRun || checkFlag(s"test.P2PNoSim")
-    override val name = s"P${row}x${col}"
+    override val name = s"P2PNoSim"
     def runPasses():Result = {
       genpir() >>
       runpir("--trace=false") >>

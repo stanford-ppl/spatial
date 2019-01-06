@@ -408,6 +408,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
 
   if (par > 0) {
     val base = Module(new FF(width))
+    base.io <> DontCare
     val init = start.asSInt
     base.io.xBarW(0).init.head := init.asUInt
     base.io.xBarW(0).reset.head := io.input.reset

@@ -481,11 +481,12 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   elements.io.input.dinc_en := io.xBarR.flatMap(_.en).toList.reduce{_|_}
 
   // Create physical mems
-  val m = (0 until par).map{ i => Module(new Mem1D(p.depth/par, p.bitWidth))}
+  val m = (0 until par).map{ i => val x = Module(new Mem1D(p.depth/par, p.bitWidth)); x.io <> DontCare; x}
 
   // Create head and reader sub counters
   val sa_width = 2 + log2Up(par)
   val subAccessor = Module(new SingleSCounterCheap(1,0,par,pW,-pR,sa_width))
+  subAccessor.io <> DontCare
   subAccessor.io.input.enable := io.xBarW.flatMap(_.en).toList.reduce{_|_} | io.xBarR.flatMap(_.en).toList.reduce{_|_}
   subAccessor.io.input.dir := io.xBarW.flatMap(_.en).toList.reduce{_|_}
   subAccessor.io.input.reset := reset
@@ -495,6 +496,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   // Create head and reader counters
   val a_width = 2 + log2Up(p.depth/par)
   val accessor = Module(new SingleSCounterCheap(1, 0, (p.depth/par), 1, -1, a_width))
+  accessor.io <> DontCare
   accessor.io.input.enable := (io.xBarW.flatMap(_.en).toList.reduce{_|_} & subAccessor.io.output.done) | (io.xBarR.flatMap(_.en).toList.reduce{_|_} & subAccessor_prev === 0.S(sa_width.W))
   accessor.io.input.dir := io.xBarW.flatMap(_.en).toList.reduce{_|_}
   accessor.io.input.reset := reset

@@ -524,6 +524,7 @@ class NBufMem(
       val numWriters = numXBarW + numDirectW
       val par = combinedXBarWMux.accessPars.sorted.headOption.getOrElse(0) max flatDirectWMux.accessPars.sorted.headOption.getOrElse(0)
       val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), false))
+      writeCol.io <> DontCare
       val en = io.xBarW.map(_.en.reduce{_||_}).reduce{_||_} || io.directW.map(_.en.reduce{_||_}).reduce{_||_}
       writeCol.io.input.enable := en
       writeCol.io.input.reset := ctrl.io.swap
@@ -537,6 +538,7 @@ class NBufMem(
 
       val base = chisel3.util.PriorityMux(io.xBarW.map(_.en).flatten, writeCol.io.output.count)
       val colCorrection = Module(new FF(32))
+      colCorrection.io <> DontCare
       colCorrection.io.xBarW(0).data.head := base.asUInt
       colCorrection.io.xBarW(0).init.head := 0.U
       colCorrection.io.xBarW(0).en.head := en & ~gotFirstInRow.io.output.data
@@ -545,6 +547,7 @@ class NBufMem(
 
       val wCRN_width = 1 + log2Up(numrows)
       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
+      writeRow.io <> DontCare
       writeRow.io.input.enable := ctrl.io.swap
       writeRow.io.input.countUp := false.B
 
@@ -565,6 +568,7 @@ class NBufMem(
       }
 
       val readRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), (numBufs-1)*rowstride, wCRN_width))
+      readRow.io <> DontCare
       readRow.io.input.enable := ctrl.io.swap
       readRow.io.input.countUp := false.B
 

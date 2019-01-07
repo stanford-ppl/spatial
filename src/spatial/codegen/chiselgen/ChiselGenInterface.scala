@@ -28,8 +28,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
       inAccel{
         inGen(out, "ArgInterface.scala") {
           forceEmit(src"object ${lhs} {")
-          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
-          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
+          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W))); data_options := DontCare")
+          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool())); en_options := DontCare")
           forceEmit(src"}")
         }
         argIOs += (lhs -> argIOs.toList.length)
@@ -40,8 +40,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
       inAccel{
         inGen(out, "ArgInterface.scala") {
           forceEmit(src"object ${lhs} {")
-          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
-          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
+          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W))); data_options := DontCare")
+          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool())); en_options := DontCare")
           forceEmit(src"}")
         }
         argOuts += (lhs -> argOuts.toList.length)

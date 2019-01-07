@@ -185,7 +185,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   // Memory address generator
   dramArbs.foreach { _.io.reset := localReset }
   dramArbs.foreach { _.reset := localReset }
-  if (target.isInstanceOf[targets.aws.AWS_F1]) {
+  if (target.isInstanceOf[targets.aws.AWS_F1] || target.isInstanceOf[targets.aws.AWS_Sim]) {
     dramArbs.foreach { _.io.enable := io.aws_top_enable }
   }
   else {

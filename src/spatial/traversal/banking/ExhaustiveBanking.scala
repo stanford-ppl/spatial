@@ -154,7 +154,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               dbgs(s"  Group #$i:")
               grp.foreach{matrix => dbgss("    ", matrix.toString) }
             }
-            findBanking(selGrps, dims, stagedDims)
+            // If only 1 acc left per group, Unit banking, otherwise search
+            if (selGrps.forall(_.lengthLessThan(2))) ModBanking.Unit(1) else findBanking(selGrps, dims, stagedDims)
           }
           val dimsInStrategy = strategy.flatten.distinct
           val prunedGrps = myGrps.map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.distinct}

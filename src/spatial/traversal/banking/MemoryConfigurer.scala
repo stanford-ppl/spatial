@@ -269,7 +269,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val mulCost = 6
     val divCost = 20
     val modCost = 20
-    val muxCost = 5
+    val muxCost = 6
     val volumePenalty = 1
 
     if (banking.nonEmpty) {

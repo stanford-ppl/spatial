@@ -105,8 +105,8 @@ val common = base ++ Seq(
 )
 
 
-val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.1.+")
-val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.2.+")
+val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.1.6")
+val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.2.8")
 val fringe_settings = base ++ Seq(
   scalacOptions += "-Xsource:2.11",
   name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse(""),

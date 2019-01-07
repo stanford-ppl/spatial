@@ -14,6 +14,8 @@ class MAGToAXI4Bridge(val p: AXI4BundleParameters) extends Module {
     val M_AXI = new AXI4Inlined(p)
   })
 
+  io <> DontCare
+  
   val numPipelinedLevels = globals.magPipelineDepth
 
   val size = io.in.cmd.bits.size

@@ -234,7 +234,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
   })
 
-  val bases = List.tabulate(par){i => Module(new FF(width))}
+  val bases = List.tabulate(par){i => val x = Module(new FF(width)); x.io <> DontCare; x}
   if (par > 0 && !forever) {
     val lock = Module(new SRFF())
     lock.io.input.set := io.input.enable  & !io.input.reset

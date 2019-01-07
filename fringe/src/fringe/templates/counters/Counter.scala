@@ -234,6 +234,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
   })
 
+  io <> DontCare
   val bases = List.tabulate(par){i => val x = Module(new FF(width)); x.io <> DontCare; x}
   if (par > 0 && !forever) {
     val lock = Module(new SRFF())
@@ -278,18 +279,18 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
 
     if(stride.isDefined) {
-      (0 until par).foreach { i =>
+      (0 until {1 max par}).foreach { i =>
         io.output.count(i) := counts(i)
       }
     } else {
-      (0 until par).foreach { i =>
+      (0 until {1 max par}).foreach { i =>
         io.output.count(i) := counts(i)
       }
     }
 
     // Connect oobies (Out Of Bound-ies)
     val defs = {if (start.isDefined) 0x4 else 0x0} | {if (stop.isDefined) 0x2 else 0x0} | {if (stride.isDefined) 0x1 else 0x0}
-    (0 until par).foreach{ i =>
+    (0 until {1 max par}).foreach{ i =>
       // Changing start and resetting counts(i) takes a cycle, so forward the init value if required
       val c = defs match {
         case 0x7 | 0x6 | 0x5 | 0x4 => counts(i)
@@ -304,7 +305,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
         case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= stop.get.S(width.W) else io.output.oobs(i) := c > io.input.start       || c <= stop.get.S(width.W)
         case 0x2 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
         case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= io.input.stop       else io.output.oobs(i) := c > io.input.start       || c <= io.input.stop
-        case 0x0 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
+        case _   =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
       }
     }
 
@@ -526,7 +527,7 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
   // Wire up the outputs
   par.zipWithIndex.foreach { case (p, i) =>
     val addr = par.take(i+1).sum - par(i) // i+1 to avoid reducing empty list
-    (0 until p).foreach { k =>
+    (0 until {1 max p}).foreach { k =>
       io.output.counts(addr+k) := ctrs(i).io.output.count(k)
       io.output.oobs(addr+k) := ctrs(i).io.output.oobs(k) | doneLatch
     }

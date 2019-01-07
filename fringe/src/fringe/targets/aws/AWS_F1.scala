@@ -14,9 +14,11 @@ class AWS_F1 extends DeviceTarget {
 
   override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
     val io = IO(new AWSInterface)
+    io <> DontCare
 
     val blockingDRAMIssue = false  // Allow only one in-flight request, block until response comes back
     val fringe = Module(new FringeZynq(blockingDRAMIssue, io.axiLiteParams, io.axiParams))
+    fringe.io <> DontCare
 
     // Fringe <-> DRAM connections
     //      topIO.dram <> fringe.io.dram

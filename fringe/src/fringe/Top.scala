@@ -34,6 +34,7 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
 
   globals.target.makeIO = { x: Data => IO(x) }
   val accel = accelGen()
+  accel.io <> DontCare
   val io = globals.target.topInterface(reset, accel)
   // Accel
 

@@ -62,8 +62,10 @@ class FringeZynq(
 //    val genericStreams = new GenericStreams(streamInsInfo, streamOutsInfo)
   })
 
+  io <> DontCare
   // Common Fringe
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
+  fringeCommon.io <> DontCare
 
   fringeCommon.io.TOP_AXI <> io.TOP_AXI
   fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI

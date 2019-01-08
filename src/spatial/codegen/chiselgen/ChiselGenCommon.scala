@@ -271,7 +271,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     inGen(out, "Controllers.scala"){
       // (0 until controllerStack.size).foreach{_ => state.incGenTab}
       val suffix = if (lhs.isBranch) "_obj" else ""
-      open(src"object $lhs$suffix extends SMObject{")
+      val strm = if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) "Stream_" else ""
+      open(src"object $lhs$suffix extends ${strm}SMObject{")
         contents
       close("}")
       // (0 until controllerStack.size).foreach{_ => state.decGenTab}

@@ -176,8 +176,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val break = Wire(Bool())")
         if (spatialConfig.enableInstrumentation) {
           emit("""val cycles = Module(new InstrumentationCounter())""")
-          emit("""val stalled = Module(new InstrumentationCounter())""")
-          emit("""val idle = Module(new InstrumentationCounter())""")
           emit("""val iters = Module(new InstrumentationCounter())""")          
         }
         emit("")
@@ -214,6 +212,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           }
         close("}")
 
+      close("}")
+
+      open(s"abstract trait Stream_SMObject extends SMObject {")
+        if (spatialConfig.enableInstrumentation) {
+          emit("""val stalled = Module(new InstrumentationCounter())""")
+          emit("""val idle = Module(new InstrumentationCounter())""")
+        }
       close("}")
     }
 

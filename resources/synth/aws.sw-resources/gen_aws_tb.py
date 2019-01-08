@@ -28,7 +28,7 @@ for line in src:
     global_buf_count += 1
   elif 'string_plus' in line:
     num_pluses = line.count('string_plus')
-    t = line.replace('string ', 'std::string ', 1).replace('string(', 'std::string(', 1).replace('string_plus(', '').replace(',', ' + ')
+    t = line.replace('string ', 'std::string ').replace('string(', 'std::string(').replace('string_plus(', '').replace(',', ' + ')
     for i in range(num_pluses):
       t = t.replace(');', ';')
     dst.write(t)

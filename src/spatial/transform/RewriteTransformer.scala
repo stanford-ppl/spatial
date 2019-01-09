@@ -90,14 +90,17 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def getPosMod(lin: scala.Int, x: Num[_], ofs: scala.Int, mod: scala.Int): Int = {
-    val Final(start) = x.counter.ctr.start
-    val Final(step) = x.counter.ctr.step
-    val par = x.counter.ctr.ctrPar.toInt
-    val lane = x.counter.lane
-    val r = start + lane * step * lin + ofs
-    val posMod = ((r % mod) + mod) % mod
-    dbgs(s"Replace $lin * $x + $ofs % $mod with ${posMod} (ctr start $start, step $step, lane $lane)")
-    posMod
+    if (lin % mod == 0) 0
+    else {
+      val Final(start) = x.counter.ctr.start
+      val Final(step) = x.counter.ctr.step
+      val par = x.counter.ctr.ctrPar.toInt
+      val lane = x.counter.lane
+      val r = start + lane * step * lin + ofs
+      val posMod = ((r % mod) + mod) % mod
+      dbgs(s"Replace $lin * $x + $ofs % $mod with ${posMod} (ctr start $start, step $step, lane $lane)")
+      posMod
+    }
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
@@ -116,7 +119,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       // Change a write from a mux with the register or some other value to an enabled register write
       case Op( Mux(sel, Op(RegRead(`reg`)), b) ) =>
         val lhs2 = writeReg(lhs, reg, b, en + !sel)
-        println(s"b is $b ${b.tp}")
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]
@@ -124,7 +126,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       // Change a write from a mux with the register or some other value to an enabled register write
       case Op( Mux(sel, a, Op(RegRead(`reg`))) ) =>
         val lhs2 = writeReg(lhs, reg, a, en + sel)
-        println(s"a is $a ${a.tp}")
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]

@@ -77,7 +77,7 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
     m.io.waddr := enqCounter.io.out
     m.io.wdata := io.in.bits
     io.out.bits := m.io.rdata
-    m.io.flow := true.B
+    m.io.backpressure := true.B
   }
 
   when (writeEn =/= readEn) {

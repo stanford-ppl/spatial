@@ -15,7 +15,7 @@ trait ChiselGenStream extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
       val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
-      emitBusObject(lhs){
+      createBusObject(lhs){
         forceEmit(src"val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
         forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
         forceEmit(src"ready := ready_options.reduce{_|_}")
@@ -26,7 +26,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 
     case StreamOutNew(bus) =>
       val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
-      emitBusObject(lhs){
+      createBusObject(lhs){
         forceEmit(src"val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
         forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
         forceEmit(src"valid := valid_options.reduce{_|_}")
@@ -40,7 +40,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
-      val maskingLogic = src"${parent}$sfx.sm.io.flow" 
+      val maskingLogic = src"${parent}$sfx.sm.io.backpressure" 
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
         emit(src"""${stream}.valid_options($base + $i) := ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")

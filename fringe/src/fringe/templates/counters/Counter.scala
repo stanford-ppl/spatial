@@ -118,15 +118,16 @@ class IICounter(val ii: Int, val width: Int = 32, val myName: String = "iiCtr") 
   })
 
   override def desiredName = myName
+  if (ii > 1) {
+    val cnt = RegInit((ii-1).S(width.W))
+    val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
 
-  val cnt = RegInit((ii-1).S(width.W))
-  val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
+    val nextLive = Mux(cnt === 0.S(width.W), (ii-1).S(width.W), cnt-1.S(width.W))
+    val next = Mux(io.input.enable, nextLive, cnt)
+    cnt := Mux(io.input.reset, (ii-1).S(width.W), next)
 
-  val nextLive = Mux(cnt === 0.S(width.W), (ii-1).S(width.W), cnt-1.S(width.W))
-  val next = Mux(io.input.enable, nextLive, cnt)
-  cnt := Mux(io.input.reset, (ii-1).S(width.W), next)
-
-  io.output.done := isDone
+    io.output.done := isDone
+  } else io.output.done := true.B
 }
 
 class CompactingIncDincCtr(inc: Int, dinc: Int, widest_inc: Int, widest_dinc: Int, stop: Int, width: Int = 32) extends Module {

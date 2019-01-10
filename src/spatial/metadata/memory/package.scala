@@ -207,6 +207,8 @@ package object memory {
       case _ => false
     }
 
+    def isNBuffered: Boolean = mem.getInstance.exists(_.depth > 1)
+    
     def isOptimizedReg: Boolean = mem.writers.exists{ _.op.get.isInstanceOf[RegAccum[_]] }
     def optimizedRegType: Option[Accum] = if (!mem.isOptimizedReg) None else 
       mem.writers.collect{ 

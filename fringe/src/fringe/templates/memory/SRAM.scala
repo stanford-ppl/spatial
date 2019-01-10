@@ -16,7 +16,7 @@ class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
     val raddrEn = Input(Bool())
     val waddrEn = Input(Bool())
     val wen = Input(Bool())
-    val flow = Input(Bool())
+    val backpressure = Input(Bool())
     val wdata = Input(UInt(t.getWidth.W))
     val rdata = Output(UInt(t.getWidth.W))
 
@@ -67,7 +67,7 @@ class GenericRAMIO[T<:Data](t: T, d: Int) extends Bundle {
   val waddr = Input(UInt(addrWidth.W))
   val wdata = Input(t.cloneType)
   val rdata = Output(t.cloneType)
-  val flow = Input(Bool())
+  val backpressure = Input(Bool())
 
   override def cloneType: this.type = {
     new GenericRAMIO(t, d).asInstanceOf[this.type]
@@ -127,7 +127,7 @@ class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: St
       mem.io.wen := io.wen
       mem.io.waddr := io.waddr
       mem.io.wdata := io.wdata.asUInt()
-      mem.io.flow := io.flow
+      mem.io.backpressure := io.backpressure
       mem.io.raddrEn := true.B
       mem.io.waddrEn := true.B
 
@@ -144,7 +144,7 @@ class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: St
       mem.io.wen := io.wen
       mem.io.waddr := io.waddr
       mem.io.wdata := io.wdata.asUInt()
-      mem.io.flow := io.flow
+      mem.io.backpressure := io.backpressure
       mem.io.raddrEn := true.B
       mem.io.waddrEn := true.B
 

@@ -23,6 +23,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   protected var globalBlockID: Int = 0
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
+  protected var boreMe = new scala.collection.mutable.ListBuffer[(String, String)]
 
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {
@@ -157,69 +158,55 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
     inGen(out, "Controllers.scala"){
       emitHeader()
+      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: Option[CounterChain], val childId: Int) {""")
+      emit("""  val resetChildren = Wire(Bool()); resetChildren := DontCare""")
+      emit("""  val done = Wire(Bool()); done := DontCare""")
+      emit("""  val baseEn = Wire(Bool()); baseEn := DontCare""")
+      emit("""  val en = Wire(Bool()); en := DontCare""")
+      emit("""  val mask = Wire(Bool()); mask := DontCare""")
+      emit("""  val resetMe = Wire(Bool()); resetMe := DontCare""")
+      emit("""  val iiDone = Wire(Bool()); iiDone := DontCare""")
+      emit("""  val backpressure = Wire(Bool()); backpressure := DontCare""")
+      emit("""  val forwardpressure = Wire(Bool()); forwardpressure := DontCare""")
+      emit("""  val datapathEn = Wire(Bool()); datapathEn := DontCare""")
+      emit("""  val doneCondition = Wire(Bool()); doneCondition := DontCare""")
+      emit("""  val break = Wire(Bool()); break := DontCare""")
+      emit("""  val parentAck = Wire(Bool()); parentAck := DontCare""")
+      emit("""  val sm: GeneralControl""")
+      emit("""  val iiCtr: IICounter""")
 
-      open(s"abstract trait SMObject {")
-        emit("val en = Wire(Bool())")
-        emit("val done = Wire(Bool())")
-        emit("val baseEn = Wire(Bool())")
-        emit("val iiDone = Wire(Bool())")
-        emit("val flow = Wire(Bool())")
-        emit("val mask = Wire(Bool())")
-        emit("val resetMe = Wire(Bool())")
-        emit("val resetChildren = Wire(Bool())")
-        emit("val datapathEn = Wire(Bool())")
-        emit("val doneCondition = Wire(Bool())")
-        emit("val sm: GeneralControl")
-        emit("val children = List[SMObject]()")
-        emit("val parent: Option[(SMObject, Int)]")
-        emit("val cchains = List[CChainObject]()")
-        emit("val break = Wire(Bool())")
-        if (spatialConfig.enableInstrumentation) {
-          emit("""val cycles = Module(new InstrumentationCounter())""")
-          emit("""val iters = Module(new InstrumentationCounter())""")          
-        }
-        emit("")
-        if (spatialConfig.enableInstrumentation) {
-          open("def configure_instrumentation(): Unit = {")
-            emit("cycles.io.enable := baseEn")
-            emit("iters.io.enable := risingEdge(done)")
-          close("}")
-        }
-        open("def configure(n: String): Unit = {")
-          emit("sm.io.flow := flow | sm.io.doneLatch")
-          emit("sm.io.rst := resetMe")
-          emit("done := sm.io.done")
-          emit("break := sm.io.break")
-          emit("sm.io.enable := en")
-          emit("resetChildren := sm.io.ctrRst")
-          emit("""en.suggestName(n + "_en")""")
-          emit("""done.suggestName(n + "_done")""")
-          emit("""baseEn.suggestName(n + "_baseEn")""")
-          emit("""iiDone.suggestName(n + "_iiDone")""")
-          emit("""flow.suggestName(n + "_flow")""")
-          emit("""mask.suggestName(n + "_mask")""")
-          emit("""resetMe.suggestName(n + "_resetMe")""")
-          emit("""resetChildren.suggestName(n + "_resetChildren")""")
-          emit("""datapathEn.suggestName(n + "_datapathEn")""")
-          emit("""doneCondition.suggestName(n + "_doneCondition")""")
-          emit("children.zipWithIndex.foreach{case (c, i) => c.baseEn := sm.io.enableOut(i).D(1) && ~c.done.D(1); c.sm.io.parentAck := sm.io.childAck(i)}")
-          emit("parent.foreach{case(p, idx) => p.sm.io.doneIn(idx) := done; p.sm.io.maskIn(idx) := mask}")
-          emit("if (sm.p.sched == Streaming && cchains.nonEmpty) cchains.zipWithIndex.foreach{case (cc, i) => sm.io.ctrCopyDone(i) := cc.done; cc.reset := sm.io.ctrRst.D(1)}")
-          emit("else if (sm.p.sched == Streaming) children.zipWithIndex.foreach{case (c, i) => sm.io.ctrCopyDone(i) := c.done}")
-          emit("if (parent.exists{pa => pa._1.sm.p.sched == Streaming && pa._1.cchains.size > 0}) {parent.get._1.cchains(parent.get._2).en := done}")
-          if (spatialConfig.enableInstrumentation) {
-            emit("configure_instrumentation()")
-          }
-        close("}")
-
-      close("}")
-
-      open(s"abstract trait Stream_SMObject extends SMObject {")
-        if (spatialConfig.enableInstrumentation) {
-          emit("""val stalled = Module(new InstrumentationCounter())""")
-          emit("""val idle = Module(new InstrumentationCounter())""")
-        }
-      close("}")
+      emit(""" """)
+      emit("""  def configure(n: String): Unit = {""")
+      emit("""    sm.io.backpressure := backpressure | sm.io.doneLatch""")
+      emit("""    sm.io.rst := resetMe""")
+      emit("""    done := sm.io.done""")
+      emit("""    break := sm.io.break""")
+      emit("""    en := baseEn & forwardpressure""")
+      emit("""    parent.foreach{p => baseEn := p.sm.io.enableOut(childId).D(1) && ~done.D(1)}""")
+      emit("""    parentAck := {if (parent.isDefined) parent.get.sm.io.childAck(childId) else false.B}""")
+      emit("""    sm.io.enable := en""")
+      emit("""    resetChildren := sm.io.ctrRst""")
+      emit("""    sm.io.parentAck := parentAck""")
+      emit("""    en.suggestName(n + "_en")""")
+      emit("""    done.suggestName(n + "_done")""")
+      emit("""    baseEn.suggestName(n + "_baseEn")""")
+      emit("""    iiDone.suggestName(n + "_iiDone")""")
+      emit("""    backpressure.suggestName(n + "_flow")""")
+      emit("""    mask.suggestName(n + "_mask")""")
+      emit("""    resetMe.suggestName(n + "_resetMe")""")
+      emit("""    resetChildren.suggestName(n + "_resetChildren")""")
+      emit("""    datapathEn.suggestName(n + "_datapathEn")""")
+      emit("""    doneCondition.suggestName(n + "_doneCondition")""")
+      emit("""    parent.foreach{p => p.sm.io.doneIn(childId) := done; p.sm.io.maskIn(childId) := mask}""")
+      emit("""    datapathEn := sm.io.datapathEn & mask & {if (cchain.isEmpty) true.B else ~sm.io.ctrDone} """)
+      emit("""    iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask""")
+      emit("""    cchain.foreach{case c => c.io.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.io.input.reset := resetChildren}""")
+      emit("""    // if (sm.p.sched == Streaming && cchains.nonEmpty) cchains.zipWithIndex.foreach{case (cc, i) => sm.io.ctrCopyDone(i) := cc.done; cc.reset := sm.io.ctrRst.D(1)}""")
+      emit("""    // else if (sm.p.sched == Streaming) children.zipWithIndex.foreach{case (c, i) => sm.io.ctrCopyDone(i) := c.done}""")
+      emit("""    // if (parent.exists{pa => pa._1.sm.p.sched == Streaming && pa._1.cchains.size > 0}) {parent.get._1.cchains(parent.get._2).en := done}""")
+      emit("""  }""")
+      emit("""""")
+      emit("""}""")
     }
 
     inGen(out, "ArgInterface.scala"){
@@ -243,43 +230,32 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     inGen(out, "CounterChains.scala"){
       emitHeader()
 
-      open(s"abstract trait CtrObject {")
-        emit("var start: Either[Option[Int],FixedPoint] = Left(None)")
-        emit("var stop: Either[Option[Int],FixedPoint] = Left(None)")
-        emit("var step: Either[Option[Int],FixedPoint] = Left(None)")
-        emit("val par: Int")
-        emit("val width: Int")
-        emit("val isForever: Boolean = false")
-        emit("")
+      open("class CtrObject(")
+        emit("val start: Either[Option[Int], FixedPoint],")
+        emit("val stop: Either[Option[Int], FixedPoint],")
+        emit("val step: Either[Option[Int], FixedPoint],")
+        emit("val par: Int,")
+        emit("val width: Int,")
+        emit("val isForever: Boolean")
+      closeopen("){")
         emit("def fixedStart: Option[Int] = start match {case Left(x) => x; case Right(x) => None}")
         emit("def fixedStop: Option[Int] = stop match {case Left(x) => x; case Right(x) => None}")
         emit("def fixedStep: Option[Int] = step match {case Left(x) => x; case Right(x) => None}")
-        emit("def set_start(x: Int): Unit = {start = Left(Some(x))}")
-        emit("def set_stop(x: Int): Unit = {stop = Left(Some(x))}")
-        emit("def set_step(x: Int): Unit = {step = Left(Some(x))}")
-        emit("def set_start(x: FixedPoint): Unit = {start = Right(x)}")
-        emit("def set_stop(x: FixedPoint): Unit = {stop = Right(x)}")
-        emit("def set_step(x: FixedPoint): Unit = {step = Right(x)}")
       close("}")
 
-      open(s"abstract trait CChainObject {")
-        emit("val done = Wire(Bool())")
-        emit("val en = Wire(Bool())")
-        emit("val reset = Wire(Bool())")
-        emit("val ctrs: List[CtrObject] = Nil")
-        emit("val cchain: CounterChain")
-        emit("")
-        open("def configure(): Unit = {")
-          emit("cchain.io <> DontCare")
-          emit("cchain.io.input.stops.zip(ctrs.map(_.stop)).foreach{case (port,Right(stop)) => port := stop.r.asSInt; case (_,_) => }")
-          emit("cchain.io.input.strides.zip(ctrs.map(_.step)).foreach{case (port,Right(stride)) => port := stride.r.asSInt; case (_,_) => }")
-          emit("cchain.io.input.starts.zip(ctrs.map(_.start)).foreach{case (port,Right(start)) => port := start.r.asSInt; case (_,_) => }")
-          emit("cchain.io.input.saturate := true.B")
-          emit("cchain.io.input.enable := en")
-          emit("done := cchain.io.output.done")
-          emit("cchain.io.input.reset := reset")
-        close("}")
+      open("class CChainObject(")
+        emit("val ctrs: List[CtrObject],")
+        emit("val name: String")
+      closeopen("){")
+        emit("""val cchain = Module(new CounterChain(ctrs.map(_.par), ctrs.map(_.fixedStart), ctrs.map(_.fixedStop), ctrs.map(_.fixedStep), """ + 
+                     """ctrs.map(_.isForever), ctrs.map(_.width), myName = name))""")
+        emit("cchain.io <> DontCare")
+        emit("cchain.io.input.stops.zip(ctrs.map(_.stop)).foreach{case (port,Right(stop)) => port := stop.r.asSInt; case (_,_) => }")
+        emit("cchain.io.input.strides.zip(ctrs.map(_.step)).foreach{case (port,Right(stride)) => port := stride.r.asSInt; case (_,_) => }")
+        emit("cchain.io.input.starts.zip(ctrs.map(_.start)).foreach{case (port,Right(start)) => port := start.r.asSInt; case (_,_) => }")
+        emit("cchain.io.input.saturate := true.B")
       close("}")
+
     }
 
   }
@@ -367,8 +343,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val streamOutsInfo: List[StreamParInfo]")
       closeopen(s") extends AbstractAccelTop with IOModule { ")
         emit("val retime_released_reg = RegInit(false.B)")
-        emit("val retime_released = Wire(Bool())")
-        emit("val rr = retime_released // Shorthand")
         emit("val accelReset = reset.toBool | io.reset")
         emit("Main.main(this)")
         emit("Instrument.connect(this)")
@@ -427,7 +401,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   // protected def arg(x: Sym[_]): String = arg(x.tp)
 
-  protected def arg(tp: Type[_]): String = tp match {
+  protected def arg(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
     case FixPtType(s,d,f) => s"FixedPoint"
     case _: Var[_] => "String"
     case FltPtType(m,e) => s"FloatingPoint"
@@ -435,7 +409,21 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case tp: Vec[_] => src"Vec[${arg(tp.typeArgs.head)}]"
     case _: Struct[_] => s"UInt"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
-    case _ => super.remap(tp)
+    case _ => node match {
+      case Some(x) if x.isNBuffered => "NBufMem"
+      case Some(Op(_: ArgInNew[_])) => "UInt"
+      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
+      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
+      case Some(Op(_: RegNew[_])) => "FF"
+      case Some(Op(_: SRAMNew[_,_])) => "BankedSRAM"
+      case Some(Op(_: FIFONew[_])) => "FIFO"
+      case Some(Op(_: LIFONew[_])) => "LIFO"
+      case Some(Op(_: DRAMHostNew[_,_])) => "DRAM"
+      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAM"
+      case Some(Op(_: StreamOutNew[_])) => "StreamOut"
+      case Some(Op(_: StreamInNew[_])) => "StreamIn"
+      case _ => super.remap(tp)
+    }
   }
 
   override def copyDependencies(out: String): Unit = {

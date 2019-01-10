@@ -12,13 +12,11 @@ import spatial.util.spatialConfig
 
 trait ChiselGenMem extends ChiselGenCommon {
 
-  private var nbufs: List[Sym[_]] = List()
   private var memsWithReset: List[Sym[_]] = List()
 
-  def and(owner: Sym[_], ens: Set[Bit]): String = {
-
-    and(ens.map{x => if (controllerStack.head.isOuterControl) appendSuffix(owner,x) else quote(x)})
-  }
+  // def and(owner: Sym[_], ens: Set[Bit]): String = {
+  //   and(ens.map{x => if (controllerStack.head.isOuterControl) appendSuffix(owner,x) else quote(x)})
+  // }
   private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
     val zipThreshold = 150 max payload.map(_.size).sorted.headOption.getOrElse(0) // Max number of characters before deciding to split line into many
     val totalPayload = payload.mkString(src"List[$tp](", ",", ")")
@@ -37,26 +35,20 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
-    val parent = lhs.parent.s.get 
-    val sfx = if (parent.isBranch) "_obj" else ""
-    if (mem.isFIFOReg) src"~${parent}$sfx.break && ${parent}$sfx.done"
-    else               src"""~${parent}$sfx.break && ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
+    if (mem.isFIFOReg) src"~break && done"
+    else               src"""~break && ${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {
-    val parent = lhs.parent.s.get 
-    val sfx = if (parent.isBranch) "_obj" else ""
-    val flowEnable = src"~${parent}$sfx.break && ${parent}$sfx.sm.io.flow"
-    src"""~${parent}$sfx.break && ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)} & $flowEnable"""
+    val flowEnable = src"~break && sm.io.backpressure"
+    src"""~break && ${DL(src"datapathEn & iiDone", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
-      val parent = lhs.parent.s.get
-      val sfx = if (parent.isBranch) "_obj" else ""
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ mem
-        val invisibleEnable = src"""${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", lhs.fullDelay, true)}"""
-        emit(src"${mem}.m.io.reset := ${invisibleEnable} & ${and(parent, en)}")
+        val invisibleEnable = src"""${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
+        emit(src"${mem}.io.reset := ${invisibleEnable} & ${and(en)}")
       }
   }
 
@@ -65,11 +57,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val name = if (mem.isInstanceOf[RegNew[_]]) "FF" else ""
     val rPar = lhs.accessWidth
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get 
-    val sfx = if (parent.isBranch) "_obj" else ""
     // if (lhs.parent.stage == -1) emitControlSignals(parent)
     val invisibleEnable = invisibleEnableRead(lhs,mem)
-    val flowEnable = src",${parent}$sfx.flow"
+    val flowEnable = src",backpressure"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -91,23 +81,23 @@ trait ChiselGenMem extends ChiselGenCommon {
     if (lhs.isDirectlyBanked & !isBroadcast) {
       emit(createWire(src"""${lhs}_port""", src"""new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList)"""))
       emit(src"${lhs}_port := DontCare")
-      emit(src"""${lhs}.toSeq.zip(${mem}.m.connectDirectRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      emit(src"""${lhs}.toSeq.zip(${mem}.connectDirectRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else if (isBroadcast) {
       val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
       emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${lhs}.toSeq.zip(${mem}.m.connectBroadcastRPort(${lhs}_port, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      emit(src"""${lhs}.toSeq.zip(${mem}.connectBroadcastRPort(${lhs}_port, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else {
       val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
       emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${lhs}.toSeq.zip(${mem}.m.connectXBarRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      emit(src"""${lhs}.toSeq.zip(${mem}.connectXBarRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     }
     val commonEns = ens.head.collect{case e if (ens.forall(_.contains(e)) && !e.isBroadcastAddr) => e}
-    val enslist = ens.map{e => and(parent, e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
-    zipAndConnect(lhs, mem, "en", "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(parent, commonEns)})")
+    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
+    zipAndConnect(lhs, mem, "en", "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})")
     if (ofs.nonEmpty) zipAndConnect(lhs, mem, "ofs", "UInt", ofs.filter(!_.isBroadcastAddr).map(quote(_) + ".r"), ".toSeq.map(_.rd)")
   }
 
@@ -116,10 +106,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val name = if (mem.isInstanceOf[RegNew[_]]) "FF" else ""
     val wPar = ens.length
     val width = bitWidth(mem.tp.typeArgs.head)
-    val parent = lhs.parent.s.get
-    val sfx = if (parent.isBranch) "_obj" else ""
     // if (lhs.parent.stage == -1) emitControlSignals(parent)
-    val flowEnable = src"${parent}$sfx.flow"
+    val flowEnable = src"backpressure"
     val invisibleEnable = invisibleEnableWrite(lhs)
     val ofsWidth = if (!mem.isLineBuffer) 1 max Math.ceil(scala.math.log(paddedDims(mem,name).product / mem.instance.nBanks.product) / scala.math.log(2)).toInt
                    else 1 max Math.ceil(scala.math.log(paddedDims(mem,name).last / mem.instance.nBanks.last) / scala.math.log(2)).toInt
@@ -135,23 +123,23 @@ trait ChiselGenMem extends ChiselGenCommon {
     if (lhs.isDirectlyBanked && !isBroadcast) {
       emit(createWire(src"""${lhs}_port""", src"""new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width)"""))
       emit(src"${lhs}_port := DontCare")
-      emit(src"""${mem}.m.connectDirectWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
+      emit(src"""${mem}.connectDirectWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     } else if (isBroadcast) {
       val banklist = bank.flatten.map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
       emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${mem}.m.connectBroadcastWPort(${lhs}_port, ($muxPort, $muxOfs))""")        
+      emit(src"""${mem}.connectBroadcastWPort(${lhs}_port, ($muxPort, $muxOfs))""")        
     } else {
       val banklist = bank.flatten.map(quote(_) + ".r")
       emit(createWire(src"""${lhs}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
       emit(src"${lhs}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${mem}.m.connectXBarWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
+      emit(src"""${mem}.connectXBarWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     }
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
-    val enslist = ens.map{e => and(parent, e.filter(!commonEns.contains(_)))}
-    zipAndConnect(lhs, mem, enport, "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(parent, commonEns)})")
+    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)))}
+    zipAndConnect(lhs, mem, enport, "Bool", enslist, src".toSeq.map(_ && ${invisibleEnable} && ${and(commonEns)})")
     if (ofs.nonEmpty) zipAndConnect(lhs, mem, "ofs", "UInt", ofs.map(quote(_) + ".r"), ".toSeq.map(_.rd)")
     zipAndConnect(lhs, mem, "data", "UInt", data.map(quote(_) + ".r"), "")
   }
@@ -188,19 +176,26 @@ trait ChiselGenMem extends ChiselGenCommon {
     val inst = mem.instance
     val dims = if (name == "FF") List(1) else mem.constDims
     // val padding = if (name == "FF") List(0) else mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-    val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}
+    val broadcastWrites = mem.writers.filter{w => w.port.bufferPort.isEmpty & mem.isNBuffered}
                                      .map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.toList
-    val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & inst.depth > 1}
+    val broadcastReads = mem.readers.filter{w => w.port.bufferPort.isEmpty & mem.isNBuffered}
                                     .map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.toList
 
-    if (inst.depth == 1 && name == "LineBuffer") throw new Exception(s"Cannot create non-buffered line buffer!  Make sure $mem has readers and writers bound by a pipelined LCA, or else turn it into an SRAM")
-    val templateName = if (inst.depth == 1 && name != "LineBuffer") s"${name}("
-                       else {{if (name == "SRAM") appPropertyStats += HasNBufSRAM}; nbufs = nbufs :+ mem; connectBufSignals(mem); s"NBufMem(${name}Type, "}
+    if (!mem.isNBuffered && name == "LineBuffer") throw new Exception(s"Cannot create non-buffered line buffer!  Make sure $mem has readers and writers bound by a pipelined LCA, or else turn it into an SRAM")
+
+    val templateName = if (!mem.isNBuffered && name != "LineBuffer") s"${name}("
+                       else {
+                         if (name == "SRAM") appPropertyStats += HasNBufSRAM
+                         mem.swappers.zipWithIndex.foreach{case (node, port) => 
+                           bufMapping += (node -> {bufMapping.getOrElse(node, List[BufMapping]()) ++ List(BufMapping(mem, port))})
+                         }
+                         s"NBufMem(${name}Type, "
+                       }
     if (mem.broadcastsAnyRead) appPropertyStats += HasBroadcastRead
 
-    val depth = if (inst.depth > 1) s"${inst.depth}," else ""
-    val nbuf = if (inst.depth > 1) "NBuf" else ""
-    def outerMap(t: String): String = if (inst.depth > 1) s"NBuf${t}Map" else s"${t}Map"
+    val depth = if (mem.isNBuffered) s"${inst.depth}," else ""
+    val nbuf = if (mem.isNBuffered) "NBuf" else ""
+    def outerMap(t: String): String = if (mem.isNBuffered) s"NBuf${t}Map" else s"${t}Map"
     def innerMap(t: String): String = s"${t}Map"
     // Strip the lanes if necessary and return ports for constructor
     def recomputePortInfo(muxOfs: Int, castgroup: Seq[Int], broadcast: Seq[Int]): Seq[(Int,Int,Int)] = {
@@ -209,21 +204,21 @@ trait ChiselGenMem extends ChiselGenCommon {
       }.toSeq
     }
     // Create mapping for (bufferPort -> (muxPort -> width)) for XBar accesses
-    val XBarW = s"${outerMap("X")}(" + mem.writers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val XBarW = s"${outerMap("X")}(" + mem.writers.filter(_.port.bufferPort.isDefined | !mem.isNBuffered) // Filter out broadcasters
                       .filterNot(_.isDirectlyBanked)              // Filter out statically banked
                       .filter(_.accessWidth > 0)
                       .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                       .map{case(bufp, writes) => 
-                        if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",") + ")"
+                        if (mem.isNBuffered) src"$bufp -> ${innerMap("X")}(" + writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",") + ")"
                         else writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> (${w.accessWidth}, ${w.shiftAxis})"}.mkString(",")
                       }.mkString(",") + ")"
-    val XBarR = s"${outerMap("X")}(" + mem.readers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val XBarR = s"${outerMap("X")}(" + mem.readers.filter(_.port.bufferPort.isDefined | !mem.isNBuffered) // Filter out broadcasters
                       .filterNot(_.isDirectlyBanked)              // Filter out statically banked
                       .filter(_.accessWidth > 0)
                       .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                       .map{case(bufp, reads) => 
                         if (mem.broadcastsAnyRead) { // Make generated code more readable if this memory doesn't actually broadcast anywhere
-                          if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + reads.map{r => 
+                          if (mem.isNBuffered) src"$bufp -> ${innerMap("X")}(" + reads.map{r => 
                             recomputePortInfo(r.port.muxOfs, r.port.castgroup, r.port.broadcast).map{case (o,c,w) => 
                               src"(${r.port.muxPort},$o,$c) -> (${w}, ${r.shiftAxis})"
                             }.mkString(",")
@@ -234,25 +229,25 @@ trait ChiselGenMem extends ChiselGenCommon {
                             }.mkString(",")
                           }.filter(_.nonEmpty).mkString(",")                                  
                         } else {
-                          if (inst.depth > 1) src"$bufp -> ${innerMap("X")}(" + reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs},0) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",") + ")"
+                          if (mem.isNBuffered) src"$bufp -> ${innerMap("X")}(" + reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs},0) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",") + ")"
                           else reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs},0) -> (${r.accessWidth}, ${r.shiftAxis})"}.mkString(",")
                         }
                       }.mkString(",") + ")"
-    val DirectW = s"${outerMap("D")}(" + mem.writers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val DirectW = s"${outerMap("D")}(" + mem.writers.filter(_.port.bufferPort.isDefined | !mem.isNBuffered) // Filter out broadcasters
                       .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                       .filter(_.accessWidth > 0)
                       .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                       .map{case(bufp, writes) => 
-                        if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
+                        if (mem.isNBuffered) src"$bufp -> ${innerMap("D")}(" + writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
                         else writes.map{w => src"(${w.port.muxPort},${w.port.muxOfs},0) -> " + s"(${w.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${w.shiftAxis})".replace("Vector","List")}.mkString(",")
                       }.mkString(",") + ")"
-    val DirectR = s"${outerMap("D")}(" + mem.readers.filter(_.port.bufferPort.isDefined | inst.depth == 1) // Filter out broadcasters
+    val DirectR = s"${outerMap("D")}(" + mem.readers.filter(_.port.bufferPort.isDefined | !mem.isNBuffered) // Filter out broadcasters
                       .filter(_.isDirectlyBanked)              // Filter out dynamically banked
                       .filter(_.accessWidth > 0)
                       .groupBy(_.port.bufferPort.getOrElse(-1))      // Group by port
                       .map{case(bufp, reads) => 
                         if (mem.broadcastsAnyRead) { // Make generated code more readable if this memory doesn't actually broadcast anywhere
-                          if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{r => 
+                          if (mem.isNBuffered) src"$bufp -> ${innerMap("D")}(" + reads.map{r => 
                             recomputePortInfo(r.port.muxOfs, r.port.castgroup, r.port.broadcast).map{case (o,c,_) => 
                               src"(${r.port.muxPort},$o,$c) -> " + s"(${r.banks.zip(r.port.castgroup).filter(_._2 == c).map(_._1).map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${r.shiftAxis})".replace("Vector","List")
                             }.mkString(",")
@@ -263,12 +258,12 @@ trait ChiselGenMem extends ChiselGenCommon {
                             }.mkString(",")
                           }.filter(_.nonEmpty).mkString(",")
                         } else {
-                          if (inst.depth > 1) src"$bufp -> ${innerMap("D")}(" + reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs},0) -> " + s"(${r.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${r.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
+                          if (mem.isNBuffered) src"$bufp -> ${innerMap("D")}(" + reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs},0) -> " + s"(${r.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${r.shiftAxis})".replace("Vector","List")}.mkString(",") + ")"
                           else reads.map{r => src"(${r.port.muxPort},${r.port.muxOfs},0) -> " + s"(${r.banks.map(_.map(_.trace.toInt).mkString("Banks(",",",")"))}, ${r.shiftAxis})".replace("Vector","List")}.mkString(",")
                         }
                       }.mkString(",") + ")"
-    val BXBarW = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastWrites.mkString(",") + ")," else ""
-    val BXBarR = if (inst.depth > 1) s"${innerMap("X")}(" + broadcastReads.mkString(",") + ")," else ""
+    val BXBarW = if (mem.isNBuffered) s"${innerMap("X")}(" + broadcastWrites.mkString(",") + ")," else ""
+    val BXBarR = if (mem.isNBuffered) s"${innerMap("X")}(" + broadcastReads.mkString(",") + ")," else ""
 
     val dimensions = paddedDims(mem, name).mkString("List[Int](", ",", ")") //dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
@@ -276,7 +271,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
-    emitMemObject(mem) {
+    createMemObject(mem) {
       emit(src"""val m = Module(new $templateName 
     $dimensions, 
     $depth ${bitWidth(mem.tp.typeArgs.head)}, 
@@ -337,7 +332,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val opLatency = scala.math.max(1.0, latencyOption("FixAdd", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
-          emitMemObject(lhs) {
+          createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Add, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
             if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
@@ -346,7 +341,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val opLatency = scala.math.max(1.0, latencyOption("FixMul", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
-          emitMemObject(lhs) {
+          createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Mul, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
             if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
@@ -355,7 +350,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val opLatency = scala.math.max(1.0, latencyOption("FixMin", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
-          emitMemObject(lhs) {
+          createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Min, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
             if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
@@ -364,7 +359,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val opLatency = scala.math.max(1.0, latencyOption("FixMax", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
-          emitMemObject(lhs) {
+          createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Max, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
             if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
@@ -373,7 +368,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val opLatency = scala.math.max(1.0, latencyOption("FixFMA", Some(d+f)))
           val cycleLatency = opLatency + latencyOption("RegRead", None) + latencyOption("RegWrite", None)
           val numWriters = lhs.writers.size
-          emitMemObject(lhs) {
+          createMemObject(lhs) {
             emit(src"val m = Module(new FixFMAAccum($numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
             if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
@@ -385,27 +380,23 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
     case RegAccumOp(reg, data, ens, t, first) => 
       val index = reg.writers.toList.indexOf(lhs)
-      val parent = lhs.parent.s.get
-      val sfx = if (parent.isBranch) "_obj" else ""
       val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.m.io.input1($index) := $data.r")
-      emit(src"${reg}.m.io.enable($index) := ${and(parent, ens)} && $invisibleEnable")
-      emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}$sfx.sm.io.ctrDone", lhs.fullDelay, true)}")
-      emit(src"${reg}.m.io.first($index) := ${first}")
+      emit(src"${reg}.io.input1($index) := $data.r")
+      emit(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
+      emit(src"${reg}.io.last($index)   := ${DL(src"sm.io.ctrDone", lhs.fullDelay, true)}")
+      emit(src"${reg}.io.first($index) := ${first}")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.m.io.output")
+      emit(src"${lhs}.r := ${reg}.io.output")
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val index = reg.writers.toList.indexOf(lhs)
-      val parent = lhs.parent.s.get
-      val sfx = if (parent.isBranch) "_obj" else ""
       val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.m.io.input1($index) := $data1.r")
-      emit(src"${reg}.m.io.input2($index) := $data2.r")
-      emit(src"${reg}.m.io.enable($index) := ${and(parent, ens)} && $invisibleEnable")
-      emit(src"${reg}.m.io.last($index)   := ${DL(src"${parent}$sfx.sm.io.ctrDone", lhs.fullDelay, true)}")
-      emit(src"${reg}.m.io.first($index) := ${first}")
+      emit(src"${reg}.io.input1($index) := $data1.r")
+      emit(src"${reg}.io.input2($index) := $data2.r")
+      emit(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
+      emit(src"${reg}.io.last($index)   := ${DL(src"sm.io.ctrDone", lhs.fullDelay, true)}")
+      emit(src"${reg}.io.first($index) := ${first}")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.m.io.output")
+      emit(src"${lhs}.r := ${reg}.io.output")
     case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
@@ -426,14 +417,14 @@ trait ChiselGenMem extends ChiselGenCommon {
     
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, None)
-    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.empty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
-    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostFull")
+    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
     case op@FIFOPeek(fifo,_) => 
       emit(src"$fifo.deqActive_$lhs := false.B") 
-      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
+      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
+    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
       emit(src"$fifo.deqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})") 
@@ -443,12 +434,12 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, None)
-    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.empty")
-    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.full")
-    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostEmpty")
-    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.m.io${ifaceType(fifo)}.almostFull")
-    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.m.io${ifaceType(fifo)}.numel")
+    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
+    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
+    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
+    case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     
@@ -459,39 +450,33 @@ trait ChiselGenMem extends ChiselGenCommon {
     // MergeBuffer
     case MergeBufferNew(ways, par) =>
       val readers = lhs.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.size
-      emitMemObject(lhs){
+      createMemObject(lhs){
         emit(src"""val m = Module(new MergeBuffer(${ways.toInt}, ${par.toInt}, ${bitWidth(lhs.tp.typeArgs.head)}, $readers)); m.io <> DontCare""")
       }
     case MergeBufferBankedEnq(merge, way, data, ens) =>
       val d = data.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.m.io.in_data($way).zip($d).foreach{case (l, r) => l := r }""")
+      emit(src"""$merge.io.in_data($way).zip($d).foreach{case (l, r) => l := r }""")
       val invEn = invisibleEnableWrite(lhs)
       val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.m.io.in_wen($way).zip($en).foreach{case (l, r) => l := r }""")
+      emit(src"""$merge.io.in_wen($way).zip($en).foreach{case (l, r) => l := r }""")
     case MergeBufferBankedDeq(merge, ens) => 
       val readerIdx = merge.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.toSeq.indexOf(lhs)
       emit(src"""val $lhs = Wire(Vec(${ens.length}, ${merge.tp.typeArgs.head}))""")
-      emit(src"""$lhs.toSeq.zip($merge.m.io.out_data).foreach{case (l, r) => l.r := r }""")
+      emit(src"""$lhs.toSeq.zip($merge.io.out_data).foreach{case (l, r) => l.r := r }""")
       val invEn = invisibleEnableRead(lhs,merge)
       val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.m.io.out_ren($readerIdx).zip($en).foreach{case (l, r) => l := r }""")
+      emit(src"""$merge.io.out_ren($readerIdx).zip($en).foreach{case (l, r) => l := r }""")
     case MergeBufferBound(merge, way, data, ens) =>
       val invEn = invisibleEnableWrite(lhs)
-      emit(src"$merge.m.io.inBound_wen($way) := ${and(ens)} & $invEn")
-      emit(src"$merge.m.io.inBound_data($way) := ${data}.r")
+      emit(src"$merge.io.inBound_wen($way) := ${and(ens)} & $invEn")
+      emit(src"$merge.io.inBound_data($way) := ${data}.r")
     case MergeBufferInit(merge, data, ens) =>
       val invEn = invisibleEnableWrite(lhs)
-      emit(src"$merge.m.io.initMerge_wen := ${and(ens)} & $invEn")
-      emit(src"$merge.m.io.initMerge_data := ${data}.r")
+      emit(src"$merge.io.initMerge_wen := ${and(ens)} & $invEn")
+      emit(src"$merge.io.initMerge_data := ${data}.r")
 
     case _ => super.gen(lhs, rhs)
   }
 
-  private def connectBufSignals(mem: Sym[_]): Unit = {
-    mem.swappers.zipWithIndex.foreach{ case (node, port) => 
-      val sfx = if (node.isBranch) "_obj" else ""
-      emit(src"""${mem}.m.connectStageCtrl(${DL(src"${node}$sfx.done", 1, true)}, ${node}$sfx.baseEn, ${port})""")
-    }
-  }
 
 }

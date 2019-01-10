@@ -21,7 +21,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       val reqCount = lhs.consumers.collect {
         case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
       }.size
-      emitMemObject(lhs){
+      createMemObject(lhs){
         emit(src"""val m = Module(new DRAMAllocator(${dim}, $reqCount)); m.io <> DontCare""")
       }
       val id = accelDrams.size

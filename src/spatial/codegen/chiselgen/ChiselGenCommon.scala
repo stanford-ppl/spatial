@@ -26,6 +26,10 @@ trait ChiselGenCommon extends ChiselCodegen {
   var depthStats = new scala.collection.mutable.ListBuffer[Int]
   var appPropertyStats = Set[AppProperties]()
 
+  // Buffer mappings from LCA to list of memories controlled by it
+  case class BufMapping(val mem: Sym[_], val lane: Int)
+  var bufMapping = scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
+
   // Interface
   var argOuts = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
@@ -180,16 +184,15 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val sfx = if (controllerStack.nonEmpty && controllerStack.head.isBranch) "_obj" else ""
-    val backpressure = if (controllerStack.nonEmpty) src"${controllerStack.head}$sfx.sm.io.flow" else "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, top.rr, $backpressure)"
+    val backpressure = if (controllerStack.nonEmpty) src"sm.io.backpressure" else "true.B"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
     else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
   // DL for when we are visiting children but emiting DL on signals that belong to parent
   def DLo[T](name: String, latency: T, isBit: Boolean = false): String = {
     val backpressure = "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, top.rr, $backpressure)"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
     else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }
 
@@ -249,52 +252,56 @@ trait ChiselGenCommon extends ChiselCodegen {
   def and(ens: Seq[String]): String = if (ens.isEmpty) "true.B" else ens.mkString(" & ")
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
 
-  protected def emitMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
+  protected def createMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
     inGen(out, src"m_${lhs}.scala"){
       emitHeader()
-      open(src"object $lhs {")
+      open(src"class $lhs {")
         contents
       close("}")
     }
+    emit(src"val ${lhs} = (new $lhs).m")
   }
 
-  protected def emitBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
+  protected def createBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
     inGen(out, src"bus_${lhs}.scala"){
       emitHeader()
-      open(src"object $lhs {")
+      open(src"class $lhs {")
         contents
       close("}")
     }
+    emit(src"val ${lhs} = new $lhs")
   }
 
-  protected def emitSMObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, "Controllers.scala"){
-      // (0 until controllerStack.size).foreach{_ => state.incGenTab}
-      val suffix = if (lhs.isBranch) "_obj" else ""
-      val strm = if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) "Stream_" else ""
-      open(src"object $lhs$suffix extends ${strm}SMObject{")
-        contents
-      close("}")
-      // (0 until controllerStack.size).foreach{_ => state.decGenTab}
+  protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean): Unit = {
+    val w = bitWidth(lhs.tp.typeArgs.head)
+    val strt = start match {case Final(s) => src"Left(Some($s))"
+                 case Expect(s) => src"Left(Some($s))"
+                 case _ => src"Right(${appendSuffix(lhs.owner, start)})"
+                }
+    val stp = stop match {case Final(s) => src"Left(Some($s))"
+                 case Expect(s) => src"Left(Some($s))"
+                 case _ => src"Right(${appendSuffix(lhs.owner, stop)})"
+                }
+    val ste = step match {case Final(s) => src"Left(Some($s))"
+                 case Expect(s) => src"Left(Some($s))"
+                 case _ => src"Right(${appendSuffix(lhs.owner, step)})"
+                }
+    val p = par match {case Final(s) => s"$s"; case Expect(s) => s"$s"; case _ => s"$par"}
+    emit(src"val $lhs = new CtrObject($strt, $stp, $ste, $p, $w, $forever)")
+  }
+  protected def createStreamCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
+    forEachChild(lhs.owner){case (c,i) => 
+      createCChainObject(lhs, ctrs, src"_copy${c}")
     }
   }
 
-  protected def emitCChainObject(lhs: Sym[_], suffix: String)(contents: => Unit): Unit = {
-    inGen(out, "CounterChains.scala"){
-      open(src"object $lhs$suffix extends CChainObject{")
-        contents
-      close("}")
-    }
-  }
+  protected def createCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]], suffix: String = ""): Unit = {
+    var isForever = lhs.isForever
+    emit(src"""val ${lhs}_components = List[CtrObject](${ctrs.map(quote).mkString(",")})""")
+    emit(src"""val $lhs = (new CChainObject(List[CtrObject](${ctrs.map(quote).mkString(",")}), "$lhs")).cchain """)
+    emit(src"""$lhs.io.input.isStream := ${lhs.isOuterStreamLoop}.B""")
 
-  protected def emitCtrObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, "CounterChains.scala"){
-      open(src"object $lhs extends CtrObject{")
-        contents
-      close("}")
-    }
   }
-
 
 }
 

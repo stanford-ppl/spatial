@@ -26,6 +26,7 @@ class SpatialConfig extends Config {
   var enableDot: Boolean = false
 
   var enableInstrumentation: Boolean = false
+  var enableModular: Boolean = false
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true

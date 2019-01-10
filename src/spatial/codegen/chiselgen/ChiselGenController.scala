@@ -37,6 +37,37 @@ trait ChiselGenController extends ChiselGenCommon {
     controllerStack.pop()
   }
 
+  final private def connectItersAndValids(lhs: Sym[_]) = {
+    val cchain = lhs.cchains.head
+    val iters = lhs.toScope.iters
+    val valids = lhs.toScope.valids
+    val Op(CounterChainNew(counters)) = cchain
+    iters.zipWithIndex.foreach{ case (iter, id) =>
+      val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
+      val w = bitWidth(counters(i).typeArgs.head)
+      if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
+        forEachChild(lhs){case (c, i) => 
+          val swobj = if (c.isBranch) "_obj" else ""
+          emit(src"""${iter}_chain.connectStageCtrl(${c}$swobj.done, ${c}$swobj.en, $i)""")
+        }
+      }
+    }
+    valids.zipWithIndex.foreach{ case (v,id) => 
+      if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
+        forEachChild(lhs){case (c, i) => 
+          val swobj = if (c.isBranch) "_obj" else ""
+          emit(src"""${v}_chain.connectStageCtrl(${c}$swobj.done, ${c}$swobj.en, $i)""")
+        }
+      }
+    }
+  }
+
+  final private def connectBufs(lhs: Sym[_]): Unit = {
+    bufMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
+      emit(src"""${mem}.connectStageCtrl(${DL(src"done", 1, true)}, baseEn, ${port})""")
+    }
+  }
+
   final private def emitItersAndValids(lhs: Sym[_]) = {
     val cchain = lhs.cchains.head
     val iters = lhs.toScope.iters
@@ -45,25 +76,23 @@ trait ChiselGenController extends ChiselGenCommon {
     iters.zipWithIndex.foreach{ case (iter, id) =>
       val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
       val w = bitWidth(counters(i).typeArgs.head)
-      emit(src"""val $iter = ${cchain}.cchain.io.output.counts($id).FP(true, $w, 0); $iter.suggestName("$iter")""")
+      emit(src"""val $iter = cchain.get.io.output.counts($id).FP(true, $w, 0); $iter.suggestName("$iter")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
         emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain")); ${iter}_chain.io <> DontCare""")
-        emit(src"""${iter}_chain.chain_pass(${iter}, ${lhs}.sm.io.doneIn.head)""")
+        emit(src"""${iter}_chain.chain_pass(${iter}, sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
-          val sfx = if (c.isBranch) "_obj" else ""
-          emit(src"""${iter}_chain.connectStageCtrl(${c}$sfx.done, ${c}$sfx.en, $i)""")
+          val swobj = if (c.isBranch) "_obj" else ""
           if (i > 0) emit(src"""val ${iter}_chain_read_$i = ${iter}_chain.read($i).FP(true,${w},0)""")
         }
       }
     }
     valids.zipWithIndex.foreach{ case (v,id) => 
-      emit(src"""val $v = ~${cchain}.cchain.io.output.oobs($id); $v.suggestName("$v")""")
+      emit(src"""val $v = ~cchain.get.io.output.oobs($id); $v.suggestName("$v")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain")); ${v}_chain.io <> DontCare""")
-        emit(src"""${v}_chain.chain_pass(${v}, ${lhs}.sm.io.doneIn.head)""")
+        emit(src"""${v}_chain.chain_pass(${v}, sm.io.doneIn.head)""")
         forEachChild(lhs){case (c, i) => 
-          val sfx = if (c.isBranch) "_obj" else ""
-          emit(src"""${v}_chain.connectStageCtrl(${c}$sfx.done, ${c}$sfx.en, $i)""")
+          val swobj = if (c.isBranch) "_obj" else ""
           if (i > 0) emit(src"""val ${v}_chain_read_$i: Bool = ${v}_chain.read($i).apply(0)""")
         }
       }
@@ -79,23 +108,28 @@ trait ChiselGenController extends ChiselGenCommon {
       iters.zipWithIndex.foreach{ case (iter, id) =>
         val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
         val w = bitWidth(counters(i).typeArgs.head)
-        emit(src"val ${iter}_copy$c = ${cchain}_copy$c.cchain.io.output.counts($id).FP(true, $w, 0)")
+        emit(src"val ${iter}_copy$c = ${cchain}_copy$c.cchain.get.io.output.counts($id).FP(true, $w, 0)")
       }
       valids.zipWithIndex.foreach{ case (v,id) => 
-        emit(src"val ${v}_copy$c = ~${cchain}_copy$c.cchain.io.output.oobs($id)")
+        emit(src"val ${v}_copy$c = ~${cchain}_copy$c.cchain.get.io.output.oobs($id)")
       }
 
     }
   }
 
-  private def createKernel(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
+  private def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
-    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }}.filterNot(_.isCounterChain).filterNot(_.isCounter)
+    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems}.filterNot(_.isCounterChain).filterNot(_.isCounter)
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).filterNot(_.isCounter)
-    val inputs: Seq[Sym[_]] = (used diff made).filterNot{s => s.isMem || s.isValue }.toSeq
+    (used diff made).filterNot{s => s.isValue || s.isArgOut}.toSeq    
+  }
+
+  private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
+    val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
+    
     val isInner = lhs.isInnerControl
-    val sfx = if (lhs.isBranch) "_obj" else ""
+    val swobj = if (lhs.isBranch) "_obj" else ""
 
     dbgs(s"${stm(lhs)}")
     val chainPassedInputs = inputs.map{x => appendSuffix(lhs, x)}
@@ -108,52 +142,123 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, src"sm_$lhs.scala"){
       emitHeader()
 
-      val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp)}" else "Unit"
+      val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp, Some(lhs))}" else "Unit"
       emit(src"/** Hierarchy: ${controllerStack.mkString(" -> ")} **/")
       emit(src"/** BEGIN ${lhs.name} $lhs **/")
-      open(src"object ${lhs}_kernel {")
-        open(src"def run(")
-          inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${arg(in.tp)},") }
-          emit("top: AccelTop")
-        closeopen(src"): $ret = {")
-          // Wire signals to SM object
-          if (!lhs.isOuterStreamControl) {
-            if (lhs.cchains.nonEmpty /* && !lhs.cchains.head.isForever*/) {
-              emitItersAndValids(lhs)
-              val ctr = lhs.cchains.head
-              emit(src"""${ctr}.en := ${lhs}$sfx.sm.io.ctrInc & ${lhs}$sfx.iiDone & ${getForwardPressure(lhs.toCtrl)}""")
-              if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
-                emit(src"${lhs}$sfx.stalled.io.enable := ${lhs}$sfx.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
-                emit(src"${lhs}$sfx.idle.io.enable := ${lhs}$sfx.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
-              }
-              emit(src"""${ctr}.reset := ${lhs}$sfx.resetChildren""")
-              emit(src"""${lhs}$sfx.sm.io.ctrDone := ${DL(src"${ctr}.done", 1, true)}""")
-            } else if (lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).nonEmpty & (lhs match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
-              val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
-              emit(src"""${lhs}$sfx.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
-            } else if (lhs match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
-            } else if (lhs match {case Op(_:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length > 0) => true; case _ => false }) {
-              val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
-              emit(src"""${lhs}$sfx.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
-            } else if (lhs match {case Op(x:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length == 0) => true; case _ => false }) {
-              val x = lhs match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
-              emit(src"""${lhs}$sfx.sm.io.ctrDone := ${lhs}$sfx.iiDone.D(${x.fullDelay})""")
-            } else {
-              emit(src"""${lhs}$sfx.sm.io.ctrDone := risingEdge(${lhs}$sfx.sm.io.ctrInc)""")
-            }
+      open(src"class ${lhs}_kernel(")
+        inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${arg(in.tp, Some(in))},") }
+        emit("parent: Option[Kernel], cchain: Option[CounterChain], childId: Int, rr: Bool")
+        // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
+        // emit("rr: ")
+      closeopen(") extends Kernel(parent, cchain, childId) {")
+
+      createSMObject(lhs)
+
+      open(src"def kernel(): $ret = {")
+        if (spatialConfig.enableModular) {
+          // open(src"class ${lhs}_module extends Module {")
+          //   open("val io = IO(new Bundle {")
+          //     inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = Input(${arg(in.tp, Some(in))})")}
+          //     emit("val rr = Input(Bool())")
+          //   close("})")
+          //   inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = io.$in")}
+          //   emit("val rr = io.rr")
+        }
+
+        // Set up reg chains
+        if (!lhs.isOuterStreamControl) {
+          if (lhs.cchains.nonEmpty) {
+            emitItersAndValids(lhs)
           }
-          else {
-            if (lhs.isOuterStreamLoop) emitItersAndValidsStream(lhs)
+        }
+        
+        // Emit body
+        contents
+
+        // Connect reg chains and buffered mems
+        if (!lhs.isOuterStreamControl) {
+          if (lhs.cchains.nonEmpty) {
+            connectItersAndValids(lhs)
           }
-          contents
-        close(s"}")
+        }
+        connectBufs(lhs)
+
+        if (spatialConfig.enableModular) {
+          // close("}")
+          // emit(src"val module = Module(new ${lhs}_module)")
+          // inputs.zipWithIndex.foreach{case(in,i) => emit(src"module.io.$in := $in")}
+          // emit("module.io.rr := rr")
+        }
+        close("}")
       close("}")
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
       emitFooter()
     }
     scoped ++= useMap
-    if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top).r")
-    else emit(src"${lhs}_kernel.run($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} top)")
+  }
+
+  private def instantiateKernel(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(modifications: => Unit): Unit = {
+    val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
+
+    val isInner = lhs.isInnerControl
+    val swobj = if (lhs.isBranch) "_obj" else ""
+    val chainPassedInputs = inputs.map{x => appendSuffix(lhs, x)}
+    
+    val parent = if (controllerStack.size == 1) "None" else "Some(this)"
+    val cchain = if (lhs.cchains.nonEmpty) src"Some(${lhs.cchains.head})" else None
+    val childId = if (controllerStack.size == 1) -1 else lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)
+    
+    emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, rr)")
+    modifications
+    // Wire signals to SM object
+    if (!lhs.isOuterStreamControl) {
+      if (lhs.cchains.nonEmpty) {
+        val ctr = lhs.cchains.head
+        // if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
+        //   emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+        //   emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+        // }
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${DL(src"${lhs}$swobj.cchain.get.io.output.done", 1, true)}""")
+      } else if (lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).nonEmpty & (lhs match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
+        val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
+      } else if (lhs match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
+      } else if (lhs match {case Op(_:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length > 0) => true; case _ => false }) {
+        val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
+      } else if (lhs match {case Op(x:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length == 0) => true; case _ => false }) {
+        val x = lhs match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${lhs}$swobj.iiDone.D(${x.fullDelay})""")
+      } else {
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := risingEdge(${lhs}$swobj.sm.io.ctrInc)""")
+      }
+    }
+    else {
+      if (lhs.isOuterStreamLoop) emitItersAndValidsStream(lhs)
+    }
+
+    // if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) { // TBD
+    //   emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+    //   emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+    // }
+    emit(src"${lhs}$swobj.backpressure := ${getBackPressure(lhs.toCtrl)}")
+    emit(src"${lhs}$swobj.forwardpressure := ${getForwardPressure(lhs.toCtrl)}")
+
+    if (lhs.isSwitch) emitSwitchAddition(lhs)
+
+    lhs match {
+      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+      case _ => emit(src"${lhs}$swobj.sm.io.break := false.B") 
+    }
+    if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
+    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
+    val noop = if (lhs.cchains.nonEmpty) src"~${lhs}.cchain.get.io.output.noop" else "true.B"
+    val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
+    emit(src"${lhs}$swobj.mask := $noop & $parentMask")
+    emit(src"""${lhs}$swobj.configure("${lhs}$swobj")""")
+    if (lhs.op.exists(_.R.isBits)) emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""}).result()") // TBD
+    else emit(src"${lhs}$swobj.kernel()")
   }
 
   private def emitSwitchAddition(lhs: Sym[_]): Unit = {
@@ -171,15 +276,15 @@ trait ChiselGenController extends ChiselGenCommon {
     close("}")
   }
 
-  private def createSMObject(lhs:Sym[_], isFSM: Boolean): Unit = {
+  private def createSMObject(lhs:Sym[_]): Unit = {
 
     val swobj = if (lhs.isBranch) "_obj" else ""
     val isInner = lhs.isInnerControl
     val lat = if (spatialConfig.enableRetiming & lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
-    val ii = scrubNoise(lhs.II)
+    val ii = if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
 
     // Construct controller args
-    val constrArg = if (lhs.isInnerControl) {s"$isFSM"} else {s"${lhs.children.filter(_.s.get != lhs).length}, isFSM = ${isFSM}"}
+    val constrArg = if (lhs.isInnerControl) {s"${lhs.isFSM}"} else {s"${lhs.children.filter(_.s.get != lhs).length}, isFSM = ${lhs.isFSM}"}
     val isPassthrough = lhs match{
       case Op(_: Switch[_]) if isInner && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl => ",isPassthrough = true";
       case Op(_:SwitchCase[_]) if isInner && lhs.parent.s.get.parent.s.isDefined && lhs.parent.s.get.parent.s.get.isInnerControl => ",isPassthrough = true";
@@ -193,88 +298,57 @@ trait ChiselGenController extends ChiselGenCommon {
       case _ => ""
     }
 
-    // Create controller
-    emitSMObject(lhs) {
-      emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm"))""")
-      emit("sm.io <> DontCare; doneCondition := DontCare; resetMe := DontCare")
-      if (lhs.cchains.isEmpty) emit(src"""datapathEn := sm.io.datapathEn & mask""")
-      else emit(src"""datapathEn := sm.io.datapathEn & mask & ~sm.io.ctrDone""")
+    emit("")
+    emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm")); sm.io <> DontCare""")
+    emit(src"""val iiCtr = Module(new IICounter(${ii}.toInt, 2 + fringe.utils.log2Up(${ii}.toInt), "${lhs}_iiCtr"))""")
 
-      if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) {
-        emit(src"""iiDone := true.B""")
-      } else {
-        emit(src"""private val iiCtr = Module(new IICounter(${ii}.toInt, 2 + fringe.utils.log2Up(${ii}.toInt), "${lhs}_iiCtr"));""")
-        emit(src"""iiCtr.io.input.enable := datapathEn""")
-        emit(src"""iiCtr.io.input.reset := sm.io.parentAck""")
-        emit(src"""iiDone := iiCtr.io.output.done | ~mask""")
-      }
-      emit(src"val parent = ${parentAndSlot(lhs)}")
-      emit(src"""override val children = List[SMObject](${lhs.children.filter(_.s.get != lhs).map(_.s.get).map{case c if (c.isBranch) => src"${c}_obj"; case c => quote(c)}.mkString(",")})""")
-      if (lhs.cchains.nonEmpty && !lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.cchains.head})")
-      else if (lhs.cchains.nonEmpty && lhs.isOuterStreamLoop) emit(src"override val cchains = List[CChainObject](${lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}.mkString(",")})")
-      if (lhs.isSwitch) emitSwitchAddition(lhs)
-
-      lhs match {
-        case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
-        case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
-        case _ => emit(src"sm.io.break := false.B") 
-      }
-    }
-    if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
-    emit(src"${lhs}$swobj.en := ${lhs}$swobj.baseEn & top.rr & ${getForwardPressure(lhs.toCtrl)}")
-    if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
-      emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
-      emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
-    }
-    emit(src"${lhs}$swobj.flow := ${getBackPressure(lhs.toCtrl)}")
-    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
-    val noop = if (lhs.cchains.nonEmpty) src"~${lhs.cchains.head}$suffix.cchain.io.output.noop" else "true.B"
-    val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
-    emit(src"${lhs}$swobj.mask := $noop & $parentMask")
-    emit(src"""${lhs}$swobj.configure("${lhs}$swobj")""")
-
+    emit("")
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
       inAccel{
+        emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+        emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
+        emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
         hwblock = Some(enterCtrl(lhs))
-        createSMObject(lhs, false)
-        createKernel(lhs, Set(), func){
-          emit(src"""${lhs}.baseEn := top.io.enable""")
-          emit(src"""${lhs}.en := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
+        instantiateKernel(lhs, Set(), func){
+          emit(src"""${lhs}.baseEn := top.io.enable && rr""")  
           if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
             emit(src"${lhs}.stalled.io.enable := ${lhs}.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
             emit(src"${lhs}.idle.io.enable := ${lhs}.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
           }
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
-          emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-          emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
-          emit(src"""top.retime_released := getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
-
           emit(src"""${lhs}.sm.io.parentAck := top.io.done""")
-          gen(func)
-
-          emit(src"""val done_latch = Module(new SRFF())""")
-          if (earlyExits.nonEmpty) {
-            appPropertyStats += HasBreakpoint
-            inGen(out, "ArgInterface.scala"){emit(createWire("breakpoints", s"""Vec(${earlyExits.length}, Bool())"""))}
-            emit(src"""done_latch.io.input.set := ${lhs}.done | breakpoints.reduce{_|_}""")        
-          } else {
-            emit(src"""done_latch.io.input.set := ${lhs}.done""")                
-          }
-          emit(src"""done_latch.io.input.reset := ${lhs}.resetMe""")
-          emit(src"""done_latch.io.input.asyn_reset := ${lhs}.resetMe""")
-          emit(src"""top.io.done := done_latch.io.output.data""")
+          emit(src"""${lhs}.sm.io.enable := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
         }
+        writeKernelClass(lhs, Set(), func){
+        emit(src"doneCondition := false.B")
+          gen(func)
+        }
+        emit(src"""val done_latch = Module(new SRFF())""")
+        if (earlyExits.nonEmpty) {
+          appPropertyStats += HasBreakpoint
+          inGen(out, "ArgInterface.scala"){emit(createWire("breakpoints", s"""Vec(${earlyExits.length}, Bool())"""))}
+          emit(src"""done_latch.io.input.set := ${lhs}.done | ${lhs}.breakpoints.reduce{_|_}""")        
+        } else {
+          emit(src"""done_latch.io.input.set := ${lhs}.done""")                
+        }
+        emit(src"""done_latch.io.input.reset := ${lhs}.resetMe""")
+        emit(src"""done_latch.io.input.asyn_reset := ${lhs}.resetMe""")
+        emit(src"""top.io.done := done_latch.io.output.data""")
+
         exitCtrl(lhs)
       }
 
     case ctrl: EnControl[_] if !lhs.isFSM => 
       enterCtrl(lhs)
-      createSMObject(lhs, false)
-      createKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {
+      instantiateKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*){
+        // revisitCChains(lhs)
+      }
+      writeKernelClass(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {
+        emit(src"doneCondition := false.B")
         ctrl.bodies.flatMap{_.blocks.map(_._2)}.foreach{b => gen(b); ()}
       }
       exitCtrl(lhs)
@@ -282,7 +356,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     case op@Switch(selects, body) => 
       enterCtrl(lhs)
-      createSMObject(lhs, false)
+      createSMObject(lhs)
       val cases = lhs.children.filter(_.s.get != lhs).map(_.s.get)
 
       if (lhs.isInnerControl) { // If inner, don't worry about condition mutation
@@ -295,7 +369,8 @@ trait ChiselGenController extends ChiselGenCommon {
         }
       }
 
-      createKernel(lhs, Set(), body) {
+      writeKernelClass(lhs, Set(), body) {
+        emit(src"doneCondition := false.B")
         gen(body)
         if (op.R.isBits) {
           emit(createWire(src"${lhs}_onehot_selects", src"Vec(${selects.length}, Bool())"))
@@ -309,10 +384,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
     case op@SwitchCase(body) =>
       enterCtrl(lhs)
-      createSMObject(lhs, false)
+      createSMObject(lhs)
 
-      createKernel(lhs, Set(), body) {
+      writeKernelClass(lhs, Set(), body) {
         emit(s"// Controller Stack: ${controllerStack.tail}")
+        emit(src"doneCondition := false.B")
         gen(body)
         if (op.R.isBits) {
           emit(src"${body.result}")
@@ -323,8 +399,8 @@ trait ChiselGenController extends ChiselGenCommon {
     case StateMachine(ens,start,notDone,action,nextState) =>
       appPropertyStats += HasFSM
       enterCtrl(lhs)
-      createSMObject(lhs, true)
-      createKernel(lhs, ens, notDone, action, nextState) {
+      createSMObject(lhs)
+      writeKernelClass(lhs, ens, notDone, action, nextState) {
         val state = notDone.input
         emit(createWire(src"$state", src"${state.tp}"))
         emit(src"${state}.r := ${lhs}.sm.io.state.r")
@@ -333,10 +409,10 @@ trait ChiselGenController extends ChiselGenCommon {
         gen(action)
         gen(nextState)
 
-        emit(src"${lhs}.sm.io.nextState := ${nextState.result}.r.asSInt ")
-        emit(src"${lhs}.sm.io.initState := ${start}.r.asSInt")
+        emit(src"sm.io.nextState := ${nextState.result}.r.asSInt ")
+        emit(src"sm.io.initState := ${start}.r.asSInt")
         emit(src"${lhs}.doneCondition := ~${notDone.result}")
-        emit(src"${lhs}.sm.io.doneCondition := ${lhs}.doneCondition")
+        emit(src"sm.io.doneCondition := ${lhs}.doneCondition")
       }
       exitCtrl(lhs)
 
@@ -355,12 +431,12 @@ trait ChiselGenController extends ChiselGenCommon {
       // }
       // emit("// Emitting nextState")
       // gen(nextState)
-      // emit(src"${lhs}.sm.io.enable := ${lhs}.en ")
-      // emit(src"${lhs}.sm.io.nextState := ${nextState.result}.r.asSInt ")
-      // emit(src"${lhs}.sm.io.initState := ${start}.r.asSInt")
-      // emit(src"${state}.r := ${lhs}.sm.io.state.r")
+      // emit(src"sm.io.enable := ${lhs}.en ")
+      // emit(src"sm.io.nextState := ${nextState.result}.r.asSInt ")
+      // emit(src"sm.io.initState := ${start}.r.asSInt")
+      // emit(src"${state}.r := sm.io.state.r")
       // emit(src"${lhs}.doneCondition := ~${notDone.result}")
-      // emit(src"${lhs}.sm.io.doneCondition := ${lhs}.doneCondition")
+      // emit(src"sm.io.doneCondition := ${lhs}.doneCondition")
       // exitCtrl(lhs)
 
 
@@ -374,22 +450,22 @@ trait ChiselGenController extends ChiselGenCommon {
       open("object Instrument {")
         open("def connect(top: AccelTop): Unit = {")
           val printableLines: Seq[(String, Int)] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
-            val sfx = if (s.isBranch) "_obj" else ""
+            val swobj = if (s.isBranch) "_obj" else ""
             Seq(
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).bits := ${s}$sfx.cycles.io.count""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).bits := ${s}$swobj.cycles.io.count""",1),
               (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).valid := ${hwblock.get}.en""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).bits := ${s}$sfx.iters.io.count""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).bits := ${s}$swobj.iters.io.count""",1),
               (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).valid := ${hwblock.get}.en""",1)
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).bits := ${s}$sfx.stalled.io.count""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).bits := ${s}$swobj.stalled.io.count""",1),
                 (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).valid := ${hwblock.get}.en""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).bits := ${s}$sfx.idle.io.count""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).bits := ${s}$swobj.idle.io.count""",1),
                 (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).valid := ${hwblock.get}.en""",1)
               )} else Nil}
 
           }
           def isLive(s: String, remaining: Seq[String]): Boolean = false
-          def branchSfx(s: String, n: Option[String] = None): String = src""""${n.getOrElse(quote(s))}" -> $s"""
+          def branchswobj(s: String, n: Option[String] = None): String = src""""${n.getOrElse(quote(s))}" -> $s"""
           def initChunkState(): Unit = {}
 
           val hierarchyDepth = (scala.math.log(printableLines.size) / scala.math.log(CODE_WINDOW)).toInt
@@ -399,7 +475,7 @@ trait ChiselGenController extends ChiselGenCommon {
             hierarchyDepth, 
             globalBlockID, 
             isLive, 
-            branchSfx, 
+            branchswobj, 
             arg, 
             () => initChunkState
           )(emit(_) )

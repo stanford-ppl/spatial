@@ -16,13 +16,13 @@ class R_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int]) e
   val banks = HVec.tabulate(port_width*bank_width.length){i => UInt(bank_width(i%bank_width.length).W)}
   val ofs = Vec(port_width, UInt(ofs_width.W))
   val en = Vec(port_width, Bool())
-  val flow = Vec(port_width, Bool())
+  val backpressure = Vec(port_width, Bool())
 
   def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_XBar, f: Bool): Unit = {
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     en(lhs_lane) := rhs_port.en(rhs_lane)
-    flow(lhs_lane) := f
+    backpressure(lhs_lane) := f
   }
 
   override def cloneType = (new R_XBar(port_width, ofs_width, bank_width)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -43,12 +43,12 @@ class W_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int], v
 class R_Direct(val port_width:Int, val ofs_width:Int, val banks:List[List[Int]]) extends Bundle {
   val ofs = Vec(port_width, UInt(ofs_width.W))
   val en = Vec(port_width, Bool())
-  val flow = Vec(port_width, Bool())
+  val backpressure = Vec(port_width, Bool())
 
   def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_Direct, f: Bool): Unit = {
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     en(lhs_lane) := rhs_port.en(rhs_lane)
-    flow(lhs_lane) := f
+    backpressure(lhs_lane) := f
   }
 
   override def cloneType = (new R_Direct(port_width, ofs_width, banks)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -91,7 +91,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     assert(p.hasXBarR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
@@ -109,7 +109,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
-        io.xBarR(base).connectLane(vecId, i, rBundle, flow)
+        io.xBarR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
       io.output.data(outBase + vecId)
@@ -128,7 +128,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     assert(p.hasDirectR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
@@ -146,7 +146,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
-        io.directR(base).connectLane(vecId, i, rBundle, flow)
+        io.directR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
       io.output.data(p.xBarOutputs + outBase + vecId)
@@ -230,30 +230,30 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     directSelectEnsModule.io.ins.zip(directSelectEnsRaw).foreach{case (a,b) => a := b}
     val directSelectEns = directSelectEnsModule.io.outs.map(_.toBool)
     val directSelectOffsets = io.directR.flatMap(_.ofs).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-    val directSelectFlows = io.directR.flatMap(_.flow).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectFlows = io.directR.flatMap(_.backpressure).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 
     // Unmask write port if any of the above match
     mem._1.io.rMask := {if (p.hasXBarR) xBarSelect.reduce{_|_} else true.B} & directSelectEns.or
     // Connect matching R port to memory
     if (directSelectEns.nonEmpty & p.hasXBarR) {          // Has direct and x
       val directChoice = fatMux("PriorityMux", directSelectEns, directSelectOffsets, directSelectEns, directSelectFlows)
-      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.flow))
+      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.backpressure))
       val finalChoice = fatMux("PriorityMux", Seq(directSelectEns.or), Seq(directChoice(0), xBarChoice(0)), Seq(directChoice(1), xBarChoice(1)), Seq(directChoice(2), xBarChoice(2))) 
       mem._1.io.r.ofs.head  := finalChoice(0)
       mem._1.io.r.en.head   := finalChoice(1)
-      mem._1.io.flow        := finalChoice(2)
+      mem._1.io.backpressure        := finalChoice(2)
     }
     else if (p.hasXBarR && directSelectEns.isEmpty) { // Has x only
-      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.flow))
+      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.backpressure))
       mem._1.io.r.ofs.head  :=  xBarChoice(0)
       mem._1.io.r.en.head   :=  xBarChoice(1)
-      mem._1.io.flow         :=  xBarChoice(2)
+      mem._1.io.backpressure         :=  xBarChoice(2)
     }
     else if (directSelectEns.nonEmpty) {                                           // Has direct only
       val directChoice = fatMux("PriorityMux", directSelectEns, directSelectOffsets, directSelectEns, directSelectFlows)
       mem._1.io.r.ofs.head  := directChoice(0)
       mem._1.io.r.en.head   := directChoice(1)
-      mem._1.io.flow         := directChoice(2)
+      mem._1.io.backpressure         := directChoice(2)
     }
   }
 
@@ -262,7 +262,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if i < entry._1 => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
       val xBarCandidatesEns = xBarIds.map(io.xBarR.flatMap(_.en).toList(_)).toList
-      val xBarCandidatesFlows = xBarIds.map(io.xBarR.flatMap(_.flow).toList(_)).toList
+      val xBarCandidatesFlows = xBarIds.map(io.xBarR.flatMap(_.backpressure).toList(_)).toList
       val xBarCandidatesBanks = xBarIds.map(io.xBarR.flatMap(_.banks).toList.grouped(p.banks.length).toList(_)).toList
       val xBarCandidatesOffsets = xBarIds.map(io.xBarR.flatMap(_.ofs).toList(_)).toList
       val sel = m.map{ mem =>
@@ -270,10 +270,10 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
           val en = xBarCandidatesEns(j)
           val banks = xBarCandidatesBanks(j)
           val ofs = xBarCandidatesOffsets(j)
-          val flow = xBarCandidatesFlows(j)
-          getRetimed(banks.zip(mem._2).map{case (b, coord) => b === coord.U}.reduce{_&&_} && en, globals.target.sramload_latency, flow)
-          // banks.zip(mem._2).map{case (b, coord) => getRetimed(b, globals.target.sramload_latency, flow) === coord.U}.reduce{_&&_} &&
-          //   getRetimed(en, globals.target.sramload_latency, flow)
+          val backpressure = xBarCandidatesFlows(j)
+          getRetimed(banks.zip(mem._2).map{case (b, coord) => b === coord.U}.reduce{_&&_} && en, globals.target.sramload_latency, backpressure)
+          // banks.zip(mem._2).map{case (b, coord) => getRetimed(b, globals.target.sramload_latency, backpressure) === coord.U}.reduce{_&&_} &&
+          //   getRetimed(en, globals.target.sramload_latency, backpressure)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -285,15 +285,15 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
       val directCandidatesEns = directIds.map(io.directR.flatMap(_.en).toList(_)).toList
       val directCandidatesBanks = directIds.map(io.directR.flatMap(_.banks).toList(_)).toList
       val directCandidatesOffsets = directIds.map(io.directR.flatMap(_.ofs).toList(_)).toList
-      val directCandidatesFlows = directIds.map(io.directR.flatMap(_.flow).toList(_)).toList
+      val directCandidatesFlows = directIds.map(io.directR.flatMap(_.backpressure).toList(_)).toList
       // Create bit vector to select which bank was activated by this io
       val sel = m.map{ mem =>
         if (directCandidatesEns.nonEmpty) directCandidatesEns.size.indices{j => 
           val en = directCandidatesEns(j)
           val banks = directCandidatesBanks(j)
           val ofs = directCandidatesOffsets(j)
-          val flow = directCandidatesFlows(j)
-          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency, flow)
+          val backpressure = directCandidatesFlows(j)
+          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency, backpressure)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -765,7 +765,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     val rMask = Input(Bool())
     val w = Input(new W_XBar(1, addrWidth, List(1), bitWidth))
     val wMask = Input(Bool())
-    val flow = Input(Bool())
+    val backpressure = Input(Bool())
     val output = new Bundle {
       val data  = Output(UInt(bitWidth.W))
     }
@@ -790,16 +790,16 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
         reg := Mux(io.w.en.head & wInBound & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
         (i.U(addrWidth.W) -> reg)
       }
-      val radder = getRetimed(io.r.ofs.head,1,io.flow)
-      io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.flow)
+      val radder = getRetimed(io.r.ofs.head,1,io.backpressure)
+      io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.backpressure)
     } else {
       val m = Module(new SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
-      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.backpressure)
       else           m.io.raddr     := 0.U
       m.io.waddr     := io.w.ofs.head
       m.io.wen       := io.w.en.head & wInBound & io.wMask
       m.io.wdata     := io.w.data.head
-      m.io.flow      := io.flow
+      m.io.backpressure      := io.backpressure
       io.output.data := m.io.rdata
     }
   } else {

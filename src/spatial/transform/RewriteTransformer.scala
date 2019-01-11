@@ -79,24 +79,28 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
   }
 
-  def static(iter: Num[_], y: scala.Int): Boolean = {
-    if (iter.counter.ctr.isStaticStartAndStep) {
+  def static(lin: scala.Int, iter: Num[_], y: scala.Int): Boolean = {
+    if (lin % y == 0) true
+    else if (iter.counter.ctr.isStaticStartAndStep) {
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt
-      val lane = iter.counter.lane
-      (par*step % y) == 0     
-    } else false
+      ((par*step*lin) % y) == 0     
+    } 
+    else false
   }
 
-  def getPosMod(x: Num[_], ofs: Int, mod: Int): Int = {
-    val Final(start) = x.counter.ctr.start
-    val Final(step) = x.counter.ctr.step
-    val par = x.counter.ctr.ctrPar.toInt
-    val lane = x.counter.lane
-    val r = start + lane * step + ofs
-    val posMod = ((r % mod) + mod) % mod
-    dbgs(s"Replace $x + $ofs % $mod with ${posMod} (ctr start $start, step $step, lane $lane)")
-    posMod
+  def getPosMod(lin: scala.Int, x: Num[_], ofs: scala.Int, mod: scala.Int): Int = {
+    if (lin % mod == 0) 0
+    else {
+      val Final(start) = x.counter.ctr.start
+      val Final(step) = x.counter.ctr.step
+      val par = x.counter.ctr.ctrPar.toInt
+      val lane = x.counter.lane
+      val r = start + lane * step * lin + ofs
+      val posMod = ((r % mod) + mod) % mod
+      dbgs(s"Replace $lin * $x + $ofs % $mod with ${posMod} (ctr start $start, step $step, lane $lane)")
+      posMod
+    }
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
@@ -115,7 +119,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       // Change a write from a mux with the register or some other value to an enabled register write
       case Op( Mux(sel, Op(RegRead(`reg`)), b) ) =>
         val lhs2 = writeReg(lhs, reg, b, en + !sel)
-        println(s"b is $b ${b.tp}")
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]
@@ -123,7 +126,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       // Change a write from a mux with the register or some other value to an enabled register write
       case Op( Mux(sel, a, Op(RegRead(`reg`))) ) =>
         val lhs2 = writeReg(lhs, reg, a, en + sel)
-        println(s"a is $a ${a.tp}")
         dbg(s"Rewrote ${stm(lhs)}")
         dbg(s"  to ${stm(lhs2)}")
         lhs2.asInstanceOf[Sym[A]]
@@ -131,28 +133,41 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       case _ => super.transform(lhs, rhs)
     }
 
-    case FixMod(F(x), F(Final(y))) if isPow2(y) && inHw => 
+    case FixMod(F(x), F(Final(y))) if inHw => 
       x match {
         // Assume chained arithmetic will have been constant propped by now
-        case Op(FixAdd(F(xx), Final(yy))) if (xx.getCounter.isDefined && static(xx, y)) => 
-          val posMod = getPosMod(xx, yy, y)
+        case Op(FixAdd(F(xx), Final(ofs))) if (xx.getCounter.isDefined && static(1, xx, y)) => 
+          val posMod = getPosMod(1, xx, ofs, y)
           transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
         // Assume chained arithmetic will have been constant propped by now
-        case Op(FixAdd(Final(yy), F(xx))) if (xx.getCounter.isDefined && static(xx, y)) => 
-          val posMod = getPosMod(xx, yy, y)
+        case Op(FixAdd(Final(ofs), F(xx))) if (xx.getCounter.isDefined && static(1, xx, y)) => 
+          val posMod = getPosMod(1, xx, ofs, y)
           transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
         // Assume chained arithmetic will have been constant propped by now
-        case Op(FixSub(F(xx), Final(yy))) if (xx.getCounter.isDefined && static(xx, y)) => 
-          val posMod = getPosMod(xx, -yy, y)
+        case Op(FixSub(F(xx), Final(ofs))) if (xx.getCounter.isDefined && static(1, xx, y)) => 
+          val posMod = getPosMod(1, xx, -ofs, y)
           transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
-        case _ if (x.getCounter.isDefined && static(x, y)) =>
-          val posMod = getPosMod(x, 0, y)
+        case Op(FixMul(Final(lin), F(xx))) if (xx.getCounter.isDefined && static(lin, xx, y)) => 
+          val posMod = getPosMod(lin, xx, 0, y)
+          transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
+        case Op(FixMul(F(xx), Final(lin))) if (xx.getCounter.isDefined && static(lin, xx, y)) => 
+          val posMod = getPosMod(lin, xx, 0, y)
+          transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
+        case Op(FixFMA(Final(lin), F(xx), Final(ofs))) if (xx.getCounter.isDefined && static(lin, xx, y)) => 
+          val posMod = getPosMod(lin, xx, ofs, y)
+          transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
+        case Op(FixFMA(F(xx), Final(lin), Final(ofs))) if (xx.getCounter.isDefined && static(lin, xx, y)) => 
+          val posMod = getPosMod(lin, xx, ofs, y)
+          transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
+        case _ if (x.getCounter.isDefined && static(1, x, y)) =>
+          val posMod = getPosMod(1, x, 0, y)
           transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
-        case _ => 
+        case _ if isPow2(y) => 
           val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
           dbgs(s"Cannot statically determine $x % $y")
           m.modulus = y
-          m        
+          m     
+        case _ => super.transform(lhs,rhs)   
       }
 
     // 1 / sqrt(b)  ==> invsqrt(b)

@@ -22,7 +22,7 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
     val unifiedUInt = inVec.reverse.reduce{ Cat(_,_) }
 
     // 2. Split apart
-    val out = Vec(List.tabulate(outv){ i =>
+    val out = VecInit(List.tabulate(outv){ i =>
       unifiedUInt(i*outw+outw-1, i*outw)
     })
 
@@ -31,7 +31,7 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
 
   def bytify(inVec: UInt, outbytes: Int, win: Int): UInt = {
     assert(win / 8 > 0)
-    val boolVec = Vec(List.tabulate(outbytes){i => 
+    val boolVec = VecInit(List.tabulate(outbytes){i => 
       val id = (i / (win/8)).toInt
       inVec(id)
     }.reverse)
@@ -49,8 +49,8 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
   if ((inWidth < outWidth) || (inWidth == outWidth && wout < win)) {
     Predef.assert(outWidth % inWidth == 0, s"ERROR: Width conversion attempted between widths that are not multiples (in: $inWidth, out: $outWidth)")
     val v = outWidth / inWidth
-    val fifo = Module(new FIFOVec(UInt(inWidth.W), d, v))
-    val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, v))
+    val fifo = Module(new FIFOVec(UInt(inWidth.W), d, v)); fifo.io <> DontCare
+    val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, v)); fifoStrb.io <> DontCare
     fifo.io.chainEnq := true.B
     fifo.io.chainDeq := false.B
     fifoStrb.io.chainEnq := true.B
@@ -69,8 +69,8 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
   else if ((inWidth > outWidth) || (inWidth == outWidth && wout > win)) {
     Predef.assert(inWidth % outWidth == 0, s"ERROR: Width conversion attempted between widths that are not multiples (in: $inWidth, out: $outWidth)")
     val v = inWidth / outWidth
-    val fifo = Module(new FIFOVec(UInt(outWidth.W), d, v))
-    val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, 1))
+    val fifo = Module(new FIFOVec(UInt(outWidth.W), d, v)); fifo.io <> DontCare
+    val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, 1)); fifoStrb.io <> DontCare
     fifo.io.chainEnq := false.B
     fifo.io.chainDeq := true.B
     fifoStrb.io.chainEnq := false.B
@@ -83,12 +83,12 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
     fifoStrb.io.in.bits(0) := io.in.bits.strobe
     fifoStrb.io.in.valid := io.in.valid
 
-    io.out.bits.data := convertVec(Vec(fifo.io.out.bits(0)), wout, vout)
+    io.out.bits.data := convertVec(VecInit(fifo.io.out.bits(0)), wout, vout)
     io.out.bits.strobe := bytify(fifoStrb.io.out.bits(0), wout*vout/8, win)
     fifo.io.out.ready := io.out.ready
   } else {
-    val fifo = Module(new FIFOVec(UInt(win.W), d, vin))
-    val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, 1))
+    val fifo = Module(new FIFOVec(UInt(win.W), d, vin)); fifo.io <> DontCare
+    val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, 1)); fifoStrb.io <> DontCare
     fifo.io.chainEnq := false.B
     fifo.io.chainDeq := false.B
     fifoStrb.io.chainEnq := false.B

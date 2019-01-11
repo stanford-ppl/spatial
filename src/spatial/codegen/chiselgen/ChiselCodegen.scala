@@ -95,16 +95,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("import fringe.templates.retiming._")
 
       emit ("class CustomAccelInterface(")
-      emit ("  io_w: Int, ")
-      emit ("  io_v: Int, ")
-      emit ("  io_loadStreamInfo: List[StreamParInfo], ")
-      emit ("  io_storeStreamInfo: List[StreamParInfo], ")
-      emit ("  io_gatherStreamInfo: List[StreamParInfo], ")
-      emit ("  io_scatterStreamInfo: List[StreamParInfo], ")
-      emit ("  io_numAllocators: Int, ")
-      emit ("  io_numArgIns: Int, ")
-      emit ("  io_numArgOuts: Int, ")
-      emit ("  io_numArgOutLoopbacks: Int")
+      emit ("  val io_w: Int, ")
+      emit ("  val io_v: Int, ")
+      emit ("  val io_loadStreamInfo: List[StreamParInfo], ")
+      emit ("  val io_storeStreamInfo: List[StreamParInfo], ")
+      emit ("  val io_gatherStreamInfo: List[StreamParInfo], ")
+      emit ("  val io_scatterStreamInfo: List[StreamParInfo], ")
+      emit ("  val io_numAllocators: Int, ")
+      emit ("  val io_numArgIns: Int, ")
+      emit ("  val io_numArgOuts: Int, ")
+      emit ("  val io_numArgOutLoopbacks: Int")
       emit (") extends AccelInterface{")
       emit ("  // Control IO")
       emit ("  val enable = Input(Bool())")
@@ -121,6 +121,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("  val argIns = Input(Vec(io_numArgIns, UInt(64.W)))")
       emit ("  val argOuts = Vec(io_numArgOuts, Decoupled((UInt(64.W))))")
       emit ("  val argOutLoopbacks = Input(Vec(io_numArgOutLoopbacks, UInt(64.W)))")
+      emit ("")
+      emit ("  override def cloneType = (new CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts, io_numArgOutLoopbacks)).asInstanceOf[this.type] // See chisel3 bug 358")
       emit ("}")
       
       open("trait IOModule extends Module {")
@@ -174,8 +176,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val break = Wire(Bool())")
         if (spatialConfig.enableInstrumentation) {
           emit("""val cycles = Module(new InstrumentationCounter())""")
-          emit("""val stalled = Module(new InstrumentationCounter())""")
-          emit("""val idle = Module(new InstrumentationCounter())""")
           emit("""val iters = Module(new InstrumentationCounter())""")          
         }
         emit("")
@@ -212,6 +212,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           }
         close("}")
 
+      close("}")
+
+      open(s"abstract trait Stream_SMObject extends SMObject {")
+        if (spatialConfig.enableInstrumentation) {
+          emit("""val stalled = Module(new InstrumentationCounter())""")
+          emit("""val idle = Module(new InstrumentationCounter())""")
+        }
       close("}")
     }
 
@@ -263,6 +270,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val cchain: CounterChain")
         emit("")
         open("def configure(): Unit = {")
+          emit("cchain.io <> DontCare")
           emit("cchain.io.input.stops.zip(ctrs.map(_.stop)).foreach{case (port,Right(stop)) => port := stop.r.asSInt; case (_,_) => }")
           emit("cchain.io.input.strides.zip(ctrs.map(_.step)).foreach{case (port,Right(stride)) => port := stride.r.asSInt; case (_,_) => }")
           emit("cchain.io.input.starts.zip(ctrs.map(_.start)).foreach{case (port,Right(start)) => port := start.r.asSInt; case (_,_) => }")
@@ -320,13 +328,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       close("}")
     }
     inGen(out, "Instantiator.scala") {
-      emit (s"""val w = if ("${spatialConfig.target.name}" == "zcu") 32 else if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 8 else 32""")
+      emit (s"""val w = if (this.target == "zcu") 32 else if (this.target == "VCS" || this.target == "ASIC") 8 else 32""")
       emit ("val numArgIns = numArgIns_mem  + numArgIns_reg + numArgIOs_reg")
       emit ("val numArgOuts = numArgOuts_reg + numArgIOs_reg + numArgOuts_instr + numArgOuts_breakpts")
       emit ("val numArgIOs = numArgIOs_reg")
       emit ("val numArgInstrs = numArgOuts_instr")
       emit ("val numArgBreakpts = numArgOuts_breakpts")
-      emit (s"""new Top("${spatialConfig.target.name}", () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
+      emit (s"""new Top(this.target, () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
       // emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
       close("}")
       emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
@@ -380,6 +388,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override protected def emitEntry(block: Block[_]): Unit = {
     open(src"object Main {")
       open(src"def main(top: AccelTop): Unit = {")
+        emit("top.io <> DontCare")
         emitPreMain()
         outsideAccel{gen(block)}
         emitPostMain()

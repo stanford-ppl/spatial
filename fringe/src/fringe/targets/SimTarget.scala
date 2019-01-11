@@ -3,6 +3,7 @@ package fringe.targets
 import chisel3.Module
 import fringe._
 import fringe.targets.verilator.VerilatorInterface
+import chisel3._
 
 /** Any simulator */
 abstract class SimTarget extends DeviceTarget {
@@ -13,6 +14,7 @@ abstract class SimTarget extends DeviceTarget {
 
     val blockingDRAMIssue = false
     val fringe = Module(new Fringe(blockingDRAMIssue, io.axiParams))
+    fringe.io <> DontCare
 
     // Fringe <-> Host connections
     fringe.io.raddr := io.raddr
@@ -36,6 +38,7 @@ abstract class SimTarget extends DeviceTarget {
       fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
         fringeArgOut.bits := accelArgOut.bits
         fringeArgOut.valid := accelArgOut.valid
+        accelArgOut.ready := true.B
       }
     }
     fringe.io.memStreams <> accel.io.memStreams

@@ -84,7 +84,7 @@ elif [[ $type == "vcs-gdocs" ]]; then
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs"
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs" "any" "any"
-  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs"
+  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs" "any" "any"
 elif [[ $type == "scalasim-gdocs" ]]; then
   export GDOCS=1
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
@@ -101,7 +101,7 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "scalasim"
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "scalasim" "any" "any"
-  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "scalasim"
+  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "scalasim" "any" "any"
 else
   echo -e "$FAIL Usage: test_all.sh <test type> [test(s)]"
   echo -e "$FAIL Test type '$test_type' was not recognized"

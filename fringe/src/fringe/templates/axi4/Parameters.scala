@@ -45,8 +45,8 @@ case class AXI4SlavePortParameters(
   require (maxTransfer <= beatBytes * (1 << AXI4Parameters.lenBits))
 
   lazy val routingMask = AddressDecoder(slaves.map(_.address))
-  def findSafe(address: UInt) = Vec(slaves.map(_.address.map(_.contains(address)).reduce(_ || _)))
-  def findFast(address: UInt) = Vec(slaves.map(_.address.map(_.widen(~routingMask)).distinct.map(_.contains(address)).reduce(_ || _)))
+  def findSafe(address: UInt) = VecInit(slaves.map(_.address.map(_.contains(address)).reduce(_ || _)))
+  def findFast(address: UInt) = VecInit(slaves.map(_.address.map(_.widen(~routingMask)).distinct.map(_.contains(address)).reduce(_ || _)))
 
   // Require disjoint ranges for addresses
   slaves.combinations(2).foreach { case Seq(x,y) =>

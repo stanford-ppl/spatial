@@ -176,6 +176,7 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
   })
 
   val base = Module(new FF(width))
+  base.io <> DontCare
   base.io.xBarW(0).init.head := 0.U(width.W)
   base.io.xBarW(0).reset.head := io.input.reset
   base.io.xBarW(0).en.head := io.input.enables.reduce{_|_}
@@ -207,15 +208,14 @@ class InstrumentationCounter(val width: Int = 64) extends Module {
   * @param w: Word width
   */
 class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
-                    val stride: Option[Int], val gap: Option[Int], val forever: Boolean, val width: Int = 32) extends Module {
-  def this(tuple: (Int, Option[Int], Option[Int], Option[Int], Option[Int], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7)
+                    val stride: Option[Int], val forever: Boolean, val width: Int = 32) extends Module {
+  def this(tuple: (Int, Option[Int], Option[Int], Option[Int], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
 
   val io = IO(new Bundle {
     val input = new Bundle {
       val start  = Input(SInt(width.W)) // TODO: Currently resets to "start" but wraps to 0, is this normal behavior?
       val stop   = Input(SInt(width.W))
       val stride = Input(SInt(width.W))
-      val gap    = Input(SInt(width.W))
       // val wrap     = BoolInput(()) // TODO: This should let
       //                                   user specify (8 by 3) ctr to go
       //                                   0,3,6 (wrap) 1,4,7 (wrap) 2,5...
@@ -234,7 +234,8 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
   })
 
-  val bases = List.tabulate(par){i => Module(new FF(width))}
+  io <> DontCare
+  val bases = List.tabulate(par){i => val x = Module(new FF(width)); x.io <> DontCare; x}
   if (par > 0 && !forever) {
     val lock = Module(new SRFF())
     lock.io.input.set := io.input.enable  & !io.input.reset
@@ -250,6 +251,11 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
         ,0) // Maybe delay by 1 cycle just in case this is a critical path.  Init should never change during execution
     }
     bases.zipWithIndex.foreach{ case (b,i) =>
+      b.io.xBarW(0) <> DontCare
+      b.io.xBarR(0)   <> DontCare
+      b.io.reset := false.B
+      b.io.directW(0) <> DontCare
+      b.io.directR(0) <> DontCare
       b.io.xBarW(0).init.head := inits(i).asUInt
       b.io.xBarW(0).reset.head := io.input.reset |
         {if (stride.isDefined) false.B else {getRetimed(io.input.stride,1) =/= io.input.stride}} |
@@ -258,10 +264,9 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
 
     val counts = bases.map(_.io.output.data(0).asSInt)
-    val delta = if (stride.isDefined & gap.isDefined) { (stride.get*par+gap.get).S(width.W) }
-    else if (stride.isDefined) { (stride.get*par).S(width.W) + io.input.gap}
-    else if (gap.isDefined) { io.input.stride * par.S(width.W) + gap.get.S(width.W)}
-    else { io.input.stride * par.S(width.W) + io.input.gap}
+    val delta = if (stride.isDefined) { (stride.get*par).S(width.W) }
+    else if (stride.isDefined) { (stride.get*par).S(width.W)}
+    else { io.input.stride * par.S(width.W)}
     val newvals = counts.map( _ + delta)
     val isMax = Mux({if (stride.isDefined) stride.get.S(width.W) else io.input.stride} >= 0.S(width.W),
       newvals(0) >= {if (stop.isDefined) stop.get.S(width.W) else io.input.stop},
@@ -274,18 +279,18 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     }
 
     if(stride.isDefined) {
-      (0 until par).foreach { i =>
+      (0 until {1 max par}).foreach { i =>
         io.output.count(i) := counts(i)
       }
     } else {
-      (0 until par).foreach { i =>
+      (0 until {1 max par}).foreach { i =>
         io.output.count(i) := counts(i)
       }
     }
 
     // Connect oobies (Out Of Bound-ies)
     val defs = {if (start.isDefined) 0x4 else 0x0} | {if (stop.isDefined) 0x2 else 0x0} | {if (stride.isDefined) 0x1 else 0x0}
-    (0 until par).foreach{ i =>
+    (0 until {1 max par}).foreach{ i =>
       // Changing start and resetting counts(i) takes a cycle, so forward the init value if required
       val c = defs match {
         case 0x7 | 0x6 | 0x5 | 0x4 => counts(i)
@@ -300,7 +305,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
         case 0x3 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= stop.get.S(width.W) else io.output.oobs(i) := c > io.input.start       || c <= stop.get.S(width.W)
         case 0x2 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= stop.get.S(width.W),                          c > io.input.start       || c <= stop.get.S(width.W))
         case 0x1 => if (stride.get >= 0) io.output.oobs(i) :=                                      c < io.input.start       || c >= io.input.stop       else io.output.oobs(i) := c > io.input.start       || c <= io.input.stop
-        case 0x0 =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
+        case _   =>                      io.output.oobs(i) := Mux(io.input.stride >= 0.S(width.W), c < io.input.start       || c >= io.input.stop,                                c > io.input.start       || c <= io.input.stop)
       }
     }
 
@@ -337,7 +342,6 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
       val start    = Input(SInt(width.W)) // TODO: Currently resets to "start" but wraps to 0, is this normal behavior?
       val stop      = Input(SInt(width.W))
       val stride   = Input(SInt(width.W))
-      val gap      = Input(SInt(width.W))
       // val wrap     = BoolInput(()) // TODO: This should let
       //                                   user specify (8 by 3) ctr to go
       //                                   0,3,6 (wrap) 1,4,7 (wrap) 2,5...
@@ -362,7 +366,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     base.io.xBarW(0).en.head := io.input.reset | io.input.enable
 
     val count = base.io.output.data(0).asSInt
-    val newval = count + (io.input.stride * par.S(width.W)) + io.input.gap // TODO: If I use *-* here, BigIPSim doesn't see par.S as a constant (but it sees par.U as one... -_-)
+    val newval = count + (io.input.stride * par.S(width.W))
     val isMax = newval >= io.input.stop
     val wasMax = RegNext(isMax, false.B)
     val isMin = newval < 0.S(width.W)
@@ -382,7 +386,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
 
 // SingleSCounter that is cheaper, if bounds and stride are known
 class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strideUp: Int, val strideDown: Int,
-                          val gap: Int, val width: Int = 32) extends Module { // Signed counter, used in FILO
+                          val width: Int = 32) extends Module { // Signed counter, used in FILO
 
   val io = IO(new Bundle {
     val input = new Bundle {
@@ -405,14 +409,15 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
 
   if (par > 0) {
     val base = Module(new FF(width))
+    base.io <> DontCare
     val init = start.asSInt
     base.io.xBarW(0).init.head := init.asUInt
     base.io.xBarW(0).reset.head := io.input.reset
     base.io.xBarW(0).en.head := io.input.enable
 
     val count = base.io.output.data(0).asSInt
-    val newval_up = count + ((strideUp * par + gap).S(width.W))
-    val newval_down = count + ((strideDown * par + gap).S(width.W))
+    val newval_up = count + ((strideUp * par).S(width.W))
+    val newval_down = count + ((strideDown * par).S(width.W))
     val isMax = newval_up >= stop.asSInt
     val wasMax = RegNext(isMax, false.B)
     val isMin = newval_down < 0.S((width).W)
@@ -449,9 +454,9 @@ count(0) 1   2  3    4   5
   * @param w: Word width
   */
 class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops: List[Option[Int]],
-              val strides: List[Option[Int]], val gaps: List[Option[Int]], val forevers: List[Boolean], val widths: List[Int], val myName: String = "CChain") extends Module {
-  def this(par: List[Int], sts: List[Option[Int]], stps: List[Option[Int]], strs: List[Option[Int]], gps: List[Option[Int]], frvrs: List[Boolean]) = this(par, sts, stps, strs, gps, frvrs, List.fill(par.length){32})
-  def this(tuple: (List[Int], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Boolean], List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7)
+              val strides: List[Option[Int]], val forevers: List[Boolean], val widths: List[Int], val myName: String = "CChain") extends Module {
+  def this(par: List[Int], sts: List[Option[Int]], stps: List[Option[Int]], strs: List[Option[Int]], frvrs: List[Boolean]) = this(par, sts, stps, strs, frvrs, List.fill(par.length){32})
+  def this(tuple: (List[Int], List[Option[Int]], List[Option[Int]], List[Option[Int]], List[Boolean], List[Int])) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6)
 
   override def desiredName = myName
   
@@ -464,7 +469,6 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
       val starts   = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
       val stops    = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
       val strides  = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
-      val gaps     = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
       val reset    = Input(Bool())
       val enable   = Input(Bool())
       val saturate = Input(Bool())
@@ -480,16 +484,14 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
   })
 
   // Create counters
-  val ctrs = (0 until depth).map{ i => Module(new SingleCounter(par(i), starts(i), stops(i), strides(i), gaps(i), forevers(i), widths(i))) }
+  val ctrs = (0 until depth).map{ i => Module(new SingleCounter(par(i), starts(i), stops(i), strides(i), forevers(i), widths(i))) }
 
   // Wire up the easy inputs from IO
   ctrs.zipWithIndex.foreach { case (ctr, i) =>
     ctr.io.input.start := io.input.starts(i)
     ctr.io.input.stop := io.input.stops(i)
     ctr.io.input.stride := io.input.strides(i)
-    ctr.io.input.gap := io.input.gaps(i)
     ctr.io.input.reset := io.input.reset
-    ctr.io.input.gap := 0.S
   }
 
   // Wire up the enables between ctrs
@@ -525,7 +527,7 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
   // Wire up the outputs
   par.zipWithIndex.foreach { case (p, i) =>
     val addr = par.take(i+1).sum - par(i) // i+1 to avoid reducing empty list
-    (0 until p).foreach { k =>
+    (0 until {1 max p}).foreach { k =>
       io.output.counts(addr+k) := ctrs(i).io.output.count(k)
       io.output.oobs(addr+k) := ctrs(i).io.output.oobs(k) | doneLatch
     }

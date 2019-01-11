@@ -35,6 +35,8 @@ class DRAMArbiter(
     val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
   })
 
+  io <> DontCare
+
   val numStreams = loadStreamInfo.size + storeStreamInfo.size +
                    gatherStreamInfo.size + scatterStreamInfo.size
 
@@ -82,7 +84,7 @@ class DRAMArbiter(
     }
 
     val streamArb = Module(new StreamArbiter(io.dram, numStreams))
-    streamArb.io.app <> Vec(
+    streamArb.io.app <> VecInit(
       loadControllers.map { _.io.dram } ++
       gatherControllers.map { _.io.dram } ++
       storeControllers.map { _.io.dram } ++

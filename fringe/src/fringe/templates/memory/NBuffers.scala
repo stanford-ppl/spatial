@@ -45,6 +45,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   // Mapping input write ports to their appropriate bank
   val statesInW = portsWithWriter.distinct.sorted.zipWithIndex.map { case (t,i) =>
     val c = Module(new NBufCtr(1,Some(t), Some(numBufs), 1+log2Up(numBufs)))
+    c.io <> DontCare
     c.io.input.enable := swap
     c.io.input.countUp := false.B
     io.statesInW(i) := c.io.output.count
@@ -54,6 +55,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   // Mapping input read ports to their appropriate bank
   val statesInR = (0 until numBufs).map{  i => 
     val c = Module(new NBufCtr(1,Some(i), Some(numBufs), 1+log2Up(numBufs)))
+    c.io <> DontCare
     c.io.input.enable := swap
     c.io.input.countUp := false.B
     io.statesInR(i) := c.io.output.count
@@ -153,6 +155,12 @@ class NBufMem(
     }
   })
 
+  io.full := DontCare
+  io.almostFull := DontCare
+  io.empty := DontCare
+  io.almostEmpty := DontCare
+  io.numel := DontCare
+
   // Instantiate buffer controller
   val ctrl = Module(new NBufController(numBufs, portsWithWriter))
   for (i <- 0 until numBufs){
@@ -172,11 +180,13 @@ class NBufMem(
   mem match {
     case BankedSRAMType => 
       val srams = (0 until numBufs).map{ i => 
-        Module(new BankedSRAM(logicalDims, bitWidth,
+        val x = Module(new BankedSRAM(logicalDims, bitWidth,
                         banks, strides, 
                         combinedXBarWMux, combinedXBarRMux,
                         flatDirectWMux, flatDirectRMux,
                         bankingMode, inits, syncMem, fracBits, "SRAM"))
+        x.io <> DontCare
+        x
       }
       // Route NBuf IO to SRAM IOs
       srams.zipWithIndex.foreach{ case (f,i) => 
@@ -221,7 +231,7 @@ class NBufMem(
           val sramBroadcastRPorts = broadcastRMux.accessPars.length
           (0 until sramBroadcastRPorts).foreach {k => 
             f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
-            f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
+            // f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
             f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
             f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
           }
@@ -298,7 +308,9 @@ class NBufMem(
       }
     case FFType => 
       val ffs = (0 until numBufs).map{ i => 
-        Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, "FF")) 
+        val x = Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, "FF")) 
+        x.io <> DontCare
+        x
       }
       ffs.foreach(_.io.reset := io.reset)
       // Route NBuf IO to FF IOs
@@ -344,6 +356,7 @@ class NBufMem(
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
                                   banks, combinedXBarWMux, combinedXBarRMux))
+      fifo.io.asInstanceOf[FIFOInterface] <> DontCare
 
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
@@ -366,10 +379,12 @@ class NBufMem(
         val combinedXBarRMux = xBarRMux.getOrElse(i,XMap()).merge(broadcastRMux)
         val isShiftEntry = isShift && combinedXBarWMux.nonEmpty
         if (isShiftEntry) shiftEntryBuf = Some(i)
-        Module(new ShiftRegFile(logicalDims, bitWidth, 
+        val x = Module(new ShiftRegFile(logicalDims, bitWidth, 
                         combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
                         inits, syncMem, fracBits, isBuf = !isShiftEntry, "sr"))
+        x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
+        x
       }
       rfs.zipWithIndex.foreach{case (rf, i) => 
         if (!shiftEntryBuf.exists(_ == i)) {
@@ -430,7 +445,7 @@ class NBufMem(
           (0 until sramBroadcastRPorts).foreach {k => 
             f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
             // f.io.xBarR(sramXBarRBase + k).shiftEn := io.broadcastR(k).shiftEn
-            f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
+            // f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
             f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
             f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
           }
@@ -504,11 +519,12 @@ class NBufMem(
                                combinedXBarWMux, combinedXBarRMux,
                                flatDirectWMux, flatDirectRMux,
                                bankingMode, inits, syncMem, fracBits, "lb"))
-
+      lb.io <> DontCare
       
       val numWriters = numXBarW + numDirectW
       val par = combinedXBarWMux.accessPars.sorted.headOption.getOrElse(0) max flatDirectWMux.accessPars.sorted.headOption.getOrElse(0)
-      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), Some(0), false))
+      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), false))
+      writeCol.io <> DontCare
       val en = io.xBarW.map(_.en.reduce{_||_}).reduce{_||_} || io.directW.map(_.en.reduce{_||_}).reduce{_||_}
       writeCol.io.input.enable := en
       writeCol.io.input.reset := ctrl.io.swap
@@ -522,6 +538,7 @@ class NBufMem(
 
       val base = chisel3.util.PriorityMux(io.xBarW.map(_.en).flatten, writeCol.io.output.count)
       val colCorrection = Module(new FF(32))
+      colCorrection.io <> DontCare
       colCorrection.io.xBarW(0).data.head := base.asUInt
       colCorrection.io.xBarW(0).init.head := 0.U
       colCorrection.io.xBarW(0).en.head := en & ~gotFirstInRow.io.output.data
@@ -530,6 +547,7 @@ class NBufMem(
 
       val wCRN_width = 1 + log2Up(numrows)
       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
+      writeRow.io <> DontCare
       writeRow.io.input.enable := ctrl.io.swap
       writeRow.io.input.countUp := false.B
 
@@ -550,6 +568,7 @@ class NBufMem(
       }
 
       val readRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), (numBufs-1)*rowstride, wCRN_width))
+      readRow.io <> DontCare
       readRow.io.input.enable := ctrl.io.swap
       readRow.io.input.countUp := false.B
 
@@ -581,7 +600,7 @@ class NBufMem(
     case LIFOType => 
       val fifo = Module(new LIFO(List(logicalDims.head), bitWidth, 
                                   banks, combinedXBarWMux, combinedXBarRMux))
-
+      fifo.io.asInstanceOf[FIFOInterface] <> DontCare
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
       combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
@@ -728,6 +747,12 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
 
   override def desiredName = myName
   
+  io.full := DontCare
+  io.almostFull := DontCare
+  io.empty := DontCare
+  io.almostEmpty := DontCare
+  io.numel := DontCare
+
   val wMap = NBufXMap(0 -> XMap((0,0,0) -> (1, None)))
   val rMap = NBufXMap((0 until numBufs).map{i => i -> XMap((0,0,0) -> (1, None)) }.toArray:_*)
 

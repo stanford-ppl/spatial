@@ -31,7 +31,7 @@ trait ChiselGenStream extends ChiselGenCommon {
         forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
         forceEmit(src"valid := valid_options.reduce{_|_}")
         forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
-        forceEmit(src"val m = Vec((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
+        forceEmit(src"val m = VecInit((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
         forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
       }	    
 
@@ -57,7 +57,10 @@ trait ChiselGenStream extends ChiselGenCommon {
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      ens.zipWithIndex.foreach{case(e,i) => val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}";emit(src"""${strm}.ready_options($base + $i) := $en & (${parent}$sfx.datapathEn & ${parent}$sfx.iiDone) // Do not delay ready because datapath includes a delayed _valid already """)}
+      ens.zipWithIndex.foreach{case(e,i) =>
+        val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
+        emit(src"""${strm}.ready_options($base + $i) := $en & (${parent}$sfx.datapathEn & ${parent}$sfx.iiDone) // Do not delay ready because datapath includes a delayed _valid already """)
+      }
       emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.m(i) }""")
 
     case _ => super.gen(lhs, rhs)

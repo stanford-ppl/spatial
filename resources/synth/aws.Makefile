@@ -45,6 +45,8 @@ aws-sim: aws-sim-hw
 	# ----------------------------------------------------------------------------
 	# Build the DPI .so library
 	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/verif/scripts && make C_TEST=test_spatial_main make_sim_dir compile
+	# Link to build dir
+	ln -s ${AWS_HOME}/hdk/cl/examples/${app_name}/ aws_dir
 	# Create the binary
 	sed 's:{{{INSERT_DESIGN_DIR}}}:'"${AWS_HOME}"'/hdk/cl/examples/${app_name}/verif/scripts:g' aws.sw-resources/Top_template > ./Top
 	chmod 700 Top

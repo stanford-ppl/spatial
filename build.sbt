@@ -94,7 +94,7 @@ val base = Seq(
 
 val emul_settings = base ++ Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
-  crossScalaVersions := Seq(scala_version, "2.11.7"),
+  //crossScalaVersions := Seq(scala_version, "2.11.7"),
   scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
 )
 val common = base ++ Seq(
@@ -105,13 +105,13 @@ val common = base ++ Seq(
 )
 
 
-val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.0-SNAPSHOT_2017-10-06")
-val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAPSHOT")
+val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.1.6")
+val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.2.8")
 val fringe_settings = base ++ Seq(
+  scalacOptions += "-Xsource:2.11",
   name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse(""),
-  scalaVersion := "2.11.7",
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % "2.11.7",
+    //"org.scala-lang" % "scala-reflect" % "2.11.7",
     "edu.berkeley.cs" %% "chisel3" % chisel3_version,              // Chisel
     "edu.berkeley.cs" %% "chisel-iotesters" % testers_version,
   ),

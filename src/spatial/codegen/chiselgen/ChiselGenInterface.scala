@@ -28,8 +28,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
       inAccel{
         inGen(out, "ArgInterface.scala") {
           forceEmit(src"object ${lhs} {")
-          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
-          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
+          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W))); data_options := DontCare")
+          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool())); en_options := DontCare")
           forceEmit(src"}")
         }
         argIOs += (lhs -> argIOs.toList.length)
@@ -40,8 +40,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
       inAccel{
         inGen(out, "ArgInterface.scala") {
           forceEmit(src"object ${lhs} {")
-          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W)))")
-          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool()))")
+          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W))); data_options := DontCare")
+          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool())); en_options := DontCare")
           forceEmit(src"}")
         }
         argOuts += (lhs -> argOuts.toList.length)
@@ -195,6 +195,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"${cmdStream}.ready := top.io.memStreams.stores($id).cmd.ready")
       emit(src"""${ackStream}.now_valid := top.io.memStreams.stores($id).wresp.valid""")
       emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
+      emit(src"""${ackStream}.m.foreach{_ := top.io.memStreams.stores($id).wresp.valid}""")
       emit(src"""top.io.memStreams.stores($id).wresp.ready := ${ackStream}.ready""")
 
     case FringeSparseStore(dram,cmdStream,ackStream) =>
@@ -217,6 +218,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).cmd.ready & top.io.memStreams.scatters($id).wdata.ready")
       emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")
       emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
+      emit(src"""${ackStream}.m.foreach{_ := top.io.memStreams.scatters($id).wresp.valid}""")
       emit(src"""top.io.memStreams.scatters($id).wresp.ready := ${ackStream}.ready""")
 
     case _ => super.gen(lhs, rhs)

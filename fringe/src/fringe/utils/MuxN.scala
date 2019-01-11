@@ -30,7 +30,7 @@ class MuxPipe[T<:Data](val t: T, val numInputs: Int) extends Module {
 
   def splitMux(input: Vec[T], stages: Int): (T, Bits) = {
     def slice(v: Vec[T], start: Int, end: Int) = {
-      Vec(for (i <- start to end) yield v(i))
+      VecInit(for (i <- start to end) yield v(i))
     }
 
     stages match {
@@ -53,7 +53,7 @@ class MuxPipe[T<:Data](val t: T, val numInputs: Int) extends Module {
         val selFF = getFF(selL, enable)
 
         val m = Module(new MuxN(t, 2))
-        m.io.ins := Vec(getFF(muxL, enable), getFF(muxH, enable))
+        m.io.ins := VecInit(getFF(muxL, enable), getFF(muxH, enable))
         m.io.sel := selFF(0)
         val s = if (selFF.getWidth > 1) selFF(selFF.getWidth - 1, 1) else 0.U
         (m.io.out, s)
@@ -62,10 +62,10 @@ class MuxPipe[T<:Data](val t: T, val numInputs: Int) extends Module {
 
   def pad(v: Vec[T]): Vec[T] = {
     val c = scala.math.pow(2, log2Ceil(v.length)).toInt
-    Vec(for (i <- 0 until c) yield if (i < v.length) v(i) else v(0))
+    VecInit(for (i <- 0 until c) yield if (i < v.length) v(i) else v(0))
   }
 
-  val (m, s) = splitMux(pad(io.in.bits.data), logInputs)
+  val (m, s) = splitMux(pad(io.in.bits), logInputs)
   val delay = (logInputs - 1).max(0)
   io.out.valid := getRetimed(io.in.valid, delay, enable)
   io.in.ready := enable
@@ -94,7 +94,7 @@ class MuxNReg(val numInputs: Int, w: Int) extends Module {
   val sel = ffsel.io.out
 
   val mux = Module(new MuxN(UInt(w.W), numInputs))
-  mux.io.ins := Vec.tabulate(numInputs) { i => ffins(i).io.out }
+  mux.io.ins := VecInit.tabulate(numInputs) { i => ffins(i).io.out }
   mux.io.sel := sel
 
   // Register the output

@@ -15,5 +15,6 @@ class Depulser() extends Module {
   r.io.in := Mux(io.rst, 0.U, io.in)
   r.io.init := 0.U
   r.io.enable := io.in | io.rst
+  r.io.reset := io.rst
   io.out := r.io.out
 }

@@ -662,7 +662,7 @@ package object control {
       case _ => false
     }
     def isStaticStartAndStep: Boolean = (start,step) match {
-      case (Final(_), Final(_)) => true
+      case (Final(a: scala.Int), Final(b: scala.Int)) => true
       case _ => false
     }
     def isFixed(relative: Option[Ctrl]): Boolean = nIters match {

@@ -71,6 +71,12 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
     case FIFOInterface => IO(new FIFOInterface(p))
   } 
 
+  p.iface match {
+    case StandardInterface => io.asInstanceOf[StandardInterface] <> DontCare
+    case ShiftRegFileInterface => io.asInstanceOf[ShiftRegFileInterface] <> DontCare
+    case FIFOInterface => io.asInstanceOf[FIFOInterface] <> DontCare    
+  }
+
   override def desiredName = p.myName
 
   var usedMuxPorts = List[(String,(Int,Int,Int,Int))]() // Check if the muxPort, muxAddr, lane, castgrp is taken for this connection style (xBar or direct)
@@ -165,6 +171,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until numMems).map{ i =>
     val mem = Module(new Mem1D(bankDim, p.bitWidth, p.syncMem))
+    mem.io <> DontCare
     val coords = p.banks.zipWithIndex.map{ case (b,j) =>
       i % (p.banks.drop(j).product) / p.banks.drop(j+1).product
     }
@@ -402,7 +409,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   elements.io.input.dinc_en.zip(io.xBarR.flatMap(_.en)).foreach{case(l,r) => l := r}
 
   // Create physical mems
-  val m = (0 until p.numBanks).map{ i => Module(new Mem1D(p.depth/p.numBanks, p.bitWidth))}
+  val m = (0 until p.numBanks).map{ i => val x = Module(new Mem1D(p.depth/p.numBanks, p.bitWidth)); x.io <> DontCare; x}
 
   // Create compacting network
 
@@ -474,11 +481,12 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   elements.io.input.dinc_en := io.xBarR.flatMap(_.en).toList.reduce{_|_}
 
   // Create physical mems
-  val m = (0 until par).map{ i => Module(new Mem1D(p.depth/par, p.bitWidth))}
+  val m = (0 until par).map{ i => val x = Module(new Mem1D(p.depth/par, p.bitWidth)); x.io <> DontCare; x}
 
   // Create head and reader sub counters
   val sa_width = 2 + log2Up(par)
-  val subAccessor = Module(new SingleSCounterCheap(1,0,par,pW,-pR,0,sa_width))
+  val subAccessor = Module(new SingleSCounterCheap(1,0,par,pW,-pR,sa_width))
+  subAccessor.io <> DontCare
   subAccessor.io.input.enable := io.xBarW.flatMap(_.en).toList.reduce{_|_} | io.xBarR.flatMap(_.en).toList.reduce{_|_}
   subAccessor.io.input.dir := io.xBarW.flatMap(_.en).toList.reduce{_|_}
   subAccessor.io.input.reset := reset
@@ -487,7 +495,8 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create head and reader counters
   val a_width = 2 + log2Up(p.depth/par)
-  val accessor = Module(new SingleSCounterCheap(1, 0, (p.depth/par), 1, -1, 0, a_width))
+  val accessor = Module(new SingleSCounterCheap(1, 0, (p.depth/par), 1, -1, a_width))
+  accessor.io <> DontCare
   accessor.io.input.enable := (io.xBarW.flatMap(_.en).toList.reduce{_|_} & subAccessor.io.output.done) | (io.xBarR.flatMap(_.en).toList.reduce{_|_} & subAccessor_prev === 0.S(sa_width.W))
   accessor.io.input.dir := io.xBarW.flatMap(_.en).toList.reduce{_|_}
   accessor.io.input.reset := reset
@@ -760,13 +769,13 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     val output = new Bundle {
       val data  = Output(UInt(bitWidth.W))
     }
-    val debug = new Bundle {
-      val invalidRAddr = Output(Bool())
-      val invalidWAddr = Output(Bool())
-      val rwOn = Output(Bool())
-      val error = Output(Bool())
-      // val addrProbe = Output(UInt(bitWidth.W))
-    }
+    // val debug = new Bundle {
+    //   val invalidRAddr = Output(Bool())
+    //   val invalidWAddr = Output(Bool())
+    //   val rwOn = Output(Bool())
+    //   val error = Output(Bool())
+    //   // val addrProbe = Output(UInt(bitWidth.W))
+    // }
   })
 
   // We can do better than MaxJ by forcing mems to be single-ported since
@@ -869,8 +878,6 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
       val headCnt = Input(SInt(width.W))
       val in = Vec(ports.sum, Input(new enqPort(bitWidth)))
       val out = Vec(banks, Output(new enqPort(bitWidth)))
-      val debug1 = Output(Bool())
-      val debug2 = Output(Bool())
     })
 
   val numEnabled = io.in.map{i => Mux(i.en, 1.U(width.W), 0.U(width.W))}.reduce{_+_}

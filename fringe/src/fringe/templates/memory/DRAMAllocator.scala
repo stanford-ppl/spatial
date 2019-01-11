@@ -25,6 +25,8 @@ class DRAMAllocator(rank: Int, appReqCount: Int) extends Module {
     val addr = Output(UInt(64.W))
   })
 
+  io <> DontCare
+
   val reqIdx = PriorityEncoder(io.appReq.map { _.valid })
   val appReq = io.appReq(reqIdx)
 

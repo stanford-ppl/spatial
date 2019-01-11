@@ -23,7 +23,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 		cycsper=`echo "$line" | sed "s/^.* - //g" | sed "s/ (.*//g"`
 		math=`echo "$line" | sed "s/^.* (/(/g" | sed "s/ \// total cycles,/g" | sed "s/)/ total iters)/g" | sed "s/).*/)/g"`
 		perprnt=`echo "$line" | sed "s/^.*\[/\[/g" | sed "s/\].*/\]/g"`
-		streamperiter=`echo "$line" | grep "<" | sed "s/^.*<//g" | sed "s/ >.*//g" | sed "s/ # idle/<br># idle/g"`
+		streamperiter=`echo "$line" | grep "<" | sed "s/^.*<//g" | sed "s/>.*//g" | sed "s/ # idle/<br># idle/g"`
 		if [[ ! -z $sym ]]; then
 			linenum=`awk "/<!-- Begin $sym -->/{ print NR; exit }" info/controller_tree.html`
 			replacement="$((linenum+3))i <br>" # linenum

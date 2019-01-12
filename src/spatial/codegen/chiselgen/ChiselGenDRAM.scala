@@ -12,10 +12,42 @@ import spatial.util.spatialConfig
 
 trait ChiselGenDRAM extends ChiselGenCommon {
   var requesters = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var loadStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var storeStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var gatherStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var scatterStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case DRAMHostNew(_,_) =>
       hostDrams += (lhs -> hostDrams.size)
+      lhs.loadStreams.foreach{f => 
+        forceEmit(src"val ${f.addrStream} = top.io.memStreams.loads(${loadStreams.size}).cmd // StreamOut")
+        forceEmit(src"val ${f.dataStream} = top.io.memStreams.loads(${loadStreams.size}).data // StreamIn")
+        RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
+        loadStreams += (f -> loadStreams.size)
+      }
+      lhs.storeStreams.foreach{f => 
+        forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
+        forceEmit(src"val ${f.dataStream} = top.io.memStreams.stores(${storeStreams.size}).data // StreamOut")
+        forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
+        RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
+        storeStreams += (f -> storeStreams.size)
+      }
+      lhs.gatherStreams.foreach{f => 
+        forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
+        forceEmit(src"val ${f.dataStream} = top.io.memStreams.gathers(${gatherStreams.size}).data // StreamIn")
+        RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
+        gatherStreams += (f -> gatherStreams.size)
+      }
+      lhs.scatterStreams.foreach{f => 
+        forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
+        forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
+        RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
+        scatterStreams += (f -> scatterStreams.size)
+      }
+
+      forceEmit(src"val $lhs = Wire(new FixedPoint(true, 64, 0))")
+      forceEmit(src"$lhs.r := top.io.argIns(api.${argHandle(lhs)}_ptr)")
 
     case DRAMAccelNew(dim) =>
       val reqCount = lhs.consumers.collect {
@@ -69,9 +101,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           emit(src"val $lhs = ${dram}.m.io.addr")
         case _@Op(DRAMHostNew(_,_)) =>
-          val id = argHandle(dram)
-          emit(src"val $lhs = Wire(${lhs.tp})")
-          emit(src"""$lhs.r := top.io.argIns(api.${id}_ptr)""")
+          emit(src"val $lhs = $dram")
         case _ =>
       }
 

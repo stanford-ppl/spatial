@@ -84,6 +84,7 @@ class NBufMem(
   val inits: Option[List[Double]] = None,
   val syncMem: Boolean = false,
   val fracBits: Int = 0,
+  val numActives: Int = 1,
   val myName: String = "NBuf"
 ) extends Module {
 
@@ -144,6 +145,8 @@ class NBufMem(
     val reset = Input(Bool())
 
     // FIFO Specific
+    val accessActivesIn = Vec(numActives, Input(Bool()))
+    val accessActivesOut = Vec(numActives, Output(Bool()))
     val full = Output(Bool())
     val almostFull = Output(Bool())
     val empty = Output(Bool())
@@ -155,6 +158,7 @@ class NBufMem(
     }
   })
 
+  io.accessActivesOut.zip(io.accessActivesIn).foreach{case (o,i) => o := i}
   io.full := DontCare
   io.almostFull := DontCare
   io.empty := DontCare
@@ -184,7 +188,7 @@ class NBufMem(
                         banks, strides, 
                         combinedXBarWMux, combinedXBarRMux,
                         flatDirectWMux, flatDirectRMux,
-                        bankingMode, inits, syncMem, fracBits, "SRAM"))
+                        bankingMode, inits, syncMem, fracBits, numActives, "SRAM"))
         x.io <> DontCare
         x
       }
@@ -308,7 +312,7 @@ class NBufMem(
       }
     case FFType => 
       val ffs = (0 until numBufs).map{ i => 
-        val x = Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, "FF")) 
+        val x = Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, numActives = 1, "FF")) 
         x.io <> DontCare
         x
       }
@@ -355,7 +359,7 @@ class NBufMem(
 
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
-                                  banks, combinedXBarWMux, combinedXBarRMux))
+                                  banks, combinedXBarWMux, combinedXBarRMux, numActives))
       fifo.io.asInstanceOf[FIFOInterface] <> DontCare
 
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
@@ -382,7 +386,7 @@ class NBufMem(
         val x = Module(new ShiftRegFile(logicalDims, bitWidth, 
                         combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
-                        inits, syncMem, fracBits, isBuf = !isShiftEntry, "sr"))
+                        inits, syncMem, fracBits, isBuf = !isShiftEntry, numActives, "sr"))
         x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
         x
       }
@@ -518,7 +522,7 @@ class NBufMem(
                                List(numrows,banks(1)), strides,
                                combinedXBarWMux, combinedXBarRMux,
                                flatDirectWMux, flatDirectRMux,
-                               bankingMode, inits, syncMem, fracBits, "lb"))
+                               bankingMode, inits, syncMem, fracBits, numActives = numActives, "lb"))
       lb.io <> DontCare
       
       val numWriters = numXBarW + numDirectW
@@ -599,7 +603,7 @@ class NBufMem(
 
     case LIFOType => 
       val fifo = Module(new LIFO(List(logicalDims.head), bitWidth, 
-                                  banks, combinedXBarWMux, combinedXBarRMux))
+                                  banks, combinedXBarWMux, combinedXBarRMux, numActives))
       fifo.io.asInstanceOf[FIFOInterface] <> DontCare
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
@@ -734,6 +738,8 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
     val reset = Input(Bool())
 
     // FIFO Specific
+    val accessActivesIn  = Vec(1, Input(Bool()))
+    val accessActivesOut = Vec(1, Output(Bool()))
     val full = Output(Bool())
     val almostFull = Output(Bool())
     val empty = Output(Bool())
@@ -747,6 +753,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
 
   override def desiredName = myName
   
+  io.accessActivesOut(0) := io.accessActivesIn(0)
   io.full := DontCare
   io.almostFull := DontCare
   io.empty := DontCare

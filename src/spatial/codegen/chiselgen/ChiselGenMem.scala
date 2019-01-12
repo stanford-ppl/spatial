@@ -286,13 +286,14 @@ trait ChiselGenMem extends ChiselGenCommon {
     $bankingMode, 
     $initStr, 
     ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, 
-    ${fracBits(mem.tp.typeArgs.head)}, 
+    ${fracBits(mem.tp.typeArgs.head)},
+    ${mem.readers.size + mem.writers.size}, 
     myName = "$mem"
   ))""")
      emit(src"m.io${ifaceType(mem)} <> DontCare")
       if (name == "FIFO" || name == "FIFOReg") {
-        mem.writers.foreach{x => emit(createWire(src"enqActive_$x","Bool()"))}
-        mem.readers.foreach{x => emit(createWire(src"deqActive_$x","Bool()"))}
+        mem.writers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> i); emit(src"// enqActive_$x = ${activesMap(x)}")}
+        mem.readers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> {i + mem.readers.size}); emit(src"// deqActive_$x = ${activesMap(x)}")}
       }
       if (mem.resetters.isEmpty && !mem.isBreaker) emit(src"m.io.reset := false.B")
     }
@@ -318,10 +319,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
     case FIFORegEnq(reg, data, ens) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-      emit(src"$reg.enqActive_$lhs := ${and(ens)}") 
+      emit(src"$reg.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
     case FIFORegDeq(reg, ens) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
-      emit(src"$reg.deqActive_$lhs := ${and(ens)}") 
+      emit(src"$reg.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
 
     // Registers
     case RegNew(init) => 
@@ -422,15 +423,15 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
     case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
     case op@FIFOPeek(fifo,_) => 
-      emit(src"$fifo.deqActive_$lhs := false.B") 
+      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := false.B") 
       emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
     case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.deqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})") 
+      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
     case FIFOBankedEnq(fifo, data, ens) => 
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.enqActive_$lhs := (${or(ens.map{e => "(" + and(e) + ")"})})") 
+      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, None)

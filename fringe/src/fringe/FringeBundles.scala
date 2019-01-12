@@ -4,6 +4,19 @@ import chisel3._
 import chisel3.util._
 import fringe.utils._
 
+class AppLoadData(v: Int, w: Int) extends Bundle {
+  val rdata = Vec(v, UInt(w.W))
+
+  override def cloneType(): this.type = new AppLoadData(v, w).asInstanceOf[this.type]
+}
+
+class AppStoreData(v: Int, w: Int) extends Bundle {
+  val wdata = Vec(v, UInt(w.W))
+  val wstrb = UInt(v.W)
+
+  override def cloneType(): this.type = new AppStoreData(v, w).asInstanceOf[this.type]
+}
+
 class AppCommandDense(val addrWidth: Int = 64, val sizeWidth: Int = 32) extends Bundle {
   val addr = UInt(addrWidth.W)
   val size = UInt(sizeWidth.W)
@@ -21,7 +34,7 @@ case class StreamParInfo(w: Int, v: Int, memChannel: Int)
 
 class LoadStream(p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandDense))
-  val rdata = Decoupled(Vec(p.v, UInt(p.w.W)))
+  val data = Decoupled(new AppLoadData(p.v, p.w))
 
   override def cloneType(): this.type = {
     new LoadStream(p).asInstanceOf[this.type]
@@ -30,8 +43,7 @@ class LoadStream(p: StreamParInfo) extends Bundle {
 
 class StoreStream(p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandDense))
-  val wdata = Flipped(Decoupled(Vec(p.v, UInt(p.w.W))))
-  val wstrb = Flipped(Decoupled(UInt(p.v.W)))
+  val data = Flipped(Decoupled(new AppStoreData(p.v, p.w)))
   val wresp = Decoupled(Bool())
 
   override def cloneType(): this.type = new StoreStream(p).asInstanceOf[this.type]
@@ -39,16 +51,22 @@ class StoreStream(p: StreamParInfo) extends Bundle {
 
 class GatherStream(p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandSparse(p.v)))
-  val rdata = Decoupled(Vec(p.v, UInt(p.w.W)))
+  val data = Decoupled(Vec(p.v, UInt(p.w.W)))
 
   override def cloneType(): this.type = {
     new GatherStream(p).asInstanceOf[this.type]
   }
 }
 
+class ScatterCmdStream(p: StreamParInfo) extends Bundle {
+  val addr = new AppCommandSparse(p.v)
+  val wdata = Vec(p.v, UInt(p.w.W))
+
+  override def cloneType(): this.type = new ScatterCmdStream(p).asInstanceOf[this.type]    
+}
+
 class ScatterStream(p: StreamParInfo) extends Bundle {
-  val cmd = Flipped(Decoupled(new AppCommandSparse(p.v)))
-  val wdata = Flipped(Decoupled(Vec(p.v, UInt(p.w.W))))
+  val cmd = Flipped(Decoupled(new ScatterCmdStream(p)))
   val wresp = Decoupled(Bool())
 
   override def cloneType(): this.type = new ScatterStream(p).asInstanceOf[this.type]

@@ -81,6 +81,26 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _ => false
     }
+
+    def isLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isGather: Boolean = op match {
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isStore: Boolean = op match {
+      case _:FringeDenseStore[_,_] => true
+      case _ => false
+    }
+
+    def isScatter: Boolean = op match {
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
   }
 
   abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
@@ -109,6 +129,11 @@ package object control {
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
     def isTileLoad: Boolean = op.exists(_.isTileLoad)
     def isTileStore: Boolean = op.exists(_.isTileStore)
+
+    def isLoad: Boolean = op.exists(_.isLoad)
+    def isGather: Boolean = op.exists(_.isGather)
+    def isStore: Boolean = op.exists(_.isStore)
+    def isScatter: Boolean = op.exists(_.isScatter)
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])

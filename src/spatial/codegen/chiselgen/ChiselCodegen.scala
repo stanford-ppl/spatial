@@ -43,6 +43,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   override def emitHeader(): Unit = {
     emit("""package accel""")
+    emit("import fringe._")
     emit("import fringe.templates._")
     emit("import fringe.utils._")
     emit("import fringe.utils.implicits._")
@@ -158,7 +159,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
     inGen(out, "Controllers.scala"){
       emitHeader()
-      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: Option[CounterChain], val childId: Int) {""")
+      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChain], val childId: Int) {""")
       emit("""  val resetChildren = Wire(Bool()); resetChildren := DontCare""")
       emit("""  val done = Wire(Bool()); done := DontCare""")
       emit("""  val baseEn = Wire(Bool()); baseEn := DontCare""")
@@ -169,7 +170,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val backpressure = Wire(Bool()); backpressure := DontCare""")
       emit("""  val forwardpressure = Wire(Bool()); forwardpressure := DontCare""")
       emit("""  val datapathEn = Wire(Bool()); datapathEn := DontCare""")
-      emit("""  val doneCondition = Wire(Bool()); doneCondition := DontCare""")
       emit("""  val break = Wire(Bool()); break := DontCare""")
       emit("""  val parentAck = Wire(Bool()); parentAck := DontCare""")
       emit("""  val sm: GeneralControl""")
@@ -192,18 +192,20 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""    baseEn.suggestName(n + "_baseEn")""")
       emit("""    iiDone.suggestName(n + "_iiDone")""")
       emit("""    backpressure.suggestName(n + "_flow")""")
+      emit("""    forwardpressure.suggestName(n + "_flow")""")
       emit("""    mask.suggestName(n + "_mask")""")
       emit("""    resetMe.suggestName(n + "_resetMe")""")
       emit("""    resetChildren.suggestName(n + "_resetChildren")""")
       emit("""    datapathEn.suggestName(n + "_datapathEn")""")
-      emit("""    doneCondition.suggestName(n + "_doneCondition")""")
       emit("""    parent.foreach{p => p.sm.io.doneIn(childId) := done; p.sm.io.maskIn(childId) := mask}""")
       emit("""    datapathEn := sm.io.datapathEn & mask & {if (cchain.isEmpty) true.B else ~sm.io.ctrDone} """)
       emit("""    iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask""")
       emit("""    cchain.foreach{case c => c.io.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.io.input.reset := resetChildren}""")
-      emit("""    // if (sm.p.sched == Streaming && cchains.nonEmpty) cchains.zipWithIndex.foreach{case (cc, i) => sm.io.ctrCopyDone(i) := cc.done; cc.reset := sm.io.ctrRst.D(1)}""")
-      emit("""    // else if (sm.p.sched == Streaming) children.zipWithIndex.foreach{case (c, i) => sm.io.ctrCopyDone(i) := c.done}""")
-      emit("""    // if (parent.exists{pa => pa._1.sm.p.sched == Streaming && pa._1.cchains.size > 0}) {parent.get._1.cchains(parent.get._2).en := done}""")
+      emit("""    parent.foreach{p => """)
+      emit("""      if (p.sm.p.sched == Streaming && p.cchain.nonEmpty) {p.sm.io.ctrCopyDone(childId) := p.cchain(childId).io.output.done; p.cchain(childId).io.input.reset := p.sm.io.ctrRst.D(1) }""")
+      emit("""      else if (p.sm.p.sched == Streaming) p.sm.io.ctrCopyDone(childId) := done""")
+      emit("""    }""")
+      emit("""    if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) {parent.get.cchain(childId).io.input.enable := done}""")
       emit("""  }""")
       emit("""""")
       emit("""}""")
@@ -412,16 +414,33 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => node match {
       case Some(x) if x.isNBuffered => "NBufMem"
       case Some(Op(_: ArgInNew[_])) => "UInt"
+      case Some(Op(_: ArgOutNew[_])) => "DecoupledIO[UInt]"
+      case Some(Op(_: HostIONew[_])) => "DecoupledIO[UInt]"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
       case Some(Op(_: RegNew[_])) => "FF"
       case Some(Op(_: SRAMNew[_,_])) => "BankedSRAM"
       case Some(Op(_: FIFONew[_])) => "FIFO"
       case Some(Op(_: LIFONew[_])) => "LIFO"
-      case Some(Op(_: DRAMHostNew[_,_])) => "DRAM"
-      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAM"
-      case Some(Op(_: StreamOutNew[_])) => "StreamOut"
-      case Some(Op(_: StreamInNew[_])) => "StreamIn"
+      case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
+      case Some(Op(_: DRAMAccelNew[_,_])) => "FixedPoint"
+      case Some(Op(_@StreamInNew(bus))) => 
+        bus match {
+          case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
+          case BurstAckBus => "DecoupledIO[Bool]"
+          case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
+          case ScatterAckBus => "DecoupledIO[Bool]"
+          case _ => super.remap(tp)
+        }
+      case Some(x@Op(_@StreamOutNew(bus))) => 
+        bus match {
+          case BurstCmdBus => "DecoupledIO[AppCommandDense]"
+          case _: BurstFullDataBus[_] => "DecoupledIO[AppStoreData]"
+          case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
+          case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
+          case _ => super.remap(tp)
+        }
+
       case _ => super.remap(tp)
     }
   }

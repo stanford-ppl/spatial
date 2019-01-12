@@ -27,29 +27,11 @@ trait ChiselGenInterface extends ChiselGenCommon {
       val id = argHandle(lhs)
       forceEmit(src"val $lhs = top.io.argIns(api.${id}_arg)")
     case HostIONew(init)  => 
-      inAccel{
-        inGen(out, "ArgInterface.scala") {
-          forceEmit(src"object ${lhs} {")
-          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W))); data_options := DontCare")
-          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool())); en_options := DontCare")
-          forceEmit(src"}")
-        }
-        argIOs += (lhs -> argIOs.toList.length)
-        forceEmit(src"""top.io.argOuts(${argIOs(lhs)}).bits := chisel3.util.Mux1H(${lhs}.en_options, ${lhs}.data_options)""")
-        forceEmit(src"""top.io.argOuts(${argIOs(lhs)}).valid := ${lhs}.en_options.reduce{_|_}""")
-      }
+      argIOs += (lhs -> argIOs.toList.length)
+      forceEmit(src"val $lhs = top.io.argOuts(${argIOs(lhs)})")
     case ArgOutNew(init) => 
-      inAccel{
-        inGen(out, "ArgInterface.scala") {
-          forceEmit(src"object ${lhs} {")
-          forceEmit(src"  val data_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, UInt(64.W))); data_options := DontCare")
-          forceEmit(src"  val en_options = Wire(Vec(${scala.math.max(1,lhs.writers.size)}, Bool())); en_options := DontCare")
-          forceEmit(src"}")
-        }
-        argOuts += (lhs -> argOuts.toList.length)
-        forceEmit(src"""top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).bits := chisel3.util.Mux1H(${lhs}.en_options, ${lhs}.data_options)""")
-        forceEmit(src"""top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).valid := ${lhs}.en_options.reduce{_|_}""")
-      }
+      argOuts += (lhs -> argOuts.toList.length)
+      forceEmit(src"val $lhs = top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)})")
 
     // case GetReg(reg) if (reg.isArgOut) =>
     //   argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -59,7 +41,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case GetReg(reg) if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.r""")
+      emit(src"""${lhs}.r := $reg.bits.r""")
 
     case RegRead(reg)  if reg.isArgIn =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
@@ -69,12 +51,12 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case RegRead(reg)  if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.r""")
+      emit(src"""${lhs}.r := $reg.bits.r""")
 
     case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
       emit(src"""val ${lhs} = Wire(${reg.tp.typeArgs.head})""")
-      emit(src"""${lhs}.r := top.io.argOutLoopbacks(${argOutLoopbacks(argOuts(reg))})""")
+      emit(src"""${lhs}.r := $reg.bits.echo.r""")
 
 
     case RegWrite(reg, v, en) if reg.isHostIO =>
@@ -111,10 +93,9 @@ trait ChiselGenInterface extends ChiselGenCommon {
             src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
           case _ => src"$v.r"
         }
-        emit(src"""${reg}.data_options($id) := $padded""")
-
+        emit(src"""${reg}.bits := $padded""")
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
+        emit(src"""${reg}.valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
       }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
@@ -127,21 +108,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       loadsList = loadsList :+ dram
 
-      emit(src"${cmdStream}.ready := $lhs.cmd.ready // Not sure why the cmdStream ready used to be delayed")
-      val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "offset")
-      val (sizeMSB, sizeLSB)  = getField(cmdStream.tp.typeArgs.head, "size")
-      val (isLdMSB, isLdLSB)  = getField(cmdStream.tp.typeArgs.head, "isLoad")
-      emit(src"$lhs.cmd.bits.addr := ${cmdStream}.m(0)($addrMSB,$addrLSB)")
-      emit(src"$lhs.cmd.bits.size := ${cmdStream}.m(0)($sizeMSB,$sizeLSB)")
-      emit(src"$lhs.cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-
-      // Connect the streams to their IO interface signals
-      emit(src"$lhs.rdata.ready := ${dataStream}.ready")
-      emit(src"""${dataStream}.m.zip($lhs.rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
-      emit(src"""${dataStream}.now_valid := $lhs.rdata.valid""")
-      emit(src"""${dataStream}.valid := ${DL(src"${dataStream}.now_valid", src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
-
-
     case FringeSparseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasGather
       val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
@@ -150,15 +116,15 @@ trait ChiselGenInterface extends ChiselGenCommon {
       gatherParMapping = gatherParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       gathersList = gathersList :+ dram
 
-      emit(src"${cmdStream}.ready := top.io.memStreams.gathers($id).cmd.ready // Not sure why the cmdStream ready used to be delayed")
-      emit(src"top.io.memStreams.gathers($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b.r}")
-      emit(src"top.io.memStreams.gathers($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-
-      // Connect the streams to their IO interface signals
-      emit(src"top.io.memStreams.gathers($id).rdata.ready := ${dataStream}.ready")
-      emit(src"""${dataStream}.m.zip(top.io.memStreams.gathers($id).rdata.bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
-      emit(src"""${dataStream}.now_valid := top.io.memStreams.gathers($id).rdata.valid""")
-      emit(src"""${dataStream}.valid := ${DL(src"${dataStream}.now_valid", src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
+      //emit(src"${cmdStream}.ready := top.io.memStreams.gathers($id).ready // Not sure why the cmdStream ready used to be delayed")
+      //emit(src"top.io.memStreams.gathers($id).bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b.r}")
+      //emit(src"top.io.memStreams.gathers($id).valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
+//
+      //// Connect the streams to their IO interface signals
+      //emit(src"top.io.memStreams.gathers($id).ready := ${dataStream}.ready")
+      //emit(src"""${dataStream}.zip(top.io.memStreams.gathers($id).bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
+      //emit(src"""${dataStream}.now_valid := top.io.memStreams.gathers($id).valid""")
+      //emit(src"""${dataStream}.valid := ${DL(src"${dataStream}.now_valid", src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
 
     case FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
       appPropertyStats += HasTileStore
@@ -172,30 +138,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       storesList = storesList :+ dram
 
-      // Connect streams to their IO interface signals
-      emit(src"""${dataStream}.ready := $lhs.wdata.ready""")
-
-      // Connect IO interface signals to their streams
-      val (dataMSB, dataLSB) = getField(dataStream.tp.typeArgs.head, "_1")
-      val (strbMSB, strbLSB) = getField(dataStream.tp.typeArgs.head, "_2")
-      val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "offset")
-      val (sizeMSB, sizeLSB)  = getField(cmdStream.tp.typeArgs.head, "size")
-      val (isLdMSB, isLdLSB)  = getField(cmdStream.tp.typeArgs.head, "isLoad")
-
-      emit(src"""$lhs.wdata.bits.zip(${dataStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB,$dataLSB) }""")
-      emit(src"""$lhs.wstrb.bits := ${dataStream}.m.map{ _.apply($strbMSB,$strbLSB) }.reduce(Cat(_,_)) """)
-      emit(src"""$lhs.wdata.valid := ${dataStream}.valid """)
-
-      emit(src"$lhs.cmd.bits.addr := ${cmdStream}.m(0)($addrMSB,$addrLSB)")
-      emit(src"$lhs.cmd.bits.size := ${cmdStream}.m(0)($sizeMSB,$sizeLSB)")
-      emit(src"$lhs.cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-
-      emit(src"${cmdStream}.ready := $lhs.cmd.ready")
-      emit(src"""${ackStream}.now_valid := $lhs.wresp.valid""")
-      emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
-      emit(src"""${ackStream}.m.foreach{_ := $lhs.wresp.valid}""")
-      emit(src"""$lhs.wresp.ready := ${ackStream}.ready""")
-
     case FringeSparseStore(dram,cmdStream,ackStream) =>
       appPropertyStats += HasScatter
       // Get parallelization of datastream
@@ -205,19 +147,19 @@ trait ChiselGenInterface extends ChiselGenCommon {
       scatterParMapping = scatterParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
       scattersList = scattersList :+ dram
 
-      // Connect IO interface signals to their streams
-      val (dataMSB, dataLSB)  = getField(cmdStream.tp.typeArgs.head, "_1")
-      val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "_2")
-
-      emit(src"top.io.memStreams.scatters($id).wdata.bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
-      emit(src"top.io.memStreams.scatters($id).wdata.valid := ${cmdStream}.valid")
-      emit(src"top.io.memStreams.scatters($id).cmd.bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB)}")
-      emit(src"top.io.memStreams.scatters($id).cmd.valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).cmd.ready & top.io.memStreams.scatters($id).wdata.ready")
-      emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")
-      emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
-      emit(src"""${ackStream}.m.foreach{_ := top.io.memStreams.scatters($id).wresp.valid}""")
-      emit(src"""top.io.memStreams.scatters($id).wresp.ready := ${ackStream}.ready""")
+      //// Connect IO interface signals to their streams
+      //val (dataMSB, dataLSB)  = getField(cmdStream.tp.typeArgs.head, "_1")
+      //val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "_2")
+//
+      //emit(src"top.io.memStreams.scatters($id).bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
+      //emit(src"top.io.memStreams.scatters($id).valid := ${cmdStream}.valid")
+      //emit(src"top.io.memStreams.scatters($id).bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB)}")
+      //emit(src"top.io.memStreams.scatters($id).valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
+      //emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).ready & top.io.memStreams.scatters($id).ready")
+      //emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")
+      //emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
+      //emit(src"""${ackStream}.foreach{_ := top.io.memStreams.scatters($id).wresp.valid}""")
+      //emit(src"""top.io.memStreams.scatters($id).wresp.ready := ${ackStream}.ready""")
 
     case _ => super.gen(lhs, rhs)
   }

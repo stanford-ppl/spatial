@@ -20,6 +20,7 @@ case class MemParams(
   syncMem: Boolean = false,
   fracBits: Int = 0,
   isBuf: Boolean = false,
+  numActives: Int = 0,
   myName: String = "mem"
 ) {
   def depth: Int = logicalDims.product

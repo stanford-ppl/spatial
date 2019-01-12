@@ -112,7 +112,7 @@ trait Codegen extends Traversal {
             take0(t, h :: accList, h + accSum)
           case _ => accList
         }
-      take0(l.toList, Nil, 0).size
+      take0(l.drop(1).toList, List(l.head), l.head).size
     }
 
     if (hierarchyDepth == 0) {

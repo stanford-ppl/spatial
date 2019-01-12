@@ -30,7 +30,7 @@ class AWS_Sim extends DeviceTarget {
 
     // Accel: Scalar and control connections
     accel.io.argIns := io.scalarIns
-    io.scalarOuts.zip(accel.io.argOuts).foreach{case (ioOut, accelOut) => ioOut := getFF(accelOut.bits, accelOut.valid) }
+    io.scalarOuts.zip(accel.io.argOuts).foreach{case (ioOut, accelOut) => ioOut := getFF(accelOut.port.bits, accelOut.port.valid) }
     accel.io.enable := io.enable
     io.done := accel.io.done
     accel.io.reset := fringe.io.reset

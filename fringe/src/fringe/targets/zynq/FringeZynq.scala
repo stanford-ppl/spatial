@@ -49,7 +49,6 @@ class FringeZynq(
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(TARGET_W.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(TARGET_W.W))))
-    val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(TARGET_W.W)))
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
@@ -106,7 +105,6 @@ class FringeZynq(
   io.reset := fringeCommon.io.reset
 
   io.argIns := fringeCommon.io.argIns
-  io.argOutLoopbacks := fringeCommon.io.argOutLoopbacks
   fringeCommon.io.argOuts <> io.argOuts
   // io.argIOIns := fringeCommon.io.argIOIns
   // fringeCommon.io.argIOOuts <> io.argIOOuts

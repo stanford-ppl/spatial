@@ -64,7 +64,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
     /** Returns list of stms that are not in a broadcast path, and the "weight" of the stm */
     def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.collect{case x if !x.isBroadcastAddr => (x, x.parOrElse1)}
-    def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = !s.isMem && !s.isCounterChain && !s.isCounter && (b.result == s || remaining.exists(_.nestedInputs.contains(s)))
+    def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists(_.nestedInputs.contains(s)))
     def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
     def initChunkState(): Unit = {ensigs = new scala.collection.mutable.ListBuffer[String]}
 
@@ -106,7 +106,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("  val io_numAllocators: Int, ")
       emit ("  val io_numArgIns: Int, ")
       emit ("  val io_numArgOuts: Int, ")
-      emit ("  val io_numArgOutLoopbacks: Int")
       emit (") extends AccelInterface{")
       emit ("  // Control IO")
       emit ("  val enable = Input(Bool())")
@@ -121,10 +120,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("  ")
       emit ("  // Scalar IO")
       emit ("  val argIns = Input(Vec(io_numArgIns, UInt(64.W)))")
-      emit ("  val argOuts = Vec(io_numArgOuts, Decoupled((UInt(64.W))))")
-      emit ("  val argOutLoopbacks = Input(Vec(io_numArgOutLoopbacks, UInt(64.W)))")
+      emit ("  val argOuts = Vec(io_numArgOuts, new ArgOut())")
       emit ("")
-      emit ("  override def cloneType = (new CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts, io_numArgOutLoopbacks)).asInstanceOf[this.type] // See chisel3 bug 358")
+      emit ("  override def cloneType = (new CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts)).asInstanceOf[this.type] // See chisel3 bug 358")
       emit ("}")
       
       open("trait IOModule extends Module {")
@@ -267,7 +265,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("// Combine values")
       emit ("val io_numArgIns = scala.math.max(1, io_numArgIns_reg + io_numArgIns_mem + io_numArgIOs_reg)")
       emit ("val io_numArgOuts = scala.math.max(1, io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + io_numArgOuts_breakpts)")
-      emit ("val io_numArgOutLoopbacks = scala.math.max(1, io_argOutLoopbacksMap.toList.length)")
       emit ("val io_numArgIOs = io_numArgIOs_reg")
       emit ("val io_numArgInstrs = io_numArgOuts_instr")
       emit ("val io_numArgBreakpts = io_numArgOuts_breakpts")
@@ -275,7 +272,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("globals.numArgOuts = io_numArgOuts")
       emit ("globals.numArgIOs = io_numArgIOs")
       emit ("globals.numArgInstrs = io_numArgInstrs")
-      emit ("globals.argOutLoopbacksMap = io_argOutLoopbacksMap")
       emit ("globals.loadStreamInfo = io_loadStreamInfo")
       emit ("globals.storeStreamInfo = io_storeStreamInfo")
       emit ("globals.gatherStreamInfo = io_gatherStreamInfo")
@@ -284,7 +280,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("globals.streamOutsInfo = io_streamOutsInfo")
       emit ("globals.numAllocators = io_numAllocators")
 
-      open("val io = IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts, io_numArgOutLoopbacks))")
+      open("val io = IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
       emit ("var outStreamMuxMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map[String,Int]()")
       open("def getStreamOutLane(id: String): Int = {")
         emit ("val lane = outStreamMuxMap.getOrElse(id, 0)")
@@ -312,8 +308,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("val numArgIOs = numArgIOs_reg")
       emit ("val numArgInstrs = numArgOuts_instr")
       emit ("val numArgBreakpts = numArgOuts_breakpts")
-      emit (s"""new Top(this.target, () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
-      // emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, io_argOutLoopbacksMap, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
+      emit (s"""new Top(this.target, () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
+      // emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
       close("}")
       emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
       close("}")
@@ -335,7 +331,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val numArgOuts: Int,")
         emit("val numArgIOs: Int,")
         emit("val numArgInstrs: Int,")
-        emit("val argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int],")
         emit("val numAllocators: Int,")
         emit("val loadStreamInfo: List[StreamParInfo],")
         emit("val storeStreamInfo: List[StreamParInfo],")
@@ -414,13 +409,17 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => node match {
       case Some(x) if x.isNBuffered => "NBufMem"
       case Some(Op(_: ArgInNew[_])) => "UInt"
-      case Some(Op(_: ArgOutNew[_])) => "DecoupledIO[UInt]"
-      case Some(Op(_: HostIONew[_])) => "DecoupledIO[UInt]"
+      case Some(Op(_: ArgOutNew[_])) => "ArgOut"
+      case Some(Op(_: HostIONew[_])) => "ArgOut"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
       case Some(Op(_: RegNew[_])) => "FF"
+      case Some(Op(_: RegFileNew[_,_])) => "ShiftRegFile"
+      case Some(Op(_: LUTNew[_,_])) => "LUT"
       case Some(Op(_: SRAMNew[_,_])) => "BankedSRAM"
       case Some(Op(_: FIFONew[_])) => "FIFO"
+      case Some(Op(_: FIFORegNew[_])) => "FIFOReg"
+      case Some(Op(_: MergeBufferNew[_])) => "MergeBuffer"
       case Some(Op(_: LIFONew[_])) => "LIFO"
       case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
       case Some(Op(_: DRAMAccelNew[_,_])) => "FixedPoint"

@@ -82,6 +82,13 @@ class AppStreams(loadPar: List[StreamParInfo], storePar: List[StreamParInfo],
   override def cloneType(): this.type = new AppStreams(loadPar, storePar, gatherPar, scatterPar).asInstanceOf[this.type]
 }
 
+class ArgOut() extends Bundle {
+  val port = Decoupled(UInt(64.W))
+  val echo = Input(UInt(64.W))
+
+  override def cloneType(): this.type = new ArgOut().asInstanceOf[this.type]
+}
+
 class DRAMCommand extends Bundle {
   val addr = UInt(64.W)
   val size = UInt(32.W)

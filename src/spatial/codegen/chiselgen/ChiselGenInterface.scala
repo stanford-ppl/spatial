@@ -56,7 +56,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
       emit(src"""val ${lhs} = Wire(${reg.tp.typeArgs.head})""")
-      emit(src"""${lhs}.r := $reg.bits.echo.r""")
+      emit(src"""${lhs}.r := $reg.echo.r""")
 
 
     case RegWrite(reg, v, en) if reg.isHostIO =>
@@ -93,9 +93,9 @@ trait ChiselGenInterface extends ChiselGenCommon {
             src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
           case _ => src"$v.r"
         }
-        emit(src"""${reg}.bits := $padded""")
+        emit(src"""${reg}.port.bits := $padded""")
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
+        emit(src"""${reg}.port.valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
       }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>

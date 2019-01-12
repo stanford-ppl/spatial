@@ -49,7 +49,6 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(regWidth.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(regWidth.W))))
-    val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(regWidth.W)))
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
@@ -74,7 +73,6 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   })
 
   io.argOuts <> DontCare
-  io.argOutLoopbacks <> DontCare
 
   println(s"[Fringe] loadStreamInfo: $LOAD_STREAMS, storeStreamInfo: $STORE_STREAMS")
   val assignment: List[List[Int]] = channelAssignment.assignments
@@ -113,7 +111,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val numRegs = NUM_ARGS + 2 - NUM_ARG_INS + numDebugs // (command, status registers)
 
   // Scalar, command, and status register file
-  val regs = Module(new RegFile(regWidth, numRegs, numArgIns+2, numArgOuts+1+numDebugs, numArgIOs, argOutLoopbacksMap))
+  val regs = Module(new RegFile(regWidth, numRegs, numArgIns+2, numArgOuts+1+numDebugs, numArgIOs))
   regs.io <> DontCare
   regs.io.raddr := io.raddr
   regs.io.waddr := io.waddr
@@ -180,7 +178,6 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     }
   }
 
-  io.argOutLoopbacks := regs.io.argOutLoopbacks
 
   // Memory address generator
   dramArbs.foreach { _.io.reset := localReset }

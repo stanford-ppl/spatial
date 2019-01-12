@@ -126,6 +126,8 @@ trait ChiselGenController extends ChiselGenCommon {
     val allUsed = ctrInputs ++ used ++ bufMapInputs
 
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
+    dbgs(s"Inputs for $lhs are (${used} ++ ${ctrInputs} ++ $bufMapInputs) diff $made")
+    Console.println(s"wtf Inputs for $lhs are (${used} ++ ${ctrInputs} ++ $bufMapInputs) diff $made")
     ((allUsed diff made) ++ RemoteMemories.all).filterNot{s => s.isValue}.toSeq    
   }
 
@@ -219,7 +221,7 @@ trait ChiselGenController extends ChiselGenCommon {
       else List(appendSuffix(lhs, x))
     }.flatten
     
-    val parent = if (controllerStack.size == 1) "None" else "Some(this)"
+    val parent = if (controllerStack.size == 1) "None" else "Some(me)"
     val cchain = if (lhs.cchains.nonEmpty) {
         if (lhs.isOuterStreamControl) {
           val ccs = lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}
@@ -273,7 +275,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
     emit(src"${lhs}$swobj.mask := $noop & $parentMask")
     emit(src"""${lhs}$swobj.configure("${lhs}$swobj")""")
-    if (lhs.op.exists(_.R.isBits)) emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""}).result()") // TBD
+    if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}$swobj.kernel()")
     else emit(src"${lhs}$swobj.kernel()")
   }
 
@@ -301,6 +303,7 @@ trait ChiselGenController extends ChiselGenCommon {
     }
 
     emit("")
+    emit("val me = this")
     emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm")); sm.io <> DontCare""")
     emit(src"""val iiCtr = Module(new IICounter(${ii}.toInt, 2 + fringe.utils.log2Up(${ii}.toInt), "${lhs}_iiCtr"))""")
 

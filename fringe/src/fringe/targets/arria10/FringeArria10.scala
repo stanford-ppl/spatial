@@ -43,7 +43,6 @@ class FringeArria10 (
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(w.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(w.W))))
-    val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(w.W)))
 
     // Accel memory IO
     val heap = new HeapIO(numAllocators)
@@ -73,10 +72,6 @@ class FringeArria10 (
 
   if (io.argIns.length > 0) {
     io.argIns := fringeCommon.io.argIns
-  }
-
-  if (io.argOutLoopbacks.length > 0) {
-    io.argOutLoopbacks := fringeCommon.io.argOutLoopbacks
   }
 
   if (io.argOuts.length > 0) {

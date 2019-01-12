@@ -30,15 +30,11 @@ abstract class SimTarget extends DeviceTarget {
       accel.io.argIns := fringe.io.argIns
     }
 
-    if (accel.io.argOutLoopbacks.length > 0) {
-      accel.io.argOutLoopbacks := fringe.io.argOutLoopbacks
-    }
-
     if (accel.io.argOuts.length > 0) {
       fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
-        fringeArgOut.bits := accelArgOut.bits
-        fringeArgOut.valid := accelArgOut.valid
-        accelArgOut.ready := true.B
+        fringeArgOut.bits := accelArgOut.port.bits
+        fringeArgOut.valid := accelArgOut.port.valid
+        accelArgOut.port.ready := true.B
       }
     }
     fringe.io.memStreams <> accel.io.memStreams

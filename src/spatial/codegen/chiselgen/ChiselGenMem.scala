@@ -293,7 +293,7 @@ trait ChiselGenMem extends ChiselGenCommon {
      emit(src"m.io${ifaceType(mem)} <> DontCare")
       if (name == "FIFO" || name == "FIFOReg") {
         mem.writers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> i); emit(src"// enqActive_$x = ${activesMap(x)}")}
-        mem.readers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> {i + mem.readers.size}); emit(src"// deqActive_$x = ${activesMap(x)}")}
+        mem.readers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> {i + mem.writers.size}); emit(src"// deqActive_$x = ${activesMap(x)}")}
       }
       if (mem.resetters.isEmpty && !mem.isBreaker) emit(src"m.io.reset := false.B")
     }

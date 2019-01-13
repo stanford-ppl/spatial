@@ -203,8 +203,8 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   // DL for when we are visiting children but emiting DL on signals that belong to parent
-  def DLo[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val backpressure = "true.B"
+  def DLo[T](name: String, latency: T, smname: String, isBit: Boolean = false): String = {
+    val backpressure = src"${smname}.sm.io.backpressure"
     if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
     else src"getRetimed($name, ${latency}.toInt, $backpressure)"
   }

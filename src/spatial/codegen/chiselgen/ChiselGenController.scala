@@ -53,8 +53,11 @@ trait ChiselGenController extends ChiselGenCommon {
     bufMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
       emit(src"""${mem}.connectStageCtrl(${DL(src"done", 1, true)}, baseEn, ${port})""")
     }
+  }
+  final private def connectChains(lhs: Sym[_]): Unit = {
     regchainsMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
-      emit(src"""${mem}_chain.connectStageCtrl(${DL(src"done", 1, true)}, baseEn, ${port})""")
+      val swobj = if (lhs.isBranch) "_obj" else ""
+      emit(src"""${mem}_chain.connectStageCtrl(${DLo(src"${lhs}${swobj}.done", 1, src"$lhs" + swobj, true)}, ${lhs}${swobj}.baseEn, ${port})""")
     }
   }
 
@@ -69,7 +72,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit(src"""val $iter = cchain.head.io.output.counts($id).FP(true, $w, 0); $iter.suggestName("$iter")""")
       if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
         lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach{case (st, port) => 
-          regchainsMapping += (lhs -> {regchainsMapping.getOrElse(lhs, List[BufMapping]()) ++ List(BufMapping(iter, port))})
+          regchainsMapping += (st.s.get -> {regchainsMapping.getOrElse(st.s.get, List[BufMapping]()) ++ List(BufMapping(iter, port))})
         }
         emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain")); ${iter}_chain.io <> DontCare""")
         emit(src"""${iter}_chain.chain_pass(${iter}, sm.io.doneIn.head)""")
@@ -85,7 +88,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain")); ${v}_chain.io <> DontCare""")
         emit(src"""${v}_chain.chain_pass(${v}, sm.io.doneIn.head)""")
         lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach{case (st, port) => 
-          regchainsMapping += (lhs -> {regchainsMapping.getOrElse(lhs, List[BufMapping]()) ++ List(BufMapping(v, port))})
+          regchainsMapping += (st.s.get -> {regchainsMapping.getOrElse(st.s.get, List[BufMapping]()) ++ List(BufMapping(v, port))})
         }
         forEachChild(lhs){case (c, i) => 
           val swobj = if (c.isBranch) "_obj" else ""
@@ -123,7 +126,6 @@ trait ChiselGenController extends ChiselGenCommon {
 
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
     dbgs(s"Inputs for $lhs are (${used} ++ ${ctrInputs} ++ $bufMapInputs) diff $made")
-    Console.println(s"wtf Inputs for $lhs are (${used} ++ ${ctrInputs} ++ $bufMapInputs) diff $made")
     ((allUsed diff made) ++ RemoteMemories.all).filterNot{s => s.isValue}.toSeq    
   }
 
@@ -252,6 +254,8 @@ trait ChiselGenController extends ChiselGenCommon {
       }
     }
 
+    connectChains(lhs)
+
     // if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) { // TBD
     //   emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
     //   emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
@@ -312,6 +316,9 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
         emit(src"val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints := DontCare")
+        RemoteMemories.all.collect{case x if (x.isDRAMAccel) => 
+          emit(src"val $lhs = top.io.heap.req(0)")
+        }
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
           emit(src"""${lhs}.baseEn := top.io.enable && rr""")  

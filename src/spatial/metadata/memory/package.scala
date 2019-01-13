@@ -226,6 +226,10 @@ package object memory {
       case _:DRAM[_,_] => true
       case _ => false
     }
+    def isDRAMAccel: Boolean = mem match {
+      case _:DRAMAccelNew[_,_] => true
+      case _ => false
+    }
 
     def isStreamIn: Boolean = mem.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = mem.isInstanceOf[StreamOut[_]]

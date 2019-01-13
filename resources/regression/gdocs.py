@@ -406,9 +406,9 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
 		alink=apphash
-		count_success="=sum ( COUNTIF ( J3:3, \"=Y\" ) )"
-		count_fail="=sum ( COUNTIF ( J3:3, \"=N\" ) )"
-		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) ) / 2"
+		count_success="=sum ( COUNTIF ( k3:3, \"=Y\" ) )"
+		count_fail="=sum ( COUNTIF ( k3:3, \"=N\" ) )"
+		count_crash="=sum ( COUNTIF ( k3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)

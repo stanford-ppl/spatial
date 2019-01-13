@@ -311,7 +311,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
         emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
-        emit(src"val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool()))")
+        emit(src"val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints := DontCare")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
           emit(src"""${lhs}.baseEn := top.io.enable && rr""")  

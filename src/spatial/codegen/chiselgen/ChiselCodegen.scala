@@ -63,11 +63,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
     /** Returns list of stms that are not in a broadcast path, and the "weight" of the stm */
-    def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.collect{case x if !x.isBroadcastAddr => (x, x.parOrElse1)}
+    def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.collect{case x if (x.parent == Ctrl.Host) => (x, 0); case x if !x.isBroadcastAddr => (x, x.parOrElse1)}
     def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists(_.nestedInputs.contains(s)))
     def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
     def initChunkState(): Unit = {ensigs = new scala.collection.mutable.ListBuffer[String]}
-
     val hierarchyDepth = (scala.math.log(printableStms(b.stms).map(_._2).sum) / scala.math.log(CODE_WINDOW)).toInt
     globalBlockID = javaStyleChunk[Sym[_]](
       printableStms(b.stms), 
@@ -174,13 +173,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val iiCtr: IICounter""")
 
       emit(""" """)
-      emit("""  def configure(n: String): Unit = {""")
+      emit("""  def configure(n: String, isSwitchCase: Boolean = false): Unit = {""")
       emit("""    sm.io.backpressure := backpressure | sm.io.doneLatch""")
       emit("""    sm.io.rst := resetMe""")
       emit("""    done := sm.io.done""")
       emit("""    break := sm.io.break""")
       emit("""    en := baseEn & forwardpressure""")
-      emit("""    parent.foreach{p => baseEn := p.sm.io.enableOut(childId).D(1) && ~done.D(1)}""")
+      emit("""    if (!isSwitchCase) parent.foreach{p => baseEn := p.sm.io.enableOut(childId).D(1) && ~done.D(1)}""")
       emit("""    parentAck := {if (parent.isDefined) parent.get.sm.io.childAck(childId) else false.B}""")
       emit("""    sm.io.enable := en""")
       emit("""    resetChildren := sm.io.ctrRst""")
@@ -411,6 +410,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: ArgInNew[_])) => "UInt"
       case Some(Op(_: ArgOutNew[_])) => "ArgOut"
       case Some(Op(_: HostIONew[_])) => "ArgOut"
+      case Some(Op(_: CounterNew[_])) => "CtrObject"
+      case Some(Op(_: CounterChainNew)) => "CounterChain"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
       case Some(Op(_: RegNew[_])) => "FF"

@@ -48,9 +48,11 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
     val reset = Input(Bool())
     val argIns = Output(Vec(numArgIns, UInt(w.W)))
     val argOuts = Vec(numArgOuts, Flipped(Decoupled(UInt(w.W))))
+    val argEchos = Output(Vec(numArgOuts, UInt(w.W)))
   })
 
   io.argOuts <> DontCare
+  io.argEchos := DontCare
 
   // Sanity-check module parameters
   Predef.assert(numArgIns >= 0, s"Invalid numArgIns ($numArgIns): must be >= 0.")
@@ -67,9 +69,10 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
       ff.reset := reset.toBool
       ff.io.reset := reset.toBool // Board level
     } else if (argOutRange contains i) {
-      ff.io.enable := io.argOuts(argOutRange.indexOf(i)).valid | (io.wen & (io.waddr === id.U(addrWidth.W)))
+      ff.io.enable := io.argOuts(regIdx2ArgOut(i)).valid | (io.wen & (io.waddr === id.U(addrWidth.W)))
       ff.io.in := Mux(io.argOuts(regIdx2ArgOut(i)).valid, io.argOuts(regIdx2ArgOut(i)).bits, io.wdata)
       ff.reset := io.reset
+      io.argEchos(regIdx2ArgOut(i)) := ff.io.out
       ff.io.reset := reset.toBool //io.reset // reset.toBool 
     } else {
       ff.io.enable := io.wen & (io.waddr === id.U(addrWidth.W))

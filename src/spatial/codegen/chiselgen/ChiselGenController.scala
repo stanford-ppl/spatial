@@ -230,7 +230,6 @@ trait ChiselGenController extends ChiselGenCommon {
       }
       else "List()"
     val childId = if (controllerStack.size == 1) -1 else lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)
-    
     emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, rr)")
     modifications
     // Wire signals to SM object
@@ -245,11 +244,11 @@ trait ChiselGenController extends ChiselGenCommon {
       } else if (lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).nonEmpty & (lhs match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
         val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
         emit(src"""${lhs}$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
-      } else if (lhs match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
+      } else if (lhs.isSwitch) { // switch, ctrDone is replaced with doneIn(#)
       } else if (lhs match {case Op(_:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length > 0) => true; case _ => false }) {
         val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
         emit(src"""${lhs}$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
-      } else if (lhs match {case Op(x:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length == 0) => true; case _ => false }) {
+      } else if (lhs match {case Op(_:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length == 0) => true; case _ => false }) {
         val x = lhs match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
         emit(src"""${lhs}$swobj.sm.io.ctrDone := ${lhs}$swobj.iiDone.D(${x.fullDelay})""")
       } else {
@@ -274,7 +273,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val noop = if (lhs.cchains.nonEmpty) src"~${lhs}.cchain.head.io.output.noop" else "true.B"
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
     emit(src"${lhs}$swobj.mask := $noop & $parentMask")
-    emit(src"""${lhs}$swobj.configure("${lhs}$swobj")""")
+    emit(src"""${lhs}$swobj.configure("${lhs}$swobj", isSwitchCase = ${lhs.isSwitchCase && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl})""")
     if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}$swobj.kernel()")
     else emit(src"${lhs}$swobj.kernel()")
   }
@@ -385,7 +384,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
     case op@SwitchCase(body) =>
       enterCtrl(lhs)
-      instantiateKernel(lhs, Set(), body){}
+      instantiateKernel(lhs, Set(), body){
+        if (lhs.isInnerControl) {
+          emit(src"""${lhs}_obj.baseEn := sm.io.selectsOut(${lhs}_obj.childId)""")
+        }
+      }
 
       writeKernelClass(lhs, Set(), body) {
         emit(s"// Controller Stack: ${controllerStack.tail}")

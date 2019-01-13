@@ -49,6 +49,8 @@ class FringeZynq(
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(TARGET_W.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(TARGET_W.W))))
+    val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(TARGET_W.W)))
+
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)

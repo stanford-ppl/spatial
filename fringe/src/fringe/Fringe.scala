@@ -49,6 +49,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(regWidth.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(regWidth.W))))
+    val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(regWidth.W)))
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
@@ -72,6 +73,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     // val dbg = new DebugSignals
   })
 
+  io.argEchos := DontCare
   io.argOuts <> DontCare
 
   println(s"[Fringe] loadStreamInfo: $LOAD_STREAMS, storeStreamInfo: $STORE_STREAMS")
@@ -169,6 +171,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
       argOutReg.bits := status.bits.asUInt
     }
     else if (i <= numArgOuts) {
+      io.argEchos(i-1) := regs.io.argEchos(i)
       argOutReg.bits := io.argOuts(i-1).bits
       argOutReg.valid := io.argOuts(i-1).valid
     }

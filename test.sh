@@ -86,8 +86,8 @@ elif [[ $type == "vcs-gdocs" ]]; then
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs"
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
   echo "$$(date +%s)" > ${curpath}/end${starttime}.log
-  if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat \`pwd\`${curpath}/end${starttime}.log`; else endtime=1; fi
-  if [[ -f ${curpath}/start${starttime}.log ]]; then starttime=`cat \`pwd\`${curpath}/start${starttime}.log`; else starttime=0; fi
+  if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat ${curpath}/end${starttime}.log`; else endtime=1; fi
+  if [[ -f ${curpath}/start${starttime}.log ]]; then starttime=`cat ${curpath}/start${starttime}.log`; else starttime=0; fi
   testtime=$((endtime-starttime))
   python3 ${curpath}/resources/regression/gdocs.py "finish_test" "vcs" "$branchname" "${testtime}"
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs" "any" "any"
@@ -109,8 +109,8 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "scalasim"
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
   echo "$$(date +%s)" > ${curpath}/end${starttime}.log
-  if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat \`pwd\`${curpath}/end${starttime}.log`; else endtime=1; fi
-  if [[ -f ${curpath}/start${starttime}.log ]]; then starttime=`cat \`pwd\`${curpath}/start${starttime}.log`; else starttime=0; fi
+  if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat ${curpath}/end${starttime}.log`; else endtime=1; fi
+  if [[ -f ${curpath}/start${starttime}.log ]]; then starttime=`cat ${curpath}/start${starttime}.log`; else starttime=0; fi
   testtime=$((endtime-starttime))
   python3 ${curpath}/resources/regression/gdocs.py "finish_test" "scalasim" "$branchname" "${testtime}"
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "scalasim" "any" "any"

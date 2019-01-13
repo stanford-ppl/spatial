@@ -12,10 +12,6 @@ import spatial.util.spatialConfig
 
 trait ChiselGenDRAM extends ChiselGenCommon {
   var requesters = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var loadStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var storeStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var gatherStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var scatterStreams = scala.collection.mutable.HashMap[Sym[_], Int]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case DRAMHostNew(_,_) =>
@@ -24,28 +20,33 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         forceEmit(src"val ${f.addrStream} = top.io.memStreams.loads(${loadStreams.size}).cmd // StreamOut")
         forceEmit(src"val ${f.dataStream} = top.io.memStreams.loads(${loadStreams.size}).data // StreamIn")
         RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
-        loadStreams += (f -> loadStreams.size)
+        val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+        loadStreams += (f -> (s"""StreamParInfo(${bitWidth(lhs.tp.typeArgs.head)}, ${par}, 0)""", loadStreams.size))
       }
       lhs.storeStreams.foreach{f => 
         forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
         forceEmit(src"val ${f.dataStream} = top.io.memStreams.stores(${storeStreams.size}).data // StreamOut")
         forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
         RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
-        storeStreams += (f -> storeStreams.size)
+        val par = f.dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
+        storeStreams += (f -> (s"""StreamParInfo(${bitWidth(lhs.tp.typeArgs.head)}, ${par}, 0)""", storeStreams.size))
       }
       lhs.gatherStreams.foreach{f => 
         forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
         forceEmit(src"val ${f.dataStream} = top.io.memStreams.gathers(${gatherStreams.size}).data // StreamIn")
         RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
-        gatherStreams += (f -> gatherStreams.size)
+        val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+        gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(lhs.tp.typeArgs.head)}, ${par}, 0)""", gatherStreams.size))
       }
       lhs.scatterStreams.foreach{f => 
         forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
         forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
         RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
-        scatterStreams += (f -> scatterStreams.size)
+        val par = f.addrStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
+        scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(lhs.tp.typeArgs.head)}, ${par}, 0)""", scatterStreams.size))
       }
 
+      forceEmit(src"// scoped in dram is ${scoped.mkString(",")} ")
       forceEmit(src"val $lhs = Wire(new FixedPoint(true, 64, 0))")
       forceEmit(src"$lhs.r := top.io.argIns(api.${argHandle(lhs)}_ptr)")
 

@@ -22,14 +22,14 @@ trait ChiselGenMem extends ChiselGenCommon {
     val totalPayload = payload.mkString(src"List[$tp](", ",", ")")
     if (totalPayload.length < zipThreshold) {
       val rdPayload = totalPayload + suffix
-      emit(src"""${lhs}_port.$port.zip($rdPayload).foreach{case (left, right) => left.r := right}""")
+      emit(src"""${local(lhs)}_port.$port.zip($rdPayload).foreach{case (left, right) => left.r := right}""")
     }
     else {
       val groupSize = 1 max (payload.length / (totalPayload.length / zipThreshold)).toInt
       val groups = payload.grouped(groupSize).toList
       groups.zipWithIndex.foreach{case (group, i) => 
         val rdPayload = group.mkString(src"List[$tp](",",",")") + suffix
-        emit(src"""${lhs}_port.$port.drop(${i*groupSize}).take(${group.size}).zip($rdPayload).foreach{case (left, right) => left.r := right}""")
+        emit(src"""${local(lhs)}_port.$port.drop(${i*groupSize}).take(${group.size}).zip($rdPayload).foreach{case (left, right) => left.r := right}""")
       }
     }
   }
@@ -79,21 +79,21 @@ trait ChiselGenMem extends ChiselGenCommon {
     val castgrps     = lhs.port.castgroup.mkString("List(",",",")")
     val broadcastids = lhs.port.broadcast.mkString("List(",",",")")
     if (lhs.isDirectlyBanked & !isBroadcast) {
-      emit(createWire(src"""${lhs}_port""", src"""new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList)"""))
-      emit(src"${lhs}_port := DontCare")
-      emit(src"""${lhs}.toSeq.zip(${mem}.connectDirectRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      emit(createWire(src"""${local(lhs)}_port""", src"""new R_Direct(${ens.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList)"""))
+      emit(src"${local(lhs)}_port := DontCare")
+      emit(src"""${lhs}.toSeq.zip(${mem}.connectDirectRPort(${local(lhs)}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else if (isBroadcast) {
       val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
-      emit(createWire(src"""${lhs}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
-      emit(src"${lhs}_port := DontCare")
+      emit(createWire(src"""${local(lhs)}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
+      emit(src"${local(lhs)}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${lhs}.toSeq.zip(${mem}.connectBroadcastRPort(${lhs}_port, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      emit(src"""${lhs}.toSeq.zip(${mem}.connectBroadcastRPort(${local(lhs)}_port, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     } else {
       val banklist = bank.flatten.filter(!_.isBroadcastAddr).map(quote(_) + ".r")
-      emit(createWire(src"""${lhs}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
-      emit(src"${lhs}_port := DontCare")
+      emit(createWire(src"""${local(lhs)}_port""", src"""new R_XBar(${ens.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")})"""))
+      emit(src"${local(lhs)}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${lhs}.toSeq.zip(${mem}.connectXBarRPort(${lhs}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
+      emit(src"""${lhs}.toSeq.zip(${mem}.connectXBarRPort(${local(lhs)}_port, $bufferPort, ($muxPort, $muxOfs),$castgrps, $broadcastids, $ignoreCastInfo $flowEnable)).foreach{case (left, right) => left.r := right}""")
     }
     val commonEns = ens.head.collect{case e if (ens.forall(_.contains(e)) && !e.isBroadcastAddr) => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
@@ -121,21 +121,21 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
     if (lhs.isDirectlyBanked && !isBroadcast) {
-      emit(createWire(src"""${lhs}_port""", src"""new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width)"""))
-      emit(src"${lhs}_port := DontCare")
-      emit(src"""${mem}.connectDirectWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
+      emit(createWire(src"""${local(lhs)}_port""", src"""new W_Direct(${data.length}, $ofsWidth, ${bank.flatten.map(_.trace.toInt).mkString("List(",",",")")}.grouped(${bank.head.length}).toList, $width)"""))
+      emit(src"${local(lhs)}_port := DontCare")
+      emit(src"""${mem}.connectDirectWPort(${local(lhs)}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     } else if (isBroadcast) {
       val banklist = bank.flatten.map(quote(_) + ".r")
-      emit(createWire(src"""${lhs}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
-      emit(src"${lhs}_port := DontCare")
+      emit(createWire(src"""${local(lhs)}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
+      emit(src"${local(lhs)}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${mem}.connectBroadcastWPort(${lhs}_port, ($muxPort, $muxOfs))""")        
+      emit(src"""${mem}.connectBroadcastWPort(${local(lhs)}_port, ($muxPort, $muxOfs))""")        
     } else {
       val banklist = bank.flatten.map(quote(_) + ".r")
-      emit(createWire(src"""${lhs}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
-      emit(src"${lhs}_port := DontCare")
+      emit(createWire(src"""${local(lhs)}_port""", src"""new W_XBar(${data.length}, $ofsWidth, ${banksWidths.mkString("List(",",",")")}, $width)"""))
+      emit(src"${local(lhs)}_port := DontCare")
       zipAndConnect(lhs, mem, "banks", "UInt", banklist, ".map(_.rd)")
-      emit(src"""${mem}.connectXBarWPort(${lhs}_port, $bufferPort, (${muxPort}, $muxOfs))""")
+      emit(src"""${mem}.connectXBarWPort(${local(lhs)}_port, $bufferPort, (${muxPort}, $muxOfs))""")
     }
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)))}

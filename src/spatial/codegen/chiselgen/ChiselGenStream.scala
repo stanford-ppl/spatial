@@ -97,10 +97,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      ens.zipWithIndex.foreach{case(e,i) =>
-        val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${strm}.ready := $en & (datapathEn & iiDone) // Do not delay ready because datapath includes a delayed _valid already """)
-      }
+      emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & (datapathEn) """)
       val Op(StreamInNew(bus)) = strm
       bus match {
         case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")

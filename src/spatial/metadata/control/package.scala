@@ -45,6 +45,10 @@ package object control {
       case _:Switch[_] | _:SwitchCase[_] | _:IfThenElse[_] => true
       case _ => false
     }
+    def isSwitchCase: Boolean = op match {
+      case _:SwitchCase[_] => true
+      case _ => false
+    }
 
     def isParallel: Boolean = op.isInstanceOf[ParallelPipe]
 
@@ -118,6 +122,7 @@ package object control {
 
     def isAccel: Boolean = op.exists(_.isAccel)
     def isSwitch: Boolean = op.exists(_.isSwitch)
+    def isSwitchCase: Boolean = op.exists(_.isSwitchCase)
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)

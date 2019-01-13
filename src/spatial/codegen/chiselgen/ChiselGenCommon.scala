@@ -20,6 +20,12 @@ trait ChiselGenCommon extends ChiselCodegen {
   private var initializedControllers = Set.empty[Sym[_]]
 
 
+  // Mapping for DRAMs, since DRAMs and their related Transfer nodes don't necessarily appear in consistent order
+  var loadStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  var storeStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  var gatherStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  var scatterStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+
   // Statistics counters
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var widthStats = new scala.collection.mutable.ListBuffer[Int]
@@ -126,7 +132,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def createWire(name: String, payload: String): String = {
-    src"""val $name = Wire($payload).suggestName("$name")"""
+    src"""val $name = Wire($payload).suggestName(""" + "\"\"\"" + src"$name" + "\"\"\"" + ")"
   }
 
   // Hack for gather/scatter/unaligned load/store, we want the controller to keep running

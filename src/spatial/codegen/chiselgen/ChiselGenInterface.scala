@@ -10,16 +10,6 @@ import spatial.metadata.retiming._
 
 trait ChiselGenInterface extends ChiselGenCommon {
 
-  var loadsList = List[Sym[_]]()
-  var storesList = List[Sym[_]]()
-  var loadParMapping = List[String]()
-  var storeParMapping = List[String]()
-
-  var gathersList = List[Sym[_]]()
-  var scattersList = List[Sym[_]]()
-  var gatherParMapping = List[String]()
-  var scatterParMapping = List[String]()
-
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments() =>
     case ArgInNew(init)  => 
@@ -51,7 +41,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case RegRead(reg)  if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.bits.r""")
+      emit(src"""${lhs}.r := $reg.echo.r""")
 
     case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -69,18 +59,18 @@ trait ChiselGenInterface extends ChiselGenCommon {
             if (s) {
               val pad = 64 - d - f
               if (pad > 0) {
-                emit(src"""${reg}.data_options($id) := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+                emit(src"""${reg}.port.bits.r := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
               } else {
-                emit(src"""${reg}.data_options($id) := ${v}.r""")
+                emit(src"""${reg}.port.bits.r := ${v}.r""")
               }
             } else {
-              emit(src"""${reg}.data_options($id) := ${v}.r""")
+              emit(src"""${reg}.port.bits.r := ${v}.r""")
             }
           case _ =>
-            emit(src"""${reg}.data_options($id) := ${v}.r""")
+            emit(src"""${reg}.port.bits.r := ${v}.r""")
         }
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.en_options($id) := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
+        emit(src"""${reg}.port.valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
       }
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
@@ -102,64 +92,17 @@ trait ChiselGenInterface extends ChiselGenCommon {
       appPropertyStats += HasTileLoad
       if (cmdStream.isAligned) appPropertyStats += HasAlignedLoad
       else appPropertyStats += HasUnalignedLoad
-      val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-
-      val id = loadsList.length
-      loadParMapping = loadParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
-      loadsList = loadsList :+ dram
 
     case FringeSparseLoad(dram,cmdStream,dataStream) =>
       appPropertyStats += HasGather
-      val par = dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-
-      val id = gathersList.length
-      gatherParMapping = gatherParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
-      gathersList = gathersList :+ dram
-
-      //emit(src"${cmdStream}.ready := top.io.memStreams.gathers($id).ready // Not sure why the cmdStream ready used to be delayed")
-      //emit(src"top.io.memStreams.gathers($id).bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b.r}")
-      //emit(src"top.io.memStreams.gathers($id).valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-//
-      //// Connect the streams to their IO interface signals
-      //emit(src"top.io.memStreams.gathers($id).ready := ${dataStream}.ready")
-      //emit(src"""${dataStream}.zip(top.io.memStreams.gathers($id).bits).foreach{case (a,b) => a.r := ${DL("b", src"${dataStream.readers.head.fullDelay}.toInt")}}""")
-      //emit(src"""${dataStream}.now_valid := top.io.memStreams.gathers($id).valid""")
-      //emit(src"""${dataStream}.valid := ${DL(src"${dataStream}.now_valid", src"${dataStream.readers.head.fullDelay}.toInt", true)}""")
 
     case FringeDenseStore(dram,cmdStream,dataStream,ackStream) =>
       appPropertyStats += HasTileStore
       if (cmdStream.isAligned) appPropertyStats += HasAlignedStore
       else appPropertyStats += HasUnalignedStore
 
-      // Get parallelization of datastream
-      val par = dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-
-      val id = storesList.length
-      storeParMapping = storeParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
-      storesList = storesList :+ dram
-
     case FringeSparseStore(dram,cmdStream,ackStream) =>
       appPropertyStats += HasScatter
-      // Get parallelization of datastream
-      val par = cmdStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-
-      val id = scattersList.length
-      scatterParMapping = scatterParMapping :+ s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)"""
-      scattersList = scattersList :+ dram
-
-      //// Connect IO interface signals to their streams
-      //val (dataMSB, dataLSB)  = getField(cmdStream.tp.typeArgs.head, "_1")
-      //val (addrMSB, addrLSB)  = getField(cmdStream.tp.typeArgs.head, "_2")
-//
-      //emit(src"top.io.memStreams.scatters($id).bits.zip(${cmdStream}.m).foreach{case (wport, wdata) => wport := wdata($dataMSB, $dataLSB)}")
-      //emit(src"top.io.memStreams.scatters($id).valid := ${cmdStream}.valid")
-      //emit(src"top.io.memStreams.scatters($id).bits.addr.zip(${cmdStream}.m).foreach{case (a,b) => a := b($addrMSB, $addrLSB)}")
-      //emit(src"top.io.memStreams.scatters($id).valid :=  ${cmdStream}.valid & ${cmdStream}.ready")
-      //emit(src"${cmdStream}.ready := top.io.memStreams.scatters($id).ready & top.io.memStreams.scatters($id).ready")
-      //emit(src"""${ackStream}.now_valid := top.io.memStreams.scatters($id).wresp.valid""")
-      //emit(src"""${ackStream}.valid := ${DL(src"${ackStream}.now_valid", src"${ackStream.readers.head.fullDelay}.toInt", true)}""")
-      //emit(src"""${ackStream}.foreach{_ := top.io.memStreams.scatters($id).wresp.valid}""")
-      //emit(src"""top.io.memStreams.scatters($id).wresp.ready := ${ackStream}.ready""")
 
     case _ => super.gen(lhs, rhs)
   }
@@ -177,12 +120,11 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit (s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
       emit ("")
       emit (s"// Memory streams")
-      emit (src"""val loadStreamInfo = List(${loadParMapping.map(_.replace("FringeGlobals.",""))}) """)
-      emit (src"""val storeStreamInfo = List(${storeParMapping.map(_.replace("FringeGlobals.",""))}) """)
-      emit (src"""val gatherStreamInfo = List(${gatherParMapping.map(_.replace("FringeGlobals.",""))}) """)
-      emit (src"""val scatterStreamInfo = List(${scatterParMapping.map(_.replace("FringeGlobals.",""))}) """)
+      emit (src"""val loadStreamInfo = List(${loadStreams.toList.sortBy(_._2._2).map(_._2._1).map(_.replace("FringeGlobals.",""))}) """)
+      emit (src"""val storeStreamInfo = List(${storeStreams.toList.sortBy(_._2._2).map(_._2._1).map(_.replace("FringeGlobals.",""))}) """)
+      emit (src"""val gatherStreamInfo = List(${gatherStreams.toList.sortBy(_._2._2).map(_._2._1).map(_.replace("FringeGlobals.",""))}) """)
+      emit (src"""val scatterStreamInfo = List(${scatterStreams.toList.sortBy(_._2._2).map(_._2._1).map(_.replace("FringeGlobals.",""))}) """)
       emit (src"""val numArgIns_mem = ${hostDrams.toList.length}""")
-      emit (src"""// $loadsList $storesList $gathersList $scattersList)""")
     }
 
     inGen(out, s"IOModule.$ext") {
@@ -192,10 +134,10 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit (s"val io_numArgIOs_reg = ${argIOs.toList.length}")
       emit (s"val io_argOutLoopbacksMap: scala.collection.immutable.Map[Int,Int] = ${argOutLoopbacks}")
       emit ("// Memory Streams")
-      emit (src"""val io_loadStreamInfo = List($loadParMapping) """)
-      emit (src"""val io_storeStreamInfo = List($storeParMapping) """)
-      emit (src"""val io_gatherStreamInfo = List($gatherParMapping) """)
-      emit (src"""val io_scatterStreamInfo = List($scatterParMapping) """)
+      emit (src"""val io_loadStreamInfo = List(${loadStreams.toList.sortBy(_._2._2).map(_._2._1)}) """)
+      emit (src"""val io_storeStreamInfo = List(${storeStreams.toList.sortBy(_._2._2).map(_._2._1)}) """)
+      emit (src"""val io_gatherStreamInfo = List(${gatherStreams.toList.sortBy(_._2._2).map(_._2._1)}) """)
+      emit (src"""val io_scatterStreamInfo = List(${scatterStreams.toList.sortBy(_._2._2).map(_._2._1)}) """)
       emit (src"val io_numArgIns_mem = ${hostDrams.toList.length}")
       emit (src"val outArgMuxMap: scala.collection.mutable.Map[Int, Int] = scala.collection.mutable.Map[Int,Int]()")
 

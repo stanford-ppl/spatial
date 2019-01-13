@@ -49,6 +49,14 @@ def getCols(wksh, appname):
 		print("ERROR: pygsheets failed getCols... -_-")	
 		exit()
 
+def getStampCol(wksh):
+	try: 
+		lol = readAllVals(wksh)
+		cols = [i+1 for i,x in enumerate(lol[1]) if (re.match("Test Time",x))]
+		return cols[0]
+	except:
+		return -1
+
 def getRuntimeCol(wksh, appname):
 	try: 
 		lol = readAllVals(wksh)
@@ -455,7 +463,19 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
-
+def finish_test(backend, branch, runtime):
+	sh = getDoc(backend)
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		worksheet = sh.worksheet('index', x)
+		print("Stamping %s" % worksheet.title)
+		lol = worksheet.get_all_values()
+		stampcol = getStampCol(worksheet)
+		if (stampcol >= 0):
+			row = getRowByBranch(sh, branch, 2) + 1
+			write(worksheet, row, stampcol, runtime)
+		else:
+			print("No Test Time field for %s" % worksheet.title)
 def report_changes(backend, newbranch, oldbranch):
 	sh = getDoc(backend)
 
@@ -672,6 +692,9 @@ elif (sys.argv[1] == "prepare_sheet"):
 elif (sys.argv[1] == "report_changes"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	report_changes(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "finish_test"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! finish_test('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	finish_test(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "report_slowdowns"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_slowdowns('%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	report_slowdowns(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
@@ -698,6 +721,7 @@ else:
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - combine_and_strip_prefixes(backend)")
 	print(" - report_changes(backend, newbranch, oldbranch (master, misc_fixes, any, etc.))")
+	print(" - finish_test(backend, branch, runtime)")
 	print(" - report_slowdowns(property (runtime, spatial, backend, newbranch, oldbranch), backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")

@@ -36,6 +36,9 @@ abstract class SimTarget extends DeviceTarget {
         fringeArgOut.valid := accelArgOut.port.valid
         accelArgOut.port.ready := true.B
       }
+      fringe.io.argEchos.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
+        accelArgOut.echo := fringeArgOut
+      }
     }
     fringe.io.memStreams <> accel.io.memStreams
     fringe.io.heap <> accel.io.heap

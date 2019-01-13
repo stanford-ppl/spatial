@@ -35,6 +35,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   // Buffer mappings from LCA to list of memories controlled by it
   case class BufMapping(val mem: Sym[_], val lane: Int)
   var bufMapping = scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
+  var regchainsMapping =  scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
 
   /** Map between cchain and list of controllers it is copied for, due to stream controller logic */
   var cchainCopies = scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]()

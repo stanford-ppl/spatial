@@ -96,6 +96,15 @@ class MultiArgOut(nw: Int) extends Bundle {
   override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]
 }
 
+class InstrCtr() extends Bundle {
+  val cycs  = Decoupled(UInt(64.W))
+  val iters = Decoupled(UInt(64.W))
+  val stalls = Decoupled(UInt(64.W))
+  val idles = Decoupled(UInt(64.W))
+
+  override def cloneType(): this.type = new InstrCtr().asInstanceOf[this.type]
+}
+
 class DRAMCommand extends Bundle {
   val addr = UInt(64.W)
   val size = UInt(32.W)
@@ -258,10 +267,10 @@ class HeapResp extends Bundle {
   val sizeAddr = UInt(64.W)
 }
 
-class HeapIO(numAlloc: Int) extends Bundle {
-  val req = Vec(numAlloc, Flipped(Valid(new HeapReq)))
-  val resp = Vec(numAlloc, Valid(new HeapResp))
+class HeapIO() extends Bundle {
+  val req = Flipped(Valid(new HeapReq))
+  val resp = Valid(new HeapResp)
 
-  override def cloneType(): this.type = new HeapIO(numAlloc).asInstanceOf[this.type]
+  override def cloneType(): this.type = new HeapIO().asInstanceOf[this.type]
 }
 

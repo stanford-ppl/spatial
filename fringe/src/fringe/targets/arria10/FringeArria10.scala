@@ -46,7 +46,7 @@ class FringeArria10 (
     val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(w.W)))
 
     // Accel memory IO
-    val heap = new HeapIO(numAllocators)
+    val heap = Vec(numAllocators, new HeapIO())
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     // TODO: need to add memory stream support
 

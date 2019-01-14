@@ -54,7 +54,7 @@ class FringeZynq(
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
-    val heap = new HeapIO(numAllocators)
+    val heap = Vec(numAllocators, new HeapIO())
 
     // External enable
     val externalEnable = Input(Bool()) // For AWS, enable comes in as input to top module

@@ -152,7 +152,6 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit (src"""val io_scatterStreamInfo = List(${scatterStreams.toList.sortBy(_._2._2).map(_._2._1)}) """)
       emit (src"val io_numArgIns_mem = ${hostDrams.toList.length}")
       emit (src"val outArgMuxMap: scala.collection.mutable.Map[Int, Int] = scala.collection.mutable.Map[Int,Int]()")
-
     }
 
     inGen(out, "ArgAPI.scala") {

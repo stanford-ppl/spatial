@@ -154,7 +154,7 @@ trait ChiselGenController extends ChiselGenCommon {
           if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"${in}_copy$c: ${arg(in.tp, Some(in))},")}
           else emit(src"$in: ${arg(in.tp, Some(in))},") 
         }
-        emit("parent: Option[Kernel], cchain: List[CounterChain], childId: Int, breakpoints: Vec[Bool], rr: Bool")
+        emit(s"parent: Option[Kernel], cchain: List[CounterChain], childId: Int, breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "List[InstrCtr], " else ""}rr: Bool")
         // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
         // emit("rr: ")
       closeopen(") extends Kernel(parent, cchain, childId) {")
@@ -228,7 +228,7 @@ trait ChiselGenController extends ChiselGenCommon {
       }
       else "List()"
     val childId = if (controllerStack.size == 1) -1 else lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)
-    emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, breakpoints, rr)")
+    emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs, " else ""}rr)")
     modifications
     // Wire signals to SM object
     if (!lhs.isOuterStreamControl) {
@@ -312,13 +312,23 @@ trait ChiselGenController extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
       RemoteMemories.all.collect{case x if (x.isDRAMAccel) => 
-        forceEmit(src"val $lhs = top.io.heap.req(0)")
+        val id = accelDrams.size
+        accelDrams += (x -> id)
+        val Op(DRAMAccelNew(dim)) = x
+        val reqCount = x.consumers.collect {
+          case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
+        }.size
+        connectDRAMStreams(x)
+        forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)); $x.io <> DontCare""")
+        forceEmit(src"top.io.heap($id).req := $x.io.heapReq")
+        forceEmit(src"$x.io.heapResp := top.io.heap($id).resp")
       }
       inAccel{
         emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
         emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
         emit(src"""val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
+        emit(src"""val instrctrs = List[InstrCtr]()""")
         emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
@@ -435,7 +445,7 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, "Instrument.scala"){
       emitHeader()
       open("object Instrument {")
-        open("def connect(top: AccelTop): Unit = {")
+        open("def connect(top: AccelTop, instrctrs: List[InstrCtr]): Unit = {")
           val printableLines: Seq[(String, Int)] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(

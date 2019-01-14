@@ -67,6 +67,7 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
       ff.io.enable := Mux(io.wen & (io.waddr === id.U(addrWidth.W)), io.wen & (io.waddr === id.U(addrWidth.W)), io.argOuts(argOutRange.indexOf(i)).valid)
       ff.io.in := Mux(io.wen & (io.waddr === id.U(addrWidth.W)), io.wdata, io.argOuts(regIdx2ArgOut(i)).bits)
       ff.reset := reset.toBool
+      io.argEchos(regIdx2ArgOut(i)) := ff.io.out
       ff.io.reset := reset.toBool // Board level
     } else if (argOutRange contains i) {
       ff.io.enable := io.argOuts(regIdx2ArgOut(i)).valid | (io.wen & (io.waddr === id.U(addrWidth.W)))
@@ -80,6 +81,11 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
       ff.reset := reset.toBool
       ff.io.reset := reset.toBool // Board level
     }
+
+    // if (i >= pureArgIns + 1) {
+    //   Console.println(s"$numArgIns, $numArgIOs, $numArgOuts, $pureArgIns, $pureArgOuts, connect ${i - pureArgIns} to ff $i")
+    //   io.argEchos(i - pureArgIns + 1) := ff.io.out
+    // }
 
     ff.io.init := 0.U
     ff

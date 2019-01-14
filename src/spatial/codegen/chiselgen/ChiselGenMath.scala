@@ -222,6 +222,10 @@ trait ChiselGenMath extends ChiselGenCommon {
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux1H(List($sels), List(${opts.map{x => src"$x.r"}}))")
 
+    case PriorityMux(sels, opts) => 
+      emit(createWire(quote(lhs),remap(lhs.tp)))
+      emit(src"$lhs.r := PriorityMux(List($sels), List(${opts.map{x => src"$x.r"}}))")
+
     case Mux(sel, a, b) => 
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux(($sel), $a.r, $b.r)")

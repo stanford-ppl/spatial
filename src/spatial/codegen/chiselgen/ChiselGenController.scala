@@ -264,8 +264,8 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"${lhs}$swobj.forwardpressure := ${getForwardPressure(lhs.toCtrl)}")
 
     lhs match {
-      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
-      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.m.io.output.data(0); ${stopWhen.get}.m.io.reset := done")
+      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.io.output.data(0); ${stopWhen.get}.io.reset := done")
+      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.io.output.data(0); ${stopWhen.get}.io.reset := done")
       case _ => emit(src"${lhs}$swobj.sm.io.break := false.B") 
     }
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
@@ -274,7 +274,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
     emit(src"${lhs}$swobj.mask := $noop & $parentMask")
     emit(src"""${lhs}$swobj.configure("${lhs}$swobj", isSwitchCase = ${lhs.isSwitchCase && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl})""")
-    if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}$swobj.kernel()")
+    if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}$swobj.kernel().r")
     else emit(src"${lhs}$swobj.kernel()")
   }
 
@@ -318,7 +318,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
         emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
-        emit(src"val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints := DontCare")
+        emit(src"val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s\"breakpoint$i\")}; breakpoints := DontCare")
         emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
@@ -331,16 +331,6 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""${lhs}.mask := true.B""")
           emit(src"""${lhs}.sm.io.parentAck := top.io.done""")
           emit(src"""${lhs}.sm.io.enable := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
-          if (earlyExits.nonEmpty) {
-            appPropertyStats += HasBreakpoint
-            earlyExits.zipWithIndex.foreach{case (e, i) => 
-              emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
-              emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
-            }
-            emit(src"""done_latch.io.input.set := ${lhs}.done | breakpoints.reduce{_|_}""")        
-          } else {
-            emit(src"""done_latch.io.input.set := ${lhs}.done""")                
-          }
           emit(src"""done_latch.io.input.reset := ${lhs}.resetMe""")
           emit(src"""done_latch.io.input.asyn_reset := ${lhs}.resetMe""")
           emit(src"""top.io.done := done_latch.io.output.data""")
@@ -348,6 +338,17 @@ trait ChiselGenController extends ChiselGenCommon {
         writeKernelClass(lhs, Set(), func){
           gen(func)
         }
+        if (earlyExits.nonEmpty) {
+          appPropertyStats += HasBreakpoint
+          earlyExits.zipWithIndex.foreach{case (e, i) => 
+            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
+            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
+          }
+          emit(src"""done_latch.io.input.set := ${lhs}.done | breakpoints.reduce{_|_}""")        
+        } else {
+          emit(src"""done_latch.io.input.set := ${lhs}.done""")                
+        }
+
 
         exitCtrl(lhs)
       }

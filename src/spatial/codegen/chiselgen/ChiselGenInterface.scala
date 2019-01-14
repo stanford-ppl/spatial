@@ -10,6 +10,8 @@ import spatial.metadata.retiming._
 
 trait ChiselGenInterface extends ChiselGenCommon {
 
+  var regMapping = scala.collection.mutable.HashMap[Sym[_], Int]()
+
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case InputArguments() =>
     case ArgInNew(init)  => 
@@ -18,10 +20,22 @@ trait ChiselGenInterface extends ChiselGenCommon {
       forceEmit(src"val $lhs = top.io.argIns(api.${id}_arg)")
     case HostIONew(init)  => 
       argIOs += (lhs -> argIOs.toList.length)
-      forceEmit(src"val $lhs = top.io.argOuts(${argIOs(lhs)})")
+      val writes = lhs.writers.filter(_.parent != Ctrl.Host)
+      writes.zipWithIndex.foreach{case (w,i) => regMapping += (w -> i)}
+      forceEmit(src"val $lhs = Wire(new MultiArgOut(${scala.math.max(1,writes.size)})); ${lhs}.port.map(_.bits := DontCare); ${lhs}.port.map(_.valid := DontCare); ${lhs}.echo := DontCare")
+      forceEmit(src"top.io.argOuts(${argIOs(lhs)}).port.valid := ${lhs}.port.map(_.valid).reduce{_||_}")
+      forceEmit(src"top.io.argOuts(${argIOs(lhs)}).port.bits := Mux1H(${lhs}.port.map(_.valid), ${lhs}.port.map(_.bits))")
+      forceEmit(src"${lhs}.port.map(_.ready := top.io.argOuts(${argIOs(lhs)}).port.ready)")
+      forceEmit(src"${lhs}.echo := top.io.argOuts(${argIOs(lhs)}).echo")
     case ArgOutNew(init) => 
       argOuts += (lhs -> argOuts.toList.length)
-      forceEmit(src"val $lhs = top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)})")
+      val writes = lhs.writers.filter(_.parent != Ctrl.Host)
+      writes.zipWithIndex.foreach{case (w,i) => regMapping += (w -> i)}
+      forceEmit(src"val $lhs = Wire(new MultiArgOut(${scala.math.max(1,writes.size)})); ${lhs}.port.map(_.bits := DontCare); ${lhs}.port.map(_.valid := DontCare); ${lhs}.echo := DontCare")
+      forceEmit(src"top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).port.valid := ${lhs}.port.map(_.valid).reduce{_||_}")
+      forceEmit(src"top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).port.bits := Mux1H(${lhs}.port.map(_.valid), ${lhs}.port.map(_.bits))")
+      forceEmit(src"${lhs}.port.map(_.ready := top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).port.ready)")
+      forceEmit(src"${lhs}.echo := top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).echo")
 
     // case GetReg(reg) if (reg.isArgOut) =>
     //   argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -31,7 +45,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case GetReg(reg) if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.bits.r""")
+      emit(src"""${lhs}.r := $reg.echo.r""")
 
     case RegRead(reg)  if reg.isArgIn =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
@@ -52,40 +66,38 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case RegWrite(reg, v, en) if reg.isHostIO =>
       val isBroadcast = lhs.port.broadcast.exists(_>0)
       if (!isBroadcast) {
-        val id = lhs.port.muxPort
-        emit(src"val $id = $id")
+        val id = regMapping(lhs)
         v.tp match {
           case FixPtType(s,d,f) =>
             if (s) {
               val pad = 64 - d - f
               if (pad > 0) {
-                emit(src"""${reg}.port.bits.r := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+                emit(src"""${reg}.port($id).bits.r := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
               } else {
-                emit(src"""${reg}.port.bits.r := ${v}.r""")
+                emit(src"""${reg}.port($id).bits.r := ${v}.r""")
               }
             } else {
-              emit(src"""${reg}.port.bits.r := ${v}.r""")
+              emit(src"""${reg}.port($id).bits.r := ${v}.r""")
             }
           case _ =>
-            emit(src"""${reg}.port.bits.r := ${v}.r""")
+            emit(src"""${reg}.port($id).bits.r := ${v}.r""")
         }
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.port.valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
+        emit(src"""${reg}.port($id).valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
       }
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
       val isBroadcast = lhs.port.broadcast.exists(_>0)
       if (!isBroadcast) {
-        val id = lhs.port.muxPort
-        emit(src"val $id = $id")
+        val id = regMapping(lhs)
         val padded = v.tp match {
           case FixPtType(s,d,f) if s && (64 > d + f) =>
             src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
           case _ => src"$v.r"
         }
-        emit(src"""${reg}.port.bits := $padded""")
+        emit(src"""${reg}.port($id).bits := $padded""")
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.port.valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
+        emit(src"""${reg}.port($id).valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
       }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>

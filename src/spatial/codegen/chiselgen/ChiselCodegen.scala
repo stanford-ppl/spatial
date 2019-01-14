@@ -408,8 +408,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => node match {
       case Some(x) if x.isNBuffered => "NBufMem"
       case Some(Op(_: ArgInNew[_])) => "UInt"
-      case Some(Op(_: ArgOutNew[_])) => "ArgOut"
-      case Some(Op(_: HostIONew[_])) => "ArgOut"
+      case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
+      case Some(Op(_: HostIONew[_])) => "MultiArgOut"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
       case Some(Op(_: CounterChainNew)) => "CounterChain"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"

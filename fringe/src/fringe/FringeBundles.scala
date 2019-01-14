@@ -89,6 +89,13 @@ class ArgOut() extends Bundle {
   override def cloneType(): this.type = new ArgOut().asInstanceOf[this.type]
 }
 
+class MultiArgOut(nw: Int) extends Bundle {
+  val port = Vec(nw, Decoupled(UInt(64.W)))
+  val echo = Input(UInt(64.W))
+
+  override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]
+}
+
 class DRAMCommand extends Bundle {
   val addr = UInt(64.W)
   val size = UInt(32.W)

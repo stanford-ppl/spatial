@@ -287,15 +287,21 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean): Unit = {
     val w = bitWidth(lhs.tp.typeArgs.head)
-    val strt = start match {case Final(s) => src"Left(Some($s))"
+    val strt = start match {
+                 case _ if forever => "Left(Some(0))"
+                 case Final(s) => src"Left(Some($s))"
                  case Expect(s) => src"Left(Some($s))"
                  case _ => src"Right(${appendSuffix(lhs.owner, start)})"
                 }
-    val stp = stop match {case Final(s) => src"Left(Some($s))"
+    val stp = stop match {
+                 case _ if forever => "Left(Some(5))"
+                 case Final(s) => src"Left(Some($s))"
                  case Expect(s) => src"Left(Some($s))"
                  case _ => src"Right(${appendSuffix(lhs.owner, stop)})"
                 }
-    val ste = step match {case Final(s) => src"Left(Some($s))"
+    val ste = step match {
+                 case _ if forever => "Left(Some(0))"
+                 case Final(s) => src"Left(Some($s))"
                  case Expect(s) => src"Left(Some($s))"
                  case _ => src"Right(${appendSuffix(lhs.owner, step)})"
                 }

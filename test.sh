@@ -87,8 +87,8 @@ elif [[ $type == "vcs-gdocs" ]]; then
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
   echo "$$(date +%s)" > ${curpath}/end${starttime}.log
   if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat ${curpath}/end${starttime}.log`; else endtime=1; fi
-  if [[ -f ${curpath}/start${starttime}.log ]]; then starttime=`cat ${curpath}/start${starttime}.log`; else starttime=0; fi
-  testtime=$((endtime-starttime))
+  if [[ -f ${curpath}/start${starttime}.log ]]; then begintime=`cat ${curpath}/start${starttime}.log`; else begintime=0; fi
+  testtime=$((endtime-begintime))
   python3 ${curpath}/resources/regression/gdocs.py "finish_test" "vcs" "$branchname" "${testtime}"
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs" "any" "any"
   python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs" "any" "any"
@@ -110,8 +110,8 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
   echo "$$(date +%s)" > ${curpath}/end${starttime}.log
   if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat ${curpath}/end${starttime}.log`; else endtime=1; fi
-  if [[ -f ${curpath}/start${starttime}.log ]]; then starttime=`cat ${curpath}/start${starttime}.log`; else starttime=0; fi
-  testtime=$((endtime-starttime))
+  if [[ -f ${curpath}/start${starttime}.log ]]; then begintime=`cat ${curpath}/start${starttime}.log`; else begintime=0; fi
+  testtime=$((endtime-begintime))
   python3 ${curpath}/resources/regression/gdocs.py "finish_test" "scalasim" "$branchname" "${testtime}"
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "scalasim" "any" "any"
   python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "scalasim" "any" "any"

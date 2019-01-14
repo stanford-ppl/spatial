@@ -20,7 +20,7 @@ trait ChiselGenCounter extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case CounterNew(start,end,step,par) => createCtrObject(lhs, start, end, step, par, false) //createCtr(lhs,start,end,step,par)
     case CounterChainNew(ctrs) => if (lhs.owner.isOuterStreamLoop) createStreamCChainObject(lhs,ctrs) else createCChainObject(lhs,ctrs)
-    case ForeverNew() => 
+    case ForeverNew() => createCtrObject(lhs, lhs, lhs, lhs, 1, true)
       // createCtrObject(lhs) {
       //   emit(src"// Owner = ${lhs.owner}")
       //   emit(src"val par = 1")

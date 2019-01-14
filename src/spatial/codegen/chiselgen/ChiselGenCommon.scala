@@ -323,6 +323,40 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   }
 
+  protected def connectDRAMStreams(dram: Sym[_]): Unit = {
+    dram.loadStreams.foreach{f =>
+      forceEmit(src"val ${f.addrStream} = top.io.memStreams.loads(${loadStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.dataStream} = top.io.memStreams.loads(${loadStreams.size}).data // StreamIn")
+      RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
+      val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", loadStreams.size))
+    }
+    dram.storeStreams.foreach{f =>
+      forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.dataStream} = top.io.memStreams.stores(${storeStreams.size}).data // StreamOut")
+      forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
+      RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
+      val par = f.dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
+      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", storeStreams.size))
+    }
+    dram.gatherStreams.foreach{f =>
+      forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.dataStream} = top.io.memStreams.gathers(${gatherStreams.size}).data // StreamIn")
+      RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
+      val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", gatherStreams.size))
+    }
+    dram.scatterStreams.foreach{f =>
+      forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
+      RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
+      val par = f.addrStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
+      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", scatterStreams.size))
+    }
+
+
+  }
+
 }
 
 

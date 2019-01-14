@@ -115,7 +115,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("  val memStreams = Flipped(new AppStreams(io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo))")
       emit ("  ")
       emit ("  // HEAP IO")
-      emit ("  val heap = Flipped(new HeapIO(io_numAllocators))")
+      emit ("  val heap = Flipped(Vec(io_numAllocators, new HeapIO()))")
       emit ("  ")
       emit ("  // Scalar IO")
       emit ("  val argIns = Input(Vec(io_numArgIns, UInt(64.W)))")
@@ -423,7 +423,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: MergeBufferNew[_])) => "MergeBuffer"
       case Some(Op(_: LIFONew[_])) => "LIFO"
       case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
-      case Some(Op(_: DRAMAccelNew[_,_])) => "FixedPoint"
+      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
       case Some(Op(_@StreamInNew(bus))) => 
         bus match {
           case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"

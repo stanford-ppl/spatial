@@ -54,7 +54,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
-    val heap = new HeapIO(numAllocators)
+    val heap = Vec(numAllocators, new HeapIO())
 
     // AXI Debuggers
     val TOP_AXI = new AXI4Probe(axiLiteParams)
@@ -106,8 +106,8 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
 
   val heap = Module(new DRAMHeap(numAllocators))
   heap.io.accel <> io.heap
-  val hostHeapReq = heap.io.host.req(0)
-  val hostHeapResp = heap.io.host.resp(0)
+  val hostHeapReq = heap.io.host(0).req
+  val hostHeapResp = heap.io.host(0).resp
 
   val numDebugs = dramArbs(debugChannelID).numDebugs
   val numRegs = NUM_ARGS + 2 - NUM_ARG_INS + numDebugs // (command, status registers)

@@ -444,6 +444,55 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     }
   }
 
+  protected def port(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
+    case FixPtType(s,d,f) => s"FixedPoint"
+    case _: Var[_] => "String"
+    case FltPtType(m,e) => s"FloatingPoint"
+    case BitType() => "Bool"
+    case tp: Vec[_] => src"Vec[${port(tp.typeArgs.head)}]"
+    case _: Struct[_] => s"UInt"
+    // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
+    case _ => node match {
+      case Some(x) if x.isNBuffered => "NBufMem"
+      case Some(Op(_: ArgInNew[_])) => "UInt"
+      case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
+      case Some(Op(_: HostIONew[_])) => "MultiArgOut"
+      case Some(Op(_: CounterNew[_])) => "CtrObject"
+      case Some(Op(_: CounterChainNew)) => "CounterChain"
+      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
+      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
+      case Some(Op(_: RegNew[_])) => "FF"
+      case Some(Op(_: RegFileNew[_,_])) => "ShiftRegFile"
+      case Some(Op(_: LUTNew[_,_])) => "LUT"
+      case Some(Op(_: SRAMNew[_,_])) => "BankedSRAM"
+      case Some(Op(_: FIFONew[_])) => "FIFO"
+      case Some(Op(_: FIFORegNew[_])) => "FIFOReg"
+      case Some(Op(_: MergeBufferNew[_])) => "MergeBuffer"
+      case Some(Op(_: LIFONew[_])) => "LIFO"
+      case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
+      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
+      case Some(Op(_@StreamInNew(bus))) => 
+        bus match {
+          case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
+          case BurstAckBus => "DecoupledIO[Bool]"
+          case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
+          case ScatterAckBus => "DecoupledIO[Bool]"
+          case _ => super.remap(tp)
+        }
+      case Some(x@Op(_@StreamOutNew(bus))) => 
+        bus match {
+          case BurstCmdBus => "DecoupledIO[AppCommandDense]"
+          case _: BurstFullDataBus[_] => "DecoupledIO[AppStoreData]"
+          case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
+          case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
+          case _ => super.remap(tp)
+        }
+
+      case _ => super.remap(tp)
+    }
+  }
+
+
   override def copyDependencies(out: String): Unit = {
 
     // if (spatialConfig.enableDebugResources) {

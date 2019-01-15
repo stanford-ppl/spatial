@@ -287,7 +287,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     $initStr, 
     ${!spatialConfig.enableAsyncMem && spatialConfig.enableRetiming}, 
     ${fracBits(mem.tp.typeArgs.head)},
-    ${mem.readers.size + mem.writers.size}, 
+    ${1 max (mem.readers.size + mem.writers.size)}, 
     myName = "$mem"
   ))""")
      emit(src"m.io${ifaceType(mem)} <> DontCare")

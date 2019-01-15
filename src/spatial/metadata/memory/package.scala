@@ -207,6 +207,8 @@ package object memory {
       case _ => false
     }
 
+    def isNBuffered: Boolean = mem.getInstance.exists(_.depth > 1)
+    
     def isOptimizedReg: Boolean = mem.writers.exists{ _.op.get.isInstanceOf[RegAccum[_]] }
     def optimizedRegType: Option[Accum] = if (!mem.isOptimizedReg) None else 
       mem.writers.collect{ 
@@ -224,6 +226,7 @@ package object memory {
       case _:DRAM[_,_] => true
       case _ => false
     }
+    def isDRAMAccel: Boolean = mem.op.exists{ case _: DRAMAccelNew[_,_] => true; case _ => false}
 
     def isStreamIn: Boolean = mem.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = mem.isInstanceOf[StreamOut[_]]
@@ -294,6 +297,37 @@ package object memory {
     def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
     def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
     def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
+
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def loadStreams: List[Sym[_]] = s.consumers.filter(_.isLoad).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def storeStreams: List[Sym[_]] = s.consumers.filter(_.isStore).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def gatherStreams: List[Sym[_]] = s.consumers.filter(_.isGather).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def scatterStreams: List[Sym[_]] = s.consumers.filter(_.isScatter).toList
+
+    /** Get BurstCmd bus */
+    def addrStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,cmd,_,_)) => cmd
+      case Op(FringeDenseLoad(_,cmd,_)) => cmd
+      case Op(FringeSparseLoad(_,cmd,_)) => cmd
+      case Op(FringeSparseStore(_,cmd,_)) => cmd //sic
+      case _ => throw new Exception("No addrStream for $s")
+    }
+
+    def dataStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,_,data,_)) => data
+      case Op(FringeDenseLoad(_,_,data)) => data
+      case Op(FringeSparseLoad(_,_,data)) => data
+      case _ => throw new Exception("No dataStream for $s")
+    }
+
+    def ackStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,_,_,ack)) => ack
+      case Op(FringeSparseStore(_,_,ack)) => ack
+      case _ => throw new Exception("No dataStream for $s")
+    }
   }
 
 

@@ -145,8 +145,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSLA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRU(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
-    case BitRandom(None) if lhs.parent.s.isDefined => emit(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${lhs.parent.s.get}.datapathEn) === 1.U")
-    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, ${lhs.parent.s.get}.datapathEn).r")
+    case BitRandom(None) if lhs.parent.s.isDefined => emit(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, datapathEn) === 1.U")
+    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, datapathEn).r")
     case FixRandom(x) =>
       val FixPtType(s,d,f) = lhs.tp
       emit(createWire(quote(lhs),remap(lhs.tp)))
@@ -158,13 +158,13 @@ trait ChiselGenMath extends ChiselGenCommon {
       }
       emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
       emit(src"val ${lhs}_rng = Module(new PRNG($seed))")
-      val en = if (lhs.parent.s.isDefined) src"${lhs.parent.s.get}.datapathEn" else "true.B"
+      val en = if (lhs.parent.s.isDefined) src"datapathEn" else "true.B"
       emit(src"${lhs}_rng.io.en := $en")
       emit(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     case FltRandom(None) if lhs.parent.s.isDefined => 
       val FltPtType(m,e) = lhs.tp
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, ${lhs.parent.s.get}.datapathEn).r")
+      emit(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, datapathEn).r")
     case FltRandom(x) => throw new Exception(s"Can only generate random float with no bounds right now!")
 
     case FixAbs(x) =>
@@ -221,6 +221,10 @@ trait ChiselGenMath extends ChiselGenCommon {
     case OneHotMux(sels, opts) => 
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Mux1H(List($sels), List(${opts.map{x => src"$x.r"}}))")
+
+    case PriorityMux(sels, opts) => 
+      emit(createWire(quote(lhs),remap(lhs.tp)))
+      emit(src"$lhs.r := PriorityMux(List($sels), List(${opts.map{x => src"$x.r"}}))")
 
     case Mux(sel, a, b) => 
       emit(createWire(quote(lhs),remap(lhs.tp)))

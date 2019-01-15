@@ -274,6 +274,14 @@ trait Spatial extends Compiler with ParamLoader {
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
 
+    cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = false
+    }.text("Disables modular codegen and puts all logic in AccelTop")
+
+    cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = true
+    }.text("Enables modular codegen")
+
     cli.opt[Unit]("forceBanking").action { (_,_) => 
       spatialConfig.enableForceBanking = true
     }.text("Ensures that memories will always get banked and compiler will never decide that it is cheaper to duplicate")

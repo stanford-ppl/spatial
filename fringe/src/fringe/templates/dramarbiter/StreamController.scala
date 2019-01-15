@@ -54,9 +54,9 @@ class StreamControllerLoad(
   rdata.io.in.valid := io.dram.rresp.valid
   io.dram.rresp.ready := rdata.io.in.ready
 
-  io.load.rdata.valid := rdata.io.out.valid
-  io.load.rdata.bits := rdata.io.out.bits.data
-  rdata.io.out.ready := io.load.rdata.ready
+  io.load.data.valid := rdata.io.out.valid
+  io.load.data.bits.rdata := rdata.io.out.bits.data
+  rdata.io.out.ready := io.load.data.ready
 }
 
 class StreamControllerStore(
@@ -87,11 +87,10 @@ class StreamControllerStore(
 
   val wdata = Module(new FIFOWidthConvert(info.w, info.v, EXTERNAL_W, EXTERNAL_V, target.bufferDepth))
   wdata.io <> DontCare
-  wdata.io.in.valid := io.store.wdata.valid
-  wdata.io.in.bits.data := io.store.wdata.bits
-  wdata.io.in.bits.strobe := io.store.wstrb.bits
-  io.store.wdata.ready := wdata.io.in.ready
-  io.store.wstrb.ready := wdata.io.in.ready
+  wdata.io.in.valid := io.store.data.valid
+  wdata.io.in.bits.data := io.store.data.bits.wdata
+  wdata.io.in.bits.strobe := io.store.data.bits.wstrb
+  io.store.data.ready := wdata.io.in.ready
 
   io.dram.wdata.valid := wdata.io.out.valid
   io.dram.wdata.bits.wdata := wdata.io.out.bits.data
@@ -141,9 +140,9 @@ class StreamControllerGather(
   gatherBuffer.io.rresp.bits.data := io.dram.rresp.bits.rdata.asTypeOf(gatherBuffer.io.rresp.bits.data)
   io.dram.rresp.ready := gatherBuffer.io.rresp.ready
 
-  io.gather.rdata.valid := gatherBuffer.io.rdata.valid
-  io.gather.rdata.bits := gatherBuffer.io.rdata.bits
-  gatherBuffer.io.rdata.ready := io.gather.rdata.ready
+  io.gather.data.valid := gatherBuffer.io.rdata.valid
+  io.gather.data.bits := gatherBuffer.io.rdata.bits
+  gatherBuffer.io.rdata.ready := io.gather.data.ready
 
   io.dram.cmd.valid := gatherBuffer.io.issueAddr.valid
   io.dram.cmd.bits.addr := gatherBuffer.io.issueAddr.bits.bits
@@ -174,7 +173,7 @@ class StreamControllerScatter(
   cmd.io.chainEnq := false.B
   cmd.io.chainDeq := true.B
   cmd.io.in.valid := io.scatter.cmd.valid
-  cmd.io.in.bits := io.scatter.cmd.bits.addr.map { DRAMAddress(_) }
+  cmd.io.in.bits := io.scatter.cmd.bits.addr.addr.map { DRAMAddress(_) }
   io.scatter.cmd.ready := cmd.io.in.ready
 
   io.dram.cmd.valid := cmd.io.out.valid
@@ -187,9 +186,9 @@ class StreamControllerScatter(
   wdata.io <> DontCare
   wdata.io.chainEnq := false.B
   wdata.io.chainDeq := true.B
-  wdata.io.in.valid := io.scatter.wdata.valid
-  wdata.io.in.bits := io.scatter.wdata.bits
-  io.scatter.wdata.ready := wdata.io.in.ready
+  wdata.io.in.valid := io.scatter.cmd.valid
+  wdata.io.in.bits := io.scatter.cmd.bits.wdata
+  io.scatter.cmd.ready := wdata.io.in.ready
 
   val wstrobe = Module(new FIFO(io.dram.wdata.bits.wstrb, target.bufferDepth))
   wstrobe.io <> DontCare

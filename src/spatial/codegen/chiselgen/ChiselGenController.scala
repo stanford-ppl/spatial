@@ -180,13 +180,17 @@ trait ChiselGenController extends ChiselGenCommon {
         }
 
         if (spatialConfig.enableModular) {
-          // open(src"class ${lhs}_module extends Module {")
-          //   open("val io = IO(new Bundle {")
-          //     inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = Input(${arg(in.tp, Some(in))})")}
-          //     emit("val rr = Input(Bool())")
-          //   close("})")
-          //   inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = io.$in")}
-          //   emit("val rr = io.rr")
+          open(src"class ${lhs}_module extends Module {")
+            open("val io = IO(new Bundle {")
+              inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = Input(${arg(in.tp, Some(in))})")}
+              emit("val parent: Input(Kernel),")
+              emit("val cchain: Input(List[CounterChain]),")
+              emit("val breakpoints: Input(Vec[Bool]),")
+              if (spatialConfig.enableInstrumentation) emit("val instrctrs: Input(List[InstrCtr]),")
+              emit("val rr = Input(Bool())")
+            close("})")
+            inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = io.$in")}
+            emit("val rr = io.rr")
         }
 
         // Set up reg chains
@@ -213,10 +217,10 @@ trait ChiselGenController extends ChiselGenCommon {
         connectBufs(lhs)
 
         if (spatialConfig.enableModular) {
-          // close("}")
-          // emit(src"val module = Module(new ${lhs}_module)")
-          // inputs.zipWithIndex.foreach{case(in,i) => emit(src"module.io.$in := $in")}
-          // emit("module.io.rr := rr")
+          close("}")
+          emit(src"val module = Module(new ${lhs}_module)")
+          inputs.zipWithIndex.foreach{case(in,i) => emit(src"module.io.$in := $in")}
+          emit("module.io.rr := rr")
         }
         close("}")
       close("}")

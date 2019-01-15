@@ -406,6 +406,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create numel counter
   val elements = Module(new CompactingIncDincCtr(p.numXBarW, p.numXBarR, p.widestXBarW, p.widestXBarR, p.depth, p.elsWidth))
+  elements.io <> DontCare
   elements.io.input.inc_en.zip(io.xBarW.flatMap(_.en)).foreach{case(l,r) => l := r}
   elements.io.input.dinc_en.zip(io.xBarR.flatMap(_.en)).foreach{case(l,r) => l := r}
 
@@ -415,6 +416,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   // Create compacting network
 
   val enqCompactor = Module(new CompactingEnqNetwork(p.xBarWMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  enqCompactor.io <> DontCare
   enqCompactor.io.headCnt := headCtr.io.output.count
   (0 until p.numXBarW).foreach{i =>
     enqCompactor.io.in.map(_.data).zip(io.xBarW.flatMap(_.data)).foreach{case (l,r) => l := r}
@@ -434,6 +436,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create dequeue compacting network
   val deqCompactor = Module(new CompactingDeqNetwork(p.xBarRMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  deqCompactor.io <> DontCare
   deqCompactor.io.tailCnt := tailCtr.io.output.count
   val active_r_bank = Math.singleCycleModulo(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
   val active_r_addr = Math.singleCycleDivide(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))

@@ -101,7 +101,7 @@ trait Codegen extends Traversal {
     globalBlockID: Int,                        // Global block ID for backend
     isLive: (X, Seq[X]) => Boolean,            // Check if X is escaping current chunk (X is in Seq AND not a "special" node)
     branchSfx: (X, Option[String]) => String,  // Create map entry from node name (unsuffixed) to node name (suffixed) (rhs requires .branch for chisel Switches)
-    argString: Type[_] => String,                    // Name for X type (not exactly remap(tp) for chisel)
+    argString: (Type[_], Option[Sym[_]]) => String,                    // Name for X type (not exactly remap(tp) for chisel)
     initChunkState: () => Unit                    // Initialize state vars for chunk (i.e. ensig compression in chisel)
   )(visitRule: X => Unit): Int = {
     def fetchWindow(l: Seq[Int], limit: Int): Int = {
@@ -135,7 +135,7 @@ trait Codegen extends Traversal {
           chunk.foreach{s => visitRule(s._1) }
           val live = chunk.map(_._1).filter(isLive(_,remain.map(_._1)))
           emit("Map[String,Any](" + live.map(branchSfx(_,None)).mkString(", ") + ")")
-          scoped ++= live.collect{case s: Sym[_] => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${argString(s.tp)}]"""}
+          scoped ++= live.collect{case s: Sym[_] => s -> src"""block${blockID}chunk$chunkID("$s").asInstanceOf[${argString(s.tp, Some(s))}]"""}
           close("}")
         close("}")
         emit(src"val block${blockID}chunk$chunkID: Map[String, Any] = Block${blockID}Chunker$chunkID.gen()")
@@ -169,7 +169,7 @@ trait Codegen extends Traversal {
             subChunk.foreach{s => visitRule(s._1) }
             val subLive = subChunk.map(_._1).filter(isLive(_, (chunk ++ remain).map(_._1)))
             emit("Map[String,Any](" + subLive.map(branchSfx(_,None)).mkString(", ") + ")")
-            scoped ++= subLive.collect{case s: Sym[_] => s -> src"""block${blockID}chunk${chunkID}sub${subChunkID}("$s").asInstanceOf[${argString(s.tp)}]"""}
+            scoped ++= subLive.collect{case s: Sym[_] => s -> src"""block${blockID}chunk${chunkID}sub${subChunkID}("$s").asInstanceOf[${argString(s.tp, Some(s))}]"""}
             close("}")
           close("}")
           emit(src"val block${blockID}chunk${chunkID}sub${subChunkID}: Map[String, Any] = Block${blockID}Chunker${chunkID}Sub${subChunkID}.gen()")
@@ -178,7 +178,7 @@ trait Codegen extends Traversal {
         // Create map from unscopedName -> subscopedName
         val mapLHS = live.collect{case x: Sym[_] if (scoped.contains(x)) => val temp = scoped(x); scoped -= x; val n = quote(x); scoped += (x -> temp); n; case x: Sym[_] => quote(x)}
         emit("Map[String,Any](" + mapLHS.zip(live).map{case (n,s) => branchSfx(s,Some(n)) }.mkString(", ") + ")")
-        scoped ++= mapLHS.zip(live).collect{case (n,s: Sym[_]) => s -> src"""block${blockID}chunk$chunkID("$n").asInstanceOf[${argString(s.tp)}]"""}
+        scoped ++= mapLHS.zip(live).collect{case (n,s: Sym[_]) => s -> src"""block${blockID}chunk$chunkID("$n").asInstanceOf[${argString(s.tp, Some(s))}]"""}
         close("}")
         close("}")
         emit(src"val block${blockID}chunk${chunkID}: Map[String, Any] = Block${blockID}Chunker${chunkID}.gen()")

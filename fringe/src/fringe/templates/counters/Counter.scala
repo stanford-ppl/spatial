@@ -118,22 +118,23 @@ class IICounter(val ii: Int, val width: Int = 32, val myName: String = "iiCtr") 
   })
 
   override def desiredName = myName
+  if (ii > 1) {
+    val cnt = RegInit((ii-1).S(width.W))
+    val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
 
-  val cnt = RegInit((ii-1).S(width.W))
-  val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
+    val nextLive = Mux(cnt === 0.S(width.W), (ii-1).S(width.W), cnt-1.S(width.W))
+    val next = Mux(io.input.enable, nextLive, cnt)
+    cnt := Mux(io.input.reset, (ii-1).S(width.W), next)
 
-  val nextLive = Mux(cnt === 0.S(width.W), (ii-1).S(width.W), cnt-1.S(width.W))
-  val next = Mux(io.input.enable, nextLive, cnt)
-  cnt := Mux(io.input.reset, (ii-1).S(width.W), next)
-
-  io.output.done := isDone
+    io.output.done := isDone
+  } else io.output.done := true.B
 }
 
 class CompactingIncDincCtr(inc: Int, dinc: Int, widest_inc: Int, widest_dinc: Int, stop: Int, width: Int = 32) extends Module {
   val io = IO(new Bundle {
     val input = new Bundle {
-      val inc_en     = Vec(inc, Input(Bool()))
-      val dinc_en    = Vec(dinc, Input(Bool()))
+      val inc_en     = Vec(1 max inc, Input(Bool()))
+      val dinc_en    = Vec(1 max dinc, Input(Bool()))
     }
     val output = new Bundle {
       val overread    = Output(Bool())
@@ -167,7 +168,7 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
     val input = new Bundle {
       val dir     = Input(Bool())
       val reset   = Input(Bool())
-      val enables = Vec(lanes, Input(Bool()))
+      val enables = Vec(1 max lanes, Input(Bool()))
     }
     val output = new Bundle {
       val done   = Output(Bool())

@@ -17,11 +17,10 @@ trait ChiselGenController extends ChiselGenCommon {
 
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
-  private var ctrls = List[Sym[_]]
   private var memsWithReset: List[Sym[_]] = List()
 
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
-    ctrls += lhs
+    ctrls = ctrls :+ lhs
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     ensigs = new scala.collection.mutable.ListBuffer[String]

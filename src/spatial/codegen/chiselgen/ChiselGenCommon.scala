@@ -28,6 +28,7 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   // Statistics counters
   var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
+  var ctrls = List[Sym[_]]()
   var widthStats = new scala.collection.mutable.ListBuffer[Int]
   var depthStats = new scala.collection.mutable.ListBuffer[Int]
   var appPropertyStats = Set[AppProperties]()

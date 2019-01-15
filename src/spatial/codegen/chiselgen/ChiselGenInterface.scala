@@ -168,6 +168,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       argOuts.foreach{case (a, id) => emit(src"val ${argHandle(a)}_arg = ${id+argIns.toList.length+hostDrams.toList.length+argIOs.toList.length}")}
       emit("\n// Instrumentation Counters")
       if (spatialConfig.enableInstrumentation) {
+        emit(src"val numCtrls = ${ctrls.size}")
         ctrls.zipWithIndex.foreach{case (s,i) => 
           emit(src"val ${quote(s).toUpperCase}_instrctr = $i")
         }

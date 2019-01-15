@@ -28,6 +28,9 @@ abstract class ZynqLike extends DeviceTarget {
     io.PROTOCOL_AXI <> fringe.io.PROTOCOL_AXI
     io.CLOCKCONVERT_AXI <> fringe.io.CLOCKCONVERT_AXI
 
+    // io.rdata handled by bridge inside FringeZynq
+    io.rdata := DontCare
+
     accel.io.argIns := fringe.io.argIns
     fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
       fringeArgOut.bits := accelArgOut.port.bits

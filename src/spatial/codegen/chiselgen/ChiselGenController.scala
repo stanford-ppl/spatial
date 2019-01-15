@@ -120,14 +120,14 @@ trait ChiselGenController extends ChiselGenCommon {
   private def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
-    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} //.filterNot(_.isCounterChain).filterNot(_.isCounter)
-    val ctrInputs: Set[Sym[_]] = Set()//lhs.children.map(_.children).flatten.filter(_.s.get != lhs).map(_.cchains).flatten.toSet
+    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems}
+    val usedStreams: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
     val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
-    val allUsed = ctrInputs ++ used ++ bufMapInputs
+    val allUsed = used ++ bufMapInputs ++ usedStreams
 
-    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
-    dbgs(s"Inputs for $lhs are (${used} ++ ${ctrInputs} ++ $bufMapInputs) diff $made")
-    ((allUsed diff made) ++ RemoteMemories.all).filterNot{s => s.isValue}.toSeq    
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
+    dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreams) diff $made ++ ${RemoteMemories.all}")
+    (allUsed diff made).filterNot{s => s.isValue}.toSeq    
   }
 
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
@@ -163,6 +163,22 @@ trait ChiselGenController extends ChiselGenCommon {
       createSMObject(lhs)
 
       open(src"def kernel(): $ret = {")
+        if (spatialConfig.enableInstrumentation) {
+          emit("cycles.io.enable := baseEn")
+          emit("iters.io.enable := risingEdge(done)")
+          emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).cycs := cycles.io.count")
+          emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).iters := iters.io.count")
+          if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
+            emit(src"stalls.io.enable := baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+            emit(src"idles.io.enable := baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+            emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).stalls := stalls.io.count")
+            emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).idles  := idles.io.count")
+          } else {
+            emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).stalls := 0.U")
+            emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).idles  := 0.U")            
+          }
+        }
+
         if (spatialConfig.enableModular) {
           // open(src"class ${lhs}_module extends Module {")
           //   open("val io = IO(new Bundle {")
@@ -307,6 +323,15 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm")); sm.io <> DontCare""")
     emit(src"""val iiCtr = Module(new IICounter(${ii}.toInt, 2 + fringe.utils.log2Up(${ii}.toInt), "${lhs}_iiCtr"))""")
 
+    if (spatialConfig.enableInstrumentation) {
+      emit("""val cycles = Module(new InstrumentationCounter())""")
+      emit("""val iters = Module(new InstrumentationCounter())""")          
+      if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) { 
+        emit("""val stalls = Module(new InstrumentationCounter())""")
+        emit("""val idles = Module(new InstrumentationCounter())""")          
+      }
+    }
+
     emit("")
   }
 
@@ -329,14 +354,14 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
         emit(src"""val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
-        if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List[InstrCtr](io_numCtrls)""")
+        if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List.fill[InstrCtr](api.numCtrls)(Wire(new InstrCtr()))""")
         emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
           emit(src"""${lhs}.baseEn := top.io.enable && rr && ~done_latch.io.output.data""")  
           if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
-            emit(src"${lhs}.stalled.io.enable := ${lhs}.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
-            emit(src"${lhs}.idle.io.enable := ${lhs}.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+            emit(src"${lhs}.stalls.io.enable := ${lhs}.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+            emit(src"${lhs}.idles.io.enable := ${lhs}.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
           }
           emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
           emit(src"""${lhs}.mask := true.B""")
@@ -457,9 +482,9 @@ trait ChiselGenController extends ChiselGenCommon {
               (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).iters""",1),
               (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.valid := top.io.enable""",1)
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalled""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalls""",1),
                 (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.valid := top.io.enable""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idle""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idles""",1),
                 (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.valid := top.io.enable""",1)
               )} else Nil}
 

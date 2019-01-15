@@ -97,10 +97,10 @@ class MultiArgOut(nw: Int) extends Bundle {
 }
 
 class InstrCtr() extends Bundle {
-  val cycs  = Decoupled(UInt(64.W))
-  val iters = Decoupled(UInt(64.W))
-  val stalls = Decoupled(UInt(64.W))
-  val idles = Decoupled(UInt(64.W))
+  val cycs  = UInt(64.W)
+  val iters = UInt(64.W)
+  val stalls = UInt(64.W)
+  val idles = UInt(64.W)
 
   override def cloneType(): this.type = new InstrCtr().asInstanceOf[this.type]
 }

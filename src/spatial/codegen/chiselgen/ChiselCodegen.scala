@@ -341,7 +341,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val retime_released_reg = RegInit(false.B)")
         emit("val accelReset = reset.toBool | io.reset")
         emit("Main.main(this)")
-        emit("Instrument.connect(this)")
       close("}")
     }
 

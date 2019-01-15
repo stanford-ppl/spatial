@@ -10,6 +10,9 @@ import spatial.metadata.control._
 
 trait NamedCodegen extends Codegen {
 
+  // Quote for sym without looking up in scoped
+  def local(s: Sym[_]): String = s"${s}"
+
   override def named(s: Sym[_], id: Int): String = s.op match {
     case Some(rhs) => rhs match {
       case _: AccelScope       => if (s.isInnerControl) s"${s}_inr_RootController${s._name}" else s"${s}_outr_RootController${s._name}"
@@ -37,13 +40,13 @@ trait NamedCodegen extends Codegen {
       case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}"
       case LUTNew(_,_)  => s"${s}_${s.nameOr("lut")}"
 
-      case SetReg(reg,_)      => s"${s}_${s.nameOr(src"set_$reg")}"
-      case GetReg(reg)       => s"${s}_${s.nameOr(src"get_$reg")}"
+      case SetReg(reg,_)      => s"${s}_${s.nameOr(src"set_${local(reg)}")}"
+      case GetReg(reg)       => s"${s}_${s.nameOr(src"get_${local(reg)}")}"
 
-      case RegRead(reg)      => s"${s}_${s.nameOr(src"rd_$reg")}"
-      case RegWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_$reg")}"
-      case FIFORegDeq(reg,_)      => s"${s}_${s.nameOr(src"deq_$reg")}"
-      case FIFORegEnq(reg,_,_) => s"${s}_${s.nameOr(src"enq_$reg")}"
+      case RegRead(reg)      => s"${s}_${s.nameOr(src"rd_${local(reg)}")}"
+      case RegWrite(reg,_,_) => s"${s}_${s.nameOr(src"wr_${local(reg)}")}"
+      case FIFORegDeq(reg,_)      => s"${s}_${s.nameOr(src"deq_${local(reg)}")}"
+      case FIFORegEnq(reg,_,_) => s"${s}_${s.nameOr(src"enq_${local(reg)}")}"
 
       case _:SRAMBankedRead[_,_]  => s"${s}_${s.nameOr("rd")}"
       case _:SRAMBankedWrite[_,_] => s"${s}_${s.nameOr("wr")}"
@@ -52,21 +55,21 @@ trait NamedCodegen extends Codegen {
       case MergeBufferBankedEnq(buf,_,_,_)   => s"${s}_${s.nameOr(src"enq_$buf")}"
       case MergeBufferBankedDeq(buf,_)   => s"${s}_${s.nameOr(src"deq_$buf")}"
 
-      case FIFOBankedEnq(fifo,_,_)   => s"${s}_${s.nameOr(src"enq_$fifo")}"
-      case FIFOBankedDeq(fifo,_)     => s"${s}_${s.nameOr(src"deq_$fifo")}"
-      case FIFOIsEmpty(fifo,_)       => s"${s}_${s.nameOr(src"isEmpty_$fifo")}"
-      case FIFOIsFull(fifo,_)        => s"${s}_${s.nameOr(src"isFull_$fifo")}"
-      case FIFOIsAlmostEmpty(fifo,_) => s"${s}_${s.nameOr(src"isAlmostEmpty_$fifo")}"
-      case FIFOIsAlmostFull(fifo,_)  => s"${s}_${s.nameOr(src"isAlmostFull_$fifo")}"
-      case FIFONumel(fifo,_)         => s"${s}_${s.nameOr(src"numel_$fifo")}"
+      case FIFOBankedEnq(fifo,_,_)   => s"${s}_${s.nameOr(src"enq_${local(fifo)}")}"
+      case FIFOBankedDeq(fifo,_)     => s"${s}_${s.nameOr(src"deq_${local(fifo)}")}"
+      case FIFOIsEmpty(fifo,_)       => s"${s}_${s.nameOr(src"isEmpty_${local(fifo)}")}"
+      case FIFOIsFull(fifo,_)        => s"${s}_${s.nameOr(src"isFull_${local(fifo)}")}"
+      case FIFOIsAlmostEmpty(fifo,_) => s"${s}_${s.nameOr(src"isAlmostEmpty_${local(fifo)}")}"
+      case FIFOIsAlmostFull(fifo,_)  => s"${s}_${s.nameOr(src"isAlmostFull_${local(fifo)}")}"
+      case FIFONumel(fifo,_)         => s"${s}_${s.nameOr(src"numel_${local(fifo)}")}"
 
-      case LIFOBankedPush(lifo,_,_)  => s"${s}_${s.nameOr(src"push_$lifo")}"
-      case LIFOBankedPop(lifo,_)     => s"${s}_${s.nameOr(src"pop_$lifo")}"
-      case LIFOIsEmpty(lifo,_)       => s"${s}_${s.nameOr(src"isEmpty_$lifo")}"
-      case LIFOIsFull(lifo,_)        => s"${s}_${s.nameOr(src"isFull_$lifo")}"
-      case LIFOIsAlmostEmpty(lifo,_) => s"${s}_${s.nameOr(src"isAlmostEmpty_$lifo")}"
-      case LIFOIsAlmostFull(lifo,_)  => s"${s}_${s.nameOr(src"isAlmostFull_$lifo")}"
-      case LIFONumel(lifo,_)         => s"${s}_${s.nameOr(src"numel_$lifo")}"
+      case LIFOBankedPush(lifo,_,_)  => s"${s}_${s.nameOr(src"push_${local(lifo)}")}"
+      case LIFOBankedPop(lifo,_)     => s"${s}_${s.nameOr(src"pop_${local(lifo)}")}"
+      case LIFOIsEmpty(lifo,_)       => s"${s}_${s.nameOr(src"isEmpty_${local(lifo)}")}"
+      case LIFOIsFull(lifo,_)        => s"${s}_${s.nameOr(src"isFull_${local(lifo)}")}"
+      case LIFOIsAlmostEmpty(lifo,_) => s"${s}_${s.nameOr(src"isAlmostEmpty_${local(lifo)}")}"
+      case LIFOIsAlmostFull(lifo,_)  => s"${s}_${s.nameOr(src"isAlmostFull_${local(lifo)}")}"
+      case LIFONumel(lifo,_)         => s"${s}_${s.nameOr(src"numel_${local(lifo)}")}"
 
       case VecAlloc(_)           => s"${s}_vec"
       case VecApply(_,i)         => s"${s}_elem_$i"

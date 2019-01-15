@@ -84,6 +84,7 @@ class NBufMem(
   val inits: Option[List[Double]] = None,
   val syncMem: Boolean = false,
   val fracBits: Int = 0,
+  val numActives: Int = 1,
   val myName: String = "NBuf"
 ) extends Module {
 
@@ -144,6 +145,8 @@ class NBufMem(
     val reset = Input(Bool())
 
     // FIFO Specific
+    val accessActivesIn = Vec(numActives, Input(Bool()))
+    val accessActivesOut = Vec(numActives, Output(Bool()))
     val full = Output(Bool())
     val almostFull = Output(Bool())
     val empty = Output(Bool())
@@ -155,6 +158,7 @@ class NBufMem(
     }
   })
 
+  io.accessActivesOut.zip(io.accessActivesIn).foreach{case (o,i) => o := i}
   io.full := DontCare
   io.almostFull := DontCare
   io.empty := DontCare
@@ -184,7 +188,7 @@ class NBufMem(
                         banks, strides, 
                         combinedXBarWMux, combinedXBarRMux,
                         flatDirectWMux, flatDirectRMux,
-                        bankingMode, inits, syncMem, fracBits, "SRAM"))
+                        bankingMode, inits, syncMem, fracBits, numActives, "SRAM"))
         x.io <> DontCare
         x
       }
@@ -252,7 +256,7 @@ class NBufMem(
               io.output.data(outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
             }
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en.map(_ & rMask)
-            f.io.xBarR(bufferBase + k).flow := io.xBarR(bufferBase + k).flow
+            f.io.xBarR(bufferBase + k).backpressure := io.xBarR(bufferBase + k).backpressure
             // f.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
             f.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
             f.io.xBarR(bufferBase + k).banks.zip(io.xBarR(bufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
@@ -277,7 +281,7 @@ class NBufMem(
             }
 
             f.io.directR(bufferBase + k).en := io.directR(bufferBase + k).en.map(_ & rMask)
-            f.io.directR(bufferBase + k).flow := io.directR(bufferBase + k).flow
+            f.io.directR(bufferBase + k).backpressure := io.directR(bufferBase + k).backpressure
             // f.io.directR(bufferBase + k).data := io.directR(bufferBase + k).data
             f.io.directR(bufferBase + k).ofs := io.directR(bufferBase + k).ofs
           }
@@ -300,7 +304,7 @@ class NBufMem(
          
           f.io.xBarR(xBarRBase + k).en := io.broadcastR( k).en
           // f.io.xBarR(xBarRBase + k).data := io.xBarR(xBarRBase + k).data
-          f.io.xBarR(xBarRBase + k).flow := io.broadcastR( k).flow
+          f.io.xBarR(xBarRBase + k).backpressure := io.broadcastR( k).backpressure
           f.io.xBarR(xBarRBase + k).ofs := io.broadcastR( k).ofs
           f.io.xBarR(xBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
         }
@@ -308,7 +312,7 @@ class NBufMem(
       }
     case FFType => 
       val ffs = (0 until numBufs).map{ i => 
-        val x = Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, "FF")) 
+        val x = Module(new FF(bitWidth, combinedXBarWMux, combinedXBarRMux, inits, fracBits, numActives = 1, "FF")) 
         x.io <> DontCare
         x
       }
@@ -355,7 +359,7 @@ class NBufMem(
 
     case FIFOType => 
       val fifo = Module(new FIFO(List(logicalDims.head), bitWidth, 
-                                  banks, combinedXBarWMux, combinedXBarRMux))
+                                  banks, combinedXBarWMux, combinedXBarRMux, numActives))
       fifo.io.asInstanceOf[FIFOInterface] <> DontCare
 
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
@@ -382,7 +386,7 @@ class NBufMem(
         val x = Module(new ShiftRegFile(logicalDims, bitWidth, 
                         combinedXBarWMux, combinedXBarRMux,
                         directWMux.getOrElse(i, DMap()), directRMux.getOrElse(i,DMap()),
-                        inits, syncMem, fracBits, isBuf = !isShiftEntry, "sr"))
+                        inits, syncMem, fracBits, isBuf = !isShiftEntry, numActives, "sr"))
         x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
         x
       }
@@ -468,7 +472,7 @@ class NBufMem(
             // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
             f.io.xBarR(k).ofs := io.xBarR(xBarRMuxBufferBase + k).ofs
             f.io.xBarR(k).banks.zip(io.xBarR(xBarRMuxBufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-              // f.io.flow(k) := io.flow(k) // Dangerous move here
+              // f.io.backpressure(k) := io.backpressure(k) // Dangerous move here
           }
         }
 
@@ -490,7 +494,7 @@ class NBufMem(
             f.io.directR(k).en := io.directR(directRMuxBufferBase + k).en
             // f.io.directR(directRMuxBufferBase + k).data := io.directR(directRMuxBufferBase + k).data
             f.io.directR(k).ofs := io.directR(directRMuxBufferBase + k).ofs
-            // f.io.flow(k + {if (hasXBarR) numXBarR else 0}) := io.flow(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
+            // f.io.backpressure(k + {if (hasXBarR) numXBarR else 0}) := io.backpressure(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
           }
         }
 
@@ -518,7 +522,7 @@ class NBufMem(
                                List(numrows,banks(1)), strides,
                                combinedXBarWMux, combinedXBarRMux,
                                flatDirectWMux, flatDirectRMux,
-                               bankingMode, inits, syncMem, fracBits, "lb"))
+                               bankingMode, inits, syncMem, fracBits, numActives = numActives, "lb"))
       lb.io <> DontCare
       
       val numWriters = numXBarW + numDirectW
@@ -587,7 +591,7 @@ class NBufMem(
             io.output.data(outputBufferBase + (k_base + m)) := lb.io.output.data(sram_index)
           }
           lb.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en
-          lb.io.xBarR(bufferBase + k).flow := io.xBarR(bufferBase + k).flow
+          lb.io.xBarR(bufferBase + k).backpressure := io.xBarR(bufferBase + k).backpressure
           // lb.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
           lb.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
           lb.io.xBarR(bufferBase + k).banks.odd.zip(io.xBarR(bufferBase+k).banks.odd).foreach{case (a:UInt,b:UInt) => a := b}
@@ -599,7 +603,7 @@ class NBufMem(
 
     case LIFOType => 
       val fifo = Module(new LIFO(List(logicalDims.head), bitWidth, 
-                                  banks, combinedXBarWMux, combinedXBarRMux))
+                                  banks, combinedXBarWMux, combinedXBarRMux, numActives))
       fifo.io.asInstanceOf[FIFOInterface] <> DontCare
       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-numXBarW)}
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-numXBarR)}
@@ -626,7 +630,7 @@ class NBufMem(
   }
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     assert(hasXBarR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
@@ -644,7 +648,7 @@ class NBufMem(
           assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
           usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))
         }
-        io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle, flow)
+        io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
       io.output.data(outputBufferBase + outputMuxBase + vecId)
     }
@@ -656,7 +660,7 @@ class NBufMem(
   }
 
   def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectBroadcastRPort(rBundle, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
       val effectiveOfs = if (ignoreCastInfo) muxAddr._2 else muxAddr._2 + i
@@ -668,7 +672,7 @@ class NBufMem(
       val outputMuxBase = broadcastRMux.accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).sum
       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
       if (bid == 0) {
-        io.broadcastR(muxBase).connectLane(vecId,i,rBundle, flow)
+        io.broadcastR(muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
       io.output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
     }
@@ -685,7 +689,7 @@ class NBufMem(
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     assert(hasDirectR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
@@ -705,7 +709,7 @@ class NBufMem(
           assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
           usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))
         }
-        io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle, flow)
+        io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
       io.output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
     }
@@ -734,6 +738,8 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
     val reset = Input(Bool())
 
     // FIFO Specific
+    val accessActivesIn  = Vec(1, Input(Bool()))
+    val accessActivesOut = Vec(1, Output(Bool()))
     val full = Output(Bool())
     val almostFull = Output(Bool())
     val empty = Output(Bool())
@@ -747,6 +753,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
 
   override def desiredName = myName
   
+  io.accessActivesOut(0) := io.accessActivesIn(0)
   io.full := DontCare
   io.almostFull := DontCare
   io.empty := DontCare

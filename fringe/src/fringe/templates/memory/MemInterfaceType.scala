@@ -41,5 +41,7 @@ class FIFOInterface(p: MemParams) extends MemInterface(p) {
   val empty = Output(Bool())
   val almostEmpty = Output(Bool())
   val numel = Output(UInt(32.W))
+  val accessActivesOut = Vec(p.numActives, Output(Bool()))
+  val accessActivesIn = Vec(p.numActives, Input(Bool()))
 }
 object FIFOInterface extends MemInterfaceType

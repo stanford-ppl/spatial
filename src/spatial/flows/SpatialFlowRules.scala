@@ -12,6 +12,7 @@ import spatial.node._
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
     case MemAlloc(mem) if mem.isLocalMem => LocalMemories += mem
+    case MemAlloc(mem) if (mem.isRemoteMem || a.isStreamIn || a.isStreamOut) => RemoteMemories += a
     case _ =>
   }
 

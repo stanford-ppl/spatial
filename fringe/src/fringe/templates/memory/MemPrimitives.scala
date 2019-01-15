@@ -16,13 +16,13 @@ class R_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int]) e
   val banks = HVec.tabulate(port_width*bank_width.length){i => UInt(bank_width(i%bank_width.length).W)}
   val ofs = Vec(port_width, UInt(ofs_width.W))
   val en = Vec(port_width, Bool())
-  val flow = Vec(port_width, Bool())
+  val backpressure = Vec(port_width, Bool())
 
   def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_XBar, f: Bool): Unit = {
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     bank_width.length.indices[Unit]{i => banks(i + lhs_lane*bank_width.length) := rhs_port.banks(i + rhs_lane*bank_width.length)}
     en(lhs_lane) := rhs_port.en(rhs_lane)
-    flow(lhs_lane) := f
+    backpressure(lhs_lane) := f
   }
 
   override def cloneType = (new R_XBar(port_width, ofs_width, bank_width)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -43,12 +43,12 @@ class W_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int], v
 class R_Direct(val port_width:Int, val ofs_width:Int, val banks:List[List[Int]]) extends Bundle {
   val ofs = Vec(port_width, UInt(ofs_width.W))
   val en = Vec(port_width, Bool())
-  val flow = Vec(port_width, Bool())
+  val backpressure = Vec(port_width, Bool())
 
   def connectLane(lhs_lane: Int, rhs_lane: Int, rhs_port: R_Direct, f: Bool): Unit = {
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     en(lhs_lane) := rhs_port.en(rhs_lane)
-    flow(lhs_lane) := f
+    backpressure(lhs_lane) := f
   }
 
   override def cloneType = (new R_Direct(port_width, ofs_width, banks)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -91,7 +91,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     assert(p.hasXBarR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
@@ -109,7 +109,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
-        io.xBarR(base).connectLane(vecId, i, rBundle, flow)
+        io.xBarR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
       io.output.data(outBase + vecId)
@@ -128,7 +128,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
 
-  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, flow: Bool): Seq[UInt] = {
+  def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {
     assert(p.hasDirectR)
     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
       val castgrp = if (ignoreCastInfo) 0 else cg
@@ -146,7 +146,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
           assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
-        io.directR(base).connectLane(vecId, i, rBundle, flow)
+        io.directR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
       io.output.data(p.xBarOutputs + outBase + vecId)
@@ -159,7 +159,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
 
   def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, directWMux: DMap, directRMux: DMap,
-           bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "sram") = this(MemParams(StandardInterface, logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits, myName = myName))
+           bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "sram") = this(MemParams(StandardInterface, logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits, numActives = numActives, myName = myName))
   def this(tuple: (List[Int], Int, List[Int], List[Int], XMap, XMap,
     DMap, DMap, BankingMode)) = this(MemParams(StandardInterface,tuple._1,tuple._2,tuple._3,tuple._4,tuple._5,tuple._6,tuple._7, tuple._8, tuple._9))
 
@@ -230,30 +230,30 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     directSelectEnsModule.io.ins.zip(directSelectEnsRaw).foreach{case (a,b) => a := b}
     val directSelectEns = directSelectEnsModule.io.outs.map(_.toBool)
     val directSelectOffsets = io.directR.flatMap(_.ofs).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-    val directSelectFlows = io.directR.flatMap(_.flow).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
+    val directSelectFlows = io.directR.flatMap(_.backpressure).zip(io.directR.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(mem._2).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
 
     // Unmask write port if any of the above match
     mem._1.io.rMask := {if (p.hasXBarR) xBarSelect.reduce{_|_} else true.B} & directSelectEns.or
     // Connect matching R port to memory
     if (directSelectEns.nonEmpty & p.hasXBarR) {          // Has direct and x
       val directChoice = fatMux("PriorityMux", directSelectEns, directSelectOffsets, directSelectEns, directSelectFlows)
-      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.flow))
+      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.backpressure))
       val finalChoice = fatMux("PriorityMux", Seq(directSelectEns.or), Seq(directChoice(0), xBarChoice(0)), Seq(directChoice(1), xBarChoice(1)), Seq(directChoice(2), xBarChoice(2))) 
       mem._1.io.r.ofs.head  := finalChoice(0)
       mem._1.io.r.en.head   := finalChoice(1)
-      mem._1.io.flow        := finalChoice(2)
+      mem._1.io.backpressure        := finalChoice(2)
     }
     else if (p.hasXBarR && directSelectEns.isEmpty) { // Has x only
-      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.flow))
+      val xBarChoice = fatMux("PriorityMux", xBarSelect, io.xBarR.flatMap(_.ofs), io.xBarR.flatMap(_.en), io.xBarR.flatMap(_.backpressure))
       mem._1.io.r.ofs.head  :=  xBarChoice(0)
       mem._1.io.r.en.head   :=  xBarChoice(1)
-      mem._1.io.flow         :=  xBarChoice(2)
+      mem._1.io.backpressure         :=  xBarChoice(2)
     }
     else if (directSelectEns.nonEmpty) {                                           // Has direct only
       val directChoice = fatMux("PriorityMux", directSelectEns, directSelectOffsets, directSelectEns, directSelectFlows)
       mem._1.io.r.ofs.head  := directChoice(0)
       mem._1.io.r.en.head   := directChoice(1)
-      mem._1.io.flow         := directChoice(2)
+      mem._1.io.backpressure         := directChoice(2)
     }
   }
 
@@ -262,7 +262,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if i < entry._1 => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
       val xBarCandidatesEns = xBarIds.map(io.xBarR.flatMap(_.en).toList(_)).toList
-      val xBarCandidatesFlows = xBarIds.map(io.xBarR.flatMap(_.flow).toList(_)).toList
+      val xBarCandidatesFlows = xBarIds.map(io.xBarR.flatMap(_.backpressure).toList(_)).toList
       val xBarCandidatesBanks = xBarIds.map(io.xBarR.flatMap(_.banks).toList.grouped(p.banks.length).toList(_)).toList
       val xBarCandidatesOffsets = xBarIds.map(io.xBarR.flatMap(_.ofs).toList(_)).toList
       val sel = m.map{ mem =>
@@ -270,10 +270,10 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
           val en = xBarCandidatesEns(j)
           val banks = xBarCandidatesBanks(j)
           val ofs = xBarCandidatesOffsets(j)
-          val flow = xBarCandidatesFlows(j)
-          getRetimed(banks.zip(mem._2).map{case (b, coord) => b === coord.U}.reduce{_&&_} && en, globals.target.sramload_latency, flow)
-          // banks.zip(mem._2).map{case (b, coord) => getRetimed(b, globals.target.sramload_latency, flow) === coord.U}.reduce{_&&_} &&
-          //   getRetimed(en, globals.target.sramload_latency, flow)
+          val backpressure = xBarCandidatesFlows(j)
+          getRetimed(banks.zip(mem._2).map{case (b, coord) => b === coord.U}.reduce{_&&_} && en, globals.target.sramload_latency, backpressure)
+          // banks.zip(mem._2).map{case (b, coord) => getRetimed(b, globals.target.sramload_latency, backpressure) === coord.U}.reduce{_&&_} &&
+          //   getRetimed(en, globals.target.sramload_latency, backpressure)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -285,15 +285,15 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
       val directCandidatesEns = directIds.map(io.directR.flatMap(_.en).toList(_)).toList
       val directCandidatesBanks = directIds.map(io.directR.flatMap(_.banks).toList(_)).toList
       val directCandidatesOffsets = directIds.map(io.directR.flatMap(_.ofs).toList(_)).toList
-      val directCandidatesFlows = directIds.map(io.directR.flatMap(_.flow).toList(_)).toList
+      val directCandidatesFlows = directIds.map(io.directR.flatMap(_.backpressure).toList(_)).toList
       // Create bit vector to select which bank was activated by this io
       val sel = m.map{ mem =>
         if (directCandidatesEns.nonEmpty) directCandidatesEns.size.indices{j => 
           val en = directCandidatesEns(j)
           val banks = directCandidatesBanks(j)
           val ofs = directCandidatesOffsets(j)
-          val flow = directCandidatesFlows(j)
-          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency, flow)
+          val backpressure = directCandidatesFlows(j)
+          banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency, backpressure)
         }.reduce{_||_} else false.B
       }
       val datas = m.map{ _._1.io.output.data }
@@ -310,15 +310,15 @@ class FF(p: MemParams) extends MemPrimitive(p) {
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "FF") = this(MemParams(StandardInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FF") = this(MemParams(StandardInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
   // def this(logicalDims: List[Int], bitWidth: Int,
   //          banks: List[Int], strides: List[Int],
   //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
   //          directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
   //          bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, {if (init.isDefined) Some(init.get.map(_.toDouble)) else None}, syncMem, fracBits))
-  def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
-  def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
-  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, myName: String) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, myName)
+  def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0, 1)
+  def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0, 1)
+  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, numActives: Int, myName: String) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, numActives = numActives, myName)
 
   val init = 
     if (p.inits.isDefined) {
@@ -341,15 +341,15 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
            banks: List[Int], strides: List[Int], 
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "FIFOReg") = this(MemParams(FIFOInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FIFOReg") = this(MemParams(FIFOInterface, logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
   // def this(logicalDims: List[Int], bitWidth: Int, 
   //          banks: List[Int], strides: List[Int], 
   //          xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
   //          directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
   //          bankingMode: BankingMode, init: => Option[List[Int]], syncMem: Boolean, fracBits: Int) = this(MemParams(logicalDims, bitWidth, banks, strides, xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, {if (init.isDefined) Some(init.get.map(_.toDouble)) else None}, syncMem, fracBits))
-  def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
-  def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0)
-  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits)
+  def this(tuple: (Int, XMap)) = this(List(1), tuple._1,List(1), List(1), tuple._2, XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0, 2)
+  def this(bitWidth: Int) = this(List(1), bitWidth,List(1), List(1), XMap((0,0,0) -> (1, None)), XMap((0,0,0) -> (1, None)), DMap(), DMap(), BankedMemory, None, false, 0, 2)
+  def this(bitWidth: Int, xBarWMux: XMap, xBarRMux: XMap, inits: Option[List[Double]], fracBits: Int, numActives: Int) = this(List(1), bitWidth,List(1), List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, false, fracBits, numActives)
 
   val init = 
     if (p.inits.isDefined) {
@@ -373,6 +373,7 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
   isValid.io.input.asyn_reset := false.B
 
   // Check if there is data
+  io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
   io.asInstanceOf[FIFOInterface].empty := ~isValid.io.output.data
   io.asInstanceOf[FIFOInterface].full := isValid.io.output.data
   io.asInstanceOf[FIFOInterface].almostEmpty := false.B
@@ -384,18 +385,18 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
 class FIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], xBarWMux: XMap, xBarRMux: XMap,
-           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits, myName = "FIFO"))
+           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits, numActives = numActives, myName = "FIFO"))
 
-  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, None, false, 0)
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, None, false, 0, tuple._6)
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "FIFO") = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FIFO") = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
 
   // Create bank counters
-  val headCtr = Module(new CompactingCounter(p.numXBarW, p.depth, p.elsWidth))
-  val tailCtr = Module(new CompactingCounter(p.numXBarR, p.depth, p.elsWidth))
+  val headCtr = Module(new CompactingCounter(p.numXBarW, p.depth, p.elsWidth)); headCtr.io <> DontCare
+  val tailCtr = Module(new CompactingCounter(p.numXBarR, p.depth, p.elsWidth)); tailCtr.io <> DontCare
   (0 until p.numXBarW).foreach{i => headCtr.io.input.enables.zip(io.xBarW.flatMap(_.en)).foreach{case (l,r) => l := r}}
   (0 until p.numXBarR).foreach{i => tailCtr.io.input.enables.zip(io.xBarR.flatMap(_.en)).foreach{case (l,r) => l := r}}
   headCtr.io.input.reset := reset
@@ -405,6 +406,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create numel counter
   val elements = Module(new CompactingIncDincCtr(p.numXBarW, p.numXBarR, p.widestXBarW, p.widestXBarR, p.depth, p.elsWidth))
+  elements.io <> DontCare
   elements.io.input.inc_en.zip(io.xBarW.flatMap(_.en)).foreach{case(l,r) => l := r}
   elements.io.input.dinc_en.zip(io.xBarR.flatMap(_.en)).foreach{case(l,r) => l := r}
 
@@ -414,6 +416,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   // Create compacting network
 
   val enqCompactor = Module(new CompactingEnqNetwork(p.xBarWMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  enqCompactor.io <> DontCare
   enqCompactor.io.headCnt := headCtr.io.output.count
   (0 until p.numXBarW).foreach{i =>
     enqCompactor.io.in.map(_.data).zip(io.xBarW.flatMap(_.data)).foreach{case (l,r) => l := r}
@@ -433,6 +436,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 
   // Create dequeue compacting network
   val deqCompactor = Module(new CompactingDeqNetwork(p.xBarRMux.sortByMuxPortAndCombine.values.map(_._1).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  deqCompactor.io <> DontCare
   deqCompactor.io.tailCnt := tailCtr.io.output.count
   val active_r_bank = Math.singleCycleModulo(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
   val active_r_addr = Math.singleCycleDivide(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
@@ -444,11 +448,12 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   (0 until p.numXBarR).foreach{i =>
     deqCompactor.io.input.deq.zip(io.xBarR.flatMap(_.en)).foreach{case (l,r) => l := r}
   }
-  (0 until p.xBarRMux.accessPars.max).foreach{i =>
+  (0 until {if (p.xBarRMux.accessPars.size == 0) 1 else p.xBarRMux.accessPars.max}).foreach{i =>
     io.output.data(i) := deqCompactor.io.output.data(i)
   }
 
   // Check if there is data
+  io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
   io.asInstanceOf[FIFOInterface].empty := elements.io.output.empty
   io.asInstanceOf[FIFOInterface].full := elements.io.output.full
   io.asInstanceOf[FIFOInterface].almostEmpty := elements.io.output.almostEmpty
@@ -463,13 +468,13 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int],
            xBarWMux: XMap, xBarRMux: XMap,
-           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits, myName = "LIFO"))
-  def this(tuple: (List[Int], Int, List[Int], XMap, XMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, None, false, 0)
+           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int) = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, DMap(), DMap(), BankedMemory, inits, syncMem, fracBits, numActives = numActives, myName = "LIFO"))
+  def this(tuple: (List[Int], Int, List[Int], XMap, XMap, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, None, false, 0, tuple._6)
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "LIFO") = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, myName = myName))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "LIFO") = this(MemParams(FIFOInterface,logicalDims, bitWidth, banks, List(1), xBarWMux, xBarRMux, directWMux, directRMux, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
 
   val pW = p.xBarWMux.accessPars.max
   val pR = p.xBarRMux.accessPars.max
@@ -558,6 +563,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Check if there is data
+  io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
   io.asInstanceOf[FIFOInterface].empty := elements.io.output.empty
   io.asInstanceOf[FIFOInterface].full := elements.io.output.full
   io.asInstanceOf[FIFOInterface].almostEmpty := elements.io.output.almostEmpty
@@ -570,15 +576,15 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
             xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
             directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, myName: String) = this(MemParams(ShiftRegFileInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, myName = myName))
+            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, numActives: Int, myName: String) = this(MemParams(ShiftRegFileInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, numActives, myName = myName))
 
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, "SR")
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, "SR")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, 1, "SR")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, 1, "SR")
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "SR") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, myName)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "SR") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, numActives, myName)
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
@@ -696,15 +702,15 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
             xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
             directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, myName: String) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, myName = myName))
+            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, numActives: Int, myName: String) = this(MemParams(StandardInterface,logicalDims, bitWidth, logicalDims, List(1), xBarWMux, xBarRMux, directWMux, directRMux, BankedMemory, inits, syncMem, fracBits, isBuf, numActives, myName = myName))
 
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, "LUT")
-  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, "LUT")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap, Option[List[Double]], Boolean, Int)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, tuple._7, tuple._8, tuple._9, false, 1, "LUT")
+  def this(tuple: (List[Int], Int, XMap, XMap, DMap, DMap)) = this(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5, tuple._6, None, false, 0, false, 1, "LUT")
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], strides: List[Int],
            xBarWMux: XMap, xBarRMux: XMap, // muxPort -> accessPar
            directWMux: DMap, directRMux: DMap,  // muxPort -> List(banks, banks, ...)
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, myName: String = "LUT") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, myName)
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "LUT") = this(logicalDims, bitWidth, xBarWMux, xBarRMux, directWMux, directRMux, init, syncMem, fracBits, false, numActives, myName)
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
@@ -765,7 +771,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     val rMask = Input(Bool())
     val w = Input(new W_XBar(1, addrWidth, List(1), bitWidth))
     val wMask = Input(Bool())
-    val flow = Input(Bool())
+    val backpressure = Input(Bool())
     val output = new Bundle {
       val data  = Output(UInt(bitWidth.W))
     }
@@ -790,16 +796,16 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
         reg := Mux(io.w.en.head & wInBound & (io.w.ofs.head === i.U(addrWidth.W)) & io.wMask, io.w.data.head, reg)
         (i.U(addrWidth.W) -> reg)
       }
-      val radder = getRetimed(io.r.ofs.head,1,io.flow)
-      io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.flow)
+      val radder = getRetimed(io.r.ofs.head,1,io.backpressure)
+      io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.backpressure)
     } else {
       val m = Module(new SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
-      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.flow)
+      if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.backpressure)
       else           m.io.raddr     := 0.U
       m.io.waddr     := io.w.ofs.head
       m.io.wen       := io.w.en.head & wInBound & io.wMask
       m.io.wdata     := io.w.data.head
-      m.io.flow      := io.flow
+      m.io.backpressure      := io.backpressure
       io.output.data := m.io.rdata
     }
   } else {
@@ -835,11 +841,11 @@ class enqPort(val w: Int) extends Bundle {
 }
 
 class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
-  val num_compactors = ports.max
+  val num_compactors = if (ports.size == 0) 1 else ports.max
   val io = IO( new Bundle {
       val numEnabled =Input(UInt(width.W))
-      val in = Vec(ports.sum, Input(new enqPort(bitWidth)))
-      val out = Vec(num_compactors, Output(new enqPort(bitWidth)))
+      val in = Vec(1 max ports.sum, Input(new enqPort(bitWidth)))
+      val out = Vec(1 max num_compactors, Output(new enqPort(bitWidth)))
     })
 
     val compacted = (0 until num_compactors).map{i => 
@@ -862,7 +868,7 @@ class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWid
         val connect_start_id = num_inputs_per_bundle.take(id).sum
         (0 until j).map{k => io.in(in_start_id + (ports(id) - j + k)).data}
       }.flatten
-      io.out(i).data := chisel3.util.PriorityMux(mux_selects, mux_datas)
+      if (mux_selects.size == 0) io.out(i).data := 0.U else io.out(i).data := chisel3.util.PriorityMux(mux_selects, mux_datas)
       io.out(i).en := i.U(width.W) < io.numEnabled
     }
 }
@@ -876,12 +882,12 @@ class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWid
 class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
   val io = IO( new Bundle {
       val headCnt = Input(SInt(width.W))
-      val in = Vec(ports.sum, Input(new enqPort(bitWidth)))
-      val out = Vec(banks, Output(new enqPort(bitWidth)))
+      val in = Vec(1 max ports.sum, Input(new enqPort(bitWidth)))
+      val out = Vec(1 max banks, Output(new enqPort(bitWidth)))
     })
 
   val numEnabled = io.in.map{i => Mux(i.en, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
-  val num_compactors = ports.max
+  val num_compactors = if (ports.size == 0) 1 else ports.max
 
   // Compactor
   val compactor = Module(new Compactor(ports, banks, width, bitWidth))
@@ -904,8 +910,8 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   }
 
   (0 until banks).foreach{i => 
-    io.out(i).data := outs(i)._1
-    io.out(i).en := outs(i)._2
+    if (banks == 0) io.out(i).data := 0.U else io.out(i).data := outs(i)._1
+    if (banks == 0) io.out(i).en := false.B else io.out(i).en := outs(i)._2
   }
 }
 
@@ -913,16 +919,16 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val io = IO( new Bundle {
       val tailCnt = Input(SInt(width.W))
       val input = new Bundle{
-        val data = Vec(banks, Input(UInt(bitWidth.W)))
-        val deq = Vec(ports.sum, Input(Bool()))
+        val data = Vec(1 max banks, Input(UInt(bitWidth.W)))
+        val deq = Vec(1 max ports.sum, Input(Bool()))
       }
       val output = new Bundle{
-        val data = Vec(ports.max, Output(UInt(bitWidth.W)))
+        val data = Vec({if (ports.size == 0) 1 else ports.max}, Output(UInt(bitWidth.W)))
       }
     })
-
+  io .output.data := DontCare
   // Compactor
-  val num_compactors = ports.max
+  val num_compactors = if (ports.size == 0) 1 else ports.max
   // val numPort_width = 1 + Utils.log2Up(ports.max)
   val numEnabled = io.input.deq.map{i => Mux(i, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
 
@@ -932,7 +938,7 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val num_straddling = Mux(upper < 0.S(width.W), 0.S(width.W), upper)
   val num_straight = (numEnabled.asSInt) - num_straddling
   // TODO: Probably has a bug if you have more than one dequeuer
-  (0 until ports.max).foreach{ i =>
+  (0 until {if (ports.size == 0) 1 else ports.max}).foreach{ i =>
     val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, Math.singleCycleModulo((i.S(width.W) + current_base_bank), banks.S(width.W)))
     val ens_below = if (i>0) (0 until i).map{j => Mux(io.input.deq(j), 1.U(width.W), 0.U(width.W)) }.reduce{_+_} else 0.U(width.W)
     val proper_bank = Math.singleCycleModulo((current_base_bank.asUInt + ens_below), banks.U(width.W))

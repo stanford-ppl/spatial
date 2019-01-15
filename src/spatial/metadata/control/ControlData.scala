@@ -155,7 +155,7 @@ case class UserII(interval: Double) extends Data[UserII](SetBy.User)
   * Setter: sym.writtenMems = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Self)
+case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Consumer)
 
 /** Memories which are read in a given controller.
   *
@@ -163,4 +163,4 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.S
   * Setter: sym.readMems = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Self)
+case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)

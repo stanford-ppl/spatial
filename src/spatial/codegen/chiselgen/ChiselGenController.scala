@@ -17,9 +17,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
+  private var ctrls = List[Sym[_]]
   private var memsWithReset: List[Sym[_]] = List()
 
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
+    ctrls += lhs
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     ensigs = new scala.collection.mutable.ListBuffer[String]
@@ -154,7 +156,7 @@ trait ChiselGenController extends ChiselGenCommon {
           if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"${in}_copy$c: ${arg(in.tp, Some(in))},")}
           else emit(src"$in: ${arg(in.tp, Some(in))},") 
         }
-        emit(s"parent: Option[Kernel], cchain: List[CounterChain], childId: Int, breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "List[InstrCtr], " else ""}rr: Bool")
+        emit(s"parent: Option[Kernel], cchain: List[CounterChain], childId: Int, breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
         // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
         // emit("rr: ")
       closeopen(") extends Kernel(parent, cchain, childId) {")
@@ -328,7 +330,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
         emit(src"""val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
-        emit(src"""val instrctrs = List[InstrCtr]()""")
+        if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List[InstrCtr](io_numCtrls)""")
         emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
@@ -358,6 +360,8 @@ trait ChiselGenController extends ChiselGenCommon {
         } else {
           emit(src"""done_latch.io.input.set := ${lhs}.done""")                
         }
+
+        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(top, instrctrs)")
 
 
         exitCtrl(lhs)
@@ -449,15 +453,15 @@ trait ChiselGenController extends ChiselGenCommon {
           val printableLines: Seq[(String, Int)] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).bits := ${s}$swobj.cycles.io.count""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).valid := ${hwblock.get}.en""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).bits := ${s}$swobj.iters.io.count""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).valid := ${hwblock.get}.en""",1)
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).cycs""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.valid := top.io.enable""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).iters""",1),
+              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.valid := top.io.enable""",1)
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).bits := ${s}$swobj.stalled.io.count""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).valid := ${hwblock.get}.en""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).bits := ${s}$swobj.idle.io.count""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).valid := ${hwblock.get}.en""",1)
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalled""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.valid := top.io.enable""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idle""",1),
+                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.valid := top.io.enable""",1)
               )} else Nil}
 
           }
@@ -486,6 +490,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit ("")
       emit ("// Instrumentation")
       emit (s"val numArgOuts_instr = ${instrumentCounterArgs}")
+      emit (s"val numCtrls = ${ctrls.size}")
       emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
       emit ("""/* Breakpoint Contexts:""")
       earlyExits.zipWithIndex.foreach {case (p,i) => 
@@ -504,6 +509,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit (s"// App Characteristics: ${appPropertyStats.toList.map(_.getClass.getName.split("\\$").last.split("\\.").last).mkString(",")}")
       emit ("// Instrumentation")
       emit (s"val io_numArgOuts_instr = ${instrumentCounterArgs}")
+      emit (s"val io_numArgCtrls = ${ctrls.size}")
       emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
 
       emit ("""// Set Build Info""")

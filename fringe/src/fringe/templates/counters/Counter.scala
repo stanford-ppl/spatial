@@ -8,8 +8,8 @@ import fringe.templates.memory.{SRFF, FF}
 
 class CChainOutput(par: List[Int], widths: List[Int]) extends Bundle {
   // val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).sum}
-  val counts    = HVec.tabulate(widths.size){i => SInt(widths(par.indices.map{i => par.dropRight(par.length - i).sum}.count(_ <= i) - 1).W) }
-  val oobs      = Vec(widths.size, Bool())
+  val counts    = HVec.tabulate(par.sum){i => SInt(widths(par.indices.map{i => par.dropRight(par.length - i).sum}.count(_ <= i) - 1).W) }
+  val oobs      = Vec(par.sum, Bool())
   val noop      = Bool()
   val done      = Bool()
   val saturated = Bool()

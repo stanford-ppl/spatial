@@ -35,20 +35,20 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
-    if (mem.isFIFOReg) src"~break && done"
-    else               src"""~break && ${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
+    if (mem.isFIFOReg) src"~$break && $done"
+    else               src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {
-    val flowEnable = src"~break && sm.io.backpressure"
-    src"""~break && ${DL(src"datapathEn & iiDone", lhs.fullDelay, true)} & $flowEnable"""
+    val flowEnable = src"~$break && $backpressure"
+    src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ mem
-        val invisibleEnable = src"""${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
-        emit(src"${mem}.io.reset := ${invisibleEnable} & ${and(en)}")
+        val invisibleEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+        emit(src"${memIO(mem)}.reset := ${invisibleEnable} & ${and(en)}")
       }
   }
 
@@ -335,7 +335,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Add, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
-            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
+            if (lhs.resetters.isEmpty) emit(src"m.io.input.foreach(_.reset := false.B)")
           }
         case Some(AccumMul) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -344,7 +344,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Mul, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
-            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
+            if (lhs.resetters.isEmpty) emit(src"m.io.input.foreach(_.reset := false.B)")
           }
         case Some(AccumMin) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -353,7 +353,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Min, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
-            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
+            if (lhs.resetters.isEmpty) emit(src"m.io.input.foreach(_.reset := false.B)")
           }
         case Some(AccumMax) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -362,7 +362,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Max, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
-            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
+            if (lhs.resetters.isEmpty) emit(src"m.io.input.foreach(_.reset := false.B)")
           }
         case Some(AccumFMA) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -371,7 +371,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixFMAAccum($numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
-            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
+            if (lhs.resetters.isEmpty) emit(src"m.io.input.foreach(_.reset := false.B)")
           }
         case Some(AccumUnk) => throw new Exception(s"Cannot emit Reg with specialized reduce of type Unk yet!")
       }
@@ -382,22 +382,15 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegAccumOp(reg, data, ens, t, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.io.input1($index) := $data.r")
-      emit(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
-      emit(src"${reg}.io.last($index)   := ${DL(src"sm.io.ctrDone", lhs.fullDelay, true)}")
-      emit(src"${reg}.io.first($index) := ${first}")
+      emit(src"${memIO(reg)}.connectXBarWPort($index, $data.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, ${first})")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.io.output")
+      emit(src"${lhs}.r := ${memIO(reg)}.output")
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.io.input1($index) := $data1.r")
-      emit(src"${reg}.io.input2($index) := $data2.r")
-      emit(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
-      emit(src"${reg}.io.last($index)   := ${DL(src"sm.io.ctrDone", lhs.fullDelay, true)}")
-      emit(src"${reg}.io.first($index) := ${first}")
+      emit(src"${memIO(reg)}.connectXBarWPort($index, $data1.r, $data2.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, ${first})")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.io.output")
+      emit(src"${lhs}.r := ${memIO(reg)}.output")
     case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles

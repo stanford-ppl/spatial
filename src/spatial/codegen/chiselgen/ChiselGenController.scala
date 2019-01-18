@@ -1,6 +1,7 @@
 package spatial.codegen.chiselgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
@@ -467,6 +468,9 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"sm.io.doneCondition := ~${notDone.result}")
       }
       exitCtrl(lhs)
+
+    case SeriesForeach(_,_,_,blk) => 
+      gen(blk)
 
 
     case _ => super.gen(lhs, rhs)

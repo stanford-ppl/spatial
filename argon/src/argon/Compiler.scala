@@ -142,7 +142,6 @@ trait Compiler extends DSLRunnable { self =>
     cli.note("Output")
     cli.opt[String]('n',"name").action{(n,_) => config.name = n }.text("Set application name [<app>]")
     cli.opt[String]('o',"out").action{(d,_) => config.genDir = d; config.genDirOverride = true }.text("Set output directory [./gen/<name>]")
-    cli.opt[String]('o',"gendir").action{(d,_) => config.genDir = d }.text("Set output directory [./gen/<name>]")
     cli.opt[String]('l',"log").action{(d,_) => config.logDir = d }.text("Set log directory [./logs/<name>]")
     cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<name>]")
     cli.opt[Unit]("nonaming").action{(_,_) => config.naming = false }.text("Disable verbose naming")

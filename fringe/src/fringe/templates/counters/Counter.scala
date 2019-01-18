@@ -6,6 +6,16 @@ import fringe.utils.getRetimed
 import fringe.utils.HVec
 import fringe.templates.memory.{SRFF, FF}
 
+class CChainOutput(par: List[Int], widths: List[Int]) extends Bundle {
+  // val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).sum}
+  val counts    = HVec.tabulate(widths.size){i => SInt(widths(par.indices.map{i => par.dropRight(par.length - i).sum}.count(_ <= i) - 1).W) }
+  val oobs      = Vec(widths.size, Bool())
+  val noop      = Bool()
+  val done      = Bool()
+  val saturated = Bool()
+
+  override def cloneType(): this.type = new CChainOutput(par, widths).asInstanceOf[this.type]
+}
 
 /** 1-dimensional counter. Basically a cheap, wrapping counter because
   * Chisel optimizes away a Vec(1) to a single val,
@@ -475,13 +485,7 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
       val saturate = Input(Bool())
       val isStream = Input(Bool()) // If a stream counter, do not need enable on to report done
     }
-    val output = new Bundle {
-      val counts    = HVec.tabulate(numWires){i => Output(SInt(widths(ctrMapping.count(_ <= i) - 1).W)) }
-      val oobs      = Vec(numWires, Output(Bool()))
-      val noop      = Output(Bool())
-      val done      = Output(Bool())
-      val saturated = Output(Bool())
-    }
+    val output = Output(new CChainOutput(par, widths))
   })
 
   // Create counters

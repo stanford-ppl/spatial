@@ -210,6 +210,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
   iterDone.zip(io.childAck).foreach{ case (id, ca) => ca := id.io.output.data }
   io.enableOut.zipWithIndex.foreach{case (eo,i) => eo := io.enable & active(i).io.output.data & ~iterDone(i).io.output.data & io.maskIn(i) & ~allDone & {if (i == 0) ~io.ctrDone else true.B}}
+  io.enableOut.foreach(chisel3.core.dontTouch(_))
   io.ctrRst := getRetimed(risingEdge(allDone), 1)
 
   // Done latch

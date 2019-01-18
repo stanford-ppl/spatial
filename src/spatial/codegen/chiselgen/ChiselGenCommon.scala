@@ -79,6 +79,20 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  protected def iodot: String = if (spatialConfig.enableModular) "io." else ""
+  protected def dotio: String = if (spatialConfig.enableModular) ".io" else ""
+  protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.io.output"
+  protected def sm: String = if (spatialConfig.enableModular) "io.stm" else "sm.io"
+  protected def memIO(mem: Sym[_]): String = if (spatialConfig.enableModular) src"${mem}" else src"${mem}.io"
+  protected def datapathEn: String = s"${iodot}sigsIn.datapathEn"
+  protected def break: String = s"${iodot}sigsIn.break"
+  protected def done: String = s"${iodot}sigsIn.done"
+  protected def mask: String = s"${iodot}sigsIn.mask"
+  protected def ctrDone: String = s"${iodot}sigsIn.ctrDone"
+  protected def iiDone: String = s"${iodot}sigsIn.iiDone"
+  protected def backpressure: String = s"${iodot}sigsIn.backpressure"
+  protected def forwardpressure: String = s"${iodot}sigsIn.forwardpressure"
+
   protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
     lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach { case (cc, idx) =>
       val c = cc.s.get
@@ -198,26 +212,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val backpressure = if (controllerStack.nonEmpty) src"sm.io.backpressure" else "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
-    else src"getRetimed($name, ${latency}.toInt, $backpressure)"
+    val bpressure = if (controllerStack.nonEmpty) src"${backpressure}" else "true.B"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $bpressure)"
+    else src"getRetimed($name, ${latency}.toInt, $bpressure)"
   }
 
   // DL for when we are visiting children but emiting DL on signals that belong to parent
   def DLo[T](name: String, latency: T, smname: String, isBit: Boolean = false): String = {
-    val backpressure = src"${smname}.sm.io.backpressure"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $backpressure)"
-    else src"getRetimed($name, ${latency}.toInt, $backpressure)"
-  }
-
-
-  protected def bitWidth(tp: Type[_]): Int = tp match {
-    case Bits(bT) => bT.nbits
-    case _ => -1
-  }
-  protected def fracBits(tp: Type[_]): Int = tp match {
-    case FixPtType(s,d,f) => f
-    case _ => 0
+    val bpressure = src"${smname}.sm.io.backpressure"
+    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $bpressure)"
+    else src"getRetimed($name, ${latency}.toInt, $bpressure)"
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {

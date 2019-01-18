@@ -41,6 +41,15 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     scoped.getOrElse(s, name)
   }
 
+  protected def bitWidth(tp: Type[_]): Int = tp match {
+    case Bits(bT) => bT.nbits
+    case _ => -1
+  }
+  protected def fracBits(tp: Type[_]): Int = tp match {
+    case FixPtType(s,d,f) => f
+    case _ => 0
+  }
+
   override def emitHeader(): Unit = {
     emit("""package accel""")
     emit("import fringe._")
@@ -51,6 +60,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     emit("import fringe.templates.counters._")
     emit("import fringe.templates.vector._")
     emit("import fringe.templates.memory._")
+    emit("import fringe.templates.memory.implicits._")
     emit("import fringe.templates.retiming._")
     emit("import api._")
     emit("import chisel3._")
@@ -67,7 +77,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists(_.nestedInputs.contains(s)))
     def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
     def initChunkState(): Unit = {ensigs = new scala.collection.mutable.ListBuffer[String]}
-    val hierarchyDepth = (scala.math.log(printableStms(b.stms).map(_._2).sum) / scala.math.log(CODE_WINDOW)).toInt
+    val hierarchyDepth = (scala.math.log(1 max printableStms(b.stms).map(_._2).sum) / scala.math.log(CODE_WINDOW)).toInt
     globalBlockID = javaStyleChunk[Sym[_]](
       printableStms(b.stms), 
       CODE_WINDOW, 
@@ -156,31 +166,60 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
     inGen(out, "Controllers.scala"){
       emitHeader()
-      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChain], val childId: Int) {""")
+      emit("""class InputKernelSignals(val depth: Int, val ctrcopies: Int, val ctrPars: List[Int], val ctrWidths: List[Int]) extends Bundle{ // From outside to inside kernel module""")
+      emit("""  val done = Bool()              // my sm -> parent sm + insides""")
+      emit("""  val mask = Bool()              // my cchain -> parent sm + insides""")
+      emit("""  val iiDone = Bool()            // my iiCtr -> my cchain + insides""")
+      emit("""  val ctrDone = Bool()           // my sm -> my cchain + insides""")
+      emit("""  val backpressure = Bool()      // parent kernel -> my insides""")
+      emit("""  val forwardpressure = Bool()   // parent kernel -> my insides""")
+      emit("""  val datapathEn = Bool()        // my sm -> insides""")
+      emit("""  val break = Bool()        """)
+      emit("""  val smEnableOuts = Vec(depth, Bool())""")
+      emit("""  val smChildAcks = Vec(depth, Bool())""")
+      emit("""  val cchainOutputs = Vec(ctrcopies, new CChainOutput(ctrWidths, ctrPars))""")
+      emit("""}""")
+      emit("""class OutputKernelSignals(val depth: Int, val ctrcopies: Int) extends Bundle{ // From inside to outside kernel module""")
+      emit("""  val smDoneIn = Vec(depth, Bool())""")
+      emit("""  val smMaskIn = Vec(depth, Bool())""")
+      emit("""  val cchainEnable = Vec(ctrcopies, Bool())""")
+      emit("""}""")
+      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChain], val childId: Int, val nMyChildren: Int, ctrPars: List[Int], ctrWidths: List[Int]) {""")
+      emit("""  val ctrcopies = if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) nMyChildren else 1""")
+      emit("""  val sigsIn = Wire(new InputKernelSignals(nMyChildren, ctrcopies, ctrPars, ctrWidths)); sigsIn := DontCare""")
+      emit("""  val sigsOut = Wire(new OutputKernelSignals(nMyChildren, ctrcopies)); sigsOut := DontCare""")
+      emit("""  def done = sigsIn.done""")
+      emit("""  def smEnableOuts = sigsIn.smEnableOuts""")
+      emit("""  def smEnableOut(i: Int) = sigsIn.smEnableOuts(i)""")
+      emit("""  def mask = sigsIn.mask""")
+      emit("""  def iiDone = sigsIn.iiDone""")
+      emit("""  def backpressure = sigsIn.backpressure""")
+      emit("""  def forwardpressure = sigsIn.forwardpressure""")
+      emit("""  def datapathEn = sigsIn.datapathEn""")
       emit("""  val resetChildren = Wire(Bool()); resetChildren := DontCare""")
-      emit("""  val done = Wire(Bool()); done := DontCare""")
-      emit("""  val baseEn = Wire(Bool()); baseEn := DontCare""")
       emit("""  val en = Wire(Bool()); en := DontCare""")
-      emit("""  val mask = Wire(Bool()); mask := DontCare""")
       emit("""  val resetMe = Wire(Bool()); resetMe := DontCare""")
-      emit("""  val iiDone = Wire(Bool()); iiDone := DontCare""")
-      emit("""  val backpressure = Wire(Bool()); backpressure := DontCare""")
-      emit("""  val forwardpressure = Wire(Bool()); forwardpressure := DontCare""")
-      emit("""  val datapathEn = Wire(Bool()); datapathEn := DontCare""")
-      emit("""  val break = Wire(Bool()); break := DontCare""")
       emit("""  val parentAck = Wire(Bool()); parentAck := DontCare""")
+      emit("""  val baseEn = Wire(Bool()); baseEn := DontCare""")
       emit("""  val sm: GeneralControl""")
       emit("""  val iiCtr: IICounter""")
-
       emit(""" """)
-      emit("""  def configure(n: String, isSwitchCase: Boolean = false): Unit = {""")
-      emit("""    sm.io.backpressure := backpressure | sm.io.doneLatch""")
+      emit("""  def configure(n: String, ifaceSigsIn: Option[InputKernelSignals], ifaceSigsOut: Option[OutputKernelSignals], isSwitchCase: Boolean = false): Unit = {""")
+      emit("""    cchain.zip(sigsIn.cchainOutputs).foreach{case (cc, sc) => sc := cc.io.output}""")
+      emit("""    sigsIn.ctrDone := sm.io.ctrDone""")
+      emit("""    sigsIn.smEnableOuts.zip(sm.io.enableOut).foreach{case (l,r) => l := r}""")
+      emit("""    sigsIn.smChildAcks.zip(sm.io.childAck).foreach{case (l,r) => l := r}""")
+      emit("""    sm.io.doneIn.zip(sigsOut.smDoneIn).foreach{case (sm, i) => sm := i}""")
+      emit("""    sm.io.maskIn.zip(sigsOut.smMaskIn).foreach{case (sm, i) => sm := i}""")
+      emit("""    ifaceSigsOut.foreach{case so => cchain.zip(so.cchainEnable).foreach{case (c,e) => c.io.input.enable := e}}""")
+      emit("""    sm.io.backpressure := backpressure""")
+      emit("""    sm.io.backpressure := backpressure""")
       emit("""    sm.io.rst := resetMe""")
       emit("""    done := sm.io.done""")
-      emit("""    break := sm.io.break""")
+      emit("""    sigsIn.break := sm.io.break""")
       emit("""    en := baseEn & forwardpressure""")
-      emit("""    if (!isSwitchCase) parent.foreach{p => baseEn := p.sm.io.enableOut(childId).D(1) && ~done.D(1)}""")
-      emit("""    parentAck := {if (parent.isDefined) parent.get.sm.io.childAck(childId) else false.B}""")
+      emit("""    if (!isSwitchCase) ifaceSigsIn.foreach{si => baseEn := si.smEnableOuts(childId).D(1) && ~done.D(1)}""")
+      emit("""    parentAck := {if (ifaceSigsIn.isDefined) ifaceSigsIn.get.smChildAcks(childId) else false.B}""")
       emit("""    sm.io.enable := en""")
       emit("""    resetChildren := sm.io.ctrRst""")
       emit("""    sm.io.parentAck := parentAck""")
@@ -194,7 +233,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""    resetMe.suggestName(n + "_resetMe")""")
       emit("""    resetChildren.suggestName(n + "_resetChildren")""")
       emit("""    datapathEn.suggestName(n + "_datapathEn")""")
-      emit("""    parent.foreach{p => p.sm.io.doneIn(childId) := done; p.sm.io.maskIn(childId) := mask}""")
+      emit("""    ifaceSigsOut.foreach{so => so.smDoneIn(childId) := done; so.smMaskIn(childId) := mask}""")
       emit("""    datapathEn := sm.io.datapathEn & mask & {if (cchain.isEmpty) true.B else ~sm.io.ctrDone} """)
       emit("""    iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask""")
       emit("""    cchain.foreach{case c => c.io.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.io.input.reset := resetChildren}""")
@@ -202,10 +241,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""      if (p.sm.p.sched == Streaming && p.cchain.nonEmpty) {p.sm.io.ctrCopyDone(childId) := p.cchain(childId).io.output.done; p.cchain(childId).io.input.reset := p.sm.io.ctrRst.D(1) }""")
       emit("""      else if (p.sm.p.sched == Streaming) p.sm.io.ctrCopyDone(childId) := done""")
       emit("""    }""")
-      emit("""    if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) {parent.get.cchain(childId).io.input.enable := done}""")
+      emit("""    if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) {ifaceSigsOut.foreach{so => so.cchainEnable(childId) := done}}""")
       emit("""  }""")
       emit("""""")
       emit("""}""")
+
     }
 
     inGen(out, "ArgInterface.scala"){
@@ -445,32 +485,34 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   protected def port(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
-    case FixPtType(s,d,f) => s"FixedPoint"
+    case FixPtType(s,d,f) => s"Input(${remap(tp)})"
     case _: Var[_] => "String"
-    case FltPtType(m,e) => s"FloatingPoint"
-    case BitType() => "Bool"
-    case tp: Vec[_] => src"Vec[${port(tp.typeArgs.head)}]"
-    case _: Struct[_] => s"UInt"
+    case FltPtType(m,e) => s"Input(${remap(tp)})"
+    case BitType() => "Input(Bool())"
+    case tp: Vec[_] => src"Vec(${tp.width},${port(tp.typeArgs.head)})"
+    case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}))"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
       case Some(x) if x.isNBuffered => "NBufMem"
-      case Some(Op(_: ArgInNew[_])) => "UInt"
-      case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
-      case Some(Op(_: HostIONew[_])) => "MultiArgOut"
+      case Some(Op(_: ArgInNew[_])) => "Input(UInt(64.W))"
+      case Some(x@Op(_: ArgOutNew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
+      case Some(x@Op(_: HostIONew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
       case Some(Op(_: CounterChainNew)) => "CounterChain"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
-      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
-      case Some(Op(_: RegNew[_])) => "FF"
-      case Some(Op(_: RegFileNew[_,_])) => "ShiftRegFile"
-      case Some(Op(_: LUTNew[_,_])) => "LUT"
-      case Some(Op(_: SRAMNew[_,_])) => "BankedSRAM"
-      case Some(Op(_: FIFONew[_])) => "FIFO"
-      case Some(Op(_: FIFORegNew[_])) => "FIFOReg"
-      case Some(Op(_: MergeBufferNew[_])) => "MergeBuffer"
-      case Some(Op(_: LIFONew[_])) => "LIFO"
-      case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
-      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
+      case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined) => 
+        val FixPtType(s,d,f) = x.tp.typeArgs.head
+        src"Flipped(new FixOpAccumBundle(${x.writers.size}, $d, $f))"
+      case Some(x@Op(_: RegNew[_])) => src"new StandardInterface(${x}.p)"
+      case Some(x@Op(_: RegFileNew[_,_])) => src"new ShiftRegFileInterface(${x}.p)"
+      case Some(x@Op(_: LUTNew[_,_])) => src"new StandardInterface(${x}.p)"
+      case Some(x@Op(_: SRAMNew[_,_])) => src"new StandardInterface(${x}.p)"
+      case Some(x@Op(_: FIFONew[_])) => src"new FIFOInterface(${x}.p)"
+      case Some(x@Op(_: FIFORegNew[_])) => src"new FIFOInterface(${x}.p)"
+      case Some(x@Op(_: MergeBufferNew[_])) => "MergeBuffer"
+      case Some(x@Op(_: LIFONew[_])) => src"new FIFOInterface(${x}.p)"
+      case Some(x@Op(_: DRAMHostNew[_,_])) => "FixedPoint"
+      case Some(x@Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
       case Some(Op(_@StreamInNew(bus))) => 
         bus match {
           case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
@@ -492,14 +534,24 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     }
   }
 
+  // Check if this node has an io that will be partially connected in each controller
+  protected def subset(node: Sym[_]): Boolean = node match {
+    case _ if node.isMem & !node.isArgIn => true
+    case _ => false
+  }
 
-  override def copyDependencies(out: String): Unit = {
-
-    // if (spatialConfig.enableDebugResources) {
-    //   dependencies ::= DirDep("fringe/src", "fringe")
-    // }
-
-    super.copyDependencies(out)
+  protected def io(node: Sym[_]): String = node match {
+    case Op(_: CounterNew[_]) => ".io"
+    case Op(_: CounterChainNew) => ".io"
+    case Op(_: RegNew[_]) => ".io"
+    case Op(_: RegFileNew[_,_]) => ".io"
+    case Op(_: LUTNew[_,_]) => ".io"
+    case Op(_: SRAMNew[_,_]) => ".io"
+    case Op(_: FIFONew[_]) => ".io"
+    case Op(_: FIFORegNew[_]) => ".io"
+    case Op(_: MergeBufferNew[_]) => ".io"
+    case Op(_: LIFONew[_]) => ".io"
+    case _ => ""
   }
 
 

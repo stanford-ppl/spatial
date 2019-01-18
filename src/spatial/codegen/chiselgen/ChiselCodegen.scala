@@ -177,7 +177,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val break = Bool()        """)
       emit("""  val smEnableOuts = Vec(depth, Bool())""")
       emit("""  val smChildAcks = Vec(depth, Bool())""")
-      emit("""  val cchainOutputs = Vec(ctrcopies, new CChainOutput(ctrWidths, ctrPars))""")
+      emit("""  val cchainOutputs = Vec(ctrcopies, new CChainOutput(ctrPars, ctrWidths))""")
       emit("""}""")
       emit("""class OutputKernelSignals(val depth: Int, val ctrcopies: Int) extends Bundle{ // From inside to outside kernel module""")
       emit("""  val smDoneIn = Vec(depth, Bool())""")

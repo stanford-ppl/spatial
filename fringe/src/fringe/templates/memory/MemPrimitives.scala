@@ -152,6 +152,19 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
       io.output.data(p.xBarOutputs + outBase + vecId)
     }
   }
+
+  def connectLedger(op: MemInterface): Unit = {
+    if (Ledger.connections.contains(op.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)
+      cxn.xBarR.foreach{p => io.xBarR(p) <> op.xBarR(p)}
+      cxn.xBarW.foreach{p => io.xBarW(p) <> op.xBarW(p)}
+      cxn.directR.foreach{p => io.directR(p) <> op.directR(p)}
+      cxn.directW.foreach{p => io.directW(p) <> op.directW(p)}
+      Ledger.reset(op.hashCode)
+    }
+    else io <> op
+  }
+
 }
 
 

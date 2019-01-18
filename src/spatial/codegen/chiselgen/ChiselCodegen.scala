@@ -235,7 +235,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""    datapathEn.suggestName(n + "_datapathEn")""")
       emit("""    ifaceSigsOut.foreach{so => so.smDoneIn(childId) := done; so.smMaskIn(childId) := mask}""")
       emit("""    datapathEn := sm.io.datapathEn & mask & {if (cchain.isEmpty) true.B else ~sm.io.ctrDone} """)
-      emit("""    iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask""")
+      emit("""    iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.rst | sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask""")
       emit("""    cchain.foreach{case c => c.io.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.io.input.reset := resetChildren}""")
       emit("""    parent.foreach{p => """)
       emit("""      if (p.sm.p.sched == Streaming && p.cchain.nonEmpty) {p.sm.io.ctrCopyDone(childId) := p.cchain(childId).io.output.done; p.cchain(childId).io.input.reset := p.sm.io.ctrRst.D(1) }""")

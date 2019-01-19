@@ -235,7 +235,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"val module = Module(new ${lhs}_module(sm.p.depth))")
           inputs.zipWithIndex.foreach{case(in,i) => 
             if (subset(in)) {
-              emit(src"module.io.in_$in.output := ${in}${io(in)}.output; ${in}.connectLedger(module.io.in_$in)")
+              emit(src"module.io.in_$in.output := ${memIO(in)}.output; ${in}.connectLedger(module.io.in_$in)")
               if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
             } else emit(src"module.io.in_$in <> ${in}")}
           emit("module.io.sigsIn := me.sigsIn")

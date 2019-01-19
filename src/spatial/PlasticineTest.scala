@@ -12,7 +12,7 @@ trait PlasticineTest extends DSLTest { test =>
 
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
 
-  protected val pirArgs:List[String] = 
+  protected def pirArgs:List[String] = 
     "bash" ::
     "run.sh" ::
     "--dot=true" ::

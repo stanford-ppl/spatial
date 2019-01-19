@@ -184,8 +184,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val smMaskIn = Vec(depth, Bool())""")
       emit("""  val cchainEnable = Vec(ctrcopies, Bool())""")
       emit("""}""")
-      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChain], val childId: Int, val nMyChildren: Int, ctrPars: List[Int], ctrWidths: List[Int]) {""")
-      emit("""  val ctrcopies = if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) nMyChildren else 1""")
+      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChain], val childId: Int, val nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int]) {""")
       emit("""  val sigsIn = Wire(new InputKernelSignals(nMyChildren, ctrcopies, ctrPars, ctrWidths)); sigsIn := DontCare""")
       emit("""  val sigsOut = Wire(new OutputKernelSignals(nMyChildren, ctrcopies)); sigsOut := DontCare""")
       emit("""  def done = sigsIn.done""")
@@ -451,16 +450,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: HostIONew[_])) => "MultiArgOut"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
       case Some(Op(_: CounterChainNew)) => "CounterChain"
-      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
-      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccum"
-      case Some(Op(_: RegNew[_])) => "FF"
-      case Some(Op(_: RegFileNew[_,_])) => "ShiftRegFile"
-      case Some(Op(_: LUTNew[_,_])) => "LUT"
-      case Some(Op(_: SRAMNew[_,_])) => "BankedSRAM"
-      case Some(Op(_: FIFONew[_])) => "FIFO"
-      case Some(Op(_: FIFORegNew[_])) => "FIFOReg"
+      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccumBundle"
+      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccumBundle"
+      case Some(Op(_: RegNew[_])) => "StandardInterface"
+      case Some(Op(_: RegFileNew[_,_])) => "ShiftRegFileInterface"
+      case Some(Op(_: LUTNew[_,_])) => "StandardInterface"
+      case Some(Op(_: SRAMNew[_,_])) => "StandardInterface"
+      case Some(Op(_: FIFONew[_])) => "FIFOInterface"
+      case Some(Op(_: FIFORegNew[_])) => "FIFOInterface"
       case Some(Op(_: MergeBufferNew[_])) => "MergeBuffer"
-      case Some(Op(_: LIFONew[_])) => "LIFO"
+      case Some(Op(_: LIFONew[_])) => "FIFOInterface"
       case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
       case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
       case Some(Op(_@StreamInNew(bus))) => 
@@ -499,34 +498,36 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(x@Op(_: HostIONew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
       case Some(Op(_: CounterChainNew)) => "CounterChain"
-      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccum"
+      case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => 
+        val FixPtType(s,d,f) = x.tp.typeArgs.head
+        src"Flipped(new FixFMAAccumBundle(${x.writers.size}, $d, $f))"
       case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined) => 
         val FixPtType(s,d,f) = x.tp.typeArgs.head
         src"Flipped(new FixOpAccumBundle(${x.writers.size}, $d, $f))"
-      case Some(x@Op(_: RegNew[_])) => src"new StandardInterface(${x}.p)"
-      case Some(x@Op(_: RegFileNew[_,_])) => src"new ShiftRegFileInterface(${x}.p)"
-      case Some(x@Op(_: LUTNew[_,_])) => src"new StandardInterface(${x}.p)"
-      case Some(x@Op(_: SRAMNew[_,_])) => src"new StandardInterface(${x}.p)"
-      case Some(x@Op(_: FIFONew[_])) => src"new FIFOInterface(${x}.p)"
-      case Some(x@Op(_: FIFORegNew[_])) => src"new FIFOInterface(${x}.p)"
+      case Some(x@Op(_: RegNew[_])) => src"Flipped(new StandardInterface(${x}_p))"
+      case Some(x@Op(_: RegFileNew[_,_])) => src"Flipped(new ShiftRegFileInterface(${x}_p))"
+      case Some(x@Op(_: LUTNew[_,_])) => src"Flipped(new StandardInterface(${x}_p))"
+      case Some(x@Op(_: SRAMNew[_,_])) => src"Flipped(new StandardInterface(${x}_p))"
+      case Some(x@Op(_: FIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
+      case Some(x@Op(_: FIFORegNew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
       case Some(x@Op(_: MergeBufferNew[_])) => "MergeBuffer"
-      case Some(x@Op(_: LIFONew[_])) => src"new FIFOInterface(${x}.p)"
-      case Some(x@Op(_: DRAMHostNew[_,_])) => "FixedPoint"
+      case Some(x@Op(_: LIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
+      case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(UInt(64.W))"
       case Some(x@Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
-      case Some(Op(_@StreamInNew(bus))) => 
+      case Some(x@Op(_@StreamInNew(bus))) => 
         bus match {
-          case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
-          case BurstAckBus => "DecoupledIO[Bool]"
-          case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
-          case ScatterAckBus => "DecoupledIO[Bool]"
+          case _: BurstDataBus[_] => s"Flipped(Decoupled(new AppLoadData(${x}_p)))"
+          case BurstAckBus => "Flipped(Decoupled(Bool()))"
+          case _: GatherDataBus[_] => "Flipped(Decoupled(Vec(0,UInt)))"
+          case ScatterAckBus => "Flipped(Decoupled(Bool()))"
           case _ => super.remap(tp)
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
         bus match {
-          case BurstCmdBus => "DecoupledIO[AppCommandDense]"
-          case _: BurstFullDataBus[_] => "DecoupledIO[AppStoreData]"
-          case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
-          case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
+          case BurstCmdBus => s"Flipped(Decoupled(new AppCommandDense(${x}_p)))"
+          case _: BurstFullDataBus[_] => s"Flipped(Decoupled(new AppStoreData(${x}_p)))"
+          case GatherAddrBus => s"Flipped(Decoupled(new AppCommandSparse(${x}_p)))"
+          case _: ScatterCmdBus[_] => "Flipped(Decoupled(new ScatterCmdStream))"
           case _ => super.remap(tp)
         }
 
@@ -534,9 +535,28 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     }
   }
 
+  protected def param(node: Sym[_]): Option[String] = node match {
+    case x if x.isNBuffered => Some(src"$x.p")
+    case x if x.isMemPrimitive => Some(src"$x.p")
+    case x@Op(_@StreamInNew(bus)) => 
+      bus match {
+        case _: BurstDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
+        case _ => None
+      }
+    case x@Op(_@StreamOutNew(bus)) => 
+      bus match {
+        case BurstCmdBus => Some(src"($x.bits.addrWidth, $x.bits.sizeWidth)")
+        case _: BurstFullDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
+        case GatherAddrBus => Some(src"($x.bits.v, $x.bits.scatterWidth)")
+        case _: ScatterCmdBus[_] => Some(src"$x.bits.p")
+        case _ => None
+      }
+
+    case _ => None
+  }
   // Check if this node has an io that will be partially connected in each controller
   protected def subset(node: Sym[_]): Boolean = node match {
-    case _ if node.isMem & !node.isArgIn => true
+    case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
     case _ => false
   }
 

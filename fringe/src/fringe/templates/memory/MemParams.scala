@@ -48,4 +48,5 @@ case class MemParams(
   def elsWidth: Int = log2Up(depth) + 2
   def axes = xBarWMux.values.map(_._2).filter(_.isDefined)
   def axis: Int = if (axes.nonEmpty) axes.toList.head.get else -1 // Assume all shifters are in the same axis
+  def createClone: MemParams = MemParams(iface,logicalDims,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,bankingMode,inits,syncMem,fracBits,isBuf,numActives,myName)
 }

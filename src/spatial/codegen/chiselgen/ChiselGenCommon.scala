@@ -19,6 +19,8 @@ trait ChiselGenCommon extends ChiselCodegen {
   **/
   private var initializedControllers = Set.empty[Sym[_]]
 
+  // List of inputs for current controller, in order to know if quote(mem) is the mem itself or the interface
+  var scopeInputs = List[Sym[_]]()
 
   // Mapping for DRAMs, since DRAMs and their related Transfer nodes don't necessarily appear in consistent order
   var loadStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
@@ -83,7 +85,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def dotio: String = if (spatialConfig.enableModular) ".io" else ""
   protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.io.output"
   protected def sm: String = if (spatialConfig.enableModular) "io.stm" else "sm.io"
-  protected def memIO(mem: Sym[_]): String = if (spatialConfig.enableModular) src"${mem}" else src"${mem}.io"
+  protected def memIO(mem: Sym[_]): String = if (scopeInputs.contains(mem)) src"${mem}" else if (mem.isMemPrimitive || mem.isNBuffered || mem.isOptimizedReg) src"${mem}.io" else src"$mem"
   protected def datapathEn: String = s"${iodot}sigsIn.datapathEn"
   protected def break: String = s"${iodot}sigsIn.break"
   protected def done: String = s"${iodot}sigsIn.done"
@@ -230,7 +232,6 @@ trait ChiselGenCommon extends ChiselCodegen {
       y match {
         case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
         case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
-        // case x if (x.isBranch) => src"${x}.data"
         case x => src"$x" 
       }
     } else src"$y"

@@ -444,7 +444,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _: Struct[_] => s"UInt"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
-      case Some(x) if x.isNBuffered => "NBufMem"
+      case Some(x) if x.isNBuffered => "NBufInterface"
       case Some(Op(_: ArgInNew[_])) => "UInt"
       case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
       case Some(Op(_: HostIONew[_])) => "MultiArgOut"
@@ -492,7 +492,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}))"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
-      case Some(x) if x.isNBuffered => "NBufMem"
+      case Some(x) if x.isNBuffered => src"Flipped(new NBufInterface(${x}_p))"
       case Some(Op(_: ArgInNew[_])) => "Input(UInt(64.W))"
       case Some(x@Op(_: ArgOutNew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(x@Op(_: HostIONew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"

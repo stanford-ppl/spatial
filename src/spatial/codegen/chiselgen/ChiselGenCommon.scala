@@ -87,6 +87,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def sm: String = if (spatialConfig.enableModular) "io.stm" else "sm.io"
   protected def memIO(mem: Sym[_]): String = if (scopeInputs.contains(mem)) src"${mem}" else {
       mem match {
+        case _ if (mem.isNBuffered) => src"${mem}.io"
         case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined) => src"${mem}.io"
         case Op(_: RegNew[_]) => src"${mem}.io.asInstanceOf[StandardInterface]"
         case Op(_: RegFileNew[_,_]) => src"${mem}.io.asInstanceOf[ShiftRegFileInterface]"

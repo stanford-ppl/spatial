@@ -28,6 +28,27 @@ class FixFMAAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
     val first = Input(Bool())
   })
   val output = Output(UInt((d+f).W))
+
+  def connectLedger(op: FixFMAAccumBundle): Unit = {
+    if (Ledger.connections.contains(op.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)
+      cxn.xBarR.foreach{p => output <> op.output}
+      cxn.xBarW.foreach{p => input(p) <> op.input(p)}
+      Ledger.reset(op.hashCode)
+    }
+    else this <> op
+  }
+
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Seq(output)}
+  def connectXBarWPort(index: Int, data1: UInt, data2: UInt, en: Bool, last: Bool, first: Bool): Unit = {
+    input(index).input1 := data1
+    input(index).input2 := data2
+    input(index).enable := en
+    input(index).last := last
+    input(index).first := first
+  }
+
   override def cloneType(): this.type = new FixFMAAccumBundle(numWriters, d, f).asInstanceOf[this.type]
 }
 class FixFMAAccum(
@@ -107,16 +128,6 @@ class FixFMAAccum(
     io.input(index).last := last
     io.input(index).first := first
   }
-  def connectLedger(op: FixFMAAccumBundle): Unit = {
-    if (Ledger.connections.contains(op.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)
-      cxn.xBarR.foreach{p => io.output <> op.output}
-      cxn.xBarW.foreach{p => io.input(p) <> op.input(p)}
-      Ledger.reset(op.hashCode)
-    }
-    else io <> op
-  }
-
 }
 
 class FixOpAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
@@ -128,6 +139,25 @@ class FixOpAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
     val first = Input(Bool())
   })
   val output = Output(UInt((d+f).W))
+
+  def connectLedger(op: FixOpAccumBundle): Unit = {
+    if (Ledger.connections.contains(op.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)
+      cxn.xBarR.foreach{p => output <> op.output}
+      cxn.xBarW.foreach{p => input(p) <> op.input(p)}
+      Ledger.reset(op.hashCode)
+    }
+    else this <> op
+  }
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Seq(output)}
+  def connectXBarWPort(index: Int, data1: UInt, en: Bool, last: Bool, first: Bool): Unit = {
+    input(index).input1 := data1
+    input(index).enable := en
+    input(index).last := last
+    input(index).first := first
+  }
+
   override def cloneType(): this.type = new FixOpAccumBundle(numWriters, d, f).asInstanceOf[this.type]
 }
 
@@ -232,15 +262,4 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     io.input(index).last := last
     io.input(index).first := first
   }
-
-  def connectLedger(op: FixOpAccumBundle): Unit = {
-    if (Ledger.connections.contains(op.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)
-      cxn.xBarR.foreach{p => io.output <> op.output}
-      cxn.xBarW.foreach{p => io.input(p) <> op.input(p)}
-      Ledger.reset(op.hashCode)
-    }
-    else io <> op
-  }
-
 }

@@ -2,6 +2,7 @@ package spatial.codegen.chiselgen
 
 import argon._
 import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
@@ -28,7 +29,6 @@ trait ChiselGenController extends ChiselGenCommon {
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
     if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
-
     parent
   }
 
@@ -132,7 +132,8 @@ trait ChiselGenController extends ChiselGenCommon {
 
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
-    
+    scopeInputs = inputs.toList
+
     val isInner = lhs.isInnerControl
     val swobj = if (lhs.isBranch) "_obj" else ""
 
@@ -155,12 +156,18 @@ trait ChiselGenController extends ChiselGenCommon {
           if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"${in}_copy$c: ${arg(in.tp, Some(in))},")}
           else emit(src"$in: ${arg(in.tp, Some(in))},") 
         }
-        emit(s"parent: Option[Kernel], cchain: List[CounterChain], childId: Int, nMyChildren: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
+        emit(s"parent: Option[Kernel], cchain: List[CounterChain], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
         // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
         // emit("rr: ")
-      closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrPars, ctrWidths) {")
+      closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
 
       createSMObject(lhs)
+
+      if (spatialConfig.enableModular) {
+        inputs.zipWithIndex.collect{case(in,i) if (param(in).isDefined) => 
+          emit(src"val ${in}_p = ${param(in).get}") 
+        }
+      }
 
       open(src"def kernel(): $ret = {")
         if (spatialConfig.enableInstrumentation) {
@@ -182,18 +189,19 @@ trait ChiselGenController extends ChiselGenCommon {
         if (spatialConfig.enableModular) {
           open(src"class ${lhs}_module(depth: Int) extends Module {")
             open("val io = IO(new Bundle {")
-              inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = ${port(in.tp, Some(in))}")}
+              inputs.zipWithIndex.foreach{case(in,i) => emit(src"val in_$in = ${port(in.tp, Some(in))}")}
               if (spatialConfig.enableInstrumentation) emit("val instrctrs: Input(List[InstrCtr])")
               val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
               val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
               val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
+              val ctrcopies = if (lhs.isOuterStreamLoop) nMyChildren else 1
               emit("//val breakpoints = Vec(api.numArgOuts_breakpts, Output(Bool()))")
-              emit(s"val sigsIn = Input(new InputKernelSignals(${nMyChildren}, ${if (lhs.isOuterStreamLoop) nMyChildren else 1}, $ctrPars, $ctrWidths))")
-              emit(s"val sigsOut = Output(new OutputKernelSignals(${nMyChildren}, ${if (lhs.isOuterStreamLoop) nMyChildren else 1}))")
+              emit(s"val sigsIn = Input(new InputKernelSignals(${nMyChildren}, ${ctrcopies}, $ctrPars, $ctrWidths))")
+              emit(s"val sigsOut = Output(new OutputKernelSignals(${nMyChildren}, ${ctrcopies}))")
               emit("val rr = Input(Bool())")
             close("})")
             emit("io.sigsOut := DontCare")
-            inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = io.$in"); if (subset(in)) emit(src"$in := DontCare")}
+            inputs.zipWithIndex.foreach{case(in,i) => emit(src"val $in = io.in_$in ${if (subset(in)) src";$in := DontCare" else ""}")}
             emit("val rr = io.rr")
         }
 
@@ -225,9 +233,9 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"val module = Module(new ${lhs}_module(sm.p.depth))")
           inputs.zipWithIndex.foreach{case(in,i) => 
             if (subset(in)) {
-              emit(src"module.io.$in.output := ${in}${io(in)}.output; ${in}.connectLedger(module.io.$in)")
-              if (in.isArgOut || in.isHostIO) emit(src"module.io.$in.port.foreach(_.ready := true.B)")
-            } else emit(src"module.io.$in <> ${in}${io(in)}")}
+              emit(src"module.io.in_$in.output := ${in}${io(in)}.output; ${in}.connectLedger(module.io.in_$in)")
+              if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
+            } else emit(src"module.io.in_$in <> ${in}")}
           emit("module.io.sigsIn := me.sigsIn")
           emit("me.sigsOut := module.io.sigsOut")
           emit("module.io.rr := rr")
@@ -247,7 +255,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val swobj = if (lhs.isBranch) "_obj" else ""
     val chainPassedInputs = inputs.map{x => 
       if (cchainCopies.contains(x)) cchainCopies(x).map{c => src"${x}_copy$c"}
-      else List(appendSuffix(lhs, x))
+      else List(appendSuffix(lhs, memIO(x)))
     }.flatten
     
     val parent = if (controllerStack.size == 1) "None" else "Some(me)"
@@ -260,9 +268,10 @@ trait ChiselGenController extends ChiselGenCommon {
       else "List()"
     val childId = if (controllerStack.size == 1) -1 else s"${lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)}"
     val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
+    val ctrcopies = if (lhs.isOuterStreamLoop) nMyChildren else 1
     val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
     val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
-    emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, $nMyChildren, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs, " else ""}rr)")
+    emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, $nMyChildren, $ctrcopies, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs, " else ""}rr)")
     modifications
     // Wire signals to SM object
     if (!lhs.isOuterStreamControl) {
@@ -485,6 +494,9 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"sm.io.doneCondition := ~${notDone.result}")
       }
       exitCtrl(lhs)
+
+    case SeriesForeach(_,_,_,blk) => 
+      gen(blk)
 
 
     case _ => super.gen(lhs, rhs)

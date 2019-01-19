@@ -59,7 +59,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val width = bitWidth(mem.tp.typeArgs.head)
     // if (lhs.parent.stage == -1) emitControlSignals(parent)
     val invisibleEnable = invisibleEnableRead(lhs,mem)
-    val flowEnable = src",backpressure"
+    val flowEnable = src",$backpressure"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}

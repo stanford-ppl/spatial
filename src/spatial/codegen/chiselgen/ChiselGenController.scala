@@ -132,6 +132,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
+    val oldInputs = scopeInputs
     scopeInputs = inputs.toList
 
     val isInner = lhs.isInnerControl
@@ -245,6 +246,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
       emitFooter()
     }
+    scopeInputs = oldInputs
     scoped ++= useMap
   }
 

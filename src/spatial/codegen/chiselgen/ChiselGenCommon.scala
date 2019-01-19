@@ -85,7 +85,19 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def dotio: String = if (spatialConfig.enableModular) ".io" else ""
   protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.io.output"
   protected def sm: String = if (spatialConfig.enableModular) "io.stm" else "sm.io"
-  protected def memIO(mem: Sym[_]): String = if (scopeInputs.contains(mem)) src"${mem}" else if (mem.isMemPrimitive || mem.isNBuffered || mem.isOptimizedReg) src"${mem}.io" else src"$mem"
+  protected def memIO(mem: Sym[_]): String = if (scopeInputs.contains(mem)) src"${mem}" else {
+      mem match {
+        case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined) => src"${mem}.io"
+        case Op(_: RegNew[_]) => src"${mem}.io.asInstanceOf[StandardInterface]"
+        case Op(_: RegFileNew[_,_]) => src"${mem}.io.asInstanceOf[ShiftRegFileInterface]"
+        case Op(_: LUTNew[_,_]) => src"${mem}.io.asInstanceOf[StandardInterface]"
+        case Op(_: SRAMNew[_,_]) => src"${mem}.io.asInstanceOf[StandardInterface]"
+        case Op(_: FIFONew[_]) => src"${mem}.io.asInstanceOf[FIFOInterface]"
+        case Op(_: FIFORegNew[_]) => src"${mem}.io.asInstanceOf[FIFOInterface]"
+        case Op(_: LIFONew[_]) => src"${mem}.io.asInstanceOf[FIFOInterface]"
+        case _ => src"$mem"
+      }
+    } 
   protected def datapathEn: String = s"${iodot}sigsIn.datapathEn"
   protected def break: String = s"${iodot}sigsIn.break"
   protected def done: String = s"${iodot}sigsIn.done"

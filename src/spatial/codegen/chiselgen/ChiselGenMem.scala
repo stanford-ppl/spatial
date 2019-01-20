@@ -319,10 +319,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
     case FIFORegEnq(reg, data, ens) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-      emit(src"$reg.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
+      emit(src"${memIO(reg)}.accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
     case FIFORegDeq(reg, ens) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
-      emit(src"$reg.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
+      emit(src"${memIO(reg)}.accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
 
     // Registers
     case RegNew(init) => 
@@ -411,29 +411,29 @@ trait ChiselGenMem extends ChiselGenCommon {
     
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, None)
-    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
-    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
+    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = ${memIO(fifo)}.empty")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = ${memIO(fifo)}.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = ${memIO(fifo)}.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${memIO(fifo)}.almostFull")
     case op@FIFOPeek(fifo,_) => 
-      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := false.B") 
-      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
+      emit(src"${memIO(fifo)}.accessActivesIn(${activesMap(lhs)}) := false.B") 
+      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${memIO(fifo)}.output.data(0)")
+    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${memIO(fifo)}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
+      emit(src"${memIO(fifo)}.accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
     case FIFOBankedEnq(fifo, data, ens) => 
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
+      emit(src"${memIO(fifo)}.accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, None)
-    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
-    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
-    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
-    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
+    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = ${memIO(fifo)}.empty")
+    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = ${memIO(fifo)}.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = ${memIO(fifo)}.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${memIO(fifo)}.almostFull")
+    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${memIO(fifo)}.output.data(0)")
+    case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${memIO(fifo)}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     

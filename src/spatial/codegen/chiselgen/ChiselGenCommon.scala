@@ -171,15 +171,15 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
     or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{
-      case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.io.asInstanceOf[FIFOInterface].accessActivesOut(${activesMap(a)})"
-      case a@Op(x: FIFORegDeq[_]) => src"${fifo}.io.asInstanceOf[FIFOInterface].accessActivesOut(${activesMap(a)})"
+      case a@Op(x: FIFOBankedDeq[_]) => src"${memIO(fifo)}.accessActivesOut(${activesMap(a)})"
+      case a@Op(x: FIFORegDeq[_]) => src"${memIO(fifo)}.accessActivesOut(${activesMap(a)})"
     })
   }
 
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
     or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{
-      case a@Op(x: FIFOBankedEnq[_]) => src"${fifo}.io.asInstanceOf[FIFOInterface].accessActivesOut(${activesMap(a)})"
-      case a@Op(x: FIFORegEnq[_]) => src"${fifo}.io.asInstanceOf[FIFOInterface].accessActivesOut(${activesMap(a)})"
+      case a@Op(x: FIFOBankedEnq[_]) => src"${memIO(fifo)}.accessActivesOut(${activesMap(a)})"
+      case a@Op(x: FIFORegEnq[_]) => src"${memIO(fifo)}.accessActivesOut(${activesMap(a)})"
     })
   }
 
@@ -200,17 +200,17 @@ trait ChiselGenCommon extends ChiselCodegen {
   def getForwardPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].empty | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFONew(_)) => src"(~${memIO(fifo)}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~${memIO(fifo)}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.io.empty"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${fifo}.ready"
-      // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.io.asInstanceOf[FIFOInterface].full"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].full | ~(${FIFOBackwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.io.asInstanceOf[FIFOInterface].full | ~(${FIFOBackwardActive(sym, fifo)}))"
+      // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${memIO(fifo)}.full"
+      case fifo@Op(FIFONew(_)) => src"(~${memIO(fifo)}.full | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~${memIO(fifo)}.full | ~(${FIFOBackwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>

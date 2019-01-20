@@ -38,8 +38,8 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
     sDone_latch(i).io.input.reset := getRetimed(swap,1)
     sDone_latch(i).io.input.asyn_reset := getRetimed(reset, 1)
   }
-  val anyEnabled = sEn_latch.map{ en => en.io.output.data }.reduce{_|_}
-  swap := risingEdge(sEn_latch.zip(sDone_latch).zipWithIndex.map{ case ((en, done), i) => en.io.output.data === (done.io.output.data || io.sDone(i)) }.reduce{_&_} & anyEnabled)
+  val anyEnabled = sEn_latch.map{ en => en.io.output }.reduce{_|_}
+  swap := risingEdge(sEn_latch.zip(sDone_latch).zipWithIndex.map{ case ((en, done), i) => en.io.output === (done.io.output || io.sDone(i)) }.reduce{_&_} & anyEnabled)
   io.swap := swap
 
   // Counters for reporting writer and reader buffer pointers
@@ -151,8 +151,21 @@ class NBufInterface(val p: NBufParams) extends Bundle {
   val almostEmpty = Output(Bool())
   val numel = Output(UInt(32.W))    
   
-  val output = new Bundle {
-    val data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))  
+  val output = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))  
+
+  def connectLedger(op: NBufInterface): Unit = {
+    if (Ledger.connections.contains(op.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)
+      cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}
+      cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
+      cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
+      cxn.directW.foreach{p => directW(p) <> op.directW(p)}
+      cxn.output.foreach{p => output(p) <> op.output(p)}
+      cxn.broadcastR.foreach{case RAddr(p,lane) => broadcastR(p).forwardLane(lane, op.broadcastR(p))}
+      cxn.broadcastW.foreach{p => broadcastW(p) <> op.broadcastW(p)}
+      Ledger.reset(op.hashCode)
+    }
+    else this <> op
   }
 
   var usedMuxPorts = List[(String,(Int,Int,Int,Int,Int))]() // Check if the bufferPort, muxPort, muxAddr, lane, castgrp is taken for this connection style (xBar or direct)
@@ -186,7 +199,7 @@ class NBufInterface(val p: NBufParams) extends Bundle {
         }
         xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
-      output.data(outputBufferBase + outputMuxBase + vecId)
+      output(outputBufferBase + outputMuxBase + vecId)
     }
   }
 
@@ -210,7 +223,7 @@ class NBufInterface(val p: NBufParams) extends Bundle {
       if (bid == 0) {
         broadcastR(muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
-      output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
+      output(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
     }
   }
 
@@ -247,7 +260,7 @@ class NBufInterface(val p: NBufParams) extends Bundle {
         }
         directR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
-      output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
+      output(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
     }
   }
 
@@ -256,17 +269,6 @@ class NBufInterface(val p: NBufParams) extends Bundle {
     sDone(port) := done
   }
 
-  def connectLedger(op: MemInterface): Unit = {
-    if (Ledger.connections.contains(op.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)
-      cxn.xBarR.foreach{p => xBarR(p) <> op.xBarR(p)}
-      cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
-      cxn.directR.foreach{p => directR(p) <> op.directR(p)}
-      cxn.directW.foreach{p => directW(p) <> op.directW(p)}
-      Ledger.reset(op.hashCode)
-    }
-    else this <> op
-  }
 
 }
 
@@ -279,7 +281,7 @@ class NBufMem(p: NBufParams) extends Module {
     broadcastWMux: XMap, broadcastRMux: XMap,  // Assume broadcasts are XBar 
     bankingMode: BankingMode, inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, numActives: Int = 1, myName: String = "NBuf"
   ) = this(NBufParams(mem,logicalDims,numBufs,bitWidth,banks,strides,xBarWMux,xBarRMux,directWMux,directRMux,broadcastWMux,broadcastRMux,bankingMode,inits,syncMem,fracBits,numActives,myName))
-  
+
   override def desiredName = p.myName
 
   // Overloaded constructers
@@ -377,7 +379,7 @@ class NBufMem(p: NBufParams) extends Module {
             val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              io.output.data(outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
+              io.output(outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output(sram_index)})
             }
             f.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en.map(_ & rMask)
             f.io.xBarR(bufferBase + k).backpressure := io.xBarR(bufferBase + k).backpressure
@@ -401,7 +403,7 @@ class NBufMem(p: NBufParams) extends Module {
             val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              io.output.data(outputXBarRBase + outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data(sram_index)})
+              io.output(outputXBarRBase + outputBufferBase + (k_base + m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output(sram_index)})
             }
 
             f.io.directR(bufferBase + k).en := io.directR(bufferBase + k).en.map(_ & rMask)
@@ -423,7 +425,7 @@ class NBufMem(p: NBufParams) extends Module {
           val port_width = p.broadcastRMux.accessPars(k)
           val k_base = p.broadcastRMux.accessPars.take(k).sum
           (0 until port_width).foreach{m => 
-            io.output.data(outputXBarRBase + outputDirectRBase + (k_base+m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output.data((k_base+m))})
+            io.output(outputXBarRBase + outputDirectRBase + (k_base+m)) := chisel3.util.Mux1H(outSel, srams.map{f => f.io.output((k_base+m))})
           }
          
           f.io.xBarR(xBarRBase + k).en := io.broadcastR( k).en
@@ -470,14 +472,14 @@ class NBufMem(p: NBufParams) extends Module {
         val bufferBase = p.xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
         val sramXBarRPorts = portMapping.accessPars.sum
         val sel = (0 until p.numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, 0 /*1*/) }
-        (0 until sramXBarRPorts).foreach {k => io.output.data(bufferBase+k) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output.data(0)})}
+        (0 until sramXBarRPorts).foreach {k => io.output(bufferBase+k) := chisel3.util.Mux1H(sel, ffs.map{f => f.io.output(0)})}
       }
 
       // TODO: BroadcastR connections?
       val xBarRBase = p.xBarRMux.accessPars.sum
       val sramBroadcastRPorts = p.broadcastRMux.accessPars.sum
       val outSel = (0 until p.numBufs).map{ a => getRetimed(ctrl.io.statesInR.head === a.U, 0 /*1*/)}
-      (0 until sramBroadcastRPorts).foreach {k => io.output.data(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output.data(0)}) }
+      (0 until sramBroadcastRPorts).foreach {k => io.output(xBarRBase + k) := chisel3.util.Mux1H(outSel, ffs.map{f => f.io.output(0)}) }
       
     case FIFORegType => throw new Exception("NBuffered FIFOReg should be impossible?")
 
@@ -490,7 +492,7 @@ class NBufMem(p: NBufParams) extends Module {
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < p.numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-p.numXBarR)}
       p.combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
         val base = p.combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
-        (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
+        (0 until entry._1).foreach{i => io.output(base + i) := fifo.io.output(i)}
       }
       io.full := fifo.io.asInstanceOf[FIFOInterface].full
       io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
@@ -590,7 +592,7 @@ class NBufMem(p: NBufParams) extends Module {
             val k_base = xBarRMuxPortMapping.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              io.output.data(outputXBarRMuxBufferBase + (k_base + m)) := f.io.output.data(sram_index)
+              io.output(outputXBarRMuxBufferBase + (k_base + m)) := f.io.output(sram_index)
             }
             f.io.xBarR(k).en := io.xBarR(xBarRMuxBufferBase + k).en
             // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
@@ -613,7 +615,7 @@ class NBufMem(p: NBufParams) extends Module {
             val k_base = directRMuxPortMapping.accessPars.take(k).sum
             (0 until port_width).foreach{m => 
               val sram_index = (k_base + m) - directRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => directRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-              io.output.data(outputXBarRBase + outputDirectRMuxBufferBase + (k_base + m)) := f.io.output.data(outputXBarRBase + k_base + m)
+              io.output(outputXBarRBase + outputDirectRMuxBufferBase + (k_base + m)) := f.io.output(outputXBarRBase + k_base + m)
             }
             f.io.directR(k).en := io.directR(directRMuxBufferBase + k).en
             // f.io.directR(directRMuxBufferBase + k).data := io.directR(directRMuxBufferBase + k).data
@@ -628,7 +630,7 @@ class NBufMem(p: NBufParams) extends Module {
         val xBarRMuxBufferBase = p.xBarRMux.accessPars.sum
         val sramXBarRPorts = xBarRMuxPortMapping.accessPars.sum
         (0 until sramXBarRPorts).foreach {k => 
-          io.output.data(xBarRMuxBufferBase + k) := f.io.output.data(k)
+          io.output(xBarRMuxBufferBase + k) := f.io.output(k)
           f.io.xBarR(xBarRMuxBufferBase + k).en := io.broadcastR(k).en
           f.io.xBarR(xBarRMuxBufferBase + k).ofs := io.broadcastR(k).ofs
           f.io.xBarR(xBarRMuxBufferBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
@@ -669,9 +671,9 @@ class NBufMem(p: NBufParams) extends Module {
       colCorrection.io <> DontCare
       colCorrection.io.xBarW(0).data.head := base.asUInt
       colCorrection.io.xBarW(0).init.head := 0.U
-      colCorrection.io.xBarW(0).en.head := en & ~gotFirstInRow.io.output.data
-      colCorrection.io.xBarW(0).reset.head := reset.toBool | risingEdge(!gotFirstInRow.io.output.data)
-      val colCorrectionValue = Mux(en & ~gotFirstInRow.io.output.data, base.asUInt, colCorrection.io.output.data(0))
+      colCorrection.io.xBarW(0).en.head := en & ~gotFirstInRow.io.output
+      colCorrection.io.xBarW(0).reset.head := reset.toBool | risingEdge(!gotFirstInRow.io.output)
+      val colCorrectionValue = Mux(en & ~gotFirstInRow.io.output, base.asUInt, colCorrection.io.output(0))
 
       val wCRN_width = 1 + log2Up(numrows)
       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
@@ -712,7 +714,7 @@ class NBufMem(p: NBufParams) extends Module {
           val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
           (0 until port_width).foreach{m => 
             val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-            io.output.data(outputBufferBase + (k_base + m)) := lb.io.output.data(sram_index)
+            io.output(outputBufferBase + (k_base + m)) := lb.io.output(sram_index)
           }
           lb.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en
           lb.io.xBarR(bufferBase + k).backpressure := io.xBarR(bufferBase + k).backpressure
@@ -733,7 +735,7 @@ class NBufMem(p: NBufParams) extends Module {
       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < p.numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-p.numXBarR)}
       p.combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
         val base = p.combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
-        (0 until entry._1).foreach{i => io.output.data(base + i) := fifo.io.output.data(i)}
+        (0 until entry._1).foreach{i => io.output(base + i) := fifo.io.output(i)}
       }
       io.full := fifo.io.asInstanceOf[FIFOInterface].full
       io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
@@ -774,7 +776,7 @@ class NBufMem(p: NBufParams) extends Module {
         }
         io.xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
-      io.output.data(outputBufferBase + outputMuxBase + vecId)
+      io.output(outputBufferBase + outputMuxBase + vecId)
     }
   }
 
@@ -798,7 +800,7 @@ class NBufMem(p: NBufParams) extends Module {
       if (bid == 0) {
         io.broadcastR(muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
-      io.output.data(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
+      io.output(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
     }
   }
 
@@ -835,7 +837,7 @@ class NBufMem(p: NBufParams) extends Module {
         }
         io.directR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
       }
-      io.output.data(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
+      io.output(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
     }
   }
 
@@ -870,9 +872,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
     val almostEmpty = Output(Bool())
     val numel = Output(UInt(32.W))    
 
-    val output = new Bundle {
-      val data  = Vec(numBufs, Output(UInt(bitWidth.W)))  
-    }
+    val output = Vec(numBufs, Output(UInt(bitWidth.W)))  
   })
 
   override def desiredName = myName
@@ -910,7 +910,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
 
 
   def read(i: Int): UInt = {
-    io.output.data(i)
+    io.output(i)
   }
 
 

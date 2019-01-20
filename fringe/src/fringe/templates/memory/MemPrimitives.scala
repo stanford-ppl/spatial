@@ -25,6 +25,13 @@ class R_XBar(val port_width: Int, val ofs_width:Int, val bank_width:List[Int]) e
     backpressure(lhs_lane) := f
   }
 
+  def forwardLane(lane: Int, rhs: R_XBar): Unit = {
+    ofs(lane) := rhs.ofs(lane)
+    bank_width.length.indices[Unit]{i => banks(i + lane*bank_width.length) := rhs.banks(i + lane*bank_width.length)}
+    en(lane) := rhs.en(lane)
+    backpressure(lane) := rhs.backpressure(lane)
+  }
+
   override def cloneType = (new R_XBar(port_width, ofs_width, bank_width)).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
@@ -49,6 +56,12 @@ class R_Direct(val port_width:Int, val ofs_width:Int, val banks:List[List[Int]])
     ofs(lhs_lane) := rhs_port.ofs(rhs_lane)
     en(lhs_lane) := rhs_port.en(rhs_lane)
     backpressure(lhs_lane) := f
+  }
+
+  def forwardLane(lane: Int, rhs: R_Direct): Unit = {
+    ofs(lane) := rhs.ofs(lane)
+    en(lane) := rhs.en(lane)
+    backpressure(lane) := rhs.backpressure(lane)
   }
 
   override def cloneType = (new R_Direct(port_width, ofs_width, banks)).asInstanceOf[this.type] // See chisel3 bug 358
@@ -112,7 +125,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
         io.xBarR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
-      io.output.data(outBase + vecId)
+      io.output(outBase + vecId)
     }
     
   }
@@ -149,7 +162,7 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
         io.directR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
-      io.output.data(p.xBarOutputs + outBase + vecId)
+      io.output(p.xBarOutputs + outBase + vecId)
     }
   }
 }
@@ -258,7 +271,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Connect read data to output
-  io.output.data.zipWithIndex.foreach { case (wire,i) =>
+  io.output.zipWithIndex.foreach { case (wire,i) =>
     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if i < entry._1 => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
       val xBarCandidatesEns = xBarIds.map(io.xBarR.flatMap(_.en).toList(_)).toList
@@ -276,7 +289,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
           //   getRetimed(en, globals.target.sramload_latency, backpressure)
         }.reduce{_||_} else false.B
       }
-      val datas = m.map{ _._1.io.output.data }
+      val datas = m.map{ _._1.io.output }
       val d = chisel3.util.PriorityMux(sel, datas) // Not sure how to connect flows
       wire := d
     } else {
@@ -296,7 +309,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
           banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && getRetimed(en, globals.target.sramload_latency, backpressure)
         }.reduce{_||_} else false.B
       }
-      val datas = m.map{ _._1.io.output.data }
+      val datas = m.map{ _._1.io.output }
       val d = chisel3.util.PriorityMux(sel, datas)
       wire := d
     }
@@ -332,7 +345,7 @@ class FF(p: MemParams) extends MemPrimitive(p) {
   val anyEnable: Bool = io.xBarW.flatMap{_.en}.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.PriorityMux(io.xBarW.flatMap{_.en}.toList, io.xBarW.flatMap{_.data}.toList)
   ff := Mux(anyReset, init, Mux(anyEnable, wr_data, ff))
-  io.output.data.foreach(_ := ff)
+  io.output.foreach(_ := ff)
 }
 
 class FIFOReg(p: MemParams) extends MemPrimitive(p) {
@@ -365,7 +378,7 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
   val anyRead: Bool = io.xBarR.map{_.en}.flatten.toList.reduce{_|_}
   val wr_data: UInt = chisel3.util.PriorityMux(io.xBarW.map{_.en}.flatten.toList, io.xBarW.map{_.data}.flatten.toList)
   ff := Mux(anyReset, init, Mux(anyWrite, wr_data, ff))
-  io.output.data.foreach(_ := ff)
+  io.output.foreach(_ := ff)
 
   val isValid = Module(new SRFF())
   isValid.io.input.set := anyWrite
@@ -374,11 +387,11 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
 
   // Check if there is data
   io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
-  io.asInstanceOf[FIFOInterface].empty := ~isValid.io.output.data
-  io.asInstanceOf[FIFOInterface].full := isValid.io.output.data
+  io.asInstanceOf[FIFOInterface].empty := ~isValid.io.output
+  io.asInstanceOf[FIFOInterface].full := isValid.io.output
   io.asInstanceOf[FIFOInterface].almostEmpty := false.B
   io.asInstanceOf[FIFOInterface].almostFull := false.B
-  io.asInstanceOf[FIFOInterface].numel := Mux(isValid.io.output.data, 1.U, 0.U)
+  io.asInstanceOf[FIFOInterface].numel := Mux(isValid.io.output, 1.U, 0.U)
 
 }
 
@@ -443,13 +456,13 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   (0 until p.numBanks).foreach{i =>
     val addr = Mux(i.S(p.elsWidth.W) < active_r_bank, active_r_addr + 1.S(p.elsWidth.W), active_r_addr)
     m(i).io.r.ofs.head := addr.asUInt
-    deqCompactor.io.input.data(i) := m(i).io.output.data
+    deqCompactor.io.input.data(i) := m(i).io.output
   }
   (0 until p.numXBarR).foreach{i =>
     deqCompactor.io.input.deq.zip(io.xBarR.flatMap(_.en)).foreach{case (l,r) => l := r}
   }
   (0 until {if (p.xBarRMux.accessPars.size == 0) 1 else p.xBarRMux.accessPars.max}).foreach{i =>
-    io.output.data(i) := deqCompactor.io.output.data(i)
+    io.output(i) := deqCompactor.io.output(i)
   }
 
   // Check if there is data
@@ -545,7 +558,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
       mem.io.r.ofs.head := (accessor.io.output.count(0) - 1.S(a_width.W)).asUInt
       mem.io.r.en.head := io.xBarR.flatMap(_.en).toList.reduce{_|_}
       mem.io.rMask := io.xBarR.flatMap(_.en).toList.reduce{_|_}
-      io.output.data(i) := mem.io.output.data
+      io.output(i) := mem.io.output
     }
   } else {
     (0 until pR).foreach { r_i =>
@@ -556,9 +569,9 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
         m(r_i + i*pR).io.r.en.head := io.xBarR.flatMap(_.en).toList.reduce{_|_} & (subAccessor_prev === (i*pR).S(sa_width.W))
         m(r_i + i*pR).io.rMask := io.xBarR.flatMap(_.en).toList.reduce{_|_} & (subAccessor_prev === (i*pR).S(sa_width.W))
         rSel(i) := subAccessor_prev === i.S
-        rData(i) := m(r_i + i*pR).io.output.data
+        rData(i) := m(r_i + i*pR).io.output
       }
-      io.output.data(pR - 1 - r_i) := chisel3.util.PriorityMux(rSel, rData)
+      io.output(pR - 1 - r_i) := chisel3.util.PriorityMux(rSel, rData)
     }
   }
 
@@ -663,7 +676,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Connect read data to output
-  io.output.data.zipWithIndex.foreach { case (wire,i) =>
+  io.output.zipWithIndex.foreach { case (wire,i) =>
     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
       // Figure out which read port was active in xBar
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
@@ -724,7 +737,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Connect read data to output
-  io.output.data.zipWithIndex.foreach { case (wire,i) =>
+  io.output.zipWithIndex.foreach { case (wire,i) =>
     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
       // Figure out which read port was active in xBar
       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
@@ -772,9 +785,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
     val w = Input(new W_XBar(1, addrWidth, List(1), bitWidth))
     val wMask = Input(Bool())
     val backpressure = Input(Bool())
-    val output = new Bundle {
-      val data  = Output(UInt(bitWidth.W))
-    }
+    val output = Output(UInt(bitWidth.W))
     // val debug = new Bundle {
     //   val invalidRAddr = Output(Bool())
     //   val invalidWAddr = Output(Bool())
@@ -797,7 +808,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
         (i.U(addrWidth.W) -> reg)
       }
       val radder = getRetimed(io.r.ofs.head,1,io.backpressure)
-      io.output.data := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.backpressure)
+      io.output := getRetimed(MuxLookup(radder, 0.U(bitWidth.W), m), 1, io.backpressure)
     } else {
       val m = Module(new SRAM(UInt(bitWidth.W), size, "Generic")) // TODO: Change to BRAM or URAM once we get SRAMVerilogAWS_BRAM/URAM.v
       if (size >= 2) m.io.raddr     := getRetimed(io.r.ofs.head, 1, io.backpressure)
@@ -806,7 +817,7 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
       m.io.wen       := io.w.en.head & wInBound & io.wMask
       m.io.wdata     := io.w.data.head
       m.io.backpressure      := io.backpressure
-      io.output.data := m.io.rdata
+      io.output := m.io.rdata
     }
   } else {
     if (size <= globals.target.SramThreshold) {
@@ -815,11 +826,11 @@ class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Modu
         reg := Mux(io.w.en.head & io.wMask & (io.w.ofs.head === i.U(addrWidth.W)), io.w.data.head, reg)
         (i.U(addrWidth.W) -> reg)
       }
-      io.output.data := MuxLookup(io.r.ofs.head, 0.U(bitWidth.W), m)
+      io.output := MuxLookup(io.r.ofs.head, 0.U(bitWidth.W), m)
     } else {
       val m = Mem(size, UInt(bitWidth.W) /*, seqRead = true deprecated? */)
       when (io.w.en.head & io.wMask & wInBound) {m(io.w.ofs.head) := io.w.data.head}
-      io.output.data := m(io.r.ofs.head)
+      io.output := m(io.r.ofs.head)
     }
   }
 
@@ -922,11 +933,9 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
         val data = Vec(1 max banks, Input(UInt(bitWidth.W)))
         val deq = Vec(1 max ports.sum, Input(Bool()))
       }
-      val output = new Bundle{
-        val data = Vec({if (ports.size == 0) 1 else ports.max}, Output(UInt(bitWidth.W)))
-      }
+      val output = Vec({if (ports.size == 0) 1 else ports.max}, Output(UInt(bitWidth.W)))
     })
-  io .output.data := DontCare
+  io.output := DontCare
   // Compactor
   val num_compactors = if (ports.size == 0) 1 else ports.max
   // val numPort_width = 1 + Utils.log2Up(ports.max)
@@ -945,7 +954,7 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
     val port_vals = (0 until banks).map{ j => 
       (j.U(width.W) -> io.input.data(j)) 
     }
-    io.output.data(i) := chisel3.util.MuxLookup(proper_bank.asUInt, 0.U(bitWidth.W), port_vals)
+    io.output(i) := chisel3.util.MuxLookup(proper_bank.asUInt, 0.U(bitWidth.W), port_vals)
   }
 
 }

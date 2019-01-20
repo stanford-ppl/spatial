@@ -21,13 +21,13 @@ class ExposedPorts {
 }
 
 object Ledger {
-  var connections = HashMap[Any, ExposedPorts]()
+  var connections = HashMap[Int, ExposedPorts]()
 
-  def reset(port: Any): Unit = {connections -= port}
-  def connectXBarR(port: Any, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addXBarR(p))}
-  def connectDirectR(port: Any, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addDirectR(p))}
-  def connectXBarW(port: Any, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addXBarW(p))}
-  def connectDirectW(port: Any, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addDirectW(p))}
-  def connectFixOpIn(port: Any, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addFixOpIn(p))}
-  def connectFixFMAIn(port: Any, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addFixFMAIn(p))}
+  def reset(port: Int): Unit = {connections -= port}
+  def connectXBarR(port: Int, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addXBarR(p))}
+  def connectDirectR(port: Int, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addDirectR(p))}
+  def connectXBarW(port: Int, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addXBarW(p))}
+  def connectDirectW(port: Int, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addDirectW(p))}
+  def connectFixOpIn(port: Int, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addFixOpIn(p))}
+  def connectFixFMAIn(port: Int, p: Int) = {connections += (port -> connections.getOrElse(port, new ExposedPorts).addFixFMAIn(p))}
 }

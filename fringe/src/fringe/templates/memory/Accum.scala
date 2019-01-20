@@ -32,7 +32,7 @@ class FixFMAAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
   def connectLedger(op: FixFMAAccumBundle): Unit = {
     if (Ledger.connections.contains(op.hashCode)) {
       val cxn = Ledger.connections(op.hashCode)
-      cxn.xBarR.foreach{p => output <> op.output}
+      cxn.output.foreach{case p => output <> op.output}
       cxn.xBarW.foreach{p => input(p) <> op.input(p)}
       Ledger.reset(op.hashCode)
     }
@@ -92,20 +92,20 @@ class FixFMAAccum(
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
   firstRound.io.input.reset := laneCtr.io.output.done | activeReset
-  val isFirstRound = firstRound.io.output.data
+  val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
   drainState.io.input.reset := activeLast.D(drain_latency + fmaLatency)
-  val isDrainState = drainState.io.output.data
+  val isDrainState = drainState.io.output
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
   accums.foreach{case (acc, lane) => 
     acc.io <> DontCare
     val fixadd = Wire(new FixedPoint(s,d,f))
-    fixadd.r := Mux(isFirstRound, 0.U, acc.io.output.data(0))
+    fixadd.r := Mux(isFirstRound, 0.U, acc.io.output(0))
     val result = Wire(new FixedPoint(s,d,f))
     result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B).r
     acc.io.xBarR <> DontCare
@@ -117,7 +117,7 @@ class FixFMAAccum(
     acc.io.xBarW(0).init(0) := initBits
   }
 
-  io.output := getRetimed(accums.map(_._1.io.output.data(0)).reduce{_+_}, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong).r // TODO: Please build tree and retime appropriately
+  io.output := getRetimed(accums.map(_._1.io.output(0)).reduce{_+_}, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong).r // TODO: Please build tree and retime appropriately
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Seq(io.output)}
@@ -141,18 +141,16 @@ class FixOpAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
   val output = Output(UInt((d+f).W))
 
   def connectLedger(op: FixOpAccumBundle): Unit = {
-    Console.println(s"connecting $op and $this with ${Ledger.connections}")
     if (Ledger.connections.contains(op.hashCode)) {
       val cxn = Ledger.connections(op.hashCode)
-      Console.println(s"cxn $cxn, ${cxn.xBarR}, ${cxn.xBarW}")
-      cxn.xBarR.foreach{p => output <> op.output}
-      cxn.xBarW.foreach{p => input(p) <> op.input(p); Console.println(s"input ${p} $input <> $op ${op.input}")}
+      cxn.output.foreach{case p => output <> op.output}
+      cxn.xBarW.foreach{p => input(p) <> op.input(p)}
       Ledger.reset(op.hashCode)
     }
     else {this <> op}
   }
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Ledger.connectXBarR(this.hashCode, 0);Seq(output)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Ledger.connectOutput(this.hashCode, 0);Seq(output)}
   def connectXBarWPort(index: Int, data1: UInt, en: Bool, last: Bool, first: Bool): Unit = {
     input(index).input1 := data1
     input(index).enable := en
@@ -193,19 +191,19 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
   firstRound.io.input.reset := laneCtr.io.output.done | activeReset
-  val isFirstRound = firstRound.io.output.data
+  val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
   drainState.io.input.reset := activeLast.D(drain_latency + opLatency)
-  val isDrainState = drainState.io.output.data
+  val isDrainState = drainState.io.output
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
   accums.foreach{case (acc, lane) => 
     val fixadd = Wire(new FixedPoint(s,d,f))
-    fixadd.r := acc.io.output.data(0)
+    fixadd.r := acc.io.output(0)
     val result = Wire(new FixedPoint(s,d,f))
     t match {
       case Accum.Add => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
@@ -225,28 +223,28 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   }
 
   t match {
-    case Accum.Add => io.output := getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
+    case Accum.Add => io.output := getRetimed(accums.map(_._1.io.output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
       (t1+t2).r
     }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
-    case Accum.Mul => io.output := getRetimed(accums.map(_._1.io.output.data(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) =>
+    case Accum.Mul => io.output := getRetimed(accums.map(_._1.io.output(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
       Math.mul(t1, t2, Some(0), true.B, Truncate, Wrapping).r
     }, drain_latency, isDrainState, init = (init*scala.math.pow(2,f)).toLong)
-    case Accum.Min => io.output := getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
+    case Accum.Min => io.output := getRetimed(accums.map(_._1.io.output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
       Mux(t1 < t2, t1.r, t2.r)
     }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
-    case Accum.Max => io.output := getRetimed(accums.map(_._1.io.output.data(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
+    case Accum.Max => io.output := getRetimed(accums.map(_._1.io.output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
@@ -258,7 +256,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
 
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Ledger.connectXBarR(this.hashCode, 0); Seq(io.output)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Ledger.connectOutput(this.hashCode, 0); Seq(io.output)}
   def connectXBarWPort(index: Int, data1: UInt, en: Bool, last: Bool, first: Bool): Unit = {
     io.input(index).input1 := data1
     io.input(index).enable := en

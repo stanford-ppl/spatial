@@ -192,14 +192,14 @@ class CompactingCounter(val lanes: Int, val depth: Int, val width: Int) extends 
   base.io.xBarW(0).reset.head := io.input.reset
   base.io.xBarW(0).en.head := io.input.enables.reduce{_|_}
 
-  val count = base.io.output.data(0).asSInt
+  val count = base.io.output(0).asSInt
   val num_enabled: SInt = io.input.enables.map{e => Mux(e, 1.S(width.W), 0.S(width.W))}.reduce{_+_}
   val newval = count + Mux(io.input.dir, num_enabled, -num_enabled)
   val isMax = Mux(io.input.dir, newval >= depth.S, newval <= 0.S)
   val next = Mux(isMax, newval - depth.S(width.W), newval)
   base.io.xBarW(0).data.head := Mux(io.input.reset, 0.asUInt, next.asUInt)
 
-  io.output.count := base.io.output.data(0).asSInt
+  io.output.count := base.io.output(0).asSInt
   io.output.done := io.input.enables.reduce{_|_} & isMax
 }
 
@@ -252,7 +252,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
     lock.io.input.set := io.input.enable  & !io.input.reset
     lock.io.input.reset := io.input.reset || io.output.done
     lock.io.input.asyn_reset := false.B
-    val locked = lock.io.output.data// | io.input.enable
+    val locked = lock.io.output// | io.input.enable
     val inits = List.tabulate(par){i =>
       getRetimed(
         if (start.isDefined & stride.isDefined) {(start.get + i*stride.get).S(width.W)}
@@ -274,7 +274,7 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       b.io.xBarW(0).en.head := io.input.enable
     }
 
-    val counts = bases.map(_.io.output.data(0).asSInt)
+    val counts = bases.map(_.io.output(0).asSInt)
     val delta = if (stride.isDefined) { (stride.get*par).S(width.W) }
     else if (stride.isDefined) { (stride.get*par).S(width.W)}
     else { io.input.stride * par.S(width.W)}
@@ -334,10 +334,10 @@ class SingleCounter(val par: Int, val start: Option[Int], val stop: Option[Int],
       b.io.xBarW(0).init.head := 0.U
       b.io.xBarW(0).reset.head := io.input.reset
       b.io.xBarW(0).en.head := io.input.enable
-      b.io.xBarW(0).data.head := (b.io.output.data.head.asSInt + 1.S).asUInt
+      b.io.xBarW(0).data.head := (b.io.output.head.asSInt + 1.S).asUInt
     }
 
-    io.output.count(0) := bases.head.io.output.data.head.asSInt
+    io.output.count(0) := bases.head.io.output.head.asSInt
     io.output.saturated := false.B
     io.output.noop := false.B
     io.output.done := false.B
@@ -376,7 +376,7 @@ class SingleSCounter(val par: Int, val width: Int = 32) extends Module { // Sign
     base.io.xBarW(0).reset.head := io.input.reset
     base.io.xBarW(0).en.head := io.input.reset | io.input.enable
 
-    val count = base.io.output.data(0).asSInt
+    val count = base.io.output(0).asSInt
     val newval = count + (io.input.stride * par.S(width.W))
     val isMax = newval >= io.input.stop
     val wasMax = RegNext(isMax, false.B)
@@ -426,7 +426,7 @@ class SingleSCounterCheap(val par: Int, val start: Int, val stop: Int, val strid
     base.io.xBarW(0).reset.head := io.input.reset
     base.io.xBarW(0).en.head := io.input.enable
 
-    val count = base.io.output.data(0).asSInt
+    val count = base.io.output(0).asSInt
     val newval_up = count + ((strideUp * par).S(width.W))
     val newval_down = count + ((strideDown * par).S(width.W))
     val isMax = newval_up >= stop.asSInt
@@ -459,6 +459,22 @@ count(0) 1   2  3    4   5
 
 */
 
+class CounterChainInterface(val par: List[Int], val widths: List[Int]) extends Bundle {
+  def this(tup: (List[Int], List[Int])) = this(tup._1, tup._2)
+  val input = new Bundle {
+    val starts   = HVec.tabulate(par.length){i => Input(SInt(widths(i).W))}
+    val stops    = HVec.tabulate(par.length){i => Input(SInt(widths(i).W))}
+    val strides  = HVec.tabulate(par.length){i => Input(SInt(widths(i).W))}
+    val reset    = Input(Bool())
+    val enable   = Input(Bool())
+    val saturate = Input(Bool())
+    val isStream = Input(Bool()) // If a stream counter, do not need enable on to report done
+  }
+  val output = Output(new CChainOutput(par, widths))
+
+  override def cloneType = (new CounterChainInterface(par, widths)).asInstanceOf[this.type] // See chisel3 bug 358
+}
+
 /**
   * Counter: n-depth counter. Counts up to each stop. Lists go from
             outermost (slowest) to innermost (fastest) counter.
@@ -475,18 +491,7 @@ class CounterChain(val par: List[Int], val starts: List[Option[Int]], val stops:
   val numWires = par.reduce{_+_}
   val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).sum}
 
-  val io = IO(new Bundle {
-    val input = new Bundle {
-      val starts   = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
-      val stops    = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
-      val strides  = HVec.tabulate(depth){i => Input(SInt(widths(i).W))}
-      val reset    = Input(Bool())
-      val enable   = Input(Bool())
-      val saturate = Input(Bool())
-      val isStream = Input(Bool()) // If a stream counter, do not need enable on to report done
-    }
-    val output = Output(new CChainOutput(par, widths))
-  })
+  val io = IO(new CounterChainInterface(par, widths))
 
   // Create counters
   val ctrs = (0 until depth).map{ i => Module(new SingleCounter(par(i), starts(i), stops(i), strides(i), forevers(i), widths(i))) }

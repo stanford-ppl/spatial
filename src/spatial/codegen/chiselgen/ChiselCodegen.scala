@@ -25,6 +25,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
   protected var boreMe = new scala.collection.mutable.ListBuffer[(String, String)]
 
+  /** Map between cchain and list of controllers it is copied for, due to stream controller logic */
+  var cchainCopies = scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]()
+
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {
       case Some(rhs) => rhs match {
@@ -175,7 +178,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val forwardpressure = Bool()   // parent kernel -> my insides""")
       emit("""  val datapathEn = Bool()        // my sm -> insides""")
       emit("""  val break = Bool()        """)
+      emit("""  val smState = SInt(32.W)        """)
       emit("""  val smEnableOuts = Vec(depth, Bool())""")
+      emit("""  val smSelectsOut = Vec(depth, Bool())""")
       emit("""  val smChildAcks = Vec(depth, Bool())""")
       emit("""  val cchainOutputs = Vec(ctrcopies, new CChainOutput(ctrPars, ctrWidths))""")
       emit("""}""")
@@ -185,7 +190,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val cchainEnable = Vec(ctrcopies, Bool())""")
       emit("""  val smCtrCopyDone = Vec(ctrcopies, Bool())""")
       emit("""}""")
-      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChain], val childId: Int, val nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int]) {""")
+      emit("""abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChainInterface], val childId: Int, val nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int]) {""")
       emit("""  val sigsIn = Wire(new InputKernelSignals(nMyChildren, ctrcopies, ctrPars, ctrWidths)); sigsIn := DontCare""")
       emit("""  val sigsOut = Wire(new OutputKernelSignals(nMyChildren, ctrcopies)); sigsOut := DontCare""")
       emit("""  def done = sigsIn.done""")
@@ -205,13 +210,15 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val iiCtr: IICounter""")
       emit(""" """)
       emit("""  def configure(n: String, ifaceSigsIn: Option[InputKernelSignals], ifaceSigsOut: Option[OutputKernelSignals], isSwitchCase: Boolean = false): Unit = {""")
-      emit("""    cchain.zip(sigsIn.cchainOutputs).foreach{case (cc, sc) => sc := cc.io.output}""")
+      emit("""    cchain.zip(sigsIn.cchainOutputs).foreach{case (cc, sc) => sc := cc.output}""")
+      emit("""    sigsIn.smSelectsOut.zip(sm.io.selectsOut).foreach{case (si, sm) => si := sm}""")
       emit("""    sigsIn.ctrDone := sm.io.ctrDone""")
+      emit("""    sigsIn.smState := sm.io.state""")
       emit("""    sigsIn.smEnableOuts.zip(sm.io.enableOut).foreach{case (l,r) => l := r}""")
       emit("""    sigsIn.smChildAcks.zip(sm.io.childAck).foreach{case (l,r) => l := r}""")
       emit("""    sm.io.doneIn.zip(sigsOut.smDoneIn).foreach{case (sm, i) => sm := i}""")
       emit("""    sm.io.maskIn.zip(sigsOut.smMaskIn).foreach{case (sm, i) => sm := i}""")
-      emit("""    cchain.zip(sigsOut.cchainEnable).foreach{case (c,e) => c.io.input.enable := e}""")
+      emit("""    cchain.zip(sigsOut.cchainEnable).foreach{case (c,e) => c.input.enable := e}""")
       emit("""    sm.io.backpressure := backpressure""")
       emit("""    sm.io.backpressure := backpressure""")
       emit("""    sm.io.rst := resetMe""")
@@ -238,12 +245,12 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""    ifaceSigsOut.foreach{so => so.smDoneIn(childId) := done; so.smMaskIn(childId) := mask}""")
       emit("""    datapathEn := sm.io.datapathEn & mask & {if (cchain.isEmpty) true.B else ~sm.io.ctrDone} """)
       emit("""    iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.rst | sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask""")
-      emit("""    cchain.foreach{case c => c.io.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.io.input.reset := resetChildren}""")
+      emit("""    cchain.foreach{case c => c.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.input.reset := resetChildren}""")
       emit("""    if (sm.p.sched == Streaming) {""")
       emit("""      sm.io.ctrCopyDone.zip(sigsOut.smCtrCopyDone).foreach{case (sm, so) => sm := so}""")
       emit("""      if (cchain.nonEmpty) {""")
-      emit("""        sigsOut.smCtrCopyDone.zip(cchain).foreach{case (ccd, cc) => ccd := cc.io.output.done}""")
-      emit("""        cchain.zip(sigsOut.cchainEnable).foreach{case (cc, ce) => cc.io.input.enable := ce }""")
+      emit("""        sigsOut.smCtrCopyDone.zip(cchain).foreach{case (ccd, cc) => ccd := cc.output.done}""")
+      emit("""        cchain.zip(sigsOut.cchainEnable).foreach{case (cc, ce) => cc.input.enable := ce }""")
       emit("""      }""")
       emit("""    }""")
       emit("""    if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) {ifaceSigsOut.foreach{so => so.cchainEnable(childId) := done}}""")
@@ -438,8 +445,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => super.remap(tp)
   }
 
-  // protected def arg(x: Sym[_]): String = arg(x.tp)
-
   protected def arg(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
     case FixPtType(s,d,f) => s"FixedPoint"
     case _: Var[_] => "String"
@@ -454,7 +459,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
       case Some(Op(_: HostIONew[_])) => "MultiArgOut"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
-      case Some(Op(_: CounterChainNew)) => "CounterChain"
+      case Some(Op(_: CounterChainNew)) => "CounterChainInterface"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccumBundle"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccumBundle"
       case Some(Op(_: RegNew[_])) => "StandardInterface"
@@ -502,7 +507,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(x@Op(_: ArgOutNew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(x@Op(_: HostIONew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
-      case Some(Op(_: CounterChainNew)) => "CounterChain"
+      case Some(x@Op(_: CounterChainNew)) => src"Flipped(new CounterChainInterface(${x}_p))"
       case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => 
         val FixPtType(s,d,f) = x.tp.typeArgs.head
         src"Flipped(new FixFMAAccumBundle(${x.writers.size}, $d, $f))"
@@ -517,7 +522,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(x@Op(_: FIFORegNew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
       case Some(x@Op(_: MergeBufferNew[_])) => "MergeBuffer"
       case Some(x@Op(_: LIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
-      case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(UInt(64.W))"
+      case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(new FixedPoint(true, 64, 0))"
       case Some(x@Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
       case Some(x@Op(_@StreamInNew(bus))) => 
         bus match {
@@ -529,10 +534,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
         bus match {
-          case BurstCmdBus => s"Flipped(Decoupled(new AppCommandDense(${x}_p)))"
-          case _: BurstFullDataBus[_] => s"Flipped(Decoupled(new AppStoreData(${x}_p)))"
-          case GatherAddrBus => s"Flipped(Decoupled(new AppCommandSparse(${x}_p)))"
-          case _: ScatterCmdBus[_] => "Flipped(Decoupled(new ScatterCmdStream))"
+          case BurstCmdBus => s"Decoupled(new AppCommandDense(${x}_p))"
+          case _: BurstFullDataBus[_] => s"Decoupled(new AppStoreData(${x}_p))"
+          case GatherAddrBus => s"Decoupled(new AppCommandSparse(${x}_p))"
+          case _: ScatterCmdBus[_] => "Decoupled(new ScatterCmdStream)"
           case _ => super.remap(tp)
         }
 
@@ -543,6 +548,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected def param(node: Sym[_]): Option[String] = node match {
     case x if x.isNBuffered => Some(src"$x.p")
     case x if x.isMemPrimitive => Some(src"$x.p")
+    case x if x.isCounterChain => 
+      val sfx = if (cchainCopies.contains(x)) src"_copy${cchainCopies(x).head}" else ""
+      Some(src"(${x}${sfx}.par, ${x}${sfx}.widths)")
     case x@Op(_@StreamInNew(bus)) => 
       bus match {
         case _: BurstDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
@@ -563,20 +571,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected def subset(node: Sym[_]): Boolean = node match {
     case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
     case _ => false
-  }
-
-  protected def io(node: Sym[_]): String = node match {
-    case Op(_: CounterNew[_]) => ".io"
-    case Op(_: CounterChainNew) => ".io"
-    case Op(_: RegNew[_]) => ".io"
-    case Op(_: RegFileNew[_,_]) => ".io"
-    case Op(_: LUTNew[_,_]) => ".io"
-    case Op(_: SRAMNew[_,_]) => ".io"
-    case Op(_: FIFONew[_]) => ".io"
-    case Op(_: FIFORegNew[_]) => ".io"
-    case Op(_: MergeBufferNew[_]) => ".io"
-    case Op(_: LIFONew[_]) => ".io"
-    case _ => ""
   }
 
 

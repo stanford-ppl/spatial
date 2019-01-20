@@ -19,18 +19,17 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
   val directR = HVec(Array.tabulate(1 max p.numDirectRPorts){i =>
     Input(new R_Direct(p.directRMux.accessPars.getOr1(i), p.ofsWidth, if (p.hasDirectR) p.directRMux.sortByMuxPortAndOfs.values.flatMap(_._1).flatten.toList.grouped(p.banks.length).toList else p.defaultDirect))
   })
-  val output = new Bundle {
-    val data  = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
-  }
+  val output = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))
   val reset = Input(Bool())
 
   def connectLedger(op: MemInterface): Unit = {
     if (Ledger.connections.contains(op.hashCode)) {
       val cxn = Ledger.connections(op.hashCode)
-      cxn.xBarR.foreach{p => xBarR(p) <> op.xBarR(p)}
+      cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}
       cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
-      cxn.directR.foreach{p => directR(p) <> op.directR(p)}
+      cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
       cxn.directW.foreach{p => directW(p) <> op.directW(p)}
+      cxn.output.foreach{p => output(p) <> op.output(p)}
       Ledger.reset(op.hashCode)
     }
     else this <> op
@@ -44,6 +43,7 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
     usedMuxPorts ::= ("XBarW", (muxAddr._1,muxAddr._2,0,0))
     val base = p.xBarWMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,0).size
     xBarW(base) := wBundle
+    Ledger.connectXBarW(this.hashCode, base)
   }
 
   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
@@ -66,10 +66,12 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
           assert(!usedMuxPorts.contains(("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to XBarR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("XBarR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
+        Ledger.connectXBarR(this.hashCode, base, vecId)
         xBarR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
-      output.data(outBase + vecId)
+      Ledger.connectOutput(this.hashCode, outBase + vecId)
+      output(outBase + vecId)
     }
     
   }
@@ -81,6 +83,7 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
     usedMuxPorts ::= ("DirectW", (muxAddr._1,muxAddr._2,0,0))
     val base = p.directWMux.accessParsBelowMuxPort(muxAddr._1,muxAddr._2,0).size
     directW(base) := wBundle
+    Ledger.connectDirectW(this.hashCode, base)
   }
 
   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
@@ -103,10 +106,12 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
           assert(!usedMuxPorts.contains(("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))), s"Attempted to connect to DirectR port $muxAddr, castgrp $castgrp on lane $i twice!")
           usedMuxPorts ::= ("DirectR", (muxAddr._1,effectiveOfs, i, castgrp))
         }
+        Ledger.connectDirectR(this.hashCode, base, vecId)
         directR(base).connectLane(vecId, i, rBundle, backpressure)
       }
       // Temp fix for merged readers not recomputing port info
-      output.data(p.xBarOutputs + outBase + vecId)
+      Ledger.connectOutput(this.hashCode, p.xBarOutputs + outBase + vecId)
+      output(p.xBarOutputs + outBase + vecId)
     }
   }
 }

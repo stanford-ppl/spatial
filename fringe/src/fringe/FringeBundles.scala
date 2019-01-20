@@ -102,7 +102,7 @@ class MultiArgOut(nw: Int) extends Bundle {
   def connectLedger(op: MultiArgOut): Unit = {
     if (Ledger.connections.contains(op.hashCode)) {
       val cxn = Ledger.connections(op.hashCode)
-      cxn.xBarR.foreach{p => output.echo <> op.output.echo}
+      cxn.xBarR.foreach{case RAddr(p,lane) => output.echo <> op.output.echo}
       cxn.xBarW.foreach{p => port(p) <> op.port(p)}
       Ledger.reset(op.hashCode)
     }

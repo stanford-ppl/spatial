@@ -1,8 +1,10 @@
 package fringe.templates.memory
 
 import chisel3._
+import scala.collection.mutable._
 import chisel3.util.Mux1H
 import fringe.templates.math._
+import fringe.Ledger._
 import fringe.templates.counters.SingleCounter
 import fringe.utils.{log2Up, getRetimed}
 import fringe.utils.implicits._
@@ -23,30 +25,35 @@ class FixFMAAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
     val input1 = Input(UInt((d+f).W))
     val input2 = Input(UInt((d+f).W))
     val enable = Input(Bool())
-    val reset = Input(Bool())
     val last = Input(Bool())
     val first = Input(Bool())
   })
+  val reset = Input(Bool())
   val output = Output(UInt((d+f).W))
 
-  def connectLedger(op: FixFMAAccumBundle): Unit = {
-    if (Ledger.connections.contains(op.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)
+  def connectLedger(op: FixFMAAccumBundle)(implicit stack: List[KernelHash]): Unit = {
+    if (Ledger.connections.contains(op.hashCode) && Ledger.connections(op.hashCode).contains(stack.head.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)(stack.head.hashCode)
       cxn.output.foreach{case p => output <> op.output}
       cxn.xBarW.foreach{p => input(p) <> op.input(p)}
-      Ledger.reset(op.hashCode)
+      cxn.reset.foreach{p => reset <> op.reset}
     }
     else this <> op
   }
 
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Seq(output)}
-  def connectXBarWPort(index: Int, data1: UInt, data2: UInt, en: Bool, last: Bool, first: Bool): Unit = {
+  def connectReset(r: Bool)(implicit stack: List[KernelHash]): Unit = {
+    reset := r
+    Ledger.connectReset(this.hashCode, 0)
+  }
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean)(implicit stack: List[KernelHash]): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool)(implicit stack: List[KernelHash]): Seq[UInt] = {Ledger.connectXBarR(this.hashCode, 0, 0);Seq(output)}
+  def connectXBarWPort(index: Int, data1: UInt, data2: UInt, en: Bool, last: Bool, first: Bool)(implicit stack: List[KernelHash]): Unit = {
     input(index).input1 := data1
     input(index).input2 := data2
     input(index).enable := en
     input(index).last := last
     input(index).first := first
+    Ledger.connectXBarW(this.hashCode, index)
   }
 
   override def cloneType(): this.type = new FixFMAAccumBundle(numWriters, d, f).asInstanceOf[this.type]
@@ -71,8 +78,8 @@ class FixFMAAccum(
   val activeIn2 = Mux1H(io.input.map(_.enable), io.input.map(_.input2))
   val activeEn  = io.input.map(_.enable).reduce{_|_}
   val activeLast = Mux1H(io.input.map(_.enable), io.input.map(_.last))
-  val activeReset = io.input.map(_.reset).reduce{_|_}
-  val activeFirst = io.input.map(_.first).reduce{_|_}
+  val activeReset = io.reset
+  val activeFirst = io.input.map(_.first).reduce{_|_} | io.reset
 
   val fixin1 = Wire(new FixedPoint(s,d,f))
   fixin1.r := activeIn1
@@ -118,40 +125,34 @@ class FixFMAAccum(
   }
 
   io.output := getRetimed(accums.map(_._1.io.output(0)).reduce{_+_}, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong).r // TODO: Please build tree and retime appropriately
-
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Seq(io.output)}
-  def connectXBarWPort(index: Int, data1: UInt, data2: UInt, en: Bool, last: Bool, first: Bool): Unit = {
-    io.input(index).input1 := data1
-    io.input(index).input2 := data2
-    io.input(index).enable := en
-    io.input(index).last := last
-    io.input(index).first := first
-  }
 }
 
 class FixOpAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
   val input = Vec(numWriters, new Bundle{
     val input1 = Input(UInt((d+f).W))
     val enable = Input(Bool())
-    val reset = Input(Bool())
     val last = Input(Bool())
     val first = Input(Bool())
   })
+  val reset = Input(Bool())
   val output = Output(UInt((d+f).W))
 
-  def connectLedger(op: FixOpAccumBundle): Unit = {
-    if (Ledger.connections.contains(op.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)
+  def connectLedger(op: FixOpAccumBundle)(implicit stack: List[KernelHash]): Unit = {
+    if (Ledger.connections.contains(op.hashCode) && Ledger.connections(op.hashCode).contains(stack.head.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)(stack.head.hashCode)
       cxn.output.foreach{case p => output <> op.output}
       cxn.xBarW.foreach{p => input(p) <> op.input(p)}
-      Ledger.reset(op.hashCode)
+      cxn.reset.foreach{p => reset <> op.reset}
     }
     else {this <> op}
   }
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Ledger.connectOutput(this.hashCode, 0);Seq(output)}
-  def connectXBarWPort(index: Int, data1: UInt, en: Bool, last: Bool, first: Bool): Unit = {
+  def connectReset(r: Bool)(implicit stack: List[KernelHash]): Unit = {
+    reset := r
+    Ledger.connectReset(this.hashCode, 0)
+  }
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean)(implicit stack: List[KernelHash]): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
+  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool)(implicit stack: List[KernelHash]): Seq[UInt] = {Ledger.connectOutput(this.hashCode, 0);Seq(output)}
+  def connectXBarWPort(index: Int, data1: UInt, en: Bool, last: Bool, first: Bool)(implicit stack: List[KernelHash]): Unit = {
     input(index).input1 := data1
     input(index).enable := en
     input(index).last := last
@@ -172,8 +173,8 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val activeIn1 = Mux1H(io.input.map(_.enable), io.input.map(_.input1))
   val activeEn  = io.input.map(_.enable).reduce{_|_}
   val activeLast = Mux1H(io.input.map(_.enable), io.input.map(_.last))
-  val activeReset = io.input.map(_.reset).reduce{_|_}
-  val activeFirst = io.input.map(_.first).reduce{_|_}
+  val activeReset = io.reset
+  val activeFirst = io.input.map(_.first).reduce{_|_} | io.reset
 
   val fixin1 = Wire(new FixedPoint(s,d,f))
   fixin1.r := activeIn1
@@ -252,16 +253,5 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
       Mux(t1 > t2, t1.r,t2.r)
       // Utils.getRetimed(Mux(t1 > t2, t1.r,t2.r), opLatency.toInt)
     }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
-  }
-
-
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-  def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool): Seq[UInt] = {Ledger.connectOutput(this.hashCode, 0); Seq(io.output)}
-  def connectXBarWPort(index: Int, data1: UInt, en: Bool, last: Bool, first: Bool): Unit = {
-    io.input(index).input1 := data1
-    io.input(index).enable := en
-    io.input(index).last := last
-    io.input(index).first := first
-    Ledger.connectXBarW(this.hashCode, index)
   }
 }

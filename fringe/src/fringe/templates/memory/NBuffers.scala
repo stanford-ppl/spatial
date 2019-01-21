@@ -155,12 +155,12 @@ class NBufInterface(val p: NBufParams) extends Bundle {
   val output = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))  
 
   def connectLedger(op: NBufInterface)(implicit stack: List[KernelHash]): Unit = {
-    accessActivesOut.zip(op.accessActivesOut).foreach{case (l,r) => l := false.B}
-    full := op.full
-    almostFull := op.almostFull
-    empty := op.empty
-    almostEmpty := op.almostEmpty
-    numel := op.numel
+    accessActivesOut.zip(op.accessActivesOut).foreach{case (l,r) => r := l}
+    op.full := full
+    op.almostFull := almostFull
+    op.empty := empty
+    op.almostEmpty := almostEmpty
+    op.numel := numel
     if (Ledger.connections.contains(op.hashCode) && Ledger.connections(op.hashCode).contains(stack.head.hashCode)) {
       val cxn = Ledger.connections(op.hashCode)(stack.head.hashCode)
       cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}

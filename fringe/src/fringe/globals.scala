@@ -22,16 +22,10 @@ object globals {
   def TARGET_W: Int = target.target_w
   def NUM_CHANNELS: Int = target.num_channels
 
-  // TODO: What is this?
   var retime = false
-
-  // TODO: What is this?
-  var tight_control = false
-
-  // TODO: What is this?
+  var enableModular: Boolean = true
+  var enableVerbose: Boolean = true
   var enableDebugRegs: Boolean = true
-
-  // TODO: What is this?
   var channelAssignment: ChannelAssignment = AllToOne
 
   /** TCL script generator. */

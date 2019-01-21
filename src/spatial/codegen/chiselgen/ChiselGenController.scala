@@ -172,10 +172,10 @@ trait ChiselGenController extends ChiselGenCommon {
       }
 
       open(src"def kernel(): $ret = {")
-        emit("""ControllerStack.stack.push(this.hashCode)""")
+        emit(src"""Ledger.enter(this.hashCode, "${lhs}")""")
         emit("implicit val stack = ControllerStack.stack.toList")
         if (spatialConfig.enableInstrumentation) {
-          emit("cycles.io.enable := $baseEn")
+          emit(src"cycles.io.enable := $baseEn")
           emit("iters.io.enable := risingEdge(done)")
           emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).cycs := cycles.io.count")
           emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).iters := iters.io.count")
@@ -252,7 +252,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit("me.sigsOut := module.io.sigsOut")
           emit("module.io.rr := rr")
         }
-        emit("""ControllerStack.stack.pop()""")
+        emit("""Ledger.exit()""")
         close("}")
       close("}")
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
@@ -432,7 +432,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
         if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(top, instrctrs)")
 
-
+        emit("Ledger.finish()")
         exitCtrl(lhs)
       }
 
@@ -599,6 +599,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit (s"globals.target.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
       emit (s"globals.target.SramThreshold = ${spatialConfig.sramThreshold}")
       emit (s"""globals.retime = ${spatialConfig.enableRetiming}""")
+      emit (s"""globals.enableModular = ${spatialConfig.enableModular}""")
 
     }
 

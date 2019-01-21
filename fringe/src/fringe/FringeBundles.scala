@@ -3,6 +3,8 @@ package fringe
 import chisel3._
 import chisel3.util._
 import fringe.utils._
+import fringe.Ledger._
+import scala.collection.mutable._
 
 class AppLoadData(val v: Int, val w: Int) extends Bundle {
   def this(tup: (Int, Int)) = this(tup._1, tup._2)
@@ -98,13 +100,12 @@ class MultiArgOut(nw: Int) extends Bundle {
   val output = new Bundle{val echo = Input(UInt(64.W))}
 
   def connectXBarR(): UInt = output.echo
-  def connectXBarW(p: Int, data: UInt, valid: Bool): Unit = {port(p).bits := data; port(p).valid := valid}
-  def connectLedger(op: MultiArgOut): Unit = {
-    if (Ledger.connections.contains(op.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)
+  def connectXBarW(p: Int, data: UInt, valid: Bool)(implicit stack: List[KernelHash]): Unit = {port(p).bits := data; port(p).valid := valid; Ledger.connectXBarW(this.hashCode, p)}
+  def connectLedger(op: MultiArgOut)(implicit stack: List[KernelHash]): Unit = {
+    if (Ledger.connections.contains(op.hashCode) && Ledger.connections(op.hashCode).contains(stack.head.hashCode)) {
+      val cxn = Ledger.connections(op.hashCode)(stack.head.hashCode)
       cxn.xBarR.foreach{case RAddr(p,lane) => output.echo <> op.output.echo}
       cxn.xBarW.foreach{p => port(p) <> op.port(p)}
-      Ledger.reset(op.hashCode)
     }
     else {port <> op.port; output <> op.output}
   }

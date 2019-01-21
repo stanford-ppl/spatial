@@ -23,16 +23,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   // var scopeInputs = List[Sym[_]]()
 
   // Mapping for DRAMs, since DRAMs and their related Transfer nodes don't necessarily appear in consistent order
-  var loadStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  var storeStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  var gatherStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  var scatterStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  val loadStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  val storeStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  val gatherStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  val scatterStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
 
   // Statistics counters
-  var controllerStack = scala.collection.mutable.Stack[Sym[_]]()
+  val controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var ctrls = List[Sym[_]]()
-  var widthStats = new scala.collection.mutable.ListBuffer[Int]
-  var depthStats = new scala.collection.mutable.ListBuffer[Int]
+  val widthStats = new scala.collection.mutable.ListBuffer[Int]
+  val depthStats = new scala.collection.mutable.ListBuffer[Int]
   var appPropertyStats = Set[AppProperties]()
 
   // Buffer mappings from LCA to list of memories controlled by it
@@ -81,6 +81,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def iodot: String = if (spatialConfig.enableModular) "io." else ""
   protected def dotio: String = if (spatialConfig.enableModular) ".io" else ""
   protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.output"
+  protected def cchainCopyOutput(ii: Int): String = if (spatialConfig.enableModular) s"io.sigsIn.cchainOutputs($ii)" else s"cchain($ii).output"
   protected def ifaceType(mem: Sym[_]): String = mem match {
         case _ if (mem.isNBuffered) => src".asInstanceOf[NBufInterface]"
         case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined && mem.optimizedRegType.get == AccumFMA) => src".asInstanceOf[FixFMAAccumBundle]"
@@ -97,6 +98,10 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def datapathEn: String = s"${iodot}sigsIn.datapathEn"
   protected def break: String = s"${iodot}sigsIn.break"
   protected def done: String = s"${iodot}sigsIn.done"
+  protected def baseEn: String = s"${iodot}sigsIn.baseEn"
+  protected def nextState: String = s"${iodot}sigsOut.smNextState"
+  protected def initState: String = s"${iodot}sigsOut.smInitState"
+  protected def doneCondition: String = s"${iodot}sigsOut.smDoneCondition"  
   protected def mask: String = s"${iodot}sigsIn.mask"
   protected def ctrDone: String = s"${iodot}sigsIn.ctrDone"
   protected def iiDone: String = s"${iodot}sigsIn.iiDone"
@@ -197,7 +202,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
       case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.io.empty"
+      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.empty"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
@@ -209,7 +214,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.io.full($way)"
+            src"~${merge}.full($way)"
         }
     }) else "true.B"
   }

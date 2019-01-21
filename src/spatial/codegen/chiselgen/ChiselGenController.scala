@@ -53,7 +53,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
   final private def connectBufs(lhs: Sym[_]): Unit = {
     bufMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
-      emit(src"""${mem}.connectStageCtrl(${DL(src"done", 1, true)}, baseEn, ${port})""")
+      emit(src"""${mem}.connectStageCtrl(${DL(src"$done", 1, true)}, $baseEn, ${port})""")
     }
   }
   final private def connectChains(lhs: Sym[_]): Unit = {
@@ -109,10 +109,10 @@ trait ChiselGenController extends ChiselGenCommon {
       iters.zipWithIndex.foreach{ case (iter, id) =>
         val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
         val w = bitWidth(counters(i).typeArgs.head)
-        emit(src"val ${iter}_copy$c = cchain($ii).output.counts($id).FP(true, $w, 0)")
+        emit(src"val ${iter}_copy$c = ${cchainCopyOutput(ii)}.counts($id).FP(true, $w, 0)")
       }
       valids.zipWithIndex.foreach{ case (v,id) => 
-        emit(src"val ${v}_copy$c = ~cchain($ii).output.oobs($id)")
+        emit(src"val ${v}_copy$c = ~${cchainCopyOutput(ii)}.oobs($id)")
       }
 
     }
@@ -172,14 +172,16 @@ trait ChiselGenController extends ChiselGenCommon {
       }
 
       open(src"def kernel(): $ret = {")
+        emit("""ControllerStack.stack.push(this.hashCode)""")
+        emit("implicit val stack = ControllerStack.stack.toList")
         if (spatialConfig.enableInstrumentation) {
-          emit("cycles.io.enable := baseEn")
+          emit("cycles.io.enable := $baseEn")
           emit("iters.io.enable := risingEdge(done)")
           emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).cycs := cycles.io.count")
           emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).iters := iters.io.count")
           if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
-            emit(src"stalls.io.enable := baseEn & ~(${getBackPressure(lhs.toCtrl)})")
-            emit(src"idles.io.enable := baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+            emit(src"stalls.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+            emit(src"idles.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
             emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).stalls := stalls.io.count")
             emit(src"instrctrs(${quote(lhs).toUpperCase}_instrctr).idles  := idles.io.count")
           } else {
@@ -207,8 +209,8 @@ trait ChiselGenController extends ChiselGenCommon {
             close("})")
             emit("io.sigsOut := DontCare")
             inputs.zipWithIndex.foreach{case(in,i) => 
-              if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val ${in}_copy$c = io.in_${in}_copy$c")}
-              else emit(src"val $in = io.in_$in ${if (subset(in)) src";$in := DontCare" else ""}")
+              if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val ${in}_copy$c = io.in_${in}_copy$c; ${in}_copy$c := DontCare")}
+              else emit(src"val $in = io.in_$in ${if (subset(in) | in.isCounterChain) src";$in := DontCare" else ""}")
             }
             emit("val rr = io.rr")
         }
@@ -250,6 +252,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit("me.sigsOut := module.io.sigsOut")
           emit("module.io.rr := rr")
         }
+        emit("""ControllerStack.stack.pop()""")
         close("}")
       close("}")
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
@@ -281,7 +284,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
     val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
     val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
-    val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
+    val ctrWidths = if (lhs.cchains.nonEmpty && !lhs.cchains.head.isForever) src"List(${lhs.cchains.head.widths})" else "List(32)"
     emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, $nMyChildren, $ctrcopies, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs, " else ""}rr)")
     modifications
     // Wire signals to SM object
@@ -319,8 +322,8 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"${lhs}$swobj.sm.io.enableOut.zip(${lhs}$swobj.smEnableOuts).foreach{case (l,r) => r := l}")
 
     lhs match {
-      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.io.output(0); ${stopWhen.get}.io.reset := done")
-      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.io.output(0); ${stopWhen.get}.io.reset := done")
+      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.output(0); ${stopWhen.get}.connectReset($done)")
+      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.output(0); ${stopWhen.get}.connectReset($done)")
       case _ => emit(src"${lhs}$swobj.sm.io.break := false.B") 
     }
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
@@ -487,22 +490,22 @@ trait ChiselGenController extends ChiselGenCommon {
       }
       exitCtrl(lhs)
 
-    case StateMachine(ens,start,notDone,action,nextState) =>
+    case StateMachine(ens,start,notDone,action,nState) =>
       appPropertyStats += HasFSM
       enterCtrl(lhs)
-      instantiateKernel(lhs, ens, notDone, action, nextState){}
-      writeKernelClass(lhs, ens, notDone, action, nextState) {
+      instantiateKernel(lhs, ens, notDone, action, nState){}
+      writeKernelClass(lhs, ens, notDone, action, nState) {
         val state = notDone.input
         emit(createWire(src"$state", src"${state.tp}"))
         emit(src"${state}.r := ${iodot}sigsIn.smState.r")
 
         gen(notDone)
         gen(action)
-        gen(nextState)
+        gen(nState)
 
-        emit(src"sm.io.nextState := ${nextState.result}.r.asSInt ")
-        emit(src"sm.io.initState := ${start}.r.asSInt")
-        emit(src"sm.io.doneCondition := ~${notDone.result}")
+        emit(src"$nextState := ${nState.result}.r.asSInt ")
+        emit(src"$initState := ${start}.r.asSInt")
+        emit(src"$doneCondition := ~${notDone.result}")
       }
       exitCtrl(lhs)
 

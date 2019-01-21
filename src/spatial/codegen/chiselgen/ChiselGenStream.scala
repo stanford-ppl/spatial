@@ -40,7 +40,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
-      val maskingLogic = src"sm.io.backpressure" 
+      val maskingLogic = src"$backpressure" 
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
         emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")

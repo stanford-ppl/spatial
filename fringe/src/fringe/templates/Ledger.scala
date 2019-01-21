@@ -1,6 +1,7 @@
 package fringe
 
 import scala.collection.mutable._
+import java.io.{File, PrintWriter}
 
 /** Structure for keeping track of which ports on which interfaces are connected inside modules 
                                  
@@ -62,11 +63,25 @@ import scala.collection.mutable._
                              * Bore xBarW0, xBarW1, xBarR0, xBarR1 between K0 <-> MEM on exit K0
 
 */
+object ControllerStack {
+  val stack = scala.collection.mutable.Stack[Ledger.KernelHash]()
+}
 
 object Ledger {
   type OpHash = Int
   type KernelHash = Int
   type BoreMap = HashMap[KernelHash, ExposedPorts] // List of bore connections to make upon leaving KernelHash
+  var indent: Int = 0
+
+  // Print all debugging signals into a header file
+  val debugFileName = "chisel/debugLedger.txt"
+
+  val debugPW = if (globals.enableVerbose) {
+    val debugPW = new PrintWriter(new File(debugFileName))
+    Some(debugPW)
+  } else None
+
+  def write(s: String): Unit = if (globals.enableVerbose) debugPW.get.println(s"${"  "*indent}$s")
 
   case class RAddr(val port: Int, val lane: Int)
   class ExposedPorts {
@@ -79,6 +94,7 @@ object Ledger {
     var reset = ListBuffer[Int]()
     var output = ListBuffer[Int]()
     var accessActivesIn = ListBuffer[Int]()
+    var stageCtrl = ListBuffer[Int]()
 
     def addXBarR(p: RAddr): ExposedPorts = {xBarR = xBarR :+ p; this}
     def addDirectR(p: RAddr): ExposedPorts = {directR = directR :+ p; this}
@@ -89,46 +105,151 @@ object Ledger {
     def addReset(p: Int): ExposedPorts = {reset = reset :+ p; this}
     def addOutput(p: Int): ExposedPorts = {output = output :+ p; this}
     def addAccessActivesIn(p: Int): ExposedPorts = {accessActivesIn = accessActivesIn :+ p; this}
+    def addStageCtrl(p: Int): ExposedPorts = {stageCtrl = stageCtrl :+ p; this}
+    def log: Unit = {
+      if (xBarR.nonEmpty)           write(s"|-- xBarR: $xBarR")
+      if (directR.nonEmpty)         write(s"|-- directR: $directR")
+      if (xBarW.nonEmpty)           write(s"|-- xBarW: $xBarW")
+      if (directW.nonEmpty)         write(s"|-- directW: $directW")
+      if (broadcastW.nonEmpty)      write(s"|-- broadcastW: $broadcastW")
+      if (broadcastR.nonEmpty)      write(s"|-- broadcastR: $broadcastR")
+      if (reset.nonEmpty)           write(s"|-- reset: $reset")
+      if (output.nonEmpty)          write(s"|-- output: $output")
+      if (accessActivesIn.nonEmpty) write(s"|-- accessActivesIn: $accessActivesIn")
+      if (stageCtrl.nonEmpty)       write(s"|-- stageCtrl: $stageCtrl")
+    }
+    def merge(port: ExposedPorts): ExposedPorts = {
+      xBarR = xBarR ++ port.xBarR
+      directR = directR ++ port.directR
+      xBarW = xBarW ++ port.xBarW
+      directW = directW ++ port.directW
+      broadcastW = broadcastW ++ port.broadcastW
+      broadcastR = broadcastR ++ port.broadcastR
+      reset = reset ++ port.reset
+      output = output ++ port.output
+      accessActivesIn = accessActivesIn ++ port.accessActivesIn
+      stageCtrl = stageCtrl ++ port.stageCtrl
+      this
+    }
   }
 
   val connections = HashMap[OpHash, BoreMap]()
 
+  def combine(oldMap: BoreMap, newMap: BoreMap): BoreMap = {
+    write(s"newHash:")
+    newMap.foreach{case (k, ports) => 
+      write(s"+ K.$k:")
+      ports.log
+    }
+    write(s"oldHash:")
+    oldMap.foreach{case (k, ports) => 
+      write(s"+ K.$k:")
+      ports.log
+    }
+    oldMap.foreach{case (k, ports) => 
+      newMap += k -> newMap.getOrElse(k, new ExposedPorts).merge(ports)
+    }
+    newMap
+  }
+
+  def lookup(op: OpHash)(implicit stack: List[KernelHash]): ExposedPorts = {
+    write(s"lookup($op)(K.${stack.head})")
+    if (connections.contains(op) && connections(op).contains(stack.head)) connections(op)(stack.head)
+    else new ExposedPorts
+  }
+
+  def substitute(oldHash: OpHash, newHash: OpHash): Unit = {
+    if (connections.contains(oldHash)) {
+      write(s"substitute($oldHash, $newHash)")
+      val tmp = connections(oldHash)
+      val current = connections.getOrElse(newHash, new BoreMap)
+      connections -= oldHash
+      val combined = combine(tmp,current)
+      connections += (newHash -> combined)
+    }
+  }
+
   // TODO: Should there be a cleanup method upon exiting KernelHash?
   def connectXBarR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addXBarR(RAddr(p,lane)))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addXBarR(RAddr(p,lane)))}
+      write(s"connectXBarR(${hash}, $p)")
+    }
   }
   def connectDirectR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addDirectR(RAddr(p,lane)))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addDirectR(RAddr(p,lane)))}
+      write(s"connectDirectR(${hash}, $p, $lane)")
+    }
   }
   def connectXBarW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addXBarW(p))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addXBarW(p))}
+      write(s"connectXBarW(${hash}, $p)")
+    }
   }
   def connectDirectW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addDirectW(p))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addDirectW(p))}
+      write(s"connectDirectW(${hash}, $p)")
+    }
   }
   def connectBroadcastW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastW(p))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastW(p))}
+      write(s"connectBroadcastW(${hash}, $p)")
+    }
   }
   def connectBroadcastR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastR(RAddr(p,lane)))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastR(RAddr(p,lane)))}
+      write(s"connectBroadcastR(${hash}, $p, $lane)")
+    }
   }
   def connectReset(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addReset(p))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addReset(p))}
+      write(s"connectReset(${hash}, $p)")
+    }
   }
   def connectOutput(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addOutput(p))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addOutput(p))}
+      write(s"connectOutput(${hash}, $p)")
+    }
   }
   def connectAccessActivesIn(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-    stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAccessActivesIn(p))}
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAccessActivesIn(p))}
+      write(s"connectAccessActivesIn(${hash}, $p)")
+    }
   }
+  def connectStageCtrl(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addStageCtrl(p))}
+      write(s"connectStageCtrl(${hash}, $p)")
+    }
+  }
+
+  def enter(ctrl: KernelHash, name: String): Unit = {
+    write(s"Enter K.$ctrl ($name)")
+    indent = indent + 1
+    ControllerStack.stack.push(ctrl)
+  }
+  def exit(): Unit = {
+    if (globals.enableVerbose) indent = indent-1
+    ControllerStack.stack.pop()
+  }
+  def finish(): Unit = if (globals.enableVerbose) debugPW.get.close()
 
 }

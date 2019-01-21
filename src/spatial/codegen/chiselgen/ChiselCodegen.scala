@@ -170,9 +170,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
     inGen(out, "Controllers.scala"){
       emitHeader()
-      emit("""object ControllerStack {""")
-      emit("""  val stack = scala.collection.mutable.Stack[KernelHash]()""")
-      emit("""}""")
       emit("""class InputKernelSignals(val depth: Int, val ctrcopies: Int, val ctrPars: List[Int], val ctrWidths: List[Int]) extends Bundle{ // From outside to inside kernel module""")
       emit("""  val done = Bool()              // my sm -> parent sm + insides""")
       emit("""  val mask = Bool()              // my cchain -> parent sm + insides""")
@@ -217,6 +214,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""  val sm: GeneralControl""")
       emit("""  val iiCtr: IICounter""")
       emit(""" """)
+      emit("""class InstrBundle(isStream: Boolean) {""")
+      emit(""" """)
+      emit(""" """)
+      emit("""""")
+      emit("""}""")
       emit("""  def configure(n: String, ifaceSigsIn: Option[InputKernelSignals], ifaceSigsOut: Option[OutputKernelSignals], isSwitchCase: Boolean = false): Unit = {""")
       emit("""    cchain.zip(sigsIn.cchainOutputs).foreach{case (cc, sc) => sc := cc.output}""")
       emit("""    sigsIn.smSelectsOut.zip(sm.io.selectsOut).foreach{case (si, sm) => si := sm}""")

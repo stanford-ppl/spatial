@@ -95,24 +95,6 @@ class ArgOut() extends Bundle {
   override def cloneType(): this.type = new ArgOut().asInstanceOf[this.type]
 }
 
-class MultiArgOut(nw: Int) extends Bundle {
-  val port = Vec(nw, Decoupled(UInt(64.W)))
-  val output = new Bundle{val echo = Input(UInt(64.W))}
-
-  def connectXBarR(): UInt = output.echo
-  def connectXBarW(p: Int, data: UInt, valid: Bool)(implicit stack: List[KernelHash]): Unit = {port(p).bits := data; port(p).valid := valid; Ledger.connectXBarW(this.hashCode, p)}
-  def connectLedger(op: MultiArgOut)(implicit stack: List[KernelHash]): Unit = {
-    if (Ledger.connections.contains(op.hashCode) && Ledger.connections(op.hashCode).contains(stack.head.hashCode)) {
-      val cxn = Ledger.connections(op.hashCode)(stack.head.hashCode)
-      cxn.xBarR.foreach{case RAddr(p,lane) => output.echo <> op.output.echo}
-      cxn.xBarW.foreach{p => port(p) <> op.port(p)}
-    }
-    else {port <> op.port; output <> op.output}
-  }
-
-  override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]
-}
-
 class InstrCtr() extends Bundle {
   val cycs  = UInt(64.W)
   val iters = UInt(64.W)

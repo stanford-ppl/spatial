@@ -326,6 +326,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Add, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
+            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
         case Some(AccumMul) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -334,6 +335,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Mul, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
+            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
         case Some(AccumMin) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -342,6 +344,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Min, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
+            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
         case Some(AccumMax) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -350,6 +353,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixOpAccum(Accum.Max, $numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
+            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
         case Some(AccumFMA) =>
           val FixPtType(s,d,f) = lhs.tp.typeArgs.head
@@ -358,6 +362,7 @@ trait ChiselGenMem extends ChiselGenCommon {
           val numWriters = lhs.writers.size
           createMemObject(lhs) {
             emit(src"val m = Module(new FixFMAAccum($numWriters, ${cycleLatency}, ${opLatency}, $s,$d,$f, ${quoteAsScala(init)}))")  
+            if (lhs.resetters.isEmpty) emit(src"m.io.reset := false.B")
           }
         case Some(AccumUnk) => throw new Exception(s"Cannot emit Reg with specialized reduce of type Unk yet!")
       }

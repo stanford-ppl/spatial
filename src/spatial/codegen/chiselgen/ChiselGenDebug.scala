@@ -21,19 +21,19 @@ trait ChiselGenDebug extends ChiselGenCommon {
 
     case ExitIf(en) => 
     	val ens = and(en)
-	    emit(s"breakpoints(${earlyExits.length}) := ${ens} & (datapathEn).D(${lhs.fullDelay})")
+	    emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & (datapathEn).D(${lhs.fullDelay}))")
 	    earlyExits = earlyExits :+ lhs
 
     case AssertIf(en,cond,_) => 
     	if (inHw) {
 	    	val ens = and(en)
-	        emit(s"breakpoints(${earlyExits.length}) := ${ens} & (datapathEn).D(${lhs.fullDelay}) & ~${quote(cond)}")
+	        emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & (datapathEn).D(${lhs.fullDelay}) & ~${quote(cond)})")
 	        earlyExits = earlyExits :+ lhs
 	    }
 
     case BreakpointIf(en) => 
         val ens = and(en)
-        emit(s"breakpoints(${earlyExits.length}) := ${ens} & (datapathEn).D(${lhs.fullDelay})")
+        emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & (datapathEn).D(${lhs.fullDelay}))")
         earlyExits = earlyExits :+ lhs
 
 	case _ => super.gen(lhs, rhs)

@@ -255,7 +255,7 @@ object Ledger {
 
   def connectInstrCtrs(upstream: List[InstrCtr], downstream: Vec[InstrCtr])(implicit stack: List[KernelHash]): Unit = {
     if (stack.isEmpty) upstream.zip(downstream).foreach{case (a,b) => a := b}
-    else instrIdsBelow(stack.head).foreach{i => Console.println(s"@ ${stack.head}: $i");upstream(i) := downstream(i)}
+    else instrIdsBelow.getOrElse(stack.head,List()).foreach{i => Console.println(s"@ ${stack.head}: $i");upstream(i) := downstream(i)}
   }
 
   def tieBreakpoint(values: Vec[Bool], id: Int, b: Bool)(implicit stack: List[KernelHash]): Unit = {
@@ -265,7 +265,7 @@ object Ledger {
 
   def connectBreakpoints(upstream: Vec[Bool], downstream: Vec[Bool])(implicit stack: List[KernelHash]): Unit = {
     if (stack.isEmpty) upstream.zip(downstream).foreach{case (a,b) => a := b}
-    else breakpointsBelow(stack.head).foreach{i => upstream(i) := downstream(i)}
+    else breakpointsBelow.getOrElse(stack.head,List()).foreach{i => upstream(i) := downstream(i)}
   }
 
   def enter(ctrl: KernelHash, name: String)(implicit stack: List[KernelHash]): Unit = {

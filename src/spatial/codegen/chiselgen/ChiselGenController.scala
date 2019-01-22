@@ -171,8 +171,8 @@ trait ChiselGenController extends ChiselGenCommon {
       }
 
       open(src"def kernel(): $ret = {")
-        emit("implicit val stack = ControllerStack.stack.toList")
         emit(src"""Ledger.enter(this.hashCode, "${lhs}$swobj")""")
+        emit("implicit val stack = ControllerStack.stack.toList")
         if (spatialConfig.enableModular) {
           open(src"class ${lhs}_module(depth: Int) extends Module {")
             open("val io = IO(new Bundle {")

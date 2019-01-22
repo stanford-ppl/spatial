@@ -249,13 +249,12 @@ object Ledger {
     values(id).iters := iters
     values(id).stalls := stalls 
     values(id).idles := idles
-    Console.println(s"here1: ${stack} ${globals.enableModular}")
-    if (globals.enableModular) stack.foreach{k => Console.println(s"add $k (${instrIdsBelow.getOrElse(k,List())}) ++ $id");instrIdsBelow += (k -> (instrIdsBelow.getOrElse(k, List()) :+ id))}
+    if (globals.enableModular) stack.foreach{k => instrIdsBelow += (k -> (instrIdsBelow.getOrElse(k, List()) :+ id))}
   }
 
   def connectInstrCtrs(upstream: List[InstrCtr], downstream: Vec[InstrCtr])(implicit stack: List[KernelHash]): Unit = {
     if (stack.isEmpty) upstream.zip(downstream).foreach{case (a,b) => a := b}
-    else instrIdsBelow.getOrElse(stack.head,List()).foreach{i => Console.println(s"@ ${stack.head}: $i");upstream(i) := downstream(i)}
+    else instrIdsBelow.getOrElse(stack.head,List()).foreach{i => upstream(i) := downstream(i)}
   }
 
   def tieBreakpoint(values: Vec[Bool], id: Int, b: Bool)(implicit stack: List[KernelHash]): Unit = {
@@ -268,7 +267,7 @@ object Ledger {
     else breakpointsBelow.getOrElse(stack.head,List()).foreach{i => upstream(i) := downstream(i)}
   }
 
-  def enter(ctrl: KernelHash, name: String)(implicit stack: List[KernelHash]): Unit = {
+  def enter(ctrl: KernelHash, name: String): Unit = {
     write(s"Enter K.$ctrl ($name)")
     indent = indent + 1
     ControllerStack.stack.push(ctrl)

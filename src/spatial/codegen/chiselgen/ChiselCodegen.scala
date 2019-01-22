@@ -233,7 +233,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("""    sm.io.maskIn.zip(sigsOut.smMaskIn).foreach{case (sm, i) => sm := i}""")
       emit("""    cchain.zip(sigsOut.cchainEnable).foreach{case (c,e) => c.input.enable := e}""")
       emit("""    sm.io.backpressure := backpressure""")
-      emit("""    sm.io.backpressure := backpressure""")
       emit("""    sm.io.rst := resetMe""")
       emit("""    done := sm.io.done""")
       emit("""    sigsIn.break := sm.io.break""")
@@ -541,7 +540,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         bus match {
           case _: BurstDataBus[_] => s"Flipped(Decoupled(new AppLoadData(${x}_p)))"
           case BurstAckBus => "Flipped(Decoupled(Bool()))"
-          case _: GatherDataBus[_] => "Flipped(Decoupled(Vec(0,UInt)))"
+          case _: GatherDataBus[_] => 
+            val par = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
+            s"Flipped(Decoupled(Vec(${par},UInt)))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
           case _ => super.remap(tp)
         }
@@ -574,7 +575,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       bus match {
         case BurstCmdBus => Some(src"($x.bits.addrWidth, $x.bits.sizeWidth)")
         case _: BurstFullDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
-        case GatherAddrBus => Some(src"($x.bits.v, $x.bits.scatterWidth)")
+        case GatherAddrBus => Some(src"($x.bits.v, $x.bits.addrWidth)")
         case _: ScatterCmdBus[_] => Some(src"$x.bits.p")
         case _ => None
       }

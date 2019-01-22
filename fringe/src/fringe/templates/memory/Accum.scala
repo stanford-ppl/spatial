@@ -55,7 +55,7 @@ class FixFMAAccum(
   laneCtr.io <> DontCare
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
-  laneCtr.io.input.saturate := false.B
+  laneCtr.io.setup.saturate := false.B
 
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
@@ -113,7 +113,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   laneCtr.io <> DontCare
   laneCtr.io.input.enable := activeEn
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + opLatency)
-  laneCtr.io.input.saturate := false.B
+  laneCtr.io.setup.saturate := false.B
 
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done

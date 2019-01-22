@@ -371,7 +371,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   subAccessor.io.input.enable := io.xBarW.flatMap(_.en).toList.reduce{_|_} | io.xBarR.flatMap(_.en).toList.reduce{_|_}
   subAccessor.io.input.dir := io.xBarW.flatMap(_.en).toList.reduce{_|_}
   subAccessor.io.input.reset := reset
-  subAccessor.io.input.saturate := false.B
+  subAccessor.io.setup.saturate := false.B
   val subAccessor_prev = Mux(subAccessor.io.output.count(0) - pR.S(sa_width.W) < 0.S(sa_width.W), (par-pR).S(sa_width.W), subAccessor.io.output.count(0) - pR.S(sa_width.W))
 
   // Create head and reader counters
@@ -381,7 +381,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   accessor.io.input.enable := (io.xBarW.flatMap(_.en).toList.reduce{_|_} & subAccessor.io.output.done) | (io.xBarR.flatMap(_.en).toList.reduce{_|_} & subAccessor_prev === 0.S(sa_width.W))
   accessor.io.input.dir := io.xBarW.flatMap(_.en).toList.reduce{_|_}
   accessor.io.input.reset := reset
-  accessor.io.input.saturate := false.B
+  accessor.io.setup.saturate := false.B
 
 
   // Connect pusher

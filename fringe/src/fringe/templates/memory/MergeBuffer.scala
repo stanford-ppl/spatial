@@ -149,12 +149,14 @@ class SortPipe(val w: Int, val v: Int) extends Module {
   io.out.bits := stages.last
 }
 
-class MergeBufferIO(ways: Int, w: Int, v: Int) extends Bundle {
+class MergeBufferIO(val ways: Int, val w: Int, val v: Int) extends Bundle {
   val in = Vec(ways, Flipped(Decoupled(Vec(v, UInt(w.W)))))
   val initMerge = Flipped(Valid(Bool()))
   val inBound = Vec(ways, Flipped(Valid(UInt(w.W))))
   val out = Decoupled(Vec(v, UInt(w.W)))
   val outBound = Valid(UInt(w.W))
+
+  override def cloneType = (new MergeBufferIO(ways, w, v)).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
 class MergeBufferTwoWay(w: Int, v: Int) extends Module {
@@ -282,20 +284,26 @@ class MergeBufferNWay(ways: Int, w: Int, v: Int) extends Module {
   }
 }
 
-class MergeBuffer(ways: Int, par: Int, bitWidth: Int, readers: Int) extends Module {
-  val io = IO(new Bundle {
-    val in_wen = Input(Vec(ways, Vec(par, Bool())))
-    val in_data = Input(Vec(ways, Vec(par, UInt(bitWidth.W))))
-    val initMerge_wen = Input(Bool())
-    val initMerge_data = Input(Bool())
-    val inBound_wen = Input(Vec(ways, UInt(bitWidth.W)))
-    val inBound_data = Input(Vec(ways, UInt(bitWidth.W)))
-    val out_ren = Input(Vec(readers, Vec(par, Bool())))
-    val out_data = Output(Vec(par, UInt(bitWidth.W)))
+class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val readers: Int) extends Bundle {
+  def this(tup: (Int, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4)
 
-    val empty = Output(Bool())
-    val full = Output(Vec(ways, Bool()))
-  })
+  val in_wen = Input(Vec(ways, Vec(par, Bool())))
+  val in_data = Input(Vec(ways, Vec(par, UInt(bitWidth.W))))
+  val initMerge_wen = Input(Bool())
+  val initMerge_data = Input(Bool())
+  val inBound_wen = Input(Vec(ways, UInt(bitWidth.W)))
+  val inBound_data = Input(Vec(ways, UInt(bitWidth.W)))
+  val out_ren = Input(Vec(readers, Vec(par, Bool())))
+  val out_data = Output(Vec(par, UInt(bitWidth.W)))
+
+  val empty = Output(Bool())
+  val full = Output(Vec(ways, Bool()))
+  
+  override def cloneType = (new MergeBufferFullIO(ways, par, bitWidth, readers)).asInstanceOf[this.type] // See chisel3 bug 358
+}
+
+class MergeBuffer(ways: Int, par: Int, bitWidth: Int, readers: Int) extends Module {
+  val io = IO(new MergeBufferFullIO(ways, par, bitWidth, readers))
 
   val mergeBuf = Module(new MergeBufferNWay(ways, bitWidth, par))
 

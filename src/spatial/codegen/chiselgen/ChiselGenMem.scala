@@ -35,20 +35,20 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
-    if (mem.isFIFOReg) src"~break && done"
-    else               src"""~break && ${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
+    if (mem.isFIFOReg) src"~$break && $done"
+    else               src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {
-    val flowEnable = src"~break && sm.io.backpressure"
-    src"""~break && ${DL(src"datapathEn & iiDone", lhs.fullDelay, true)} & $flowEnable"""
+    val flowEnable = src"~$break && $backpressure"
+    src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ mem
-        val invisibleEnable = src"""${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
-        emit(src"${mem}.io.reset := ${invisibleEnable} & ${and(en)}")
+        val invisibleEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+        emit(src"${mem}.connectReset(${invisibleEnable} & ${and(en)})")
       }
   }
 
@@ -59,7 +59,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val width = bitWidth(mem.tp.typeArgs.head)
     // if (lhs.parent.stage == -1) emitControlSignals(parent)
     val invisibleEnable = invisibleEnableRead(lhs,mem)
-    val flowEnable = src",backpressure"
+    val flowEnable = src",$backpressure"
     val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).product/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                      else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
     val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -299,15 +299,6 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
   }
 
-  private def ifaceType(mem: Sym[_]): String = {
-    mem match {
-      case Op(_:FIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
-      case Op(_:FIFORegNew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
-      case Op(_:LIFONew[_]) => if (mem.instance.depth > 1) "" else ".asInstanceOf[FIFOInterface]"
-      case _ => ""
-    }
-  }
-
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     // SRAMs
@@ -319,10 +310,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
     case FIFORegEnq(reg, data, ens) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-      emit(src"$reg.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
+      emit(src"${reg}.connectAccessActivesIn(${activesMap(lhs)}, ${and(ens)})") 
     case FIFORegDeq(reg, ens) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
-      emit(src"$reg.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := ${and(ens)}") 
+      emit(src"${reg}.connectAccessActivesIn(${activesMap(lhs)}, ${and(ens)})") 
 
     // Registers
     case RegNew(init) => 
@@ -382,22 +373,15 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegAccumOp(reg, data, ens, t, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.io.input1($index) := $data.r")
-      emit(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
-      emit(src"${reg}.io.last($index)   := ${DL(src"sm.io.ctrDone", lhs.fullDelay, true)}")
-      emit(src"${reg}.io.first($index) := ${first}")
+      emit(src"${reg}.connectXBarWPort($index, $data.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, ${first})")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.io.output")
+      emit(src"${lhs}.r := ${reg}.output")
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val index = reg.writers.toList.indexOf(lhs)
       val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.io.input1($index) := $data1.r")
-      emit(src"${reg}.io.input2($index) := $data2.r")
-      emit(src"${reg}.io.enable($index) := ${and(ens)} && $invisibleEnable")
-      emit(src"${reg}.io.last($index)   := ${DL(src"sm.io.ctrDone", lhs.fullDelay, true)}")
-      emit(src"${reg}.io.first($index) := ${first}")
+      emit(src"${reg}.connectXBarWPort($index, $data1.r, $data2.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, ${first})")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.io.output")
+      emit(src"${lhs}.r := ${reg}.output")
     case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
@@ -418,29 +402,29 @@ trait ChiselGenMem extends ChiselGenCommon {
     
     // FIFOs
     case FIFONew(depths) => emitMem(lhs, None)
-    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
-    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
-    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
-    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
+    case FIFOIsEmpty(fifo,_) => emit(src"val $lhs = ${fifo}.empty")
+    case FIFOIsFull(fifo,_)  => emit(src"val $lhs = ${fifo}.full")
+    case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = ${fifo}.almostEmpty")
+    case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${fifo}.almostFull")
     case op@FIFOPeek(fifo,_) => 
-      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := false.B") 
-      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
-    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
+      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, false.B)") 
+      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.output(0)")
+    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
+      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))") 
     case FIFOBankedEnq(fifo, data, ens) => 
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"$fifo.io.asInstanceOf[FIFOInterface].accessActivesIn(${activesMap(lhs)}) := (${or(ens.map{e => "(" + and(e) + ")"})})") 
+      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))") 
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, None)
-    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.empty")
-    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.full")
-    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostEmpty")
-    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = $fifo.io${ifaceType(fifo)}.almostFull")
-    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io.output.data(0)")
-    case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.io${ifaceType(fifo)}.numel")
+    case LIFOIsEmpty(fifo,_) => emit(src"val $lhs = ${fifo}.empty")
+    case LIFOIsFull(fifo,_)  => emit(src"val $lhs = ${fifo}.full")
+    case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = ${fifo}.almostEmpty")
+    case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${fifo}.almostFull")
+    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.output(0)")
+    case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
     
@@ -456,25 +440,25 @@ trait ChiselGenMem extends ChiselGenCommon {
       }
     case MergeBufferBankedEnq(merge, way, data, ens) =>
       val d = data.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.io.in_data($way).zip($d).foreach{case (l, r) => l := r }""")
+      emit(src"""$merge.in_data($way).zip($d).foreach{case (l, r) => l := r }""")
       val invEn = invisibleEnableWrite(lhs)
       val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.io.in_wen($way).zip($en).foreach{case (l, r) => l := r }""")
+      emit(src"""$merge.in_wen($way).zip($en).foreach{case (l, r) => l := r }""")
     case MergeBufferBankedDeq(merge, ens) => 
       val readerIdx = merge.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.toSeq.indexOf(lhs)
       emit(src"""val $lhs = Wire(Vec(${ens.length}, ${merge.tp.typeArgs.head}))""")
-      emit(src"""$lhs.toSeq.zip($merge.io.out_data).foreach{case (l, r) => l.r := r }""")
+      emit(src"""$lhs.toSeq.zip($merge.out_data).foreach{case (l, r) => l.r := r }""")
       val invEn = invisibleEnableRead(lhs,merge)
       val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.io.out_ren($readerIdx).zip($en).foreach{case (l, r) => l := r }""")
+      emit(src"""$merge.out_ren($readerIdx).zip($en).foreach{case (l, r) => l := r }""")
     case MergeBufferBound(merge, way, data, ens) =>
       val invEn = invisibleEnableWrite(lhs)
-      emit(src"$merge.io.inBound_wen($way) := ${and(ens)} & $invEn")
-      emit(src"$merge.io.inBound_data($way) := ${data}.r")
+      emit(src"$merge.inBound_wen($way) := ${and(ens)} & $invEn")
+      emit(src"$merge.inBound_data($way) := ${data}.r")
     case MergeBufferInit(merge, data, ens) =>
       val invEn = invisibleEnableWrite(lhs)
-      emit(src"$merge.io.initMerge_wen := ${and(ens)} & $invEn")
-      emit(src"$merge.io.initMerge_data := ${data}.r")
+      emit(src"$merge.initMerge_wen := ${and(ens)} & $invEn")
+      emit(src"$merge.initMerge_data := ${data}.r")
 
     case _ => super.gen(lhs, rhs)
   }

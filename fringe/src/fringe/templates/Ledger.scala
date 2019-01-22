@@ -1,6 +1,7 @@
 package fringe
 
 import scala.collection.mutable._
+import chisel3._
 import java.io.{File, PrintWriter}
 
 /** Structure for keeping track of which ports on which interfaces are connected inside modules 
@@ -134,6 +135,8 @@ object Ledger {
   }
 
   val connections = HashMap[OpHash, BoreMap]()
+  val instrIdsBelow = HashMap[KernelHash, List[Int]]()
+  val breakpointsBelow = HashMap[KernelHash, List[Int]]()
 
   def combine(oldMap: BoreMap, newMap: BoreMap): BoreMap = {
     write(s"newHash:")
@@ -241,7 +244,31 @@ object Ledger {
     }
   }
 
-  def enter(ctrl: KernelHash, name: String): Unit = {
+  def tieInstrCtr(values: List[InstrCtr], id: Int, cycs: UInt, iters: UInt, stalls: UInt, idles: UInt)(implicit stack: List[KernelHash]): Unit = {
+    values(id).cycs := cycs
+    values(id).iters := iters
+    values(id).stalls := stalls 
+    values(id).idles := idles
+    Console.println(s"here1: ${stack} ${globals.enableModular}")
+    if (globals.enableModular) stack.foreach{k => Console.println(s"add $k (${instrIdsBelow.getOrElse(k,List())}) ++ $id");instrIdsBelow += (k -> (instrIdsBelow.getOrElse(k, List()) :+ id))}
+  }
+
+  def connectInstrCtrs(upstream: List[InstrCtr], downstream: Vec[InstrCtr])(implicit stack: List[KernelHash]): Unit = {
+    if (stack.isEmpty) upstream.zip(downstream).foreach{case (a,b) => a := b}
+    else instrIdsBelow(stack.head).foreach{i => Console.println(s"@ ${stack.head}: $i");upstream(i) := downstream(i)}
+  }
+
+  def tieBreakpoint(values: Vec[Bool], id: Int, b: Bool)(implicit stack: List[KernelHash]): Unit = {
+    values(id) := b
+    if (globals.enableModular) stack.foreach{k => breakpointsBelow += (k -> (breakpointsBelow.getOrElse(k, List()) :+ id))}
+  }
+
+  def connectBreakpoints(upstream: Vec[Bool], downstream: Vec[Bool])(implicit stack: List[KernelHash]): Unit = {
+    if (stack.isEmpty) upstream.zip(downstream).foreach{case (a,b) => a := b}
+    else breakpointsBelow(stack.head).foreach{i => upstream(i) := downstream(i)}
+  }
+
+  def enter(ctrl: KernelHash, name: String)(implicit stack: List[KernelHash]): Unit = {
     write(s"Enter K.$ctrl ($name)")
     indent = indent + 1
     ControllerStack.stack.push(ctrl)

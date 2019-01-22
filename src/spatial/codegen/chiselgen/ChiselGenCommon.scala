@@ -336,9 +336,8 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   protected def createCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]], suffix: String = ""): Unit = {
     var isForever = lhs.isForever
-    emit(src"""val ${lhs}${suffix}_components = List[CtrObject](${ctrs.map(quote).mkString(",")})""")
     emit(src"""val $lhs$suffix = (new CChainObject(List[CtrObject](${ctrs.map(quote).mkString(",")}), "$lhs$suffix")).cchain.io """)
-    emit(src"""$lhs$suffix.input.isStream := ${lhs.isOuterStreamLoop}.B""")
+    emit(src"""$lhs$suffix.setup.isStream := ${lhs.isOuterStreamLoop}.B""")
 
   }
 

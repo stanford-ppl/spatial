@@ -455,7 +455,7 @@ class NBufMem(p: NBufParams) extends Module {
       val en = io.xBarW.map(_.en.reduce{_||_}).reduce{_||_} || io.directW.map(_.en.reduce{_||_}).reduce{_||_}
       writeCol.io.input.enable := en
       writeCol.io.input.reset := ctrl.io.swap
-      writeCol.io.input.saturate := false.B
+      writeCol.io.setup.saturate := false.B
 
       val rowChanged = io.xBarW.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_}
       val gotFirstInRow = Module(new SRFF())

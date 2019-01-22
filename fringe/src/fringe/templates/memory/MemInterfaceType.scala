@@ -93,14 +93,17 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
   val reset = Input(Bool())
 
   def connectLedger(op: MemInterface)(implicit stack: List[KernelHash]): Unit = {
-    val cxn = Ledger.lookup(op.hashCode)
-    cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}
-    cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
-    cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
-    cxn.directW.foreach{p => directW(p) <> op.directW(p)}
-    cxn.reset.foreach{p => reset <> op.reset}
-    cxn.output.foreach{p => output(p) <> op.output(p)}
-    Ledger.substitute(op.hashCode, this.hashCode)
+    if (stack.isEmpty) this <> op
+    else {
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}
+      cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
+      cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
+      cxn.directW.foreach{p => directW(p) <> op.directW(p)}
+      cxn.reset.foreach{p => reset <> op.reset}
+      cxn.output.foreach{p => output(p) <> op.output(p)}
+      Ledger.substitute(op.hashCode, this.hashCode)
+    }
   }
 
   def connectReset(r: Bool)(implicit stack: List[KernelHash]): Unit = {
@@ -271,23 +274,26 @@ class NBufInterface(val p: NBufParams) extends Bundle {
   val output = Vec(1 max p.totalOutputs, Output(UInt(p.bitWidth.W)))  
 
   def connectLedger(op: NBufInterface)(implicit stack: List[KernelHash]): Unit = {
-    accessActivesOut.zip(op.accessActivesOut).foreach{case (l,r) => r := l}
-    op.full := full
-    op.almostFull := almostFull
-    op.empty := empty
-    op.almostEmpty := almostEmpty
-    op.numel := numel
-    val cxn = Ledger.lookup(op.hashCode)
-    cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}
-    cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
-    cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
-    cxn.directW.foreach{p => directW(p) <> op.directW(p)}
-    cxn.output.foreach{p => output(p) <> op.output(p)}
-    cxn.broadcastR.foreach{case RAddr(p,lane) => broadcastR(p).forwardLane(lane, op.broadcastR(p))}
-    cxn.broadcastW.foreach{p => broadcastW(p) <> op.broadcastW(p)}
-    cxn.reset.foreach{p => reset <> op.reset}
-    cxn.stageCtrl.foreach{p => sEn(p) := op.sEn(p); sDone(p) := op.sDone(p)}
-    Ledger.substitute(op.hashCode, this.hashCode)
+    if (stack.isEmpty) this <> op
+    else {
+      accessActivesOut.zip(op.accessActivesOut).foreach{case (l,r) => r := l}
+      op.full := full
+      op.almostFull := almostFull
+      op.empty := empty
+      op.almostEmpty := almostEmpty
+      op.numel := numel
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.xBarR.foreach{case RAddr(p,lane) => xBarR(p).forwardLane(lane, op.xBarR(p))}
+      cxn.xBarW.foreach{p => xBarW(p) <> op.xBarW(p)}
+      cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
+      cxn.directW.foreach{p => directW(p) <> op.directW(p)}
+      cxn.output.foreach{p => output(p) <> op.output(p)}
+      cxn.broadcastR.foreach{case RAddr(p,lane) => broadcastR(p).forwardLane(lane, op.broadcastR(p))}
+      cxn.broadcastW.foreach{p => broadcastW(p) <> op.broadcastW(p)}
+      cxn.reset.foreach{p => reset <> op.reset}
+      cxn.stageCtrl.foreach{p => sEn(p) := op.sEn(p); sDone(p) := op.sDone(p)}
+      Ledger.substitute(op.hashCode, this.hashCode)
+    }
   }
 
   def connectReset(r: Bool)(implicit stack: List[KernelHash]): Unit = {
@@ -426,11 +432,14 @@ class FixFMAAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
   val output = Output(UInt((d+f).W))
 
   def connectLedger(op: FixFMAAccumBundle)(implicit stack: List[KernelHash]): Unit = {
-    val cxn = Ledger.lookup(op.hashCode)
-    cxn.output.foreach{case p => output <> op.output}
-    cxn.xBarW.foreach{p => input(p) <> op.input(p)}
-    cxn.reset.foreach{p => reset <> op.reset}
-    Ledger.substitute(op.hashCode, this.hashCode)
+    if (stack.isEmpty) this <> op
+    else {
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.output.foreach{case p => output <> op.output}
+      cxn.xBarW.foreach{p => input(p) <> op.input(p)}
+      cxn.reset.foreach{p => reset <> op.reset}
+      Ledger.substitute(op.hashCode, this.hashCode)
+    }
   }
 
   def connectReset(r: Bool)(implicit stack: List[KernelHash]): Unit = {
@@ -463,11 +472,14 @@ class FixOpAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
   val output = Output(UInt((d+f).W))
 
   def connectLedger(op: FixOpAccumBundle)(implicit stack: List[KernelHash]): Unit = {
-    val cxn = Ledger.lookup(op.hashCode)
-    cxn.output.foreach{case p => output <> op.output}
-    cxn.xBarW.foreach{p => input(p) <> op.input(p)}
-    cxn.reset.foreach{p => reset <> op.reset}
-    Ledger.substitute(op.hashCode, this.hashCode)
+    if (stack.isEmpty) this <> op
+    else {
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.output.foreach{case p => output <> op.output}
+      cxn.xBarW.foreach{p => input(p) <> op.input(p)}
+      cxn.reset.foreach{p => reset <> op.reset}
+      Ledger.substitute(op.hashCode, this.hashCode)
+    }
   }
   def connectReset(r: Bool)(implicit stack: List[KernelHash]): Unit = {
     reset := r
@@ -493,11 +505,14 @@ class MultiArgOut(nw: Int) extends Bundle {
   def connectXBarR(): UInt = output.echo
   def connectXBarW(p: Int, data: UInt, valid: Bool)(implicit stack: List[KernelHash]): Unit = {port(p).bits := data; port(p).valid := valid; Ledger.connectXBarW(this.hashCode, p)}
   def connectLedger(op: MultiArgOut)(implicit stack: List[KernelHash]): Unit = {
-    val cxn = Ledger.lookup(op.hashCode)
-    cxn.xBarR.foreach{case RAddr(p,lane) => output.echo <> op.output.echo}
-    cxn.xBarW.foreach{p => port(p) <> op.port(p)}
-    Ledger.substitute(op.hashCode, this.hashCode)
-    output <> op.output // ?
+    if (stack.isEmpty) this <> op
+    else {
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.xBarR.foreach{case RAddr(p,lane) => output.echo <> op.output.echo}
+      cxn.xBarW.foreach{p => port(p) <> op.port(p)}
+      Ledger.substitute(op.hashCode, this.hashCode)
+      output <> op.output // ?
+    }
   }
 
   override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]

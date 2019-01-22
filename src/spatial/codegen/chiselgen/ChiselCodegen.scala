@@ -313,10 +313,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("""val cchain = Module(new CounterChain(ctrs.map(_.par), ctrs.map(_.fixedStart), ctrs.map(_.fixedStop), ctrs.map(_.fixedStep), """ + 
                      """ctrs.map(_.isForever), ctrs.map(_.width), myName = name))""")
         emit("cchain.io <> DontCare")
-        emit("cchain.io.input.stops.zip(ctrs.map(_.stop)).foreach{case (port,Right(stop)) => port := stop.r.asSInt; case (_,_) => }")
-        emit("cchain.io.input.strides.zip(ctrs.map(_.step)).foreach{case (port,Right(stride)) => port := stride.r.asSInt; case (_,_) => }")
-        emit("cchain.io.input.starts.zip(ctrs.map(_.start)).foreach{case (port,Right(start)) => port := start.r.asSInt; case (_,_) => }")
-        emit("cchain.io.input.saturate := true.B")
+        emit("cchain.io.setup.stops.zip(ctrs.map(_.stop)).foreach{case (port,Right(stop)) => port := stop.r.asSInt; case (_,_) => }")
+        emit("cchain.io.setup.strides.zip(ctrs.map(_.step)).foreach{case (port,Right(stride)) => port := stride.r.asSInt; case (_,_) => }")
+        emit("cchain.io.setup.starts.zip(ctrs.map(_.start)).foreach{case (port,Right(start)) => port := start.r.asSInt; case (_,_) => }")
+        emit("cchain.io.setup.saturate := true.B")
       close("}")
 
     }

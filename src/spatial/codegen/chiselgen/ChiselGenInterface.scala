@@ -23,20 +23,20 @@ trait ChiselGenInterface extends ChiselGenCommon {
       argIOs += (lhs -> argIOs.toList.length)
       val writes = lhs.writers.filter(_.parent != Ctrl.Host)
       writes.zipWithIndex.foreach{case (w,i) => regMapping += (w -> i)}
-      forceEmit(src"val $lhs = Wire(new MultiArgOut(${scala.math.max(1,writes.size)})); ${lhs}.port.map(_.bits := DontCare); ${lhs}.port.map(_.valid := DontCare); ${lhs}.echo := DontCare")
+      forceEmit(src"val $lhs = Wire(new MultiArgOut(${scala.math.max(1,writes.size)})); ${lhs}.port.map(_.bits := DontCare); ${lhs}.port.map(_.valid := DontCare); ${lhs}.output.echo := DontCare")
       forceEmit(src"top.io.argOuts(${argIOs(lhs)}).port.valid := ${lhs}.port.map(_.valid).reduce{_||_}")
       forceEmit(src"top.io.argOuts(${argIOs(lhs)}).port.bits := Mux1H(${lhs}.port.map(_.valid), ${lhs}.port.map(_.bits))")
       forceEmit(src"${lhs}.port.map(_.ready := top.io.argOuts(${argIOs(lhs)}).port.ready)")
-      forceEmit(src"${lhs}.echo := top.io.argOuts(${argIOs(lhs)}).echo")
+      forceEmit(src"${lhs}.output.echo := top.io.argOuts(${argIOs(lhs)}).echo")
     case ArgOutNew(init) => 
       argOuts += (lhs -> argOuts.toList.length)
       val writes = lhs.writers.filter(_.parent != Ctrl.Host)
       writes.zipWithIndex.foreach{case (w,i) => regMapping += (w -> i)}
-      forceEmit(src"val $lhs = Wire(new MultiArgOut(${scala.math.max(1,writes.size)})); ${lhs}.port.map(_.bits := DontCare); ${lhs}.port.map(_.valid := DontCare); ${lhs}.echo := DontCare")
+      forceEmit(src"val $lhs = Wire(new MultiArgOut(${scala.math.max(1,writes.size)})); ${lhs}.port.map(_.bits := DontCare); ${lhs}.port.map(_.valid := DontCare); ${lhs}.output.echo := DontCare")
       forceEmit(src"top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).port.valid := ${lhs}.port.map(_.valid).reduce{_||_}")
       forceEmit(src"top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).port.bits := Mux1H(${lhs}.port.map(_.valid), ${lhs}.port.map(_.bits))")
       forceEmit(src"${lhs}.port.map(_.ready := top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).port.ready)")
-      forceEmit(src"${lhs}.echo := top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).echo")
+      forceEmit(src"${lhs}.output.echo := top.io.argOuts(top.io_numArgIOs_reg + ${argOuts(lhs)}).echo")
 
     // case GetReg(reg) if (reg.isArgOut) =>
     //   argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
@@ -46,7 +46,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case GetReg(reg) if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.echo.r""")
+      emit(src"""${lhs}.r := $reg.connectXBarR().r""")
 
     case RegRead(reg)  if reg.isArgIn =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
@@ -56,35 +56,34 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case RegRead(reg)  if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.echo.r""")
+      emit(src"""${lhs}.r := $reg.connectXBarR().r""")
 
     case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
       emit(src"""val ${lhs} = Wire(${reg.tp.typeArgs.head})""")
-      emit(src"""${lhs}.r := $reg.echo.r""")
+      emit(src"""${lhs}.r := $reg.connectXBarR().r""")
 
 
     case RegWrite(reg, v, en) if reg.isHostIO =>
       val isBroadcast = lhs.port.broadcast.exists(_>0)
       if (!isBroadcast) {
+        val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
         val id = regMapping(lhs)
         v.tp match {
           case FixPtType(s,d,f) =>
             if (s) {
               val pad = 64 - d - f
               if (pad > 0) {
-                emit(src"""${reg}.port($id).bits.r := util.Cat(util.Fill($pad, ${v}.msb), ${v}.r)""")
+                emit(src"""${reg}.connectXBarW($id, util.Cat(util.Fill($pad, ${v}.msb), ${v}.r), ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
               } else {
-                emit(src"""${reg}.port($id).bits.r := ${v}.r""")
+                emit(src"""${reg}.connectXBarW($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
               }
             } else {
-              emit(src"""${reg}.port($id).bits.r := ${v}.r""")
+              emit(src"""${reg}.connectXBarW($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
             }
           case _ =>
-            emit(src"""${reg}.port($id).bits.r := ${v}.r""")
+            emit(src"""${reg}.connectXBarW($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
         }
-        val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.port($id).valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
       }
 
     case RegWrite(reg, v, en) if reg.isArgOut =>
@@ -96,9 +95,8 @@ trait ChiselGenInterface extends ChiselGenCommon {
             src"util.Cat(util.Fill(${64 - d - f}, $v.msb), $v.r)"
           case _ => src"$v.r"
         }
-        emit(src"""${reg}.port($id).bits := $padded""")
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.port($id).valid := ${enStr} & ${DL(src"datapathEn & iiDone", lhs.fullDelay)}""")
+        emit(src"""${reg}.connectXBarW($id, $padded, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
       }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>
@@ -182,6 +180,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
           emit(src"val ${quote(s).toUpperCase}_idle_arg = ${argIOs.toList.length + argOuts.toList.length + base + 3}")
         }
       }
+      emit (s"val numArgOuts_breakpts = ${1 max earlyExits.length}")
       earlyExits.foreach{x => 
         emit(src"val ${quote(x).toUpperCase}_exit_arg = ${argOuts.toList.length + argIOs.toList.length + instrumentCounterArgs()}")
       }

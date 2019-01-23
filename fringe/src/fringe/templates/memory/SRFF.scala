@@ -13,18 +13,16 @@ class SRFF(val strongReset: Boolean = false) extends Module {
       val reset = Input(Bool())
       val asyn_reset = Input(Bool())
     }
-    val output = new Bundle {
-      val data = Output(Bool())
-    }
+    val output = Output(Bool())
   })
 
   if (!strongReset) { // Set + reset = on
     val ff = RegInit(false.B)
     ff := Mux(io.input.asyn_reset, false.B, Mux(io.input.set, true.B, Mux(io.input.reset, false.B, ff)))
-    io.output.data := Mux(io.input.asyn_reset, false.B, ff)
+    io.output := Mux(io.input.asyn_reset, false.B, ff)
   } else { // Set + reset = off
     val ff = RegInit(false.B)
     ff := Mux(io.input.asyn_reset, false.B, Mux(io.input.reset, false.B, Mux(io.input.set, true.B, ff)))
-    io.output.data := Mux(io.input.asyn_reset, false.B, ff)
+    io.output := Mux(io.input.asyn_reset, false.B, ff)
   }
 }

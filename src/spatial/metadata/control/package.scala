@@ -670,6 +670,8 @@ package object control {
 
     def counters: Seq[Counter[_]] = x.node.counters
     def pars: Seq[I32] = counters.map(_.ctrPar)
+    def parsOr1: Seq[Int] = counters.map(_.ctrParOr1)
+    @rig def widths: Seq[Int] = counters.map(_.ctrWidth)
     def constPars: Seq[Int] = pars.map(_.toInt)
     def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
     def isUnit: Boolean = counters.forall(_.isUnit)
@@ -687,6 +689,8 @@ package object control {
     def step: Sym[F] = x.node.step
     def end: Sym[F] = x.node.end
     def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
+    def ctrParOr1: Int = ctrPar.toInt
+    @rig def ctrWidth: Int = x.node.A.nbits
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false

@@ -8,9 +8,6 @@ import scala.reflect.runtime.universe._
 
 trait PlasticineTest extends DSLTest { test =>
 
-  override def runtimeArgs: Args = NoArgs
-  override def compileArgs = s"--pir --dot"
-
   protected val cmdlnArgs = sys.env.get("TEST_ARGS").getOrElse("").split(" ").map(_.trim).toList
 
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
@@ -26,7 +23,7 @@ trait PlasticineTest extends DSLTest { test =>
     s"--tungsten=false" ::
     Nil
 
-  abstract class PIRBackend extends Backend(name, "", "", "") {
+  abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "") {
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
     def compileOnly = checkFlag(s"test.compileOnly")

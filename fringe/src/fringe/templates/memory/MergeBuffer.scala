@@ -292,8 +292,8 @@ class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val read
     val in_wen = Input(Vec(ways, Vec(par, Bool())))
     val in_data = Input(Vec(ways, Vec(par, UInt(bitWidth.W))))
     val initMerge_wen = Input(Bool())
-    val initMerge_data = Input(Bool())
-    val inBound_wen = Input(Vec(ways, UInt(bitWidth.W)))
+    val initMerge_data = Input(UInt(bitWidth.W))
+    val inBound_wen = Input(Vec(ways, Bool()))
     val inBound_data = Input(Vec(ways, UInt(bitWidth.W)))
     val out_ren = Input(Vec(readers, Vec(par, Bool())))
   }
@@ -310,7 +310,7 @@ class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val read
       cxn.mergeEnq.foreach{p => input.in_wen(p) := op.input.in_wen(p); input.in_data(p) := op.input.in_data(p)}
       cxn.mergeDeq.foreach{p => input.out_ren(p) := op.input.out_ren(p)}
       cxn.mergeBound.foreach{p => input.inBound_data(p) := op.input.inBound_data(p); input.inBound_wen(p) := op.input.inBound_wen(p)}
-      cxn.mergeInit.foreach{p => input.initMerge_wen(p) := op.input.initMerge_wen(p); input.initMerge_data(p) := op.input.initMerge_data(p)}
+      cxn.mergeInit.foreach{p => input.initMerge_wen := op.input.initMerge_wen; input.initMerge_data := op.input.initMerge_data}
       Ledger.substitute(op.hashCode, this.hashCode)
     }
   }
@@ -333,7 +333,7 @@ class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val read
   def connectMergeInit(data: UInt, en: Bool)(implicit stack: List[KernelHash]): Unit = {
     input.initMerge_wen := en
     input.initMerge_data := data
-    Ledger.connectMergeBound(this.hashCode, 0)
+    Ledger.connectMergeInit(this.hashCode, 0)
   }
 
   override def cloneType = (new MergeBufferFullIO(ways, par, bitWidth, readers)).asInstanceOf[this.type] // See chisel3 bug 358

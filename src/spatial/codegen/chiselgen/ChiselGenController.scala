@@ -251,6 +251,7 @@ trait ChiselGenController extends ChiselGenCommon {
             } 
           else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
           else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
+          else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
           else emit(src"module.io.in_$in <> ${in}")}
           emit("module.io.sigsIn := me.sigsIn")
           emit("me.sigsOut := module.io.sigsOut")

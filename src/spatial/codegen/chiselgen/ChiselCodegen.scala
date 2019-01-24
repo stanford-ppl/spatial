@@ -56,6 +56,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override def emitHeader(): Unit = {
     emit("""package accel""")
     emit("import fringe._")
+    emit("import fringe.templates.memory._")
     emit("import fringe.templates._")
     emit("import fringe.Ledger._")
     emit("import fringe.utils._")
@@ -483,7 +484,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: MergeBufferNew[_])) => "MergeBufferFullIO"
       case Some(Op(_: LIFONew[_])) => "FIFOInterface"
       case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
-      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
+      case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocatorIO"
       case Some(Op(_@StreamInNew(bus))) => 
         bus match {
           case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
@@ -532,17 +533,17 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(x@Op(_: SRAMNew[_,_])) => src"Flipped(new StandardInterface(${x}_p))"
       case Some(x@Op(_: FIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
       case Some(x@Op(_: FIFORegNew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
-      case Some(x@Op(_: MergeBufferNew[_])) => s"Flipped(new MergeBufferFullIO(${x}_p)"
+      case Some(x@Op(_: MergeBufferNew[_])) => src"Flipped(new MergeBufferFullIO(${x}_p))"
       case Some(x@Op(_: LIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
       case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(new FixedPoint(true, 64, 0))"
-      case Some(x@Op(_: DRAMAccelNew[_,_])) => "DRAMAllocator"
+      case Some(x@Op(_: DRAMAccelNew[_,_])) => src"Flipped(new DRAMAllocatorIO(${x}_p))"
       case Some(x@Op(_@StreamInNew(bus))) => 
         bus match {
           case _: BurstDataBus[_] => s"Flipped(Decoupled(new AppLoadData(${x}_p)))"
           case BurstAckBus => "Flipped(Decoupled(Bool()))"
           case _: GatherDataBus[_] => 
-            val par = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-            s"Flipped(Decoupled(Vec(${par},UInt)))"
+            val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => (ens.length, bitWidth(e.A.tp)) }
+            s"Flipped(Decoupled(Vec(${par},UInt(${width}.W))))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
           case _ => super.remap(tp)
         }
@@ -551,7 +552,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case BurstCmdBus => s"Decoupled(new AppCommandDense(${x}_p))"
           case _: BurstFullDataBus[_] => s"Decoupled(new AppStoreData(${x}_p))"
           case GatherAddrBus => s"Decoupled(new AppCommandSparse(${x}_p))"
-          case _: ScatterCmdBus[_] => "Decoupled(new ScatterCmdStream)"
+          case _: ScatterCmdBus[_] => s"Decoupled(new ScatterCmdStream(${x}_p))"
           case _ => super.remap(tp)
         }
 
@@ -563,6 +564,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case x if x.isNBuffered => Some(src"$x.p")
     case Op(_: MergeBufferNew[_]) => Some(src"($node.ways, $node.par, $node.bitWidth, $node.readers)")
     case x if x.isMemPrimitive => Some(src"$x.p")
+    case Op(_: DRAMAccelNew[_,_]) => Some(src"($node.rank, $node.appReqCount)")
     case x if x.isCounterChain => 
       val sfx = if (cchainCopies.contains(x)) src"_copy${cchainCopies(x).head}" else ""
       Some(src"(${x}${sfx}.par, ${x}${sfx}.widths)")

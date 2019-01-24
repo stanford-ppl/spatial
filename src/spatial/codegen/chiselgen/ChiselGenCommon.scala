@@ -202,7 +202,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
       case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.empty"
+      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
@@ -214,7 +214,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.full($way)"
+            src"~${merge}.output.full($way)"
         }
     }) else "true.B"
   }

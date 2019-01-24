@@ -1,9 +1,4 @@
 #!/bin/bash
 
 cd pir
-sbt "; project pir; publishAll"
-cd ../
-gendir=$1
-args=${@:2}
-cd $gendir
-sbt "runMain AccelMain $args"
+bin/pir ../$1 ${@:2}

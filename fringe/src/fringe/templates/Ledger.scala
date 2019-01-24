@@ -102,6 +102,7 @@ object Ledger {
     var mergeInit = ListBuffer[Int]()
     var allocDealloc = ListBuffer[Int]()
 
+    def allEmpty: Boolean = xBarR.isEmpty && directR.isEmpty && xBarW.isEmpty && directW.isEmpty && broadcastW.isEmpty && broadcastR.isEmpty && reset.isEmpty && output.isEmpty && accessActivesIn.isEmpty && stageCtrl.isEmpty && mergeEnq.isEmpty && mergeDeq.isEmpty && mergeBound.isEmpty && mergeInit.isEmpty && allocDealloc.isEmpty
     def addXBarR(p: RAddr): ExposedPorts = {xBarR = xBarR :+ p; this}
     def addDirectR(p: RAddr): ExposedPorts = {directR = directR :+ p; this}
     def addXBarW(p: Int): ExposedPorts = {xBarW = xBarW :+ p; this}
@@ -117,7 +118,8 @@ object Ledger {
     def addMergeBound(p: Int): ExposedPorts = {mergeBound = mergeBound :+ p; this}
     def addMergeInit(p: Int): ExposedPorts = {mergeInit = mergeInit :+ p; this}
     def addAllocDealloc(p: Int): ExposedPorts = {allocDealloc = allocDealloc :+ p; this}
-    def log: Unit = {
+    def log(k: KernelHash): Unit = {
+      if (!allEmpty) write(s"+ K.$k:")
       if (xBarR.nonEmpty)           write(s"|-- xBarR: $xBarR")
       if (directR.nonEmpty)         write(s"|-- directR: $directR")
       if (xBarW.nonEmpty)           write(s"|-- xBarW: $xBarW")
@@ -128,6 +130,11 @@ object Ledger {
       if (output.nonEmpty)          write(s"|-- output: $output")
       if (accessActivesIn.nonEmpty) write(s"|-- accessActivesIn: $accessActivesIn")
       if (stageCtrl.nonEmpty)       write(s"|-- stageCtrl: $stageCtrl")
+      if (mergeEnq.nonEmpty)       write(s"|-- mergeEnq: $mergeEnq")
+      if (mergeDeq.nonEmpty)       write(s"|-- mergeDeq: $mergeDeq")
+      if (mergeBound.nonEmpty)       write(s"|-- mergeBound: $mergeBound")
+      if (mergeInit.nonEmpty)       write(s"|-- mergeInit: $mergeInit")
+      if (allocDealloc.nonEmpty)       write(s"|-- allocDealloc: $allocDealloc")
     }
     def merge(port: ExposedPorts): ExposedPorts = {
       xBarR = xBarR ++ port.xBarR
@@ -140,6 +147,12 @@ object Ledger {
       output = output ++ port.output
       accessActivesIn = accessActivesIn ++ port.accessActivesIn
       stageCtrl = stageCtrl ++ port.stageCtrl
+      mergeEnq = mergeEnq ++ port.mergeEnq
+      mergeDeq = mergeDeq ++ port.mergeDeq
+      mergeBound = mergeBound ++ port.mergeBound
+      mergeInit = mergeInit ++ port.mergeInit
+      allocDealloc = allocDealloc ++ port.allocDealloc
+
       this
     }
   }
@@ -149,15 +162,13 @@ object Ledger {
   val breakpointsBelow = HashMap[KernelHash, List[Int]]()
 
   def combine(oldMap: BoreMap, newMap: BoreMap): BoreMap = {
-    write(s"newHash:")
+    write(s"dstHash:")
     newMap.foreach{case (k, ports) => 
-      write(s"+ K.$k:")
-      ports.log
+      ports.log(k)
     }
-    write(s"oldHash:")
+    write(s"srcHash:")
     oldMap.foreach{case (k, ports) => 
-      write(s"+ K.$k:")
-      ports.log
+      ports.log(k)
     }
     oldMap.foreach{case (k, ports) => 
       newMap += k -> newMap.getOrElse(k, new ExposedPorts).merge(ports)
@@ -173,7 +184,7 @@ object Ledger {
 
   def substitute(oldHash: OpHash, newHash: OpHash): Unit = {
     if (connections.contains(oldHash)) {
-      write(s"substitute($oldHash, $newHash)")
+      write(s"substitute(src = $oldHash, dst = $newHash)")
       val tmp = connections(oldHash)
       val current = connections.getOrElse(newHash, new BoreMap)
       connections -= oldHash

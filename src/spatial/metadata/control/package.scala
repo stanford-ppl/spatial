@@ -690,7 +690,7 @@ package object control {
     def end: Sym[F] = x.node.end
     def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
     def ctrParOr1: Int = ctrPar.toInt
-    @rig def ctrWidth: Int = x.node.A.nbits
+    @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false

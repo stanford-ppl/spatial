@@ -177,7 +177,7 @@ trait ChiselGenController extends ChiselGenCommon {
         if (spatialConfig.enableModular) {
           open(src"class ${lhs}_module(depth: Int) extends Module {")
             open("val io = IO(new Bundle {")
-              inputs.zipWithIndex.foreach{case(in,i) => 
+              inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
                 if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val in_${in}_copy$c = ${port(in.tp, Some(in))}")}
                 else emit(src"val in_$in = ${port(in.tp, Some(in))}")
               }
@@ -194,7 +194,7 @@ trait ChiselGenController extends ChiselGenCommon {
             close("})")
             emit("io.sigsOut := DontCare")
             emit("val breakpoints = io.in_breakpoints; breakpoints := DontCare")
-            inputs.zipWithIndex.foreach{case(in,i) => 
+            inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
               if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val ${in}_copy$c = io.in_${in}_copy$c; ${in}_copy$c := DontCare")}
               else emit(src"val $in = io.in_$in ${if (subset(in) | in.isCounterChain) src";$in := DontCare" else ""}")
             }
@@ -244,7 +244,7 @@ trait ChiselGenController extends ChiselGenCommon {
         if (spatialConfig.enableModular) {
           close("}")
           emit(src"val module = Module(new ${lhs}_module(sm.p.depth))")
-          inputs.zipWithIndex.foreach{case(in,i) => 
+          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
             if (subset(in)) {
               emit(src"module.io.in_$in.output := ${in}.output; ${in}.connectLedger(module.io.in_$in)")
               if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
@@ -389,9 +389,9 @@ trait ChiselGenController extends ChiselGenCommon {
           case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
         }.size
         connectDRAMStreams(x)
-        forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)); $x.io <> DontCare""")
-        forceEmit(src"top.io.heap($id).req := $x.io.heapReq")
-        forceEmit(src"$x.io.heapResp := top.io.heap($id).resp")
+        forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)).io; $x <> DontCare""")
+        forceEmit(src"top.io.heap($id).req := $x.heapReq")
+        forceEmit(src"$x.heapResp := top.io.heap($id).resp")
       }
       inAccel{
         emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")

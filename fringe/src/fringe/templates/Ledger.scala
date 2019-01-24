@@ -96,6 +96,11 @@ object Ledger {
     var output = ListBuffer[Int]()
     var accessActivesIn = ListBuffer[Int]()
     var stageCtrl = ListBuffer[Int]()
+    var mergeEnq = ListBuffer[Int]()
+    var mergeDeq = ListBuffer[Int]()
+    var mergeBound = ListBuffer[Int]()
+    var mergeInit = ListBuffer[Int]()
+    var allocDealloc = ListBuffer[Int]()
 
     def addXBarR(p: RAddr): ExposedPorts = {xBarR = xBarR :+ p; this}
     def addDirectR(p: RAddr): ExposedPorts = {directR = directR :+ p; this}
@@ -107,6 +112,11 @@ object Ledger {
     def addOutput(p: Int): ExposedPorts = {output = output :+ p; this}
     def addAccessActivesIn(p: Int): ExposedPorts = {accessActivesIn = accessActivesIn :+ p; this}
     def addStageCtrl(p: Int): ExposedPorts = {stageCtrl = stageCtrl :+ p; this}
+    def addMergeEnq(p: Int): ExposedPorts = {mergeEnq = mergeEnq :+ p; this}
+    def addMergeDeq(p: Int): ExposedPorts = {mergeDeq = mergeDeq :+ p; this}
+    def addMergeBound(p: Int): ExposedPorts = {mergeBound = mergeBound :+ p; this}
+    def addMergeInit(p: Int): ExposedPorts = {mergeInit = mergeInit :+ p; this}
+    def addAllocDealloc(p: Int): ExposedPorts = {allocDealloc = allocDealloc :+ p; this}
     def log: Unit = {
       if (xBarR.nonEmpty)           write(s"|-- xBarR: $xBarR")
       if (directR.nonEmpty)         write(s"|-- directR: $directR")
@@ -242,6 +252,41 @@ object Ledger {
       stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addStageCtrl(p))}
       write(s"connectStageCtrl(${hash}, $p)")
     }
+  }
+  def connectMergeEnq(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeEnq(p))}
+      write(s"connectMergeEnq(${hash}, $p)")
+    }    
+  }
+  def connectMergeDeq(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeDeq(p))}
+      write(s"connectMergeDeq(${hash}, $p)")
+    }    
+  }
+  def connectMergeBound(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeBound(p))}
+      write(s"connectMergeBound(${hash}, $p)")
+    }    
+  }
+  def connectMergeInit(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeInit(p))}
+      write(s"connectMergeInit(${hash}, $p)")
+    }    
+  }
+  def connectAllocDealloc(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAllocDealloc(p))}
+      write(s"connectAllocDealloc(${hash}, $p)")
+    }    
   }
 
   def tieInstrCtr(values: List[InstrCtr], id: Int, cycs: UInt, iters: UInt, stalls: UInt, idles: UInt)(implicit stack: List[KernelHash]): Unit = {

@@ -22,7 +22,7 @@ trait ChiselGenController extends ChiselGenCommon {
   private var memsWithReset: List[Sym[_]] = List()
 
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
-    ctrls = ctrls :+ lhs
+    if (inHw) ctrls = ctrls :+ lhs
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     ensigs = new scala.collection.mutable.ListBuffer[String]

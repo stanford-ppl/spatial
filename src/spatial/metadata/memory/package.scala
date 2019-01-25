@@ -232,6 +232,8 @@ package object memory {
     def isStreamOut: Boolean = mem.isInstanceOf[StreamOut[_]]
     def isInternalStream: Boolean = (mem.isStreamIn || mem.isStreamOut) && mem.parent != Ctrl.Host
 
+    def isMemPrimitive: Boolean = (isSRAM || isLineBuffer || isRegFile || isFIFO || isLIFO || isFIFOReg || isReg || isLUT) && !isNBuffered && (!isRemoteMem && !isOptimizedReg)
+
     def isSRAM: Boolean = mem match {
       case _: SRAM[_,_] => true
       case _ => false

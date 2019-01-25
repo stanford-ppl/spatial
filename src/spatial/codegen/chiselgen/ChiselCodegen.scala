@@ -585,8 +585,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => None
   }
   // Check if this node has an io that will be partially connected in each controller
-  protected def subset(node: Sym[_]): Boolean = node match {
+  protected def ledgerized(node: Sym[_]): Boolean = node match {
     case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
+    case _ if node.isDRAMAccel => true
     case _ => false
   }
 

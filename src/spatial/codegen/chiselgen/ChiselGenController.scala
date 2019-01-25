@@ -131,6 +131,10 @@ trait ChiselGenController extends ChiselGenCommon {
     (allUsed diff made).filterNot{s => s.isValue}.toSeq    
   }
 
+  private def groupInputs(ins: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
+    ins.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map((List(_) -> name)) else Seq((ins -> name))}.flatten.toMap
+  }
+
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
     // val oldInputs = scopeInputs
@@ -153,10 +157,11 @@ trait ChiselGenController extends ChiselGenCommon {
       val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp, Some(lhs))}" else "Unit"
       emit(src"/** Hierarchy: ${controllerStack.mkString(" -> ")} **/")
       emit(src"/** BEGIN ${lhs.name} $lhs **/")
+      val groupedInputs = groupInputs(inputs)
       open(src"class ${lhs}_kernel(")
-        inputs.zipWithIndex.foreach{case (in,i) => 
-          if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"${in}_copy$c: ${arg(in.tp, Some(in))},")}
-          else emit(src"$in: ${arg(in.tp, Some(in))},") 
+        groupedInputs.foreach{case (ins, typ) => 
+          if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).foreach{c => emit(src"${ins.head}_copy$c: ${arg(ins.head.tp, Some(ins.head))},")}
+          else emit(src"list_${ins.head}: List[$typ],")
         }
         emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
         // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
@@ -164,6 +169,10 @@ trait ChiselGenController extends ChiselGenCommon {
       closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
 
       createSMObject(lhs)
+
+      groupedInputs.collect{case (ins, typ) if !cchainCopies.contains(ins.head) => 
+        ins.zipWithIndex.foreach{case (in, i) => emit(src"val $in = list_${ins.head}($i)")}
+      }
 
       if (spatialConfig.enableModular) {
         inputs.zipWithIndex.collect{case(in,i) if (param(in).isDefined) => 
@@ -276,9 +285,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
     val isInner = lhs.isInnerControl
     val swobj = if (lhs.isBranch) "_obj" else ""
-    val chainPassedInputs = inputs.map{x => 
-      if (cchainCopies.contains(x)) cchainCopies(x).map{c => src"${x}_copy$c"}
-      else List(appendSuffix(lhs, x))
+    val groupedInputs = groupInputs(inputs)
+
+    val chainPassedInputs = groupedInputs.map{case (ins, typ) => 
+      if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).map{c => src"${ins.head}_copy$c"}
+      else List(ins.map{x => appendSuffix(lhs, x)}.mkString("List(", ",", ")"))
     }.flatten
     
     val parent = if (controllerStack.size == 1) "None" else "Some(me)"

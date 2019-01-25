@@ -22,7 +22,7 @@ trait ChiselGenController extends ChiselGenCommon {
   private var memsWithReset: List[Sym[_]] = List()
 
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
-    ctrls = ctrls :+ lhs
+    if (inHw) ctrls = ctrls :+ lhs
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
     ensigs = new scala.collection.mutable.ListBuffer[String]
@@ -122,13 +122,18 @@ trait ChiselGenController extends ChiselGenCommon {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
     val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet
-    val usedStreams: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl).toSet ++ getWriteStreams(lhs.toCtrl).toSet} else Set()
     val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
-    val allUsed = used ++ bufMapInputs ++ usedStreams
+    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
 
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
-    dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreams) diff $made ++ ${RemoteMemories.all}")
+    dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
     (allUsed diff made).filterNot{s => s.isValue}.toSeq    
+  }
+
+  private def groupInputs(ins: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
+    ins.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map((List(_) -> name)) else Seq((ins -> name))}.flatten.toMap
   }
 
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
@@ -153,10 +158,11 @@ trait ChiselGenController extends ChiselGenCommon {
       val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp, Some(lhs))}" else "Unit"
       emit(src"/** Hierarchy: ${controllerStack.mkString(" -> ")} **/")
       emit(src"/** BEGIN ${lhs.name} $lhs **/")
+      val groupedInputs = groupInputs(inputs)
       open(src"class ${lhs}_kernel(")
-        inputs.zipWithIndex.foreach{case (in,i) => 
-          if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"${in}_copy$c: ${arg(in.tp, Some(in))},")}
-          else emit(src"$in: ${arg(in.tp, Some(in))},") 
+        groupedInputs.foreach{case (ins, typ) => 
+          if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).foreach{c => emit(src"${ins.head}_copy$c: ${arg(ins.head.tp, Some(ins.head))},")}
+          else emit(src"list_${ins.head}: List[$typ],")
         }
         emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
         // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
@@ -164,6 +170,10 @@ trait ChiselGenController extends ChiselGenCommon {
       closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
 
       createSMObject(lhs)
+
+      groupedInputs.collect{case (ins, typ) if !cchainCopies.contains(ins.head) => 
+        ins.zipWithIndex.foreach{case (in, i) => emit(src"val $in = list_${ins.head}($i)")}
+      }
 
       if (spatialConfig.enableModular) {
         inputs.zipWithIndex.collect{case(in,i) if (param(in).isDefined) => 
@@ -177,7 +187,7 @@ trait ChiselGenController extends ChiselGenCommon {
         if (spatialConfig.enableModular) {
           open(src"class ${lhs}_module(depth: Int) extends Module {")
             open("val io = IO(new Bundle {")
-              inputs.zipWithIndex.foreach{case(in,i) => 
+              inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
                 if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val in_${in}_copy$c = ${port(in.tp, Some(in))}")}
                 else emit(src"val in_$in = ${port(in.tp, Some(in))}")
               }
@@ -194,7 +204,7 @@ trait ChiselGenController extends ChiselGenCommon {
             close("})")
             emit("io.sigsOut := DontCare")
             emit("val breakpoints = io.in_breakpoints; breakpoints := DontCare")
-            inputs.zipWithIndex.foreach{case(in,i) => 
+            inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
               if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val ${in}_copy$c = io.in_${in}_copy$c; ${in}_copy$c := DontCare")}
               else emit(src"val $in = io.in_$in ${if (subset(in) | in.isCounterChain) src";$in := DontCare" else ""}")
             }
@@ -244,13 +254,14 @@ trait ChiselGenController extends ChiselGenCommon {
         if (spatialConfig.enableModular) {
           close("}")
           emit(src"val module = Module(new ${lhs}_module(sm.p.depth))")
-          inputs.zipWithIndex.foreach{case(in,i) => 
+          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
             if (subset(in)) {
               emit(src"module.io.in_$in.output := ${in}.output; ${in}.connectLedger(module.io.in_$in)")
               if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
             } 
           else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
           else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
+          else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
           else emit(src"module.io.in_$in <> ${in}")}
           emit("module.io.sigsIn := me.sigsIn")
           emit("me.sigsOut := module.io.sigsOut")
@@ -275,9 +286,11 @@ trait ChiselGenController extends ChiselGenCommon {
 
     val isInner = lhs.isInnerControl
     val swobj = if (lhs.isBranch) "_obj" else ""
-    val chainPassedInputs = inputs.map{x => 
-      if (cchainCopies.contains(x)) cchainCopies(x).map{c => src"${x}_copy$c"}
-      else List(appendSuffix(lhs, x))
+    val groupedInputs = groupInputs(inputs)
+
+    val chainPassedInputs = groupedInputs.map{case (ins, typ) => 
+      if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).map{c => src"${ins.head}_copy$c"}
+      else List(ins.map{x => appendSuffix(lhs, x)}.mkString("List(", ",", ")"))
     }.flatten
     
     val parent = if (controllerStack.size == 1) "None" else "Some(me)"
@@ -389,9 +402,9 @@ trait ChiselGenController extends ChiselGenCommon {
           case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
         }.size
         connectDRAMStreams(x)
-        forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)); $x.io <> DontCare""")
-        forceEmit(src"top.io.heap($id).req := $x.io.heapReq")
-        forceEmit(src"$x.io.heapResp := top.io.heap($id).resp")
+        forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)).io; $x <> DontCare""")
+        forceEmit(src"top.io.heap($id).req := $x.heapReq")
+        forceEmit(src"$x.heapResp := top.io.heap($id).resp")
       }
       inAccel{
         emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")

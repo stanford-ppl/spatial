@@ -166,7 +166,7 @@ case class Memory(
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
-      val size = bank.dims.map{i => dims(i) }.product
+      val size = if (dims.nonEmpty) bank.dims.map{i => dims(i) }.product else (1)
       Math.ceil(size.toDouble / bank.nBanks)    // Assumes evenly divided
     }.product.toInt
   }

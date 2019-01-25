@@ -206,7 +206,7 @@ trait ChiselGenController extends ChiselGenCommon {
             emit("val breakpoints = io.in_breakpoints; breakpoints := DontCare")
             inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
               if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val ${in}_copy$c = io.in_${in}_copy$c; ${in}_copy$c := DontCare")}
-              else emit(src"val $in = io.in_$in ${if (subset(in) | in.isCounterChain) src";$in := DontCare" else ""}")
+              else emit(src"val $in = io.in_$in ${if (ledgerized(in) | in.isCounterChain) src";$in := DontCare" else ""}")
             }
             if (spatialConfig.enableInstrumentation) emit("val instrctrs = io.in_instrctrs; instrctrs := DontCare")
             emit("val rr = io.rr")
@@ -255,7 +255,7 @@ trait ChiselGenController extends ChiselGenCommon {
           close("}")
           emit(src"val module = Module(new ${lhs}_module(sm.p.depth))")
           inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
-            if (subset(in)) {
+            if (ledgerized(in)) {
               emit(src"module.io.in_$in.output := ${in}.output; ${in}.connectLedger(module.io.in_$in)")
               if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
             } 
@@ -403,7 +403,7 @@ trait ChiselGenController extends ChiselGenCommon {
         }.size
         connectDRAMStreams(x)
         forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)).io; $x <> DontCare""")
-        forceEmit(src"top.io.heap($id).req := $x.heapReq")
+        forceEmit(src"top.io.heap($id).req := $x.output.heapReq")
         forceEmit(src"$x.heapResp := top.io.heap($id).resp")
       }
       inAccel{

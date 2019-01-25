@@ -122,12 +122,13 @@ trait ChiselGenController extends ChiselGenCommon {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
     val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet
-    val usedStreams: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl).toSet ++ getWriteStreams(lhs.toCtrl).toSet} else Set()
     val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
-    val allUsed = used ++ bufMapInputs ++ usedStreams
+    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
 
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
-    dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreams) diff $made ++ ${RemoteMemories.all}")
+    dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
     (allUsed diff made).filterNot{s => s.isValue}.toSeq    
   }
 

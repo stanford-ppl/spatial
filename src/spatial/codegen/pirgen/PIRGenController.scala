@@ -82,7 +82,7 @@ trait PIRGenController extends PIRCodegen {
       emitController(lhs) { ret(body) }
       val cases = body.stms.collect{case sym@Op(op:SwitchCase[_]) => sym }
       cases.zipWithIndex.foreach { case (c, i) =>
-        emit(src"$c.en(${selects(i)})")
+        emit(s"$c.en(${selects(i)})")
       }
 
     case SwitchCase(body) => // Controlled by Switch

@@ -44,6 +44,9 @@ trait PIRSplitGen extends PIRCodegen {
 
   override def emitAccelHeader = {
     super.emitAccelHeader
+    emit(s"val nameSpace = scala.collection.mutable.Map[String,Any]()")
+    emit(s"def lookup[T](name:String) = nameSpace(name).asInstanceOf[T]")
+    emit(s"def save[T](name:String, x:T) = { nameSpace(name) = x; x.sname(name); x }")
     splitting = true
     splitCount = 0
     splitStart

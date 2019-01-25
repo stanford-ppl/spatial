@@ -3,7 +3,6 @@ package fringe.templates.memory
 import chisel3._
 import chisel3.util._
 import fringe._
-import fringe.Ledger._
 import fringe.utils._
 import fringe.templates.dramarbiter.{FIFO => SFIFO}
 
@@ -150,14 +149,12 @@ class SortPipe(val w: Int, val v: Int) extends Module {
   io.out.bits := stages.last
 }
 
-class MergeBufferIO(val ways: Int, val w: Int, val v: Int) extends Bundle {
+class MergeBufferIO(ways: Int, w: Int, v: Int) extends Bundle {
   val in = Vec(ways, Flipped(Decoupled(Vec(v, UInt(w.W)))))
   val initMerge = Flipped(Valid(Bool()))
   val inBound = Vec(ways, Flipped(Valid(UInt(w.W))))
   val out = Decoupled(Vec(v, UInt(w.W)))
   val outBound = Valid(UInt(w.W))
-
-  override def cloneType = (new MergeBufferIO(ways, w, v)).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
 class MergeBufferTwoWay(w: Int, v: Int) extends Module {
@@ -285,84 +282,42 @@ class MergeBufferNWay(ways: Int, w: Int, v: Int) extends Module {
   }
 }
 
-class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val readers: Int) extends Bundle {
-  def this(tup: (Int, Int, Int, Int)) = this(tup._1, tup._2, tup._3, tup._4)
-
-  val input = new Bundle {
+class MergeBuffer(ways: Int, par: Int, bitWidth: Int, readers: Int) extends Module {
+  val io = IO(new Bundle {
     val in_wen = Input(Vec(ways, Vec(par, Bool())))
     val in_data = Input(Vec(ways, Vec(par, UInt(bitWidth.W))))
     val initMerge_wen = Input(Bool())
-    val initMerge_data = Input(UInt(bitWidth.W))
-    val inBound_wen = Input(Vec(ways, Bool()))
+    val initMerge_data = Input(Bool())
+    val inBound_wen = Input(Vec(ways, UInt(bitWidth.W)))
     val inBound_data = Input(Vec(ways, UInt(bitWidth.W)))
     val out_ren = Input(Vec(readers, Vec(par, Bool())))
-  }
-  val output = new Bundle {
     val out_data = Output(Vec(par, UInt(bitWidth.W)))
+
     val empty = Output(Bool())
     val full = Output(Vec(ways, Bool()))
-  }
-  
-  def connectLedger(op: MergeBufferFullIO)(implicit stack: List[KernelHash]): Unit = {
-    if (stack.isEmpty) this <> op
-    else {
-      val cxn = Ledger.lookup(op.hashCode)
-      cxn.mergeEnq.foreach{p => input.in_wen(p) := op.input.in_wen(p); input.in_data(p) := op.input.in_data(p)}
-      cxn.mergeDeq.foreach{p => input.out_ren(p) := op.input.out_ren(p)}
-      cxn.mergeBound.foreach{p => input.inBound_data(p) := op.input.inBound_data(p); input.inBound_wen(p) := op.input.inBound_wen(p)}
-      cxn.mergeInit.foreach{p => input.initMerge_wen := op.input.initMerge_wen; input.initMerge_data := op.input.initMerge_data}
-      Ledger.substitute(op.hashCode, this.hashCode)
-    }
-  }
-
-  def connectMergeEnq(lane: Int, data: List[UInt], en: List[Bool])(implicit stack: List[KernelHash]): Unit = {
-    input.in_data(lane).zip(data).foreach{case (l,r) => l := r}
-    input.in_wen(lane).zip(en).foreach{case (l,r) => l := r}
-    Ledger.connectMergeEnq(this.hashCode, lane)
-  }
-  def connectMergeDeq(lane: Int, en: List[Bool])(implicit stack: List[KernelHash]): Seq[UInt] = {
-    input.out_ren(lane).zip(en).foreach{case (l, r) => l := r}
-    Ledger.connectMergeDeq(this.hashCode, lane)
-    output.out_data.toSeq
-  }
-  def connectMergeBound(lane: Int, data: UInt, en: Bool)(implicit stack: List[KernelHash]): Unit = {
-    input.inBound_data(lane) := data
-    input.inBound_wen(lane) := en
-    Ledger.connectMergeBound(this.hashCode, lane)
-  }
-  def connectMergeInit(data: UInt, en: Bool)(implicit stack: List[KernelHash]): Unit = {
-    input.initMerge_wen := en
-    input.initMerge_data := data
-    Ledger.connectMergeInit(this.hashCode, 0)
-  }
-
-  override def cloneType = (new MergeBufferFullIO(ways, par, bitWidth, readers)).asInstanceOf[this.type] // See chisel3 bug 358
-}
-
-class MergeBuffer(ways: Int, par: Int, bitWidth: Int, readers: Int) extends Module {
-  val io = IO(new MergeBufferFullIO(ways, par, bitWidth, readers))
+  })
 
   val mergeBuf = Module(new MergeBufferNWay(ways, bitWidth, par))
 
-  mergeBuf.io.out.ready := io.input.out_ren.asUInt.orR
+  mergeBuf.io.out.ready := io.out_ren.asUInt.orR
 
   mergeBuf.io.in.zipWithIndex.foreach { case (in, i) =>
-    in.valid := io.input.in_wen(i).reduce{_|_}
-    in.bits := io.input.in_data(i)
+    in.valid := io.in_wen(i).reduce{_|_}
+    in.bits := io.in_data(i)
   }
 
   mergeBuf.io.inBound.zipWithIndex.foreach { case (bound, i) =>
-    bound.valid := io.input.inBound_wen(i)
-    bound.bits := io.input.inBound_data(i)
+    bound.valid := io.inBound_wen(i)
+    bound.bits := io.inBound_data(i)
   }
 
-  mergeBuf.io.initMerge.valid := io.input.initMerge_wen
-  mergeBuf.io.initMerge.bits := io.input.initMerge_data
+  mergeBuf.io.initMerge.valid := io.initMerge_wen
+  mergeBuf.io.initMerge.bits := io.initMerge_data
 
-  io.output.out_data := mergeBuf.io.out.bits
+  io.out_data := mergeBuf.io.out.bits
 
-  io.output.empty := ~mergeBuf.io.out.valid
-  io.output.full.zipWithIndex.foreach { case (f, i) =>
+  io.empty := ~mergeBuf.io.out.valid
+  io.full.zipWithIndex.foreach { case (f, i) =>
     f := ~mergeBuf.io.in(i).ready
   }
 }

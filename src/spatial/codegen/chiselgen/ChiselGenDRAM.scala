@@ -28,9 +28,11 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent.s.get
-          val invEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+          val invEnable = src"""${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
+          emit(src"${dram}.io.appReq($id).valid := $invEnable")
+          emit(src"${dram}.io.appReq($id).bits.allocDealloc := true.B")
           val d = dims.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-          emit(src"${dram}.connectAlloc($id, $d, $invEnable)")
+          emit(src"${dram}.io.appReq($id).bits.dims.zip($d).foreach { case (l, r) => l := r }")
           requesters += (lhs -> id)
         case _ =>
       }
@@ -38,7 +40,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMIsAlloc(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = $dram.isAlloc")
+          emit(src"val $lhs = $dram.io.isAlloc")
         case _@Op(DRAMHostNew(_,_)) =>
           emit(src"val $lhs = true.B")
         case _ =>
@@ -49,8 +51,9 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent.s.get
-          val invEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
-          emit(src"${dram}.connectDealloc($id, $invEnable)")
+          val invEnable = src"""${DL(src"datapathEn & iiDone", lhs.fullDelay, true)}"""
+          emit(src"${dram}.io.appReq($id).valid := $invEnable")
+          emit(src"${dram}.io.appReq($id).bits.allocDealloc := false.B")
           requesters += (lhs -> id)
         case _ =>
       }
@@ -58,7 +61,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMAddress(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = ${dram}.addr")
+          emit(src"val $lhs = ${dram}.io.addr")
         case _@Op(DRAMHostNew(_,_)) =>
           emit(src"val $lhs = $dram")
         case _ =>

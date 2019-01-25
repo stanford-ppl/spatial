@@ -40,10 +40,10 @@ trait ChiselGenStream extends ChiselGenCommon {
       val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
-      val maskingLogic = src"$backpressure" 
+      val maskingLogic = src"sm.io.backpressure" 
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
+        emit(src"""${stream}.valid := ${DL(src"datapathEn & iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
       val Op(StreamOutNew(bus)) = stream
     
@@ -97,7 +97,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) """)
+      emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & (datapathEn) """)
       val Op(StreamInNew(bus)) = strm
       bus match {
         case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")

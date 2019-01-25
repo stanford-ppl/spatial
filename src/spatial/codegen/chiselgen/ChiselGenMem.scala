@@ -440,25 +440,21 @@ trait ChiselGenMem extends ChiselGenCommon {
       }
     case MergeBufferBankedEnq(merge, way, data, ens) =>
       val d = data.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.in_data($way).zip($d).foreach{case (l, r) => l := r }""")
       val invEn = invisibleEnableWrite(lhs)
-      val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.in_wen($way).zip($en).foreach{case (l, r) => l := r }""")
+      val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[Bool](", ",", ")")
+      emit(src"""$merge.connectMergeEnq($way, $d, $en)""")
     case MergeBufferBankedDeq(merge, ens) => 
       val readerIdx = merge.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.toSeq.indexOf(lhs)
       emit(src"""val $lhs = Wire(Vec(${ens.length}, ${merge.tp.typeArgs.head}))""")
-      emit(src"""$lhs.toSeq.zip($merge.out_data).foreach{case (l, r) => l.r := r }""")
       val invEn = invisibleEnableRead(lhs,merge)
-      val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[UInt](", ",", ")")
-      emit(src"""$merge.out_ren($readerIdx).zip($en).foreach{case (l, r) => l := r }""")
+      val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[Bool](", ",", ")")
+      emit(src"$lhs.toSeq.zip($merge.connectMergeDeq($readerIdx, $en)).foreach{case (l,r) => l.r := r}")
     case MergeBufferBound(merge, way, data, ens) =>
       val invEn = invisibleEnableWrite(lhs)
-      emit(src"$merge.inBound_wen($way) := ${and(ens)} & $invEn")
-      emit(src"$merge.inBound_data($way) := ${data}.r")
+      emit(src"$merge.connectMergeBound($way, $data.r, ${and(ens)} & $invEn)")
     case MergeBufferInit(merge, data, ens) =>
       val invEn = invisibleEnableWrite(lhs)
-      emit(src"$merge.initMerge_wen := ${and(ens)} & $invEn")
-      emit(src"$merge.initMerge_data := ${data}.r")
+      emit(src"$merge.connectMergeInit($data.r, ${and(ens)} & $invEn)")
 
     case _ => super.gen(lhs, rhs)
   }

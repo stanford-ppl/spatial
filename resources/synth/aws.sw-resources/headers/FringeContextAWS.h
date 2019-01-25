@@ -199,6 +199,9 @@ public:
      * other API calls.
      * This function accepts the slot_id, physical function, and bar number
      */
+
+    // TODO: Check if check_slot_config should be here, or down below?
+    // rc = check_slot_config(slot_id);
     rc = fpga_pci_attach(slot_id, pf_id, bar_id, fpga_attach_flags, &pci_bar_handle);
     fail_on(rc, out, "Unable to attach to the AFI on slot id %d", slot_id);
 
@@ -338,6 +341,10 @@ public:
 
   // set enable high in app and poll until done is high
   virtual void run() {
+    // TODO: See if these lines should be here rather than in load()
+    // aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 1);
+    // aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 0);
+
     printf("[run] Begin\n");
 #ifdef SIM
     // These may not be needed anymore

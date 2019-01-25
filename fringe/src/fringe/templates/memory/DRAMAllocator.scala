@@ -2,10 +2,13 @@ package fringe.templates.memory
 
 import chisel3._
 import chisel3.util._
+import fringe.Ledger._
 
 import fringe._
 
-class DRAMAllocator(rank: Int, appReqCount: Int) extends Module {
+class DRAMAllocatorIO(val rank: Int, val appReqCount: Int) extends Bundle {
+  def this(tup: (Int, Int)) = this(tup._1, tup._2)
+
   class AppReq(rank: Int) extends Bundle {
     val allocDealloc = Bool()
     val dims = Vec(rank, UInt(32.W))
@@ -49,14 +52,9 @@ class DRAMAllocator(rank: Int, appReqCount: Int) extends Module {
   override def cloneType = (new DRAMAllocatorIO(rank, appReqCount)).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
-    val heapReq = Valid(new HeapReq)
-    val heapResp = Flipped(Valid(new HeapResp))
+class DRAMAllocator(val rank: Int, val appReqCount: Int) extends Module {
 
-    val isAlloc = Output(Bool())
-    val size = Output(UInt(64.W))
-    val dims = Output(Vec(rank, UInt(32.W)))
-    val addr = Output(UInt(64.W))
-  })
+  val io = IO(new DRAMAllocatorIO(rank, appReqCount))
 
   io <> DontCare
 

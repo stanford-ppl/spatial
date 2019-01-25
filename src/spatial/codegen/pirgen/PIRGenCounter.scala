@@ -13,7 +13,7 @@ trait PIRGenCounter extends PIRCodegen {
     case CounterChainNew(ctrs)          => 
       state(lhs, tp=Some("List[Counter]"))(src"$ctrs")
     case ForeverNew()                   => 
-      state(lhs)(src"Counter(par=1, isForever=true)")
+      state(lhs)(src"ForeverNew")
     case _ => super.genAccel(lhs, rhs)
   }
 

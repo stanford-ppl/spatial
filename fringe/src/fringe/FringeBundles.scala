@@ -3,18 +3,14 @@ package fringe
 import chisel3._
 import chisel3.util._
 import fringe.utils._
-import fringe.Ledger._
-import scala.collection.mutable._
 
-class AppLoadData(val v: Int, val w: Int) extends Bundle {
-  def this(tup: (Int, Int)) = this(tup._1, tup._2)
+class AppLoadData(v: Int, w: Int) extends Bundle {
   val rdata = Vec(v, UInt(w.W))
 
   override def cloneType(): this.type = new AppLoadData(v, w).asInstanceOf[this.type]
 }
 
-class AppStoreData(val v: Int, val w: Int) extends Bundle {
-  def this(tup: (Int, Int)) = this(tup._1, tup._2)
+class AppStoreData(v: Int, w: Int) extends Bundle {
   val wdata = Vec(v, UInt(w.W))
   val wstrb = UInt(v.W)
 
@@ -22,7 +18,6 @@ class AppStoreData(val v: Int, val w: Int) extends Bundle {
 }
 
 class AppCommandDense(val addrWidth: Int = 64, val sizeWidth: Int = 32) extends Bundle {
-  def this(tup: (Int, Int)) = this(tup._1, tup._2)
   val addr = UInt(addrWidth.W)
   val size = UInt(sizeWidth.W)
 
@@ -30,7 +25,6 @@ class AppCommandDense(val addrWidth: Int = 64, val sizeWidth: Int = 32) extends 
 }
 
 class AppCommandSparse(val v: Int, val addrWidth: Int = 64) extends Bundle {
-  def this(tup: (Int, Int)) = this(tup._1, tup._2)
   val addr = Vec(v, UInt(addrWidth.W))
 
   override def cloneType(): this.type = new AppCommandSparse(v, addrWidth).asInstanceOf[this.type]
@@ -38,7 +32,7 @@ class AppCommandSparse(val v: Int, val addrWidth: Int = 64) extends Bundle {
 
 case class StreamParInfo(w: Int, v: Int, memChannel: Int)
 
-class LoadStream(val p: StreamParInfo) extends Bundle {
+class LoadStream(p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandDense))
   val data = Decoupled(new AppLoadData(p.v, p.w))
 
@@ -47,7 +41,7 @@ class LoadStream(val p: StreamParInfo) extends Bundle {
   }
 }
 
-class StoreStream(val p: StreamParInfo) extends Bundle {
+class StoreStream(p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandDense))
   val data = Flipped(Decoupled(new AppStoreData(p.v, p.w)))
   val wresp = Decoupled(Bool())
@@ -55,7 +49,7 @@ class StoreStream(val p: StreamParInfo) extends Bundle {
   override def cloneType(): this.type = new StoreStream(p).asInstanceOf[this.type]
 }
 
-class GatherStream(val p: StreamParInfo) extends Bundle {
+class GatherStream(p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandSparse(p.v)))
   val data = Decoupled(Vec(p.v, UInt(p.w.W)))
 
@@ -64,7 +58,7 @@ class GatherStream(val p: StreamParInfo) extends Bundle {
   }
 }
 
-class ScatterCmdStream(val p: StreamParInfo) extends Bundle {
+class ScatterCmdStream(p: StreamParInfo) extends Bundle {
   val addr = new AppCommandSparse(p.v)
   val wdata = Vec(p.v, UInt(p.w.W))
 
@@ -93,6 +87,13 @@ class ArgOut() extends Bundle {
   val echo = Input(UInt(64.W))
 
   override def cloneType(): this.type = new ArgOut().asInstanceOf[this.type]
+}
+
+class MultiArgOut(nw: Int) extends Bundle {
+  val port = Vec(nw, Decoupled(UInt(64.W)))
+  val echo = Input(UInt(64.W))
+
+  override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]
 }
 
 class InstrCtr() extends Bundle {

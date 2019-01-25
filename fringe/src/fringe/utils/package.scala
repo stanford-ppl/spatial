@@ -97,12 +97,12 @@ package object utils {
     if (retime.toInt > 0) {
       val done_catch = Module(new SRFF())
       val sr = Module(new RetimeWrapperWithReset(1, retime - 1, 0))
-      sr.io.in := done_catch.io.output.data & ready
+      sr.io.in := done_catch.io.output & ready
       sr.io.flow := ready
       done_catch.io.input.asyn_reset := reset
       done_catch.io.input.set := in_done.toBool & ready
       val out = sr.io.out
-      val out_overlap = done_catch.io.output.data
+      val out_overlap = done_catch.io.output
       done_catch.io.input.reset := out & out_overlap & ready
       sr.io.rst := out(0) & out_overlap & ready
       out(0) & out_overlap & ready

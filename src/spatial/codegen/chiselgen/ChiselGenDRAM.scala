@@ -40,7 +40,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMIsAlloc(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = $dram.io.isAlloc")
+          emit(src"val $lhs = $dram.output.isAlloc")
         case _@Op(DRAMHostNew(_,_)) =>
           emit(src"val $lhs = true.B")
         case _ =>
@@ -61,7 +61,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMAddress(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = ${dram}.io.addr")
+          emit(src"val $lhs = ${dram}.output.addr")
         case _@Op(DRAMHostNew(_,_)) =>
           emit(src"val $lhs = $dram")
         case _ =>

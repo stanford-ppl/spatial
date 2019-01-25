@@ -493,13 +493,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
 
-  override def copyDependencies(out: String): Unit = {
-
-    // if (spatialConfig.enableDebugResources) {
-    //   dependencies ::= DirDep("fringe/src", "fringe")
-    // }
-
-    super.copyDependencies(out)
+    case _ => None
+  }
+  // Check if this node has an io that will be partially connected in each controller
+  protected def ledgerized(node: Sym[_]): Boolean = node match {
+    case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
+    case _ if node.isDRAMAccel => true
+    case _ => false
   }
 
 

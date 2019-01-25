@@ -1063,8 +1063,7 @@ import spatial.dsl._
   }
 }
 
-@spatial class ConvolutionReclaimFlat extends SpatialTest {
-
+@spatial class ConvolutionFlatSRAM extends SpatialTest {
   override def runtimeArgs: Args = "128 64 32 16 2"
   type T = FixPt[TRUE,_32,_0]
 
@@ -1088,7 +1087,6 @@ import spatial.dsl._
     val IN_CHANS = ArgIn[Int]
     val OUT_CHANS = ArgIn[Int]
     val STRIDE = ArgIn[Int]
-    val donttouch = ArgOut[Bit]
     val n_points_in = args(0).to[Int]
     val n_points_out = args(1).to[Int]
     val n_chans_in = args(2).to[Int]
@@ -1118,27 +1116,23 @@ import spatial.dsl._
 
       // Create stream controller to run once per output point (which includes all output channels per point)
       Foreach(OUT_POINTS by 1){ pt =>
-        val C = pt * STRIDE
 
         // Create FIFOs to hold input data (declare here so parallelizing stream results in duplication of these)
-        val in_fifos = List.tabulate(window){_ => FIFO[T](IN_CHANS_MAX).conflictable}
+        val in_fifos = List.tabulate(window){_ => FIFO[T](IN_CHANS_MAX)}
         // Create FIFO to buffer output data
         val line_out = FIFO[T](OUT_CHANS_MAX)
         // Create signalling FIFO to mediate control
         val store_ready = FIFO[Bit](8)
+        
+        val C = pt * STRIDE
 
         // Fetch data
-        in_fifos.zipWithIndex.map{case (f, i) => 
-          // Quirk of compiler's Pipe insertion, guarantee that pt * STRIDE is computed locally
-          'FETCH.Pipe{ 
-            if (pt == 0 || (i >= (window-STRIDE.value))) {
-              f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-            }
+        Parallel{
+          in_fifos.zipWithIndex.map{case (f, i) => 
+            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
           }
         }
 
-        // Greedily consume data
-        // Quirk of compiler's Pipe insertion, guarantee that pt * STRIDE is computed locally
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)
         // Compute partial result for each IN_CHAN
@@ -1149,30 +1143,14 @@ import spatial.dsl._
           val data = List.tabulate(window){lane => mux(C - (window/2) + lane >= 0 && C - (window/2) + lane < IN_POINTS-1, data_raw(lane), 0.to[T])}
           val acc = filter.zip(data).map{case (a,b) => a*b}.reduceTree{_+_}
           line_out_sram(oc) = mux(ic == 0, acc, line_out_sram(oc) + acc)
-          // Reclaim data
-          if (oc == 0) {
-            in_fifos.dropRight(2).zipWithIndex.foreach{case (f, i) => 
-              val s2data = data_raw(i+2)
-              val s1data = data_raw(i+1)
-              val data = mux(STRIDE.value == 1, s1data, s2data)
-              f.enq(data)
-            }
-            in_fifos.dropRight(1).last.enq(data_raw.last, STRIDE.value == 1)
-          }
         }
 
-        // Quickly copy results to output FIFO and indicate data is ready
-        Foreach(OUT_CHANS by 1){oc => line_out.enq(line_out_sram(oc)); if (oc == 0) {store_ready.enq(true)}}
-
         // Store data out
-        donttouch := store_ready.deq() // Do not want to begin issuing store commands too soon
-        RESULT(pt, 0::OUT_CHANS par SP) store line_out  
+        RESULT(pt, 0::OUT_CHANS par SP) store line_out_sram
         
       }
 
     }
-
-    println(r"donttouch: $donttouch") // Guarantee compiler will not DCE
 
     // Compute gold
     val gold = (0::n_points_out, 0::n_chans_out){(pt, oc) => 
@@ -1190,8 +1168,7 @@ import spatial.dsl._
     printMatrix(gold.t, "Gold")
 
     val cksum = gold == got
-    println("PASS: " + cksum + " (ConvolutionStreamReclaimFlat)")
+    println("PASS: " + cksum + " (ConvolutionFlat)")
     assert(cksum)
   }
 }
-

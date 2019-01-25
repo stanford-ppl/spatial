@@ -42,8 +42,6 @@ for line in src:
     dst.write(line.replace('string', ' std::string', 1).replace(' string', ' std::string'))
   elif 'vector<string>' in line:
     dst.write(line.replace('<string>', '<std::string>'))
-  elif '(string' in line:
-    dst.write(line.replace('(string', '(std::string'))
   elif ' string(argv' in line:
     dst.write(line.replace(' string(argv', ' std::string(argv'))
   else:

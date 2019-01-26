@@ -327,10 +327,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -441,10 +441,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -551,10 +551,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -678,10 +678,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -802,10 +802,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -940,10 +940,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -1076,10 +1076,10 @@ import spatial.dsl._
 
     // Set parallelizations
     val P1 = 1
-    val P2 = 4
-    val P3 = 4
-    val LP = 4
-    val SP = 4
+    val P2 = 1
+    val P3 = 1
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]

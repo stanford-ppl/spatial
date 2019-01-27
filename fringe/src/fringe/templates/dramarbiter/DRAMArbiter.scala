@@ -140,6 +140,7 @@ class DRAMArbiter(
 
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid), "[FRINGE] # DRAM Commands Issued")
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid & !io.dram.cmd.bits.isWr), "[FRINGE] # Read Commands Sent")
+      connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid & io.dram.cmd.bits.isWr), "[FRINGE] # Write Commands Sent")
 
       // Count number of load commands issued from accel per stream
       io.app.loads.zipWithIndex.foreach { case (load, i) =>

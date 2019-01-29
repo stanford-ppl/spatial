@@ -40,46 +40,46 @@ import spatial.dsl._
   }
 }
 
-// @spatial class StreamMultiFIFO extends SpatialTest {
-//   override def runtimeArgs: Args = "3"
+@spatial class StreamMultiFIFO extends SpatialTest {
+  override def runtimeArgs: Args = "3"
 
-//   def main(args: Array[String]): Unit = {
-//     type T = I32
+  def main(args: Array[String]): Unit = {
+    type T = I32
 
-//     val N = ArgIn[Int]
-//     setArg(N, args(0).to[Int])
-//     val n = 90
-//     val p = 16
-//     val mem = DRAM[T](n)
+    val N = ArgIn[Int]
+    setArg(N, args(0).to[Int])
+    val n = 90
+    val p = 16
+    val mem = DRAM[T](n)
 
-//     Accel {
-//       val fifo1 = FIFO[T](p)
-//       val fifo2 = FIFO[T](p)
-//       val fifo3 = FIFO[T](p)
+    Accel {
+      val fifo1 = FIFO[T](p)
+      val fifo2 = FIFO[T](p)
+      val fifo3 = FIFO[T](p)
 
-//       Stream.Foreach(3 by 1) { i =>
-//         Foreach(p by 1){j => 
-//           // Always enq to fifo1
-//           fifo1.enq(j)
-//           // Sometimes enq to fifo2
-//           if (i % 2 == 0) fifo2.enq(j)
-//         }
-//         Foreach(0 until n) { i =>
-//           val a = fifo1.deq()
-//           val b = if (i % 2 == 0) fifo2.deq() else 0
-//           fifo3.enq(a + b)
-//         }
-//         mem(0::n) store fifo3
-//       }
+      Stream.Foreach(N by 1) { i =>
+        Foreach(p by 1){j => 
+          // Always enq to fifo1
+          fifo1.enq(j)
+          // Sometimes enq to fifo2
+          if (i % 2 == 0) fifo2.enq(j)
+        }
+        Foreach(0 until p) { _ =>
+          val a = fifo1.deq()
+          val b = if (i % 2 == 0) fifo2.deq() else 0
+          fifo3.enq(a + b)
+        }
+        mem(0::p) store fifo3
+      }
 
-//     }
+    }
 
-//     val result = getMem(mem)
-//     val gold = Array.tabulate(p){i => if ((args(0).to[Int] - 1) % 2 == 0) i * 2 else i}
+    val result = getMem(mem)
+    val gold = Array.tabulate(p){i => if ((args(0).to[Int] - 1) % 2 == 0) i * 2 else i}
 
-//     printArray(gold, "Wanted: ")
-//     printArray(result, "Result: ")
-//     println(r"Pass: ${gold == result}")
-//     assert(gold == result)
-//   }
-// }
+    printArray(gold, "Wanted: ")
+    printArray(result, "Result: ")
+    println(r"Pass: ${gold == result}")
+    assert(gold == result)
+  }
+}

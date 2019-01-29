@@ -175,6 +175,12 @@ trait ChiselGenController extends ChiselGenCommon {
         ins.zipWithIndex.foreach{case (in, i) => emit(src"val $in = list_${ins.head}($i)")}
       }
 
+      if (spatialConfig.enableModular) {
+        inputs.zipWithIndex.collect{case(in,i) if (param(in).isDefined) => 
+          emit(src"val ${in}_p = ${param(in).get}") 
+        }
+      }
+
       open(src"def kernel(): $ret = {")
         emit(src"""Ledger.enter(this.hashCode, "${lhs}$swobj")""")
         emit("implicit val stack = ControllerStack.stack.toList")

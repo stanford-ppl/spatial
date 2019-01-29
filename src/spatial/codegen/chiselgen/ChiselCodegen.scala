@@ -515,31 +515,31 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}))"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
-      case Some(x) if x.isNBuffered => src"Flipped(new NBufInterface(${x}_p))"
+      case Some(x) if x.isNBuffered => src"""Flipped(new NBufInterface(ModuleParams.getParams("${x}_p").asInstanceOf[NBufParams] ))"""
       case Some(Op(_: ArgInNew[_])) => "Input(UInt(64.W))"
       case Some(x@Op(_: ArgOutNew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(x@Op(_: HostIONew[_])) => s"new MultiArgOut(${scala.math.max(1,x.writers.filter(_.parent != Ctrl.Host).size)})"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
-      case Some(x@Op(_: CounterChainNew)) => src"Flipped(new CounterChainInterface(${x}_p))"
+      case Some(x@Op(_: CounterChainNew)) => src"""Flipped(new CounterChainInterface(ModuleParams.getParams("${x}_p").asInstanceOf[(List[Int],List[Int])] ))"""
       case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => 
         val FixPtType(s,d,f) = x.tp.typeArgs.head
         src"Flipped(new FixFMAAccumBundle(${x.writers.size}, $d, $f))"
       case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined) => 
         val FixPtType(s,d,f) = x.tp.typeArgs.head
         src"Flipped(new FixOpAccumBundle(${x.writers.size}, $d, $f))"
-      case Some(x@Op(_: RegNew[_])) => src"Flipped(new StandardInterface(${x}_p))"
-      case Some(x@Op(_: RegFileNew[_,_])) => src"Flipped(new ShiftRegFileInterface(${x}_p))"
-      case Some(x@Op(_: LUTNew[_,_])) => src"Flipped(new StandardInterface(${x}_p))"
-      case Some(x@Op(_: SRAMNew[_,_])) => src"Flipped(new StandardInterface(${x}_p))"
-      case Some(x@Op(_: FIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
-      case Some(x@Op(_: FIFORegNew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
-      case Some(x@Op(_: MergeBufferNew[_])) => src"Flipped(new MergeBufferFullIO(${x}_p))"
-      case Some(x@Op(_: LIFONew[_])) => src"Flipped(new FIFOInterface(${x}_p))"
+      case Some(x@Op(_: RegNew[_])) => src"""Flipped(new StandardInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: RegFileNew[_,_])) => src"""Flipped(new ShiftRegFileInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: LUTNew[_,_])) => src"""Flipped(new StandardInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: SRAMNew[_,_])) => src"""Flipped(new StandardInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: FIFONew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: FIFORegNew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: MergeBufferNew[_])) => src"""Flipped(new MergeBufferFullIO(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: LIFONew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
       case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(new FixedPoint(true, 64, 0))"
-      case Some(x@Op(_: DRAMAccelNew[_,_])) => src"Flipped(new DRAMAllocatorIO(${x}_p))"
+      case Some(x@Op(_: DRAMAccelNew[_,_])) => src"""Flipped(new DRAMAllocatorIO(ModuleParams.getParams("${x}_p").asInstanceOf[(Int, Int)] ))"""
       case Some(x@Op(_@StreamInNew(bus))) => 
         bus match {
-          case _: BurstDataBus[_] => s"Flipped(Decoupled(new AppLoadData(${x}_p)))"
+          case _: BurstDataBus[_] => src"""Flipped(Decoupled(new AppLoadData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int, Int)] )))"""
           case BurstAckBus => "Flipped(Decoupled(Bool()))"
           case _: GatherDataBus[_] => 
             val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => (ens.length, bitWidth(e.A.tp)) }
@@ -549,10 +549,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
         bus match {
-          case BurstCmdBus => s"Decoupled(new AppCommandDense(${x}_p))"
-          case _: BurstFullDataBus[_] => s"Decoupled(new AppStoreData(${x}_p))"
-          case GatherAddrBus => s"Decoupled(new AppCommandSparse(${x}_p))"
-          case _: ScatterCmdBus[_] => s"Decoupled(new ScatterCmdStream(${x}_p))"
+          case BurstCmdBus => src"""Decoupled(new AppCommandDense(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
+          case _: BurstFullDataBus[_] => src"""Decoupled(new AppStoreData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
+          case GatherAddrBus => src"""Decoupled(new AppCommandSparse(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
+          case _: ScatterCmdBus[_] => src"""Decoupled(new ScatterCmdStream(ModuleParams.getParams("${x}_p").asInstanceOf[StreamParInfo] ))"""
           case _ => super.remap(tp)
         }
 
@@ -561,24 +561,24 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   protected def param(node: Sym[_]): Option[String] = node match {
-    case x if x.isNBuffered => Some(src"$x.p")
-    case Op(_: MergeBufferNew[_]) => Some(src"($node.ways, $node.par, $node.bitWidth, $node.readers)")
-    case x if x.isMemPrimitive => Some(src"$x.p")
-    case Op(_: DRAMAccelNew[_,_]) => Some(src"($node.rank, $node.appReqCount)")
+    case x if x.isNBuffered => Some(src"m.io.p")
+    case Op(_: MergeBufferNew[_]) => Some(src"(m.io.ways, m.io.par, m.io.bitWidth, m.io.readers)")
+    case x if x.isMemPrimitive => Some(src"m.io.p")
+    case Op(_: DRAMAccelNew[_,_]) => Some(src"(m.io.rank, m.io.appReqCount)")
     case x if x.isCounterChain => 
       val sfx = if (cchainCopies.contains(x)) src"_copy${cchainCopies(x).head}" else ""
-      Some(src"(${x}${sfx}.par, ${x}${sfx}.widths)")
+      Some(src"(${x}$sfx.par, ${x}$sfx.widths)")
     case x@Op(_@StreamInNew(bus)) => 
       bus match {
-        case _: BurstDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
+        case _: BurstDataBus[_] => Some(src"(${x}.bits.v, ${x}.bits.w)")
         case _ => None
       }
     case x@Op(_@StreamOutNew(bus)) => 
       bus match {
-        case BurstCmdBus => Some(src"($x.bits.addrWidth, $x.bits.sizeWidth)")
-        case _: BurstFullDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
-        case GatherAddrBus => Some(src"($x.bits.v, $x.bits.addrWidth)")
-        case _: ScatterCmdBus[_] => Some(src"$x.bits.p")
+        case BurstCmdBus => Some(src"(${x}.bits.addrWidth, ${x}.bits.sizeWidth)")
+        case _: BurstFullDataBus[_] => Some(src"(${x}.bits.v, ${x}.bits.w)")
+        case GatherAddrBus => Some(src"(${x}.bits.v, ${x}.bits.addrWidth)")
+        case _: ScatterCmdBus[_] => Some(src"${x}.bits.p")
         case _ => None
       }
 

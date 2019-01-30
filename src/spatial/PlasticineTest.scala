@@ -110,6 +110,8 @@ trait PlasticineTest extends DSLTest { test =>
       def parse(line:String) = {
         if (line.contains("Compilation succeed in")) Pass
         else if (line.contains("Not enough resource of type")) Pass
+        else if (line.contains("error")) Fail
+        else if (line.contains("fail")) Fail
         else Unknown
       }
       val timeout = 3000

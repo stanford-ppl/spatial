@@ -171,6 +171,47 @@ trait ChiselGenController extends ChiselGenCommon {
 
       createSMObject(lhs)
 
+      if (spatialConfig.enableModular) {
+        open(src"abstract class ${lhs}_module(depth: Int)(implicit stack: List[KernelHash]) extends Module {")
+          open("val io = IO(new Bundle {")
+            inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
+              if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val in_${in}_copy$c = ${port(in.tp, Some(in))}")}
+              else emit(src"val in_$in = ${port(in.tp, Some(in))}")
+            }
+            if (spatialConfig.enableInstrumentation) emit("val in_instrctrs = Vec(api.numCtrls, Output(new InstrCtr()))")
+            val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
+            val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
+            val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
+            val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
+            emit(s"val in_breakpoints = Vec(api.numArgOuts_breakpts, Output(Bool()))")
+            emit(s"val sigsIn = Input(new InputKernelSignals(${nMyChildren}, ${ctrcopies}, $ctrPars, $ctrWidths))")
+            emit(s"val sigsOut = Output(new OutputKernelSignals(${nMyChildren}, ${ctrcopies}))")
+            emit("val rr = Input(Bool())")
+            if (lhs.op.exists(_.R.isBits)) emit(src"val ret = Output(${remap(lhs.op.get.R.tp)})")
+          close("})")
+          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
+            if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"def ${in}_copy$c = {io.in_${in}_copy$c}; io.in_${in}_copy$c := DontCare")}
+            else emit(src"def $in = {io.in_$in} ${if (ledgerized(in) | in.isCounterChain) src"; io.in_$in := DontCare" else ""}")
+          }
+
+        close("}")
+
+        val numgrps = math.ceil(inputs.filter(!_.isString).size.toDouble / 100.0)
+        inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  => 
+          open(src"def connectWires${grpid}(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
+            inpgrp.foreach{ in => 
+              if (ledgerized(in)) {
+                emit(src"module.io.in_$in.output := ${in}.output; ${in}.connectLedger(module.io.in_$in)")
+                if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
+              } 
+            else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
+            else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
+            else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
+            else emit(src"module.io.in_$in <> ${in}")}
+          close("}")
+        }
+      }
+
       groupedInputs.collect{case (ins, typ) if !cchainCopies.contains(ins.head) => 
         ins.zipWithIndex.foreach{case (in, i) => emit(src"val $in = list_${ins.head}($i)")}
       }
@@ -179,29 +220,9 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""Ledger.enter(this.hashCode, "${lhs}$swobj")""")
         emit("implicit val stack = ControllerStack.stack.toList")
         if (spatialConfig.enableModular) {
-          open(src"class ${lhs}_module(depth: Int) extends Module {")
-            open("val io = IO(new Bundle {")
-              inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
-                if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val in_${in}_copy$c = ${port(in.tp, Some(in))}")}
-                else emit(src"val in_$in = ${port(in.tp, Some(in))}")
-              }
-              if (spatialConfig.enableInstrumentation) emit("val in_instrctrs = Vec(api.numCtrls, Output(new InstrCtr()))")
-              val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
-              val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
-              val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
-              val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
-              emit(s"val in_breakpoints = Vec(api.numArgOuts_breakpts, Output(Bool()))")
-              emit(s"val sigsIn = Input(new InputKernelSignals(${nMyChildren}, ${ctrcopies}, $ctrPars, $ctrWidths))")
-              emit(s"val sigsOut = Output(new OutputKernelSignals(${nMyChildren}, ${ctrcopies}))")
-              emit("val rr = Input(Bool())")
-              if (lhs.op.exists(_.R.isBits)) emit(src"val ret = Output(${remap(lhs.op.get.R.tp)})")
-            close("})")
+          open(src"class ${lhs}_concrete(depth: Int)(implicit stack: List[KernelHash]) extends ${lhs}_module(depth) {")
             emit("io.sigsOut := DontCare")
             emit("val breakpoints = io.in_breakpoints; breakpoints := DontCare")
-            inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
-              if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val ${in}_copy$c = io.in_${in}_copy$c; ${in}_copy$c := DontCare")}
-              else emit(src"val $in = io.in_$in ${if (ledgerized(in) | in.isCounterChain) src";$in := DontCare" else ""}")
-            }
             if (spatialConfig.enableInstrumentation) emit("val instrctrs = io.in_instrctrs; instrctrs := DontCare")
             emit("val rr = io.rr")
         }
@@ -247,21 +268,15 @@ trait ChiselGenController extends ChiselGenCommon {
 
         if (spatialConfig.enableModular) {
           close("}")
-          emit(src"val module = Module(new ${lhs}_module(sm.p.depth))")
-          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
-            if (ledgerized(in)) {
-              emit(src"module.io.in_$in.output := ${in}.output; ${in}.connectLedger(module.io.in_$in)")
-              if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
-            } 
-          else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
-          else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
-          else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
-          else emit(src"module.io.in_$in <> ${in}")}
-          emit("module.io.sigsIn := me.sigsIn")
-          emit("me.sigsOut := module.io.sigsOut")
+          emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth))")
+          val numgrps = math.ceil(inputs.filter(!_.isString).size.toDouble / 100.0).toInt
+          List.tabulate(numgrps){i => emit(src"connectWires$i(module)")}
           if (spatialConfig.enableInstrumentation) emit("Ledger.connectInstrCtrs(instrctrs, module.io.in_instrctrs)")
           emit(src"Ledger.connectBreakpoints(breakpoints, module.io.in_breakpoints)")
           emit("module.io.rr := rr")
+          emit("module.io.sigsIn := me.sigsIn")
+          emit("me.sigsOut := module.io.sigsOut")
+
           if (lhs.op.exists(_.R.isBits)) emit("val ret = module.io.ret")
         }
         emit("""Ledger.exit()""")

@@ -533,7 +533,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(x@Op(_: SRAMNew[_,_])) => src"""Flipped(new StandardInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
       case Some(x@Op(_: FIFONew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
       case Some(x@Op(_: FIFORegNew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
-      case Some(x@Op(_: MergeBufferNew[_])) => src"""Flipped(new MergeBufferFullIO(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
+      case Some(x@Op(_: MergeBufferNew[_])) => src"""Flipped(new MergeBufferFullIO(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int,Int,Int)] ))"""
       case Some(x@Op(_: LIFONew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
       case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(new FixedPoint(true, 64, 0))"
       case Some(x@Op(_: DRAMAccelNew[_,_])) => src"""Flipped(new DRAMAllocatorIO(ModuleParams.getParams("${x}_p").asInstanceOf[(Int, Int)] ))"""
@@ -564,7 +564,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case x if x.isNBuffered => Some(src"m.io.p")
     case Op(_: MergeBufferNew[_]) => Some(src"(m.io.ways, m.io.par, m.io.bitWidth, m.io.readers)")
     case x if x.isMemPrimitive => Some(src"m.io.p")
-    case Op(_: DRAMAccelNew[_,_]) => Some(src"(m.io.rank, m.io.appReqCount)")
+    case Op(_: DRAMAccelNew[_,_]) => Some(src"(${node}.rank, ${node}.appReqCount)")
     case x if x.isCounterChain => 
       val sfx = if (cchainCopies.contains(x)) src"_copy${cchainCopies(x).head}" else ""
       Some(src"(${x}$sfx.par, ${x}$sfx.widths)")

@@ -413,6 +413,7 @@ trait ChiselGenController extends ChiselGenCommon {
         connectDRAMStreams(x)
         forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)).io; $x <> DontCare""")
         forceEmit(src"top.io.heap($id).req := $x.output.heapReq")
+        if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${x}_p", ${param(x).get})  """)
         forceEmit(src"$x.heapResp := top.io.heap($id).resp")
       }
       inAccel{

@@ -8,6 +8,7 @@ import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
+import spatial.codegen.tsthgen._
 import spatial.codegen.dotgen._
 import spatial.codegen.resourcegen._
 
@@ -111,6 +112,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
     lazy val pirCodegen    = PIRGenSpatial(state)
+    lazy val tsthCodegen   = TungstenHostGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
@@ -179,7 +181,8 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
-        (spatialConfig.enablePIR ? pirCodegen)
+        (spatialConfig.enablePIR ? pirCodegen) ==>
+        (spatialConfig.enablePIR ? tsthCodegen)
     }
 
     isl.shutdown(100)

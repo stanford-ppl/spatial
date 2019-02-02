@@ -17,10 +17,6 @@ trait PlasticineTest extends DSLTest { test =>
     "run.sh" ::
     "--dot=true" ::
     "--debug=true" ::
-    "--trace=true" ::
-    "--psim=true" ::
-    "--run-psim=false" ::
-    s"--tungsten=false" ::
     Nil
 
   abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "") {
@@ -83,39 +79,91 @@ trait PlasticineTest extends DSLTest { test =>
       }
     }
 
+    def parsepir(line:String) = {
+      if (line.contains("error")) Fail
+      else if (line.contains("fail")) Fail
+      else if (line.contains("Compilation succeed in")) Pass
+      else Unknown
+    }
+
     def runpir(args:String="") = {
       var cmd = pirArgs :+
       "--load=false" :+
-      "--mapping=false"
+      "--mapping=false" :+
+      "--codegen=false"
       cmd ++= args.split(" ").map(_.trim).toList
       cmd ++= cmdlnArgs
-      def parse(line:String) = {
-        if (line.contains("error")) Fail
-        else if (line.contains("fail")) Fail
-        else if (line.contains("Compilation succeed in")) Pass
-        else Unknown
-      }
       val timeout = 3000
-      scommand(s"runpir", cmd, timeout, parse _, RunError.apply)
+      scommand(s"runpir", cmd, timeout, parsepir _, RunError.apply)
     }
 
     def mappir(args:String, fifo:Int=20, rerun:Boolean=false) = {
       var cmd = pirArgs :+
       "--load=true" :+
+      "--ckpt=1" :+
       "--mapping=true" :+
       s"--fifo-depth=$fifo" :+
+      "--codegen=false" :+
       "--stat" 
       cmd ++= args.split(" ").map(_.trim).toList
       cmd ++= cmdlnArgs
-      def parse(line:String) = {
-        if (line.contains("Compilation succeed in")) Pass
-        else if (line.contains("Not enough resource of type")) Pass
-        else if (line.contains("error")) Fail
-        else if (line.contains("fail")) Fail
-        else Unknown
-      }
       val timeout = 3000
-      scommand(s"mappir", cmd, timeout, parse _, { case msg:String => println(msg); Pass}, rerun)
+      scommand(s"mappir", cmd, timeout, parsepir _, RunError.apply, rerun)
+    }
+
+    def genpsim(args:String="", fifo:Int=20, rerun:Boolean=false) = {
+      var gentracecmd = pirArgs :+
+      "--load=true" :+
+      "--ckpt=0" :+
+      "--codegen=true" :+
+      "--end-id=5" :+
+      "--trace=true" :+
+      "--psim=true" :+
+      "--run-psim=false"
+      gentracecmd ++= args.split(" ").map(_.trim).toList
+      gentracecmd ++= cmdlnArgs
+      var genpsimcmd = pirArgs :+
+      "--load=true" :+
+      "--ckpt=2" :+
+      "--codegen=true" :+
+      s"--fifo-depth=$fifo" :+
+      "--psim=true" :+
+      "--run-psim=false"
+      genpsimcmd ++= args.split(" ").map(_.trim).toList
+      genpsimcmd ++= cmdlnArgs
+      val timeout = 3000
+      scommand(s"gentrace", gentracecmd, timeout, parsepir _, RunError.apply, rerun) >>
+      scommand(s"genpsim", genpsimcmd, timeout, parsepir _, RunError.apply, rerun)
+    }
+
+    def parseMake(line:String) = {
+      if (line.contains("error")) Fail
+      else Pass
+    }
+
+    def parseTst(line:String) = {
+      if (line.contains("Simulation complete at cycle")) {
+        println(line)
+        Pass
+      }
+      else Unknown
+    }
+
+    def runtst(args:String="", fifo:Int=20, rerun:Boolean=false) = {
+      var gentstcmd = pirArgs :+
+      "--load=true" :+
+      "--ckpt=2" :+
+      "--codegen=true" :+
+      s"--fifo-depth=$fifo" :+
+      "--tungsten=true" :+
+      "--psim=false" :+
+      "--run-psim=false"
+      gentstcmd ++= args.split(" ").map(_.trim).toList
+      gentstcmd ++= cmdlnArgs
+      val timeout = 3000
+      scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply, rerun) >>
+      scommand(s"maketst", "make -C tungsten/".split(" "), timeout, parseMake, MakeError.apply, rerun) >>
+      scommand(s"runtst", "./tungsten/tungsten 1000".split(" "), timeout, parseTst, RunError.apply, rerun)
     }
 
     def parseProute(vcLimit:Int)(line:String) = {
@@ -188,10 +236,12 @@ trait PlasticineTest extends DSLTest { test =>
 
   object Asic extends PIRBackend {
     def runPasses():Result = {
-      genpir() >>
+      val mapres = genpir() >>
       runpir() >>
-      mappir("--net=asic") >>
-      runpsim()
+      mappir("--net=asic")
+      val psimres = mapres >> genpsim() >> runpsim()
+      val tstres = mapres >> runtst()
+      psimres >> tstres
     }
   }
 
@@ -202,8 +252,8 @@ trait PlasticineTest extends DSLTest { test =>
     override val name = s"P2PNoSim"
     def runPasses():Result = {
       genpir() >>
-      runpir("--trace=false") >>
-      mappir(s"--net=p2p --row=$row --col=$col --codegen=false --trace=false")
+      runpir() >>
+      mappir(s"--net=p2p --row=$row --col=$col")
     }
   }
 
@@ -214,10 +264,12 @@ trait PlasticineTest extends DSLTest { test =>
     override def shouldRun: Boolean = super.shouldRun || checkFlag(s"test.P2P")
     override val name = s"P${row}x${col}"
     def runPasses():Result = {
-      genpir() >>
+      var mapres = genpir() >>
       runpir() >>
-      mappir(s"--net=p2p --row=$row --col=${col}") >>
-      runpsim()
+      mappir(s"--net=p2p --row=$row --col=$col") 
+      val psimres = mapres >> genpsim() >> runpsim()
+      val tstres = mapres >> runtst()
+      psimres >> tstres
     }
   }
 
@@ -248,6 +300,7 @@ trait PlasticineTest extends DSLTest { test =>
       genpir() >>
       runpir() >>
       mappir(s"--row=$row --col=$col --pattern=checkerboard --vc=$vcLimit --scheduled=${scheduled}", fifo=fifo) >>
+      genpsim() >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit) >>
       runpsim(placefile=s"${IR.config.genDir}/pir/plastisim/final.place", linkTp=linkTp, flit=flit)
     }
@@ -276,6 +329,7 @@ trait PlasticineTest extends DSLTest { test =>
       genpir() >>
       runpir() >>
       mappir(s"--row=$row --col=$col --pattern=checkerboard --vc=0 --scheduled=${scheduled}", fifo=fifo) >>
+      genpsim() >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=0, stopScore=25) >>
       runpsim(placefile=s"${IR.config.genDir}/pir/plastisim/final.place", linkTp=linkTp)
     }

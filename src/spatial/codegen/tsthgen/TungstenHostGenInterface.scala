@@ -9,8 +9,22 @@ import spatial.codegen.cppgen._
 
 trait TungstenHostGenInterface extends TungstenHostCodegen {
 
+  override def emitHeader = {
+    super.emitHeader
+
+    genIO {
+      emit("""
+#include <iostream>
+
+std::stringstream stopsim;
+
+  long cycle = 0;
+""")
+    }
+  }
+
   def genIO(block: => Unit) = {
-    inGen(out, "io.h") {
+    inGen(out, "hostio.h") {
       block
     }
   }
@@ -44,44 +58,9 @@ trait TungstenHostGenInterface extends TungstenHostCodegen {
 
     case SetReg(reg, v) =>
       emit(s"$reg = $v;")
-      //reg.tp.typeArgs.head match {
-        //case FixPtType(s,d,f) => 
-          //if (f != 0) {
-            //emit(src"c1->setArg(${argHandle(reg)}_arg, (int64_t)($v * ((int64_t)1 << $f)), ${reg.isHostIO}); // $reg")
-            //emit(src"$reg = $v;")
-          //} else {
-            //emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${reg.isHostIO});")
-            //emit(src"$reg = $v;")
-          //}
-        //case FltPtType(g,e) =>         
-          //emit(src"int64_t ${v}_raw;")
-          //emit(src"memcpy(&${v}_raw, &${v}, sizeof(${v}));")
-          //emit(src"${v}_raw = ${v}_raw & ((int64_t) 0 | (int64_t) pow(2,${g+e}) - 1);")
-          //emit(src"c1->setArg(${argHandle(reg)}_arg, ${v}_raw, ${reg.isHostIO}); // $reg")
-          //emit(src"$reg = $v;")
-        //case _ => 
-            //emit(src"c1->setArg(${argHandle(reg)}_arg, $v, ${reg.isHostIO}); // $reg")
-            //emit(src"$reg = $v;")
-      //}
     //case _: CounterNew[_] => 
     //case _: CounterChainNew => 
     case GetReg(reg)    =>
-      //val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
-      //val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${reg.isHostIO})"
-    
-      //lhs.tp match {
-        //case FixPtType(s,d,f) => 
-          //emit(src"int64_t ${lhs}_tmp = ${get_string};")            
-          //emit(src"bool ${lhs}_sgned = $s & ((${lhs}_tmp & ((int64_t)1 << ${d+f-1})) > 0); // Determine sign")
-          //emit(src"if (${lhs}_sgned) ${lhs}_tmp = ${lhs}_tmp | ~(((int64_t)1 << ${d+f})-1); // Sign-extend if necessary")
-          //emit(src"${lhs.tp} ${lhs} = (${lhs.tp}) ${lhs}_tmp / ((int64_t)1 << $f);")            
-        //case FltPtType(g,e) => 
-          //emit(src"int64_t ${lhs}_tmp = ${get_string};")            
-          //emit(src"${lhs.tp} ${lhs};")
-          //emit(src"memcpy(&${lhs}, &${lhs}_tmp, sizeof(${lhs}));")
-        //case _ => 
-          //emit(src"${lhs.tp} $lhs = (${lhs.tp}(${get_string}));")
-      //}
       emit(s"auto $lhs = $reg;")
 
     //case SetMem(dram, data) =>

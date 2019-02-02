@@ -14,8 +14,7 @@ trait TungstenHostGenAccel extends CppGenAccel {
 
     case AccelScope(func) => 
       emit("REPL Top(&DUT, std::cout);")
-      emit("ifstream in(argv[1]);")
-      emit("Top.Run(in, true);")
+      emit("Top.RunTill(stopsim);")
 
     case ExitIf(en) => 
       // Emits will only happen if outside the accel

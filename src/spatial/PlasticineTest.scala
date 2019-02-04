@@ -146,6 +146,7 @@ trait PlasticineTest extends DSLTest { test =>
         println(line)
         Pass
       }
+      else if (line.contains("fail")) Fail
       else Unknown
     }
 

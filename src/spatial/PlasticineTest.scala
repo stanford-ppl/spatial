@@ -12,7 +12,7 @@ trait PlasticineTest extends DSLTest { test =>
 
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
 
-  protected val pirArgs:List[String] = 
+  protected def pirArgs:List[String] = 
     "bash" ::
     "run.sh" ::
     "--dot=true" ::
@@ -99,7 +99,7 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"runpir", cmd, timeout, parse _, RunError.apply)
     }
 
-    def mappir(args:String, fifo:Int=100, rerun:Boolean=false) = {
+    def mappir(args:String, fifo:Int=20, rerun:Boolean=false) = {
       var cmd = pirArgs :+
       "--load=true" :+
       "--mapping=true" :+
@@ -145,7 +145,6 @@ trait PlasticineTest extends DSLTest { test =>
       s"-i$iter" ::
       Nil
       cmd ++= "-p100 -t1 -d100".split(" ").map(_.trim).toList
-      cmd ++= args.split(" ").map(_.trim).toList
       val timeout = 10800 * 2 // 6 hours
       val name = "runproute"
       scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply, rerun)
@@ -171,7 +170,6 @@ trait PlasticineTest extends DSLTest { test =>
         cmd :+= "-p"
         cmd :+= placefile
       }
-      cmd ++= args.split(" ").map(_.trim).toList
       val timeout = 10800 * 4 // 12 hours
       scommand(name, cmd, timeout, parsePsim _, RunError.apply, rerun)
     }
@@ -242,7 +240,6 @@ trait PlasticineTest extends DSLTest { test =>
       if (scheduled) n += s"w"
       if (linkTp != "B") n += s"${linkTp}"
       if (flit != 512) n += s"f${flit}"
-      if (fifo != 100) n += s"d${fifo}"
       n
     }
     def runPasses():Result = {
@@ -271,7 +268,6 @@ trait PlasticineTest extends DSLTest { test =>
       if (time != -1) n += s"t${time}"
       if (scheduled) n += s"w"
       if (linkTp != "B") n += s"${linkTp}"
-      if (fifo != 100) n += s"d${fifo}"
       n
     }
     def runPasses():Result = {

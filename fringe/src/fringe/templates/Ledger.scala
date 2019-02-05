@@ -96,7 +96,13 @@ object Ledger {
     var output = ListBuffer[Int]()
     var accessActivesIn = ListBuffer[Int]()
     var stageCtrl = ListBuffer[Int]()
+    var mergeEnq = ListBuffer[Int]()
+    var mergeDeq = ListBuffer[Int]()
+    var mergeBound = ListBuffer[Int]()
+    var mergeInit = ListBuffer[Int]()
+    var allocDealloc = ListBuffer[Int]()
 
+    def allEmpty: Boolean = xBarR.isEmpty && directR.isEmpty && xBarW.isEmpty && directW.isEmpty && broadcastW.isEmpty && broadcastR.isEmpty && reset.isEmpty && output.isEmpty && accessActivesIn.isEmpty && stageCtrl.isEmpty && mergeEnq.isEmpty && mergeDeq.isEmpty && mergeBound.isEmpty && mergeInit.isEmpty && allocDealloc.isEmpty
     def addXBarR(p: RAddr): ExposedPorts = {xBarR = xBarR :+ p; this}
     def addDirectR(p: RAddr): ExposedPorts = {directR = directR :+ p; this}
     def addXBarW(p: Int): ExposedPorts = {xBarW = xBarW :+ p; this}
@@ -107,7 +113,13 @@ object Ledger {
     def addOutput(p: Int): ExposedPorts = {output = output :+ p; this}
     def addAccessActivesIn(p: Int): ExposedPorts = {accessActivesIn = accessActivesIn :+ p; this}
     def addStageCtrl(p: Int): ExposedPorts = {stageCtrl = stageCtrl :+ p; this}
-    def log: Unit = {
+    def addMergeEnq(p: Int): ExposedPorts = {mergeEnq = mergeEnq :+ p; this}
+    def addMergeDeq(p: Int): ExposedPorts = {mergeDeq = mergeDeq :+ p; this}
+    def addMergeBound(p: Int): ExposedPorts = {mergeBound = mergeBound :+ p; this}
+    def addMergeInit(p: Int): ExposedPorts = {mergeInit = mergeInit :+ p; this}
+    def addAllocDealloc(p: Int): ExposedPorts = {allocDealloc = allocDealloc :+ p; this}
+    def log(k: KernelHash): Unit = {
+      if (!allEmpty) write(s"+ K.$k:")
       if (xBarR.nonEmpty)           write(s"|-- xBarR: $xBarR")
       if (directR.nonEmpty)         write(s"|-- directR: $directR")
       if (xBarW.nonEmpty)           write(s"|-- xBarW: $xBarW")
@@ -118,6 +130,11 @@ object Ledger {
       if (output.nonEmpty)          write(s"|-- output: $output")
       if (accessActivesIn.nonEmpty) write(s"|-- accessActivesIn: $accessActivesIn")
       if (stageCtrl.nonEmpty)       write(s"|-- stageCtrl: $stageCtrl")
+      if (mergeEnq.nonEmpty)       write(s"|-- mergeEnq: $mergeEnq")
+      if (mergeDeq.nonEmpty)       write(s"|-- mergeDeq: $mergeDeq")
+      if (mergeBound.nonEmpty)       write(s"|-- mergeBound: $mergeBound")
+      if (mergeInit.nonEmpty)       write(s"|-- mergeInit: $mergeInit")
+      if (allocDealloc.nonEmpty)       write(s"|-- allocDealloc: $allocDealloc")
     }
     def merge(port: ExposedPorts): ExposedPorts = {
       xBarR = xBarR ++ port.xBarR
@@ -130,6 +147,12 @@ object Ledger {
       output = output ++ port.output
       accessActivesIn = accessActivesIn ++ port.accessActivesIn
       stageCtrl = stageCtrl ++ port.stageCtrl
+      mergeEnq = mergeEnq ++ port.mergeEnq
+      mergeDeq = mergeDeq ++ port.mergeDeq
+      mergeBound = mergeBound ++ port.mergeBound
+      mergeInit = mergeInit ++ port.mergeInit
+      allocDealloc = allocDealloc ++ port.allocDealloc
+
       this
     }
   }
@@ -139,15 +162,13 @@ object Ledger {
   val breakpointsBelow = HashMap[KernelHash, List[Int]]()
 
   def combine(oldMap: BoreMap, newMap: BoreMap): BoreMap = {
-    write(s"newHash:")
+    write(s"dstHash:")
     newMap.foreach{case (k, ports) => 
-      write(s"+ K.$k:")
-      ports.log
+      ports.log(k)
     }
-    write(s"oldHash:")
+    write(s"srcHash:")
     oldMap.foreach{case (k, ports) => 
-      write(s"+ K.$k:")
-      ports.log
+      ports.log(k)
     }
     oldMap.foreach{case (k, ports) => 
       newMap += k -> newMap.getOrElse(k, new ExposedPorts).merge(ports)
@@ -163,7 +184,7 @@ object Ledger {
 
   def substitute(oldHash: OpHash, newHash: OpHash): Unit = {
     if (connections.contains(oldHash)) {
-      write(s"substitute($oldHash, $newHash)")
+      write(s"substitute(src = $oldHash, dst = $newHash)")
       val tmp = connections(oldHash)
       val current = connections.getOrElse(newHash, new BoreMap)
       connections -= oldHash
@@ -242,6 +263,41 @@ object Ledger {
       stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addStageCtrl(p))}
       write(s"connectStageCtrl(${hash}, $p)")
     }
+  }
+  def connectMergeEnq(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeEnq(p))}
+      write(s"connectMergeEnq(${hash}, $p)")
+    }    
+  }
+  def connectMergeDeq(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeDeq(p))}
+      write(s"connectMergeDeq(${hash}, $p)")
+    }    
+  }
+  def connectMergeBound(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeBound(p))}
+      write(s"connectMergeBound(${hash}, $p)")
+    }    
+  }
+  def connectMergeInit(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeInit(p))}
+      write(s"connectMergeInit(${hash}, $p)")
+    }    
+  }
+  def connectAllocDealloc(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAllocDealloc(p))}
+      write(s"connectAllocDealloc(${hash}, $p)")
+    }    
   }
 
   def tieInstrCtr(values: List[InstrCtr], id: Int, cycs: UInt, iters: UInt, stalls: UInt, idles: UInt)(implicit stack: List[KernelHash]): Unit = {

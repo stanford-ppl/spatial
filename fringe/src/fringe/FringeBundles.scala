@@ -64,7 +64,7 @@ class GatherStream(val p: StreamParInfo) extends Bundle {
   }
 }
 
-class ScatterCmdStream(p: StreamParInfo) extends Bundle {
+class ScatterCmdStream(val p: StreamParInfo) extends Bundle {
   val addr = new AppCommandSparse(p.v)
   val wdata = Vec(p.v, UInt(p.w.W))
 

@@ -8,7 +8,7 @@ scalaSource in Compile := baseDirectory.value / "pir"
 scalaSource in Test := baseDirectory.value / "pir"
 
 libraryDependencies += "edu.stanford.ppl" %% "pir" % "0.1"
-libraryDependencies += "edu.stanford.ppl" %% "emul" % "1.0"
+/*libraryDependencies += "edu.stanford.ppl" %% "emul" % "1.0"*/
 
 // Recommendations from http://www.scalatest.org/user_guide/using_scalatest_with_sbt
 logBuffered in Test := false

@@ -70,6 +70,12 @@ resources:
 	bash bin/update_resources.sh
 	sbt "; project fringe; publishLocal"
 
+###-----------------------------------###
+## Update local emul package.          ##
+###-----------------------------------###
+emul:
+	sbt "; project emul; publishLocal"
+
 
 ###-----------------------------------###
 ## Make all documentation .            ##

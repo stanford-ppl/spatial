@@ -49,3 +49,28 @@ import spatial.dsl._
   }
 }
 
+@spatial class PartialXBar extends SpatialTest {
+  override def runtimeArgs: Args = "8 7"
+
+  val tile = 32
+
+  def main(args: Array[String]): Unit = {
+    val test1 = ArgOut[Int]
+
+    Accel {
+      // 8-lane directW, 4-lane 2-bank xBarR
+      val sram1 = SRAM[Int](tile)
+      Foreach(tile by 1 par 8){i => sram1(i) = i}
+      Reduce(Reg[Int])(tile by 1 par 4){i => sram1(i)}{_+_}
+
+    }
+
+    val result1 = getArg(test1)
+
+    val gold1 = Array.tabulate(tile){i => i}.reduce{_+_}
+
+    val cksum1 = result1 == gold1
+    println(r"$cksum1: Test1 - $gold1 =?= $result1")
+    assert(cksum1)
+  }
+}

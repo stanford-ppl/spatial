@@ -46,7 +46,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case GetReg(reg) if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.connectXBarR().r""")
+      emit(src"""${lhs}.r := $reg.connectRPort().r""")
 
     case RegRead(reg)  if reg.isArgIn =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
@@ -56,12 +56,12 @@ trait ChiselGenInterface extends ChiselGenCommon {
     case RegRead(reg)  if reg.isHostIO =>
       emit(src"""val ${lhs} = Wire(${lhs.tp})""")
       val id = argHandle(reg)
-      emit(src"""${lhs}.r := $reg.connectXBarR().r""")
+      emit(src"""${lhs}.r := $reg.connectRPort().r""")
 
     case RegRead(reg)  if reg.isArgOut =>
       argOutLoopbacks.getOrElseUpdate(argOuts(reg), argOutLoopbacks.toList.length)
       emit(src"""val ${lhs} = Wire(${reg.tp.typeArgs.head})""")
-      emit(src"""${lhs}.r := $reg.connectXBarR().r""")
+      emit(src"""${lhs}.r := $reg.connectRPort().r""")
 
 
     case RegWrite(reg, v, en) if reg.isHostIO =>
@@ -74,15 +74,15 @@ trait ChiselGenInterface extends ChiselGenCommon {
             if (s) {
               val pad = 64 - d - f
               if (pad > 0) {
-                emit(src"""${reg}.connectXBarW($id, util.Cat(util.Fill($pad, ${v}.msb), ${v}.r), ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+                emit(src"""${reg}.connectWPort($id, util.Cat(util.Fill($pad, ${v}.msb), ${v}.r), ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
               } else {
-                emit(src"""${reg}.connectXBarW($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+                emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
               }
             } else {
-              emit(src"""${reg}.connectXBarW($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+              emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
             }
           case _ =>
-            emit(src"""${reg}.connectXBarW($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+            emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
         }
       }
 
@@ -96,7 +96,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
           case _ => src"$v.r"
         }
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.connectXBarW($id, $padded, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+        emit(src"""${reg}.connectWPort($id, $padded, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
       }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>

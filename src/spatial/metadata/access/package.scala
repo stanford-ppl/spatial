@@ -6,8 +6,10 @@ import forge.tags._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.math._
 import spatial.metadata.retiming._
 import poly.{ISL,ConstraintMatrix}
+import emul.ResidualGenerator._
 
 package object access {
 
@@ -112,6 +114,10 @@ package object access {
     def isPeek: Boolean = a match {
       case Op(_:FIFOPeek[_]) => true
       case _ => false
+    }
+
+    def residualGenerators: List[List[ResidualGenerator]] = {
+      if (a.banks.isEmpty) List(List(ResidualGenerator(1,0,0))) else a.banks.map(_.map(_.residual).toList).toList
     }
 
     /** Returns the sequence of enables associated with this symbol. */

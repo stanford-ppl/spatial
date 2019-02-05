@@ -42,11 +42,12 @@ trait ChiselGenMem extends ChiselGenCommon {
     else {
       val groupSize = 1 max (payload.length / (totalPayload.length / zipThreshold)).toInt
       val groups = payload.grouped(groupSize).toList
-      emit(src"""var $port = List[$tp]()""")
       groups.zipWithIndex.foreach{case (group, i) => 
         val rdPayload = group.mkString(src"List[$tp](",",",")")
-        emit(src"""$port += $rdPayload""")
+        emit(src"""val $port$i = $rdPayload""")
       }
+      val all = List.tabulate(groups.size){i => src"$port$i"}.mkString(" ++ ")
+      emit(src"""val $port = $all""")
     }
   }
 

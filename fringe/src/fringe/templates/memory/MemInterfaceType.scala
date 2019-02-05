@@ -312,7 +312,8 @@ class FixFMAAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
     if (stack.isEmpty) this <> op
     else {
       val cxn = Ledger.lookup(op.hashCode)
-      cxn.rPort.foreach{case p => output <> op.output}
+      output <> op.output
+      cxn.rPort.foreach{case p => output <> op.output} // Unused
       cxn.wPort.foreach{case p => input(p) <> op.input(p)}
       cxn.reset.foreach{p => reset <> op.reset}
       Ledger.substitute(op.hashCode, this.hashCode)
@@ -369,7 +370,8 @@ class FixOpAccumBundle(numWriters: Int, d: Int, f: Int) extends Bundle {
     if (stack.isEmpty) this <> op
     else {
       val cxn = Ledger.lookup(op.hashCode)
-      cxn.rPort.foreach{case p => output <> op.output}
+      output <> op.output
+      cxn.rPort.foreach{case p => output <> op.output} // Unused
       cxn.wPort.foreach{case p => input(p) <> op.input(p)}
       cxn.reset.foreach{p => reset <> op.reset}
       Ledger.substitute(op.hashCode, this.hashCode)

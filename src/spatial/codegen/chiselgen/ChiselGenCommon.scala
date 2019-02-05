@@ -202,7 +202,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
       case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.empty"
+      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
@@ -214,7 +214,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.full($way)"
+            src"~${merge}.output.full($way)"
         }
     }) else "true.B"
   }
@@ -289,6 +289,9 @@ trait ChiselGenCommon extends ChiselCodegen {
       emitHeader()
       open(src"class $lhs {")
         contents
+        if (param(lhs).isDefined && spatialConfig.enableModular) {
+          emit(src"""ModuleParams.addParams("${lhs}_p", ${param(lhs).get})""")
+        }
       close("}")
     }
     emit(src"val ${lhs} = (new $lhs).m.io${ifaceType(lhs)}")
@@ -299,6 +302,9 @@ trait ChiselGenCommon extends ChiselCodegen {
       emitHeader()
       open(src"class $lhs {")
         contents
+        if (param(lhs).isDefined && spatialConfig.enableModular) {
+          emit(src"""ModuleParams.addParams("${lhs}_p", ${param(lhs).get})""")
+        }
       close("}")
     }
     emit(src"val ${lhs} = new $lhs")
@@ -338,20 +344,25 @@ trait ChiselGenCommon extends ChiselCodegen {
     var isForever = lhs.isForever
     emit(src"""val $lhs$suffix = (new CChainObject(List[CtrObject](${ctrs.map(quote).mkString(",")}), "$lhs$suffix")).cchain.io """)
     emit(src"""$lhs$suffix.setup.isStream := ${lhs.isOuterStreamLoop}.B""")
+    if (spatialConfig.enableModular) emit(src"""ModuleParams.addParams("${lhs}_p", ${param(lhs).get})""")
 
   }
 
   protected def connectDRAMStreams(dram: Sym[_]): Unit = {
     dram.loadStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.loads(${loadStreams.size}).cmd // StreamOut")
+      if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
       forceEmit(src"val ${f.dataStream} = top.io.memStreams.loads(${loadStreams.size}).data // StreamIn")
+      if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
       loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", loadStreams.size))
     }
     dram.storeStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
+      if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
       forceEmit(src"val ${f.dataStream} = top.io.memStreams.stores(${storeStreams.size}).data // StreamOut")
+      if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
       val par = f.dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
@@ -359,13 +370,16 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
     dram.gatherStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
+      if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
       forceEmit(src"val ${f.dataStream} = top.io.memStreams.gathers(${gatherStreams.size}).data // StreamIn")
+      // if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
       gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", gatherStreams.size))
     }
     dram.scatterStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
+      if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
       forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
       RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
       val par = f.addrStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }

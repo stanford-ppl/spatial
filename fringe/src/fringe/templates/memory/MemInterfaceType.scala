@@ -101,6 +101,7 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
       cxn.directR.foreach{case RAddr(p,lane) => directR(p).forwardLane(lane, op.directR(p))}
       cxn.directW.foreach{p => directW(p) <> op.directW(p)}
       cxn.reset.foreach{p => reset <> op.reset}
+      cxn.accessActivesIn.foreach{p => this.asInstanceOf[FIFOInterface].accessActivesIn(p) <> op.asInstanceOf[FIFOInterface].accessActivesIn(p)}
       cxn.output.foreach{p => output(p) <> op.output(p)}
       Ledger.substitute(op.hashCode, this.hashCode)
     }
@@ -227,13 +228,12 @@ class FIFOInterface(p: MemParams) extends MemInterface(p) {
     accessActivesIn(p) := e
   }
   def connectLedger(op: FIFOInterface)(implicit stack: List[KernelHash]): Unit = {
-    full <> op.full
-    almostFull <> op.almostFull
-    empty <> op.empty
-    almostEmpty <> op.almostEmpty
-    numel <> op.numel
-    accessActivesOut <> op.accessActivesOut
-    accessActivesIn <> op.accessActivesIn
+    op.full <> full
+    op.almostFull <> almostFull
+    op.empty <> empty
+    op.almostEmpty <> almostEmpty
+    op.numel <> numel
+    op.accessActivesOut <> accessActivesOut
     this.asInstanceOf[MemInterface].connectLedger(op.asInstanceOf[MemInterface])
   }
 }

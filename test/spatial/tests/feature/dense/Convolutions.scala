@@ -329,8 +329,8 @@ import spatial.dsl._
     val P1 = 1
     val P2 = 1
     val P3 = 1
-    val LP = 16
-    val SP = 16
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -443,8 +443,8 @@ import spatial.dsl._
     val P1 = 1
     val P2 = 1
     val P3 = 1
-    val LP = 16
-    val SP = 16
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -553,8 +553,8 @@ import spatial.dsl._
     val P1 = 1
     val P2 = 1
     val P3 = 1
-    val LP = 16
-    val SP = 16
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -680,8 +680,8 @@ import spatial.dsl._
     val P1 = 1
     val P2 = 1
     val P3 = 1
-    val LP = 16
-    val SP = 16
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -804,8 +804,8 @@ import spatial.dsl._
     val P1 = 1
     val P2 = 1
     val P3 = 1
-    val LP = 16
-    val SP = 16
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]
@@ -1062,7 +1062,6 @@ import spatial.dsl._
     assert(cksum)
   }
 }
-
 @spatial class ConvolutionFlatSRAM extends SpatialTest {
   override def runtimeArgs: Args = "128 64 32 16 2"
   type T = FixPt[TRUE,_32,_0]
@@ -1078,8 +1077,8 @@ import spatial.dsl._
     val P1 = 1
     val P2 = 1
     val P3 = 1
-    val LP = 16
-    val SP = 16
+    val LP = 1
+    val SP = 1
 
     // Create ArgIns/Outs
     val IN_POINTS = ArgIn[Int]

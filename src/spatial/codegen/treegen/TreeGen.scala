@@ -12,6 +12,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.traversal.AccelTraversal
 import spatial.util.modeling.scrubNoise
+import emul.ResidualGenerator._
 
 import scala.collection.mutable.HashMap
 
@@ -185,9 +186,15 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val lca = mem.swappers.head.parent.s.get
-        val hasXBarR = if (mem.readers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarR" else "<s>no XBarR</s>"
-        val hasXBarW = if (mem.writers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarW" else "<s>no XBarW</s>"
-        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, a = $alphas, p = $Ps", s"$hasXBarR, $hasXBarW")
+        val histR: Map[Int, Int] = mem.readers.flatMap{x => 
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+        val histW: Map[Int, Int] = mem.readers.flatMap{x => 
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted
+        val hist = (Seq("<table><tr><th>width</th><th>read</th><th>write</th></tr>") ++ allBins.map{b => s"<tr><td>$b</td><td>${histR.getOrElse(b,0)}</td><td>${histW.getOrElse(b,0)}</td></tr>"} ++ Seq("</table>")).mkString(" ")
+        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
       }
     }
     inCell("Single-Buffered Mems", true) {
@@ -200,9 +207,15 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val banks = mem.instance.nBanks
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
-        val hasXBarR = if (mem.readers.exists{x => !x.isDirectlyBanked}) "has XBarR" else "<s>no XBarR</s>"
-        val hasXBarW = if (mem.writers.exists{x => !x.isDirectlyBanked}) "has XBarW" else "<s>no XBarW</s>"
-        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", s"$hasXBarR, $hasXBarW")
+        val histR: Map[Int, Int] = mem.readers.flatMap{x => 
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+        val histW: Map[Int, Int] = mem.readers.flatMap{x => 
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted
+        val hist = (Seq("<table><tr><th>width</th><th>read</th><th>write</th></tr>") ++ allBins.map{b => s"<tr><td>$b</td><td>${histR.getOrElse(b,0)}</td><td>${histW.getOrElse(b,0)}</td></tr>"} ++ Seq("</table>")).mkString(" ")
+        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
       }
     }
     emit("</body>")

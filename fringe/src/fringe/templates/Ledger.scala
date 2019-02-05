@@ -86,12 +86,10 @@ object Ledger {
 
   case class RAddr(val port: Int, val lane: Int)
   class ExposedPorts {
-    var xBarR = ListBuffer[RAddr]()
-    var directR = ListBuffer[RAddr]()
-    var xBarW = ListBuffer[Int]()
-    var directW = ListBuffer[Int]()
+    var rPort = ListBuffer[Int]()
+    var wPort = ListBuffer[Int]()
     var broadcastW = ListBuffer[Int]()
-    var broadcastR = ListBuffer[RAddr]()
+    var broadcastR = ListBuffer[Int]()
     var reset = ListBuffer[Int]()
     var output = ListBuffer[Int]()
     var accessActivesIn = ListBuffer[Int]()
@@ -102,13 +100,11 @@ object Ledger {
     var mergeInit = ListBuffer[Int]()
     var allocDealloc = ListBuffer[Int]()
 
-    def allEmpty: Boolean = xBarR.isEmpty && directR.isEmpty && xBarW.isEmpty && directW.isEmpty && broadcastW.isEmpty && broadcastR.isEmpty && reset.isEmpty && output.isEmpty && accessActivesIn.isEmpty && stageCtrl.isEmpty && mergeEnq.isEmpty && mergeDeq.isEmpty && mergeBound.isEmpty && mergeInit.isEmpty && allocDealloc.isEmpty
-    def addXBarR(p: RAddr): ExposedPorts = {xBarR = xBarR :+ p; this}
-    def addDirectR(p: RAddr): ExposedPorts = {directR = directR :+ p; this}
-    def addXBarW(p: Int): ExposedPorts = {xBarW = xBarW :+ p; this}
-    def addDirectW(p: Int): ExposedPorts = {directW = directW :+ p; this}
+    def allEmpty: Boolean = rPort.isEmpty && wPort.isEmpty && broadcastW.isEmpty && broadcastR.isEmpty && reset.isEmpty && output.isEmpty && accessActivesIn.isEmpty && stageCtrl.isEmpty && mergeEnq.isEmpty && mergeDeq.isEmpty && mergeBound.isEmpty && mergeInit.isEmpty && allocDealloc.isEmpty
+    def addRPort(p: Int): ExposedPorts = {rPort = rPort :+ p; this}
+    def addWPort(p: Int): ExposedPorts = {wPort = wPort :+ p; this}
     def addBroadcastW(p: Int): ExposedPorts = {broadcastW = broadcastW :+ p; this}
-    def addBroadcastR(p: RAddr): ExposedPorts = {broadcastR = broadcastR :+ p; this}
+    def addBroadcastR(p: Int): ExposedPorts = {broadcastR = broadcastR :+ p; this}
     def addReset(p: Int): ExposedPorts = {reset = reset :+ p; this}
     def addOutput(p: Int): ExposedPorts = {output = output :+ p; this}
     def addAccessActivesIn(p: Int): ExposedPorts = {accessActivesIn = accessActivesIn :+ p; this}
@@ -120,10 +116,8 @@ object Ledger {
     def addAllocDealloc(p: Int): ExposedPorts = {allocDealloc = allocDealloc :+ p; this}
     def log(k: KernelHash): Unit = {
       if (!allEmpty) write(s"+ K.$k:")
-      if (xBarR.nonEmpty)           write(s"|-- xBarR: $xBarR")
-      if (directR.nonEmpty)         write(s"|-- directR: $directR")
-      if (xBarW.nonEmpty)           write(s"|-- xBarW: $xBarW")
-      if (directW.nonEmpty)         write(s"|-- directW: $directW")
+      if (rPort.nonEmpty)           write(s"|-- rPort: $rPort")
+      if (wPort.nonEmpty)           write(s"|-- wPort: $wPort")
       if (broadcastW.nonEmpty)      write(s"|-- broadcastW: $broadcastW")
       if (broadcastR.nonEmpty)      write(s"|-- broadcastR: $broadcastR")
       if (reset.nonEmpty)           write(s"|-- reset: $reset")
@@ -137,10 +131,8 @@ object Ledger {
       if (allocDealloc.nonEmpty)       write(s"|-- allocDealloc: $allocDealloc")
     }
     def merge(port: ExposedPorts): ExposedPorts = {
-      xBarR = xBarR ++ port.xBarR
-      directR = directR ++ port.directR
-      xBarW = xBarW ++ port.xBarW
-      directW = directW ++ port.directW
+      rPort = rPort ++ port.rPort
+      wPort = wPort ++ port.wPort
       broadcastW = broadcastW ++ port.broadcastW
       broadcastR = broadcastR ++ port.broadcastR
       reset = reset ++ port.reset
@@ -194,32 +186,18 @@ object Ledger {
   }
 
   // TODO: Should there be a cleanup method upon exiting KernelHash?
-  def connectXBarR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
+  def connectRPort(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addXBarR(RAddr(p,lane)))}
-      write(s"connectXBarR(${hash}, $p)")
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addRPort(p))}
+      write(s"connectRPort(${hash}, $p)")
     }
   }
-  def connectDirectR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
+  def connectWPort(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addDirectR(RAddr(p,lane)))}
-      write(s"connectDirectR(${hash}, $p, $lane)")
-    }
-  }
-  def connectXBarW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    if (globals.enableModular) {
-      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addXBarW(p))}
-      write(s"connectXBarW(${hash}, $p)")
-    }
-  }
-  def connectDirectW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
-    if (globals.enableModular) {
-      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addDirectW(p))}
-      write(s"connectDirectW(${hash}, $p)")
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addWPort(p))}
+      write(s"connectWPort(${hash}, $p)")
     }
   }
   def connectBroadcastW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
@@ -232,7 +210,7 @@ object Ledger {
   def connectBroadcastR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastR(RAddr(p,lane)))}
+      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastR(p))}
       write(s"connectBroadcastR(${hash}, $p, $lane)")
     }
   }

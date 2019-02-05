@@ -9,7 +9,7 @@
 
 int main(int argc, char **argv)
 {
-    float version = 1.0;
+    float version = 1.1;
     if (argc == 2 && strcmp(argv[1], "-version") == 0) {
         fprintf(stderr, "Version: %.1f\n", version);
         return 0;

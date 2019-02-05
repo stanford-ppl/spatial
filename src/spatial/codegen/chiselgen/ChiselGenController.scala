@@ -201,11 +201,11 @@ trait ChiselGenController extends ChiselGenCommon {
           open(src"def connectWires${grpid}(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
             inpgrp.foreach{ in => 
               if (ledgerized(in)) {
-                emit(src"module.io.in_$in.output := ${in}.output; ${in}.connectLedger(module.io.in_$in)")
+                emit(src"${in}.connectLedger(module.io.in_$in)")
                 if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
               } 
-            else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
-            else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
+            else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.rPort(0) <> ${in}_copy$c.rPort(0)")}
+            else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.rPort(0) <> ${in}.rPort(0)")
             else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
             else emit(src"module.io.in_$in <> ${in}")}
           close("}")
@@ -268,7 +268,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
         if (spatialConfig.enableModular) {
           close("}")
-          emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth))")
+          emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth)); module.io := DontCare")
           val numgrps = math.ceil(inputs.filter(!_.isString).size.toDouble / 100.0).toInt
           List.tabulate(numgrps){i => emit(src"connectWires$i(module)")}
           if (spatialConfig.enableInstrumentation) emit("Ledger.connectInstrCtrs(instrctrs, module.io.in_instrctrs)")

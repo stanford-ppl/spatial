@@ -94,6 +94,7 @@ val base = Seq(
 
 val emul_settings = base ++ Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
+  name := "emul" + sys.env.get("EMUL_PACKAGE").getOrElse(""),
   //crossScalaVersions := Seq(scala_version, "2.11.7"),
   scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
 )

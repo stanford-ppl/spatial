@@ -77,25 +77,27 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     // See which W ports can see this mem
     val connected: Seq[(W_Port, Seq[Int])] = io.wPort.collect{case x if (canSee(x.visibleBanks, mem._2, p.banks)) => (x, lanesThatCanSee(x.visibleBanks, mem._2, p.banks))}
 
-    val (ens, datas, ofs) = connected.map{case (port, lanes) => 
-      val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-      val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.banks(j))})
-      val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
-      val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => if (visBanks.size == 1) true.B else wireBanks.zip(mem._2).map{case (a,b) => a === b.U}.reduce{_&&_}}
-      val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
-      val datas:           Seq[UInt]          = lanes.map(port.data)
-      val ofs:             Seq[UInt]          = lanes.map(port.ofs)
-      (ens,datas,ofs)
-    }.reduce[(Seq[Bool], Seq[UInt], Seq[UInt])]{case 
-      (
-       a: (Seq[Bool], Seq[UInt], Seq[UInt]),
-       b: (Seq[Bool], Seq[UInt], Seq[UInt])
-      ) => (a._1 ++ b._1, a._2 ++ b._2, a._3 ++ b._3)}
+    if (connected.size > 0) {
+      val (ens, datas, ofs) = connected.map{case (port, lanes) => 
+        val lane_enables:    Seq[Bool]          = lanes.map(port.en)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.banks(j))})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
+        val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
+        val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
+        val datas:           Seq[UInt]          = lanes.map(port.data)
+        val ofs:             Seq[UInt]          = lanes.map(port.ofs)
+        (ens,datas,ofs)
+      }.reduce[(Seq[Bool], Seq[UInt], Seq[UInt])]{case 
+        (
+         a: (Seq[Bool], Seq[UInt], Seq[UInt]),
+         b: (Seq[Bool], Seq[UInt], Seq[UInt])
+        ) => (a._1 ++ b._1, a._2 ++ b._2, a._3 ++ b._3)}
 
-    val finalChoice = fatMux("PriorityMux", ens, ens, datas, ofs)
-    mem._1.io.w.ofs.head := finalChoice(2)
-    mem._1.io.w.data.head := finalChoice(1)
-    mem._1.io.w.en.head := finalChoice(0)
+      val finalChoice = fatMux("PriorityMux", ens, ens, datas, ofs)
+      mem._1.io.w.ofs.head := finalChoice(2)
+      mem._1.io.w.data.head := finalChoice(1)
+      mem._1.io.w.en.head := finalChoice(0)
+    }
   }
 
 
@@ -103,30 +105,32 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   m.foreach{ mem =>
     val connected: Seq[(R_Port, Seq[Int])] = io.rPort.collect{case x if (canSee(x.visibleBanks, mem._2, p.banks)) => (x, lanesThatCanSee(x.visibleBanks, mem._2, p.banks))}
 
-    val (rawEns, ofs, backpressures) = connected.map{case (port, lanes) => 
-      val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-      val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.banks(j))})
-      val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
-      val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => if (visBanks.size == 1) true.B else wireBanks.zip(mem._2).map{case (a,b) => a === b.U}.reduce{_&&_}}
-      val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
-      val ofs:             Seq[UInt]          = lanes.map(port.ofs)
-      val backpressure:    Seq[Bool]          = Seq.fill(lanes.size){port.backpressure}
-      (ens,ofs,backpressure)
-    }.reduce[(Seq[Bool], Seq[UInt], Seq[Bool])]{case 
-      (
-       a: (Seq[Bool], Seq[UInt], Seq[Bool]),
-       b: (Seq[Bool], Seq[UInt], Seq[Bool])
-      ) => (a._1 ++ b._1, a._2 ++ b._2, a._3 ++ b._3)}
+    if (connected.size > 0) {
+      val (rawEns, ofs, backpressures) = connected.map{case (port, lanes) => 
+        val lane_enables:    Seq[Bool]          = lanes.map(port.en)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.banks(j))})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
+        val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
+        val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
+        val ofs:             Seq[UInt]          = lanes.map(port.ofs)
+        val backpressure:    Seq[Bool]          = Seq.fill(lanes.size){port.backpressure}
+        (ens,ofs,backpressure)
+      }.reduce[(Seq[Bool], Seq[UInt], Seq[Bool])]{case 
+        (
+         a: (Seq[Bool], Seq[UInt], Seq[Bool]),
+         b: (Seq[Bool], Seq[UInt], Seq[Bool])
+        ) => (a._1 ++ b._1, a._2 ++ b._2, a._3 ++ b._3)}
 
-    // val stickyEns = Module(new StickySelects(rawEns.size))
-    // stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
-    val ens = rawEns //stickyEns.io.outs.map(_.toBool)
+      // val stickyEns = Module(new StickySelects(rawEns.size))
+      // stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
+      val ens = rawEns //stickyEns.io.outs.map(_.toBool)
 
-    // Unmask write port if any of the above match
-    val finalChoice = fatMux("PriorityMux", ens, ens, backpressures, ofs)
-    mem._1.io.r.ofs.head := finalChoice(2)
-    mem._1.io.r.backpressure := finalChoice(1)
-    mem._1.io.r.en.head := finalChoice(0)
+      // Unmask write port if any of the above match
+      val finalChoice = fatMux("PriorityMux", ens, ens, backpressures, ofs)
+      mem._1.io.r.ofs.head := finalChoice(2)
+      mem._1.io.r.backpressure := finalChoice(1)
+      mem._1.io.r.en.head := finalChoice(0)
+    }
   }
 
   // Connect read data to output
@@ -432,19 +436,20 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     // See which W ports can see this mem
     val connected: Seq[(W_Port, Seq[Int])] = io.wPort.collect{case x if (canSee(x.visibleBanks, mem._2, p.banks)) => (x, lanesThatCanSee(x.visibleBanks, mem._2, p.banks))}
 
-    val (ens, datas) = connected.map{case (port, lanes) => 
-      val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-      val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(j)})
-      val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
-      val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => if (visBanks.size == 1) true.B else wireBanks.zip(mem._2).map{case (a,b) => a === b.U}.reduce{_&&_}}
-      val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
-      val datas:           Seq[UInt]          = lanes.map(port.data)
-      (ens,datas)
-    }.reduce[(Seq[Bool], Seq[UInt])]{case 
-      (
-       a: (Seq[Bool], Seq[UInt]),
-       b: (Seq[Bool], Seq[UInt])
-      ) => (a._1 ++ b._1, a._2 ++ b._2)}
+    if (connected.size > 0) {
+      val (ens, datas) = connected.map{case (port, lanes) => 
+        val lane_enables:    Seq[Bool]          = lanes.map(port.en)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(j)})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
+        val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
+        val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
+        val datas:           Seq[UInt]          = lanes.map(port.data)
+        (ens,datas)
+      }.reduce[(Seq[Bool], Seq[UInt])]{case 
+        (
+         a: (Seq[Bool], Seq[UInt]),
+         b: (Seq[Bool], Seq[UInt])
+        ) => (a._1 ++ b._1, a._2 ++ b._2)}
 
       // TODO: FIGURE OUT SHIFT CONNECTIONS AND THINGS BELOW
   //   // Check if shiftEn is turned on for this line, guaranteed false on entry plane
@@ -457,6 +462,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   //   } else false.B
 
     // mem._1 := Mux(io.reset, initval, Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
+    }
   }
 
 

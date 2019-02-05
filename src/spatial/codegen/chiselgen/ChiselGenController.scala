@@ -204,8 +204,8 @@ trait ChiselGenController extends ChiselGenCommon {
                 emit(src"${in}.connectLedger(module.io.in_$in)")
                 if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
               } 
-            else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.rPort(0) <> ${in}_copy$c.rPort(0)")}
-            else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.rPort(0) <> ${in}.rPort(0)")
+            else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
+            else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
             else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
             else emit(src"module.io.in_$in <> ${in}")}
           close("}")

@@ -61,7 +61,7 @@ import spatial.dsl._
       // 8-lane directW, 4-lane 2-bank xBarR
       val sram1 = SRAM[Int](tile)
       Foreach(tile by 1 par 8){i => sram1(i) = i}
-      Reduce(Reg[Int])(tile by 1 par 4){i => sram1(i)}{_+_}
+      test1 := Reduce(Reg[Int])(tile by 1 par 4){i => sram1(i)}{_+_}
 
     }
 

@@ -186,11 +186,12 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val lca = mem.swappers.head.parent.s.get
+        val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
         val histR: Map[Int, Int] = mem.readers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
         val histW: Map[Int, Int] = mem.readers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
         val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted
         val hist = (Seq("<table><tr><th>width</th><th>read</th><th>write</th></tr>") ++ allBins.map{b => s"<tr><td>$b</td><td>${histR.getOrElse(b,0)}</td><td>${histW.getOrElse(b,0)}</td></tr>"} ++ Seq("</table>")).mkString(" ")
@@ -207,11 +208,12 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val banks = mem.instance.nBanks
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
+        val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
         val histR: Map[Int, Int] = mem.readers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
         val histW: Map[Int, Int] = mem.readers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(mem.instance.nBanks(j)).size}.product}
+          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
         val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted
         val hist = (Seq("<table><tr><th>width</th><th>read</th><th>write</th></tr>") ++ allBins.map{b => s"<tr><td>$b</td><td>${histR.getOrElse(b,0)}</td><td>${histW.getOrElse(b,0)}</td></tr>"} ++ Seq("</table>")).mkString(" ")

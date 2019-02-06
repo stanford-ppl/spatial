@@ -207,6 +207,9 @@ package object access {
     }
 
     def banks: Seq[Seq[Idx]] = a match {
+      case Op(op@RegFileVectorWrite(_,_,addr,_)) => addr
+      case Op(op@RegFileVectorRead(_,addr,_)) => addr
+      case Op(op@RegFileShiftIn(_,_,addr,_,_)) => Seq(addr)
       case BankedReader(_,banks,_,_)   => banks
       case BankedWriter(_,_,banks,_,_) => banks
       case _ => Seq(Seq())

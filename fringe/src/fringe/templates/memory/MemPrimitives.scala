@@ -233,17 +233,17 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FIFO") = this(MemParams(FIFOInterfaceType,logicalDims, bitWidth, banks, List(1), WMapping, RMapping, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
 
   // Create bank counters
-  val headCtr = Module(new CompactingCounter(p.WMapping.size, p.depth, p.elsWidth)); headCtr.io <> DontCare
-  val tailCtr = Module(new CompactingCounter(p.RMapping.size, p.depth, p.elsWidth)); tailCtr.io <> DontCare
-  (0 until p.WMapping.size).foreach{i => headCtr.io.input.enables.zip(io.wPort.flatMap(_.en)).foreach{case (l,r) => l := r}}
-  (0 until p.RMapping.size).foreach{i => tailCtr.io.input.enables.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}}
+  val headCtr = Module(new CompactingCounter(p.WMapping.map(_.par).sum, p.depth, p.elsWidth)); headCtr.io <> DontCare
+  val tailCtr = Module(new CompactingCounter(p.RMapping.map(_.par).sum, p.depth, p.elsWidth)); tailCtr.io <> DontCare
+  (0 until p.WMapping.map(_.par).sum).foreach{i => headCtr.io.input.enables.zip(io.wPort.flatMap(_.en)).foreach{case (l,r) => l := r}}
+  (0 until p.RMapping.map(_.par).sum).foreach{i => tailCtr.io.input.enables.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}}
   headCtr.io.input.reset := reset
   tailCtr.io.input.reset := reset
   headCtr.io.input.dir := true.B
   tailCtr.io.input.dir := true.B
 
   // Create numel counter
-  val elements = Module(new CompactingIncDincCtr(p.WMapping.size, p.RMapping.size, p.widestW, p.widestR, p.depth, p.elsWidth))
+  val elements = Module(new CompactingIncDincCtr(p.WMapping.map(_.par).sum, p.RMapping.map(_.par).sum, p.widestW, p.widestR, p.depth, p.elsWidth))
   elements.io <> DontCare
   elements.io.input.inc_en.zip(io.wPort.flatMap(_.en)).foreach{case(l,r) => l := r}
   elements.io.input.dinc_en.zip(io.rPort.flatMap(_.en)).foreach{case(l,r) => l := r}
@@ -412,6 +412,9 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int],
            WMapping: List[Access], RMapping: List[Access],
            bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String) = this(MemParams(ShiftRegFileInterfaceType, logicalDims,bitWidth,banks,strides,WMapping,RMapping,bankingMode,inits,syncMem,fracBits, false, numActives, myName))
+  def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int],
+           WMapping: List[Access], RMapping: List[Access],
+           inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, numActives: Int, myName: String) = this(MemParams(ShiftRegFileInterfaceType, logicalDims,bitWidth,banks,strides,WMapping,RMapping,BankedMemory,inits,syncMem,fracBits, isBuf, numActives, myName))
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
@@ -431,13 +434,18 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
 
   // Handle Writes
   m.foreach{ mem =>
-    val coords = mem._2
     val initval = mem._3
     // See which W ports can see this mem
-    val connected: Seq[(W_Port, Seq[Int])] = io.wPort.collect{case x if (canSee(x.visibleBanks, mem._2, p.banks)) => (x, lanesThatCanSee(x.visibleBanks, mem._2, p.banks))}
+    val connectedNormals: Seq[(W_Port, Seq[Int])] = p.WMapping.zipWithIndex.collect{
+      case (x,i) if (!x.shiftAxis.isDefined && canSee(io.wPort(i).visibleBanks, mem._2, p.banks)) => (io.wPort(i), lanesThatCanSee(io.wPort(i).visibleBanks, mem._2, p.banks))
+    }
+    val connectedShifters: Seq[(W_Port, Seq[Int], Int)] = p.WMapping.zipWithIndex.collect{
+      case (x,i) if (x.shiftAxis.isDefined && canSee(io.wPort(i).visibleBanks.map(_.patch(x.shiftAxis.get,Nil,1)), mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1))) => 
+        (io.wPort(i), lanesThatCanSee(io.wPort(i).visibleBanks.map(_.patch(x.shiftAxis.get,Nil,1)), mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1)), x.shiftAxis.get)
+    }
 
-    if (connected.size > 0) {
-      val (ens, datas) = connected.map{case (port, lanes) => 
+    val (normalEns, normalDatas) = if (connectedNormals.size > 0) {
+      connectedNormals.map{case (port, lanes) => 
         val lane_enables:    Seq[Bool]          = lanes.map(port.en)
         val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(j)})
         val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
@@ -450,119 +458,42 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
          a: (Seq[Bool], Seq[UInt]),
          b: (Seq[Bool], Seq[UInt])
         ) => (a._1 ++ b._1, a._2 ++ b._2)}
+      } else (Seq(), Seq())
+    val (shiftEns, shiftDatas) = if (connectedShifters.size > 0) {
+      connectedShifters.map{case (port, lanes, axis) => 
+        val lane_enables:    Seq[Bool]          = lanes.map(port.shiftEn)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.patch(axis,Nil,1).map{case(r,j) => r.expand(j)})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).map(_.patch(axis,Nil,1)).toSeq)
+        val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => val matches = (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}; if (matches.size == 0) true.B else matches.reduce{_&&_}}
+        val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
+        val datas:           Seq[UInt]          = if (mem._2(axis) == 0) lanes.map(port.data) else m.collect{case (m,coords,_) if (coords(axis) == mem._2(axis)-1 && coords.patch(axis,Nil,1) == mem._2.patch(axis,Nil,1)) => m} // Pray there is only one lane connected to this line
+        (ens,datas)
+      }.reduce[(Seq[Bool], Seq[UInt])]{case 
+        (
+         a: (Seq[Bool], Seq[UInt]),
+         b: (Seq[Bool], Seq[UInt])
+        ) => (a._1 ++ b._1, a._2 ++ b._2)}
+      } else (Seq(), Seq())
 
-      // TODO: FIGURE OUT SHIFT CONNECTIONS AND THINGS BELOW
-  //   // Check if shiftEn is turned on for this line, guaranteed false on entry plane
-  //   val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
-  //     val axisShiftXBar = io.wPort.flatMap(_.banks).toList.grouped(p.banks.length).toList.zip(io.wPort.flatMap(_.shiftEn).toList).map{ case(bids, en) =>
-  //       bids.zip(coords).zipWithIndex.map{case ((b, coord),id) => if (id == p.axis) true.B else b === coord.U}.reduce{_&&_} & en
-  //     }
-  //     // Unmask shift if any of the above match
-  //     axisShiftXBar.reduce{_|_}
-  //   } else false.B
-
-    // mem._1 := Mux(io.reset, initval, Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
+    if (shiftEns.size > 0 || normalEns.size > 0) {
+      val finalChoice = fatMux("PriorityMux", normalEns ++ shiftEns, normalDatas ++ shiftDatas)
+      mem._1 := Mux(io.reset, initval, Mux((normalEns ++ shiftEns).reduce{_||_}, finalChoice(0), mem._1))
     }
+    else mem._1 := mem._1
   }
 
-
-  
-
-  // // Handle Writes
-  // m.foreach{ case(mem, coords, flatCoord, initval) =>
-  //   // Check all xBar w ports against this bank's coords
-  //   val xBarSelect = (io.xBarW.flatMap(_.banks).toList.grouped(p.banks.length).toList, io.xBarW.flatMap(_.en).toList, io.xBarW.flatMap(_.shiftEn).toList).zipped.map{ case(bids, en, shiftEn) =>
-  //     bids.zip(coords).map{case (b,coord) => b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en | shiftEn else false.B}
-  //   }
-  //   // Check all direct W ports against this bank's coords
-  //   val directSelectEns = io.directW.flatMap(_.en).zip(io.directW.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-  //   val directSelectDatas = io.directW.flatMap(_.data).zip(io.directW.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-  //   val directSelectOffsets = io.directW.flatMap(_.ofs).zip(io.directW.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-  //   val directSelectShiftEns = io.directW.flatMap(_.shiftEn).zip(io.directW.flatMap(_.banks.flatten).grouped(p.banks.length).toList).collect{case (en, banks) if (banks.zip(coords).map{case (b,coord) => b == coord}.reduce(_&_)) => en}
-
-  //   // Unmask write port if any of the above match
-  //   val wMask = xBarSelect.reduce{_|_} | directSelectEns.or | directSelectShiftEns.or
-
-  //   // Check if shiftEn is turned on for this line, guaranteed false on entry plane
-  //   val shiftMask = if (p.axis >= 0 && coords(p.axis) != 0) {
-  //     // XBarW requests shift
-  //     val axisShiftXBar = io.xBarW.flatMap(_.banks).toList.grouped(p.banks.length).toList.zip(io.xBarW.flatMap(_.shiftEn).toList).map{ case(bids, en) =>
-  //       bids.zip(coords).zipWithIndex.map{case ((b, coord),id) => if (id == p.axis) true.B else b === coord.U}.reduce{_&&_} & {if (p.hasXBarW) en else false.B}
-  //     }
-  //     // // DirectW requests shift
-  //     // val axisShiftDirect = io.directW.map(_.banks).flatten.filter{case banks => stripCoord(banks, p.axis).zip(stripCoord(coords, p.axis)).map{case (b,coord) => b == coord}.reduce(_&_)}
-
-  //     // Unmask shift if any of the above match
-  //     axisShiftXBar.reduce{_|_} | directSelectShiftEns.or
-  //   } else false.B
-
-  //   // Connect matching W port to memory
-  //   val shiftSource = if (p.axis >= 0 && coords(p.axis) != 0) m.filter{case (_,c,_,_) => decrementAxisCoord(coords,p.axis) == c}.head._1 else mem
-  //   val shiftEnable = if (p.axis >= 0 && coords(p.axis) != 0) shiftMask else false.B
-  //   val (data, enable) =
-  //     if (directSelectEns.nonEmpty & p.hasXBarW) {           // Has direct and x
-  //       val liveDirectWireSelects = directSelectEns.zip(directSelectShiftEns).map{case (e,se) => e | se}
-  //       val liveDirectWireData = chisel3.util.PriorityMux(liveDirectWireSelects, directSelectDatas)
-  //       val liveDirectWireEn = chisel3.util.PriorityMux(liveDirectWireSelects, liveDirectWireSelects)
-  //       val liveXBarWireEn = chisel3.util.PriorityMux(xBarSelect, io.xBarW.flatMap(_.en).zip(io.xBarW.flatMap(_.shiftEn)).map{case(e,se) => e | se})
-  //       val liveXBarWireData = chisel3.util.PriorityMux(xBarSelect, io.xBarW.flatMap(_.data))
-  //       val enable = Mux(liveDirectWireSelects.or, liveDirectWireEn, liveXBarWireEn) & wMask
-  //       val data = Mux(liveDirectWireSelects.or, liveDirectWireData, liveXBarWireData)
-  //       (data, enable)
-  //     }
-  //     else if (p.hasXBarW && directSelectEns.isEmpty) {  // Has x only
-  //       val liveXBarWireEn = chisel3.util.PriorityMux(xBarSelect, io.xBarW.flatMap(_.en).zip(io.xBarW.flatMap(_.shiftEn)).map{case(e,se) => e | se})
-  //       val liveXBarWireData = chisel3.util.PriorityMux(xBarSelect, io.xBarW.flatMap(_.data))
-  //       val enable = (liveXBarWireEn) & wMask
-  //       val data = liveXBarWireData
-  //       (data, enable)
-  //     }
-  //     else if (directSelectEns.nonEmpty) {                                            // Has direct only
-  //       val liveDirectWireSelects = directSelectEns.zip(directSelectShiftEns).map{case (e,se) => e | se}
-  //       val liveDirectWireData = chisel3.util.PriorityMux(liveDirectWireSelects, directSelectDatas)
-  //       val liveDirectWireEn = chisel3.util.PriorityMux(liveDirectWireSelects, liveDirectWireSelects)
-  //       val enable = (liveDirectWireEn) & wMask
-  //       val data = liveDirectWireData
-  //       (data, enable)
-  //     } else (0.U, false.B)
-  //   if (p.isBuf) mem := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en, io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord), Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
-  //   else mem := Mux(io.reset, initval, Mux(shiftEnable, shiftSource, Mux(enable, data, mem)))
-  // }
-
-//   // Connect read data to output
-//   io.output.zipWithIndex.foreach { case (wire,i) =>
-//     if (p.xBarRMux.nonEmpty && i < p.xBarOutputs) {
-//       // Figure out which read port was active in xBar
-//       val xBarIds = p.xBarRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i < entry._1) => p.xBarRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i }
-//       val xBarCandidatesEns = xBarIds.map(io.rPort.flatMap(_.en).toList(_))
-//       val xBarCandidatesBanks = xBarIds.map(io.rPort.flatMap(_.banks).toList.grouped(p.banks.length).toList(_))
-//       val xBarCandidatesOffsets = xBarIds.map(io.rPort.flatMap(_.ofs).toList(_))
-//       val sel = m.map{ mem =>
-//         if (xBarCandidatesEns.nonEmpty) (xBarCandidatesEns, xBarCandidatesBanks, xBarCandidatesOffsets).zipped.map {case(en,banks,ofs) =>
-//           banks.zip(mem._2).map{case (b, coord) => b === coord.U}.reduce{_&&_} && en
-//         }.reduce{_||_} else false.B
-//       }
-//       val datas = m.map{ _._1 }
-//       val d = chisel3.util.PriorityMux(sel, datas)
-//       wire := d
-//     } else {
-//       // Figure out which read port was active in direct
-//       val directIds = p.directRMux.sortByMuxPortAndCombine.collect{case(muxAddr,entry) if (i - p.xBarOutputs < entry._1.length) => p.directRMux.accessParsBelowMuxPort(muxAddr._1,0,0).sum + i - p.xBarOutputs}
-//       val directCandidatesEns = directIds.map(io.directR.flatMap(_.en).toList(_))
-//       val directCandidatesBanks = directIds.map(io.directR.flatMap(_.banks).toList(_))
-//       val directCandidatesOffsets = directIds.map(io.directR.flatMap(_.ofs).toList(_))
-//       // Create bit vector to select which bank was activated by this io
-//       val sel = m.map{ mem =>
-//         if (directCandidatesEns.nonEmpty) (directCandidatesEns, directCandidatesBanks, directCandidatesOffsets).zipped.map {case(en,banks,ofs) =>
-//           banks.zip(mem._2).map{case (b, coord) => b == coord}.reduce{_&&_}.B && en
-//         }.reduce{_||_} else false.B
-//       }
-//       val datas = m.map{ _._1 }
-//       val d = chisel3.util.PriorityMux(sel, datas)
-//       wire := d
-//     }
-//   }
-
+  // Connect read data to output
+  io.rPort.foreach{ port => 
+    port.output.zipWithIndex.foreach{case (out, lane) => 
+      val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.banks(j))}
+      val visibleMems = m.collect{case (m, ba,_) if (ba.zip(visBanksForLane).forall{case (real, possible) => possible.contains(real)}) => (m, ba)}
+      val datas = visibleMems.map(_._1)
+      val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.banks.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
+      val en = port.en(lane)
+      val sel = bankMatches.map{be => be & en}
+      out := chisel3.util.PriorityMux(sel, datas)
+    }
+  }
 }
 
 class LUT(p: MemParams) extends MemPrimitive(p) {

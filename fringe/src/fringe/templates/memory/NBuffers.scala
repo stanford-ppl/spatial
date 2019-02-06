@@ -150,264 +150,108 @@ class NBufMem(np: NBufParams) extends Module {
     case FIFORegType => throw new Exception("NBuffered FIFOReg should be impossible?")
 
     case FIFOType => throw new Exception("NBuffered FIFO should be impossible?")
-//       val fifo = Module(new FIFO(List(p.logicalDims.head), p.bitWidth, 
-//                                   p.banks, p.combinedXBarWMux, p.combinedXBarRMux, p.numActives))
-//       fifo.io.asInstanceOf[FIFOInterface] <> DontCare
-
-//       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < p.numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-p.numXBarW)}
-//       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < p.numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-p.numXBarR)}
-//       p.combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
-//         val base = p.combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
-//         (0 until entry._1).foreach{i => io.output(base + i) := fifo.io.output(i)}
-//       }
-//       io.full := fifo.io.asInstanceOf[FIFOInterface].full
-//       io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
-//       io.empty := fifo.io.asInstanceOf[FIFOInterface].empty
-//       io.almostEmpty := fifo.io.asInstanceOf[FIFOInterface].almostEmpty
-//       io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
 
     case ShiftRegFileType => 
-//       def posMod(n: Int, d: Int): Int = ((n % d) + d) % d
-//       val isShift = p.xBarWMux.mergeXMaps.values.map(_._2).exists(_.isDefined)
-//       var shiftEntryBuf: Option[Int] = None
-//       val rfs = (0 until p.numBufs).map{ i => 
-//         val combinedXBarWMux = p.xBarWMux.getOrElse(i,XMap()).merge(p.broadcastWMux)
-//         val combinedXBarRMux = p.xBarRMux.getOrElse(i,XMap()).merge(p.broadcastRMux)
-//         val isShiftEntry = isShift && combinedXBarWMux.nonEmpty
-//         if (isShiftEntry) shiftEntryBuf = Some(i)
-//         val x = Module(new ShiftRegFile(p.logicalDims, p.bitWidth, 
-//                         combinedXBarWMux, combinedXBarRMux,
-//                         p.directWMux.getOrElse(i, DMap()), p.directRMux.getOrElse(i,DMap()),
-//                         p.inits, p.syncMem, p.fracBits, isBuf = !isShiftEntry, p.numActives, "sr"))
-//         x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
-//         x
-//       }
-//       rfs.zipWithIndex.foreach{case (rf, i) => 
-//         if (!shiftEntryBuf.exists(_ == i)) {
-//           rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(posMod((i-1),p.numBufs)).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{
-//             case(a,b) => a:=b
-//           }
-//           rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap
-//         }
-//       }
-//       rfs.foreach(_.io.reset := io.reset)
+      def posMod(n: Int, d: Int): Int = ((n % d) + d) % d
+      val isShift = np.p.WMapping.exists(_.shiftAxis.isDefined)
+      var shiftEntryBuf: Option[Int] = None
+      val rfs = (0 until np.numBufs).map{ i => 
+        val isShiftEntry = isShift && np.p.WMapping.filter(_.port.bufPort == Some(i)).nonEmpty
+        if (isShiftEntry) shiftEntryBuf = Some(i)
+        val WPorts = np.p.WMapping.filter{x => x.port.bufPort == Some(i) || !x.port.bufPort.isDefined}
+        val RPorts = np.p.RMapping.filter(_.port.bufPort == Some(i))
+        val x = Module(new ShiftRegFile(np.p.logicalDims, np.p.bitWidth, np.p.logicalDims, np.p.logicalDims,
+                        if (WPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else WPorts, if (RPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else RPorts,
+                        np.p.inits, np.p.syncMem, np.p.fracBits, isBuf = !isShiftEntry, np.p.numActives, "sr"))
+        x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
+        x
+      }
+      rfs.zipWithIndex.foreach{case (rf, i) => 
+        if (!shiftEntryBuf.exists(_ == i)) {
+          rf.io.asInstanceOf[ShiftRegFileInterface].dump_in.zip(rfs(posMod((i-1),np.numBufs)).io.asInstanceOf[ShiftRegFileInterface].dump_out).foreach{
+            case(a,b) => a:=b
+          }
+          rf.io.asInstanceOf[ShiftRegFileInterface].dump_en := ctrl.io.swap
+        }
+      }
+      rfs.foreach(_.io.reset := io.reset)
 
-//       // Route NBuf IO to SRAM IOs
-//       rfs.zipWithIndex.foreach{ case (f,i) => 
-//         // Connect XBarW ports
-//         if (p.xBarWMux.contains(i)) {
-//           val xBarWMuxPortMapping = p.xBarWMux(i)
-//           val xBarWMuxBufferBase = p.xBarWMux.accessParsBelowBufferPort(i).length // Index into NBuf io
-//           val sramXBarWPorts = xBarWMuxPortMapping.accessPars.length
-//           (0 until sramXBarWPorts).foreach {k => 
-//             f.io.xBarW(k).en := io.xBarW(xBarWMuxBufferBase + k).en
-//             f.io.xBarW(k).shiftEn := io.xBarW(xBarWMuxBufferBase + k).shiftEn
-//             f.io.xBarW(k).data := io.xBarW(xBarWMuxBufferBase + k).data
-//             f.io.xBarW(k).ofs := io.xBarW(xBarWMuxBufferBase + k).ofs
-//             f.io.xBarW(k).banks.zip(io.xBarW(xBarWMuxBufferBase + k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-//           }
-//         }
+      // Route NBuf IO to SRAM IOs
+      rfs.zipWithIndex.foreach{ case (f,i) => 
+        val bufWPorts = np.p.WMapping.zip(io.wPort).collect{case (x,p) if (x.port.bufPort == Some(i) || !x.port.bufPort.isDefined) => p}
+        val bufRPorts = np.p.RMapping.zip(io.rPort).collect{case (x,p) if (x.port.bufPort == Some(i)) => p}
 
-//         // Connect DirectW ports
-//         if (p.directWMux.contains(i)) {
-//           val directWMuxPortMapping = p.directWMux(i)
-//           val directWMuxBufferBase = p.directWMux.accessParsBelowBufferPort(i).length // Index into NBuf io
-//           val sramDirectWPorts = directWMuxPortMapping.accessPars.length
-//           (0 until sramDirectWPorts).foreach {k => 
-//             f.io.directW(k).en := io.directW(directWMuxBufferBase + k).en
-//             f.io.directW(k).shiftEn := io.directW(directWMuxBufferBase + k).shiftEn
-//             f.io.directW(k).data := io.directW(directWMuxBufferBase + k).data
-//             f.io.directW(k).ofs := io.directW(directWMuxBufferBase + k).ofs
-//           }
-//         }
+        f.io.wPort.zip(bufWPorts).foreach{case (a,b) => a <> b}
+        f.io.rPort.zip(bufRPorts).foreach{case (a,b) => a <> b}
+      }
 
-//         // Connect BroadcastW ports
-//         if (p.hasBroadcastW) {
-//           val sramXBarWBase = if (p.xBarWMux.contains(i)) p.xBarWMux(i).values.size else 0
-//           val sramBroadcastWPorts = p.broadcastWMux.accessPars.length
-//           (0 until sramBroadcastWPorts).foreach {k => 
-//             f.io.xBarW(sramXBarWBase + k).en := io.broadcastW(k).en
-//             f.io.xBarW(sramXBarWBase + k).shiftEn := io.broadcastW(k).shiftEn
-//             f.io.xBarW(sramXBarWBase + k).data := io.broadcastW(k).data
-//             f.io.xBarW(sramXBarWBase + k).ofs := io.broadcastW(k).ofs
-//             f.io.xBarW(sramXBarWBase + k).banks.zip(io.broadcastW(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-//           }
-//         }
-
-//         // Connect BroadcastR ports
-//         if (p.hasBroadcastR) {
-//           val sramXBarRBase = if (p.xBarRMux.contains(i)) p.xBarRMux(i).values.size else 0
-//           val sramBroadcastRPorts = p.broadcastRMux.accessPars.length
-//           (0 until sramBroadcastRPorts).foreach {k => 
-//             f.io.xBarR(sramXBarRBase + k).en := io.broadcastR(k).en
-//             // f.io.xBarR(sramXBarRBase + k).shiftEn := io.broadcastR(k).shiftEn
-//             // f.io.xBarR(sramXBarRBase + k).data := io.broadcastR(k).data
-//             f.io.xBarR(sramXBarRBase + k).ofs := io.broadcastR(k).ofs
-//             f.io.xBarR(sramXBarRBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-//           }
-//         }
-
-//         // Connect XBarR ports and the associated outputs
-//         if (p.xBarRMux.contains(i)) {
-//           val xBarRMuxPortMapping = p.xBarRMux(i)
-//           val xBarRMuxBufferBase = p.xBarRMux.accessParsBelowBufferPort(i).length // Index into NBuf io
-//           val outputXBarRMuxBufferBase = p.xBarRMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-//           val sramXBarRPorts = xBarRMuxPortMapping.accessPars.length
-//           (0 until sramXBarRPorts).foreach {k => 
-//             val port_width = xBarRMuxPortMapping.accessPars(k)
-//             val k_base = xBarRMuxPortMapping.accessPars.take(k).sum
-//             (0 until port_width).foreach{m => 
-//               val sram_index = (k_base + m) - xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => xBarRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-//               io.output(outputXBarRMuxBufferBase + (k_base + m)) := f.io.output(sram_index)
-//             }
-//             f.io.xBarR(k).en := io.xBarR(xBarRMuxBufferBase + k).en
-//             // f.io.xBarR(xBarRMuxBufferBase + k).data := io.xBarR(xBarRMuxBufferBase + k).data
-//             f.io.xBarR(k).ofs := io.xBarR(xBarRMuxBufferBase + k).ofs
-//             f.io.xBarR(k).banks.zip(io.xBarR(xBarRMuxBufferBase+k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-//               // f.io.backpressure(k) := io.backpressure(k) // Dangerous move here
-//           }
-//         }
-
-//         // Connect DirectR ports and the associated outputs
-//         if (p.directRMux.contains(i)) {
-//           val directRMuxPortMapping = p.directRMux(i)
-//           val directRMuxBufferBase = p.directRMux.accessParsBelowBufferPort(i).length // Index into NBuf io
-//           val xBarRBase = p.xBarRMux.accessPars.length
-//           val outputDirectRMuxBufferBase = p.directRMux.accessParsBelowBufferPort(i).sum // Index into NBuf io
-//           val outputXBarRBase = p.xBarRMux.accessPars.sum
-//           val sramDirectRPorts = directRMuxPortMapping.accessPars.length
-//           (0 until sramDirectRPorts).foreach {k => 
-//             val port_width = directRMuxPortMapping.accessPars(k)
-//             val k_base = directRMuxPortMapping.accessPars.take(k).sum
-//             (0 until port_width).foreach{m => 
-//               val sram_index = (k_base + m) - directRMuxPortMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => directRMuxPortMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-//               io.output(outputXBarRBase + outputDirectRMuxBufferBase + (k_base + m)) := f.io.output(outputXBarRBase + k_base + m)
-//             }
-//             f.io.directR(k).en := io.directR(directRMuxBufferBase + k).en
-//             // f.io.directR(directRMuxBufferBase + k).data := io.directR(directRMuxBufferBase + k).data
-//             f.io.directR(k).ofs := io.directR(directRMuxBufferBase + k).ofs
-//             // f.io.backpressure(k + {if (hasXBarR) numXBarR else 0}) := io.backpressure(k + {if (hasXBarR) numXBarR else 0}) // Dangerous move here
-//           }
-//         }
-
-//         // Connect BroadcastR ports and the associated outputs
-//         // TODO: Broadcasting sram reads are untested and expected behavior is unclear, currently getting last buffer all the time just because
-//         val xBarRMuxPortMapping = p.broadcastRMux
-//         val xBarRMuxBufferBase = p.xBarRMux.accessPars.sum
-//         val sramXBarRPorts = xBarRMuxPortMapping.accessPars.sum
-//         (0 until sramXBarRPorts).foreach {k => 
-//           io.output(xBarRMuxBufferBase + k) := f.io.output(k)
-//           f.io.xBarR(xBarRMuxBufferBase + k).en := io.broadcastR(k).en
-//           f.io.xBarR(xBarRMuxBufferBase + k).ofs := io.broadcastR(k).ofs
-//           f.io.xBarR(xBarRMuxBufferBase + k).banks.zip(io.broadcastR(k).banks).foreach{case (a:UInt,b:UInt) => a := b}
-//         }
-//       }
     case LineBufferType => 
-//       val rowstride = p.strides(0)
-//       val numrows = p.logicalDims(0) + (p.numBufs-1)*rowstride
-//       val numcols = p.logicalDims(1)
-//       val combinedXBarWMux = p.xBarWMux.mergeXMaps
-//       val combinedXBarRMux = p.xBarRMux.mergeXMaps
-//       val flatDirectWMux = p.directWMux.mergeDMaps 
-//       val flatDirectRMux = p.directRMux.mergeDMaps 
-//       val lb = Module(new BankedSRAM(List(numrows,numcols), p.bitWidth,
-//                                List(numrows,p.banks(1)), p.strides,
-//                                combinedXBarWMux, combinedXBarRMux,
-//                                flatDirectWMux, flatDirectRMux,
-//                                p.bankingMode, p.inits, p.syncMem, p.fracBits, numActives = p.numActives, "lb"))
-//       lb.io <> DontCare
+      val rowstride = np.p.strides(0)
+      val numrows = np.p.logicalDims(0) + (np.numBufs-1)*rowstride
+      val numcols = np.p.logicalDims(1)
+      val lb = Module(new BankedSRAM(List(numrows,numcols), np.p.bitWidth,
+                               List(numrows,np.p.banks(1)), np.p.strides,
+                               np.p.WMapping, np.p.RMapping,
+                               np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, numActives = np.p.numActives, "lb"))
+      lb.io <> DontCare
       
-//       val numWriters = p.numXBarW + p.numDirectW
-//       val par = combinedXBarWMux.accessPars.sorted.headOption.getOrElse(0) max flatDirectWMux.accessPars.sorted.headOption.getOrElse(0)
-//       val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), false))
-//       writeCol.io <> DontCare
-//       val en = io.xBarW.map(_.en.reduce{_||_}).reduce{_||_} || io.directW.map(_.en.reduce{_||_}).reduce{_||_}
-//       writeCol.io.input.enable := en
-//       writeCol.io.input.reset := ctrl.io.swap
-//       writeCol.io.setup.saturate := false.B
+      val numWriters = np.p.WMapping.map(_.par).sum
+      val par = np.p.WMapping.map(_.par).max
+      val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), false))
+      writeCol.io <> DontCare
+      val en = io.wPort.flatMap(_.en).reduce{_||_}
+      writeCol.io.input.enable := en
+      writeCol.io.input.reset := ctrl.io.swap
+      writeCol.io.setup.saturate := false.B
 
-//       val rowChanged = io.xBarW.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_}
-//       val gotFirstInRow = Module(new SRFF())
-//       gotFirstInRow.io.input.set := risingEdge(en) || (en && rowChanged)
-//       gotFirstInRow.io.input.reset :=  rowChanged | ctrl.io.swap
-//       gotFirstInRow.io.input.asyn_reset := false.B
+      val rowChanged = io.wPort.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_}
+      val gotFirstInRow = Module(new SRFF())
+      gotFirstInRow.io.input.set := risingEdge(en) || (en && rowChanged)
+      gotFirstInRow.io.input.reset :=  rowChanged | ctrl.io.swap
+      gotFirstInRow.io.input.asyn_reset := false.B
 
-//       val base = chisel3.util.PriorityMux(io.xBarW.map(_.en).flatten, writeCol.io.output.count)
-//       val colCorrection = Module(new FF(32))
-//       colCorrection.io <> DontCare
-//       colCorrection.io.xBarW(0).data.head := base.asUInt
-//       colCorrection.io.xBarW(0).init.head := 0.U
-//       colCorrection.io.xBarW(0).en.head := en & ~gotFirstInRow.io.output
-//       colCorrection.io.xBarW(0).reset.head := reset.toBool | risingEdge(!gotFirstInRow.io.output)
-//       val colCorrectionValue = Mux(en & ~gotFirstInRow.io.output, base.asUInt, colCorrection.io.output(0))
+      val base = chisel3.util.PriorityMux(io.wPort.flatMap(_.en), writeCol.io.output.count)
+      val colCorrection = Module(new FF(32))
+      colCorrection.io <> DontCare
+      colCorrection.io.wPort(0).data.head := base.asUInt
+      colCorrection.io.wPort(0).init := 0.U
+      colCorrection.io.wPort(0).en.head := en & ~gotFirstInRow.io.output
+      colCorrection.io.wPort(0).reset := reset.toBool | risingEdge(!gotFirstInRow.io.output)
+      val colCorrectionValue = Mux(en & ~gotFirstInRow.io.output, base.asUInt, colCorrection.io.rPort(0).output.head)
 
-//       val wCRN_width = 1 + log2Up(numrows)
-//       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
-//       writeRow.io <> DontCare
-//       writeRow.io.input.enable := ctrl.io.swap
-//       writeRow.io.input.countUp := false.B
+      val wCRN_width = 1 + log2Up(numrows)
+      val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
+      writeRow.io <> DontCare
+      writeRow.io.input.enable := ctrl.io.swap
+      writeRow.io.input.countUp := false.B
 
-//       // Connect XBarW ports
-//       p.xBarWMux.foreach { case (bufferPort, portMapping) =>
-//         val bufferBase = p.xBarWMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
-//         val sramXBarWPorts = portMapping.accessPars.length
-//         // val wMask = getRetimed(ctrl.io.statesInW(ctrl.lookup(bufferPort)) === i.U, {if (retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-//         (0 until sramXBarWPorts).foreach {k => 
-//           lb.io.xBarW(bufferBase + k).en := io.xBarW(bufferBase + k).en
-//           lb.io.xBarW(bufferBase + k).data := io.xBarW(bufferBase + k).data
-//           lb.io.xBarW(bufferBase + k).ofs := writeCol.io.output.count.map{x => (x.asUInt - colCorrectionValue) / p.banks(1).U}
-//           lb.io.xBarW(bufferBase + k).banks.zipWithIndex.map{case (b,i) => 
-//             if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - io.xBarW(bufferBase + k).banks(0)
-//             else b := (writeCol.io.output.count(i/2).asUInt - colCorrectionValue) % p.banks(1).U
-//           }
-//         }
-//       }
+      // Connect wPorts
+      lb.io.wPort.zip(io.wPort).foreach { case (mem, nbuf) =>
+        mem.en := nbuf.en
+        mem.data := nbuf.data
+        mem.ofs := writeCol.io.output.count.map{x => (x.asUInt - colCorrectionValue) / np.p.banks(1).U}
+        mem.banks.zipWithIndex.map{case (b,i) => 
+          if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - nbuf.banks(0)
+          else b := (writeCol.io.output.count(i/2).asUInt - colCorrectionValue) % np.p.banks(1).U
+        }
+      }
 
-//       val readRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), (p.numBufs-1)*rowstride, wCRN_width))
-//       readRow.io <> DontCare
-//       readRow.io.input.enable := ctrl.io.swap
-//       readRow.io.input.countUp := false.B
+      val readRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), (np.numBufs-1)*rowstride, wCRN_width))
+      readRow.io <> DontCare
+      readRow.io.input.enable := ctrl.io.swap
+      readRow.io.input.countUp := false.B
 
-//       // Connect XBarR ports and the associated outputs
-//       p.xBarRMux.foreach { case (bufferPort, portMapping) =>
-//         val bufferBase = p.xBarRMux.accessParsBelowBufferPort(bufferPort).length // Index into NBuf io
-//         val outputBufferBase = p.xBarRMux.accessParsBelowBufferPort(bufferPort).sum // Index into NBuf io
-//         val sramXBarRPorts = portMapping.accessPars.length
-//         // val rMask = getRetimed(ctrl.io.statesInR(bufferPort) === i.U, {if (retime) 1 else 0}) // Check if ctrl is routing this bufferPort to this sram
-//         // val outSel = (0 until p.numBufs).map{ a => getRetimed(ctrl.io.statesInR(bufferPort) === a.U, {if (retime) 1 else 0}) }
-//         (0 until sramXBarRPorts).foreach {k => 
-//           val port_width = portMapping.sortByMuxPortAndOfs.accessPars(k)
-//           val k_base = portMapping.sortByMuxPortAndOfs.accessPars.take(k).sum
-//           (0 until port_width).foreach{m => 
-//             val sram_index = (k_base + m) - portMapping.sortByMuxPortAndCombine.accessPars.indices.map{i => portMapping.sortByMuxPortAndCombine.accessPars.take(i+1).sum}.filter((k_base + m) >= _).lastOption.getOrElse(0)
-//             io.output(outputBufferBase + (k_base + m)) := lb.io.output(sram_index)
-//           }
-//           lb.io.xBarR(bufferBase + k).en := io.xBarR(bufferBase + k).en
-//           lb.io.xBarR(bufferBase + k).backpressure := io.xBarR(bufferBase + k).backpressure
-//           // lb.io.xBarR(bufferBase + k).data := io.xBarR(bufferBase + k).data
-//           lb.io.xBarR(bufferBase + k).ofs := io.xBarR(bufferBase + k).ofs
-//           lb.io.xBarR(bufferBase + k).banks.odd.zip(io.xBarR(bufferBase+k).banks.odd).foreach{case (a:UInt,b:UInt) => a := b}
-//           lb.io.xBarR(bufferBase + k).banks.even.zip(io.xBarR(bufferBase+k).banks.even).foreach{case (a:UInt,b:UInt) => a := (b + readRow.io.output.count) % numrows.U}
-//         }
-//       }
-
-
+      // Connect rPorts and the associated outputs
+      lb.io.rPort.zip(io.rPort).foreach { case (mem, nbuf) =>
+        mem.en := nbuf.en
+        mem.backpressure := nbuf.backpressure
+        nbuf.output := mem.output
+        mem.ofs := nbuf.ofs
+        mem.banks.odd.zip(nbuf.banks.odd).foreach{case (a: UInt, b:UInt) => a := b}
+        mem.banks.even.zip(nbuf.banks.even).foreach{case (a:UInt,b:UInt) => a := (b + readRow.io.output.count) % numrows.U}
+      }
 
     case LIFOType => throw new Exception("NBuffered LIFO should be impossible?")
-//       val fifo = Module(new LIFO((List(p.logicalDims.head), p.bitWidth, 
-//                                   p.banks, p.combinedXBarWMux, p.combinedXBarRMux, p.numActives)))
-//       fifo.io.asInstanceOf[FIFOInterface] <> DontCare
-//       fifo.io.xBarW.zipWithIndex.foreach{case (f, i) => if (i < p.numXBarW) f := io.xBarW(i) else f := io.broadcastW(i-p.numXBarW)}
-//       fifo.io.xBarR.zipWithIndex.foreach{case (f, i) => if (i < p.numXBarR) f := io.xBarR(i) else f := io.broadcastR(i-p.numXBarR)}
-//       p.combinedXBarRMux.sortByMuxPortAndOfs.foreach{case (muxAddr, entry) => 
-//         val base = p.combinedXBarRMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2, muxAddr._3).sum
-//         (0 until entry._1).foreach{i => io.output(base + i) := fifo.io.output(i)}
-//       }
-//       io.full := fifo.io.asInstanceOf[FIFOInterface].full
-//       io.almostFull := fifo.io.asInstanceOf[FIFOInterface].almostFull
-//       io.empty := fifo.io.asInstanceOf[FIFOInterface].empty
-//       io.almostEmpty := fifo.io.asInstanceOf[FIFOInterface].almostEmpty
-//       io.numel := fifo.io.asInstanceOf[FIFOInterface].numel
   }
 }
 

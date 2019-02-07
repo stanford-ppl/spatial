@@ -121,9 +121,9 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
          b: (Seq[Bool], Seq[UInt], Seq[Bool])
         ) => (a._1 ++ b._1, a._2 ++ b._2, a._3 ++ b._3)}
 
-      // val stickyEns = Module(new StickySelects(rawEns.size))
-      // stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
-      val ens = rawEns //stickyEns.io.outs.map(_.toBool)
+      val stickyEns = Module(new StickySelects(rawEns.size)) // Fixes bug exposed by ScatterGatherSRAM app
+      stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
+      val ens = stickyEns.io.outs.map(_.toBool)
 
       // Unmask write port if any of the above match
       val finalChoice = fatMux("PriorityMux", ens, ens, backpressures, ofs)

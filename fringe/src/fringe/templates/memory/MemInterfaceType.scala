@@ -110,7 +110,8 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
     rPort(base).banks.zip(banks).foreach{case (a,b) => a := b}
     rPort(base).ofs.zip(ofs).foreach{case (a,b) => a := b}
     rPort(base).backpressure := backpressure
-    rPort(base).en.zip(en).foreach{case (a,b) => a := b}
+    val bcasts = p.lookupR(accHash).broadcast
+    (rPort(base).en, en, bcasts).zipped.foreach{case (a,b,e) => if (e == 0) a := b else a := false.B}
     Ledger.connectRPort(this.hashCode, base)
     rPort(base).output
   }
@@ -182,110 +183,6 @@ class NBufInterface(val np: NBufParams) extends FIFOInterface(np.p) {
       super.connectLedger(op)
     }
   }
-
-//   def connectXBarWPort(wBundle: W_XBar, bufferPort: Int, muxAddr: (Int, Int))(implicit stack: List[KernelHash]): Unit = {
-//     assert(p.hasXBarW)
-//     assert(!usedMuxPorts.contains(("XBarW", (bufferPort,muxAddr._1,muxAddr._2,0,0))), s"Attempted to connect to XBarW port ($bufferPort,$muxAddr) twice!")
-//     usedMuxPorts ::= ("XBarW", (bufferPort,muxAddr._1,muxAddr._2,0,0))
-//     val bufferBase = p.xBarWMux.accessParsBelowBufferPort(bufferPort).length
-//     val muxBase = p.xBarWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2,0).length
-//     Ledger.connectXBarW(this.hashCode, bufferBase + muxBase)
-//     xBarW(bufferBase + muxBase) := wBundle
-//   }
-
-//   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean)(implicit stack: List[KernelHash]): Seq[UInt] = {connectXBarRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-//   def connectXBarRPort(rBundle: R_XBar, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool)(implicit stack: List[KernelHash]): Seq[UInt] = {
-//     assert(p.hasXBarR)
-//     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
-//       val castgrp = if (ignoreCastInfo) 0 else cg
-//       val effectiveOfs = if (ignoreCastInfo) muxAddr._2 else muxAddr._2 + i
-//       val bufferBase = p.xBarRMux.accessParsBelowBufferPort(bufferPort).length
-//       val muxBase = p.xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).length
-//       val outputBufferBase = p.xBarRMux.accessParsBelowBufferPort(bufferPort).sum
-//       val outputMuxBase = p.xBarRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).sum
-//       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
-//       if (bid == 0) {
-//         if (ignoreCastInfo && i == 0) {
-//           assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,0))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
-//           usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,0))
-//         } else if (!ignoreCastInfo) {
-//           assert(!usedMuxPorts.contains(("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))), s"Attempted to connect to XBarR port ($bufferPort,$muxAddr) twice!")
-//           usedMuxPorts ::= ("XBarR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))
-//         }
-//         Ledger.connectXBarR(this.hashCode, bufferBase + muxBase, vecId)
-//         xBarR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
-//       }
-//       Ledger.connectOutput(this.hashCode, outputBufferBase + outputMuxBase + vecId)
-//       output(outputBufferBase + outputMuxBase + vecId)
-//     }
-//   }
-
-//   def connectBroadcastWPort(wBundle: W_XBar, muxAddr: (Int, Int))(implicit stack: List[KernelHash]): Unit = {
-//     val muxBase = p.broadcastWMux.accessParsBelowMuxPort(muxAddr._1, muxAddr._2,0).length
-//     broadcastW(muxBase) := wBundle
-//     Ledger.connectBroadcastW(this.hashCode, muxBase)
-//   }
-
-//   def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean)(implicit stack: List[KernelHash]): Seq[UInt] = {connectBroadcastRPort(rBundle, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-//   def connectBroadcastRPort(rBundle: R_XBar, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool)(implicit stack: List[KernelHash]): Seq[UInt] = {
-//     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
-//       val castgrp = if (ignoreCastInfo) 0 else cg
-//       val effectiveOfs = if (ignoreCastInfo) muxAddr._2 else muxAddr._2 + i
-//       val muxBase = p.broadcastRMux.accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).length
-//       val xBarRBase = p.xBarRMux.accessPars.length
-//       val directRBase = p.directRMux.accessPars.length
-//       val outputXBarRBase = p.xBarRMux.accessPars.sum
-//       val outputDirectRBase = p.directRMux.accessPars.sum
-//       val outputMuxBase = p.broadcastRMux.accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).sum
-//       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
-//       if (bid == 0) {
-//         Ledger.connectBroadcastR(this.hashCode, muxBase, vecId)
-//         broadcastR(muxBase).connectLane(vecId,i,rBundle, backpressure)
-//       }
-//       Ledger.connectOutput(this.hashCode, outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
-//       output(outputXBarRBase + outputDirectRBase + outputMuxBase + vecId)
-//     }
-//   }
-
-//   def connectDirectWPort(wBundle: W_Direct, bufferPort: Int, muxAddr: (Int, Int))(implicit stack: List[KernelHash]): Unit = {
-//     assert(p.hasDirectW)
-//     assert(!usedMuxPorts.contains(("directW", (bufferPort,muxAddr._1,muxAddr._2,0,0))), s"Attempted to connect to directW port ($bufferPort,$muxAddr) twice!")
-//     usedMuxPorts ::= ("directW", (bufferPort,muxAddr._1,muxAddr._2,0,0))
-//     val bufferBase = p.directWMux.accessParsBelowBufferPort(bufferPort).length 
-//     val muxBase = p.directWMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, muxAddr._2, 0).length
-//     Ledger.connectDirectW(this.hashCode, bufferBase + muxBase)
-//     directW(bufferBase + muxBase) := wBundle
-//   }
-
-//   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean)(implicit stack: List[KernelHash]): Seq[UInt] = {connectDirectRPort(rBundle, bufferPort, muxAddr, castgrps, broadcastids, ignoreCastInfo, true.B)}
-
-//   def connectDirectRPort(rBundle: R_Direct, bufferPort: Int, muxAddr: (Int, Int), castgrps: List[Int], broadcastids: List[Int], ignoreCastInfo: Boolean, backpressure: Bool)(implicit stack: List[KernelHash]): Seq[UInt] = {
-//     assert(p.hasDirectR)
-//     castgrps.zip(broadcastids).zipWithIndex.map{case ((cg, bid), i) => 
-//       val castgrp = if (ignoreCastInfo) 0 else cg
-//       val effectiveOfs = if (ignoreCastInfo) muxAddr._2 else muxAddr._2 + i
-//       val bufferBase = p.directRMux.accessParsBelowBufferPort(bufferPort).length
-//       val xBarRBase = p.xBarRMux.accessPars.length
-//       val muxBase = p.directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).length
-//       val outputBufferBase = p.directRMux.accessParsBelowBufferPort(bufferPort).sum
-//       val outputXBarRBase = p.xBarRMux.accessPars.sum
-//       val outputMuxBase = p.directRMux(bufferPort).accessParsBelowMuxPort(muxAddr._1, effectiveOfs,castgrp).sum
-//       val vecId = if (ignoreCastInfo) i else castgrps.take(i).count(_ == castgrp)
-//       if (bid == 0) {
-//         if (ignoreCastInfo && i == 0) {
-//           assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,effectiveOfs,i,0))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
-//           usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,effectiveOfs,i,0))
-//         } else if (!ignoreCastInfo) {
-//           assert(!usedMuxPorts.contains(("directR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))), s"Attempted to connect to directR port ($bufferPort,$muxAddr) twice!")
-//           usedMuxPorts ::= ("directR", (bufferPort,muxAddr._1,effectiveOfs,i,castgrp))
-//         }
-//         Ledger.connectDirectR(this.hashCode, bufferBase + muxBase, vecId)
-//         directR(bufferBase + muxBase).connectLane(vecId,i,rBundle, backpressure)
-//       }
-//       Ledger.connectOutput(this.hashCode, outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
-//       output(outputXBarRBase + outputBufferBase + outputMuxBase + vecId)
-//     }
-//   }
 
   def connectStageCtrl(done: Bool, en: Bool, port: Int)(implicit stack: List[KernelHash]): Unit = {
     Ledger.connectStageCtrl(this.hashCode, port)

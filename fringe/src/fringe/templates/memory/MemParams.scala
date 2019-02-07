@@ -26,8 +26,8 @@ case class MemParams(
   myName: String = "mem"
 ) {
   def depth: Int = logicalDims.product
-  def widestR: Int = RMapping.map(_.par).sorted.headOption.getOrElse(0)
-  def widestW: Int = WMapping.map(_.par).sorted.headOption.getOrElse(0)
+  def widestR: Int = RMapping.map(_.par).sorted.reverse.headOption.getOrElse(0)
+  def widestW: Int = WMapping.map(_.par).sorted.reverse.headOption.getOrElse(0)
   def totalOutputs: Int = RMapping.map(_.par).sum
   def numBanks: Int = banks.product
   def ofsWidth: Int = log2Up(depth/banks.product)

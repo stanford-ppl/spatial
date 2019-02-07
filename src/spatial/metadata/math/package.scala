@@ -19,7 +19,7 @@ package object math {
 
     def getResidual: Option[ResidualGenerator] = metadata[Residual](s.trace).map(_.equ)
     def residual: ResidualGenerator = getResidual.getOrElse(
-    	if (s.trace.isConst) ResidualGenerator(s.traceToInt+1, s.traceToInt, s.traceToInt+1) 
+    	if (s.trace.isConst) ResidualGenerator(s.traceToInt) 
     	else if (s.trace.asInstanceOf[Num[_]].getCounter.isDefined && s.trace.asInstanceOf[Num[_]].counter.ctr.isStaticStartAndStep) {
 	      val Final(start) = s.trace.asInstanceOf[Num[_]].counter.ctr.start
 	      val Final(step) = s.trace.asInstanceOf[Num[_]].counter.ctr.step

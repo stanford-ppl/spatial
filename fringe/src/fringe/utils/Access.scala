@@ -16,7 +16,9 @@ case class PortInfo(
   val banksWidth: List[Int],
   val dataWidth: Int,
   val visibleBanks: List[List[ResidualGenerator]]
-)
+){
+  def randomBanks: PortInfo = PortInfo(bufPort, portWidth, ofsWidth, banksWidth, dataWidth, List.tabulate(portWidth){i => List.tabulate(banksWidth.size){j => ResidualGenerator(1,0,0)}})
+}
 case class Access(
   val accHash: OpHash,
   val muxPort: Int,
@@ -27,4 +29,5 @@ case class Access(
   val port: PortInfo
 ) {
   def par: Int = castgroup.size
+  def randomBanks: Access = Access(accHash, muxPort, muxOfs, castgroup, broadcast, shiftAxis, port.randomBanks)
 }

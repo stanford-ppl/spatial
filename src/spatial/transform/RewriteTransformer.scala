@@ -293,16 +293,53 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     // m1*m2 + add --> fma(m1,m2,add)
     case FixAdd((Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
-      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
 
     case FixAdd(F(add: Fix[s,i,f]), F(Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
-      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
 
     case FltAdd(F(Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
       transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
     case FltAdd(F(add: Flt[m,e]), F(Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
       transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+
+    // Not rewrite, but set residual metadata on certain patterns
+    case Op(FixAdd(F(xx), Final(ofs))) if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(1, xx, ofs, 0)
+      m
+        
+    case Op(FixAdd(Final(ofs), F(xx)))  if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(1, xx, ofs, 0)
+      m
+
+        
+    case Op(FixSub(F(xx), Final(ofs)))  if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(1, xx, -ofs, 0)
+      m
+
+    case Op(FixMul(Final(lin), F(xx)))  if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(lin, xx, 0, 0)
+      m
+
+    case Op(FixMul(F(xx), Final(lin)))  if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(lin, xx, 0, 0)
+      m
+
+    case Op(FixFMA(Final(lin), F(xx), Final(ofs)))  if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(lin, xx, ofs, 0)
+      m
+
+    case Op(FixFMA(F(xx), Final(lin), Final(ofs)))  if inHw => 
+      val m = super.transform(lhs,rhs)
+      m.residual = residual(lin, xx, ofs, 0)
+      m
 
     case _ => super.transform(lhs,rhs)
   }

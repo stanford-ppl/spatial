@@ -200,13 +200,13 @@ trait ChiselGenController extends ChiselGenCommon {
         inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  => 
           open(src"def connectWires${grpid}(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
             inpgrp.foreach{ in => 
-              if (ledgerized(in)) {
-                emit(src"${in}.connectLedger(module.io.in_$in)")
-                if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
-              } 
+            if (ledgerized(in)) {
+              emit(src"${in}.connectLedger(module.io.in_$in)")
+              if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
+              else if (in.isMergeBuffer || in.isDRAMAccel) emit(src"module.io.in_${in}.output <> ${in}.output")
+            } 
             else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
             else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
-            else if (in.isMergeBuffer) emit(src"module.io.in_${in}.output <> ${in}.output")
             else emit(src"module.io.in_$in <> ${in}")}
           close("}")
         }
@@ -352,8 +352,8 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"${lhs}$swobj.sm.io.enableOut.zip(${lhs}$swobj.smEnableOuts).foreach{case (l,r) => r := l}")
 
     lhs match {
-      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.output(0); ${stopWhen.get}.connectReset($done)")
-      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.output(0); ${stopWhen.get}.connectReset($done)")
+      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
+      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
       case _ => emit(src"${lhs}$swobj.sm.io.break := false.B") 
     }
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))

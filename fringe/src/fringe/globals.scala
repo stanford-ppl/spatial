@@ -24,7 +24,7 @@ object globals {
 
   var retime = false
   var enableModular: Boolean = true
-  var enableVerbose: Boolean = true
+  var enableVerbose: Boolean = false
   var enableDebugRegs: Boolean = true
   var channelAssignment: ChannelAssignment = AllToOne
 

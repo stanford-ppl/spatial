@@ -180,7 +180,6 @@ class NBufMem(np: NBufParams) extends Module {
       rfs.zipWithIndex.foreach{ case (f,i) => 
         val bufWPorts = np.p.WMapping.zip(io.wPort).collect{case (x,p) if (x.port.bufPort == Some(i) || !x.port.bufPort.isDefined) => p}
         val bufRPorts = np.p.RMapping.zip(io.rPort).collect{case (x,p) if (x.port.bufPort == Some(i)) => p}
-
         f.io.wPort.zip(bufWPorts).foreach{case (a,b) => a <> b}
         f.io.rPort.zip(bufRPorts).foreach{case (a,b) => a <> b}
       }
@@ -191,10 +190,9 @@ class NBufMem(np: NBufParams) extends Module {
       val numcols = np.p.logicalDims(1)
       val lb = Module(new BankedSRAM(List(numrows,numcols), np.p.bitWidth,
                                List(numrows,np.p.banks(1)), np.p.strides,
-                               np.p.WMapping, np.p.RMapping,
+                               np.p.WMapping.map(_.randomBanks), np.p.RMapping.map(_.randomBanks),
                                np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, numActives = np.p.numActives, "lb"))
       lb.io <> DontCare
-      
       val numWriters = np.p.WMapping.map(_.par).sum
       val par = np.p.WMapping.map(_.par).max
       val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), false))

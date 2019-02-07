@@ -78,9 +78,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
 
     val invisibleEnable = invisibleEnableRead(lhs,mem)
-    val banklist = bank.flatten.map(quote(_) + ".r")
+    val banklist = bank.flatten.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}}
     splitAndCreate(lhs, mem, src"${lhs}_banks", "UInt", banklist)
-    splitAndCreate(lhs, mem, src"${lhs}_ofs", "UInt", ofs.map(quote(_) + ".r"))
+    splitAndCreate(lhs, mem, src"${lhs}_ofs", "UInt", ofs.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}})
     val commonEns = ens.head.collect{case e if (ens.forall(_.contains(e)) && !e.isBroadcastAddr) => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
@@ -91,13 +91,13 @@ trait ChiselGenMem extends ChiselGenCommon {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
 
     val invisibleEnable = invisibleEnableWrite(lhs)
-    val banklist = bank.flatten.map(quote(_) + ".r")
+    val banklist = bank.flatten.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}}
     splitAndCreate(lhs, mem, src"${lhs}_banks", "UInt", banklist)
-    splitAndCreate(lhs, mem, src"${lhs}_ofs", "UInt", ofs.map(quote(_) + ".r"))
+    splitAndCreate(lhs, mem, src"${lhs}_ofs", "UInt", ofs.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}})
     val commonEns = ens.head.collect{case e if (ens.forall(_.contains(e)) && !e.isBroadcastAddr) => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    splitAndCreate(lhs, mem, src"${lhs}_data", "UInt", data.map(quote(_) + ".r"))
+    splitAndCreate(lhs, mem, src"${lhs}_data", "UInt", data.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}})
     emit(src"""${mem}.connectWPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, ${lhs}_data, ${lhs}_en.map(_ && ${invisibleEnable} && ${and(commonEns)}))""")
 
     val enport = if (shiftAxis.isDefined) "shiftEn" else "en"
@@ -179,7 +179,7 @@ trait ChiselGenMem extends ChiselGenCommon {
                           else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
         val resids = w.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
-        emit(src"val w$i = Access(${w.hashCode}, ${w.port.muxPort}, ${w.port.muxOfs}, ${w.port.castgroup.mkString("List(",",",")")}, ${w.port.broadcast.mkString("List(",",",")")}, ${w.shiftAxis}, PortInfo(${w.port.bufferPort}, ${w.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
+        emit(src"val w$i = Access(${w.hashCode}, ${w.port.muxPort}, ${w.port.muxOfs}, ${w.port.castgroup.mkString("List(",",",")")}, ${w.port.broadcast.mkString("List(",",",")")}, ${w.shiftAxis}, PortInfo(${w.port.bufferPort}, ${1 max w.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
       }
       if (mem.writers.isEmpty) {emit(src"val w0 = AccessHelper.singular(32)")}
       mem.readers.zipWithIndex.foreach{ case (r, i) => 
@@ -189,7 +189,7 @@ trait ChiselGenMem extends ChiselGenCommon {
                           else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
         val resids = r.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
-        emit(src"val r$i = Access(${r.hashCode}, ${r.port.muxPort}, ${r.port.muxOfs}, ${r.port.castgroup.mkString("List(",",",")")}, ${r.port.broadcast.mkString("List(",",",")")}, ${r.shiftAxis}, PortInfo(${r.port.bufferPort}, ${r.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
+        emit(src"val r$i = Access(${r.hashCode}, ${r.port.muxPort}, ${r.port.muxOfs}, ${r.port.castgroup.mkString("List(",",",")")}, ${r.port.broadcast.mkString("List(",",",")")}, ${r.shiftAxis}, PortInfo(${r.port.bufferPort}, ${1 max r.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
       }
       if (mem.readers.isEmpty) {emit(src"val r0 = AccessHelper.singular(32)")}
 
@@ -323,9 +323,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsFull(fifo,_)  => emit(src"val $lhs = ${fifo}.full")
     case FIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = ${fifo}.almostEmpty")
     case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${fifo}.almostFull")
-    case op@FIFOPeek(fifo,_) => 
+    case op@FIFOPeek(fifo,ens) => 
+      emitRead(lhs, fifo, Seq(Seq()), Seq(), Seq(Set(Bit(false))))
       emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, false.B)") 
-      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.output(0)")
+      // emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.rPort(0).output.head")
     case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
@@ -340,7 +341,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     case LIFOIsFull(fifo,_)  => emit(src"val $lhs = ${fifo}.full")
     case LIFOIsAlmostEmpty(fifo,_) => emit(src"val $lhs = ${fifo}.almostEmpty")
     case LIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${fifo}.almostFull")
-    case op@LIFOPeek(fifo,_) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.output(0)")
+    case op@LIFOPeek(fifo,ens) => 
+      emitRead(lhs, fifo, Seq(Seq()), Seq(), Seq(Set(Bit(false))))
     case LIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.numel")
     case op@LIFOBankedPop(fifo, ens) => emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
     case LIFOBankedPush(fifo, data, ens) => emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)

@@ -223,11 +223,11 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
     val doneReg = Module(new SRFF())
     doneReg.io <> DontCare
 
-    stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
-    stateFSM.io.xBarW(0).init.head := io.initState.asUInt
-    stateFSM.io.xBarW(0).en.head := io.enable & iterDone.last.io.output
-    stateFSM.io.xBarW(0).reset.head := reset.toBool | ~io.enable
-    io.state := stateFSM.io.output(0).asSInt
+    stateFSM.io.wPort(0).data.head := io.nextState.asUInt
+    stateFSM.io.wPort(0).init := io.initState.asUInt
+    stateFSM.io.wPort(0).en.head := io.enable & iterDone.last.io.output
+    stateFSM.io.wPort(0).reset := reset.toBool | ~io.enable
+    io.state := stateFSM.io.rPort(0).output(0).asSInt
 
     doneReg.io.input.set := io.doneCondition & io.enable & iterDone.last.io.output.D(1)
     doneReg.io.input.reset := ~io.enable
@@ -304,13 +304,13 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
     // if (p.latency == 0) depulser := Mux(io.enable, ~depulser, depulser)
     // else depulser := true.B
 
-    stateFSM.io.xBarW(0).data.head := io.nextState.asUInt
-    stateFSM.io.xBarW(0).init.head := io.initState.asUInt
-    stateFSM.io.xBarW(0).en.head := io.enable & io.ctrDone
-    // if (p.latency == 0) stateFSM.io.xBarW(0).en := io.enable & ~depulser
-    // else stateFSM.io.xBarW(0).en := io.enable
-    stateFSM.io.xBarW(0).reset.head := reset.toBool | ~io.enable
-    io.state := stateFSM.io.output(0).asSInt
+    stateFSM.io.wPort(0).data.head := io.nextState.asUInt
+    stateFSM.io.wPort(0).init := io.initState.asUInt
+    stateFSM.io.wPort(0).en.head := io.enable & io.ctrDone
+    // if (p.latency == 0) stateFSM.io.wPort(0).en := io.enable & ~depulser
+    // else stateFSM.io.wPort(0).en := io.enable
+    stateFSM.io.wPort(0).reset := reset.toBool | ~io.enable
+    io.state := stateFSM.io.rPort(0).output.head.asSInt
 
     // Screwiness with "switch" signals until we have better fsm test cases
     io.childAck.last := io.doneIn.last

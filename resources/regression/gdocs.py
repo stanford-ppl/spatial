@@ -571,16 +571,19 @@ def report_slowdowns(prop, backend, newbranch, oldbranch):
 		col = lol[0].index(t)
 		if (len(lol[0]) > col and lol[newrow][col] != "" and lol[oldrow][col] != ""): 
 			nowtime = float(lol[newrow][col])
-			lasttime = float(lol[oldrow][col])
-			percent_change = ((nowtime - lasttime) / lasttime) * 100
-			if (percent_change < -2):
-				better_apps.append(t)
-				better_raw.append(nowtime)
-				better_change.append(percent_change)
-			elif (percent_change > 2):
-				worse_apps.append(t)
-				worse_raw.append(nowtime)
-				worse_change.append(percent_change)
+			try:
+				lasttime = float(lol[oldrow][col])
+				percent_change = ((nowtime - lasttime) / lasttime) * 100
+				if (percent_change < -2):
+					better_apps.append(t)
+					better_raw.append(nowtime)
+					better_change.append(percent_change)
+				elif (percent_change > 2):
+					worse_apps.append(t)
+					worse_raw.append(nowtime)
+					worse_change.append(percent_change)
+			except:
+				1
 
 	print("SUMMARY FOR %s: %s" % (backend, prop))
 	print("-------")
@@ -722,7 +725,7 @@ else:
 	print(" - combine_and_strip_prefixes(backend)")
 	print(" - report_changes(backend, newbranch, oldbranch (master, misc_fixes, any, etc.))")
 	print(" - finish_test(backend, branch, runtime)")
-	print(" - report_slowdowns(property (runtime, spatial, backend, newbranch, oldbranch), backend)")
+	print(" - report_slowdowns(property [runtime, spatial, backend], newbranch, oldbranch, backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - merge_apps_columns(old appname, new appname, backend)")

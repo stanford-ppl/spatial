@@ -45,9 +45,10 @@ trait ISL {
         }
       }
 
-      // step 3: check if emptiness exists
+      // step 3: check if emptiness exists && is correct version
       val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
       println(s"Emptiness: $emptiness_exists, $emptiness_bin")
+      // TODO: Check if emptiness -version is correct!
 
       // step 4: if emptiness does not exist, compile it.
       if (!emptiness_exists) {

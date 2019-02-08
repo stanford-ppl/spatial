@@ -74,19 +74,17 @@ class FixFMAAccum(
   accums.foreach{case (acc, lane) => 
     acc.io <> DontCare
     val fixadd = Wire(new FixedPoint(s,d,f))
-    fixadd.r := Mux(isFirstRound, 0.U, acc.io.output(0))
+    fixadd.r := Mux(isFirstRound, 0.U, acc.io.rPort(0).output(0))
     val result = Wire(new FixedPoint(s,d,f))
     result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B).r
-    acc.io.xBarR <> DontCare
-    acc.io.directR <> DontCare
-    acc.io.directW <> DontCare
-    acc.io.xBarW(0).data(0) := result.r
-    acc.io.xBarW(0).en(0) := getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
-    acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + fmaLatency)
-    acc.io.xBarW(0).init(0) := initBits
+    acc.io.rPort <> DontCare
+    acc.io.wPort(0).data(0) := result.r
+    acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
+    acc.io.wPort(0).reset := activeReset | activeLast.D(drain_latency + fmaLatency)
+    acc.io.wPort(0).init := initBits
   }
 
-  io.output := getRetimed(accums.map(_._1.io.output(0)).reduce{_+_}, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong).r // TODO: Please build tree and retime appropriately
+  io.output := getRetimed(accums.map(_._1.io.rPort(0).output(0)).reduce{_+_}, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong).r // TODO: Please build tree and retime appropriately
 }
 
 
@@ -131,7 +129,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
   accums.foreach{case (acc, lane) => 
     val fixadd = Wire(new FixedPoint(s,d,f))
-    fixadd.r := acc.io.output(0)
+    fixadd.r := acc.io.rPort(0).output(0)
     val result = Wire(new FixedPoint(s,d,f))
     t match {
       case Accum.Add => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
@@ -139,40 +137,38 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
       case Accum.Min => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
       case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
     }
-    acc.io.xBarW <> DontCare
-    acc.io.xBarR <> DontCare
-    acc.io.directW <> DontCare
-    acc.io.directR <> DontCare
+    acc.io.wPort <> DontCare
+    acc.io.rPort <> DontCare
     acc.io.reset := false.B
-    acc.io.xBarW(0).data(0) := result.r
-    acc.io.xBarW(0).en(0) := getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
-    acc.io.xBarW(0).reset(0) := activeReset | activeLast.D(drain_latency + opLatency)
-    acc.io.xBarW(0).init(0) := initBits
+    acc.io.wPort(0).data(0) := result.r
+    acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
+    acc.io.wPort(0).reset := activeReset | activeLast.D(drain_latency + opLatency)
+    acc.io.wPort(0).init := initBits
   }
 
   t match {
-    case Accum.Add => io.output := getRetimed(accums.map(_._1.io.output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
+    case Accum.Add => io.output := getRetimed(accums.map(_._1.io.rPort(0).output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
       (t1+t2).r
     }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
-    case Accum.Mul => io.output := getRetimed(accums.map(_._1.io.output(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) =>
+    case Accum.Mul => io.output := getRetimed(accums.map(_._1.io.rPort(0).output(0)).foldRight[UInt](1.FP(s,d,f).r){case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
       Math.mul(t1, t2, Some(0), true.B, Truncate, Wrapping).r
     }, drain_latency, isDrainState, init = (init*scala.math.pow(2,f)).toLong)
-    case Accum.Min => io.output := getRetimed(accums.map(_._1.io.output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
+    case Accum.Min => io.output := getRetimed(accums.map(_._1.io.rPort(0).output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
       Mux(t1 < t2, t1.r, t2.r)
     }, drain_latency, isDrainState, (init*scala.math.pow(2,f)).toLong)
-    case Accum.Max => io.output := getRetimed(accums.map(_._1.io.output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
+    case Accum.Max => io.output := getRetimed(accums.map(_._1.io.rPort(0).output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a

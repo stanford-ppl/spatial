@@ -67,6 +67,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     emit("import fringe.templates.memory._")
     emit("import fringe.templates.memory.implicits._")
     emit("import fringe.templates.retiming._")
+    emit("import emul.ResidualGenerator._")
     emit("import api._")
     emit("import chisel3._")
     emit("import chisel3.util._")
@@ -561,7 +562,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   protected def param(node: Sym[_]): Option[String] = node match {
-    case x if x.isNBuffered => Some(src"m.io.p")
+    case x if x.isNBuffered => Some(src"m.io.np")
     case Op(_: MergeBufferNew[_]) => Some(src"(m.io.ways, m.io.par, m.io.bitWidth, m.io.readers)")
     case x if x.isMemPrimitive => Some(src"m.io.p")
     case Op(_: DRAMAccelNew[_,_]) => Some(src"(${node}.rank, ${node}.appReqCount)")

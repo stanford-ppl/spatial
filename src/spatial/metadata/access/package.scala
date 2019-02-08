@@ -6,8 +6,10 @@ import forge.tags._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.math._
 import spatial.metadata.retiming._
 import poly.{ISL,ConstraintMatrix}
+import emul.ResidualGenerator._
 
 package object access {
 
@@ -114,6 +116,10 @@ package object access {
       case _ => false
     }
 
+    def residualGenerators: List[List[ResidualGenerator]] = {
+      if (a.banks.isEmpty) List(List(ResidualGenerator(1,0,0))) else a.banks.map(_.map(_.residual).toList).toList
+    }
+
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {
       case Op(d: Enabled[_]) => d.ens
@@ -201,6 +207,9 @@ package object access {
     }
 
     def banks: Seq[Seq[Idx]] = a match {
+      case Op(op@RegFileVectorWrite(_,_,addr,_)) => addr
+      case Op(op@RegFileVectorRead(_,addr,_)) => addr
+      case Op(op@RegFileShiftIn(_,_,addr,_,_)) => Seq(addr)
       case BankedReader(_,banks,_,_)   => banks
       case BankedWriter(_,_,banks,_,_) => banks
       case _ => Seq(Seq())

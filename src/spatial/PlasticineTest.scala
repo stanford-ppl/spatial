@@ -145,7 +145,6 @@ trait PlasticineTest extends DSLTest { test =>
       s"-i$iter" ::
       Nil
       cmd ++= "-p100 -t1 -d100".split(" ").map(_.trim).toList
-      cmd ++= args.split(" ").map(_.trim).toList
       val timeout = 10800 * 2 // 6 hours
       val name = "runproute"
       scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply, rerun)
@@ -171,7 +170,6 @@ trait PlasticineTest extends DSLTest { test =>
         cmd :+= "-p"
         cmd :+= placefile
       }
-      cmd ++= args.split(" ").map(_.trim).toList
       val timeout = 10800 * 4 // 12 hours
       scommand(name, cmd, timeout, parsePsim _, RunError.apply, rerun)
     }

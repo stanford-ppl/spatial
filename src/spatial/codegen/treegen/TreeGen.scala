@@ -188,11 +188,11 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val lca = mem.swappers.head.parent.s.get
         val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
         val histR: Map[Int, Int] = mem.readers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
-        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+          x.residualGenerators.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
+        }.map{case (k,v) => k -> v.size}.toMap
         val histW: Map[Int, Int] = mem.writers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
-        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+          x.residualGenerators.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
+        }.map{case (k,v) => k -> v.size}.toMap
         val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
@@ -212,11 +212,11 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val Ps = mem.instance.Ps
         val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
         val histR: Map[Int, Int] = mem.readers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
-        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+          x.residualGenerators.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
+        }.map{case (k,v) => k -> v.size}.toMap
         val histW: Map[Int, Int] = mem.writers.flatMap{x => 
-          x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
-        }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
+          x.residualGenerators.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
+        }.map{case (k,v) => k -> v.size}.toMap
         val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")

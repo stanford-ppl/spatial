@@ -190,11 +190,13 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val histR: Map[Int, Int] = mem.readers.flatMap{x => 
           x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
-        val histW: Map[Int, Int] = mem.readers.flatMap{x => 
+        val histW: Map[Int, Int] = mem.writers.flatMap{x => 
           x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
-        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted
-        val hist = (Seq("<table><tr><th>width</th><th>read</th><th>write</th></tr>") ++ allBins.map{b => s"<tr><td>$b</td><td>${histR.getOrElse(b,0)}</td><td>${histW.getOrElse(b,0)}</td></tr>"} ++ Seq("</table>")).mkString(" ")
+        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
+        val hist = 
+          if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
+          else ""
         printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
       }
     }
@@ -204,7 +206,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
       nonBufMems.toList.map{x => (x, x.constDims.product)}.sortBy(_._2).reverse.map(_._1).foreach{mem => 
         val dims = mem.constDims
         val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-        val volume = dims.zip(pads).map{case (d:Int,p:Int) => d+p}.product
+        val volume = singleVolume(mem)
         val banks = mem.instance.nBanks
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
@@ -212,11 +214,13 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val histR: Map[Int, Int] = mem.readers.flatMap{x => 
           x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
-        val histW: Map[Int, Int] = mem.readers.flatMap{x => 
+        val histW: Map[Int, Int] = mem.writers.flatMap{x => 
           x.residualGenerators.map{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}
         }.groupBy(identity).mapValues(_.map(_ => 1).reduce(_ + _))
-        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted
-        val hist = (Seq("<table><tr><th>width</th><th>read</th><th>write</th></tr>") ++ allBins.map{b => s"<tr><td>$b</td><td>${histR.getOrElse(b,0)}</td><td>${histW.getOrElse(b,0)}</td></tr>"} ++ Seq("</table>")).mkString(" ")
+        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
+        val hist = 
+          if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
+          else ""
         printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
       }
     }

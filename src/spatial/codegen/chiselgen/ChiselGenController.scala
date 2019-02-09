@@ -291,6 +291,11 @@ trait ChiselGenController extends ChiselGenCommon {
     scoped ++= useMap
   }
 
+  private def quoteCChainCopy(cchain: Sym[_], copy: Sym[_]): String = {
+    if (scoped.contains(cchain)) scoped(cchain).assemble(src"_copy$copy")
+    else src"${cchain}_copy$copy"
+  }
+
   private def instantiateKernel(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(modifications: => Unit): Unit = {
     val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
 
@@ -299,14 +304,14 @@ trait ChiselGenController extends ChiselGenCommon {
     val groupedInputs = groupInputs(inputs)
 
     val chainPassedInputs = groupedInputs.map{case (ins, typ) => 
-      if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).map{c => src"${ins.head}_copy$c"}
+      if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).map{c => quoteCChainCopy(ins.head, c)}
       else List(ins.map{x => appendSuffix(lhs, x)}.mkString("List(", ",", ")"))
     }.flatten
     
     val parent = if (controllerStack.size == 1) "None" else "Some(me)"
     val cchain = if (lhs.cchains.nonEmpty) {
         if (lhs.isOuterStreamControl) {
-          val ccs = lhs.children.filter(_.s.get != lhs).map{c => src"${lhs.cchains.head}_copy${c.s.get}"}
+          val ccs = lhs.children.filter(_.s.get != lhs).map{c => quoteCChainCopy(lhs.cchains.head, c.s.get)}
           src"List(${ccs.mkString(",")})"
         } else src"List(${lhs.cchains.head})"
       }
@@ -541,18 +546,18 @@ trait ChiselGenController extends ChiselGenCommon {
       emitHeader()
       open("object Instrument {")
         open("def connect(top: AccelTop, instrctrs: List[InstrCtr]): Unit = {")
-          val printableLines: Seq[(String, Int)] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
+          val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).cycs""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.valid := top.io.enable""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).iters""",1),
-              (src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.valid := top.io.enable""",1)
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).cycs""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.valid := top.io.enable""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).iters""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.valid := top.io.enable""",1,Seq[String]())
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalls""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.valid := top.io.enable""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idles""",1),
-                (src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.valid := top.io.enable""",1)
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalls""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.valid := top.io.enable""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idles""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.valid := top.io.enable""",1,Seq[String]())
               )} else Nil}
 
           }

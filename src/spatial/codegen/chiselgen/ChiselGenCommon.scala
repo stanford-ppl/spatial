@@ -29,7 +29,6 @@ trait ChiselGenCommon extends ChiselCodegen {
   val scatterStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
 
   // Statistics counters
-  val controllerStack = scala.collection.mutable.Stack[Sym[_]]()
   var ctrls = List[Sym[_]]()
   val widthStats = new scala.collection.mutable.ListBuffer[Int]
   val depthStats = new scala.collection.mutable.ListBuffer[Int]
@@ -107,15 +106,6 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def iiDone: String = s"${iodot}sigsIn.iiDone"
   protected def backpressure: String = s"${iodot}sigsIn.backpressure"
   protected def forwardpressure: String = s"${iodot}sigsIn.forwardpressure"
-
-  protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
-    lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach { case (cc, idx) =>
-      val c = cc.s.get
-      controllerStack.push(c)
-      body(c,idx)
-      controllerStack.pop()
-    }
-  }
 
   var argHandleMap = scala.collection.mutable.HashMap[Sym[_], String]() // Map for tracking defs of nodes and if they get redeffed anywhere, we map it to a suffix
   def argHandle(d: Sym[_]): String = {
@@ -335,7 +325,6 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def createStreamCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
     forEachChild(lhs.owner){case (c,i) => 
-      cchainCopies += (lhs -> {cchainCopies.getOrElse(lhs, List()) ++ List(c)})
       createCChainObject(lhs, ctrs, src"_copy${c}")
     }
   }

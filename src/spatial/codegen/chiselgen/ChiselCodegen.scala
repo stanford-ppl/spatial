@@ -27,6 +27,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   val controllerStack = scala.collection.mutable.Stack[Sym[_]]()
 
+  // Buffer mappings from LCA to list of memories controlled by it
+  case class BufMapping(val mem: Sym[_], val lane: Int)
+  var bufMapping = scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
+  var regchainsMapping =  scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
+
   /** Map between cchain and list of controllers it is copied for, due to stream controller logic */
   var cchainCopies = scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]()
 
@@ -99,7 +104,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     /** Returns list of stms that are not in a broadcast path, and the "weight" of the stm */
     markCChainObjects(b)
     def printableStms(stms: Seq[Sym[_]]): Seq[StmWithWeight[Sym[_]]] = stms.collect{case x: Sym[_] if (x.parent == Ctrl.Host) => StmWithWeight[Sym[_]](x, 0, Seq[String]()); case x: Sym[_] if !x.isBroadcastAddr => StmWithWeight[Sym[_]](x, x.parOrElse1,cchainCopies.getOrElse(x, Seq[String]()).map{c => src"_copy${c}"})}
-    def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists(_.nestedInputs.contains(s)))
+    def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists{x => x.nestedInputs.contains(s) || bufMapping.getOrElse(x, List[BufMapping]()).map{_.mem}.contains(s)})
     def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
     def initChunkState(): Unit = {ensigs = new scala.collection.mutable.ListBuffer[String]}
     val hierarchyDepth = (scala.math.log(1 max printableStms(b.stms).map(_.weight).sum) / scala.math.log(CODE_WINDOW)).toInt

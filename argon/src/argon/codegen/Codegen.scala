@@ -96,7 +96,7 @@ trait Codegen extends Traversal {
 
   case class ScopeInfo(val blockID: Int, val chunkID: Int, val subChunkID: Option[Int], val str: String, val tp: String){
     def assemble(sfx: String = ""): String = {
-      val sub = if (subChunkID.isDefined) src"sub${subChunkID}" else ""
+      val sub = if (subChunkID.isDefined) src"sub${subChunkID.get}" else ""
       src"block${blockID}chunk${chunkID}" + sub + src"""("${str + sfx}").asInstanceOf[$tp]"""
     }
   }
@@ -186,9 +186,9 @@ trait Codegen extends Traversal {
           subChunkID += 1
         }
         // Create map from unscopedName -> subscopedName
-        val mapLHS = live.collect{case StmWithWeight(x: Sym[_], _,_) if (scoped.contains(x)) => val temp = scoped(x); scoped -= x; val n = quote(x); scoped += (x -> temp); n; case StmWithWeight(x: Sym[_], _,_) => quote(x)}
+        val mapLHS: Seq[String] = live.collect{case StmWithWeight(x: Sym[_], _,_) if (scoped.contains(x)) => val temp = scoped(x); scoped -= x;val n = quote(x); scoped += (x -> temp); n; case StmWithWeight(x: Sym[_], _,_) => quote(x)}
         emit("Map[String,Any](" + mapLHS.zip(live).flatMap{case (n,s) if (s.copies.isEmpty) => Seq(branchSfx(s.stm,Some(n))); case (n,s) => s.copies.map{sfx => src""""${n}$sfx" -> ${n}$sfx"""}}.mkString(", ") + ")")
-        scoped ++= mapLHS.zip(live).collect{case (n,StmWithWeight(s: Sym[_],_,_)) => s -> ScopeInfo(blockID, chunkID, None, quote(s), argString(s.tp, Some(s)))}
+        scoped ++= mapLHS.zip(live).collect{case (n,StmWithWeight(s: Sym[_],_,_)) => s -> ScopeInfo(blockID, chunkID, None, n, argString(s.tp, Some(s)))}
         close("}")
         close("}")
         emit(src"val block${blockID}chunk${chunkID}: Map[String, Any] = Block${blockID}Chunker${chunkID}.gen()")

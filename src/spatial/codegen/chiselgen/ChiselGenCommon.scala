@@ -34,11 +34,6 @@ trait ChiselGenCommon extends ChiselCodegen {
   val depthStats = new scala.collection.mutable.ListBuffer[Int]
   var appPropertyStats = Set[AppProperties]()
 
-  // Buffer mappings from LCA to list of memories controlled by it
-  case class BufMapping(val mem: Sym[_], val lane: Int)
-  var bufMapping = scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
-  var regchainsMapping =  scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
-
   // Interface
   var argOuts = scala.collection.mutable.HashMap[Sym[_], Int]()
   var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()

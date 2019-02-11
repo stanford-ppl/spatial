@@ -1,6 +1,5 @@
 FRINGE_SRC=../SW
 HOST_SRC=../
-STATIC_SRC=../datastructures/static
 SIM_SRC=verilator_srcs
 
 include ${FRINGE_SRC}/DUT.mk
@@ -10,14 +9,12 @@ EXCLUDES= \
 			${SIM_SRC}/VTop__ALLsup.cpp \
 			${SIM_SRC}/VTop__ALLcls.cpp \
 
-SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${STATIC_SRC}/*.cpp ${FRINGE_SRC}/*.cpp ${SIM_SRC}/*.cpp)
+SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp ${SIM_SRC}/*.cpp)
 SOURCES := $(filter-out ${EXCLUDES}, $(SOURCES))
 INCLUDES +=													\
 			-I${HOST_SRC}/datastructures 	\
 			-I$(JAVA_HOME)/include 				\
 			-I$(JAVA_HOME)/include/linux 	\
-			-I${STATIC_SRC} 							\
-			-I${STATIC_SRC}/standalone  	\
 			-I${FRINGE_SRC} 					  	\
 			-I../sw-resources 					  	\
 			-I${SIM_SRC}                	\
@@ -29,7 +26,7 @@ OBJECTS+=$(VK_GLOBAL_OBJS)
 DEFINES=$(OBJECTS:.o=.d)
 
 
-CXXFLAGS=-DSIM -D__DELITE_CPP_STANDALONE__ -D__USE_STD_STRING__ -std=c++11 -Wno-format -Wno-unused-result
+CXXFLAGS=-DSIM -D__USE_STD_STRING__ -std=c++11 -Wno-format -Wno-unused-result
 LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm
 
 all: verilatorCrapClean pre-build-checks Top

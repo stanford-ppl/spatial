@@ -29,6 +29,15 @@ trait ScalaGenBits extends ScalaCodegen {
     case Mux(sel, a, b) => emit(src"val $lhs = if ($sel) $a else $b")
     case op @ OneHotMux(selects,datas) =>
       open(src"val $lhs = {")
+        emit(src"List(")
+        selects.indices.foreach { i =>
+          emit(src"""(${selects(i)}, ${datas(i)}) ${if (i < selects.size-1) "," else ""}""")
+        }
+        emit(").collect{case (sel, d) if sel => d}.reduce{_|_}")
+      close("}")
+
+    case op @ PriorityMux(selects,datas) =>
+      open(src"val $lhs = {")
       selects.indices.foreach { i =>
         emit(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) { ${datas(i)} }""")
       }

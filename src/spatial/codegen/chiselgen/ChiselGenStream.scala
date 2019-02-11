@@ -15,39 +15,79 @@ trait ChiselGenStream extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
       val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
-      emitBusObject(lhs){
-        forceEmit(src"val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
-        forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
-        forceEmit(src"ready := ready_options.reduce{_|_}")
-        forceEmit(src"""val now_valid = Wire(Bool()).suggestName("${lhs}_now_valid")""")
-        forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
-        forceEmit(src"val m = Wire(${lhs.readers.toList.head.tp})")
-      }
+      // createBusObject(lhs){
+      //   forceEmit(src"val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
+      //   forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
+      //   forceEmit(src"ready := ready_options.reduce{_|_}")
+      //   forceEmit(src"""val now_valid = Wire(Bool()).suggestName("${lhs}_now_valid")""")
+      //   forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
+      //   forceEmit(src"val m = Wire(${lhs.readers.toList.head.tp})")
+      // }
 
     case StreamOutNew(bus) =>
       val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
-      emitBusObject(lhs){
-        forceEmit(src"val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
-        forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
-        forceEmit(src"valid := valid_options.reduce{_|_}")
-        forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
-        forceEmit(src"val m = VecInit((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
-        forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
-      }	    
+      // createBusObject(lhs){
+      //   forceEmit(src"val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
+      //   forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
+      //   forceEmit(src"valid := valid_options.reduce{_|_}")
+      //   forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
+      //   forceEmit(src"val m = VecInit((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
+      //   forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
+      // }	    
 
     case StreamOutBankedWrite(stream, data, ens) =>
       val muxPort = lhs.port.muxPort
       val base = stream.writers.filter(_.port.muxPort < muxPort).map(_.accessWidth).sum
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
-      val maskingLogic = src"${parent}$sfx.sm.io.flow" 
+      val maskingLogic = src"$backpressure" 
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${stream}.valid_options($base + $i) := ${DL(src"${parent}$sfx.datapathEn & ${parent}$sfx.iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
+        emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
+      val Op(StreamOutNew(bus)) = stream
+    
+      bus match {
+        case BurstCmdBus => 
+          val (addrMSB, addrLSB)  = getField(stream.tp.typeArgs.head, "offset")
+          val (sizeMSB, sizeLSB)  = getField(stream.tp.typeArgs.head, "size")
+          emit(src"$stream.bits.addr := $data($addrMSB,$addrLSB)")
+          emit(src"$stream.bits.size := $data($sizeMSB,$sizeLSB)")
 
-      data.zipWithIndex.foreach{case(d,i) =>
-        emit(src"""${stream}.data_options($base + $i) := $d""")
+        case _: BurstFullDataBus[_] => 
+          val (dataMSB, dataLSB) = getField(stream.tp.typeArgs.head, "_1")
+          val (strbMSB, strbLSB) = getField(stream.tp.typeArgs.head, "_2")
+
+          if (ens.size == 1) {
+            emit(src"$stream.bits.wdata(0) := $data($dataMSB,$dataLSB)")
+            emit(src"$stream.bits.wstrb := $data($strbMSB,$strbLSB)")            
+          } else {
+            data.zipWithIndex.foreach{case (d,i) => 
+              emit(src"$stream.bits.wdata($i) := $d($dataMSB,$dataLSB)")
+            }
+              
+            emit(src"$stream.bits.wstrb := List($data).map{_($strbMSB,$strbLSB)}.reduce(Cat(_,_))")
+          }
+
+        case GatherAddrBus => 
+          data.zipWithIndex.foreach{case (d,i) => 
+            emit(src"$stream.bits.addr($i) := $d.r")
+          }
+          
+        
+        case _: ScatterCmdBus[_] => 
+          val (dataMSB, dataLSB)  = getField(stream.tp.typeArgs.head, "_1")
+          val (addrMSB, addrLSB)  = getField(stream.tp.typeArgs.head, "_2")
+          data.zipWithIndex.foreach{case (d,i) => 
+            emit(src"$stream.bits.addr.addr($i) := $d($addrMSB, $addrLSB)")
+            emit(src"$stream.bits.wdata($i) := $d($dataMSB, $dataLSB)")
+          }
+
+
+        case _ =>
+          data.zipWithIndex.foreach{case(d,i) =>
+            emit(src"""${stream}.bits := $d""")
+          }
       }
 
 
@@ -57,11 +97,16 @@ trait ChiselGenStream extends ChiselGenCommon {
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      ens.zipWithIndex.foreach{case(e,i) =>
-        val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${strm}.ready_options($base + $i) := $en & (${parent}$sfx.datapathEn & ${parent}$sfx.iiDone) // Do not delay ready because datapath includes a delayed _valid already """)
+      emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) """)
+      val Op(StreamInNew(bus)) = strm
+      bus match {
+        case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")
+        case BurstAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
+        case _: GatherDataBus[_] => emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits(i).r }")
+        case ScatterAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
+
       }
-      emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.m(i) }""")
+      
 
     case _ => super.gen(lhs, rhs)
   }

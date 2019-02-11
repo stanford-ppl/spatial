@@ -94,6 +94,7 @@ val base = Seq(
 
 val emul_settings = base ++ Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
+  name := "emul" + sys.env.get("EMUL_PACKAGE").getOrElse(""),
   //crossScalaVersions := Seq(scala_version, "2.11.7"),
   scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
 )
@@ -155,6 +156,12 @@ lazy val apps = project.settings(common).dependsOn(spatial)
 /*featureTest)*/
 lazy val test = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
+).dependsOn(spatial)
+
+lazy val pirTest = project 
+.settings(common)
+.settings(
+  scalaSource in Test := baseDirectory.in(spatial).value/"pir/regression"
 ).dependsOn(spatial)
 
 /** Set number of threads for testing **/

@@ -1,3 +1,11 @@
-backend=$1
-app=$2
-cat logs/$backend/$app/run.log
+#!/usr/bin/env python
+
+import sys
+sys.path.insert(0, 'pir/bin')
+import logger
+
+def main():
+    logger.main()
+
+if __name__ == "__main__":
+    main()

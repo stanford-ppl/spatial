@@ -3,6 +3,8 @@ package fringe
 import chisel3._
 import chisel3.util.log2Ceil
 
+import emul.ResidualGenerator._
+
 import fringe.templates.memory.{FringeFF, SRFF}
 import fringe.templates.retiming.{RetimeWrapperWithReset, RetimeWrapper}
 import fringe.templates.math.FixedPoint
@@ -31,6 +33,15 @@ package object utils {
   def mux[T<:Data](cond: Bool, op1: T, op2: T): T = Mux(cond, op1, op2)
   def mux[T<:Data](cond: UInt, op1: T, op2: T): T = Mux(cond(0), op1, op2)
 
+  // Given some list of ResidualGenerators (per lane), is the target bank in view?
+  def canSee(gens: List[List[ResidualGenerator]], target: List[Int], max: List[Int]): Boolean = {
+    lanesThatCanSee(gens, target, max).nonEmpty
+  }
+
+  // Given some list of ResidualGenerators (per lane), which lanes can see the target bank?
+  def lanesThatCanSee(gens: List[List[ResidualGenerator]], target: List[Int], max: List[Int]): Seq[Int] = {
+    gens.zipWithIndex.collect{case (x,i) if (x.zipWithIndex.map{case (r,j) => r.expand(max(j))}.zip(target).forall{case (inView, trgt) => inView.contains(trgt)}) => i}
+  }
 
   def log2Up(n: Int): Int = if (n < 0) 1 max log2Ceil(1 max (1 + scala.math.abs(n))) else 1 max log2Ceil(1 max n)
   def log2Up(n: BigInt): Int = if (n < 0) log2Ceil((n.abs + 1) max 1) max 1 else log2Ceil(n max 1) max 1
@@ -97,12 +108,12 @@ package object utils {
     if (retime.toInt > 0) {
       val done_catch = Module(new SRFF())
       val sr = Module(new RetimeWrapperWithReset(1, retime - 1, 0))
-      sr.io.in := done_catch.io.output.data & ready
+      sr.io.in := done_catch.io.output & ready
       sr.io.flow := ready
       done_catch.io.input.asyn_reset := reset
       done_catch.io.input.set := in_done.asBool & ready
       val out = sr.io.out
-      val out_overlap = done_catch.io.output.data
+      val out_overlap = done_catch.io.output
       done_catch.io.input.reset := out & out_overlap & ready
       sr.io.rst := out(0) & out_overlap & ready
       out(0) & out_overlap & ready

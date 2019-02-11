@@ -114,7 +114,7 @@ import spatial.lang._
     addr: Seq[Seq[Idx]],
     enss: Seq[Set[Bit]]
     )(implicit val vT: Type[Vec[A]])
-  extends VectorReader[A]
+  extends VectorReader[A] 
 
 /** A banked write of a vector of elements to an RegFile.
   * @param mem the RegFile being written

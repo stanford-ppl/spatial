@@ -11,13 +11,12 @@ import fringe.globals
   * @param numArgIns: Number of 'argin' registers that can be read in parallel
   * @param numArgOuts: Number of 'argOut' registers that can be written to in parallel
   */
-class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: Int = 0, val numArgIOs: Int = 0, val argOutLoopbacksMapRaw: scala.collection.immutable.Map[Int,Int]) extends Module {
+class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: Int = 0, val numArgIOs: Int = 0) extends Module {
   val addrWidth = globals.target.regFileAddrWidth(d)
   val pureArgIns = numArgIns-numArgIOs
   val pureArgOuts = numArgOuts-numArgIOs
   val argInRange = List(0, 1) ++ (2 until numArgIns).toList
   val argOutRange = List(1) ++ (pureArgIns until (numArgIns + pureArgOuts - 1)).toList
-  val argOutLoopbacksMap = argOutLoopbacksMapRaw.map{case (k,v) => (k + 1 -> v)}
   // Console.println("argin: " + argInRange + ", argout: " + argOutRange)
 
   /*
@@ -49,11 +48,11 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
     val reset = Input(Bool())
     val argIns = Output(Vec(numArgIns, UInt(w.W)))
     val argOuts = Vec(numArgOuts, Flipped(Decoupled(UInt(w.W))))
-    val argOutLoopbacks = Output(Vec(1 max argOutLoopbacksMap.toList.length, UInt(w.W)))
+    val argEchos = Output(Vec(numArgOuts, UInt(w.W)))
   })
 
-  io.argOutLoopbacks <> DontCare
   io.argOuts <> DontCare
+  io.argEchos := DontCare
 
   // Sanity-check module parameters
   Predef.assert(numArgIns >= 0, s"Invalid numArgIns ($numArgIns): must be >= 0.")
@@ -67,20 +66,26 @@ class RegFile(val w: Int, val d: Int, val numArgIns: Int = 0, val numArgOuts: In
     if ((argOutRange contains i) & (argInRange contains i)) {
       ff.io.enable := Mux(io.wen & (io.waddr === id.U(addrWidth.W)), io.wen & (io.waddr === id.U(addrWidth.W)), io.argOuts(argOutRange.indexOf(i)).valid)
       ff.io.in := Mux(io.wen & (io.waddr === id.U(addrWidth.W)), io.wdata, io.argOuts(regIdx2ArgOut(i)).bits)
-      ff.reset := reset.asBool
-      ff.io.reset := reset.asBool // Board level
+      ff.reset := reset.toBool
+      io.argEchos(regIdx2ArgOut(i)) := ff.io.out
+      ff.io.reset := reset.toBool // Board level
     } else if (argOutRange contains i) {
-      ff.io.enable := io.argOuts(argOutRange.indexOf(i)).valid | (io.wen & (io.waddr === id.U(addrWidth.W)))
+      ff.io.enable := io.argOuts(regIdx2ArgOut(i)).valid | (io.wen & (io.waddr === id.U(addrWidth.W)))
       ff.io.in := Mux(io.argOuts(regIdx2ArgOut(i)).valid, io.argOuts(regIdx2ArgOut(i)).bits, io.wdata)
-      if (argOutLoopbacksMap.contains(regIdx2ArgOut(i))) {io.argOutLoopbacks(argOutLoopbacksMap(regIdx2ArgOut(i))) := ff.io.out}
       ff.reset := io.reset
-      ff.io.reset := reset.asBool //io.reset // reset.asBool 
+      io.argEchos(regIdx2ArgOut(i)) := ff.io.out
+      ff.io.reset := reset.toBool //io.reset // reset.toBool 
     } else {
       ff.io.enable := io.wen & (io.waddr === id.U(addrWidth.W))
       ff.io.in := io.wdata
       ff.reset := reset.asBool
       ff.io.reset := reset.asBool // Board level
     }
+
+    // if (i >= pureArgIns + 1) {
+    //   Console.println(s"$numArgIns, $numArgIOs, $numArgOuts, $pureArgIns, $pureArgOuts, connect ${i - pureArgIns} to ff $i")
+    //   io.argEchos(i - pureArgIns + 1) := ff.io.out
+    // }
 
     ff.io.init := 0.U
     ff

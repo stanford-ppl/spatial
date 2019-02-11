@@ -36,3 +36,22 @@ import utils.implicits.collections._
   }
 }
 
+@op case class PriorityMux[A:Bits](sels: Seq[Bit], vals: Seq[Bits[A]]) extends Primitive[A] {
+
+  @rig override def rewrite: A = {
+    if (sels.length == 1) vals.head.unbox
+    else if (sels.exists{case Literal(true) => true; case _ => false}) {
+      val trues = sels.zipWithIndex.filter{case (Literal(true), _) => true; case _ => false }
+      if (trues.lengthMoreThan(1)) {
+        warn(ctx, "Priority mux has multiple statically true selects")
+        warn(ctx)
+      }
+      val idx = trues.head._2
+      vals(idx).unbox
+    }
+    else if (vals.distinct.lengthIs(1)) {
+      vals.head.unbox
+    }
+    else super.rewrite
+  }
+}

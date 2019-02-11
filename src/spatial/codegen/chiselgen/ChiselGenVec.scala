@@ -7,7 +7,7 @@ import spatial.node._
 trait ChiselGenVec extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case VecAlloc(elems) => emit(src"val $lhs = Vec($elems)")
+    case VecAlloc(elems) => emit(src"val $lhs = VecInit($elems)")
 
     case VecSlice(vec, start, stop) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))

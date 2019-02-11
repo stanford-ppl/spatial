@@ -43,10 +43,10 @@ class FringeArria10 (
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(w.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(w.W))))
-    val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(w.W)))
+    val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(w.W)))
 
     // Accel memory IO
-    val heap = new HeapIO(numAllocators)
+    val heap = Vec(numAllocators, new HeapIO())
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     // TODO: need to add memory stream support
 
@@ -73,10 +73,6 @@ class FringeArria10 (
 
   if (io.argIns.length > 0) {
     io.argIns := fringeCommon.io.argIns
-  }
-
-  if (io.argOutLoopbacks.length > 0) {
-    io.argOutLoopbacks := fringeCommon.io.argOutLoopbacks
   }
 
   if (io.argOuts.length > 0) {

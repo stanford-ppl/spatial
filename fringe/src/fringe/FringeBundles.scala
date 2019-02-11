@@ -3,8 +3,26 @@ package fringe
 import chisel3._
 import chisel3.util._
 import fringe.utils._
+import fringe.Ledger._
+import scala.collection.mutable._
+
+class AppLoadData(val v: Int, val w: Int) extends Bundle {
+  def this(tup: (Int, Int)) = this(tup._1, tup._2)
+  val rdata = Vec(v, UInt(w.W))
+
+  override def cloneType(): this.type = new AppLoadData(v, w).asInstanceOf[this.type]
+}
+
+class AppStoreData(val v: Int, val w: Int) extends Bundle {
+  def this(tup: (Int, Int)) = this(tup._1, tup._2)
+  val wdata = Vec(v, UInt(w.W))
+  val wstrb = UInt(v.W)
+
+  override def cloneType(): this.type = new AppStoreData(v, w).asInstanceOf[this.type]
+}
 
 class AppCommandDense(val addrWidth: Int = 64, val sizeWidth: Int = 32) extends Bundle {
+  def this(tup: (Int, Int)) = this(tup._1, tup._2)
   val addr = UInt(addrWidth.W)
   val size = UInt(sizeWidth.W)
 
@@ -12,6 +30,7 @@ class AppCommandDense(val addrWidth: Int = 64, val sizeWidth: Int = 32) extends 
 }
 
 class AppCommandSparse(val v: Int, val addrWidth: Int = 64) extends Bundle {
+  def this(tup: (Int, Int)) = this(tup._1, tup._2)
   val addr = Vec(v, UInt(addrWidth.W))
 
   override def cloneType(): this.type = new AppCommandSparse(v, addrWidth).asInstanceOf[this.type]
@@ -19,36 +38,41 @@ class AppCommandSparse(val v: Int, val addrWidth: Int = 64) extends Bundle {
 
 case class StreamParInfo(w: Int, v: Int, memChannel: Int)
 
-class LoadStream(p: StreamParInfo) extends Bundle {
+class LoadStream(val p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandDense))
-  val rdata = Decoupled(Vec(p.v, UInt(p.w.W)))
+  val data = Decoupled(new AppLoadData(p.v, p.w))
 
   override def cloneType(): this.type = {
     new LoadStream(p).asInstanceOf[this.type]
   }
 }
 
-class StoreStream(p: StreamParInfo) extends Bundle {
+class StoreStream(val p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandDense))
-  val wdata = Flipped(Decoupled(Vec(p.v, UInt(p.w.W))))
-  val wstrb = Flipped(Decoupled(UInt(p.v.W)))
+  val data = Flipped(Decoupled(new AppStoreData(p.v, p.w)))
   val wresp = Decoupled(Bool())
 
   override def cloneType(): this.type = new StoreStream(p).asInstanceOf[this.type]
 }
 
-class GatherStream(p: StreamParInfo) extends Bundle {
+class GatherStream(val p: StreamParInfo) extends Bundle {
   val cmd = Flipped(Decoupled(new AppCommandSparse(p.v)))
-  val rdata = Decoupled(Vec(p.v, UInt(p.w.W)))
+  val data = Decoupled(Vec(p.v, UInt(p.w.W)))
 
   override def cloneType(): this.type = {
     new GatherStream(p).asInstanceOf[this.type]
   }
 }
 
+class ScatterCmdStream(val p: StreamParInfo) extends Bundle {
+  val addr = new AppCommandSparse(p.v)
+  val wdata = Vec(p.v, UInt(p.w.W))
+
+  override def cloneType(): this.type = new ScatterCmdStream(p).asInstanceOf[this.type]    
+}
+
 class ScatterStream(p: StreamParInfo) extends Bundle {
-  val cmd = Flipped(Decoupled(new AppCommandSparse(p.v)))
-  val wdata = Flipped(Decoupled(Vec(p.v, UInt(p.w.W))))
+  val cmd = Flipped(Decoupled(new ScatterCmdStream(p)))
   val wresp = Decoupled(Bool())
 
   override def cloneType(): this.type = new ScatterStream(p).asInstanceOf[this.type]
@@ -62,6 +86,22 @@ class AppStreams(loadPar: List[StreamParInfo], storePar: List[StreamParInfo],
   val scatters = HVec.tabulate(scatterPar.size){ i => new ScatterStream(scatterPar(i)) }
 
   override def cloneType(): this.type = new AppStreams(loadPar, storePar, gatherPar, scatterPar).asInstanceOf[this.type]
+}
+
+class ArgOut() extends Bundle {
+  val port = Decoupled(UInt(64.W))
+  val echo = Input(UInt(64.W))
+
+  override def cloneType(): this.type = new ArgOut().asInstanceOf[this.type]
+}
+
+class InstrCtr() extends Bundle {
+  val cycs  = UInt(64.W)
+  val iters = UInt(64.W)
+  val stalls = UInt(64.W)
+  val idles = UInt(64.W)
+
+  override def cloneType(): this.type = new InstrCtr().asInstanceOf[this.type]
 }
 
 class DRAMCommand extends Bundle {
@@ -226,10 +266,10 @@ class HeapResp extends Bundle {
   val sizeAddr = UInt(64.W)
 }
 
-class HeapIO(numAlloc: Int) extends Bundle {
-  val req = Vec(numAlloc, Flipped(Valid(new HeapReq)))
-  val resp = Vec(numAlloc, Valid(new HeapResp))
+class HeapIO() extends Bundle {
+  val req = Flipped(Valid(new HeapReq))
+  val resp = Valid(new HeapResp)
 
-  override def cloneType(): this.type = new HeapIO(numAlloc).asInstanceOf[this.type]
+  override def cloneType(): this.type = new HeapIO().asInstanceOf[this.type]
 }
 

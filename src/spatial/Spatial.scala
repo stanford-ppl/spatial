@@ -8,6 +8,7 @@ import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
+import spatial.codegen.tsthgen._
 import spatial.codegen.dotgen._
 import spatial.codegen.resourcegen._
 
@@ -111,6 +112,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
     lazy val pirCodegen    = PIRGenSpatial(state)
+    lazy val tsthCodegen   = TungstenHostGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
@@ -179,7 +181,8 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
-        (spatialConfig.enablePIR ? pirCodegen)
+        (spatialConfig.enablePIR ? pirCodegen) ==>
+        (spatialConfig.enablePIR ? tsthCodegen)
     }
 
     isl.shutdown(100)
@@ -273,6 +276,14 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = false
+    }.text("Disables modular codegen and puts all logic in AccelTop")
+
+    cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = true
+    }.text("Enables modular codegen")
 
     cli.opt[Unit]("forceBanking").action { (_,_) => 
       spatialConfig.enableForceBanking = true

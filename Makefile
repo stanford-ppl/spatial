@@ -36,9 +36,14 @@ install:
 ## Update pir libs.                    ##
 ###-----------------------------------###
 pir:
-	#git submodule update --init --recursive
+	git submodule update --init --recursive
 	bin/update_resources.sh
-	sbt "; project emul; +publishLocal; project argon; publishLocal; project forge; publishLocal; project spatial; publishLocal; project models; publishLocal; project poly; publishLocal; project utils; publishLocal"
+	cd pir && make install
+
+pir-develop:
+	git submodule update --init --recursive
+	bin/update_resources.sh
+	cd pir/ && git checkout develop && make install
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##
@@ -64,6 +69,12 @@ test: tests
 resources:
 	bash bin/update_resources.sh
 	sbt "; project fringe; publishLocal"
+
+###-----------------------------------###
+## Update local emul package.          ##
+###-----------------------------------###
+emul:
+	sbt "; project emul; publishLocal"
 
 
 ###-----------------------------------###

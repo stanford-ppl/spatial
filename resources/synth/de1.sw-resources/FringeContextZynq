@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+using namespace std;
+
 /**
  * Simulation Fringe Context
  */

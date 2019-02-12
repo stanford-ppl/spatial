@@ -127,7 +127,7 @@ abstract class BankedWriter[A:Type] extends BankedAccessor[A,Void] {
 
 object BankedWriter {
   def unapply(x: Op[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x match {
-    case a: BankedWriter[_] => a.unrolledWrite.map{wr => (wr.mem,wr.data,wr.bank,wr.ofs,wr.ens) }
+    case a: BankedWriter[_] => a.unrolledWrite.map{rd => (rd.mem,rd.data,rd.bank,rd.ofs,rd.ens) }
     case _ => None
   }
   def unapply(x: Sym[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x.op.flatMap(BankedWriter.unapply)

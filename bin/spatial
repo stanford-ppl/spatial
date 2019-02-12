@@ -24,7 +24,7 @@ class SpatialArgumentParser(ArgumentParser):
 Spatial
 Usage: spatial <app> [options]
 
-elp
+Help
   -h, --help              Prints this message
   --H, --HELP, --halp     Prints usage text for Spatial, will take a few seconds. NOTE:
                              You MUST include the app name in addition to this flag

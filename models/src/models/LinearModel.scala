@@ -9,6 +9,7 @@ case class Prod(a: Double, xs: Seq[String]) {
   def *(b: Double): Prod = Prod(a*b,xs)
   def /(b: Double): Prod = Prod(a/b,xs)
   def eval(vals: Map[String,Double]): Double = a * xs.map{x => vals(x)}.product
+  def exactEval(vals: Map[String,Double]): Double = a * xs.map{x => vals(x)}.product
   def partial(vals: Map[String,Double]): Prod = {
     val (res, un) = xs.partition(x => vals.contains(x))
     val newa = a * res.map{x => vals(x) }.product
@@ -52,7 +53,9 @@ case class LinearModel(exp: Seq[Prod], vars: Set[String]) {
   }
 
   private def eval(vals: Map[String,Double]): Double = exp.map{_.eval(vals)}.sum
+  private def exactEval(vals: Map[String,Double]): Double = exp.map{_.exactEval(vals)}.sum
   def eval(vals: (String,Double)*): Double = eval(vals.toMap)
+  def exactEval(vals: (String,Double)*): Double = exactEval(vals.toMap)
 
   def partial(vals: (String,Double)*): LinearModel = {
     val vs = vals.toMap

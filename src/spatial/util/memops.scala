@@ -51,7 +51,6 @@ object memops {
       case _ => Nil
     }
 
-    @rig def series(): Seq[Series[I32]] = {
     @rig def rawSeries(): Seq[Series[I32]] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
       val sparseRank = mem.sparseRank

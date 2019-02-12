@@ -15,15 +15,13 @@ trait NamedCodegen extends Codegen {
 
   override def named(s: Sym[_], id: Int): String = s.op match {
     case Some(rhs) => rhs match {
-      case _: BlackBox[_]      => s"${s}_${rhs.name}_${s._name}"
-      case _: AccelScope       => s"${s}_${s.level}_RootController${s._name}"
-      case _: UnitPipe         => s"${s}_${s.level}_UnitPipe${s._name}"
-      case _: UnrolledForeach  => s"${s}_${s.level}_Foreach${s._name}"
-      case _: UnrolledReduce   => s"${s}_${s.level}_Reduce${s._name}"
-      case _: Switch[_]        => s"${s}_${s.level}_Switch${s._name}"
-      case _: SwitchCase[_]    => s"${s}_${s.level}_SwitchCase${s._name}"
-      case _: StateMachine[_]  => s"${s}_${s.level}_FSM${s._name}"
-
+      case _: AccelScope       => if (s.isInnerControl) s"${s}_inr_RootController${s._name}" else s"${s}_outr_RootController${s._name}"
+      case _: UnitPipe         => if (s.isInnerControl) s"${s}_inr_UnitPipe${s._name}" else s"${s}_outr_UnitPipe${s._name}"
+      case _: UnrolledForeach  => if (s.isInnerControl) s"${s}_inr_Foreach${s._name}" else s"${s}_outr_Foreach${s._name}"
+      case _: UnrolledReduce   => if (s.isInnerControl) s"${s}_inr_Reduce${s._name}" else s"${s}_outr_Reduce${s._name}"
+      case _: Switch[_]        => if (s.isInnerControl) s"${s}_inr_Switch${s._name}" else s"${s}_outr_Switch${s._name}"
+      case _: SwitchCase[_]    => if (s.isInnerControl) s"${s}_inr_SwitchCase${s._name}" else s"${s}_outr_SwitchCase${s._name}"
+      case _: StateMachine[_]  => if (s.isInnerControl) s"${s}_inr_FSM${s._name}" else s"${s}_outr_FSM${s._name}"
       case _: CounterNew[_]    => s"${s}_ctr"
       case _: CounterChainNew  => s"${s}_ctrchain"
 

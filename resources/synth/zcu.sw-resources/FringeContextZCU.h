@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <map>
 #include "generated_debugRegs.h"
 // #include <xil_cache.h>
 // #include <xil_io.h>
@@ -51,10 +52,10 @@ class FringeContextZCU : public FringeContextBase<void> {
   u64 commandReg;
   u64 statusReg;
 
-  std::map<uint64_t, void*> physToVirtMap;
+  map<uint64_t, void*> physToVirtMap;
 
   void* physToVirt(uint64_t physAddr) {
-    std::map<uint64_t, void*>::iterator iter = physToVirtMap.find(physAddr);
+    map<uint64_t, void*>::iterator iter = physToVirtMap.find(physAddr);
     if (iter == physToVirtMap.end()) {
       EPRINTF("Physical address '%lx' not found in physToVirtMap\n. Was this allocated before?", physAddr);
       exit(-1);
@@ -98,9 +99,9 @@ public:
   uint32_t numArgOuts;
   uint32_t numArgOutInstrs;
   uint32_t numArgEarlyExits;
-  std::string bitfile;
+  string bitfile;
 
-  FringeContextZCU(std::string path = "") : FringeContextBase(path) {
+  FringeContextZCU(string path = "") : FringeContextBase(path) {
     bitfile = path;
 
     numArgIns = 0;
@@ -215,7 +216,7 @@ public:
   }
 
   virtual void load() {
-    std::string cmd = "prog_fpga " + bitfile;
+    string cmd = "prog_fpga " + bitfile;
     int dnu = system(cmd.c_str());
     return;
   }
@@ -277,7 +278,7 @@ public:
 
     void* dst = (void*) getFPGAVirt(devmem);
     std::memcpy(dst, hostmem, size);
-   // std::memcpy(dst, hostmem, alignedSize(burstSizeBytes, size));
+   // memcpy(dst, hostmem, alignedSize(burstSizeBytes, size));
     // EPRINTF("[Cache Flush] devmem = %lx, size = %u\n", devmem, alignedSize(burstSizeBytes, size));
     // Xil_DCacheFlushRange(devmem, alignedSize(burstSizeBytes, size));
 
@@ -288,7 +289,7 @@ public:
     EPRINTF("[memcpy FPGA -> HOST] hostmem = %p, devmem = %lx, size = %lu\n", hostmem, devmem, size);
     void *src = (void*) getFPGAVirt(devmem);
     std::memcpy(hostmem, src, size);
-    //std::memcpy(hostmem, src, alignedSize(burstSizeBytes, size));
+    //memcpy(hostmem, src, alignedSize(burstSizeBytes, size));
     // EPRINTF("[Cache Flush] devmem = %lx, size = %u\n", devmem, alignedSize(burstSizeBytes, size));
     // Xil_DCacheFlushRange(devmem, alignedSize(burstSizeBytes, size));
   }
@@ -297,7 +298,7 @@ public:
     // Iterate through an array the size of the L2$, to "flush" the cache aka fill it with garbage
     int cacheSizeWords = kb * (1 << 10) / sizeof(int); // 512kB on ZCU, 1MB on ZCU
     int arraySize = cacheSizeWords * 10;
-    int *dummyBuf = (int*) std::malloc(arraySize * sizeof(int));
+    int *dummyBuf = (int*) malloc(arraySize * sizeof(int));
     EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", dummyBuf, getFPGAPhys((uint64_t) dummyBuf), arraySize);
     for (int i = 0; i<arraySize; i++) {
       if (i == 0) {

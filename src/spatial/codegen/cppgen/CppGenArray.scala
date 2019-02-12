@@ -221,9 +221,9 @@ trait CppGenArray extends CppGenCommon {
     case ArrayMkString(array,start,delim,end) =>
       emit(src"""${lhs.tp} $lhs = $start;""")
       open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i++){ ")
-        emit(src"${lhs} = string_plus(string_plus(${lhs}, ${delim}), std::to_string((*${array})[${lhs}_i]));")
+        emit(src"${lhs} = ((${lhs}, ${delim}) + std::to_string((*${array})[${lhs}_i]));")
       close("}")
-      emit(src"""$lhs = string_plus($lhs, $end);""")
+      emit(src"""$lhs = ($lhs + $end);""")
 
     case op @ IfThenElse(cond, thenp, elsep) =>
       val star = lhs.tp match {case _: host.Array[_] => "*"; case _ => ""}

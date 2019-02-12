@@ -22,6 +22,8 @@
 #define PAGEMAP_LENGTH 8
 #define USE_PHYS_ADDR
 
+using namespace std;
+
 /**
  * Arria10 Fringe Context
  */

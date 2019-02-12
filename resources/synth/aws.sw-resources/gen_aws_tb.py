@@ -50,8 +50,9 @@ for line in src:
     dst.write(line)
 src.close()
 dst.write('''
+#include <cstring>
 extern "C" void test_main(uint32_t *exit_code) {
-
+  
   // cwd is .../verif/sim/test_spatial_main/
   // char cwd[1024];
   // getcwd(cwd, sizeof(cwd));

@@ -4,17 +4,14 @@ CROSS_COMPILE=/usr/bin/arm-linux-gnueabihf-
 
 FRINGE_SRC=../zynq.sw-resources
 HOST_SRC=./
-STATIC_SRC=./datastructures/static
 
-SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${STATIC_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
+SOURCES := $(wildcard ${HOST_SRC}/*.cpp  ${FRINGE_SRC}/*.cpp)
 
 INCLUDES +=													\
 			-I${HOST_SRC}/                \
 			-I${HOST_SRC}/datastructures 	\
 			-I$(JAVA_HOME)/include 				\
 			-I$(JAVA_HOME)/include/linux 	\
-			-I${STATIC_SRC} 							\
-			-I${STATIC_SRC}/standalone  	\
 			-I${FRINGE_SRC} 					  	\
 
 
@@ -22,8 +19,7 @@ OBJECTS=$(SOURCES:.cpp=.o)
 
 DEFINES=$(OBJECTS:.o=.d)
 
-CXXFLAGS=-DZYNQ -D__DELITE_CPP_STANDALONE__ -D__USE_STD_STRING__ -std=c++11 -O0 -g -marm -march=armv7-a -mcpu=cortex-a9
-#CXXFLAGS=-DZYNQ -D__DELITE_CPP_STANDALONE__  -std=c++11
+CXXFLAGS=-DZYNQ -D__USE_STD_STRING__ -std=c++11 -O0 -g -marm -march=armv7-a -mcpu=cortex-a9
 LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm
 
 all: pre-build-checks Top

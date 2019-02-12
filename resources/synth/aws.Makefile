@@ -37,7 +37,9 @@ help:
 # aws-F1-sw : aws-F1-afi
 
 # Run simulation using Vivado XSIM
-aws-sim: aws-sim-hw
+aws-sim: aws-sim-hw aws-sim-sw
+
+aws-sim-sw:
 	$(eval app_name=$(notdir $(shell pwd)))
 	# ----------------------------------------------------------------------------
 	# Compile the testbench and make the binary to call xsim run

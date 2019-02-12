@@ -1,6 +1,7 @@
 #ifndef __FRINGE_CONTEXT_AWS_H__
 #define __FRINGE_CONTEXT_AWS_H__
 
+#include <assert.h>
 #include "FringeContextBase.h"
 //#include "commonDefs.h"
 
@@ -12,6 +13,8 @@
 #ifndef EPRINTF
 #define EPRINTF(...) fprintf(stderr, __VA_ARGS__)
 #endif
+
+using namespace std;
 
 #ifndef ASSERT
 #define ASSERT(cond, ...) \

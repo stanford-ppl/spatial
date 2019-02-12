@@ -4,17 +4,14 @@ CROSS_COMPILE=
 
 FRINGE_SRC=../vcs.sw-resources
 HOST_SRC=./
-STATIC_SRC=./datastructures/static
 
-SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${STATIC_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
+SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
 
 INCLUDES +=													\
 			-I${HOST_SRC}/                \
 			-I${HOST_SRC}/datastructures 	\
 			-I$(JAVA_HOME)/include 				\
 			-I$(JAVA_HOME)/include/linux 	\
-			-I${STATIC_SRC} 							\
-			-I${STATIC_SRC}/standalone  	\
 			-I../vcs.sw-resources 					  	\
 			-I${FRINGE_SRC} 					  	\
 
@@ -23,7 +20,7 @@ OBJECTS=$(SOURCES:.cpp=.o)
 
 DEFINES=$(OBJECTS:.o=.d)
 
-CXXFLAGS=-DVCS -D__DELITE_CPP_STANDALONE__ -D__USE_STD_STRING__ -std=c++11
+CXXFLAGS=-DVCS -D__USE_STD_STRING__ -std=c++11
 LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm
 
 all: pre-build-checks Top

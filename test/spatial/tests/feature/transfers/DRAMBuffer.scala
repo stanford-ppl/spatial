@@ -16,7 +16,7 @@ import spatial.dsl._
     setMem(dram_in, src)
 
     Accel {
-      val x1 = SRAM[T](16)
+      val x1 = SRAM[T](16).buffer
       val x2 = SRAM[T](16)
       Foreach(16 by 1){i => 
         x1 load dram_in

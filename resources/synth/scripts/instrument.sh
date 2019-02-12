@@ -23,9 +23,18 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 		cycsper=`echo "$line" | sed "s/^.* - //g" | sed "s/ (.*//g"`
 		math=`echo "$line" | sed "s/^.* (/(/g" | sed "s/ \// total cycles,/g" | sed "s/)/ total iters)/g" | sed "s/).*/)/g"`
 		perprnt=`echo "$line" | sed "s/^.*\[/\[/g" | sed "s/\].*/\]/g"`
+		streamperiter=`echo "$line" | grep "<" | sed "s/^.*<//g" | sed "s/>.*//g" | sed "s/ # idle/<br># idle/g"`
 		if [[ ! -z $sym ]]; then
 			linenum=`awk "/<!-- Begin $sym -->/{ print NR; exit }" info/controller_tree.html`
-			sed -i "$((linenum+3))i <br><font color=\"red\"> $cycsper cycles/iter<br><font size=\"2\">$math<br>$perprnt</font></font><br>" info/controller_tree.html
+			replacement="$((linenum+3))i <br>" # linenum
+			replacement="${replacement}<font color=\"red\"> $cycsper cycles/iter<br>" #cycs/iter
+			if [[ "$streamperiter" != "" ]]; then
+				replacement="${replacement}<p><div style=\"padding: 10px; border: 1px;display:inline-block;background-color: #e5e7e9\"><font size=\"4\">" # start box
+				replacement="${replacement}$streamperiter</font><br></div><br>"
+			fi
+			replacement="${replacement}<font size=\"2\">$math<br>$perprnt</font></font><br>" #raw data
+			sed -i "$replacement" info/controller_tree.html
+			# sed -i "$((linenum+3))i <br><font color=\"red\"> $cycsper cycles/iter<br><p><mark style=\"border:1px; border-style:solid; border-color:black; padding: 1px; background: #c\"><font size=\"4\">$streamperiter</font></mark><br><font size=\"2\">$math<br>$streamall<br>$perprnt</font></font><br>" info/controller_tree.html
 			# perl -i -pe "s|(<b>$sym.*?</b>)|<b>$sym - <font color=\"red\"> $cycsper cycles/iter<br><font size=\"2\">$math<br>$perprnt</font></font></b>|" info/controller_tree.html
 		fi
 	fi

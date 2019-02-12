@@ -3,6 +3,7 @@ package utils.io
 import java.io._
 import java.nio.file._
 import java.util.function.Consumer
+import java.nio.file.{Files,Paths}
 
 object files {
   def sep: String = java.io.File.separator
@@ -19,7 +20,7 @@ object files {
     files.foreach{filename =>
       val file = new File(path + java.io.File.separator + filename)
       if (file.isDirectory && recursive) {
-        deleteExts(filename, ext, recursive)
+        deleteExts(file.getPath, ext, recursive)
       }
       else if (filename.endsWith("."+ext)) {
         file.delete()
@@ -119,6 +120,11 @@ object files {
 
   def buildPath(parts:String*):String = {
     parts.mkString(sep)
+  }
+
+  def createDirectories(dir:String) = {
+    val path = Paths.get(dir)
+    if (!Files.exists(path)) Files.createDirectories(path)
   }
 
 }

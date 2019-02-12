@@ -35,7 +35,7 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
 
   // Properties
   val number: UInt = UInt((d + f).W)
-  val debug_overflow: Bool = Bool()
+  // val debug_overflow: Bool = Bool()
 
   def raw: UInt = number
   def r: UInt = number

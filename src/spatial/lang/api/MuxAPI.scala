@@ -3,7 +3,7 @@ package spatial.lang.api
 import forge.tags._
 import argon._
 
-import spatial.node.{Mux,OneHotMux}
+import spatial.node.{Mux,OneHotMux,PriorityMux}
 
 trait MuxAPI { this: Implicits =>
 
@@ -25,6 +25,10 @@ trait MuxAPI { this: Implicits =>
 
   @api def oneHotMux[A:Bits](sels: Seq[Bit], vals: Seq[A]): A = {
     stage(OneHotMux(sels,vals.map{s => boxBits(s) }))
+  }
+
+  @api def priorityMux[A:Bits](sels: Seq[Bit], vals: Seq[A]): A = {
+    stage(PriorityMux(sels,vals.map{s => boxBits(s) }))
   }
 
 }

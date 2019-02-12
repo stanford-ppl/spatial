@@ -64,18 +64,20 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   }
 
   /** Indicate that the memory should be buffered and ignore
-    * ignore potential situation where result from running sequentially
+    * potential situation where result from running sequentially
     * does not match with resurt from running pipelined
     */
   def buffer: C[A] = { this.isWriteBuffer = true; me }
   /** Do not buffer memory */
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
-  /** Only attempt to bank memory hierarchically */
-  def hierarchical: C[A] = { this.isHierarchicalBank = true; me }
-  /** Only attempt to bank memory in a flattened manner */
-  def flat: C[A] = { this.isFlatBank = true; me }
-  /** Bank memory by duplication only */
+  /** Do not attempt to bank memory hierarchically */
+  def nohierarchical: C[A] = { this.isNoHierarchicalBank = true; me }
+  /** Do not attempt to bank memory in a flattened manner */
+  def noflat: C[A] = { this.isNoFlatBank = true; me }
+  /** Do not attempt to bank memory at all, and only use bank-by-duplication */
   def nobank: C[A] = { this.isNoBank = true; me }
+  /** Do not attempt to bank memory by duplication */
+  def noduplicate: C[A] = { this.isNoDuplicate = true; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

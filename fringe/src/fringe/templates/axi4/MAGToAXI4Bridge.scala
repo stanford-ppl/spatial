@@ -14,6 +14,8 @@ class MAGToAXI4Bridge(val p: AXI4BundleParameters) extends Module {
     val M_AXI = new AXI4Inlined(p)
   })
 
+  io <> DontCare
+  
   val numPipelinedLevels = globals.magPipelineDepth
 
   val size = io.in.cmd.bits.size
@@ -53,7 +55,7 @@ class MAGToAXI4Bridge(val p: AXI4BundleParameters) extends Module {
   io.in.wdata.ready := io.M_AXI.WREADY // Used to be shift registered
 
   // R
-  val rdataAsVec = Vec(List.tabulate(globals.EXTERNAL_V) { i =>
+  val rdataAsVec = VecInit(List.tabulate(globals.EXTERNAL_V) { i =>
       io.M_AXI.RDATA((globals.EXTERNAL_W*globals.EXTERNAL_V) - 1 - i*globals.EXTERNAL_W, (globals.EXTERNAL_W*globals.EXTERNAL_V) - 1 - i*globals.EXTERNAL_W - (globals.EXTERNAL_W-1))
   }.reverse)
   io.in.rresp.bits.rdata := rdataAsVec // Used to be shift registered

@@ -10,7 +10,13 @@ class StickySelects(n: Int) extends Module {
   })
 
   if (n == 1) io.outs(0) := io.ins(0)
-  else {
+  else if (n > 1) {
+    // io.outs := io.ins
+    // val r = RegInit(0.U(n.W))
+    // val newActive = io.ins.reduce{_||_}
+    // r := Mux(newActive, chisel3.util.Cat(io.ins.reverse), r)
+    // io.outs.zipWithIndex.foreach{case(o,i) => o := r(i)}
+
 	  val outs = Array.tabulate(n){i => 
       val r = RegInit(false.B)
       val elseActive = io.ins.patch(i,Nil,1).reduce{_||_}

@@ -38,14 +38,20 @@ package object memory {
     def isNonBuffer: Boolean = metadata[EnableNonBuffer](s).exists(_.flag)
     def isNonBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableNonBuffer(flag))
 
-    def isHierarchicalBank: Boolean = metadata[HierarchicalBank](s).exists(_.flag)
-    def isHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, HierarchicalBank(flag))
+    def isNoHierarchicalBank: Boolean = metadata[NoHierarchicalBank](s).exists(_.flag)
+    def isNoHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, NoHierarchicalBank(flag))
 
-    def isFlatBank: Boolean = metadata[FlatBank](s).exists(_.flag)
-    def isFlatBank_=(flag: Boolean): Unit = metadata.add(s, FlatBank(flag))
+    def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
+    def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
+
+    def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
+    def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
     def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
     def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
+
+    def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
+    def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
 
     def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
     def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
@@ -164,6 +170,12 @@ package object memory {
       }
     }
 
+    def getConstDims: Option[Seq[Int]] = {
+      if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
+        Some(stagedDims.collect{case Expect(c) => c.toInt })
+      } else None
+    }
+
     def readWidths: Set[Int] = mem.readers.map{
       case Op(read: UnrolledAccessor[_,_]) => read.width
       case _ => 1
@@ -195,6 +207,8 @@ package object memory {
       case _ => false
     }
 
+    def isNBuffered: Boolean = mem.getInstance.exists(_.depth > 1)
+    
     def isOptimizedReg: Boolean = mem.writers.exists{ _.op.get.isInstanceOf[RegAccum[_]] }
     def optimizedRegType: Option[Accum] = if (!mem.isOptimizedReg) None else 
       mem.writers.collect{ 
@@ -212,10 +226,13 @@ package object memory {
       case _:DRAM[_,_] => true
       case _ => false
     }
+    def isDRAMAccel: Boolean = mem.op.exists{ case _: DRAMAccelNew[_,_] => true; case _ => false}
 
     def isStreamIn: Boolean = mem.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = mem.isInstanceOf[StreamOut[_]]
     def isInternalStream: Boolean = (mem.isStreamIn || mem.isStreamOut) && mem.parent != Ctrl.Host
+
+    def isMemPrimitive: Boolean = (isSRAM || isLineBuffer || isRegFile || isFIFO || isLIFO || isFIFOReg || isReg || isLUT) && !isNBuffered && (!isRemoteMem && !isOptimizedReg)
 
     def isSRAM: Boolean = mem match {
       case _: SRAM[_,_] => true
@@ -282,6 +299,37 @@ package object memory {
     def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
     def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
     def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
+
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def loadStreams: List[Sym[_]] = s.consumers.filter(_.isLoad).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def storeStreams: List[Sym[_]] = s.consumers.filter(_.isStore).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def gatherStreams: List[Sym[_]] = s.consumers.filter(_.isGather).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def scatterStreams: List[Sym[_]] = s.consumers.filter(_.isScatter).toList
+
+    /** Get BurstCmd bus */
+    def addrStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,cmd,_,_)) => cmd
+      case Op(FringeDenseLoad(_,cmd,_)) => cmd
+      case Op(FringeSparseLoad(_,cmd,_)) => cmd
+      case Op(FringeSparseStore(_,cmd,_)) => cmd //sic
+      case _ => throw new Exception("No addrStream for $s")
+    }
+
+    def dataStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,_,data,_)) => data
+      case Op(FringeDenseLoad(_,_,data)) => data
+      case Op(FringeSparseLoad(_,_,data)) => data
+      case _ => throw new Exception("No dataStream for $s")
+    }
+
+    def ackStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,_,_,ack)) => ack
+      case Op(FringeSparseStore(_,_,ack)) => ack
+      case _ => throw new Exception("No dataStream for $s")
+    }
   }
 
 

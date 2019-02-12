@@ -5,6 +5,7 @@ import chisel3.util._
 import fringe.globals._
 import fringe.targets.asic.ASIC
 import fringe.targets.vcs.VCS
+import fringe.targets.aws.AWS_Sim
 import fringe.utils._
 import fringe.templates.axi4._
 import fringe.templates.dramarbiter.DRAMArbiter
@@ -48,12 +49,12 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(regWidth.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(regWidth.W))))
-    val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(regWidth.W)))
+    val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(regWidth.W)))
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
-    val heap = new HeapIO(numAllocators)
+    val heap = Vec(numAllocators, new HeapIO())
 
     // AXI Debuggers
     val TOP_AXI = new AXI4Probe(axiLiteParams)
@@ -71,6 +72,9 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
 
     // val dbg = new DebugSignals
   })
+
+  io.argEchos := DontCare
+  io.argOuts <> DontCare
 
   println(s"[Fringe] loadStreamInfo: $LOAD_STREAMS, storeStreamInfo: $STORE_STREAMS")
   val assignment: List[List[Int]] = channelAssignment.assignments
@@ -92,6 +96,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
       axiParams,
       debugChannelID == i
     ))
+    dramArb.io <> DontCare
     dramArb.io.app.loads.zip(loadStreams).foreach{ case (l, ls) => l <> ls }
     dramArb.io.app.stores.zip(storeStreams).foreach{ case (s, ss) => s <> ss }
     dramArb.io.app.gathers.zip(io.memStreams.gathers).foreach{ case (g, gs) => g <> gs }
@@ -101,20 +106,21 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
 
   val heap = Module(new DRAMHeap(numAllocators))
   heap.io.accel <> io.heap
-  val hostHeapReq = heap.io.host.req(0)
-  val hostHeapResp = heap.io.host.resp(0)
+  val hostHeapReq = heap.io.host(0).req
+  val hostHeapResp = heap.io.host(0).resp
 
   val numDebugs = dramArbs(debugChannelID).numDebugs
   val numRegs = NUM_ARGS + 2 - NUM_ARG_INS + numDebugs // (command, status registers)
 
   // Scalar, command, and status register file
-  val regs = Module(new RegFile(regWidth, numRegs, numArgIns+2, numArgOuts+1+numDebugs, numArgIOs, argOutLoopbacksMap))
+  val regs = Module(new RegFile(regWidth, numRegs, numArgIns+2, numArgOuts+1+numDebugs, numArgIOs))
+  regs.io <> DontCare
   regs.io.raddr := io.raddr
   regs.io.waddr := io.waddr
   regs.io.wen := io.wen
   regs.io.wdata := io.wdata
   // TODO: Fix this bug asap so that the axi42rf bridge verilog anticipates the 1 cycle delay of the data
-  val bug239_hack = !(globals.target.isInstanceOf[VCS] || globals.target.isInstanceOf[ASIC])
+  val bug239_hack = !(globals.target.isInstanceOf[AWS_Sim] || globals.target.isInstanceOf[VCS] || globals.target.isInstanceOf[ASIC])
   if (bug239_hack) {
     io.rdata := regs.io.rdata
   }
@@ -135,6 +141,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   // Hardware time out (for debugging)
   val timeoutCycles = 12000000000L
   val timeoutCtr = Module(new FringeCounter(40))
+  timeoutCtr.io <> DontCare
   timeoutCtr.io.reset := 0.U 
   timeoutCtr.io.saturate := 1.U
   timeoutCtr.io.max := timeoutCycles.U
@@ -144,6 +151,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   io.argIns.zipWithIndex.foreach{case (p, i) => p := regs.io.argIns(i+2)}
 
   val depulser = Module(new Depulser())
+  depulser.io <> DontCare
   depulser.io.in := io.done | timeoutCtr.io.done
   depulser.io.rst := ~command
 
@@ -163,6 +171,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
       argOutReg.bits := status.bits.asUInt
     }
     else if (i <= numArgOuts) {
+      io.argEchos(i-1) := regs.io.argEchos(i)
       argOutReg.bits := io.argOuts(i-1).bits
       argOutReg.valid := io.argOuts(i-1).valid
     }
@@ -172,12 +181,11 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     }
   }
 
-  io.argOutLoopbacks := regs.io.argOutLoopbacks
 
   // Memory address generator
   dramArbs.foreach { _.io.reset := localReset }
   dramArbs.foreach { _.reset := localReset }
-  if (target.isInstanceOf[targets.aws.AWS_F1]) {
+  if (target.isInstanceOf[targets.aws.AWS_F1] || target.isInstanceOf[targets.aws.AWS_Sim]) {
     dramArbs.foreach { _.io.enable := io.aws_top_enable }
   }
   else {

@@ -26,7 +26,7 @@ val base = Seq(
 
   pgpPassphrase := {
    try {Some(scala.io.Source.fromFile(Path.userHome / ".sbt" / "pgp.credentials").mkString.trim.toCharArray)}
-   catch { case _ => None }
+   catch { case _:Throwable => None }
   },
 
   /** Scalac Options **/
@@ -46,7 +46,6 @@ val base = Seq(
   /** Project Structure **/
   resourceDirectory in Compile := baseDirectory(_/ "resources").value,
   scalaSource in Compile := baseDirectory(_/"src").value,
-  //scalaSource in Test := baseDirectory(_/"test").value,
 
   /** Testing **/
   scalacOptions in Test ++= Seq("-Yrangepos"),
@@ -95,7 +94,8 @@ val base = Seq(
 
 val emul_settings = base ++ Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scala_version,
-  crossScalaVersions := Seq(scala_version, "2.11.7"),
+  name := "emul" + sys.env.get("EMUL_PACKAGE").getOrElse(""),
+  //crossScalaVersions := Seq(scala_version, "2.11.7"),
   scalacOptions in (Compile, doc) += "-diagrams",   // Generate type hiearchy graph in scala doc
 )
 val common = base ++ Seq(
@@ -106,13 +106,13 @@ val common = base ++ Seq(
 )
 
 
-val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.0-SNAPSHOT_2017-10-06")
-val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.1-SNAPSHOT")
+val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.1.6")
+val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.2.8")
 val fringe_settings = base ++ Seq(
+  scalacOptions += "-Xsource:2.11",
   name := "fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse(""),
-  scalaVersion := "2.11.7",
   libraryDependencies ++= Seq(
-    "org.scala-lang" % "scala-reflect" % "2.11.7",
+    //"org.scala-lang" % "scala-reflect" % "2.11.7",
     "edu.berkeley.cs" %% "chisel3" % chisel3_version,              // Chisel
     "edu.berkeley.cs" %% "chisel-iotesters" % testers_version,
   ),
@@ -132,34 +132,38 @@ lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 
 lazy val spatial = (project in file(".")).settings(
-  common ++ Seq(scalaSource in Test := baseDirectory(_/"test").value)
+  common// ++ Seq(scalaSource in Test := baseDirectory(_/"test").value)
 ).dependsOn(forge, emul, argon, models, poly)
 lazy val apps = project.settings(common).dependsOn(spatial)
 
 /** Testing Projects **/
-lazy val appsTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/apps/"),
+/*lazy val appsTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/apps/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val compilerTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/compiler/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val RosettaTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/Rosetta/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val syntaxTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val featureTest = project.settings(*/
+  /*common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),*/
+/*).dependsOn(spatial)*/
+/*lazy val test = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,*/
+/*featureTest)*/
+lazy val test = project.settings(
+  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
 ).dependsOn(spatial)
-lazy val compilerTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/compiler/"),
-).dependsOn(spatial)
-lazy val RosettaTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/Rosetta/"),
-).dependsOn(spatial)
-lazy val syntaxTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax/"),
-).dependsOn(spatial)
-lazy val denseTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/dense/"),
-).dependsOn(spatial)
-lazy val featureTest = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/feature/"),
-).aggregate(denseTest).dependsOn(spatial)
 
-lazy val tests = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest, featureTest)
+lazy val pirTest = project 
+.settings(common)
+.settings(
+  scalaSource in Test := baseDirectory.in(spatial).value/"pir/regression"
+).dependsOn(spatial)
 
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
-
-addCommandAlias("make", "; project denseTest; test:compile")

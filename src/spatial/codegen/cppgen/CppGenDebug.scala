@@ -38,7 +38,7 @@ trait CppGenDebug extends CppGenCommon {
     case GenericToText(x) => emit(src"""${lhs.tp} $lhs = $x.toString();""")
 
     case TextConcat(strings) => 
-    	val paired = strings.map(quote).reduceRight{(r,c) => "string_plus(" + r + "," + c} + ")" * (strings.length-1)
+    	val paired = strings.map(quote).reduceRight{(r,c) => "(" + r + " + " + c} + ")" * (strings.length-1)
     	emit(src"${lhs.tp} $lhs = $paired;")
     case PrintIf(cond,x)   => 
     	if (cond.isEmpty) emit(src"""std::cout << $x;""")

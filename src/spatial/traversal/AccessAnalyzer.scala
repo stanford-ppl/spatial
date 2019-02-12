@@ -7,6 +7,7 @@ import utils.implicits.collections._
 
 import spatial.lang._
 import spatial.node._
+import spatial.util.modeling
 import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
@@ -30,7 +31,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     iters ++= is
     iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
-    scopes ++= is.map{_ -> scope}
+    scopes ++= is.map{i => (i -> modeling.consumersDfs(i.consumers,Set(), scope)) }
     visitBlock(block)
 
     iters = saveIters
@@ -49,7 +50,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Op(RegRead(reg)) =>
       val loop = loops(i)
       reg.writers.forall{writer => LCA(writer.parent,x.parent) != loop.toCtrl }
-    case _ => !scopes(i).contains(x)
+    case _ => dbgs(s"isInvariant $i, $x?  check against ${scopes(i)}");!scopes(i).contains(x)
   }
 
   /** True if all symbols in xs are invariant to all iterators in is. */

@@ -5,9 +5,10 @@ import argon._
 case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenController
   with PIRGenArray
-  //with PIRGenBit
+  with PIRGenBits
+  with PIRGenBit
   with PIRGenFixPt
-  //with PIRGenFltPt
+  with PIRGenFltPt
   with PIRGenStructs
   //with PIRGenText
   //with PIRGenVoid
@@ -31,10 +32,11 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   {
 
   override def copyDependencies(out: String): Unit = {
-    //dependencies ::= FileDep("pirgen", "Makefile", "../")
-    //dependencies ::= FileDep("pirgen", "run.sh", "../")
-    //dependencies ::= FileDep("pirgen", "build.sbt", "../")
-    //dependencies ::= FileDep("pirgen/project", "build.properties", "../project/")
+    dependencies ::= FileDep("pirgen", "pir.Makefile", "../", Some("Makefile"))
+    dependencies ::= FileDep("pirgen", "run.sh", "../")
+    dependencies ::= FileDep("pirgen", "build.sbt", "../")
+    dependencies ::= FileDep("pirgen", "build.properties", "../project/")
+    dependencies ::= FileDep("pirgen", "run_trace.sh", "../")
     super.copyDependencies(out)
   }
 }

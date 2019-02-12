@@ -1,0 +1,3 @@
+[submodule "pir"]
+	path = pir
+  url = git@github.com:stanford-ppl/pir.git 

@@ -8,6 +8,7 @@ import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
+import spatial.codegen.tsthgen._
 import spatial.codegen.dotgen._
 import spatial.codegen.resourcegen._
 
@@ -61,9 +62,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val finalIRPrinter = IRPrinter(state, enable = true)
 
     // --- Checking
-    lazy val userSanityChecks  = UserSanityChecks(state)
-    lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog)
-    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = true)
+    lazy val userSanityChecks  = UserSanityChecks(state, enable = !spatialConfig.allowInsanity)
+    lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog && !spatialConfig.allowInsanity)
+    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = !spatialConfig.allowInsanity)
 
     // --- Analysis
     lazy val cliNaming          = CLINaming(state)
@@ -110,6 +111,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
     lazy val pirCodegen    = PIRGenSpatial(state)
+    lazy val tsthCodegen   = TungstenHostGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
@@ -238,7 +240,8 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
-        (spatialConfig.enablePIR ? pirCodegen)
+        (spatialConfig.enablePIR ? pirCodegen) ==>
+        (spatialConfig.enablePIR ? tsthCodegen)
     }
 
     isl.shutdown(100)
@@ -294,7 +297,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
       //spatialConfig.enableBroadcast = false
-      spatialConfig.noInnerLoopUnroll = true // TODO: cause bunch of unread memory
+      spatialConfig.noInnerLoopUnroll = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       //spatialConfig.enableDot = true
@@ -322,7 +325,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")
 
-    cli.opt[Int]("compressWires").action{(t,_) => spatialConfig.compressWires = t }.text("Enable string compression on chisel wires to shrink JVM bytecode")
+    cli.opt[Unit]("insanity").action{(_,_) => spatialConfig.allowInsanity = true }.text("Disable sanity checks, allows insanity to happen.  Not recommended!")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true
@@ -335,6 +338,14 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = false
+    }.text("Disables modular codegen and puts all logic in AccelTop")
+
+    cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = true
+    }.text("Enables modular codegen")
 
     cli.opt[Unit]("forceBanking").action { (_,_) => 
       spatialConfig.enableForceBanking = true

@@ -44,64 +44,79 @@ else
   echo -e "$INFO Test Data Directory: $TEST_DATA_HOME"
 fi
 
-fileout="test_$(date +'%m_%d_%y_%H_%M_%S')_$type.log"
+starttime="$(date +'%m_%d_%y_%H_%M_%S')"
+fileout="test_${starttime}_$type.log"
 echo -e "$INFO Running tests $tests"
 echo -e "$INFO Logging tests to $fileout"
 
 
 # Basic tests
 if [[ $type == "sim" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "vcs" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 
 # Synthesis tests
 elif [[ $type == "zynq" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Zynq=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Zynq=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "aws" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.AWS=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.AWS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "zcu" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.ZCU=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.ZCU=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "arria10" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Arria10=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Arria10=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "pir" ]]; then
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.PIR=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.PIR=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 
 # Verilog tests that report to gdocs (https://docs.google.com/spreadsheets/d/1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM/edit#gid=1748974351)
 elif [[ $type == "vcs-gdocs" ]]; then
+  curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  echo "$(date +%s)" > ${curpath}/start${starttime}.log
   export GDOCS=1
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="vcs-gdocs-${branchname}"
+  export EMUL_PACKAGE="vcs-gdocs-${branchname}"
   make resources
   make publish
   hash=`git rev-parse HEAD`
   export timestamp=`git show -s --format=%ci`
-  curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash
   echo $branchname > ${curpath}/branchname
   rm -rf gen/VCS
   echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"$branchname\" \"$timestamp\" \"vcs\""
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "vcs"
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
+  echo "$(date +%s)" > ${curpath}/end${starttime}.log
+  if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat ${curpath}/end${starttime}.log`; else endtime=1; fi
+  if [[ -f ${curpath}/start${starttime}.log ]]; then begintime=`cat ${curpath}/start${starttime}.log`; else begintime=0; fi
+  testtime=$(((endtime-begintime)/60))
+  python3 ${curpath}/resources/regression/gdocs.py "finish_test" "vcs" "$branchname" "${testtime}"
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "vcs" "any" "any"
-  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs"
+  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "vcs" "any" "any"
 elif [[ $type == "scalasim-gdocs" ]]; then
+  curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  echo "$(date +%s)" > ${curpath}/start${starttime}.log
   export GDOCS=1
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="scalasim-gdocs-${branchname}"
+  export EMUL_PACKAGE="scalasim-gdocs-${branchname}"
   make resources
   make publish
   hash=`git rev-parse HEAD`
   export timestamp=`git show -s --format=%ci`
-  curpath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo $hash > ${curpath}/reghash
   echo $branchname > ${curpath}/branchname
   rm -rf gen/Scala
   echo "python3 ${curpath}/resources/regression/gdocs.py \"prepare_sheet\" \"$hash\" \"$branchname\" \"$timestamp\" \"scalasim\""
   python3 ${curpath}/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "scalasim"
-  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "testOnly $tests" 2>&1 | tee $fileout
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
+  echo "$(date +%s)" > ${curpath}/end${starttime}.log
+  if [[ -f ${curpath}/end${starttime}.log ]]; then endtime=`cat ${curpath}/end${starttime}.log`; else endtime=1; fi
+  if [[ -f ${curpath}/start${starttime}.log ]]; then begintime=`cat ${curpath}/start${starttime}.log`; else begintime=0; fi
+  testtime=$(((endtime-begintime)/60))
+  python3 ${curpath}/resources/regression/gdocs.py "finish_test" "scalasim" "$branchname" "${testtime}"
   python3 ${curpath}/resources/regression/gdocs.py "report_changes" "scalasim" "any" "any"
-  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "scalasim"
+  python3 ${curpath}/resources/regression/gdocs.py "report_slowdowns" "runtime" "scalasim" "any" "any"
 else
   echo -e "$FAIL Usage: test_all.sh <test type> [test(s)]"
   echo -e "$FAIL Test type '$test_type' was not recognized"

@@ -19,7 +19,7 @@ trait PIRSplitGen extends PIRCodegen {
   val scope = mutable.ListBuffer[Lhs]()
 
   override def emitStm(lhs:Lhs, tp:String, rhsStr:Any):Unit = {
-    emit(src"""val $lhs = save("$lhs", $rhsStr) // ${comment(lhs.sym)}""")
+    emit(src"""val $lhs = save("$lhs", $rhsStr) // ${comment(lhs, tp)}""")
     typeMap += lhs -> tp
 
     scope += lhs
@@ -44,9 +44,6 @@ trait PIRSplitGen extends PIRCodegen {
 
   override def emitAccelHeader = {
     super.emitAccelHeader
-    emit(s"val nameSpace = scala.collection.mutable.Map[String,Any]()")
-    emit(s"def lookup[T](name:String) = nameSpace(name).asInstanceOf[T]")
-    emit(s"def save[T](name:String, x:T) = { nameSpace(name) = x; x }")
     splitting = true
     splitCount = 0
     splitStart

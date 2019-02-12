@@ -47,7 +47,7 @@ import spatial.dsl._
     Accel {
       // Tile by output regions in C
       Foreach(M by bm par op, N by bn par op) { (i,j) =>
-        val tileC = SRAM[X](bm, bn)
+        val tileC = SRAM[X](bm, bn).buffer
                                                    
         // Prefetch C tile
         tileC load C(i::i+bm, j::j+bn par ip)

@@ -12,6 +12,8 @@ endif
 all: help
 
 help:
+	@echo "------- INFO -------"
+	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make aws-sim     : AWS simulation SW + HW build"
 	@echo "make aws-sim-hw  : Build Chisel for AWS simulation"
@@ -35,7 +37,9 @@ help:
 # aws-F1-sw : aws-F1-afi
 
 # Run simulation using Vivado XSIM
-aws-sim: aws-sim-hw
+aws-sim: aws-sim-hw aws-sim-sw
+
+aws-sim-sw:
 	$(eval app_name=$(notdir $(shell pwd)))
 	# ----------------------------------------------------------------------------
 	# Compile the testbench and make the binary to call xsim run
@@ -43,6 +47,8 @@ aws-sim: aws-sim-hw
 	# ----------------------------------------------------------------------------
 	# Build the DPI .so library
 	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/verif/scripts && make C_TEST=test_spatial_main make_sim_dir compile
+	# Link to build dir
+	ln -s ${AWS_HOME}/hdk/cl/examples/${app_name}/ aws_dir
 	# Create the binary
 	sed 's:{{{INSERT_DESIGN_DIR}}}:'"${AWS_HOME}"'/hdk/cl/examples/${app_name}/verif/scripts:g' aws.sw-resources/Top_template > ./Top
 	chmod 700 Top
@@ -59,6 +65,7 @@ aws-sim-hw:
 	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
 	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/Top.v
 	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/Top.v
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${AWS_V_DIR}/Top.v; fi
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}
@@ -73,6 +80,7 @@ aws-sim-hw:
 	# Add all the static software files
 	cp -f cpp/TopHost.cpp $(AWS_HOME)/hdk/cl/examples/${app_name}/software/src/
 	cp -f cpp/*.h $(AWS_HOME)/hdk/cl/examples/${app_name}/software/include/
+	cp -f cpp/*.hpp $(AWS_HOME)/hdk/cl/examples/${app_name}/software/include/
 	cp -f aws.sw-resources/headers/* $(AWS_HOME)/hdk/cl/examples/${app_name}/software/include/
 	cp -rf cpp/datastructures $(AWS_HOME)/hdk/cl/examples/${app_name}/software/src/
 	# Add all the simulation Makefiles

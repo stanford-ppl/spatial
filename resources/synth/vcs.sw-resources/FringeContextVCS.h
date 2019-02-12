@@ -19,6 +19,8 @@
 #include "channel.h"
 #include "generated_debugRegs.h"
 
+using namespace std;
+
 //Source: http://stackoverflow.com/questions/13893085/posix-spawnp-and-piping-child-output-to-a-string
 class FringeContextVCS : public FringeContextBase<void> {
 

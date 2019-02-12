@@ -49,6 +49,14 @@ def getCols(wksh, appname):
 		print("ERROR: pygsheets failed getCols... -_-")	
 		exit()
 
+def getStampCol(wksh):
+	try: 
+		lol = readAllVals(wksh)
+		cols = [i+1 for i,x in enumerate(lol[1]) if (re.match("Test Time",x))]
+		return cols[0]
+	except:
+		return -1
+
 def getRuntimeCol(wksh, appname):
 	try: 
 		lol = readAllVals(wksh)
@@ -160,6 +168,7 @@ def getRow(sh, hash, apphash):
 
 def getRowByBranch(sh, branchname, start):
 	if (branchname == "any"): 
+		print("branch %s is row %d" % (branchname, start))
 		return start
 	else:
 		worksheet = sh.worksheet('index', 0)
@@ -167,9 +176,10 @@ def getRowByBranch(sh, branchname, start):
 		row = -1
 		for i in range(start, len(lol)):
 			if (lol[i][1] == branchname):
-				row = i + 1
+				row = i
 				break
 		if (row == -1):	print("ERROR: Could not find row for %s, starting from %s" % (branchname, start))
+		print("branch %s is row %d" % (branchname, row))
 		return row
 
 def isPerf(title):
@@ -396,9 +406,9 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
 		alink=apphash
-		count_success="=sum ( COUNTIF ( J3:3, \"=Y\" ) )"
-		count_fail="=sum ( COUNTIF ( J3:3, \"=N\" ) )"
-		count_crash="=sum ( COUNTIF ( J3:3, \"\" ) ) / 2"
+		count_success="=sum ( COUNTIF ( k3:3, \"=Y\" ) )"
+		count_fail="=sum ( COUNTIF ( k3:3, \"=N\" ) )"
+		count_crash="=sum ( COUNTIF ( k3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
@@ -453,7 +463,19 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
-
+def finish_test(backend, branch, runtime):
+	sh = getDoc(backend)
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		worksheet = sh.worksheet('index', x)
+		print("Stamping %s" % worksheet.title)
+		lol = worksheet.get_all_values()
+		stampcol = getStampCol(worksheet)
+		if (stampcol >= 0):
+			row = getRowByBranch(sh, branch, 2) + 1
+			write(worksheet, row, stampcol, runtime)
+		else:
+			print("No Test Time field for %s" % worksheet.title)
 def report_changes(backend, newbranch, oldbranch):
 	sh = getDoc(backend)
 
@@ -524,7 +546,7 @@ def combine_and_strip_prefixes(backend):
 					print("Replace %s with %s" % (t, purename))
 
 
-def report_slowdowns(prop, backend):
+def report_slowdowns(prop, backend, newbranch, oldbranch):
 	sh = getDoc(backend)
 
 	if (prop == "runtime"):
@@ -537,6 +559,8 @@ def report_slowdowns(prop, backend):
 	lol = worksheet.get_all_values()
 	start = getCols(worksheet, "Test:")[0]
 	tests = list(filter(None, lol[0][start:]))
+	newrow = getRowByBranch(sh, newbranch, 2)
+	oldrow = getRowByBranch(sh, oldbranch, newrow+1)
 	better_apps = []
 	better_raw = []
 	better_change = []
@@ -545,18 +569,21 @@ def report_slowdowns(prop, backend):
 	worse_change = []
 	for t in tests:
 		col = lol[0].index(t)
-		if (len(lol[0]) > col and lol[2][col] != "" and lol[3][col] != ""): 
-			nowtime = float(lol[2][col])
-			lasttime = float(lol[3][col])
-			percent_change = ((nowtime - lasttime) / lasttime) * 100
-			if (percent_change < -2):
-				better_apps.append(t)
-				better_raw.append(nowtime)
-				better_change.append(percent_change)
-			elif (percent_change > 2):
-				worse_apps.append(t)
-				worse_raw.append(nowtime)
-				worse_change.append(percent_change)
+		if (len(lol[0]) > col and lol[newrow][col] != "" and lol[oldrow][col] != ""): 
+			nowtime = float(lol[newrow][col])
+			try:
+				lasttime = float(lol[oldrow][col])
+				percent_change = ((nowtime - lasttime) / lasttime) * 100
+				if (percent_change < -2):
+					better_apps.append(t)
+					better_raw.append(nowtime)
+					better_change.append(percent_change)
+				elif (percent_change > 2):
+					worse_apps.append(t)
+					worse_raw.append(nowtime)
+					worse_change.append(percent_change)
+			except:
+				1
 
 	print("SUMMARY FOR %s: %s" % (backend, prop))
 	print("-------")
@@ -668,9 +695,12 @@ elif (sys.argv[1] == "prepare_sheet"):
 elif (sys.argv[1] == "report_changes"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	report_changes(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "finish_test"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! finish_test('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	finish_test(sys.argv[2], sys.argv[3], sys.argv[4])
 elif (sys.argv[1] == "report_slowdowns"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_slowdowns('%s', '%s')" % (sys.argv[2], sys.argv[3]))
-	report_slowdowns(sys.argv[2], sys.argv[3])
+	report_slowdowns(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 elif (sys.argv[1] == "delete_n_rows"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
@@ -693,8 +723,9 @@ else:
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
 	print(" - combine_and_strip_prefixes(backend)")
-	print(" - report_changes(backend, branch (master, misc_fixes, any, etc.))")
-	print(" - report_slowdowns(property (runtime, spatial, backend), backend)")
+	print(" - report_changes(backend, newbranch, oldbranch (master, misc_fixes, any, etc.))")
+	print(" - finish_test(backend, branch, runtime)")
+	print(" - report_slowdowns(property [runtime, spatial, backend], newbranch, oldbranch, backend)")
 	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - delete_app_column(appname (regex supported), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - merge_apps_columns(old appname, new appname, backend)")

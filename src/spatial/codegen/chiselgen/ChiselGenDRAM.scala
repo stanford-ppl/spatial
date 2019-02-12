@@ -16,29 +16,21 @@ trait ChiselGenDRAM extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case DRAMHostNew(_,_) =>
       hostDrams += (lhs -> hostDrams.size)
+      connectDRAMStreams(lhs)
+      forceEmit(src"// scoped in dram is ${scoped.mkString(",")} ")
+      forceEmit(src"val $lhs = Wire(new FixedPoint(true, 64, 0))")
+      forceEmit(src"$lhs.r := top.io.argIns(api.${argHandle(lhs)}_ptr)")
 
     case DRAMAccelNew(dim) =>
-      val reqCount = lhs.consumers.collect {
-        case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
-      }.size
-      emitMemObject(lhs){
-        emit(src"""val m = Module(new DRAMAllocator(${dim}, $reqCount))""")
-      }
-      val id = accelDrams.size
-      emit(src"top.io.heap.req($id) := $lhs.m.io.heapReq")
-      emit(src"$lhs.m.io.heapResp := top.io.heap.resp($id)")
-      accelDrams += (lhs -> id)
 
     case DRAMAlloc(dram, dims) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent.s.get
-          val invEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
-          emit(src"${dram}.m.io.appReq($id).valid := $invEnable")
-          emit(src"${dram}.m.io.appReq($id).bits.allocDealloc := true.B")
+          val invEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
           val d = dims.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-          emit(src"${dram}.m.io.appReq($id).bits.dims.zip($d).foreach { case (l, r) => l := r }")
+          emit(src"${dram}.connectAlloc($id, $d, $invEnable)")
           requesters += (lhs -> id)
         case _ =>
       }
@@ -46,7 +38,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMIsAlloc(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = $dram.m.io.isAlloc")
+          emit(src"val $lhs = $dram.output.isAlloc")
         case _@Op(DRAMHostNew(_,_)) =>
           emit(src"val $lhs = true.B")
         case _ =>
@@ -57,9 +49,8 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent.s.get
-          val invEnable = src"""${DL(src"${parent}.datapathEn & ${parent}.iiDone", lhs.fullDelay, true)}"""
-          emit(src"${dram}.m.io.appReq($id).valid := $invEnable")
-          emit(src"${dram}.m.io.appReq($id).bits.allocDealloc := false.B")
+          val invEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+          emit(src"${dram}.connectDealloc($id, $invEnable)")
           requesters += (lhs -> id)
         case _ =>
       }
@@ -67,11 +58,9 @@ trait ChiselGenDRAM extends ChiselGenCommon {
     case DRAMAddress(dram) =>
       dram match {
         case _@Op(DRAMAccelNew(_)) =>
-          emit(src"val $lhs = ${dram}.m.io.addr")
+          emit(src"val $lhs = ${dram}.output.addr")
         case _@Op(DRAMHostNew(_,_)) =>
-          val id = argHandle(dram)
-          emit(src"val $lhs = Wire(${lhs.tp})")
-          emit(src"""$lhs.r := top.io.argIns(api.${id}_ptr)""")
+          emit(src"val $lhs = $dram")
         case _ =>
       }
 

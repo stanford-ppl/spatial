@@ -1,8 +1,8 @@
 package utils
 
-import org.scalatest.{FlatSpecLike,Matchers}
+import org.scalatest.{FlatSpecLike}
 
-trait Testbench extends FlatSpecLike with Matchers {
+trait Testbench extends FlatSpecLike with Serializable {
   type Result = utils.Result
   type CompileError = Result.CompileError
   type MakeError = Result.MakeError

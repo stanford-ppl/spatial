@@ -65,7 +65,6 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
 
     case e: DenseTransfer[_,_,_] =>
       val pars = e.pars.map(_.asInstanceOf[Sym[_]]).flatMap(collectParams)
-      println(s"node is $lhs = $e")
       e.pars.collect{case p if !p.isParam => p.setIntValue(p.toInt)}
       pars.foreach(ParParams += _)
 

@@ -25,15 +25,18 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
   val addrWidth = log2Ceil(depth)
 
   val io = IO(new FIFOIO(t, depth))
+  io <> DontCare
 
   val writeEn = io.in.valid & io.in.ready
   val readEn = io.out.valid & io.out.ready
 
   val counterW = log2Ceil(depth)
   val enqCounter = Module(new Counter(counterW))
+  enqCounter.io <> DontCare
   enqCounter.io.enable := writeEn
   enqCounter.io.stride := 1.U
   val deqCounter = Module(new Counter(counterW))
+  deqCounter.io <> DontCare
   deqCounter.io.enable := readEn
   deqCounter.io.stride := 1.U
   val maybeFull = RegInit(false.B)
@@ -44,6 +47,7 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
 
   if (t.getWidth == 1 || banked) {
     val m = Module(new FFRAM(t, depth))
+    m.io <> DontCare
 
     m.io.raddr := deqCounter.io.out
     m.io.wen := writeEn
@@ -73,7 +77,7 @@ class FIFO[T <: Data](t: T, depth: Int, banked: Boolean = false) extends Module 
     m.io.waddr := enqCounter.io.out
     m.io.wdata := io.in.bits
     io.out.bits := m.io.rdata
-    m.io.flow := true.B
+    m.io.backpressure := true.B
   }
 
   when (writeEn =/= readEn) {

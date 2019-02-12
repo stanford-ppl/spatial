@@ -26,19 +26,19 @@ class SpatialConfig extends Config {
   var enableDot: Boolean = false
 
   var enableInstrumentation: Boolean = false
+  var enableModular: Boolean = true
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
   var enableForceBanking: Boolean = false
+  var allowInsanity: Boolean = false
 
-  var enableSplitting: Boolean = false
   var enableArchDSE: Boolean = false
   var quitAtDSE: Boolean = false
   var bootAtDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
-  var compressWires = 0
   var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true

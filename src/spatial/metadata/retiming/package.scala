@@ -2,6 +2,7 @@ package spatial.metadata
 
 import argon._
 import spatial.node._
+import emul.FixedPoint
 
 package object retiming {
 
@@ -16,8 +17,13 @@ package object retiming {
     def fullDelay_=(d: Double): Unit = metadata.add(s, FullDelay(d))
 
     def trace: Sym[_] = s match {
-    	case Op(DelayLine(_,data)) => data.trace
-    	case _ => s
+      case Op(DelayLine(_,data)) => data.trace
+      case _ => s
+    }
+
+    def traceToInt: Int = s.trace match {
+      case Const(c: FixedPoint) => c.toInt
+      case _ => throw new Exception(s"Cannot trace $s (${s.trace}) to an Int")
     }
 
   }

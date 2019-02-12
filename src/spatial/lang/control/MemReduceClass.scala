@@ -90,12 +90,12 @@ protected class MemReduceAccum[A,C[T]](
   }
 }
 
-protected class MemReduceClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) {
-  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = false, opt, stopWhen)
-  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = false, opt, stopWhen)
+protected class MemReduceClass(opt: CtrlOpt) {
+  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = false, opt, opt.stopWhen)
+  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = false, opt, opt.stopWhen)
 }
 
-protected class MemFoldClass(opt: CtrlOpt, stopWhen: Option[Reg[Bit]]) {
-  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = true, opt, stopWhen)
-  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = true, opt, stopWhen)
+protected class MemFoldClass(opt: CtrlOpt) {
+  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = true, opt, opt.stopWhen)
+  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = true, opt, opt.stopWhen)
 }

@@ -1,19 +1,11 @@
-.PHONY: all resources apps test
+.PHONY: all resources apps test pir
 all: apps
 
 ###-----------------------------------###
 ## Publish spatial locally to ivy2.    ##
 ###-----------------------------------###
-publish:
-	bin/update_resources.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project forge; publishLocal"
-	sbt "; project spatial; publishLocal"
-	sbt "; project models; publishLocal"
-	sbt "; project poly; publishLocal"
-	sbt "; project utils; publishLocal"
-	sbt "; project argon; publishLocal"
+publish: 
+	sbt "; project emul; +publishLocal; project fringe; publishLocal; project argon; publishLocal; project forge; publishLocal; project spatial; publishLocal; project models; publishLocal; project poly; publishLocal; project utils; publishLocal"
 
 ###-----------------------------------###
 ## Publish spatial locally to m2.      ##
@@ -38,17 +30,27 @@ publishM2Release:
 ###-----------------------------------###
 install: 
 	bin/update_resources.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
+	sbt "; project emul; +publishLocal; project fringe; publishLocal"
+
+###-----------------------------------###
+## Update pir libs.                    ##
+###-----------------------------------###
+pir:
+	git submodule update --init --recursive
+	bin/update_resources.sh
+	cd pir && make install
+
+pir-develop:
+	git submodule update --init --recursive
+	bin/update_resources.sh
+	cd pir/ && git checkout develop && make install
 
 ###-----------------------------------###
 ## Make all apps (but not tests).      ##
 ###-----------------------------------###
-apps:
+apps:  
 	bin/update_resources.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project apps; compile"
+	sbt "; project emul; +publishLocal; project fringe; publishLocal; project apps; compile"
 
 app: apps
 
@@ -57,10 +59,7 @@ app: apps
 ###-----------------------------------###
 tests:
 	bin/update_resources.sh
-	sbt "; project emul; +publishLocal"
-	sbt "; project fringe; publishLocal"
-	sbt "; project apps; compile"
-	sbt test:compile
+	sbt "; project emul; +publishLocal; project fringe; publishLocal; project apps; compile; test:compile"
 
 test: tests
 
@@ -70,6 +69,12 @@ test: tests
 resources:
 	bash bin/update_resources.sh
 	sbt "; project fringe; publishLocal"
+
+###-----------------------------------###
+## Update local emul package.          ##
+###-----------------------------------###
+emul:
+	sbt "; project emul; publishLocal"
 
 
 ###-----------------------------------###

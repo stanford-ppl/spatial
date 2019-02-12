@@ -171,6 +171,21 @@ object DenseTransfer {
 
     case class AlignmentData(start: I32, end: I32, size: I32, addr_bytes: I64, size_bytes: I32)
 
+    def staticStart(dramAddr: () => I32): Either[scala.Int, Sym[_]] = {
+      val elementsPerBurst = (target.burstSize/A.nbits).to[I32]
+      val bytesPerBurst = (target.burstSize/8).to[I32]
+
+      val maddr_bytes  = dramAddr() * bytesPerWord     // Raw address in bytes
+      val start_bytes  = maddr_bytes % bytesPerBurst    // Number of bytes offset from previous burst aligned address
+
+      val start = start_bytes / bytesPerWord     // Number of WHOLE elements to ignore at start
+
+      start match {
+        case Const(x) => Left(x.toInt)
+        case x => Right(x)
+      }
+    }
+
     def alignmentCalc(dramAddr: () => I32) = {
       /*
               ←--------------------------- size ----------------→
@@ -228,8 +243,15 @@ object DenseTransfer {
             length := aligned.size
           }
           Foreach(length.value par p){i =>
-            val en = i >= startBound && i < endBound
-            val data = local.__read(localAddr(i - startBound), Set(en))
+            val en = staticStart(dramAddr) match {
+                    case Left(x)  => i >= x && i < endBound
+                    case Right(_) => i >= startBound && i < endBound
+                  }
+            val addr = staticStart(dramAddr) match {
+                  case Left(x)  => localAddr(i - x)
+                  case Right(_) => localAddr(i - startBound)
+                }
+            val data = local.__read(addr, Set(en))
             dataStream := pack(data,en)
           }
         }
@@ -303,8 +325,14 @@ object DenseTransfer {
           size := cmd.size
         }
         Foreach(size par p){i =>
-          val en = i >= start && i < end
-          val addr = localAddr(i - start)
+          val en = staticStart(dramAddr) match {
+                  case Left(x)  => i >= x && i < end
+                  case Right(_) => i >= start && i < end
+                }
+          val addr = staticStart(dramAddr) match {
+                  case Left(x)  => localAddr(i - x)
+                  case Right(_) => localAddr(i - start)
+                }
           val data = dataStream.value()
           local.__write(data, addr, Set(en))
         }

@@ -10,23 +10,27 @@ import fringe.targets.zcu.ZCU
 import fringe.targets.zynq.Zynq
 
 class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
-    val addrWidth = {1 max log2Ceil(d)}
     val clk = Input(Clock())
-    val raddr = Input(UInt(addrWidth.W))
-    val waddr = Input(UInt(addrWidth.W))
+    val raddr = Input(UInt({1 max log2Ceil(d)}.W))
+    val waddr = Input(UInt({1 max log2Ceil(d)}.W))
     val raddrEn = Input(Bool())
     val waddrEn = Input(Bool())
     val wen = Input(Bool())
-    val flow = Input(Bool())
+    val backpressure = Input(Bool())
     val wdata = Input(UInt(t.getWidth.W))
     val rdata = Output(UInt(t.getWidth.W))
+
+    override def cloneType = (new SRAMVerilogIO(t, d)).asInstanceOf[this.type] // See chisel3 bug 358
+
 }
 
 abstract class SRAMBlackBox[T<:Data](params: Map[String,Param]) extends BlackBox(params) {
   val io: SRAMVerilogIO[T]
 }
 
-class SRAMVerilogSim[T<:Data](val t: T, val d: Int) extends SRAMBlackBox[T](
+
+
+class SRAMVerilogSim[T<:Data](val t: T, val d: Int) extends BlackBox(
   Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
 {
   override val io = IO(new SRAMVerilogIO(t, d))
@@ -63,7 +67,7 @@ class GenericRAMIO[T<:Data](t: T, d: Int) extends Bundle {
   val waddr = Input(UInt(addrWidth.W))
   val wdata = Input(t.cloneType)
   val rdata = Output(t.cloneType)
-  val flow = Input(Bool())
+  val backpressure = Input(Bool())
 
   override def cloneType: this.type = {
     new GenericRAMIO(t, d).asInstanceOf[this.type]
@@ -102,7 +106,7 @@ class FFRAM[T<:Data](override val t: T, override val d: Int) extends GenericRAM(
     r
   }
 
-  io.rdata := Vec(regs)(io.raddr)
+  io.rdata := VecInit(regs)(io.raddr)
 }
 
 class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: String) extends GenericRAM(t, d) {
@@ -123,7 +127,7 @@ class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: St
       mem.io.wen := io.wen
       mem.io.waddr := io.waddr
       mem.io.wdata := io.wdata.asUInt()
-      mem.io.flow := io.flow
+      mem.io.backpressure := io.backpressure
       mem.io.raddrEn := true.B
       mem.io.waddrEn := true.B
 
@@ -140,7 +144,7 @@ class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: St
       mem.io.wen := io.wen
       mem.io.waddr := io.waddr
       mem.io.wdata := io.wdata.asUInt()
-      mem.io.flow := io.flow
+      mem.io.backpressure := io.backpressure
       mem.io.raddrEn := true.B
       mem.io.waddrEn := true.B
 

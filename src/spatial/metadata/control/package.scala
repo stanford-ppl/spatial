@@ -11,7 +11,7 @@ import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
-import spatial.issues.AmbiguousMetaPipes
+import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
 import scala.util.Try
 
@@ -43,6 +43,10 @@ package object control {
     def isSwitch: Boolean = op.isInstanceOf[Switch[_]]
     def isBranch: Boolean = op match {
       case _:Switch[_] | _:SwitchCase[_] | _:IfThenElse[_] => true
+      case _ => false
+    }
+    def isSwitchCase: Boolean = op match {
+      case _:SwitchCase[_] => true
       case _ => false
     }
 
@@ -81,6 +85,26 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _ => false
     }
+
+    def isLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isGather: Boolean = op match {
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isStore: Boolean = op match {
+      case _:FringeDenseStore[_,_] => true
+      case _ => false
+    }
+
+    def isScatter: Boolean = op match {
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
   }
 
   abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
@@ -98,6 +122,7 @@ package object control {
 
     def isAccel: Boolean = op.exists(_.isAccel)
     def isSwitch: Boolean = op.exists(_.isSwitch)
+    def isSwitchCase: Boolean = op.exists(_.isSwitchCase)
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
@@ -109,6 +134,11 @@ package object control {
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
     def isTileLoad: Boolean = op.exists(_.isTileLoad)
     def isTileStore: Boolean = op.exists(_.isTileStore)
+
+    def isLoad: Boolean = op.exists(_.isLoad)
+    def isGather: Boolean = op.exists(_.isGather)
+    def isStore: Boolean = op.exists(_.isStore)
+    def isScatter: Boolean = op.exists(_.isScatter)
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
@@ -640,6 +670,8 @@ package object control {
 
     def counters: Seq[Counter[_]] = x.node.counters
     def pars: Seq[I32] = counters.map(_.ctrPar)
+    def parsOr1: Seq[Int] = counters.map(_.ctrParOr1)
+    @rig def widths: Seq[Int] = counters.map(_.ctrWidth)
     def constPars: Seq[Int] = pars.map(_.toInt)
     def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
     def isUnit: Boolean = counters.forall(_.isUnit)
@@ -657,8 +689,14 @@ package object control {
     def step: Sym[F] = x.node.step
     def end: Sym[F] = x.node.end
     def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
+    def ctrParOr1: Int = ctrPar.toInt
+    @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
+      case _ => false
+    }
+    def isStaticStartAndStep: Boolean = (start,step) match {
+      case (Final(a: scala.Int), Final(b: scala.Int)) => true
       case _ => false
     }
     def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
@@ -696,17 +734,17 @@ package object control {
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
-    def ctrStart: Ind[W] = i.counter.start.unbox
-    def ctrStep: Ind[W] = i.counter.step.unbox
-    def ctrEnd: Ind[W] = i.counter.end.unbox
-    @rig def ctrPar: I32 = if (i.counter.isForever) I32(1) else i.counter.ctrPar
-    def ctrParOr1: Int = if (i.counter.isForever) 1 else i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
+    def ctrStart: Ind[W] = i.counter.ctr.start.unbox
+    def ctrStep: Ind[W] = i.counter.ctr.step.unbox
+    def ctrEnd: Ind[W] = i.counter.ctr.end.unbox
+    @rig def ctrPar: I32 = if (i.counter.ctr.isForever) I32(1) else i.counter.ctr.ctrPar
+    def ctrParOr1: Int = if (i.counter.ctr.isForever) 1 else i.getCounter.map(_.ctr.ctrPar.toInt).getOrElse(1)
   }
 
   implicit class IndexCounterOps[A](i: Num[A]) {
-    def getCounter: Option[Counter[A]] = metadata[IndexCounter](i).map(_.ctr.asInstanceOf[Counter[A]])
-    def counter: Counter[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
-    def counter_=(ctr: Counter[_]): Unit = metadata.add(i, IndexCounter(ctr))
+    def getCounter: Option[IndexCounterInfo[A]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[A]])
+    def counter: IndexCounterInfo[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
+    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
   }
 
 
@@ -908,7 +946,7 @@ package object control {
     else {
       val metapipeLCAs = findAllMetaPipes(readers, writers)
       val hierarchicalBuffer = metapipeLCAs.keys.size > 1
-      val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
+      val hierIssue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
 
       metapipeLCAs.keys.headOption match {
         case Some(metapipe) =>
@@ -923,10 +961,14 @@ package object control {
           val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
           val minDist = buffers.minOrElse(0)
           val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
+          val bufferHazards = ports.toList.collect{case (a, i) if (a.isWriter && i.getOrElse(0) > 0) => (a,i.getOrElse(0))}
+          val bufIssue = if (bufferHazards.nonEmpty && !mem.isWriteBuffer && !mem.isNonBuffer) Some(PotentialBufferHazard(mem, bufferHazards)) else None
+          val issue = if (hierIssue.isDefined) hierIssue else bufIssue
+
           (Some(metapipe), ports, issue)
 
         case None =>
-          (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+          (None, accesses.map{a => a -> Some(0)}.toMap, hierIssue)
       }
     }
   }

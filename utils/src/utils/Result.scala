@@ -15,7 +15,7 @@ object Result {
 
   case object Pass extends Result {
     def ==>(func: => Result): Result = this orElse func
-    def orElse(result: => Result): Result = result match {
+    def orElse(result: => Result): Result = this match {
       case Pass => Pass
       case _ => result
     }

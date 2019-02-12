@@ -20,6 +20,13 @@ import scala.collection.immutable.SortedSet
 
 object modeling {
 
+  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+    if (scope.contains(x) && !nodes.contains(x)) {
+      consumersDfs(x.consumers, nodes + x, scope)
+    }
+    else nodes
+  }
+
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
     val result   = (block +: schedule.flatMap{_.blocks}).flatMap{b => exps(b) }
@@ -259,13 +266,6 @@ object modeling {
       WARCycle(reader, writer, mem, symbols, cycleLength)
     }
 
-    def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
-      if (scope.contains(x) && !nodes.contains(x)) {
-        consumersDfs(x.consumers, nodes + x)
-      }
-      else nodes
-    }
-
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){
         debugs(s"Multiplexed accesses for memory $mem: ")
@@ -301,7 +301,7 @@ object modeling {
             if (writeDelay-oldPath > 0) {
               debugs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
-              val affectedNodes = consumersDfs(access.consumers, Set()) intersect scope
+              val affectedNodes = consumersDfs(access.consumers, Set(), scope) intersect scope
               affectedNodes.foreach{case x if (paths.contains(x)) => 
                   debugs(s"  $x")
                   paths(x) = paths(x) + (writeDelay-oldPath)
@@ -328,7 +328,7 @@ object modeling {
           // Place reader at this latency
           val originalReadLatency = paths(reader)
           paths(reader) = baseLatency + 2 /*sram load latency*/
-          val affectedNodes = (consumersDfs(reader.consumers, Set()) intersect scope) diff Set(reader)
+          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope) intersect scope) diff Set(reader)
           dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
           // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
           affectedNodes.foreach{case x if (paths.contains(x)) => 

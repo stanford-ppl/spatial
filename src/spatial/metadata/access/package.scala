@@ -6,8 +6,10 @@ import forge.tags._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.math._
 import spatial.metadata.retiming._
 import poly.{ISL,ConstraintMatrix}
+import emul.ResidualGenerator._
 
 package object access {
 
@@ -30,6 +32,7 @@ package object access {
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
       case _:FIFORegDeq[_] => true
+      case _:FIFOBankedDeq[_] => true
       case _:MergeBufferDeq[_] => true
       case _:MergeBufferBankedDeq[_] => true
       case _:LIFOPop[_] => true
@@ -111,6 +114,10 @@ package object access {
     def isPeek: Boolean = a match {
       case Op(_:FIFOPeek[_]) => true
       case _ => false
+    }
+
+    def residualGenerators: List[List[ResidualGenerator]] = {
+      if (a.banks.isEmpty) List(List(ResidualGenerator(1,0,0))) else a.banks.map(_.map(_.residual).toList).toList
     }
 
     /** Returns the sequence of enables associated with this symbol. */
@@ -200,6 +207,9 @@ package object access {
     }
 
     def banks: Seq[Seq[Idx]] = a match {
+      case Op(op@RegFileVectorWrite(_,_,addr,_)) => addr
+      case Op(op@RegFileVectorRead(_,addr,_)) => addr
+      case Op(op@RegFileShiftIn(_,_,addr,_,_)) => Seq(addr)
       case BankedReader(_,banks,_,_)   => banks
       case BankedWriter(_,_,banks,_,_) => banks
       case _ => Seq(Seq())
@@ -262,8 +272,8 @@ package object access {
     // Want: MemReduce(1,0) [STOP]
     // access.scopes(stop = mem.scope) = Accel Foreach(-1,-1) Foreach(0,0) MemReduce(-1) MemReduce(1)
     // access.scopes(stop = mem.scope.master) = MemReduce(1)
-    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.isForever)
-    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.isForever)
+    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
+    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
 
     accessIters diff memoryIters
   }

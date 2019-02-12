@@ -20,6 +20,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case op: StatusReader[_] => unrollStatus(lhs, op)
     case op: Resetter[_]   => unrollResetter(lhs, op)
     case op: Accessor[_,_] => unrollAccess(lhs, op)
+    case op: ShuffleOp[_] => unrollShuffle(lhs, op)
 
     // TODO: treat vector enqueues like single operations for now
     //    case op:VectorEnqueueLikeOp[_] if op.localWrites.length == 1 =>
@@ -109,6 +110,19 @@ trait MemoryUnrolling extends UnrollingBase {
     lanes.unify(lhs,lhs2.head)
   }
 
+  def unrollShuffle[A](lhs: Sym[_], rhs: ShuffleOp[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
+    implicit val A: Bits[A] = rhs.A
+    val in = lanes.map { i => f(rhs.in).asInstanceOf[Tup2[A,Bit]] }
+    implicit val vT: Type[Vec[Tup2[A,Bit]]] = Vec.bits[Tup2[A,Bit]](in.length)
+    val shuffle = stage(ShuffleCompressVec(in))
+    lanes.unify(lhs, shuffle)
+    val vec = lanes.map { i =>
+      val elem: Sym[Tup2[A,Bit]] = shuffle(i)
+      register(lhs -> elem)
+      elem
+    }
+    vec.toList
+  }
 
   case class UnrollInstance(
     memory:   Sym[_],

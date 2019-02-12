@@ -1,6 +1,7 @@
 #ifndef __FRINGE_CONTEXT_AWS_H__
 #define __FRINGE_CONTEXT_AWS_H__
 
+#include <assert.h>
 #include "FringeContextBase.h"
 //#include "commonDefs.h"
 
@@ -12,6 +13,8 @@
 #ifndef EPRINTF
 #define EPRINTF(...) fprintf(stderr, __VA_ARGS__)
 #endif
+
+using namespace std;
 
 #ifndef ASSERT
 #define ASSERT(cond, ...) \
@@ -199,6 +202,9 @@ public:
      * other API calls.
      * This function accepts the slot_id, physical function, and bar number
      */
+
+    // TODO: Check if check_slot_config should be here, or down below?
+    // rc = check_slot_config(slot_id);
     rc = fpga_pci_attach(slot_id, pf_id, bar_id, fpga_attach_flags, &pci_bar_handle);
     fail_on(rc, out, "Unable to attach to the AFI on slot id %d", slot_id);
 
@@ -338,6 +344,10 @@ public:
 
   // set enable high in app and poll until done is high
   virtual void run() {
+    // TODO: See if these lines should be here rather than in load()
+    // aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 1);
+    // aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 0);
+
     printf("[run] Begin\n");
 #ifdef SIM
     // These may not be needed anymore
@@ -353,7 +363,7 @@ public:
     startTime = (double) (ts1.tv_sec);
     startTime = (double) (startTime * 1000 + (double)(ts1.tv_nsec) / 1000000) ;
 #endif // F1
-    // aws_poke(BASE_ADDR + NUM_INST, 0x00000000);	// TODO: Move outside run()?
+    // aws_poke(BASE_ADDR + NUM_INST, 0x00000000);  // TODO: Move outside run()?
     uint32_t status;
     aws_poke(SCALAR_CMD_BASE_ADDR + CMD_REG_ADDR, 1);
     do {
@@ -405,10 +415,10 @@ public:
     uint64_t value;
     uint32_t value_32b;
     
-    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*arg,                      &value_32b);
+    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*(arg - numArgIns),                      &value_32b);
     value = (uint64_t)(value_32b);
     
-    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*arg + UINT64_C_AWS(0x20), &value_32b);
+    aws_peek(SCALAR_OUT_BASE_ADDR + SCALAR_ARG_INCREMENT*(arg - numArgIns) + UINT64_C_AWS(0x20), &value_32b);
     value = value | (uint64_t)((uint64_t)(value_32b) << 32);
     
     return value;

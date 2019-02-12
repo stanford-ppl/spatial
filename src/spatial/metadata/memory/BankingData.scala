@@ -32,6 +32,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
+    dbgs(s"BANKSELECT $addr zip $alpha (_*_).sum / $B mod $N = ${(alpha.zip(addr).map{case (a,i) => a*i })}")
     (alpha.zip(addr).map{case (a,i) => a*i }.sumTree / B) % N
   }
   override def toString: String = {
@@ -165,7 +166,7 @@ case class Memory(
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
-      val size = bank.dims.map{i => dims(i) }.product
+      val size = if (dims.nonEmpty) bank.dims.map{i => dims(i) }.product else 1
       Math.ceil(size.toDouble / bank.nBanks)    // Assumes evenly divided
     }.product.toInt
   }
@@ -303,31 +304,40 @@ case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.Us
   * Used in cases where it could be tricky to find flattened scheme but hierarchical scheme 
   * is very simple
   *
-  * Getter:  sym.isHierarchicalBank
-  * Setter:  sym.isHierarchicalBank = (true | false)
+  * Getter:  sym.isNoHierarchicalBank
+  * Setter:  sym.isNoHierarchicalBank = (true | false)
   * Default: false
   */
-case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.User)
+case class NoHierarchicalBank(flag: Boolean) extends Data[NoHierarchicalBank](SetBy.User)
 
 /** Flag set by the user to disable hierarchical banking and only attempt flat banking,
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isFlatBank
-  * Setter:  sym.isFlatBank = (true | false)
+  * Getter:  sym.isNoBank
+  * Setter:  sym.isNoBank = (true | false)
   * Default: false
   */
 case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
+
+/** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
+  * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
+  *
+  * Getter:  sym.isNoDuplicate
+  * Setter:  sym.isNoDuplicate = (true | false)
+  * Default: false
+  */
+case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
 
 /** Flag set by the user to disable banking,
   * Used in cases where it could be tricky or impossible to find any banking scheme scheme and
   * the user does not want the compiler to waste time trying
   *
-  * Getter:  sym.isFlatBank
-  * Setter:  sym.isFlatBank = (true | false)
+  * Getter:  sym.isNoFlatBank
+  * Setter:  sym.isNoFlatBank = (true | false)
   * Default: false
   */
-case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
+case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
 
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
@@ -337,3 +347,12 @@ case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
   * Default: false
   */
 case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User)
+
+/** Flag set by the user to permit FIFOs where the enqs are technically not bankable,
+  * based on control structure analysis alone
+  *
+  * Getter:  sym.shouldIgnoreConflicts
+  * Setter:  sym.shouldIgnoreConflicts = (true | false)
+  * Default: false
+  */
+case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)

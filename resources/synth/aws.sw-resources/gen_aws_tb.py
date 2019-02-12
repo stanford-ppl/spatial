@@ -27,17 +27,32 @@ for line in src:
     dst.write(line.replace('string', 'std::string', 1).replace('std::to_string', 'convert_to_string_int32_t').replace(');', ',tmp_buf' + str(global_buf_count) + ');'))
     global_buf_count += 1
   elif 'string_plus' in line:
-    dst.write(line.replace('string ', 'std::string ', 1).replace('string(', 'std::string(', 1).replace('string_plus(', '').replace(', ', ' + ').replace(');', ';'))
-  elif ' = std::string(argv[i]);' in line:
-    dst.write(line.replace(' = std::string(argv[i]);', ' = string(argv[i]);', 1))
+    num_pluses = line.count('string_plus')
+    t = line.replace('string ', 'std::string ').replace('string(', 'std::string(').replace('string_plus(', '').replace(',', ' + ')
+    for i in range(num_pluses):
+      t = t.replace(');', ';')
+    dst.write(t)
+  # elif ' = std::string(argv[i]);' in line:
+  #   dst.write(line.replace(' = std::string(argv[i]);', ' = string(argv[i]);', 1))
   elif '>>' in line and 'vector' in line:
     dst.write(line.replace('>>', '> >'))
+  elif ' string x' in line:
+    dst.write(line.replace(' string', ' std::string'))
+  elif line.startswith('string x'):
+    dst.write(line.replace('string', ' std::string', 1).replace(' string', ' std::string'))
+  elif 'vector<string>' in line:
+    dst.write(line.replace('<string>', '<std::string>'))
+  elif '(string' in line:
+    dst.write(line.replace('(string', '(std::string'))
+  elif ' string(argv' in line:
+    dst.write(line.replace(' string(argv', ' std::string(argv'))
   else:
     dst.write(line)
 src.close()
 dst.write('''
+#include <cstring>
 extern "C" void test_main(uint32_t *exit_code) {
-
+  
   // cwd is .../verif/sim/test_spatial_main/
   // char cwd[1024];
   // getcwd(cwd, sizeof(cwd));

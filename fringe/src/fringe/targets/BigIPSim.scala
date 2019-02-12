@@ -101,6 +101,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
       val y = Output(UInt(width.W))
     })
     val m = Module(new Log2BBox(width, signed, latency))
+    m.io <> DontCare
     m.io.clk := clock
     m.io.reset := reset.toBool
     m.io.x := io.x
@@ -113,6 +114,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
       val y = Output(UInt(width.W))
     })
     val m = Module(new SqrtSimBBox(width, signed, latency))
+    m.io <> DontCare
     m.io.clk := clock
     m.io.reset := reset.toBool | (getRetimed(io.x,1,true.B) =/= io.x) // Hacky but should be ok for now
     m.io.x := getRetimed(io.x,1,true.B)
@@ -122,6 +124,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   override def fsqrt(a: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new DivSqrtRecFN_small(e, m, 0))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.inValid := true.B // TODO: What should this be?
     fma.io.sqrtOp := true.B // TODO: What should this be?
@@ -131,8 +134,8 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
 
   def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
-    val result = Wire(new FloatingPoint(m, e))
     val fma = Module(new MulAddRecFN(e, m))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
     fma.io.c := recFNFromFN(e, m, b)
@@ -142,6 +145,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   def fsub(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, FloatingPoint.bits(1.0f).S((m+e).W))
     fma.io.c := recFNFromFN(e, m, b)
@@ -150,6 +154,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
   def fmul(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, b)
     fma.io.c := recFNFromFN(e, m, FloatingPoint.bits(0.0f).S((m+e).W))
@@ -158,6 +163,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
   def fdiv(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
     val fma = Module(new DivSqrtRecFN_small(e, m, 0))
+    fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
     fma.io.b := recFNFromFN(e, m, b)
     fma.io.inValid := true.B // TODO: What should this be?
@@ -170,6 +176,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   def flt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
+    comp.io <> DontCare
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
@@ -179,6 +186,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   def feq(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
+    comp.io <> DontCare
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
@@ -188,6 +196,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   def fgt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
+    comp.io <> DontCare
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
@@ -197,6 +206,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   def fge(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
+    comp.io <> DontCare
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
@@ -206,6 +216,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   def fle(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
+    comp.io <> DontCare
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
@@ -215,6 +226,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   def fne(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
+    comp.io <> DontCare
     comp.io.a := recFNFromFN(e, m, a)
     comp.io.b := recFNFromFN(e, m, b)
     comp.io.signaling := false.B // TODO: What is this bit for?
@@ -225,6 +237,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     if (src.litArg.isEmpty) {
       val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
+      fix2fixBox.io <> DontCare
       fix2fixBox.io.a := src
       fix2fixBox.io.expect_neg := false.B
       fix2fixBox.io.expect_pos := false.B
@@ -260,6 +273,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int, latency: Int, flow: Bool): UInt = {
     val conv = Module(new INToRecFN(a.getWidth,exp,man))
+    conv.io <> DontCare
     conv.io.signedIn := sign.B
     conv.io.in := a
     conv.io.roundingMode := 0.U(3.W)
@@ -269,6 +283,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
     val conv = Module(new RecFNToIN(exp,man,a.getWidth))
+    conv.io <> DontCare
     conv.io.signedOut := sign.B
     conv.io.in := recFNFromFN(exp, man, a)
     conv.io.roundingMode := 0.U(3.W)

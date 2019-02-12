@@ -7,6 +7,10 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
 
+import argon.node._
+import spatial.metadata.control._
+import utils.tags.instrument
+
 import utils.implicits.collections._
 
 object memops {
@@ -46,7 +50,7 @@ object memops {
     }
 
     def parsImm: Seq[I32] = mem match {
-      case Op(MemDenseAlias(_,_,ranges)) => ranges.map(_.head.par)
+      case Op(alias: MemDenseAlias[_,_,_]) => alias.ranges.map(_.head.par)
       case Op(alloc: MemAlloc[_,_])      => Seq.fill(alloc.rank.length){ I32(1) }
       case _ => Nil
     }

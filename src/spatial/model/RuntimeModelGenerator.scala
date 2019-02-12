@@ -7,7 +7,7 @@ import spatial.lang._
 import spatial.metadata.control._
 import spatial.util.modeling._
 
-trait ControlModels { this: PythonModelGenerator =>
+trait ControlModels { this: RuntimeModelGenerator =>
   import spatial.dsl._
 
   val common = src"""
@@ -102,10 +102,10 @@ trait ControlModels { this: PythonModelGenerator =>
      """.stripMargin
 }
 
-case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
-  override val ext: String = ".py"
-  override val lang: String = "python"
-  override val entryFile: String = "model.py"
+case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
+  override val ext: String = ".scala"
+  override val lang: String = "scala"
+  override val entryFile: String = "model.scala"
 
   var inCycle: Boolean = false
   var undefinedSyms: Set[Sym[_]] = Set.empty
@@ -190,7 +190,7 @@ case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
           val series: Series[Idx] = rng.last
           emit(src"${lhs}_dim$d = ( (${series.end} - ${series.start} + ${series.step} - 1)/${series.step})")
         }
-        alias.rank.length
+        alias.rawRank.length
       case Op(alloc: MemAlloc[_, _]) =>
         (1 to alloc.rank.length).foreach{d =>
           emit(src"# Parallelization in dimension #d")
@@ -273,7 +273,7 @@ case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
       emit(src"${lhs}_II = $II")
       cmntFoot()
 
-    case OpForeach(ens,cchain,block,_) if lhs.isInnerControl =>
+    case OpForeach(ens,cchain,block,_,_) if lhs.isInnerControl =>
       val (body, blockII) = latencyAndInterval(block)
       val II = lhs.userII.getOrElse(blockII)
 
@@ -295,7 +295,7 @@ case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
       emit(src"${lhs}_time = inner_pipeline_runtime_model(${lhs}_N, ${lhs}_II, ${lhs}_L, ${lhs}_schedule)")
       cmntFoot()
 
-    case OpReduce(ens, cchain, _, map, load, reduce, store, _,_,_) =>
+    case OpReduce(ens, cchain, _, map, load, reduce, store, _,_,_,_) =>
       val (mapLat, mapII) = latencyAndInterval(map)
 
       val ldLat = latencyOfCycle(load)
@@ -375,7 +375,7 @@ case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
       emit(src"${lhs}_time = control_model(1.0, 1.0, ${lhs}_stages_times, ${schedule(lhs)})")
       cmntFoot()
 
-    case OpForeach(ens, cchain, block, iters) =>
+    case OpForeach(ens, cchain, block, iters, _) =>
       visitBlock(block)
       cmntHead()
       cmnt(src"Outer Foreach ${lhs.fullname}")
@@ -393,34 +393,34 @@ case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
       emit(src"${lhs}_time = control_model(${lhs}_N, ${lhs}_II, ${lhs}_stages_times, ${lhs}_schedule)")
       cmntFoot()
 
-    case OpReduce(ens, cchain, _, map, load, reduce, store, _, _, _) =>
-      visitBlock(map)
-      val ldLat = latencyOfCycle(load)
-      val reduceLat = latencyOfCycle(reduce)
-      val storeLat = latencyOfCycle(store)
+    // case OpReduce(ens, cchain, _, map, load, reduce, store, _, _, _,_) =>
+    //   visitBlock(map)
+    //   val ldLat = latencyOfCycle(load)
+    //   val reduceLat = latencyOfCycle(reduce)
+    //   val storeLat = latencyOfCycle(store)
 
-      val nodeLat = latencyOfPipe(reduce)
-      val cycle = ldLat + reduceLat + storeLat
+    //   val nodeLat = latencyOfPipe(reduce)
+    //   val cycle = ldLat + reduceLat + storeLat
 
-      cmntHead()
-      cmnt(src"Outer Reduce ${lhs.fullname}")
-      cmntCtx(lhs)
-      cmntHead()
-      ctrHead(src"$lhs", cchain)
-      emit(src"# Execution schedule [SEQUENTIAL | OUTER_PIPELINE]")
-      emit(src"${lhs}_schedule = ${schedule(lhs)}")
-      emit(src"")
-      cmntHead()
-      nIters(src"$lhs", cchain, src"${lhs}_N", src"${lhs}_P")
-      emit(src"${lhs}_tree_depth = ceil(log(${lhs}_P, 2))")
-      emit(src"${lhs}_tree_L = $cycle + $nodeLat * ${lhs}_tree_depth")
-      emit(src"${lhs}_stages_times = [${lhs.children.map{c => src"${c}_time"}.mkString(", ")}, ${lhs}_tree_L]")
-      emit(src"${lhs}_stages_IIs = [${lhs.children.map{c => src"${c}_II"}.mkString(", ")}, $cycle]")
-      emit(src"${lhs}_II = max(${lhs}_stages_IIs)")
-      emit(src"${lhs}_time = control_model(${lhs}_N, ${lhs}_II, ${lhs}_stages_times, ${lhs}_schedule)")
-      cmntFoot()
+    //   cmntHead()
+    //   cmnt(src"Outer Reduce ${lhs.fullname}")
+    //   cmntCtx(lhs)
+    //   cmntHead()
+    //   ctrHead(src"$lhs", cchain)
+    //   emit(src"# Execution schedule [SEQUENTIAL | OUTER_PIPELINE]")
+    //   emit(src"${lhs}_schedule = ${schedule(lhs)}")
+    //   emit(src"")
+    //   cmntHead()
+    //   nIters(src"$lhs", cchain, src"${lhs}_N", src"${lhs}_P")
+    //   emit(src"${lhs}_tree_depth = ceil(log(${lhs}_P, 2))")
+    //   emit(src"${lhs}_tree_L = $cycle + $nodeLat * ${lhs}_tree_depth")
+    //   emit(src"${lhs}_stages_times = [${lhs.children.map{c => src"${c}_time"}.mkString(", ")}, ${lhs}_tree_L]")
+    //   emit(src"${lhs}_stages_IIs = [${lhs.children.map{c => src"${c}_II"}.mkString(", ")}, $cycle]")
+    //   emit(src"${lhs}_II = max(${lhs}_stages_IIs)")
+    //   emit(src"${lhs}_time = control_model(${lhs}_N, ${lhs}_II, ${lhs}_stages_times, ${lhs}_schedule)")
+    //   cmntFoot()
 
-    case OpMemReduce(ens, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, _, _, _, _) =>
+    case OpMemReduce(ens, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, _, _, _, _, _) =>
       visitBlock(map)
       val nodeLat = latencyOfPipe(reduce)
       val loadLat = latencyOfPipe(loadRes)
@@ -492,20 +492,20 @@ case class PythonModelGenerator(IR: State) extends Codegen with ControlModels {
       emit(src"${lhs}_II = max(${lhs}_stages_IIs)")
       cmntFoot()
 
-    case tx:DenseTransfer[_,_,_] =>
-      val tp = if (tx.isStore) "store" else "load"
-      cmntHead()
-      cmnt(src"Dense $tp ${lhs.fullname}")
-      cmntCtx(lhs)
-      cmntHead()
-      memPars(src"$lhs", tx.dram)
-      emit(src"")
-      cmntHead()
-      memSizes(src"$lhs", tx.local)
-      emit(src"${lhs}_wordBits = ${tx.A.nbits}")
-      emit(src"${lhs}_II = 1.0")
-      emit(src"${lhs}_time = memory_${tp}_runtime_model(${lhs}_dims, ${lhs}_pars, ${lhs}_wordBits)")
-      cmntFoot()
+    // case tx:DenseTransfer[_,_,_] =>
+    //   val tp = if (tx.isStore) "store" else "load"
+    //   cmntHead()
+    //   cmnt(src"Dense $tp ${lhs.fullname}")
+    //   cmntCtx(lhs)
+    //   cmntHead()
+    //   memPars(src"$lhs", tx.dram)
+    //   emit(src"")
+    //   cmntHead()
+    //   memSizes(src"$lhs", tx.local)
+    //   emit(src"${lhs}_wordBits = ${tx.A.nbits}")
+    //   emit(src"${lhs}_II = 1.0")
+    //   emit(src"${lhs}_time = memory_${tp}_runtime_model(${lhs}_dims, ${lhs}_pars, ${lhs}_wordBits)")
+    //   cmntFoot()
 
     case _ => lhs.blocks.foreach{block => visitBlock(block) }
   }

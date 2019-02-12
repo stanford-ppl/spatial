@@ -68,6 +68,8 @@ trait CppFileGen extends CppCodegen {
       emit("""#include <signal.h>""")
       emit("""#include <sys/wait.h>""")
       emit("""#include <pwd.h>""")
+      emit("""#include <map>""")
+      emit("""#include <math.h>""")
       emit("""#include <unistd.h>""")
       emit("""#include <stdlib.h>""")
       emit("""#include <stdio.h>""")

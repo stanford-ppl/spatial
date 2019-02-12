@@ -34,9 +34,6 @@ import spatial.util.modeling.target
 
   override def effects: Effects = if (isScatter) Effects.Writes(dram) else Effects.Writes(local)
   @rig def lower(): Void = SparseTransfer.transfer(dram,local,ens,isGather)
-
-  @rig def pars: Seq[I32] = Seq(dram.addrs().sparsePars().values.head)
-
 }
 
 object SparseTransfer {

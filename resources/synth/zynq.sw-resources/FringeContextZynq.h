@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <map>
 #include <unistd.h>
 #include "generated_debugRegs.h"
 // Some key code snippets have been borrowed from the following source:

@@ -61,17 +61,18 @@ object DenseTransfer {
   ): Void = {
 
     // Special case if dram is a DenseAlias with the last dimension slashed
-    val normalCounting: Boolean = dram.rawRank.last == dram.seqRank.last
-    val dramOffsets: Seq[I32] = dram.starts()
+    val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
     val rawDramOffsets: Seq[I32] = dram.rawStarts()
-    val lens: Seq[I32] = dram.lens() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
+    val rawRank: Int = dram.rawRank.length
+    val sparseRank: Seq[Int] = dram.sparseRank ++ {if (!normalCounting) Seq(rawRank) else Nil }
+    val lens: Map[Int,I32] = dram.sparseLens() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
     val rawDims: Seq[I32] = dram.rawDims()
-    val strides: Seq[I32] = dram.steps()
-    val pars: Seq[I32] = dram.pars() ++ {if (!normalCounting) Seq[I32](1) else Seq[I32]()}
-    val counters: Seq[() => Counter[I32]] = lens.zip(pars).map{case (d,p) => () => Counter[I32](start = 0, end = d, par = p) }
+    val strides: Map[Int,I32] = dram.sparseSteps()
+    val pars: Map[Int,I32] = dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
+    val counters: Seq[() => Counter[I32]] = sparseRank.map{d => () => Counter[I32](start = 0, end = lens(d), par = pars(d)) }
 
-    val p = pars.last
-    val requestLength: I32 = lens.last
+    val p = pars.toSeq.maxBy(_._1)._2
+    val requestLength: I32 = lens.toSeq.maxBy(_._1)._2
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
     p match {case Expect(p) => assert(p.toInt*A.nbits <= target.burstSize, s"Cannot parallelize by more than the burst size! Please shrink par (par ${p.toInt} * ${A.nbits} > ${target.burstSize})"); case _ =>}
 
@@ -81,8 +82,8 @@ object DenseTransfer {
         val indices = is :+ 0.to[I32]
 
         // Pad indices, strides with 0's against rawDramOffsets
-        val indicesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) indices(dram.seqRank.indexOf(i)) else 0.to[I32]}
-        val stridesPadded = dram.rawRank.map{i => if (dram.seqRank.contains(i)) strides(dram.seqRank.indexOf(i)) else 1.to[I32]}
+        val indicesPadded = dram.rawRank.map{i => if (dram.sparseRank.contains(i)) indices(dram.sparseRank.indexOf(i)) else 0.to[I32]}
+        val stridesPadded = dram.rawRank.map{i => strides.getOrElse(i, 1.to[I32])}
 
         val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
         val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}
@@ -134,7 +135,7 @@ object DenseTransfer {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val size = requestLength
         val size_bytes = size * bytesPerWord
-        cmdStream := BurstCmd(addr_bytes.to[I64], size_bytes, false)
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
         // issueQueue.enq(size)
       }
 
@@ -161,6 +162,21 @@ object DenseTransfer {
     }
 
     case class AlignmentData(start: I32, end: I32, size: I32, addr_bytes: I64, size_bytes: I32)
+
+    def staticStart(dramAddr: () => I32): Either[scala.Int, Sym[_]] = {
+      val elementsPerBurst = (target.burstSize/A.nbits).to[I32]
+      val bytesPerBurst = (target.burstSize/8).to[I32]
+
+      val maddr_bytes  = dramAddr() * bytesPerWord     // Raw address in bytes
+      val start_bytes  = maddr_bytes % bytesPerBurst    // Number of bytes offset from previous burst aligned address
+
+      val start = start_bytes / bytesPerWord     // Number of WHOLE elements to ignore at start
+
+      start match {
+        case Const(x) => Left(x.toInt)
+        case x => Right(x)
+      }
+    }
 
     def alignmentCalc(dramAddr: () => I32) = {
       /*
@@ -206,21 +222,28 @@ object DenseTransfer {
       // Command generator
       Pipe{ // Outer pipe necessary or else acks may come back after extra write commands
         Pipe {
-          val startBound = Reg[I32]
-          val endBound   = Reg[I32]
-          val length     = Reg[I32]
+          val startBound: Reg[I32] = Reg[I32]
+          val endBound: Reg[I32]   = Reg[I32]
+          val length: Reg[I32]     = Reg[I32]
           Pipe {
             val aligned = alignmentCalc(dramAddr)
 
-            cmdStream := BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false)
+            cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false), dram.isAlloc)
             //          issueQueue.enq(aligned.size)
             startBound := aligned.start
             endBound := aligned.end
             length := aligned.size
           }
           Foreach(length.value par p){i =>
-            val en = i >= startBound && i < endBound
-            val data = local.__read(localAddr(i - startBound), Set(en))
+            val en = staticStart(dramAddr) match {
+                    case Left(x)  => i >= x && i < endBound
+                    case Right(_) => i >= startBound && i < endBound
+                  }
+            val addr = staticStart(dramAddr) match {
+                  case Left(x)  => localAddr(i - x)
+                  case Right(_) => localAddr(i - startBound)
+                }
+            val data = local.__read(addr, Set(en))
             dataStream := pack(data,en)
           }
         }
@@ -253,7 +276,7 @@ object DenseTransfer {
         val addr_bytes = addr
         val size_bytes = size * bytesPerWord
 
-        cmdStream := BurstCmd(addr_bytes.to[I64], size_bytes, true)
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, true), dram.isAlloc)
       }
       // Fringe
       Fringe.denseLoad(dram, cmdStream, dataStream)
@@ -274,7 +297,7 @@ object DenseTransfer {
       Pipe {
         val aligned = alignmentCalc(dramAddr)
 
-        cmdStream := BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true)
+        cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true), dram.isAlloc)
         issueQueue.enq( IssuedCmd(aligned.size, aligned.start, aligned.end) )
       }
 
@@ -284,9 +307,9 @@ object DenseTransfer {
       // Receive
       Pipe {
         // TODO: Should also try Reg[IssuedCmd] here
-        val start = Reg[I32]
-        val end   = Reg[I32]
-        val size  = Reg[I32]
+        val start: Reg[I32] = Reg[I32]
+        val end: Reg[I32]   = Reg[I32]
+        val size: Reg[I32]  = Reg[I32]
         Pipe {
           val cmd = issueQueue.deq()
           start := cmd.start
@@ -294,8 +317,14 @@ object DenseTransfer {
           size := cmd.size
         }
         Foreach(size par p){i =>
-          val en = i >= start && i < end
-          val addr = localAddr(i - start)
+          val en = staticStart(dramAddr) match {
+                  case Left(x)  => i >= x && i < end
+                  case Right(_) => i >= start && i < end
+                }
+          val addr = staticStart(dramAddr) match {
+                  case Left(x)  => localAddr(i - x)
+                  case Right(_) => localAddr(i - start)
+                }
           val data = dataStream.value()
           local.__write(data, addr, Set(en))
         }

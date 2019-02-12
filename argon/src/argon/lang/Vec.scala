@@ -55,6 +55,10 @@ import argon.node._
     * Index 0 is always the least significant word.
     */
   @api def apply(i: Int): A = stage(VecApply(this,i))
+  @api def apply(i: I32): A = i match {
+    case Const(idx) => this.apply(idx.toInt)
+    case _ => this.apply(0)
+  }
 
   /**
     * Returns a new vector by slicing this vector in the given range.

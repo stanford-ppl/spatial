@@ -21,14 +21,14 @@ trait ScalaGenFIFO extends ScalaGenMemories {
 
     case FIFOIsAlmostEmpty(fifo,_) =>
       val rPar = fifo.readWidths.maxOrElse(1)
-      emit(src"val $lhs = $fifo.size <= $rPar")
+      emit(src"val $lhs = $fifo.size <= $rPar && $fifo.size > 0")
 
     case FIFOIsAlmostFull(fifo,_) =>
       val wPar = fifo.writeWidths.maxOrElse(1)
-      emit(src"val $lhs = $fifo.size === ${fifo.stagedSize} - $wPar")
+      emit(src"val $lhs = ($fifo.size >= ${fifo.stagedSize} - $wPar) && ($fifo.size < ${fifo.stagedSize})")
 
     case op@FIFOPeek(fifo,_) => emit(src"val $lhs = if ($fifo.nonEmpty) $fifo.head else ${invalid(op.A)}")
-    case FIFONumel(fifo,_)   => emit(src"val $lhs = $fifo.size")
+    case FIFONumel(fifo,_)   => emit(src"val $lhs = FixedPoint($fifo.size,FixFormat(true,32,0))")
 
     case op@FIFOBankedDeq(fifo, ens) =>
       open(src"val $lhs = {")
@@ -42,6 +42,17 @@ trait ScalaGenFIFO extends ScalaGenMemories {
       open(src"val $lhs = {")
       ens.zipWithIndex.foreach{case (en,i) => emit(src"if (${and(en)}) $fifo.enqueue(${data(i)})") }
       close("}")
+
+    case op@FIFORegNew(init) => emitMemObject(lhs){ emit(src"object $lhs extends scala.collection.mutable.Queue[${op.A}]") }
+    case FIFORegEnq(reg, data, ens) => 
+      open(src"val $lhs = {")
+      emit(src"if (${and(ens)}) $reg.enqueue(${data})") 
+      close("}")
+    case op@FIFORegDeq(reg, ens) => 
+      emit(src"val $lhs = if (${and(ens)} && $reg.nonEmpty) $reg.dequeue() else ${invalid(op.A)}")
+
+
+
 
     case _ => super.gen(lhs, rhs)
   }

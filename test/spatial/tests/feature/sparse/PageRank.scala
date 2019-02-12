@@ -36,18 +36,14 @@
          }
        }.sum
      }
-
-     // printArray(node1_list, "node1_list:")
-     // printArray(node2_list, "node2_list:")
      printArray(edgeLens, "edgeLens: ")
      printArray(edgeIds, "edgeIds: ")
 
-     val par_load = 1 // Do not change
-     val par_store = 1 // Do not change
-     val tile_par = 1 // Do not change
-     val page_par = 2 (1 -> 1 -> tileSize)
+     val par_load = 1
+     val par_store = 1
+     val tile_par = 1
+     val page_par = 2
 
-     // Arguments
      val itersIN = args(0).to[Int]
      val dampIN = args(1).to[X]
 
@@ -72,7 +68,7 @@
      setMem(OCedgeLens, edgeLens)
      setMem(OCedgeIds, edgeIds)
 
-     Accel {
+     Accel { 
        Sequential.Foreach(iters by 1) { iter =>
          // Step through each tile
          Foreach(NP by tileSize par tile_par) { page =>
@@ -122,7 +118,7 @@
              }{_+_}
 
              // Write new rank
-             local_pages(local_page) = pagerank * damp + (1.to[X] - damp)
+             local_pages(local_page) = pagerank * damp + (1.to[X] - damp) / NP.value.to[X]
            }
            OCpages(page :: page + pages_left par par_store) store local_pages
          }
@@ -149,7 +145,7 @@
          val these_counts = these_edges.map { j => edgeLens(j) }
          val pr = these_pages.zip(these_counts){(p, c) => p / c.to[X] }.sum
          // println("new pr for " + i + " is " + pr)
-         gold(i) = pr * dampIN + (1.to[X] - dampIN)
+         gold(i) = pr * dampIN + (1.to[X] - dampIN) / rows.to[X]
        }
      }
 

@@ -6,18 +6,11 @@ import spatial.dsl._
   override def runtimeArgs: Args = "640 640"
   type X = FixPt[TRUE,_32,_0]
 
-  val ip = 8
-  val op = 1
-
-  val tileSize1 = 32
-  val tileSize2 = 32
-
-
-  def outerproduct[T:Num](a: Array[T], b: Array[T]): Array[T] = {
-    val tileSizeA = tileSize1 (64 -> 64 -> 38400)
-    val tileSizeB = tileSize2 (64 -> 64 -> 38400)
-    val outerPar  = op (1 -> 4)
-    val innerPar  = ip (1 -> 256)
+  def outerproduct[T:Num](a: Array[T], b: Array[T]): Matrix[T] = {
+    val tsA = loadParam("tsA", 32 (64 -> 64 -> 38400))
+    val tsB = loadParam("tsB", 32 (64 -> 64 -> 38400))
+    val ip = loadParam("ip", 8 (1 -> 256))
+    val op = loadParam("op", 1 (1 -> 4))
 
     val M = a.length;  bound(M) = 38400
     val N = b.length;  bound(N) = 38400
@@ -35,24 +28,23 @@ import spatial.dsl._
     setMem(vec2, b)
 
     Accel {
-      Foreach(sizeA by tileSizeA, sizeB by tileSizeB par outerPar){ (i,j) =>
-        val b1 = SRAM[T](tileSizeA)
-        val b2 = SRAM[T](tileSizeB)
-        val outTile = SRAM[T](tileSizeA, tileSizeB)
+      Foreach(sizeA by tsA, sizeB by tsB par op) { (i,j) =>
+        val b1 = SRAM[T](tsA)
+        val b2 = SRAM[T](tsB)
+        val outTile = SRAM[T](tsA, tsB)
         //val blkA = Reg[Int]
         //val blkB = Reg[Int]
         Parallel {
-          b1 load vec1(i::i+tileSizeA par innerPar)
-          b2 load vec2(j::j+tileSizeB par innerPar)
-          //Pipe{ blkA := min(sizeA - i, tileSizeA) }
-          //Pipe{ blkB := min(sizeB - j, tileSizeB) }
+          b1 load vec1(i::i+tsA par ip)
+          b2 load vec2(j::j+tsB par ip)
+          //Pipe{ blkA := min(sizeA - i, tsA) }
+          //Pipe{ blkB := min(sizeB - j, tsB) }
         }
-        Foreach(tileSizeA by 1, tileSizeB par innerPar){ (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
-
-        out(i::i+tileSizeA, j::j+tileSizeB par 16) store outTile
+        Foreach(tsA by 1, tsB par ip){ (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
+        out(i::i+tsA, j::j+tsB par ip) store outTile
       }
     }
-    getMem(out)
+    getMatrix(out)
   }
 
 
@@ -64,11 +56,13 @@ import spatial.dsl._
 
     val result = outerproduct(a, b)
 
-    val gold = Array.tabulate(M){i => Array.tabulate(N){j => a(i) * b(j) }}.flatten
-    val gold_cksum = gold.map(a => a).reduce{_+_}
-    val result_cksum = result.map(a => a).reduce{_+_}
+    val gold = (0::M, 0::N){(i,j) =>  a(i) * b(j) }
+    val gold_cksum = gold.flatten.reduce{_+_}
+    val result_cksum = result.flatten.reduce{_+_}
     println("expected cksum: " + gold_cksum)
     println("result cksum:   " + result_cksum)
+    printMatrix(gold, "Gold")
+    printMatrix(result, "Result")
     // (0 until M*N) foreach { i => assert(result(i) == gold(i)) }
 
     val cksum = result_cksum == gold_cksum

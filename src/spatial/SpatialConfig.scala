@@ -4,7 +4,6 @@ import argon.Config
 import spatial.dse.DSEMode
 import spatial.targets.HardwareTarget
 
-
 class SpatialConfig extends Config {
 
   var targetName: String = _
@@ -22,33 +21,40 @@ class SpatialConfig extends Config {
   // --- Backends --- //
   var enableSim: Boolean = false
   var enableSynth: Boolean = true
+  var enableResourceReporter: Boolean = false
   var enableTree: Boolean = true
   var enableDot: Boolean = false
   var enablePythonModel = false
 
   var enableInstrumentation: Boolean = false
+  var enableModular: Boolean = true
   var enableTightControl: Boolean = false
-  var enableDebugResources: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
+  var enableForceBanking: Boolean = false
+  var allowInsanity: Boolean = false
 
-  var enableSplitting: Boolean = false
   var enableArchDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 
-  var compressWires = 0
+  var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
   var enableRetiming = true
+  var fuseAsFMA = true
 
   var enableBroadcast = true // Allow broadcasting reads
 
   // Internal flag used to mark whether unit pipe transformer has been run or not
   var allowPrimitivesInOuterControl = true
 
-  def ignoreParEdgeCases: Boolean = false
-  def noInnerLoopUnroll: Boolean = false
-  def enableBufferCoalescing: Boolean = true
 
+  var ignoreParEdgeCases: Boolean = false
+  var noInnerLoopUnroll: Boolean = false
+  var enableBufferCoalescing: Boolean = true
+
+  var enablePIR = false
+
+  var paramSavePath:Option[String] = None
 
 }

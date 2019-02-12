@@ -3,9 +3,11 @@ package spatial.lang
 import argon._
 import forge.tags._
 import utils.implicits.collections._
+import spatial.util._
 
 import spatial.node._
 import spatial.lang.types._
+import spatial.lang.api._
 
 abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends LocalMem[A,C] {
   val A: Bits[A] = Bits[A]
@@ -37,7 +39,7 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
 
   @rig private def checkDims(given: Int): Unit = {
     if (given != rank) {
-      error(ctx, s"Expected a $rank-dimensional address, got a $given-dimensional address.")
+      error(ctx, s"Expected a $rank-dimensional address for $this (${this.name}), got a $given-dimensional address.")
       error(ctx)
     }
   }
@@ -76,6 +78,47 @@ object LUT {
   @api def apply[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int, d4: Int)(elems: Bits[A]*): LUT5[A] = {
     stage(LUTNew[A,LUT5](Seq(d0,d1,d2,d3,d4), elems))
   }
+
+  /** Allocates a 1-dimensional [[LUT1]] with capacity of `length` and elements of type A.  
+    * Elements are read from csv file at compile time with delimiter ",". 
+    */
+  @api def fromFile[A:Bits](length: Int)(filename: String): LUT1[A] = {
+    val elems = loadCSVNow[A](filename, ",")(parseValue[A]).map(_.asInstanceOf[Bits[A]])
+    stage(LUTNew[A,LUT1](Seq(length),elems))
+  }
+
+ /** Allocates a 2-dimensional [[LUT2]] with `rows` x `cols` and elements of type A.  
+   * Elements are read from csv file at compile time with delimiter ",". 
+   */
+ @api def fromFile[A:Bits](rows: Int, cols: Int)(filename: String): LUT2[A] = {
+  val elems = loadCSVNow[A](filename, ",")(parseValue[A]).map(_.asInstanceOf[Bits[A]])
+   stage(LUTNew[A,LUT2](Seq(rows,cols), elems))
+ }
+
+ /** Allocates a 3-dimensional [[LUT3]] with the given dimensions and elements of type A.  
+   * Elements are read from csv file at compile time with delimiter ",". 
+   */
+ @api def fromFile[A:Bits](d0: Int, d1: Int, d2: Int)(filename: String): LUT3[A] = {
+  val elems = loadCSVNow[A](filename, ",")(parseValue[A]).map(_.asInstanceOf[Bits[A]])
+   stage(LUTNew[A,LUT3](Seq(d0,d1,d2), elems))
+ }
+
+ /** Allocates a 4-dimensional [[LUT4]] with the given dimensions and elements of type A.  
+   * Elements are read from csv file at compile time with delimiter ",". 
+   */
+ @api def fromFile[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int)(filename: String): LUT4[A] = {
+  val elems = loadCSVNow[A](filename, ",")(parseValue[A]).map(_.asInstanceOf[Bits[A]])
+   stage(LUTNew[A,LUT4](Seq(d0,d1,d2,d3), elems))
+ }
+
+ /** Allocates a 5-dimensional [[LUT5]] with the given dimensions and elements of type A.  
+   * Elements are read from csv file at compile time with delimiter ",". 
+   */
+ @api def fromFile[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int, d4: Int)(filename: String): LUT5[A] = {
+  val elems = loadCSVNow[A](filename, ",")(parseValue[A]).map(_.asInstanceOf[Bits[A]])
+   stage(LUTNew[A,LUT5](Seq(d0,d1,d2,d3,d4), elems))
+ }
+
 }
 
 /** A 1-dimensional LUT with elements of type A. */

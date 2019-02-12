@@ -25,8 +25,37 @@ trait ImplicitsPriority3 { this: Implicits =>
         implicit val M: INT[m] = tp.fmt.m
         implicit val E: INT[e] = tp.fmt.e
         a.__toFlt[m,e]
-
     }).asInstanceOf[B]
+
+    @rig override def saturating(a: A): B = (Num[B] match {
+      case tp:Fix[s,i,f] => 
+        implicit val S: BOOL[s] = tp.fmt.s
+        implicit val I: INT[i] = tp.fmt.i
+        implicit val F: INT[f] = tp.fmt.f
+        a.__toFixSat[s,i,f]
+      case tp:Flt[m,e] => apply(a)
+    }).asInstanceOf[B]
+
+    @rig override def unbiased(a: A): B = (Num[B] match {
+      case tp:Fix[s,i,f] => 
+        implicit val S: BOOL[s] = tp.fmt.s
+        implicit val I: INT[i] = tp.fmt.i
+        implicit val F: INT[f] = tp.fmt.f
+        a.__toFixUnb[s,i,f]
+
+      case tp:Flt[m,e] => apply(a)
+    }).asInstanceOf[B]
+    
+    @rig override def unbsat(a: A): B = (Num[B] match {
+      case tp:Fix[s,i,f] => 
+        implicit val S: BOOL[s] = tp.fmt.s
+        implicit val I: INT[i] = tp.fmt.i
+        implicit val F: INT[f] = tp.fmt.f
+        a.__toFixUnbSat[s,i,f]
+
+      case tp:Flt[m,e] => apply(a)
+    }).asInstanceOf[B]
+
   })
 
 
@@ -174,6 +203,9 @@ trait Implicits extends ImplicitsPriority1 {
 
   class Cvt_Fix_Fix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT] extends CastFunc[Fix[S1,I1,F1],Fix[S2,I2,F2]] {
     @rig def apply(x: Fix[S1,I1,F1]): Fix[S2,I2,F2] = stage(FixToFix(x, FixFmt.from[S2,I2,F2]))
+    @rig override def saturating(x: Fix[S1,I1,F1]): Fix[S2,I2,F2] = stage(FixToFixSat(x, FixFmt.from[S2,I2,F2]))
+    @rig override def unbiased(x: Fix[S1,I1,F1]): Fix[S2,I2,F2] = stage(FixToFixUnb(x, FixFmt.from[S2,I2,F2]))
+    @rig override def unbsat(x: Fix[S1,I1,F1]): Fix[S2,I2,F2] = stage(FixToFixUnbSat(x, FixFmt.from[S2,I2,F2]))
     @rig override def getLeft(x: Fix[S2,I2,F2]): Option[Fix[S1,I1,F1]] = Some(stage(FixToFix(x, FixFmt.from[S1,I1,F1])))
   }
   implicit def CastFixToFix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT]: Cast[Fix[S1,I1,F1],Fix[S2,I2,F2]] = {
@@ -217,10 +249,16 @@ trait Implicits extends ImplicitsPriority1 {
 
   class CastType[A](x: A) {
     @api def to[B](implicit cast: Cast[A,B]): B = cast.apply(x)
+    @api def toSaturating[B](implicit cast: Cast[A,B]): B = cast.saturating(x)
+    @api def toUnbiased[B](implicit cast: Cast[A,B]): B = cast.unbiased(x)
+    @api def toUnbSat[B](implicit cast: Cast[A,B]): B = cast.unbsat(x)
   }
 
   class LiteralWrapper[A](a: A)(implicit ctx: SrcCtx, state: State) {
     def to[B](implicit cast: Cast[A,B]): B = cast(a)
+    def toSaturating[B](implicit cast: Cast[A,B]): B = cast.saturating(a)
+    def toUnbiased[B](implicit cast: Cast[A,B]): B = cast.unbiased(a)
+    def toUnbSat[B](implicit cast: Cast[A,B]): B = cast.unbsat(a)
     def toUnchecked[B](implicit cast: Cast[A,B]): B = cast.unchecked(a)
   }
 

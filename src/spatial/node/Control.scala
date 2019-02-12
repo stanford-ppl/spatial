@@ -45,7 +45,8 @@ import spatial.lang._
   ens:    Set[Bit],
   cchain: CounterChain,
   block:  Block[Void],
-  iters:  Seq[I32]
+  iters:  Seq[I32],
+  stopWhen:  Option[Reg[Bit]]
 ) extends Loop[Void] {
   def cchains = Seq(cchain -> iters)
   def bodies = Seq(PseudoStage(iters -> block))
@@ -62,7 +63,8 @@ import spatial.lang._
   store:  Lambda2[Reg[A],A,Void],
   ident:  Option[A],
   fold:   Option[A],
-  iters:  List[I32]
+  iters:  List[I32],
+  stopWhen:  Option[Reg[Bit]]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def cchains = Seq(cchain -> iters)
@@ -85,7 +87,8 @@ import spatial.lang._
   ident:     Option[A],
   fold:      Boolean,
   itersMap:  Seq[I32],
-  itersRed:  Seq[I32]
+  itersRed:  Seq[I32],
+  stopWhen:  Option[Reg[Bit]]
 )(implicit val A: Bits[A], val C: LocalMem[A,C]) extends Loop[Void] {
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
   override def iters: Seq[I32] = itersMap ++ itersRed
@@ -109,7 +112,7 @@ import spatial.lang._
   override def bodies = Seq(
     InnerStage(Nil -> notDone),
     PseudoStage(Nil -> action),
-    InnerStage(Nil -> nextState)
+    PseudoStage(Nil -> nextState)
   )
 }
 
@@ -119,7 +122,8 @@ import spatial.lang._
   cchain:  CounterChain,
   func:    Block[Void],
   iterss:  Seq[Seq[I32]],
-  validss: Seq[Seq[Bit]]
+  validss: Seq[Seq[Bit]],
+  stopWhen: Option[Reg[Bit]]
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
   override def bodiess = Seq(iterss -> Seq(func))
@@ -130,7 +134,8 @@ import spatial.lang._
   cchain:  CounterChain,
   func:    Block[Void],
   iterss:  Seq[Seq[I32]],
-  validss: Seq[Seq[Bit]]
+  validss: Seq[Seq[Bit]],
+  stopWhen: Option[Reg[Bit]]
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
   override def bodiess = Seq(iterss -> Seq(func))

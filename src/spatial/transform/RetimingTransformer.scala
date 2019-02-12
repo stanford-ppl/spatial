@@ -17,6 +17,8 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   override def shouldRun: Boolean = spatialConfig.enableRetiming
 
   var retimeBlocks: List[Boolean] = Nil
+  var pushBlocks: List[Boolean] = Nil
+  var lastLatency: Double = 0
   var ctx: Option[SrcCtx] = None
 
   var delayLines: Map[Sym[_], SortedSet[ValueDelay]] = Map.empty
@@ -196,53 +198,65 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     register(switch -> switch2)
   }
 
-  private def retimeBlock[T](block: Block[T])(implicit ctx: SrcCtx): Sym[T] = {
+  private def retimeBlock[T](block: Block[T], saveLatency: Boolean)(implicit ctx: SrcCtx): Sym[T] = {
     val scope = block.nestedStms
     val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_))
 
+    import spatial.metadata.access._
+    import spatial.metadata.memory._
     dbgs(s"Retiming block $block:")
     //scope.foreach{e => dbgs(s"  ${stm(e)}") }
     //dbgs(s"Result: ")
     //result.foreach{e => dbgs(s"  ${stm(e)}") }
     // The position AFTER the given node
     val (newLatencies, newCycles) = pipeLatencies(result, scope)
-    latencies ++= newLatencies
+    val adjustedLatencies = newLatencies.map{case (k,v) => (k , v + lastLatency)}
+    latencies ++= adjustedLatencies
     cycles ++= newCycles.flatMap(_.symbols)
 
-    newLatencies.toList.sortBy(_._2).foreach{case (s,l) => dbgs(s"[$l] ${stm(s)}") }
+    adjustedLatencies.toList.sortBy(_._2).foreach{case (s,l) => dbgs(s"[$l] ${stm(s)}") }
 
     dbgs("")
     dbgs("")
     dbgs("Sym Delays:")
-    newLatencies.toList.map{case (s,l) => s -> scrubNoise(l - latencyOf(s, inReduce = cycles.contains(s))) }
+    adjustedLatencies.toList.map{case (s,l) => s -> scrubNoise(l - latencyOf(s, inReduce = cycles.contains(s))) }
       .sortBy(_._2)
       .foreach{case (s,l) =>
         s.fullDelay = l
-        dbgs(s"  [$l = ${newLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
+        dbgs(s"  [$l = ${adjustedLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
+    if (saveLatency) {
+      lastLatency = adjustedLatencies.toList.map(_._2).sorted.reverse.headOption.getOrElse(0.0)
+      dbgs(s"Storing latency of block: $lastLatency")
+    } else lastLatency = 0.0
 
     isolateSubst(){ retimeStms(block) }
   }
 
 
-  def withRetime[A](wrap: List[Boolean], srcCtx: SrcCtx)(x: => A): A = {
+  def withRetime[A](wrap: List[Boolean], push: List[Boolean], srcCtx: SrcCtx)(x: => A): A = {
     val prevRetime = retimeBlocks
+    val prevPush = pushBlocks
     val prevCtx = ctx
 
     retimeBlocks = wrap
+    pushBlocks = push
     ctx = Some(srcCtx)
     val result = x
 
     retimeBlocks = prevRetime
+    pushBlocks = prevPush
     ctx = prevCtx
     result
   }
 
   override protected def inlineBlock[T](b: Block[T]): Sym[T] = {
     val doWrap = retimeBlocks.headOption.getOrElse(false)
+    val saveLatency = pushBlocks.headOption.getOrElse(false)
     if (retimeBlocks.nonEmpty) retimeBlocks = retimeBlocks.drop(1)
-    dbgs(s"Transforming Block $b [$retimeBlocks => $doWrap]")
-    if (doWrap) retimeBlock(b)(ctx.get)
+    if (pushBlocks.nonEmpty) pushBlocks = pushBlocks.drop(1)
+    dbgs(s"Transforming Block $b [$retimeBlocks => $doWrap, $pushBlocks => $saveLatency]")
+    if (doWrap) retimeBlock(b,saveLatency)(ctx.get)
     else super.inlineBlock(b)
   }
 
@@ -250,11 +264,16 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
     if (lhs.isInnerControl && !rhs.isSwitch && inHw) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
-      withRetime(retimeEnables, ctx) { super.transform(lhs, rhs) }
+      val retimePushLaterBlock = rhs.blocks.map{_ => false }.toList
+      rhs match {
+        case _:StateMachine[_] => withRetime(retimeEnables, List(false,true,false), ctx) { super.transform(lhs, rhs) }
+        case _ => withRetime(retimeEnables, retimePushLaterBlock, ctx) { super.transform(lhs, rhs) }
+      }
+      
     }
     else rhs match {
-      case _:StateMachine[_] => withRetime(List(true,false,true), ctx){ super.transform(lhs, rhs) }
-      case _ => if (inHw) withRetime(Nil, ctx){ super.transform(lhs, rhs) } else super.transform(lhs, rhs)
+      case _:StateMachine[_] => withRetime(List(true,false,false), List(false,false,false), ctx){ super.transform(lhs, rhs) }
+      case _ => if (inHw) withRetime(Nil, Nil, ctx){ super.transform(lhs, rhs) } else super.transform(lhs, rhs)
     }
   }
 

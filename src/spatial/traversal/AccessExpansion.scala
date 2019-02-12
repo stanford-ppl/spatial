@@ -64,7 +64,7 @@ trait AccessExpansion {
   ): Seq[AccessMatrix] = {
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrParOr1)
-    val starts = is.map(_.ctrStart)
+    val starts = is.map{case x if x.counter.ctr.isForever => I32(0); case x => x.ctrStart}
 
     dbgs("  Iterators: " + is.indices.map{i => s"${is(i)} (par: ${ps(i)}, start: ${starts(i)})"}.mkString(", "))
 

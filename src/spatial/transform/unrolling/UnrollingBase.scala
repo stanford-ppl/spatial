@@ -317,7 +317,6 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def isCommon(e: Sym[_]): Boolean = contexts.map{p => f(e)}.forall{e2 => e2 == f(e)}
   }
 
-
   case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
     // HACK: Don't unroll inner loops for CGRA generation
     val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.noInnerLoopUnroll) inds.map{_ => 1}

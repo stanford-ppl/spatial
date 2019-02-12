@@ -17,14 +17,6 @@ trait ScalaGenStream extends ScalaGenMemories with ScalaGenControl {
 
   override protected def emitControlDone(ctrl: Sym[_]): Unit = {
     super.emitControlDone(ctrl)
-
-    /*val written = localMems.filter{mem => writersOf(mem).exists{wr => topControllerOf(wr.node,mem,0).exists(_.node == ctrl) } }
-    val bufferedOuts = written.filter(isBufferedOut)
-    if (bufferedOuts.nonEmpty) {
-      emit("/** Dump BufferedOuts **/")
-      bufferedOuts.foreach{buff => emit(src"dump_$buff()") }
-      emit("/***********************/")
-    }*/
   }
 
   // HACK

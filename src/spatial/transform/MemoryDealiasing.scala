@@ -85,16 +85,16 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
     // These are still needed to track accumulators for Reduce, MemReduce
     // MemDenseAlias and MemSparseAlias are removed after unrolling in AliasCleanup
     case op: MemDenseAlias[_,_,_]    if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
-    case op: MemSparseAlias[_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
+    case op: MemSparseAlias[_,_,_,_,_] if op.mem.size == 1 => op.mem.head.asInstanceOf[Sym[A]]
 
-    case op @ GetDRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
+    case op @ DRAMAddress(Op(MemDenseAlias(F(conds),F(mems),F(ranges)))) =>
       implicit val ba: Bits[_] = op.A
-      val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]])) }
+      val addrs = mems.map{mem => stage(DRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]])) }
       oneHotMux(conds, addrs)
 
-    case op @ GetDRAMAddress(Op(MemSparseAlias(F(conds), F(mems), F(ranges), F(size)))) =>
+    case op @ DRAMAddress(Op(MemSparseAlias(F(conds), F(mems), F(ranges), F(size), F(origin)))) =>
       implicit val ba: Bits[_] = op.A
-      val addrs = mems.map{mem => stage(GetDRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]]))}
+      val addrs = mems.map{mem => stage(DRAMAddress(mem.asInstanceOf[DRAM[A,C forSome{type C[_]}]]))}
       oneHotMux(conds, addrs)
 
 
@@ -103,19 +103,23 @@ case class MemoryDealiasing(IR: State) extends MutateTransformer {
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)
 
-    case MemDim(Op(MemSparseAlias(F(conds),F(ms),_,_)),d) =>
+    case MemDim(Op(MemSparseAlias(F(conds),F(ms),_,_,_)),d) =>
       val mems = ms.map(_.asInstanceOf[Sym[_]])
       val dims = mems.map{case Op(op: MemAlloc[_,_]) => op.dims.indexOrElse(d, I32(1)) }
       oneHotMux(conds, dims)
 
-    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.rank.length)
-    case MemRank(Op(op: MemSparseAlias[_,_,_,_])) => I32(op.rank.length)
+    case MemRank(Op(op: MemDenseAlias[_,_,_])) => I32(op.sparseRank.length)
+    case MemRank(Op(op: MemSparseAlias[_,_,_,_,_])) => I32(op.sparseRank.length)
 
     case MemLen(Op(MemDenseAlias(F(conds),_,F(ranges))), d)   => dealiasRanges(conds, ranges, d)(_.length)
-    case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes))), _) => oneHotMux(conds,sizes)
+    case MemLen(Op(MemSparseAlias(F(conds),_,_,F(sizes),_)), _) => oneHotMux(conds,sizes)
+
+    case MemOrigin(Op(MemSparseAlias(F(conds),_,_,_,F(origins: Seq[Fix[s,w,f]]))), _) => 
+      implicit val T: Bits[Ind[w]] = origins.head.asInstanceOf[Bits[Ind[w]]]
+      oneHotMux[Ind[w]](conds,origins.asInstanceOf[Seq[Ind[w]]])
 
     case MemPar(Op(MemDenseAlias(_,_,F(ranges))), d)          => fieldsRanges(ranges, d)(_.par).head
-    case MemPar(Op(MemSparseAlias(F(conds),_,F(addrs),_)), _) =>
+    case MemPar(Op(MemSparseAlias(F(conds),_,F(addrs),_,_)), _) =>
       val pars = addrs.map(_.asInstanceOf[Sym[_]]).map{
         case Def(MemPar(Op(MemDenseAlias(_,_,F(ranges))), d)) => fieldsRanges(ranges, d)(_.par).head
         case _ => I32(1)

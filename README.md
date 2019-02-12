@@ -1,21 +1,31 @@
 # Spatial
 Spatial is an Argon DSL for programming reconfigurable hardware from a parameterized, high level abstraction.  
 
+# External Dependencies
+
+* [Scala SBT](http://www.scala-sbt.org/)
+* [Java JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
+* [Integer Set Library](http://isl.gforge.inria.fr/) (apt-get install libisl-dev)
+
 # Getting Started
+
+We recommend using [spatial-quickstart](https://github.com/stanford-ppl/spatial-quickstart) rather than this repo, if you only intend to develop applications without modifying the compiler.  
+
+If you prefer to install Spatial from source using this repo, follow these instructions.  The [Spatial website](https://spatial.stanford.edu) has more information and tutorials.
 
 ```
     $ git clone https://github.com/stanford-ppl/spatial.git
     $ cd spatial
-    $ sbt compile
+    $ make install
 ```
 
 To run an app:
 
 ```
-	$ bin/spatial <app name> <options>
-	$ cd gen/<app name>
-	$ make <target>
-	$ bash run.sh <input args>
+    $ bin/spatial <app name> <options>
+    $ cd gen/<app name>
+    $ make
+    $ bash run.sh <input args>
 ```
 
 # Links

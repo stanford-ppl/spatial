@@ -4,6 +4,7 @@ import spatial.dsl._
 
 @spatial class DiagonalBanking extends SpatialTest {
   type T = Int
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
 
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals

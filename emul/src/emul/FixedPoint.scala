@@ -47,8 +47,8 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
 
   def +!(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value + that.value, this.valid && that.valid, fmt)
   def -!(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value - that.value, this.valid && that.valid, fmt)
-  def *!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value * that.value) >> fmt.bits, this.valid && that.valid, fmt)
-  def /!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value << fmt.bits) / that.value, this.valid && that.valid, fmt)
+  def *!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value * that.value) >> fmt.fbits, this.valid && that.valid, fmt)
+  def /!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value << fmt.fbits) / that.value, this.valid && that.valid, fmt)
 
   def *&(that: FixedPoint): FixedPoint = {
     FixedPoint.unbiased(((this.value << 2) * (that.value << 2)) >> fmt.fbits, this.valid && that.valid, fmt)

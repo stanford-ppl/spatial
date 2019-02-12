@@ -83,12 +83,12 @@ trait AliasRewrites extends RewriteRules {
   }
   @rewrite def mem_par(op: MemPar): Sym[_] = {
     case MemPar(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).par
-    case MemPar(Op(MemSparseAlias(cond,mem,addr,_)), _) if addr.lengthIs(1) => addr.head.asInstanceOf[Sym[_]].pars().head
+    case MemPar(Op(MemSparseAlias(cond,mem,addr,_, _)), _) if addr.lengthIs(1) => addr.head.asInstanceOf[Sym[_]].sparsePars().values.headOption.getOrElse(I32(1))
     case MemPar(Op(alloc: MemAlloc[_,_]), d) => I32(1)
   }
   @rewrite def mem_len(op: MemLen): Sym[_] = {
     case MemLen(Op(MemDenseAlias(cond,mem,ranges)), d) if ranges.lengthIs(1) => ranges.head.apply(d).length
-    case MemLen(Op(MemSparseAlias(cond,mem,addr,size)), _) if size.lengthIs(1) => size.head
+    case MemLen(Op(MemSparseAlias(cond,mem,addr,size,_)), _) if size.lengthIs(1) => size.head
     case MemLen(Op(alloc: MemAlloc[_,_]), d) => alloc.dims.indexOrElse(d, I32(1))
   }
 
@@ -102,7 +102,7 @@ trait AliasRewrites extends RewriteRules {
 
   @rewrite def mem_rank(op: MemRank): Sym[_] = {
     case MemRank(Op(alloc: MemAlloc[_,_]))   => I32(alloc.rank.length)
-    case MemRank(Op(alias: MemAlias[_,_,_])) => I32(alias.rank.length)
+    case MemRank(Op(alias: MemAlias[_,_,_])) => I32(alias.sparseRank.length)
   }
 
 }

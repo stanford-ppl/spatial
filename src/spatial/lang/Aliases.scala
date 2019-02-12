@@ -67,6 +67,11 @@ trait ExternalAliases extends InternalAliases {
   type DRAM3[A] = spatial.lang.DRAM3[A]
   type DRAM4[A] = spatial.lang.DRAM4[A]
   type DRAM5[A] = spatial.lang.DRAM5[A]
+  lazy val DRAM1 = spatial.lang.DRAM1
+  lazy val DRAM2 = spatial.lang.DRAM2
+  lazy val DRAM3 = spatial.lang.DRAM3
+  lazy val DRAM4 = spatial.lang.DRAM4
+  lazy val DRAM5 = spatial.lang.DRAM5
   lazy val DRAM = spatial.lang.DRAM
 
   type SRAM[A,C[T]] = spatial.lang.SRAM[A,C]
@@ -91,6 +96,11 @@ trait ExternalAliases extends InternalAliases {
   type RegFile3[A] = spatial.lang.RegFile3[A]
   lazy val RegFile = spatial.lang.RegFile
 
+  type MergeBuffer[A] = spatial.lang.MergeBuffer[A]
+  lazy val MergeBuffer = spatial.lang.MergeBuffer
+  type LineBuffer[A] = spatial.lang.LineBuffer[A]
+  lazy val LineBuffer = spatial.lang.LineBuffer
+
   type FIFO[A] = spatial.lang.FIFO[A]
   lazy val FIFO = spatial.lang.FIFO
 
@@ -98,7 +108,9 @@ trait ExternalAliases extends InternalAliases {
   lazy val LIFO = spatial.lang.LIFO
 
   type Reg[A] = spatial.lang.Reg[A]
+  type FIFOReg[A] = spatial.lang.FIFOReg[A]
   lazy val Reg = spatial.lang.Reg
+  lazy val FIFOReg = spatial.lang.FIFOReg
   lazy val ArgIn = spatial.lang.ArgIn
   lazy val ArgOut = spatial.lang.ArgOut
   lazy val HostIO = spatial.lang.HostIO
@@ -119,6 +131,7 @@ trait ExternalAliases extends InternalAliases {
   lazy val CounterChain = spatial.lang.CounterChain
 
   type Wildcard = spatial.lang.Wildcard
+
 }
 
 /** Remaining aliases that shadow original Scala types. */

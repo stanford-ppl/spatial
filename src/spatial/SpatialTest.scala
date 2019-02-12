@@ -3,8 +3,10 @@ package spatial
 import argon.DSLTest
 import forge.SrcCtx
 import spatial.lang.{Bit, Text, Void}
+import utils.io.files
+import spatial.util.spatialConfig
 
-trait SpatialTest extends Spatial with DSLTest {
+trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
   /** By default, SpatialTests have no runtime arguments. Override to add list(s) of arguments. */
   override def runtimeArgs: Args = NoArgs
 
@@ -15,13 +17,13 @@ trait SpatialTest extends Spatial with DSLTest {
     private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
 
     override def parseMakeError(line: String): Result = {
-      if (line.contains("Placer could not place all instances")) Error(line)
-      else if (err.findFirstIn(line).isDefined) Error(line)
+      if (line.contains("Placer could not place all instances")) MakeError(line)
+      else if (err.findFirstIn(line).isDefined) MakeError(line)
       else super.parseMakeError(line)
     }
 
     override def parseRunError(line: String): Result = {
-      if (line.trim.endsWith("failed.")) Error(line)    // VCS assertion failure
+      if (line.trim.endsWith("failed.")) RunError(line)    // VCS assertion failure
       else super.parseRunError(line)
     }
   }
@@ -30,41 +32,31 @@ trait SpatialTest extends Spatial with DSLTest {
     name = "Scala",
     args = "--sim",
     make = "make",
-    run  = "bash run.sh"
+    run  = "bash scripts/regression_run.sh scalasim"
   ) {
     def shouldRun: Boolean = checkFlag("test.Scala")
     override def parseRunError(line: String): Result = {
-      if (line.trim.startsWith("at")) Error(prev) // Scala exception
-      else if (line.trim.contains("Assertion failure")) Error(line) // Assertion failure
-      else if (line.trim.contains("error")) Error(line) // Runtime/compiler error
+      if (line.trim.startsWith("at")) RunError(prev) // Scala exception
+      else if (line.trim.contains("Assertion failure")) RunError(line) // Assertion failure
+      else if (line.trim.contains("error")) RunError(line) // Runtime/compiler error
       else super.parseRunError(line)
     }
   }
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --fpga Zynq --debugResources",
-    make = "make vcs",
+    args = "--synth --insanity --instrument --fpga VCS",
+    make = "make",
     run  = "bash scripts/regression_run.sh vcs"
   ) {
     override def shouldRun: Boolean = checkFlag("test.VCS")
     override val makeTimeout: Long = 3600
   }
 
-  object VCS_noretime extends ChiselBackend(
-    name = "VCS_noretime",
-    args = "--synth --noretime --debugResources",
-    make = "make vcs",
-    run  = "bash scripts/regression_run.sh vcs-noretime"
-  ) {
-    override def shouldRun: Boolean = checkFlag("test.VCS_noretime")
-    override val makeTimeout: Long = 3600
-  }
-
   object Zynq extends ChiselBackend(
     name = "Zynq",
-    args = "--synth --fpga Zynq --debugResources",
-    make = "make zynq",
+    args = "--synth --insanity --fpga Zynq",
+    make = "make",
     run  = "bash scripts/scrape.sh Zynq"
   ) {
     override def shouldRun: Boolean = checkFlag("test.Zynq")
@@ -73,8 +65,8 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth --fpga ZCU --debugResources",
-    make = "make zcu",
+    args = "--synth --insanity --fpga ZCU",
+    make = "make",
     run  = "bash scripts/scrape.sh ZCU"
   ) {
     override def shouldRun: Boolean = checkFlag("test.ZCU")
@@ -83,7 +75,7 @@ trait SpatialTest extends Spatial with DSLTest {
 
   object AWS extends ChiselBackend(
     name = "AWS",
-    args = "--synth --fpga AWS_F1 --debugResources",
+    args = "--synth --insanity --fpga AWS_F1",
     make = "make aws-F1-afi",
     run  = "bash scripts/scrape.sh AWS"
   ) {
@@ -96,6 +88,6 @@ trait SpatialTest extends Spatial with DSLTest {
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, VCS_noretime)
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS) ++ super.backends
 
 }

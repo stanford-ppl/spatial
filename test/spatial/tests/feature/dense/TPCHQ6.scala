@@ -13,12 +13,6 @@ import spatial.dsl._
   val MAX_DISC = 9999
   val margin = 1
 
-  val innerPar = 2
-  val outerPar = 2
-
-  val tileSize = 384
-
-
   def tpchq6[T:Num](datesIn: Array[Int], quantsIn: Array[Int], disctsIn: Array[T], pricesIn: Array[T]): T = {
     val dataSize = ArgIn[Int]
     setArg(dataSize, datesIn.length)
@@ -31,10 +25,10 @@ import spatial.dsl._
     val maxDateIn = MAX_DATE
     val out = ArgOut[T]
 
-    val ts = tileSize (96 -> 96 -> 192000)
-    val op = outerPar (1 -> 6)
-    val ip = innerPar (1 -> 384)
-    val lp = 16 (1 -> 384)
+    val ts = loadParam("ts", 384 (96 -> 96 -> 192000))
+    val op = loadParam("op", 2 (1 -> 6))
+    val ip = loadParam("ip", 2 (1 -> 384))
+    val lp = loadParam("lp", 16 (1 -> 384))
 
     setMem(dates, datesIn)
     setMem(quants, quantsIn)

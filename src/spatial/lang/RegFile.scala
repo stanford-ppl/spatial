@@ -24,7 +24,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   @api def par(p: I32): C[A] = {
     implicit val C: Type[C[A]] = this.selfType
     val ds = this.dims
-    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => i.toSeries } :+ (ds.last par p)
+    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => Series(I32(0),i,I32(1),I32(1)) } :+ (ds.last par p)
     stage(MemDenseAlias(me,ranges))
   }
 
@@ -39,7 +39,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
     */
   @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
-    stage(RegFileRead[A,C](me,addr,Set.empty))
+    stage(RegFileRead[A,C](me,addr,ens))
   }
 
   /** Updates the value at `addr` to `data`.
@@ -47,23 +47,29 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
     */
   @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
-    stage(RegFileWrite[A,C](me,data,addr,Set.empty))
+    stage(RegFileWrite[A,C](me,data,addr,ens))
   }
 
   @rig private def checkDims(given: Int): Unit = {
     if (given != rank) {
-      error(ctx, s"Expected a $rank-dimensional address, got a $given-dimensional address.")
+      error(ctx, s"Expected a $rank-dimensional address for $this (${this.name}), got a $given-dimensional address.")
       error(ctx)
     }
   }
 
+  /** Indicate that the memory should be buffered and ignore
+    * ignore potential situation where result from running sequentially
+    * does not match with resurt from running pipelined
+    */
   def buffer: C[A] = { this.isWriteBuffer = true; me }
+  /** Do not buffer memory */
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
+  def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
-  @rig def __reset(ens: Set[Bit]): Void = void
+  @rig def __reset(ens: Set[Bit]): Void = stage(RegFileReset(this, ens))
 }
 object RegFile {
   /** Allocates a [[RegFile1]] with capacity for `length` elements of type A. */

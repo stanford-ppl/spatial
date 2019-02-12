@@ -146,18 +146,8 @@ import spatial.dsl._
       def SHA256(): Unit = {
         // Init
         Pipe{
-          bitlen(0) = 0.to[ULong]
-          bitlen(1) = 0.to[ULong]
-          state(0) = 0x6a09e667L.to[ULong]
-          state(1) = 0xbb67ae85L.to[ULong]
-          state(2) = 0x3c6ef372L.to[ULong]
-          state(3) = 0xa54ff53aL.to[ULong]
-          state(4) = 0x510e527fL.to[ULong]
-          state(5) = 0x9b05688cL.to[ULong]
-          state(6) = 0x1f83d9abL.to[ULong]
-          state(7) = 0x5be0cd19L.to[ULong]
-          // bitlen.reset
-          // state.reset
+          bitlen.reset
+          state.reset
         }
 
         // Update
@@ -181,14 +171,14 @@ import spatial.dsl._
         }
 
         DBL_INT_ADD(datalen.value.to[ULong] * 8.to[ULong])
-        Pipe{data(63) = (bitlen(0)).to[UInt8]}
-        Pipe{data(62) = (bitlen(0) >> 8).to[UInt8]}
-        Pipe{data(61) = (bitlen(0) >> 16).to[UInt8]}
-        Pipe{data(60) = (bitlen(0) >> 24).to[UInt8]}
-        Pipe{data(59) = (bitlen(1)).to[UInt8]}
-        Pipe{data(58) = (bitlen(1) >> 8).to[UInt8]}
-        Pipe{data(57) = (bitlen(1) >> 16).to[UInt8]}
-        Pipe{data(56) = (bitlen(1) >> 24).to[UInt8]}
+        Pipe{data(63) = bitlen(0).bits(7::0).as[UInt8]}
+        Pipe{data(62) = bitlen(0).bits(15::8).as[UInt8]}
+        Pipe{data(61) = bitlen(0).bits(23::16).as[UInt8]}
+        Pipe{data(60) = bitlen(0).bits(31::24).as[UInt8]}
+        Pipe{data(59) = bitlen(1).bits(7::0).as[UInt8]}
+        Pipe{data(58) = bitlen(1).bits(15::8).as[UInt8]}
+        Pipe{data(57) = bitlen(1).bits(23::16).as[UInt8]}
+        Pipe{data(56) = bitlen(1).bits(31::24).as[UInt8]}
         sha_transform()
 
         // Foreach(8 by 1){i => println(" " + state(i))}

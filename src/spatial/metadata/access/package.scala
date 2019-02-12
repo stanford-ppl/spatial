@@ -6,15 +6,20 @@ import forge.tags._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.math._
 import spatial.metadata.retiming._
 import poly.{ISL,ConstraintMatrix}
+import emul.ResidualGenerator._
 
 package object access {
 
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
     def isParEnq: Boolean = op match {
+      // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true
+      case _:MergeBufferEnq[_] => true
+      case _:MergeBufferBankedEnq[_] => true
       case _:LIFOBankedPush[_] => true
       case _:SRAMBankedWrite[_,_] => true
       case _:FIFOEnq[_] => true
@@ -26,7 +31,10 @@ package object access {
 
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
+      case _:FIFORegDeq[_] => true
       case _:FIFOBankedDeq[_] => true
+      case _:MergeBufferDeq[_] => true
+      case _:MergeBufferBankedDeq[_] => true
       case _:LIFOPop[_] => true
       case _:LIFOBankedPop[_] => true
       case _:StreamInRead[_] => true
@@ -36,13 +44,17 @@ package object access {
 
     def isStreamStageHolder: Boolean = op match {
       case _:FIFOEnq[_] => true
+      case _:FIFORegEnq[_] => true
       case _:FIFOBankedEnq[_] => true
+      case _:MergeBufferEnq[_] => true
+      case _:MergeBufferBankedEnq[_] => true
       case _:LIFOPush[_] => true
       case _:LIFOBankedPush[_] => true
       case _:StreamOutWrite[_] => true
       case _:StreamOutBankedWrite[_] => true
       case _ => false
     }
+
   }
 
   implicit class UsageOps(s: Sym[_]) {
@@ -83,6 +95,7 @@ package object access {
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
+    def isArgInRead: Boolean = a match {case Op(RegRead(Op(ArgInNew(_)))) => true; case _ => false}
 
     def isStreamStageEnabler: Boolean = a.op.exists(_.isStreamStageEnabler)
     def isStreamStageHolder: Boolean = a.op.exists(_.isStreamStageHolder)
@@ -94,10 +107,37 @@ package object access {
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
+    def parOrElse1: Int = a match {
+      case Op(x: UnrolledAccessor[_,_]) => x.enss.size
+      case _ => 1
+    }
+    def isPeek: Boolean = a match {
+      case Op(_:FIFOPeek[_]) => true
+      case _ => false
+    }
+
+    def residualGenerators: List[List[ResidualGenerator]] = {
+      if (a.banks.isEmpty) List(List(ResidualGenerator(1,0,0))) else a.banks.map(_.map(_.residual).toList).toList
+    }
+
     /** Returns the sequence of enables associated with this symbol. */
     @stateful def enables: Set[Bit] = a match {
       case Op(d: Enabled[_]) => d.ens
       case _ => Set.empty
+    }
+
+    /** Returns the memory written to by this symbol, if applicable. */
+    @stateful def writtenMem: Option[Sym[_]] = a match {
+      case Op(d: Writer[_]) => Some(d.mem)
+      case Op(d: VectorWriter[_]) => Some(d.mem)
+      case _ => None
+    }
+
+    /** Returns the memory read from by this symbol, if applicable. */
+    @stateful def readMem: Option[Sym[_]] = a match {
+      case Op(d: Reader[_,_]) => Some(d.mem)
+      case Op(d: VectorReader[_]) => Some(d.mem)
+      case _ => None
     }
 
     /** Returns true if an execution of access a may occur before one of access b. */
@@ -150,8 +190,12 @@ package object access {
       case Op(_:RegFileShiftIn[_,_])        => 1
       case Op(op:RegFileShiftInVector[_,_]) => op.data.width
       case Op(ua: UnrolledAccessor[_,_])    => ua.width
+      case Op(MergeBufferBound(_,_,_,_)) => 1
+      case Op(MergeBufferInit(_,_,_)) => 1
       case Op(RegWrite(_,_,_)) => 1
       case Op(RegRead(_))      => 1
+      case Op(FIFORegDeq(_,_))      => 1
+      case Op(FIFORegEnq(_,_,_))      => 1
       case _ => -1
     }
 
@@ -163,6 +207,9 @@ package object access {
     }
 
     def banks: Seq[Seq[Idx]] = a match {
+      case Op(op@RegFileVectorWrite(_,_,addr,_)) => addr
+      case Op(op@RegFileVectorRead(_,addr,_)) => addr
+      case Op(op@RegFileShiftIn(_,_,addr,_,_)) => Seq(addr)
       case BankedReader(_,banks,_,_)   => banks
       case BankedWriter(_,_,banks,_,_) => banks
       case _ => Seq(Seq())
@@ -173,6 +220,24 @@ package object access {
       else if (a.banks.head.forall(_.asInstanceOf[Sym[_]].trace.isConst)) true
       else false
     }
+  }
+
+  /** Checks the iters in accesses a and b for those which can dephase due to controllers not running in lockstep.  Returns a Seq of 
+    * iters and Seq of ints that identify the location of each iter relative to a.  We can use this info to create replacement rules
+    * for each iter in each access that may conflict due to lockstep dephasing
+    */
+  @stateful def dephasingIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Set[(Idx,Seq[Int])] = {
+    val aIters = accessIterators(a.access, mem)
+    val bIters = accessIterators(a.access, mem)
+    // For any iters a and b have in common, check if the iterator's owner's parent has children running in lockstep. 
+    //   return false if we find at least one who is not in lockstep
+    val forkLayer = a.unroll.zip(b.unroll).zipWithIndex.collectFirst{case ((u0,u1),i) if (u0 != u1) => i}
+    if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {
+      val forkNode = aIters(forkLayer.get).parent.s.get
+      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access), Some(forkNode.toCtrl))
+      if (mustClone) aIters.zipWithIndex.collect{case (x,i) if i > forkLayer.get => (x, a.unroll.take(i))}.toSet
+      else Set()
+    } else Set()    
   }
 
 
@@ -207,8 +272,8 @@ package object access {
     // Want: MemReduce(1,0) [STOP]
     // access.scopes(stop = mem.scope) = Accel Foreach(-1,-1) Foreach(0,0) MemReduce(-1) MemReduce(1)
     // access.scopes(stop = mem.scope.master) = MemReduce(1)
-    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters)
-    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters)
+    val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
+    val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
 
     accessIters diff memoryIters
   }
@@ -256,6 +321,17 @@ package object access {
       reachingWrites ++= reaching
     }
     reachingWrites
+  }
+
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+    val preceding = writes.filter{write => write.mayPrecede(read)}
+    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
+
+    val reachingBefore = before.filterNot{wr => (before - wr).exists{w => w.mustFollow(wr, read)}}
+    val reachingAfter  = after.filterNot{wr => ((after - wr) ++ before).exists{w => w.mustFollow(wr, read)}}
+    val reaching = reachingBefore ++ reachingAfter
+
+    reaching
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

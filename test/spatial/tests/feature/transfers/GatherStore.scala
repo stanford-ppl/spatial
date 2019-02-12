@@ -7,7 +7,7 @@ import spatial.dsl._
   val numAddr = tileSize * 100
   val numData = tileSize * 1000
 
-  val P = param(1)
+  val P = param(16)
 
   def gatherStore[T:Num](addrs: Array[Int], offchip_data: Array[T]): Array[T] = {
 
@@ -24,7 +24,7 @@ import spatial.dsl._
         val sram = SRAM[T](tileSize)
         addrs load srcAddrs(i::i + tileSize par P)
         sram gather gatherData(addrs par P, tileSize)
-        denseResult(i::i+tileSize) store sram
+        denseResult(i::i+tileSize par P) store sram
       }
     }
 
@@ -64,6 +64,8 @@ import spatial.dsl._
 
     printArray(gold, "gold:")
     printArray(received, "received:")
-    assert(received == gold)
+    val cksum = (received == gold)
+    println("PASS: " + cksum + " (GatherStore)")
+    assert(cksum)
   }
 }

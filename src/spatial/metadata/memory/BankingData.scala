@@ -32,6 +32,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
+    dbgs(s"BANKSELECT $addr zip $alpha (_*_).sum / $B mod $N = ${(alpha.zip(addr).map{case (a,i) => a*i })}")
     (alpha.zip(addr).map{case (a,i) => a*i }.sumTree / B) % N
   }
   override def toString: String = {
@@ -41,6 +42,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 }
 object ModBanking {
   def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
+  def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
 }
 
 
@@ -84,11 +86,12 @@ case class Instance(
   metapipe: Option[Ctrl],           // Controller if at least some accesses require n-buffering
   banking:  Seq[Banking],           // Banking information
   depth:    Int,                    // Depth of n-buffer
-  cost:     Int,                    // Cost estimate of this configuration
+  cost:     Long,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
+  padding:  Seq[Int],               // Padding for memory based on banking
   accType:  AccumType               // Type of accumulator for instance
 ) {
-  def toMemory: Memory = Memory(banking, depth, accType)
+  def toMemory: Memory = Memory(banking, depth, padding, accType)
 
   def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
   def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
@@ -130,6 +133,7 @@ case class Instance(
 
     s"""<Banked>
        |Depth:    $depth
+       |Padding:  $padding
        |Accum:    $accType
        |Banking:  $banking <$format>
        |Pipeline: ${metapipe.map(_.toString).getOrElse("---")}
@@ -139,7 +143,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,Seq.fill(rank)(0),AccumType.None)
 }
 
 
@@ -149,31 +153,34 @@ object Instance {
 case class Memory(
   banking: Seq[Banking],  // Banking information
   depth:   Int,           // Buffer depth
+  padding: Seq[Int],      // Padding on each dim
   accType: AccumType      // Flags whether this instance is an accumulator
 ) {
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
-  def updateDepth(d: Int): Memory = Memory(banking, d, accType)
+  def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
+  def Ps: Seq[Int] = banking.map(_.Ps).flatten
+  def alphas: Seq[Int] = banking.map(_.alphas).flatten
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
-      val size = bank.dims.map{i => dims(i) }.product
+      val size = if (dims.nonEmpty) bank.dims.map{i => dims(i) }.product else 1
       Math.ceil(size.toDouble / bank.nBanks)    // Assumes evenly divided
     }.product.toInt
   }
 
   @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = {
-    if (banking.lengthIs(mem.seqRank.length)) {
+    if (banking.lengthIs(mem.sparseRank.length)) {
       banking.zip(addr).map{case(a,b) => a.bankSelect(Seq(b))}
     } else banking.map(_.bankSelect(addr))
   }
 
   @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = {
     import spatial.util.IntLike._
-    val w = mem.stagedDims.map(_.toInt).zip(mem.getPadding.getOrElse(Seq.fill(mem.stagedDims.size)(0))).map{case(x,y) => x+y}
-    val D = mem.seqRank.length
+    val w = mem.stagedDims.map(_.toInt).zip(padding).map{case(x,y) => x+y}
+    val D = mem.sparseRank.length
     val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
       val b = banking.head.stride
@@ -187,11 +194,9 @@ case class Memory(
         ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val xt = addr(t)
-        val ofsdim_t = xt % b
-        ofsdim_t * List.fill(D-t-1)(b).product.toInt
-      }.sumTree
-      ofschunk * math.pow(b,D).toInt + intrablockofs
+        addr(t)
+      }.sumTree % b // Appears to be modulo magic but may be wrong
+      ofschunk * b + intrablockofs
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)
@@ -203,11 +208,9 @@ case class Memory(
         ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val xt = addr(t)
-        val ofsdim_t = xt % b(t)
-        ofsdim_t * b.slice(t+1,D).product.toInt
-      }.sumTree
-      ofschunk * b.product.toInt + intrablockofs
+        addr(t) 
+      }.sumTree % b.head.toInt // Appears to be modulo magic but may be wrong 
+      ofschunk * b.head.toInt + intrablockofs
     }
     else {
       // TODO: Bank address for mixed dimension groups
@@ -216,7 +219,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, Seq.fill(rank)(0), AccumType.None)
 }
 
 
@@ -296,3 +299,60 @@ case class EnableWriteBuffer(flag: Boolean) extends Data[EnableWriteBuffer](SetB
   * Default: false
   */
 case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.User)
+
+/** Flag set by the user to disable flattened banking and only attempt hierarchical banking,
+  * Used in cases where it could be tricky to find flattened scheme but hierarchical scheme 
+  * is very simple
+  *
+  * Getter:  sym.isNoHierarchicalBank
+  * Setter:  sym.isNoHierarchicalBank = (true | false)
+  * Default: false
+  */
+case class NoHierarchicalBank(flag: Boolean) extends Data[NoHierarchicalBank](SetBy.User)
+
+/** Flag set by the user to disable hierarchical banking and only attempt flat banking,
+  * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
+  * user knows that a flat scheme exists or is a simpler search
+  *
+  * Getter:  sym.isNoBank
+  * Setter:  sym.isNoBank = (true | false)
+  * Default: false
+  */
+case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
+
+/** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
+  * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
+  *
+  * Getter:  sym.isNoDuplicate
+  * Setter:  sym.isNoDuplicate = (true | false)
+  * Default: false
+  */
+case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
+
+/** Flag set by the user to disable banking,
+  * Used in cases where it could be tricky or impossible to find any banking scheme scheme and
+  * the user does not want the compiler to waste time trying
+  *
+  * Getter:  sym.isNoFlatBank
+  * Setter:  sym.isNoFlatBank = (true | false)
+  * Default: false
+  */
+case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
+
+/** Flag set by the user to ensure an SRAM will merge the buffers, in cases
+    where you have metapipelined access such as pre-load, accumulate, store.
+  *
+  * Getter:  sym.shouldCoalesce
+  * Setter:  sym.shouldCoalesce = (true | false)
+  * Default: false
+  */
+case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User)
+
+/** Flag set by the user to permit FIFOs where the enqs are technically not bankable,
+  * based on control structure analysis alone
+  *
+  * Getter:  sym.shouldIgnoreConflicts
+  * Setter:  sym.shouldIgnoreConflicts = (true | false)
+  * Default: false
+  */
+case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)

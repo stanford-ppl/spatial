@@ -72,3 +72,225 @@ import spatial.dsl._
     assert(cksum)
   }
 }
+
+@spatial class ScatterGatherSRAM2 extends SpatialTest {
+  override def runtimeArgs: Args = "160"
+
+  val tileSize = 32
+  val P = param(1)
+
+
+  def loadScatter[T:Num](addrs: Array[Int], offchip_data: Array[T], numAddr: Int, numData: Int): Array[T] = {
+    val na = ArgIn[Int]
+    setArg(na, numAddr)
+    val nd = ArgIn[Int]
+    setArg(nd, numData)
+
+    val srcAddrs = DRAM[Int](na)
+    val inData = DRAM[T](nd)
+    val scatterResult = DRAM[T](nd)
+
+    setMem(srcAddrs, addrs)
+    setMem(inData, offchip_data)
+
+    Accel {
+      val addrs = SRAM[Int](tileSize)
+      Sequential.Foreach(na by tileSize) { i =>
+        val sram = SRAM[T](tileSize)
+        // val numscats = scatgats_per + random[Int](8)
+        val numscats = tileSize
+        addrs load srcAddrs(i::i + numscats par P)
+        sram gather inData(addrs par P, numscats)
+        scatterResult(addrs par P, numscats) scatter sram
+      }
+    }
+
+    getMem(scatterResult)
+  }
+
+
+  def main(args: Array[String]): Unit = {
+    val numAddr = args(0).to[Int]
+    val mul = 2
+    val numData = numAddr*mul*mul
+
+    val nd = numData
+    val na = numAddr
+    val addrs = Array.tabulate(na) { i => i * mul }
+    val offchip_data = Array.tabulate[Int](nd){ i => i * 10 }
+
+    val received = loadScatter(addrs, offchip_data, na,nd)
+
+    def contains(a: Array[Int], elem: Int) = {
+      a.map { e => e == elem }.reduce {_||_}
+    }
+
+    def indexOf(a: Array[Int], elem: Int) = {
+      val indices = Array.tabulate(a.length.to[Int]) { i => i }
+      if (contains(a, elem)) {
+        a.zip(indices){(e, idx) => if (e == elem) idx else 0 }.reduce{_+_}
+      }
+      else -1
+    }
+
+    val gold = Array.tabulate(nd) { i =>
+      if (contains(addrs, i)) offchip_data(i) else 0
+    }
+
+    printArray(offchip_data, "data:")
+    printArray(addrs, "addrs:")
+    printArray(gold, "gold:")
+    printArray(received, "received:")
+    assert(received == gold)
+  }
+}
+
+@spatial class ScatterGatherSRAM3 extends SpatialTest {
+  override def runtimeArgs: Args = "160"
+
+  val tileSize = 32
+  val P = param(1)
+
+
+  def loadScatter[T:Num](addrs: Array[I64], offchip_data: Array[T], numAddr: Int, numData: Int): Array[T] = {
+    val na = ArgIn[Int]
+    setArg(na, numAddr)
+    val nd = ArgIn[Int]
+    setArg(nd, numData)
+
+    val srcAddrs = DRAM[I64](na)
+    val inData = DRAM[T](nd)
+    val scatterResult = DRAM[T](nd)
+
+    setMem(srcAddrs, addrs)
+    setMem(inData, offchip_data)
+
+    Accel {
+      val addrs = SRAM[I64](tileSize)
+      Sequential.Foreach(na by tileSize) { i =>
+        val sram = SRAM[T](tileSize)
+        // val numscats = scatgats_per + random[Int](8)
+        val numscats = tileSize
+        addrs load srcAddrs(i::i + numscats par P)
+        sram gather inData(addrs par P, numscats.to[I64])
+        scatterResult(addrs par P, numscats.to[I64]) scatter sram
+      }
+    }
+
+    getMem(scatterResult)
+  }
+
+
+  def main(args: Array[String]): Unit = {
+    val numAddr = args(0).to[Int]
+    val mul = 2
+    val numData = numAddr*mul*mul
+
+    val nd = numData
+    val na = numAddr
+    val addrs = Array.tabulate[I64](na) { i => (i * mul).to[I64] }
+    val offchip_data = Array.tabulate[Int](nd){ i => i * 10 }
+
+    val received = loadScatter[Int](addrs, offchip_data, na,nd)
+
+    def contains(a: Array[I64], elem: Int) = {
+      a.map { e => e == elem.to[I64] }.reduce {_||_}
+    }
+
+    def indexOf(a: Array[I64], elem: Int) = {
+      val indices = Array.tabulate(a.length.to[Int]) { i => i }
+      if (contains(a, elem)) {
+        a.zip(indices){(e, idx) => if (e == elem.to[I64]) idx else 0 }.reduce{_+_}
+      }
+      else -1
+    }
+
+    val gold = Array.tabulate(nd) { i =>
+      if (contains(addrs, i)) offchip_data(i) else 0
+    }
+
+    printArray(offchip_data, "data:")
+    printArray(addrs, "addrs:")
+    printArray(gold, "gold:")
+    printArray(received, "received:")
+    assert(received == gold)
+  }
+}
+
+
+@spatial class ScatterGather_Bias extends SpatialTest {
+  override def runtimeArgs: Args = "160"
+
+  val tileSize = 32
+  val P = param(1)
+
+
+  def loadScatter[T:Num](addrs: Array[I64], offchip_data: Array[T], numAddr: Int, numData: Int): Array[T] = {
+    val na = ArgIn[Int]
+    setArg(na, numAddr)
+    val nd = ArgIn[Int]
+    setArg(nd, numData)
+
+    val srcAddrs = DRAM[I64](na)
+    val inData = DRAM[T](nd*2)
+    val scatterResult = DRAM[T](nd*2)
+
+    val alldata = offchip_data ++ offchip_data.map{x => x + 1.to[T]}
+    setMem(srcAddrs, addrs)
+    setMem(inData, alldata)
+
+    Accel {
+      val addrs = SRAM[I64](tileSize)
+      Foreach(2 by 1){ page => 
+        val bias = mux(page == 0, 0, nd.value).to[I64]
+        Sequential.Foreach(na by tileSize) { i =>
+          val sram = SRAM[T](tileSize)
+          // val numscats = scatgats_per + random[Int](8)
+          val numscats = tileSize
+          addrs load srcAddrs(i::i + numscats par P)
+          sram gather inData(addrs par P, numscats.to[I64], origin = bias)
+          scatterResult(addrs par P, numscats.to[I64], origin = bias) scatter sram
+        }
+      }
+    }
+
+    getMem(scatterResult)
+  }
+
+
+  def main(args: Array[String]): Unit = {
+    val numAddr = args(0).to[Int]
+    val mul = 2
+    val numData = numAddr*mul*mul
+
+    val nd = numData
+    val na = numAddr
+    val addrs = Array.tabulate[I64](na) { i => (i * mul).to[I64] }
+    val offchip_data = Array.tabulate[Int](nd){ i => i * 10 }
+
+    val received = loadScatter[Int](addrs, offchip_data, na,nd)
+
+    def contains(a: Array[I64], elem: Int) = {
+      a.map { e => e == elem.to[I64] }.reduce {_||_}
+    }
+
+    def indexOf(a: Array[I64], elem: Int) = {
+      val indices = Array.tabulate(a.length.to[Int]) { i => i }
+      if (contains(a, elem)) {
+        a.zip(indices){(e, idx) => if (e == elem.to[I64]) idx else 0 }.reduce{_+_}
+      }
+      else -1
+    }
+
+    val gold = Array.tabulate(nd * 2) { i => 
+      if (i < numData) {if (contains(addrs, i)) offchip_data(i) else 0}
+      else {if (contains(addrs, i - numData)) {offchip_data(i - numData) + 1} else 0}
+    }
+
+    printArray(offchip_data, "data:")
+    printArray(addrs, "addrs:")
+    printArray(gold, "gold:")
+    printArray(received, "received:")
+    assert(received == gold)
+  }
+}

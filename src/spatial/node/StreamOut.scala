@@ -14,6 +14,11 @@ import spatial.lang._
     ens:  Set[Bit])
   extends Enqueuer[A]
 
+/** A banked write of a vector of elements to an StreamOut.
+  * @param mem the StreamOut being written
+  * @param data the vector of data being written to the StreamOut
+  * @param enss the set of enables for each vector element
+  */
 @op case class StreamOutBankedWrite[A:Bits](
   mem:  StreamOut[A],
   data: Seq[Sym[A]],

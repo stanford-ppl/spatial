@@ -23,12 +23,13 @@ case class ScalaGenSpatial(IR: State) extends ScalaCodegen
   with ScalaGenVec
   with ScalaGenStream
   with ScalaGenRegFile
+  with ScalaGenLineBuffer
   with ScalaGenFileIO
   with ScalaGenDelays
   with ScalaGenLUTs {
 
   override def copyDependencies(out: String): Unit = {
-    dependencies ::= FileDep("scalagen", "Makefile", "../")
+    dependencies ::= FileDep("scalagen", "sim.Makefile", "../", Some("Makefile"))
     dependencies ::= FileDep("scalagen", "run.sh", "../")
     dependencies ::= FileDep("scalagen", "build.sbt", "../")
     dependencies ::= FileDep("scalagen/project", "build.properties", "../project/")

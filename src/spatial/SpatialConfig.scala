@@ -24,6 +24,7 @@ class SpatialConfig extends Config {
   var enableResourceReporter: Boolean = false
   var enableTree: Boolean = true
   var enableDot: Boolean = false
+  var enablePythonModel = false
 
   var enableInstrumentation: Boolean = false
   var enableModular: Boolean = true
@@ -48,6 +49,7 @@ class SpatialConfig extends Config {
 
   // Internal flag used to mark whether unit pipe transformer has been run or not
   var allowPrimitivesInOuterControl = true
+
 
   var ignoreParEdgeCases: Boolean = false
   var noInnerLoopUnroll: Boolean = false

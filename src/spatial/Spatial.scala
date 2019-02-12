@@ -16,14 +16,13 @@ import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
 import spatial.metadata.access._
 import spatial.targets.HardwareTarget
-
 import spatial.dse._
 import spatial.transform._
 import spatial.traversal._
+import spatial.model.RuntimeModelGenerator
 import spatial.report._
 import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
-
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -92,7 +91,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val friendlyTransformer   = FriendlyTransformer(state)
     lazy val switchTransformer     = SwitchTransformer(state)
     lazy val switchOptimizer       = SwitchOptimizer(state)
-    lazy val blackboxLowering      = BlackboxLowering(state)
+    lazy val blackboxLowering1     = BlackboxLowering(state, lowerTransfers = false)
+    lazy val blackboxLowering2     = BlackboxLowering(state, lowerTransfers = true)
     lazy val memoryDealiasing      = MemoryDealiasing(state)
     lazy val pipeInserter          = PipeInserter(state)
     lazy val transientCleanup      = TransientCleanup(state)
@@ -110,83 +110,30 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
+    lazy val runtimeModelGen = RuntimeModelGenerator(state)
     lazy val pirCodegen    = PIRGenSpatial(state)
     lazy val tsthCodegen   = TungstenHostGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
-    val result = if (spatialConfig.bootAtDSE) {
+    val result = {
 
-      block ==> /** Immediately toss out block in dsePass */
-        (spatialConfig.enableArchDSE ? dsePass) ==> 
-        blackboxLowering    ==> printer ==> transformerChecks ==>
-        switchTransformer   ==> printer ==> transformerChecks ==>
-        switchOptimizer     ==> printer ==> transformerChecks ==>
-        memoryDealiasing    ==> printer ==> transformerChecks ==>
-        /** Control insertion */
-        pipeInserter        ==> printer ==> transformerChecks ==>
-        /** CSE on regs */
-        regReadCSE          ==>
-        /** Dead code elimination */
-        useAnalyzer         ==>
-        transientCleanup    ==> printer ==> transformerChecks ==>
-        /** Memory analysis */
-        retimingAnalyzer    ==>
-        accessAnalyzer      ==>
-        iterationDiffAnalyzer   ==>
-        memoryAnalyzer      ==>
-        memoryAllocator     ==> printer ==>
-        /** Unrolling */
-        unrollTransformer   ==> printer ==> transformerChecks ==>
-        /** CSE on regs */
-        regReadCSE          ==>
-        /** Dead code elimination */
-        useAnalyzer         ==>
-        transientCleanup    ==> printer ==> transformerChecks ==>
-        /** Hardware Rewrites **/
-        rewriteAnalyzer     ==>
-        rewriteTransformer  ==> printer ==> transformerChecks ==>
-        /** Pipe Flattening */
-        flatteningTransformer ==> 
-        /** Update buffer depths */
-        bufferRecompute     ==> printer ==> transformerChecks ==>
-        /** Accumulation Specialization **/
-        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
-        (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
-        /** Retiming */
-        retiming            ==> printer ==> transformerChecks ==>
-        retimeReporter      ==>
-        /** Broadcast cleanup */
-        broadcastCleanup    ==> printer ==>
-        /** Schedule finalization */
-        initiationAnalyzer  ==>
-        /** Reports */
-        memoryReporter      ==>
-        finalIRPrinter      ==>
-        finalSanityChecks   ==>
-        /** Code generation */
-        treeCodegen         ==>
-        irCodegen           ==>
-        (spatialConfig.enableDot ? dotFlatGen)      ==>
-        (spatialConfig.enableDot ? dotHierGen)      ==>
-        (spatialConfig.enableSim   ? scalaCodegen)  ==>
-        (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen) ==>
-        (spatialConfig.enableResourceReporter ? resourceReporter) ==>
-        (spatialConfig.enablePIR ? pirCodegen)
-    } 
-    else {
-      block ==> printer     ==>
+        block ==> printer     ==>
         cliNaming           ==>
-        friendlyTransformer ==> printer ==> transformerChecks ==>
+        (!spatialConfig.bootAtDSE ? friendlyTransformer) ==> printer ==> transformerChecks ==>
         userSanityChecks    ==>
         /** Black box lowering */
-        switchTransformer   ==> printer ==> transformerChecks ==>
-        switchOptimizer     ==> printer ==> transformerChecks ==>
+        (!spatialConfig.bootAtDSE ? switchTransformer)   ==> printer ==> transformerChecks ==>
+        (!spatialConfig.bootAtDSE ? switchOptimizer)     ==> printer ==> transformerChecks ==>
+        (!spatialConfig.bootAtDSE ? blackboxLowering1)   ==> printer ==> transformerChecks ==>
+        /** Optional python model generator */
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE)? runtimeModelGen) ==>
+        /** More black box lowering */
+        (!spatialConfig.bootAtDSE ? blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
-        (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
+        ((spatialConfig.enableArchDSE && !spatialConfig.bootAtDSE) ? paramAnalyzer) ==> 
         (spatialConfig.enableArchDSE ? dsePass) ==> 
-        blackboxLowering    ==> printer ==> transformerChecks ==>
+        //blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>

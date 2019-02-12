@@ -1,13 +1,16 @@
 package spatial.codegen.chiselgen
 
 import argon._
+import argon.node._
 import argon.codegen.Codegen
+import argon.node._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
 import spatial.metadata.access._
 import spatial.metadata.retiming._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.modeling.scrubNoise
 import spatial.util.spatialConfig
@@ -16,72 +19,17 @@ trait ChiselGenController extends ChiselGenCommon {
 
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
-  private var nbufs: List[(Sym[Reg[_]], Int)]  = List()
-
-  /* Set of control nodes which already have their enable signal emitted */
-  var enDeclaredSet = Set.empty[Sym[_]]
-
-  /* Set of control nodes which already have their done signal emitted */
-  var doneDeclaredSet = Set.empty[Sym[_]]
-
-  var instrumentCounters: List[(Sym[_], Int)] = List()
-
-  /* For every iter we generate, we track the children it may be used in.
-     Given that we are quoting one of these, look up if it has a map entry,
-     and keep getting parents of the currentController until we find a match or 
-     get to the very top
-  */
-
-
-  def createBreakpoint(lhs: Sym[_], id: Int): Unit = {
-    emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).bits := 1.U")
-    emitInstrumentation(src"io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + $id).valid := breakpoints($id)")
-  }
-
-  def createInstrumentation(lhs: Sym[_]): Unit = {
-    if (spatialConfig.enableInstrumentation) {
-      val ctx = s"${lhs.ctx}"
-      emitInstrumentation(src"""// Instrumenting $lhs, context: ${ctx}, depth: ${controllerStack.length}""")
-      val id = instrumentCounters.length
-      if (spatialConfig.compressWires == 1 || spatialConfig.compressWires == 2) {
-        emitInstrumentation(src"ic(${id*2}).io.enable := ${swap(lhs,En)}; ic(${id*2}).reset := accelReset")
-        emitInstrumentation(src"ic(${id*2+1}).io.enable := Utils.risingEdge(${swap(lhs, Done)}); ic(${id*2+1}).reset := accelReset")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ic(${id*2}).io.count""")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ic(${id*2+1}).io.count""")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")        
-      } else {
-        emitInstrumentation(src"""val ${lhs}_cycles = Module(new InstrumentationCounter())""")
-        emitInstrumentation(src"${lhs}_cycles.io.enable := ${swap(lhs,En)}; ${lhs}_cycles.reset := accelReset")
-        emitInstrumentation(src"""val ${lhs}_iters = Module(new InstrumentationCounter())""")
-        emitInstrumentation(src"${lhs}_iters.io.enable := Utils.risingEdge(${swap(lhs, Done)}); ${lhs}_iters.reset := accelReset")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).bits := ${lhs}_cycles.io.count""")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id}).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).bits := ${lhs}_iters.io.count""")
-        emitInstrumentation(src"""io.argOuts(io_numArgOuts_reg + io_numArgIOs_reg + 2 * ${id} + 1).valid := ${swap(hwblock.get, En)}//${swap(hwblock.get, Done)}""")        
-      }
-      instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    }
-  }
-
-
-
-  protected def forEachChild(lhs: Sym[_])(body: (Sym[_],Int) => Unit): Unit = {
-    lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach { case (cc, idx) =>
-      val c = cc.s.get
-      controllerStack.push(c)
-      body(c,idx)
-      controllerStack.pop()
-    }
-  }
+  private var memsWithReset: List[Sym[_]] = List()
 
   final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
+    if (inHw) ctrls = ctrls :+ lhs
     val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
     controllerStack.push(lhs)
+    ensigs = new scala.collection.mutable.ListBuffer[String]
+    if (spatialConfig.enableInstrumentation && inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
     val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
     if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
     else if (lhs.isInnerControl) { depthStats += controllerStack.length }
-
     parent
   }
 
@@ -90,619 +38,596 @@ trait ChiselGenController extends ChiselGenCommon {
     controllerStack.pop()
   }
 
-  final private def allocateValids(lhs: Sym[_], cchain: Sym[CounterChain], iters: Seq[Seq[Sym[_]]], valids: Seq[Seq[Sym[_]]]): Unit = {
-    // Need to recompute ctr data because of multifile 5
-    valids.zip(iters).zipWithIndex.foreach{ case ((layer,count), i) =>
-      layer.zip(count).foreach{ case (v, c) =>
-        // emitGlobalWire(s"//${validPassMap}")
-        emitGlobalModuleMap(src"${v}","Wire(Bool())")  
-        if (lhs.isOuterPipeControl) {
-          lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModuleMap(src"""${swap(src"$v", Blank)}_chain_read_$i""", "Wire(Bool())")}
-        }
-      }
-    }
-  }
-
-  final private def allocateRegChains(lhs: Sym[_], inds:Seq[Sym[_]], cchain:Sym[CounterChain]): Unit = {
-    if (lhs.isOuterPipeControl) {
-      val stages = lhs.children.filter(_.s.get != lhs).map(_.s.get)
-      val Op(CounterChainNew(counters)) = cchain
-      val par = counters.map(_.ctrPar)
-      val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
-      inds.zipWithIndex.foreach { case (idx,index) =>
-        val this_counter = ctrMapping.count(_ <= index) - 1
-        val this_width = bitWidth(counters(this_counter).typeArgs.head)
-        emitGlobalModuleMap(src"""${idx}_chain""", src"""Module(new RegChainPass(${stages.size}, ${this_width}))""")
-        stages.indices.foreach{i => emitGlobalModuleMap(src"""${idx}_chain_read_$i""", src"Wire(new FixedPoint(true,${this_width},0))"); emitGlobalModule(src"""${swap(src"${idx}_chain_read_$i", Blank)} := ${swap(idx, Chain)}.read(${i})""")}
-      }
-    }
-  }
-
-  private final def emitRegChains(lhs: Sym[_]) = {
-    if (lhs.isOuterPipeControl) {
-      val stages = lhs.children.filter(_.s.get != lhs).toList.map(_.s.get)
-      val counters = lhs.cchains.head.counters
-      val par = lhs.cchains.head.pars
-      val ctrMapping = par.indices.map{i => par.dropRight(par.length - i).map(_.toInt).sum}
-      lhs.toScope.iters.toList.zipWithIndex.foreach { case (idx,index) =>
-        val ctr = ctrMapping.count(_ <= index) - 1
-        val w = bitWidth(counters(ctr).typeArgs.head)
-        inGenn(out, "BufferControlCxns", ext) {
-          stages.zipWithIndex.foreach{ case (s, i) =>
-            emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
-            emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
-            emitt(src"""${swap(idx, Chain)}.connectStageCtrl(${swap(s, Done)}, ${swap(s, En)}, $i)""")
-          }
-        }
-        emitt(src"""${swap(idx, Chain)}.chain_pass(${idx}, ${swap(lhs, SM)}.io.doneIn.head)""")
-        // Associate bound sym with both ctrl node and that ctrl node's cchain
-      }
-    }
-  }
-
-  final private def emitValids(lhs: Sym[_], cchain: Sym[CounterChain], iters: Seq[Seq[Sym[_]]], valids: Seq[Seq[Sym[_]]]): Unit = {
+  final private def connectItersAndValids(lhs: Sym[_]) = {
+    val cchain = lhs.cchains.head
+    val iters = lhs.toScope.iters
+    val valids = lhs.toScope.valids
     val Op(CounterChainNew(counters)) = cchain
-    valids.zipWithIndex.foreach{ case (vs,id) =>
-      val base = counters.take(id).map(_.ctrPar.toInt).sum
-      vs.zipWithIndex.foreach{ case(v,i) =>
-        emitt(src"${swap(src"${v}", Blank)} := ~${cchain}.io.output.oobs(${base} + $i)")
-        if (lhs.isOuterPipeControl) {
-          emitGlobalModuleMap(src"""${swap(src"${swap(src"${v}", Blank)}", Chain)}""",src"""Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1))""")
-          lhs.children.filter(_.s.get != lhs).indices.drop(1).foreach{i => emitGlobalModule(src"""${swap(src"${swap(src"${v}", Blank)}_chain_read_$i", Blank)} := ${swap(src"${swap(src"${v}", Blank)}", Chain)}.read(${i}) === 1.U(1.W)""")}
-          inGenn(out, "BufferControlCxns", ext) {
-            lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach{ case (ss, i) =>
-              val s = ss.s.get
-              emitGlobalWireMap(src"${s}_done", "Wire(Bool())")
-              emitGlobalWireMap(src"${s}_en", "Wire(Bool())")
-              emitt(src"""${swap(src"${swap(src"${v}", Blank)}", Chain)}.connectStageCtrl(${DL(swap(s, Done), 1, true)}, ${swap(s,En)}, $i)""")
-            }
-          }
-          emitt(src"""${swap(src"${swap(src"${v}", Blank)}", Chain)}.chain_pass(${swap(src"${v}", Blank)}, ${swap(lhs, SM)}.io.doneIn.head)""")
-        }
-      }
-    }
-  }
-
-  protected def connectMask(ctr: Option[Sym[_]]): Unit = {
-    if (ctr.isDefined) {
-      val ctrl = ctr.get.owner
-      emitt(src"""${swap(ctrl, Mask)} := ~${ctr.get}.io.output.noop & ${and(controllerStack.head.enables)}""")
-    } else {
-      emitt(src"""${swap(controllerStack.head, Mask)} := ${and(controllerStack.head.enables)}""")     
-    }
-  }
-
-
-  final private def emitValidsDummy(iters: Seq[Seq[Sym[_]]], valids: Seq[Seq[Sym[_]]]): Unit = {
-    valids.zip(iters).zipWithIndex.foreach{ case ((layer,count), i) =>
-      layer.zip(count).foreach{ case (v, c) =>
-        emitt(src"val ${v} = true.B")
-      }
-    }
-  }
-
-  final private def emitIICounter(lhs: Sym[_]): Unit = {
-    if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) {
-      emitt(src"""${swap(lhs, IIDone)} := true.B""")
-    } else {
-      emitt(src"""val ${lhs}_IICtr = Module(new IICounter(${swap(lhs, II)}, 2 + Utils.log2Up(${swap(lhs, II)})));""")
-      emitt(src"""${swap(lhs, IIDone)} := ${lhs}_IICtr.io.output.done | ~${swap(lhs, Mask)}""")
-      emitt(src"""${lhs}_IICtr.io.input.enable := ${swap(lhs,DatapathEn)}""")
-      emitt(src"""${lhs}_IICtr.io.input.reset := accelReset | ${swap(lhs, SM)}.io.parentAck""")
-    }
-  }
-
-  final private def allocateIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
-    val Op(CounterChainNew(counters)) = cchain
-    iters.zipWithIndex.foreach{ case (is, i) =>
+    iters.zipWithIndex.foreach{ case (iter, id) =>
+      val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
       val w = bitWidth(counters(i).typeArgs.head)
-      is.zipWithIndex.foreach{ case (iter, j) =>
-        emitGlobalWireMap(src"${iter}", src"Wire(new FixedPoint(true,${w},0))")
-      }
+    }
+    valids.zipWithIndex.foreach{ case (v,id) => 
     }
   }
 
+  final private def connectBufs(lhs: Sym[_]): Unit = {
+    bufMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
+      emit(src"""${mem}.connectStageCtrl(${DL(src"$done", 1, true)}, $baseEn, ${port})""")
+    }
+  }
+  final private def connectChains(lhs: Sym[_]): Unit = {
+    regchainsMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
+      val swobj = if (lhs.isBranch) "_obj" else ""
+      emit(src"""${mem}_chain.connectStageCtrl(${DLo(src"${lhs}${swobj}.done", 1, src"$lhs" + swobj, true)}, ${lhs}${swobj}.baseEn, ${port})""")
+    }
+  }
 
-  final private def emitIters(iters: Seq[Seq[Sym[_]]], cchain: Sym[CounterChain]) = {
+  final private def emitItersAndValids(lhs: Sym[_]) = {
+    val cchain = lhs.cchains.head
+    val iters = lhs.toScope.iters
+    val valids = lhs.toScope.valids
     val Op(CounterChainNew(counters)) = cchain
-    iters.zipWithIndex.foreach{ case (is, id) =>
-      val base = counters.take(id).map(_.ctrPar.toInt).sum
-      is.zipWithIndex.foreach{ case (iter, j) =>
-        emitt(src"${swap(src"${iter}", Blank)}.r := ${cchain}.io.output.counts($base + $j).r")
+    iters.zipWithIndex.foreach{ case (iter, id) =>
+      val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
+      val w = bitWidth(counters(i).typeArgs.head)
+      emit(src"""val $iter = ${cchainOutput}.counts($id).FP(true, $w, 0); $iter.suggestName("$iter")""")
+      if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
+        lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach{case (st, port) => 
+          regchainsMapping += (st.s.get -> {regchainsMapping.getOrElse(st.s.get, List[BufMapping]()) ++ List(BufMapping(iter, port))})
+        }
+        emit(src"""val ${iter}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, ${w}, myName = "${iter}_chain")); ${iter}_chain.io <> DontCare""")
+        emit(src"""${iter}_chain.chain_pass(${iter}, ${iodot}sigsOut.smDoneIn.head)""")
+        forEachChild(lhs){case (c, i) => 
+          val swobj = if (c.isBranch) "_obj" else ""
+          if (i > 0) emit(src"""val ${iter}_chain_read_$i = ${iter}_chain.read($i).FP(true,${w},0)""")
+        }
+      }
+    }
+    valids.zipWithIndex.foreach{ case (v,id) => 
+      emit(src"""val $v = ~${cchainOutput}.oobs($id); $v.suggestName("$v")""")
+      if (lhs.isOuterPipeLoop && lhs.children.filter(_.s.get != lhs).size > 1) {
+        emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.filter(_.s.get != lhs).size}, 1, myName = "${v}_chain")); ${v}_chain.io <> DontCare""")
+        emit(src"""${v}_chain.chain_pass(${v}, ${iodot}sigsOut.smDoneIn.head)""")
+        lhs.children.filter(_.s.get != lhs).zipWithIndex.foreach{case (st, port) => 
+          regchainsMapping += (st.s.get -> {regchainsMapping.getOrElse(st.s.get, List[BufMapping]()) ++ List(BufMapping(v, port))})
+        }
+        forEachChild(lhs){case (c, i) => 
+          val swobj = if (c.isBranch) "_obj" else ""
+          if (i > 0) emit(src"""val ${v}_chain_read_$i: Bool = ${v}_chain.read($i).apply(0)""")
+        }
       }
     }
   }
 
-  protected def emitChildrenCxns(sym: Sym[_], isFSM: Boolean = false): Unit = {
-    val isInner = sym.isInnerControl
-
-    forEachChild(sym){case (c, idx) => 
-      sym match {
-        case Op(op@Switch(_,_)) => 
-          emitt(src"""${swap(c, BaseEn)} := ${swap(sym, SM)}.io.selectsOut($idx)""")
-          emitt(src"""${swap(c, En)} := ${swap(sym, SM)}.io.selectsOut($idx)""")
-          emitt(src"""${swap(sym, SM)}.io.doneIn($idx) := ${swap(c, Done)}""")
-        case Op(op@SwitchCase(_)) => 
-          emitt(src"""${swap(c, BaseEn)} := ${swap(sym,DatapathEn)}""")
-          emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")
-        case _ if (isInner) => // Happens when a controller (FSM, Foreach, etc) contains a switch with inner style cases
-          emitt(src"""${swap(c, En)} := ${swap(sym,DatapathEn)}""")  
-          emitt(src"""${swap(sym, SM)}.io.doneIn($idx) := ${swap(c,Done)}""")  
-        case _ => 
+  final private def emitItersAndValidsStream(lhs: Sym[_]) = {
+    val cchain = lhs.cchains.head
+    val iters = lhs.toScope.iters
+    val valids = lhs.toScope.valids
+    val Op(CounterChainNew(counters)) = cchain
+    forEachChild(lhs){case (c, ii) => 
+      iters.zipWithIndex.foreach{ case (iter, id) =>
+        val i = cchain.constPars.zipWithIndex.map{case(_,j) => cchain.constPars.take(j+1).sum}.indexWhere(id < _)
+        val w = bitWidth(counters(i).typeArgs.head)
+        emit(src"val ${iter}_copy$c = ${cchainCopyOutput(ii)}.counts($id).FP(true, $w, 0)")
       }
-      if (!isInner) emitt(src"""${swap(sym, SM)}.io.maskIn(${idx}) := ${swap(c, Mask)}""")
-      emitt(src"""${swap(c, SM)}.io.parentAck := ${swap(sym, SM)}.io.childAck(${idx})""")
+      valids.zipWithIndex.foreach{ case (v,id) => 
+        emit(src"val ${v}_copy$c = ~${cchainCopyOutput(ii)}.oobs($id)")
+      }
+
     }
+  }
 
-    /* Control Signals to Children Controllers */
-    if (!isInner) {
-      emitt(src"""// ---- Begin ${sym.rawSchedule.toString} $sym Children Signals ----""")
+  private def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
+    // Find everything that is used in this scope
+    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
+    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet
+    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl).toSet ++ getWriteStreams(lhs.toCtrl).toSet} else Set()
+    val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
+    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
 
-      forEachChild(sym) { case (c, idx) =>
-        val streamAddition = getStreamEnablers(c)
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
+    dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
+    (allUsed diff made).filterNot{s => s.isValue}.toSeq    
+  }
 
-        val base_delay = if (spatialConfig.enableTightControl) 0 else 1
-        emitt(src"""${swap(c, BaseEn)} := ${DL(src"${swap(sym, SM)}.io.enableOut(${idx})", base_delay, true)} & ${DL(src"~${swap(c, Done)}", 1, true)} & ${and(c.enables)}""")  
-        emitt(src"""${swap(c, En)} := ${swap(c, BaseEn)} ${streamAddition}""")  
+  private def groupInputs(ins: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
+    ins.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map((List(_) -> name)) else Seq((ins -> name))}.flatten.toMap
+  }
 
-        // If this is a stream controller, need to set up counter copy for children
-        if (sym.isOuterStreamLoop) {
-          emitt(src"""// ${swap(sym, SM)}.io.parentAck := ${swap(src"${sym.cchains.head}", Done)} // Not sure why this used to be connected, since it can cause an extra command issued""")
-          emitGlobalWireMap(src"""${swap(src"${sym.cchains.head}", En)}""", """Wire(Bool())""") 
-          emitt(src"""${swap(src"${sym.cchains.head}", En)} := ${swap(c,Done)}//${if (getStreamAdvancement(c) != "") getStreamAdvancement(c) else swap(c, Done)}""")
-          emitt(src"""${swap(src"${sym.cchains.head}", Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")
-          emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(src"${sym.cchains.head}",Done)}""")
-        } else if (sym.isOuterStreamControl) {
-          emitt(src"""${swap(sym, SM)}.io.ctrCopyDone(${idx}) := ${swap(c, Done)}""")
+  private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
+    val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
+    // val oldInputs = scopeInputs
+    // scopeInputs = inputs.toList
+
+    val isInner = lhs.isInnerControl
+    val swobj = if (lhs.isBranch) "_obj" else ""
+
+    dbgs(s"${stm(lhs)}")
+    val chainPassedInputs = inputs.map{x => appendSuffix(lhs, x)}
+    inputs.foreach{in => dbgs(s" - ${stm(in)}") }
+    chainPassedInputs.foreach{in => dbgs(s" - ${in}") }
+
+    val useMap = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
+    scoped --= useMap.map(_._1)
+
+    inGen(out, src"sm_$lhs.scala"){
+      emitHeader()
+
+      val ret = if (lhs.op.exists(_.R.isBits)) src"${arg(lhs.op.get.R.tp, Some(lhs))}" else "Unit"
+      emit(src"/** Hierarchy: ${controllerStack.mkString(" -> ")} **/")
+      emit(src"/** BEGIN ${lhs.name} $lhs **/")
+      val groupedInputs = groupInputs(inputs)
+      open(src"class ${lhs}_kernel(")
+        groupedInputs.foreach{case (ins, typ) => 
+          if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).foreach{c => emit(src"${ins.head}_copy$c: ${arg(ins.head.tp, Some(ins.head))},")}
+          else emit(src"list_${ins.head}: List[$typ],")
         }
-        emitt(src"""${swap(sym, SM)}.io.doneIn(${idx}) := ${swap(c, Done)};""")
-        if (c match { case Op(_: StateMachine[_]) => true; case _ => false}) emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)} | ${DL(swap(c, Done), 1, true)}""") //changed on 12/13 // If this is an fsm, we want it to reset with each iteration, not with the reset of the parent
-        else emitt(src"""${swap(c, Resetter)} := ${DL(src"${swap(sym, SM)}.io.ctrRst", 1, true)}""")   //changed on 12/13
+        emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
+        // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
+        // emit("rr: ")
+      closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
+
+      createSMObject(lhs)
+
+      if (spatialConfig.enableModular) {
+        open(src"abstract class ${lhs}_module(depth: Int)(implicit stack: List[KernelHash]) extends Module {")
+          open("val io = IO(new Bundle {")
+            inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
+              if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"val in_${in}_copy$c = ${port(in.tp, Some(in))}")}
+              else emit(src"val in_$in = ${port(in.tp, Some(in))}")
+            }
+            if (spatialConfig.enableInstrumentation) emit("val in_instrctrs = Vec(api.numCtrls, Output(new InstrCtr()))")
+            val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
+            val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
+            val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
+            val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
+            emit(s"val in_breakpoints = Vec(api.numArgOuts_breakpts, Output(Bool()))")
+            emit(s"val sigsIn = Input(new InputKernelSignals(${nMyChildren}, ${ctrcopies}, $ctrPars, $ctrWidths))")
+            emit(s"val sigsOut = Output(new OutputKernelSignals(${nMyChildren}, ${ctrcopies}))")
+            emit("val rr = Input(Bool())")
+            if (lhs.op.exists(_.R.isBits)) emit(src"val ret = Output(${remap(lhs.op.get.R.tp)})")
+          close("})")
+          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
+            if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"def ${in}_copy$c = {io.in_${in}_copy$c}; io.in_${in}_copy$c := DontCare")}
+            else emit(src"def $in = {io.in_$in} ${if (ledgerized(in) | in.isCounterChain) src"; io.in_$in := DontCare" else ""}")
+          }
+
+        close("}")
+
+        val numgrps = math.ceil(inputs.filter(!_.isString).size.toDouble / 100.0)
+        inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  => 
+          open(src"def connectWires${grpid}(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
+            inpgrp.foreach{ in => 
+            if (ledgerized(in)) {
+              emit(src"${in}.connectLedger(module.io.in_$in)")
+              if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
+              else if (in.isMergeBuffer || in.isDRAMAccel) emit(src"module.io.in_${in}.output <> ${in}.output")
+              else if (in.isBreaker) emit(src"module.io.in_${in}.rPort <> ${in}.rPort")
+            } 
+            else if (cchainCopies.contains(in)) cchainCopies(in).map{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
+            else if (in.isCounterChain) emit(src"module.io.in_${in}.input <> ${in}.input; module.io.in_${in}.output <> ${in}.output")
+            else emit(src"module.io.in_$in <> ${in}")}
+          close("}")
+        }
+      }
+
+      groupedInputs.collect{case (ins, typ) if !cchainCopies.contains(ins.head) => 
+        ins.zipWithIndex.foreach{case (in, i) => emit(src"val $in = list_${ins.head}($i)")}
+      }
+
+      open(src"def kernel(): $ret = {")
+        emit(src"""Ledger.enter(this.hashCode, "${lhs}$swobj")""")
+        emit("implicit val stack = ControllerStack.stack.toList")
+        if (spatialConfig.enableModular) {
+          open(src"class ${lhs}_concrete(depth: Int)(implicit stack: List[KernelHash]) extends ${lhs}_module(depth) {")
+            emit("io.sigsOut := DontCare")
+            emit("val breakpoints = io.in_breakpoints; breakpoints := DontCare")
+            if (spatialConfig.enableInstrumentation) emit("val instrctrs = io.in_instrctrs; instrctrs := DontCare")
+            emit("val rr = io.rr")
+        }
+        if (lhs.op.exists(_.R.isBits) && !spatialConfig.enableModular) emit(src"val ret = Wire(${remap(lhs.op.get.R.tp)})")
+        if (spatialConfig.enableInstrumentation) {
+          emit("""val cycles = Module(new InstrumentationCounter())""")
+          emit("""val iters = Module(new InstrumentationCounter())""")          
+          emit(src"cycles.io.enable := $baseEn")
+          emit(src"iters.io.enable := risingEdge($done)")
+          if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
+            emit("""val stalls = Module(new InstrumentationCounter())""")
+            emit("""val idles = Module(new InstrumentationCounter())""")          
+            emit(src"stalls.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+            emit(src"idles.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${quote(lhs).toUpperCase}_instrctr, cycles.io.count, iters.io.count, stalls.io.count, idles.io.count)")
+          } else {
+            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${quote(lhs).toUpperCase}_instrctr, cycles.io.count, iters.io.count, 0.U, 0.U)")
+          }
+        }
+
+        // Set up reg chains
+        if (!lhs.isOuterStreamControl) {
+          if (lhs.cchains.nonEmpty) {
+            emitItersAndValids(lhs)
+          }
+        }
+        else {
+          if (lhs.isOuterStreamLoop) emitItersAndValidsStream(lhs)
+        }
+
         
+        // Emit body
+        contents
+
+        // Connect reg chains and buffered mems
+        if (!lhs.isOuterStreamControl) {
+          if (lhs.cchains.nonEmpty) {
+            connectItersAndValids(lhs)
+          }
+        }
+
+        connectBufs(lhs)
+
+        if (spatialConfig.enableModular) {
+          close("}")
+          emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth)); module.io := DontCare")
+          val numgrps = math.ceil(inputs.filter(!_.isString).size.toDouble / 100.0).toInt
+          List.tabulate(numgrps){i => emit(src"connectWires$i(module)")}
+          if (spatialConfig.enableInstrumentation) emit("Ledger.connectInstrCtrs(instrctrs, module.io.in_instrctrs)")
+          emit(src"Ledger.connectBreakpoints(breakpoints, module.io.in_breakpoints)")
+          emit("module.io.rr := rr")
+          emit("module.io.sigsIn := me.sigsIn")
+          emit("me.sigsOut := module.io.sigsOut")
+
+          if (lhs.op.exists(_.R.isBits)) emit("val ret = module.io.ret")
+        }
+        emit("""Ledger.exit()""")
+        if (lhs.op.exists(_.R.isBits)) emit("ret")
+        close("}")
+      close("}")
+      emit(src"/** END ${lhs.op.get.name} $lhs **/")
+      emitFooter()
+    }
+    // scopeInputs = oldInputs
+    scoped ++= useMap
+  }
+
+  private def quoteCChainCopy(cchain: Sym[_], copy: Sym[_]): String = {
+    if (scoped.contains(cchain)) scoped(cchain).assemble(src"_copy$copy")
+    else src"${cchain}_copy$copy"
+  }
+
+  private def instantiateKernel(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(modifications: => Unit): Unit = {
+    val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
+
+    val isInner = lhs.isInnerControl
+    val swobj = if (lhs.isBranch) "_obj" else ""
+    val groupedInputs = groupInputs(inputs)
+
+    val chainPassedInputs = groupedInputs.map{case (ins, typ) => 
+      if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).map{c => quoteCChainCopy(ins.head, c)}
+      else List(ins.map{x => appendSuffix(lhs, x)}.mkString("List(", ",", ")"))
+    }.flatten
+    
+    val parent = if (controllerStack.size == 1) "None" else "Some(me)"
+    val cchain = if (lhs.cchains.nonEmpty) {
+        if (lhs.isOuterStreamControl) {
+          val ccs = lhs.children.filter(_.s.get != lhs).map{c => quoteCChainCopy(lhs.cchains.head, c.s.get)}
+          src"List(${ccs.mkString(",")})"
+        } else src"List(${lhs.cchains.head})"
+      }
+      else "List()"
+    val childId = if (controllerStack.size == 1) -1 else s"${lhs.parent.s.get.children.filter(_.s.get != lhs.parent.s.get).map(_.s.get).indexOf(lhs)}"
+    val nMyChildren = lhs.children.filter(_.s.get != lhs).size max 1
+    val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
+    val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
+    val ctrWidths = if (lhs.cchains.nonEmpty && !lhs.cchains.head.isForever) src"List(${lhs.cchains.head.widths})" else "List(32)"
+    emit(src"val ${lhs}$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, $nMyChildren, $ctrcopies, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs.toList, " else ""}rr)")
+    modifications
+    // Wire signals to SM object
+    if (!lhs.isOuterStreamControl) {
+      if (lhs.cchains.nonEmpty) {
+        val ctr = lhs.cchains.head
+        // if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) {
+        //   emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+        //   emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+        // }
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${DL(src"${lhs}$swobj.cchain.head.output.done", 1, true)}""")
+      } else if (lhs.isInnerControl & lhs.children.filter(_.s.get != lhs).nonEmpty & (lhs match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
+        val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
+      } else if (lhs.isSwitch) { // switch, ctrDone is replaced with doneIn(#)
+      } else if (lhs match {case Op(_:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length > 0) => true; case _ => false }) {
+        val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
+      } else if (lhs match {case Op(_:StateMachine[_]) if (isInner && lhs.children.filter(_.s.get != lhs).length == 0) => true; case _ => false }) {
+        val x = lhs match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := ${lhs}$swobj.iiDone.D(${x.fullDelay})""")
+      } else {
+        emit(src"""${lhs}$swobj.sm.io.ctrDone := risingEdge(${lhs}$swobj.sm.io.ctrInc)""")
       }
     }
-    /* Emit reg chains */
-    emitRegChains(sym)
+
+    connectChains(lhs)
+
+    // if (spatialConfig.enableInstrumentation && (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl))) { // TBD
+    //   emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+    //   emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+    // }
+    emit(src"${lhs}$swobj.backpressure := ${getBackPressure(lhs.toCtrl)} | ${lhs}$swobj.sm.io.doneLatch")
+    emit(src"${lhs}$swobj.forwardpressure := ${getForwardPressure(lhs.toCtrl)} | ${lhs}$swobj.sm.io.doneLatch")
+    emit(src"${lhs}$swobj.sm.io.enableOut.zip(${lhs}$swobj.smEnableOuts).foreach{case (l,r) => r := l}")
+
+    lhs match {
+      case Op(UnrolledForeach(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
+      case Op(UnrolledReduce(ens,cchain,func,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"${lhs}$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
+      case _ => emit(src"${lhs}$swobj.sm.io.break := false.B") 
+    }
+    if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
+    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
+    val noop = if (lhs.cchains.nonEmpty) src"~${lhs}.cchain.head.output.noop" else "true.B"
+    val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
+    emit(src"${lhs}$swobj.mask := $noop & $parentMask")
+
+    val sigsIn = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsIn)"
+    val sigsOut = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsOut)"
+    emit(src"""${lhs}$swobj.configure("${lhs}$swobj", ${sigsIn}, ${sigsOut}, isSwitchCase = ${lhs.isSwitchCase && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl})""")
+      
+    if (lhs.op.exists(_.R.isBits)) emit(src"${lhs}.r := ${lhs}$swobj.kernel().r")
+    else emit(src"${lhs}$swobj.kernel()")
 
   }
 
-  def emitController(sym:Sym[_], isFSM: Boolean = false): Unit = {
-    val isInner = sym.isInnerControl
-    val lat = if (spatialConfig.enableRetiming & sym.isInnerControl) {
-      sym match {
-          case Op(_: SwitchCase[_]) => scrubNoise(sym.parent.s.get.bodyLatency.sum) // For some reason, inner SwitchCases don't have latency set (issue #83)
-          case _ => scrubNoise(sym.bodyLatency.sum)
-        }
-      }
-      else 0.0
-    val ii = sym match {
-          case Op(_: SwitchCase[_]) => scrubNoise(sym.parent.s.get.II) // For some reason, inner SwitchCases don't have II set (issue #83)
-          case _ => scrubNoise(sym.II)
-        }
+
+  private def createSMObject(lhs:Sym[_]): Unit = {
+
+    val swobj = if (lhs.isBranch) "_obj" else ""
+    val isInner = lhs.isInnerControl
+    val lat = if (spatialConfig.enableRetiming & lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+    val ii = if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
 
     // Construct controller args
-    emitt(src"""//  ---- ${sym.level.toString}: Begin ${sym.rawSchedule.toString} $sym Controller ----""")
-    val constrArg = if (sym.isInnerControl) {s"$isFSM"} else {s"${sym.children.filter(_.s.get != sym).length}, isFSM = ${isFSM}"}
-    val isPassthrough = sym match{
-      case Op(_: Switch[_]) if isInner && sym.parent.s.isDefined && sym.parent.s.get.isInnerControl => ",isPassthrough = true";
-      case Op(_:SwitchCase[_]) if isInner && sym.parent.s.get.parent.s.isDefined && sym.parent.s.get.parent.s.get.isInnerControl => ",isPassthrough = true";
+    val constrArg = if (lhs.isInnerControl) {s"${lhs.isFSM}"} else {s"${lhs.children.filter(_.s.get != lhs).length}, isFSM = ${lhs.isFSM}"}
+    val isPassthrough = lhs match{
+      case Op(_: Switch[_]) if isInner && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl => ",isPassthrough = true";
+      case Op(_:SwitchCase[_]) if isInner && lhs.parent.s.get.parent.s.isDefined && lhs.parent.s.get.parent.s.get.isInnerControl => ",isPassthrough = true";
       case _ => ""
     }
-    val stw = sym match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
-    val ncases = sym match{
+    val stw = lhs match{case Op(StateMachine(_,_,notDone,_,_)) => s",stateWidth = ${bitWidth(notDone.input.tp)}"; case _ => ""}
+    val ncases = lhs match{
       case Op(x: Switch[_]) => s",cases = ${x.cases.length}"
-      case Op(x: SwitchCase[_]) if isInner & sym.children.filter(_.s.get != sym).nonEmpty => s",cases = ${sym.children.filter(_.s.get != sym).length}"
-      case Op(_: StateMachine[_]) if isInner & sym.children.filter(_.s.get != sym).nonEmpty => s", cases=${sym.children.filter(_.s.get != sym).length}"
+      case Op(x: SwitchCase[_]) if isInner & lhs.children.filter(_.s.get != lhs).nonEmpty => s",cases = ${lhs.children.filter(_.s.get != lhs).length}"
+      case Op(_: StateMachine[_]) if isInner & lhs.children.filter(_.s.get != lhs).nonEmpty => s", cases=${lhs.children.filter(_.s.get != lhs).length}"
       case _ => ""
     }
 
-    // Generate standard control signals for all types
-    emitGlobalRetimeMap(src"""${sym}_latency""", s"$lat.toInt")
-    emitGlobalRetimeMap(src"""${sym}_ii""", s"$ii.toInt")
-
-    // Emit control signals for children up front because of blk/parent distinction, a regread in an outer pipe may use control signals of a still-to-be-visited controller
-    forEachChild(sym){case (c, idx) => emitControlSignals(c)}
-
-    createInstrumentation(sym)
-
-    // Create controller
-    emitGlobalModuleMap(src"${sym}_sm", src"Module(new ${sym.level.toString}(templates.${sym.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = ${swap(sym, Latency)}))")
-
-    // Connect enable and rst in (rst)
-    emitt(src"""${swap(sym, SM)}.io.enable := ${swap(sym, En)} & retime_released ${getNowValidLogic(sym)} ${getStreamReadyLogic(sym)}""")
-    emitt(src"""${swap(sym, SM)}.io.rst := ${swap(sym, Resetter)} // generally set by parent""")
-
-    //  Capture rst out (ctrRst)
-    emitGlobalWireMap(src"""${swap(sym, RstEn)}""", """Wire(Bool())""") 
-    emitt(src"""${swap(sym, RstEn)} := ${swap(sym, SM)}.io.ctrRst // Generally used in inner pipes""")
-
-    // Capture sm done
-    val streamOuts = getAllReadyLogic(sym.toCtrl).mkString(" && ")
-    emitt(src"""${swap(sym, Done)} := ${swap(sym, SM)}.io.done // Used to delay in cg, now delay in templates""")
-    emitt(src"""${swap(sym, SM)}.io.flow := ${swap(sym, BaseEn)} ${getStreamReadyLogic(sym)}""")
-    // if (!(streamOuts.replaceAll(" ", "") == "")) {
-    //   emitt(src"""${swap(sym, Done)} := Utils.streamCatchDone(${swap(sym, SM)}.io.done, $streamOuts, ${swap(sym, Retime)}, rr, accelReset) // Directly connecting *_done.D* creates a hazard on stream pipes if ~*_ready turns off for that exact cycle, since the retime reg will reject it""")
-    // } else {
-    //   emitt(src"""${swap(sym, Done)} := ${DL(src"${swap(sym, SM)}.io.done", swap(sym, Retime), true)} // Used to catch risingEdge""")
-    // }
-
-    // Capture datapath_en
-    if (sym.cchains.isEmpty) emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ${swap(sym, Mask)} // Used to have many variations""")
-    else emitt(src"""${swap(sym, DatapathEn)} := ${swap(sym, SM)}.io.datapathEn & ${swap(sym, Mask)} & ~${swap(sym, SM)}.io.ctrDone // Used to have many variations""")
-
-    // Update bound sym watchlists
-    (sym.toScope.iters ++ sym.toScope.valids).foreach{ item =>
-      if (sym.isPipeControl) pipeChainPassMap += (item -> sym.children.filter(_.s.get != sym).toList.map(_.s.get))
-      else if (sym.isStreamControl) {streamCopyWatchlist = streamCopyWatchlist :+ item}
-    }
-
-    // Emit counterchain(s)
-    if (sym.isOuterStreamLoop) {
-      streamCopyWatchlist = streamCopyWatchlist :+ sym.cchains.head
-      sym.cchains.head.counters.foreach{c => streamCopyWatchlist = streamCopyWatchlist :+ c}
-      forEachChild(sym){case (c, idx) =>
-        emitCounterChain(sym)
-        emitt(src"""${swap(sym.cchains.head, En)} := ${swap(sym, SM)}.io.ctrInc & ${swap(sym, IIDone)} ${getNowValidLogic(sym)}""")
-      }
-    } 
-    else {
-      emitCounterChain(sym)  
-      // Hook up ctr done
-      if (sym.cchains.nonEmpty && !sym.cchains.head.isForever) {
-        val ctr = sym.cchains.head
-        emitt(src"""${swap(ctr, En)} := ${swap(sym, SM)}.io.ctrInc & ${swap(sym, IIDone)} ${getNowValidLogic(sym)}""")
-        if (getReadStreams(sym.toCtrl).nonEmpty) emitt(src"""${swap(ctr, Resetter)} := ${DL(swap(sym, Done), 1, true)} // Do not use rst_en for stream kiddo""")
-        emitt(src"""${swap(ctr, Resetter)} := ${swap(sym, RstEn)}""")
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${DL(swap(ctr, Done), 1, true)}""")
-      } else if (sym.isInnerControl & sym.children.filter(_.s.get != sym).nonEmpty & (sym match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(src"${sym.children.filter(_.s.get != sym).head.s.get}", Done)}""")
-      } else if (sym match {case Op(Switch(_,_)) => true; case _ => false}) { // switch, ctrDone is replaced with doneIn(#)
-      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length > 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym.children.filter(_.s.get != sym).head.s.get, Done)}""")
-      } else if (sym match {case Op(_:StateMachine[_]) if (isInner && sym.children.filter(_.s.get != sym).length == 0) => true; case _ => false }) {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := ${swap(sym, IIDone)}.D(${swap(sym, II)}) // extremely screwy logic?""")
-      } else {
-        emitt(src"""${swap(sym, SM)}.io.ctrDone := Utils.risingEdge(${swap(sym, SM)}.io.ctrInc)""")
-      }
-    }
-
+    emit("")
+    emit("val me = this")
+    emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm")); sm.io <> DontCare""")
+    emit(src"""val iiCtr = Module(new IICounter(${ii}.toInt, 2 + fringe.utils.log2Up(${ii}.toInt), "${lhs}_iiCtr"))""")
+    emit("")
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func) =>
+      RemoteMemories.all.collect{case x if (x.isDRAMAccel) => 
+        val id = accelDrams.size
+        accelDrams += (x -> id)
+        val Op(DRAMAccelNew(dim)) = x
+        val reqCount = x.consumers.collect {
+          case w@Op(_: DRAMAlloc[_,_] | _: DRAMDealloc[_,_]) => w
+        }.size
+        connectDRAMStreams(x)
+        forceEmit(src"""val $x = Module(new DRAMAllocator(${dim}, $reqCount)).io; $x <> DontCare""")
+        forceEmit(src"top.io.heap($id).req := $x.output.heapReq")
+        if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${x}_p", ${param(x).get})  """)
+        forceEmit(src"$x.heapResp := top.io.heap($id).resp")
+      }
       inAccel{
+        emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+        emit(src"""retime_counter.io.setup.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
+        emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
+        emit(src"""val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
+        if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List.fill[InstrCtr](api.numCtrls)(Wire(new InstrCtr()))""")
+        emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
-        val streamAddition = getStreamEnablers(lhs)
-        emitControlSignals(lhs)
-        emitController(lhs)
-        emitGlobalWire(src"val accelReset = reset.toBool | io.reset")
-        emitt(s"""${swap(lhs, BaseEn)} := io.enable""")
-        emitt(s"""${swap(lhs, En)} := ${swap(lhs, BaseEn)} & !io.done ${streamAddition}""")
-        emitt(s"""${swap(lhs, Resetter)} := Utils.getRetimed(accelReset, 1)""")
-        emitt(src"""${swap(lhs, Mask)} := true.B""")
-        emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())""")
-        emitIICounter(lhs)
-        emitt(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(max_latency), Some(1), Some(0))) // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-        // emitt(src"""retime_counter.io.input.start := 0.S; retime_counter.io.input.stop := (max_latency.S); retime_counter.io.input.stride := 1.S; retime_counter.io.input.gap := 0.S""")
-        emitt(src"""retime_counter.io.input.saturate := true.B; retime_counter.io.input.reset := accelReset; retime_counter.io.input.enable := true.B;""")
-        emitGlobalWire(src"""val retime_released_reg = RegInit(false.B)""")
-        emitGlobalWire(src"""val retime_released = ${DL("retime_released_reg", 1)}""")
-        emitGlobalWire(src"""val rr = retime_released // Shorthand""")
-        emitt(src"""retime_released := ${DL("retime_counter.io.output.done",1)} // break up critical path by delaying this """)
-        // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-
-        emitt(src"""${swap(lhs, SM)}.io.parentAck := io.done""")
-        visitBlock(func)
-        emitChildrenCxns(lhs)
-
-        emitt(s"""val done_latch = Module(new SRFF())""")
+        instantiateKernel(lhs, Set(), func){
+          emit(src"""${lhs}.baseEn := top.io.enable && rr && ~done_latch.io.output""")  
+          emit(src"""${lhs}.resetMe := getRetimed(top.accelReset, 1)""")
+          emit(src"""${lhs}.mask := true.B""")
+          emit(src"""${lhs}.sm.io.parentAck := top.io.done""")
+          emit(src"""${lhs}.sm.io.enable := ${lhs}.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
+          emit(src"""done_latch.io.input.reset := ${lhs}.resetMe""")
+          emit(src"""done_latch.io.input.asyn_reset := ${lhs}.resetMe""")
+          emit(src"""top.io.done := done_latch.io.output""")
+        }
+        writeKernelClass(lhs, Set(), func){
+          gen(func)
+        }
         if (earlyExits.nonEmpty) {
           appPropertyStats += HasBreakpoint
-          emitGlobalWire(s"""val breakpoints = Wire(Vec(${earlyExits.length}, Bool()))""")
-          emitt(s"""done_latch.io.input.set := ${swap(lhs, Done)} | breakpoints.reduce{_|_}""")        
+          earlyExits.zipWithIndex.foreach{case (e, i) => 
+            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
+            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
+          }
+          emit(src"""done_latch.io.input.set := ${lhs}.done | breakpoints.reduce{_|_}""")        
         } else {
-          emitt(s"""done_latch.io.input.set := ${swap(lhs, Done)}""")                
+          emit(src"""done_latch.io.input.set := ${lhs}.done""")                
         }
-        emitt(s"""done_latch.io.input.reset := ${swap(lhs, Resetter)}""")
-        emitt(s"""done_latch.io.input.asyn_reset := ${swap(lhs, Resetter)}""")
-        emitt(s"""io.done := done_latch.io.output.data""")
+
+        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(top, instrctrs)")
+
+        emit("Ledger.finish()")
         exitCtrl(lhs)
       }
 
-    case UnitPipe(ens,func) =>
-      // emitGlobalWireMap(src"${lhs}_II_done", "Wire(Bool())")
-      // // emitGlobalWireMap(src"${lhs}_inhibitor", "Wire(Bool())") // hack
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs)
-      connectMask(None)
-      emitGlobalWire(src"""${swap(lhs, IIDone)} := true.B""")
-      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-      inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emitt(s"// Controller Stack: ${controllerStack.tail}")
-        visitBlock(func)
-        emitChildrenCxns(lhs)
+    case ctrl: EnControl[_] if !lhs.isFSM => 
+      enterCtrl(lhs)
+      instantiateKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*){}
+      writeKernelClass(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {
+        ctrl.bodies.flatMap{_.blocks.map(_._2)}.foreach{b => gen(b); ()}
       }
       exitCtrl(lhs)
 
-    case ParallelPipe(ens,func) =>
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs)
-      connectMask(None)
-      emitGlobalWire(src"""${swap(lhs, IIDone)} := true.B""")
-      inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emitt(s"// Controller Stack: ${controllerStack.tail}")
-        visitBlock(func)
-        emitChildrenCxns(lhs)
-      } 
-      exitCtrl(lhs)
-
-    case UnrolledForeach(ens,cchain,func,iters,valids) if (inHw) =>
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs)
-      emitIICounter(lhs)
-      if (lhs.isStreamControl) forEachChild(lhs){case (c,i) => allocateIters(iters, cchain)}
-      else allocateIters(iters, cchain)
-      allocateRegChains(lhs, iters.flatten, cchain)
-      if (lhs.isPipeControl | lhs.isSeqControl) {
-        inSubGen(src"${lhs}", src"${parent_kernel}") {
-          emitt(s"// Controller Stack: ${controllerStack.tail}")
-          emitIters(iters, cchain)
-          allocateValids(lhs, cchain, iters, valids)
-          visitBlock(func)
-          emitChildrenCxns(lhs)
-        }
-        emitValids(lhs, cchain, iters, valids)
-      }
-      else if (lhs.isStreamControl) {
-        inSubGen(src"${lhs}", src"${parent_kernel}") {
-          emitt(s"// Controller Stack: ${controllerStack.tail}")
-          forEachChild(lhs){case (_,_) =>
-            emitIters(iters, cchain)
-            allocateValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
-          }
-          visitBlock(func)
-          emitChildrenCxns(lhs)
-        }
-        forEachChild(lhs){case (_,_) =>
-          emitValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
-        }
-      }
-      if (lhs.isOuterStreamControl) { controllerStack.push(lhs.children.head.s.get) } // If stream controller with children, just quote the counter for its first child for ctr trivial check
-      connectMask(Some(cchain))
-      if (lhs.isOuterStreamControl) { controllerStack.pop() }
-      exitCtrl(lhs)
-
-    case UnrolledReduce(ens,cchain,func,iters,valids) if (inHw) =>
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs) // If this is a stream, then each child has its own ctr copy
-      // if (lhs.isInnerControl) emitInhibitor(lhs, None, None)
-      emitIICounter(lhs)
-      if (lhs.isStreamControl) forEachChild(lhs){case (c,i) => controllerStack.push(c); allocateIters(iters, cchain); controllerStack.pop()}
-      else allocateIters(iters, cchain)
-      allocateRegChains(lhs, iters.flatten, cchain)
-      if (lhs.isPipeControl | lhs.isSeqControl) {
-        inSubGen(src"${lhs}", src"${parent_kernel}") {
-          emitt(s"// Controller Stack: ${controllerStack.tail}")
-          emitIters(iters, cchain)
-          allocateValids(lhs, cchain, iters, valids)
-          visitBlock(func)
-          emitChildrenCxns(lhs)
-        }
-        emitValids(lhs, cchain, iters, valids)
-      }
-      else if (lhs.isStreamControl) {
-        inSubGen(src"${lhs}", src"${parent_kernel}") {
-          emitt(s"// Controller Stack: ${controllerStack.tail}")
-          forEachChild(lhs){case (_,_) =>
-            emitIters(iters, cchain)
-            allocateValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
-          }
-          visitBlock(func)
-          emitChildrenCxns(lhs)
-        }
-        forEachChild(lhs){case (_,_) =>
-          emitValids(lhs, cchain, iters, valids) // Must have visited func before we can properly run this method
-        }
-      }
-      if (lhs.isOuterStreamControl) { controllerStack.push(lhs.children.head.s.get) } // If stream controller with children, just quote the counter for its first child for ctr trivial check
-      connectMask(Some(cchain))
-      if (lhs.isOuterStreamControl) { controllerStack.pop() }
-      exitCtrl(lhs)
-
-    case StateMachine(ens,start,notDone,action,nextState) =>
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs, true) // If this is a stream, then each child has its own ctr copy
-      val state = notDone.input
-      alphaconv_register(src"$state")
-
-      emitt("// Emitting notDone")
-      visitBlock(notDone)
-
-      connectMask(None)
-      emitIICounter(lhs)
-
-      emitt("// Emitting action")
-      inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emitt(s"// Controller Stack: ${controllerStack.tail}")
-        visitBlock(action)
-      }
-      emitt("// Emitting nextState")
-      visitBlock(nextState)
-      emitt(src"${swap(lhs, SM)}.io.enable := ${swap(lhs, En)} ")
-      emitt(src"${swap(lhs, SM)}.io.nextState := ${nextState.result}.r.asSInt //Mux(${DL(swap(lhs, IIDone), src"1 max ${if (spatialConfig.enableRetiming) nextState.result.fullDelay else 0}", true)}, ${nextState.result}.r.asSInt, ${swap(lhs, SM)}.io.state.r.asSInt) // Assume always int")
-      emitt(src"${swap(lhs, SM)}.io.initState := ${start}.r.asSInt")
-      emitGlobalWireMap(src"$state", src"Wire(${state.tp})")
-      emitt(src"${state}.r := ${swap(lhs, SM)}.io.state.r")
-      emitGlobalWireMap(src"${lhs}_doneCondition", "Wire(Bool())")
-      emitt(src"${lhs}_doneCondition := ~${notDone.result}")
-      emitt(src"${swap(lhs, SM)}.io.doneCondition := ${lhs}_doneCondition")
-      emitChildrenCxns(lhs, true)
-      exitCtrl(lhs)
 
     case op@Switch(selects, body) => 
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs) // If this is a stream, then each child has its own ctr copy
-      emitIICounter(lhs)
+      enterCtrl(lhs)
       val cases = lhs.children.filter(_.s.get != lhs).map(_.s.get)
-      
-      // Route through signals
-      // emitGlobalWireMap(src"""${lhs}_II_done""", """Wire(Bool())"""); emitt(src"""${swap(lhs, IIDone)} := ${swap(parent_kernel, IIDone)}""")
-      emitt(src"""${swap(lhs, DatapathEn)} := ${swap(parent_kernel, DatapathEn)} // Not really used probably""")
-      connectMask(None)
-      // emitt(src"""${swap(lhs, Mask)} := true.B // No enable associated with switch, never mask it""")
+      instantiateKernel(lhs, Set(), body){
 
-
-      if (lhs.isInnerControl) { // If inner, don't worry about condition mutation
-        selects.zipWithIndex.foreach{case (s,i) => emitt(src"""${swap(lhs, SM)}.io.selectsIn($i) := $s""")}
-      } else { // If outer, latch in selects in case the body mutates the condition
-        selects.indices.foreach{i => 
-          emitGlobalWire(src"""val ${cases(i)}_switch_sel_reg = RegInit(false.B)""")
-          emitt(src"""${cases(i)}_switch_sel_reg := Mux(Utils.risingEdge(${swap(lhs, En)}), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
-          emitt(src"""${swap(lhs, SM)}.io.selectsIn($i) := ${selects(i)}""")
+        if (lhs.isInnerControl) { // If inner, don't worry about condition mutation
+          selects.zipWithIndex.foreach{case (s,i) => emit(src"""${lhs}_obj.sm.io.selectsIn($i) := $s""")}
+        } else { // If outer, latch in selects in case the body mutates the condition
+          selects.indices.foreach{i => 
+            emit(src"""val ${cases(i)}_switch_sel_reg = RegInit(false.B)""")
+            emit(src"""${cases(i)}_switch_sel_reg := Mux(risingEdge(${lhs}_obj.en), ${selects(i)}, ${cases(i)}_switch_sel_reg)""")
+            emit(src"""${lhs}_obj.sm.io.selectsIn($i) := ${selects(i)}""")
+          }
         }
       }
 
-      inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emitt(s"// Controller Stack: ${controllerStack.tail}")
+      writeKernelClass(lhs, Set(), body) {
+        gen(body)
         if (op.R.isBits) {
-          emitt(src"val ${lhs}_onehot_selects = Wire(Vec(${selects.length}, Bool()))");emitt(src"val ${lhs}_data_options = Wire(Vec(${selects.length}, ${lhs.tp}))")
-          selects.indices.foreach { i => emitt(src"${lhs}_onehot_selects($i) := ${selects(i)}");emitt(src"${lhs}_data_options($i) := ${cases(i)}") }
-          emitGlobalWire(src"val $lhs = Wire(${lhs.tp})"); emitt(src"$lhs := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
+          emit(createWire(src"${lhs}_onehot_selects", src"Vec(${selects.length}, Bool())"))
+          emit(createWire(src"${lhs}_data_options", src"Vec(${selects.length}, ${lhs.tp})"))
+          selects.indices.foreach { i => emit(src"${lhs}_onehot_selects($i) := ${selects(i)}");emit(src"${lhs}_data_options($i) := ${cases(i)}") }
+          emit(src"${iodot}ret.r := Mux1H(${lhs}_onehot_selects, ${lhs}_data_options).r")
         }
-        visitBlock(body)
       }
-      emitChildrenCxns(lhs, false)
       exitCtrl(lhs)
 
 
     case op@SwitchCase(body) =>
-      val parent_kernel = enterCtrl(lhs)
-      emitController(lhs) // If this is a stream, then each child has its own ctr copy
-      emitIICounter(lhs)
-      // emitInhibitor(lhs, None, Some(lhs.parent.s.get))
-      connectMask(None)
-
-      inSubGen(src"${lhs}", src"${parent_kernel}") {
-        emitt(s"// Controller Stack: ${controllerStack.tail}")
-        // if (blockContents(body).length > 0) {
-        // if (childrenOf(lhs).count(isControlNode) == 1) { // This is an outer pipe
-        visitBlock(body)
-        if (op.R.isBits) {
-          emitGlobalWire(src"val $lhs = Wire(${lhs.tp})")
-          emitt(src"$lhs.r := ${body.result}.r")
+      enterCtrl(lhs)
+      instantiateKernel(lhs, Set(), body){
+        if (lhs.isInnerControl) {
+          emit(src"""${lhs}_obj.baseEn := ${iodot}sigsIn.smSelectsOut(${lhs}_obj.childId)""")
         }
       }
-      emitChildrenCxns(lhs, false)
+
+      writeKernelClass(lhs, Set(), body) {
+        emit(s"// Controller Stack: ${controllerStack.tail}")
+        gen(body)
+        if (op.R.isBits) {
+          emit(src"${iodot}ret.r := ${body.result}.r")
+        }
+      }
       exitCtrl(lhs)
+
+    case StateMachine(ens,start,notDone,action,nState) =>
+      appPropertyStats += HasFSM
+      enterCtrl(lhs)
+      instantiateKernel(lhs, ens, notDone, action, nState){}
+      writeKernelClass(lhs, ens, notDone, action, nState) {
+        val state = notDone.input
+        emit(createWire(src"$state", src"${state.tp}"))
+        emit(src"${state}.r := ${iodot}sigsIn.smState.r")
+
+        gen(notDone)
+        gen(action)
+        gen(nState)
+
+        emit(src"$nextState := ${nState.result}.r.asSInt ")
+        emit(src"$initState := ${start}.r.asSInt")
+        emit(src"$doneCondition := ~${notDone.result}")
+      }
+      exitCtrl(lhs)
+
+    case SeriesForeach(_,_,_,blk) => 
+      gen(blk)
 
 
     case _ => super.gen(lhs, rhs)
   }
 
-  override def emitFooter(): Unit = {
-    inAccel{
-      if (spatialConfig.compressWires >= 1) {
-        inGenn(out, "GlobalModules", ext) {
-          emitt(src"val ic = List.fill(${instrumentCounters.length*2}){Module(new InstrumentationCounter())}")
-        }
-        inGenn(out, "Mapping", ext) {
-          emit("// Found the following wires:")
-          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
-            emit(s"    // $wire (${listHandle(wire)})")
+  override def emitPostMain(): Unit = {
+
+    inGen(out, "Instrument.scala"){
+      emitHeader()
+      open("object Instrument {")
+        open("def connect(top: AccelTop, instrctrs: List[InstrCtr]): Unit = {")
+          val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
+            val swobj = if (s.isBranch) "_obj" else ""
+            Seq(
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).cycs""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.valid := top.io.enable""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).iters""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.valid := top.io.enable""",1,Seq[String]())
+            ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalls""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.valid := top.io.enable""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idles""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.valid := top.io.enable""",1,Seq[String]())
+              )} else Nil}
+
           }
-          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
-            val handle = listHandle(wire)
-            emit("")
-            emit(s"// ${wire}")
-            emit("// ##################")
-            compressorMap.filter(_._2._1 == wire).foreach{entry => 
-              emit(s"      // ${handle}(${entry._2._2}) = ${entry._1}")
-            }
-          }
-        }
+          def isLive(s: String, remaining: Seq[String]): Boolean = false
+          def branchswobj(s: String, n: Option[String] = None): String = src""""${n.getOrElse(quote(s))}" -> $s"""
+          def initChunkState(): Unit = {}
+
+          val hierarchyDepth = (scala.math.log(printableLines.size) / scala.math.log(CODE_WINDOW)).toInt
+          globalBlockID = javaStyleChunk[String](
+            printableLines, 
+            CODE_WINDOW, 
+            hierarchyDepth, 
+            globalBlockID, 
+            isLive, 
+            branchswobj, 
+            arg, 
+            () => initChunkState
+          )(emit(_) )
+
+          emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
+        close("}")
+      close("}")
+    }
+
+    inGen(out, "Instantiator.scala") {
+      emit ("")
+      emit ("// Instrumentation")
+      emit (s"val numArgOuts_instr = ${instrumentCounterArgs}")
+      emit (s"val numCtrls = ${ctrls.size}")
+      emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
+      emit ("""/* Breakpoint Contexts:""")
+      earlyExits.zipWithIndex.foreach {case (p,i) => 
+        emit (s"breakpoint ${i}: ${p.ctx}")
       }
+      emit ("""*/""")
+    }
 
+    inGen(out, s"IOModule.$ext") {
+      emit (src"// Root controller for app: ${config.name}")
+      emit ("")
+      emit (src"// Widths: ${widthStats.sorted}")
+      emit (src"//   Widest Outer Controller: ${if (widthStats.length == 0) 0 else widthStats.max}")
+      emit (src"// Depths: ${depthStats.sorted}")
+      emit (src"//   Deepest Inner Controller: ${if (depthStats.length == 0) 0 else depthStats.max}")
+      emit (s"// App Characteristics: ${appPropertyStats.toList.map(_.getClass.getName.split("\\$").last.split("\\.").last).mkString(",")}")
+      emit ("// Instrumentation")
+      emit (s"val io_numArgOuts_instr = ${instrumentCounterArgs}")
+      emit (s"val io_numArgCtrls = ${ctrls.size}")
+      emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
 
-      emitGlobalWire(s"val max_latency = $maxretime")
+      emit ("""// Set Build Info""")
+      emit(s"val max_latency = $maxretime")
 
-      inGenn(out, "GlobalModules", ext) {
-        emitt(src"val breakpt_activators = List.fill(${earlyExits.length}){Wire(Bool())}")
-      }
-
-      inGen(out, "Instantiator.scala") {
-        emit ("")
-        emit ("// Instrumentation")
-        emit (s"val numArgOuts_instr = ${instrumentCounters.length*2}")
-        instrumentCounters.zipWithIndex.foreach { case(p,i) =>
-          val depth = " "*p._2
-          emit (src"""// ${depth}${quote(p._1)}""")
-        }
-        emit (s"val numArgOuts_breakpts = ${earlyExits.length}")
-        emit ("""/* Breakpoint Contexts:""")
-        earlyExits.zipWithIndex.foreach {case (p,i) => 
-          createBreakpoint(p, i)
-          emit (s"breakpoint ${i}: ${p.ctx}")
-        }
-        emit ("""*/""")
-      }
-
-      inGenn(out, "IOModule", ext) {
-        emit (src"// Root controller for app: ${config.name}")
-        // emit (src"// Complete config: ${config.printer()}")
-        // emit (src"// Complete cfg: ${spatialConfig.printer()}")
-        emit ("")
-        emit (src"// Widths: ${widthStats.sorted}")
-        emit (src"//   Widest Outer Controller: ${if (widthStats.length == 0) 0 else widthStats.max}")
-        emit (src"// Depths: ${depthStats.sorted}")
-        emit (src"//   Deepest Inner Controller: ${if (depthStats.length == 0) 0 else depthStats.max}")
-        emit (s"// App Characteristics: ${appPropertyStats.toList.map(_.getClass.getName.split("\\$").last.split("\\.").last).mkString(",")}")
-        emit ("// Instrumentation")
-        emit (s"val io_numArgOuts_instr = ${instrumentCounters.length*2}")
-        emit (s"val io_numArgOuts_breakpts = ${earlyExits.length}")
-
-        emit ("""// Set Build Info""")
-        val trgt = s"${spatialConfig.target.name}".replace("DE1", "de1soc")
-        if (spatialConfig.compressWires >= 1) {
-          pipeRtMap.groupBy(_._1._1).map{x => 
-            val listBuilder = x._2.toList.sortBy(_._1._2).map(_._2)
-            emit (src"val ${listHandle(x._1)}_latmap = List(${listBuilder.mkString(",")})")
-          }
-          // TODO: Make the things below more efficient
-          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
-            if (wire == "_latency") {
-              emit (src"val ${listHandle(wire)} = List[Int](${retimeList.mkString(",")})")  
-            }
-          }
-          compressorMap.values.map(_._1).toSet.toList.foreach{wire: String => 
-            if (wire == "_latency") {
-            } else if (wire.contains("InnerControl(") || wire.contains("OuterControl(")) {
-              val numel = compressorMap.filter(_._2._1 == wire).size
-              emit (src"val ${listHandle(wire)} = List.tabulate(${numel}){i => ${wire.replace("))", src",latency=${listHandle("_latency")}(${listHandle(wire)}_latmap(i))))")}}")
-            } else {
-              val numel = compressorMap.filter(_._2._1 == wire).size
-              emit (src"val ${listHandle(wire)} = List.fill(${numel}){${wire}}")            
-            }
-          }
-        }
-
-        emit (s"Utils.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
-        emit (s"Utils.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
-        emit (s"Utils.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
-        emit (s"Utils.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
-        emit (s"Utils.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
-        emit (s"Utils.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
-        // emit (s"Utils.tight_control   = ${spatialConfig.enableTightControl}")
-        emit (s"Utils.mux_latency    = ${latencyOption("Mux", None)}.toInt")
-        emit (s"Utils.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
-        emit (s"Utils.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
-        emit (s"Utils.SramThreshold = 4")
-        emit (s"""Utils.target = ${trgt}""")
-        emit (s"""Utils.retime = ${spatialConfig.enableRetiming}""")
-
-      }
+      emit (s"globals.target.fixmul_latency = ${latencyOption("FixMul", Some(1))}")
+      emit (s"globals.target.fixdiv_latency = ${latencyOption("FixDiv", Some(1))}")
+      emit (s"globals.target.fixadd_latency = ${latencyOption("FixAdd", Some(1))}")
+      emit (s"globals.target.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
+      emit (s"globals.target.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
+      emit (s"globals.target.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
+      // emit (s"tight_control   = ${spatialConfig.enableTightControl}")
+      emit (s"globals.target.mux_latency    = ${latencyOption("Mux", None)}.toInt")
+      emit (s"globals.target.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")
+      emit (s"globals.target.sramstore_latency    = ${latencyOption("SRAMBankedWrite", None)}.toInt")
+      emit (s"globals.target.SramThreshold = ${spatialConfig.sramThreshold}")
+      emit (s"""globals.retime = ${spatialConfig.enableRetiming}""")
+      emit (s"""globals.enableModular = ${spatialConfig.enableModular}""")
 
     }
-    super.emitFooter()
+
+    super.emitPostMain()
   }
 
 }

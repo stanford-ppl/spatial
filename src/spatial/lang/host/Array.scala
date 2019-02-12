@@ -155,7 +155,10 @@ import utils.implicits.Readable._
     Matrix(data, out_rows, out_cols)
   }
 
-
+  /** Concatenates two Arrays. **/
+  @api def ++(that: Array[A]): Array[A] = {
+    Array.tabulate(this.length + that.length){i => ifThenElse(i < this.length, () => this.apply(i), () => that.apply(i-this.length))}
+  }
 
   /** Returns true if this Array and `that` contain the same elements, false otherwise. */
   @api override def neql(that: Array[A]): Bit = this.zip(that){(x,y) => x !== y }.exists(x => x)
@@ -165,7 +168,7 @@ import utils.implicits.Readable._
 
   @api override def toText: Text = this.mkString(", ")
 
-  @rig override def getFrom(c: Any, isParam: Boolean = false): Option[(Array[A],Boolean)] = c match {
+  @rig override def getFrom(c: Any, isParam: Boolean = false, saturating: Boolean = false, unbiased: Boolean = false): Option[(Array[A],Boolean)] = c match {
     case d: scala.Array[_] if d.isEmpty => Some((stage(ArrayFromSeq[A](Nil)), true))
 
     case d: scala.Array[_] =>

@@ -22,3 +22,5 @@ object HasFloats extends AppProperties
 object HasVariableCtrSyms extends AppProperties
 object HasBroadcastRead extends AppProperties
 object HasAccumSegmentation extends AppProperties
+object HasDephasedAccess extends AppProperties
+object HasFSM extends AppProperties

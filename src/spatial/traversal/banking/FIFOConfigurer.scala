@@ -41,10 +41,10 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
   }
 
   def groupsAreConcurrent(grps: Set[Set[AccessMatrix]]): Boolean = grps.cross(grps).exists{case (g1,g2) =>
-    g1 != g2 && g1.cross(g2).exists{case (a,b) => requireConcurrentPortAccess(a,b) }
+    g1 != g2 && g1.cross(g2).exists{case (a,b) => !mem.shouldIgnoreConflicts && requireConcurrentPortAccess(a,b) }
   }
 
-  override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Instance] = {
+  override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Seq[Instance]] = {
     val haveConcurrentReads = groupsAreConcurrent(rdGroups)
     val haveConcurrentWrites = groupsAreConcurrent(wrGroups)
 
@@ -52,13 +52,13 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       Left(UnbankableGroup(mem,rdGroups.flatten,wrGroups.flatten))
     }
     else {
-      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, Seq(FLAT_BANKS))
+      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, Seq(FLAT_BANKS)).head._2
       if (bankings.nonEmpty) {
         val banking = bankings.head
-        val bankingCosts = cost(banking, depth = 1)
+        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)
         val ports = computePorts(rdGroups) ++ computePorts(wrGroups)
 
-        Right(Instance(
+        Right(Seq(Instance(
           reads  = rdGroups,
           writes = wrGroups,
           ctrls  = Set.empty,
@@ -67,8 +67,9 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
           depth    = 1,
           cost     = bankingCosts,
           ports    = ports,
+          padding  = mem.getPadding.getOrElse(Seq(0)),
           accType  = AccumType.None
-        ))
+        )))
       }
       else Left(UnbankableGroup(mem,rdGroups.flatten,wrGroups.flatten))
     }

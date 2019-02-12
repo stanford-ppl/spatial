@@ -7,6 +7,11 @@ import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
+import spatial.codegen.pirgen._
+import spatial.codegen.tsthgen._
+import spatial.codegen.dotgen._
+import spatial.codegen.resourcegen._
+
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
 import spatial.metadata.access._
@@ -19,9 +24,9 @@ import spatial.flows.SpatialFlowRules
 import spatial.model.PythonModelGenerator
 import spatial.rewrites.SpatialRewriteRules
 import spatial.util.spatialConfig
+import spatial.util.ParamLoader
 
-
-trait Spatial extends Compiler {
+trait Spatial extends Compiler with ParamLoader {
 
   val target: HardwareTarget = null   // Optionally overridden by the application
   final val desc: String = "Spatial compiler"
@@ -56,9 +61,9 @@ trait Spatial extends Compiler {
     lazy val finalIRPrinter = IRPrinter(state, enable = true)
 
     // --- Checking
-    lazy val userSanityChecks  = UserSanityChecks(state)
-    lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog)
-    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = true)
+    lazy val userSanityChecks  = UserSanityChecks(state, enable = !spatialConfig.allowInsanity)
+    lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog && !spatialConfig.allowInsanity)
+    lazy val finalSanityChecks = CompilerSanityChecks(state, enable = !spatialConfig.allowInsanity)
 
     // --- Analysis
     lazy val cliNaming          = CLINaming(state)
@@ -73,6 +78,11 @@ trait Spatial extends Compiler {
     lazy val initiationAnalyzer = InitiationAnalyzer(state)
     lazy val accumAnalyzer      = AccumAnalyzer(state)
     lazy val broadcastCleanup   = BroadcastCleanupAnalyzer(state)
+
+    // --- DSE
+    // lazy val paramAnalyzer        = ParameterAnalyzer(state)
+    // lazy val dsePass              = DSEAnalyzer(state)
+    // lazy val finalizeTransformer  = FinalizeTransformer(state)
 
     // --- Reports
     lazy val memoryReporter = MemoryReporter(state)
@@ -96,10 +106,16 @@ trait Spatial extends Compiler {
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
+    lazy val resourceReporter = ResourceReporter(state)
     lazy val cppCodegen    = CppGen(state)
     lazy val treeCodegen   = TreeGen(state)
+    lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
     lazy val pythonModelGen = PythonModelGenerator(state)
+    lazy val pirCodegen    = PIRGenSpatial(state)
+    lazy val tsthCodegen   = TungstenHostGenSpatial(state)
+    lazy val dotFlatGen    = DotFlatGenSpatial(state)
+    lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
     val result = {
       block ==> printer     ==>
@@ -114,6 +130,9 @@ trait Spatial extends Compiler {
         (spatialConfig.enablePythonModel ? pythonModelGen) ==>
         /** More black box lowering */
         blackboxLowering2   ==> printer ==> transformerChecks ==>
+        /** DSE */
+        // (spatialConfig.enableArchDSE ? paramAnalyzer) ==> 
+        // (spatialConfig.enableArchDSE ? dsePass) ==> 
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
@@ -127,24 +146,23 @@ trait Spatial extends Compiler {
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
+        iterationDiffAnalyzer   ==>
         memoryAnalyzer      ==>
         memoryAllocator     ==> printer ==>
-        /** Iteration difference analysis */
-        iterationDiffAnalyzer ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */
         regReadCSE          ==>
         /** Dead code elimination */
         useAnalyzer         ==>
-        transientCleanup    ==>
-        /** Update buffer depths */
-        bufferRecompute     ==> printer ==> transformerChecks ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
-        flatteningTransformer ==> printer ==> transformerChecks ==>
+        flatteningTransformer ==> 
+        /** Update buffer depths */
+        bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Accumulation Specialization **/
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
@@ -161,9 +179,15 @@ trait Spatial extends Compiler {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        irCodegen           ==>
+        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen)
+        (spatialConfig.enableSynth ? cppCodegen) ==>
+        (spatialConfig.enableResourceReporter ? resourceReporter) ==>
+        (spatialConfig.enablePIR ? pirCodegen) ==>
+        (spatialConfig.enablePIR ? tsthCodegen)
     }
 
     isl.shutdown(100)
@@ -179,10 +203,10 @@ trait Spatial extends Compiler {
 
     cli.note("")
     cli.note("Design Tuning:")
-    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce}.text("Enable default design tuning (bruteforce)")
-    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce }.text("Enable brute force tuning.")
-    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic }.text("Enable heuristic tuning.")
-    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment }.text("Enable DSE experimental mode.").hidden()
+    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true}.text("Enable default design tuning (bruteforce)")
+    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true }.text("Enable brute force tuning.")
+    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic; spatialConfig.enableArchDSE = true }.text("Enable heuristic tuning.")
+    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
 
     cli.note("")
@@ -209,6 +233,26 @@ trait Spatial extends Compiler {
     cli.opt[Unit]("pymodel").action( (_,_) =>
       spatialConfig.enablePythonModel = true
     )
+    cli.opt[Unit]("reporter").action( (_,_) =>
+      spatialConfig.enableResourceReporter = true
+    ).text("Enable resource reporter [false]")
+
+    cli.opt[Unit]("pir").action { (_,_) =>
+      spatialConfig.enablePIR = true
+      spatialConfig.enableInterpret = false
+      spatialConfig.enableSynth = false
+      spatialConfig.enableRetiming = false
+      //spatialConfig.enableBroadcast = false
+      spatialConfig.noInnerLoopUnroll = true
+      //spatialConfig.ignoreParEdgeCases = true
+      spatialConfig.enableBufferCoalescing = false
+      //spatialConfig.enableDot = true
+      spatialConfig.targetName = "Plasticine"
+      spatialConfig.enableForceBanking = true
+    }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
+
+    cli.note("")
+    cli.note("Experimental:")
 
     cli.opt[Unit]("retime").action{ (_,_) =>
       spatialConfig.enableRetiming = true
@@ -219,16 +263,15 @@ trait Spatial extends Compiler {
       spatialConfig.enableRetiming = false
       spatialConfig.enableOptimizedReduce = false
       overrideRetime = true
-    }.text("Disable retiming")
+    }.text("Disable retiming (NOTE: May generate buggy verilog)")
 
-    cli.note("")
-    cli.note("Experimental:")
+    cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c)")
 
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")
 
-    cli.opt[Int]("compressWires").action{(t,_) => spatialConfig.compressWires = t }.text("Enable string compression on chisel wires to shrink JVM bytecode")
+    cli.opt[Unit]("insanity").action{(_,_) => spatialConfig.allowInsanity = true }.text("Disable sanity checks, allows insanity to happen.  Not recommended!")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true
@@ -242,21 +285,31 @@ trait Spatial extends Compiler {
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
 
+    cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = false
+    }.text("Disables modular codegen and puts all logic in AccelTop")
+
+    cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.enableModular = true
+    }.text("Enables modular codegen")
+
+    cli.opt[Unit]("forceBanking").action { (_,_) => 
+      spatialConfig.enableForceBanking = true
+    }.text("Ensures that memories will always get banked and compiler will never decide that it is cheaper to duplicate")
+
     cli.opt[Unit]("tightControl").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableTightControl = true
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable tighter timing between controllers at the expense of potentially failing timing")
 
-    cli.opt[Unit]("debugResources").action { (_,_) => 
-      spatialConfig.enableDebugResources = true
-    }.text("Copy chisel + fringe templates with DirDep and do not use the published jars for templates")
-
     cli.opt[Unit]("cheapFifos").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.useCheapFifos = true
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable cheap fifos where accesses must be multiples of each other and not have lane-enables")
+
+    cli.opt[Int]("sramThreshold").action { (t,_) => spatialConfig.sramThreshold = t }.text("Minimum number of elements in memory to instantiate BRAM over Registers")
 
     cli.opt[Unit]("noOptimizeReduce").action { (_,_) => 
       spatialConfig.enableOptimizedReduce = false
@@ -265,6 +318,19 @@ trait Spatial extends Compiler {
     cli.opt[Unit]("runtime").action{ (_,_) =>
       spatialConfig.enableRuntimeModel = true
     }.text("Enable application runtime estimation")
+
+    cli.opt[String]("load-param").action{(x,_) => 
+      loadParams(x)
+    }.text("Set path to load application parameter")
+
+    cli.opt[String]("save-param").action{(x,_) => 
+      spatialConfig.paramSavePath = Some(x)
+    }.text("Set path to store application parameter")
+  }
+
+  override def postprocess(block: Block[_]): Unit = {
+    spatialConfig.paramSavePath.foreach(path => saveParams(path))
+    super.postprocess(block)
   }
 
   override def settings(): Unit = {
@@ -282,7 +348,7 @@ trait Spatial extends Compiler {
         }
       }
       else {
-        val target = targets.fpgas.find{_.name.toLowerCase == spatialConfig.targetName.toLowerCase }
+        val target = targets.all.find{_.name.toLowerCase == spatialConfig.targetName.toLowerCase }
         if (target.isDefined) {
           spatialConfig.target = target.get
         }
@@ -291,6 +357,8 @@ trait Spatial extends Compiler {
             error(s"No target found with the name '${spatialConfig.targetName}'.")
             error(s"Available FPGA targets: ")
             targets.fpgas.foreach{t => error(s"  ${t.name}") }
+            error(s"Available Other targets: ")
+            (targets.all -- targets.fpgas).foreach{t => error(s"  ${t.name}") }
             IR.logError()
             return
           }
@@ -321,6 +389,11 @@ trait Spatial extends Compiler {
     else {
       spatialConfig.target.areaModel.init()
       spatialConfig.target.latencyModel.init()
+    }
+    if (config.genDirOverride && java.nio.file.Files.exists(java.nio.file.Paths.get(config.genDir)) ||
+        !config.genDirOverride && java.nio.file.Files.exists(java.nio.file.Paths.get(config.genDir + "/" + config.name))) {
+      warn(s"Output directory ${if (config.genDirOverride) config.genDir else {config.genDir + "/" + config.name}} already exists!  Generated files")
+      warn(s"from other targets may still exist and may interfere with this build!")
     }
   }
 

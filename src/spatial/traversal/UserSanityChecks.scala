@@ -8,8 +8,11 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
 import spatial.metadata.types._
+import spatial.util.spatialConfig
 
-case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
+case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityChecks {
+
+  override def shouldRun: Boolean = enable
 
   def busWidthCheck(tp: Bits[_], bus: Bus, mem: String): Unit = {
     if (tp.nbits < bus.nbits) {
@@ -128,8 +131,13 @@ case class UserSanityChecks(IR: State) extends AbstractSanityChecks {
       val size = dims.map(_.toInt).product
       if (elems.length != size) {
         // TODO[5]: This could be downgraded to a warning if we fill zeros in here
-        error(ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
-        error(ctx)
+        if (spatialConfig.enablePIR) {
+          warn(lhs.ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
+          warn(lhs.ctx)
+        } else {
+          error(lhs.ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
+          error(lhs.ctx)
+        }
       }
 
     case _ => super.visit(lhs, rhs)

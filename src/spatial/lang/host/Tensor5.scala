@@ -19,6 +19,8 @@ import forge.tags._
 
   @rig def data: Array[A] = field[Array[A]]("data")
 
+  /** Returns the dimensions of this Tensor5. */
+  @api def dims: Seq[I32] = Seq(field[I32]("dim0"), field[I32]("dim1"), field[I32]("dim2"), field[I32]("dim3"), field[I32]("dim4"))
   /** Returns the first dimension of this Tensor5. */
   @api def dim0: I32 = field[I32]("dim0")
   /** Returns the second dimension of this Tensor5. */
@@ -55,6 +57,14 @@ import forge.tags._
 
   /** Reduces the elements in this Tensor5 into a single element using associative function `rfunc`. */
   @api def reduce(rfunc: (A,A) => A): A = data.reduce(rfunc)
+
+  /** Reorders the Tensor5 based on given ordering (i.e.- reorder(0,1,2,3,4) does nothing) */
+  @api def reorder(ordering: Seq[scala.Int]): Tensor5[A] = {
+    (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1)), 0::dims.apply(ordering(2)), 0::dims.apply(ordering(3)), 0::dims.apply(ordering(4))){(a,b,c,d,e) => 
+      val i = List(a,b,c,d,e)
+      apply(i(ordering(0)), i(ordering(1)), i(ordering(2)), i(ordering(3)), i(ordering(4)))
+    }
+  }
 
   /** Returns true if this Tensor5 and `that` contain the same elements, false otherwise. */
   @api override def neql(that: Tensor5[A]): Bit = data !== that.data

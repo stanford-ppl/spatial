@@ -4,6 +4,7 @@ import argon._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds.Expect
+import spatial.metadata.access._
 import spatial.metadata.control._
 
 package object memory {
@@ -23,9 +24,11 @@ package object memory {
     def getIterDiff: Option[Int] = metadata[IterDiff](s).map(_.diff)
     def iterDiff: Int = metadata[IterDiff](s).map(_.diff).getOrElse(1)
     def iterDiff_=(diff: Int): Unit = metadata.add(s, IterDiff(diff))
+    def removeIterDiff: Unit = metadata.add(s,IterDiff(1))
 
     def segmentMapping: Map[Int,Int] = metadata[SegmentMapping](s).map(_.mapping).getOrElse(Map[Int,Int]())
     def segmentMapping_=(mapping: Map[Int,Int]): Unit = metadata.add(s, SegmentMapping(mapping))
+    def removeSegmentMapping: Unit = metadata.add(s,SegmentMapping(Map[Int,Int]()))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {
@@ -34,6 +37,24 @@ package object memory {
 
     def isNonBuffer: Boolean = metadata[EnableNonBuffer](s).exists(_.flag)
     def isNonBuffer_=(flag: Boolean): Unit = metadata.add(s, EnableNonBuffer(flag))
+
+    def isNoHierarchicalBank: Boolean = metadata[NoHierarchicalBank](s).exists(_.flag)
+    def isNoHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, NoHierarchicalBank(flag))
+
+    def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
+    def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
+
+    def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
+    def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
+
+    def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
+    def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
+
+    def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
+    def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
+
+    def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
+    def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
 
     /** Pre-unrolling duplicates (one or more Memory instances per node) */
 
@@ -47,6 +68,9 @@ package object memory {
     def padding: Seq[Int] = getPadding.getOrElse{throw new Exception(s"No padding defined for $s")}
     def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
 
+    /** Stride info for LineBuffer */
+    def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}
+
     /** Post-unrolling duplicates (exactly one Memory instance per node) */
 
     def getInstance: Option[Memory] = getDuplicates.flatMap(_.headOption)
@@ -54,6 +78,29 @@ package object memory {
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
 
     def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}
+
+    /** Controllers just below the LCA who are responsible for swapping a buffered memory */
+    import forge.tags.stateful
+    @stateful def swappers: List[Sym[_]] = {
+      val accesses = s.accesses.filter(_.port.bufferPort.isDefined)
+      if (accesses.nonEmpty) {
+        val lca = if (accesses.size == 1) accesses.head.parent else LCA(accesses)
+        if (lca.isParallel){ // Assume memory analysis chose buffering based on lockstep of different bodies within this parallel, and just use one
+          val releventAccesses = accesses.toList.filter(_.ancestors.contains(lca.children.head)).toSet
+          val logickingLca = LCA(releventAccesses)
+          val (basePort, numPorts) = if (logickingLca.s.get.isInnerControl) (0,0) else LCAPortMatchup(releventAccesses.toList, logickingLca)
+          val info = if (logickingLca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => logickingLca.children.toList(port).s.get }
+          info.toList        
+        } else {
+          val (basePort, numPorts) = if (lca.s.get.isInnerControl) (0,0) else LCAPortMatchup(accesses.toList, lca)
+          val info = if (lca.s.get.isInnerControl) List[Sym[_]]() else (basePort to {basePort+numPorts}).map { port => lca.children.toList(port).s.get }
+          info.toList        
+        }
+      } else {
+        throw new Exception(s"Cannot create a buffer on $s, which has no accesses")
+      }
+    }
+
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {
@@ -89,9 +136,9 @@ package object memory {
 
   implicit class MemoryOps(mem: Sym[_]) {
     /** Returns the statically defined rank (number of dimensions) of the given memory. */
-    def seqRank: Seq[Int] = mem match {
+    def sparseRank: Seq[Int] = mem match {
       case Op(m: MemAlloc[_,_])   => m.rank
-      case Op(m: MemAlias[_,_,_]) => m.rank
+      case Op(m: MemAlias[_,_,_]) => m.sparseRank
       case _ => throw new Exception(s"Could not statically determine the rank of $mem")
     }
 
@@ -123,6 +170,12 @@ package object memory {
       }
     }
 
+    def getConstDims: Option[Seq[Int]] = {
+      if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
+        Some(stagedDims.collect{case Expect(c) => c.toInt })
+      } else None
+    }
+
     def readWidths: Set[Int] = mem.readers.map{
       case Op(read: UnrolledAccessor[_,_]) => read.width
       case _ => 1
@@ -142,16 +195,20 @@ package object memory {
       case _: Reg[_] => mem.isArgOut || mem.isArgIn || mem.isHostIO
       case _ => false
     }
+
+    def asMem[C[_]]:Mem[_,C] = mem.asInstanceOf[Mem[_,C]]
     def isMem: Boolean = isLocalMem || isRemoteMem
     def isDenseAlias: Boolean = mem.op.exists{
       case _: MemDenseAlias[_,_,_] => true
       case _ => false
     }
     def isSparseAlias: Boolean = mem.op.exists{
-      case _: MemSparseAlias[_,_,_,_] => true
+      case _: MemSparseAlias[_,_,_,_,_] => true
       case _ => false
     }
 
+    def isNBuffered: Boolean = mem.getInstance.exists(_.depth > 1)
+    
     def isOptimizedReg: Boolean = mem.writers.exists{ _.op.get.isInstanceOf[RegAccum[_]] }
     def optimizedRegType: Option[Accum] = if (!mem.isOptimizedReg) None else 
       mem.writers.collect{ 
@@ -169,10 +226,13 @@ package object memory {
       case _:DRAM[_,_] => true
       case _ => false
     }
+    def isDRAMAccel: Boolean = mem.op.exists{ case _: DRAMAccelNew[_,_] => true; case _ => false}
 
     def isStreamIn: Boolean = mem.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = mem.isInstanceOf[StreamOut[_]]
     def isInternalStream: Boolean = (mem.isStreamIn || mem.isStreamOut) && mem.parent != Ctrl.Host
+
+    def isMemPrimitive: Boolean = (isSRAM || isLineBuffer || isRegFile || isFIFO || isLIFO || isFIFOReg || isReg || isLUT) && !isNBuffered && (!isRemoteMem && !isOptimizedReg)
 
     def isSRAM: Boolean = mem match {
       case _: SRAM[_,_] => true
@@ -182,12 +242,28 @@ package object memory {
       case _: RegFile[_,_] => true
       case _ => false
     }
+    def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
+    def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
+    def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
 
     def isLUT: Boolean = mem match {
       case _: LUT[_,_] => true
       case _ => false
+    }
+
+    def memName: String = mem match {
+      case _: LUT[_,_] => "LUT"
+      case _: SRAM[_,_] => "BankedSRAM"
+      case _: Reg[_] => "FF"
+      case _: FIFOReg[_] => "FIFOReg"
+      case _: RegFile[_,_] => "ShiftRegFile"
+      case _: LineBuffer[_] => "LineBuffer"
+      case _: MergeBuffer[_] => "MergeBuffer"
+      case _: FIFO[_] => "FIFO"
+      case _: LIFO[_] => "LIFO"
+      case _ => "Unknown"
     }
 
     def hasInitialValues: Boolean = mem match {
@@ -211,12 +287,49 @@ package object memory {
     def resetters: Set[Sym[_]] = metadata[Resetters](s).map(_.resetters).getOrElse(Set.empty)
     def resetters_=(rst: Set[Sym[_]]): Unit = metadata.add(s, Resetters(rst))
 
+    def dephasedAccesses: Set[Sym[_]] = metadata[DephasedAccess](s).map(_.accesses).getOrElse(Set.empty)
+    def addDephasedAccess(access: Sym[_]): Unit = metadata.add(s, DephasedAccess(Set(access) ++ s.dephasedAccesses))
+
     def isUnusedMemory: Boolean = metadata[UnusedMemory](s).exists(_.flag)
     def isUnusedMemory_=(flag: Boolean): Unit = metadata.add(s, UnusedMemory(flag))
+
+    def isBreaker: Boolean = metadata[Breaker](s).exists(_.flag)
+    def isBreaker_=(flag: Boolean): Unit = metadata.add(s, Breaker(flag))
 
     def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
     def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
     def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
+
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def loadStreams: List[Sym[_]] = s.consumers.filter(_.isLoad).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def storeStreams: List[Sym[_]] = s.consumers.filter(_.isStore).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def gatherStreams: List[Sym[_]] = s.consumers.filter(_.isGather).toList
+    /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
+    def scatterStreams: List[Sym[_]] = s.consumers.filter(_.isScatter).toList
+
+    /** Get BurstCmd bus */
+    def addrStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,cmd,_,_)) => cmd
+      case Op(FringeDenseLoad(_,cmd,_)) => cmd
+      case Op(FringeSparseLoad(_,cmd,_)) => cmd
+      case Op(FringeSparseStore(_,cmd,_)) => cmd //sic
+      case _ => throw new Exception("No addrStream for $s")
+    }
+
+    def dataStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,_,data,_)) => data
+      case Op(FringeDenseLoad(_,_,data)) => data
+      case Op(FringeSparseLoad(_,_,data)) => data
+      case _ => throw new Exception("No dataStream for $s")
+    }
+
+    def ackStream: Sym[_] = s match {
+      case Op(FringeDenseStore(_,_,_,ack)) => ack
+      case Op(FringeSparseStore(_,_,ack)) => ack
+      case _ => throw new Exception("No dataStream for $s")
+    }
   }
 
 

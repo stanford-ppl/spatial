@@ -21,6 +21,9 @@ sealed abstract class CtrlLooping
 case object Single extends CtrlLooping
 case object Looped extends CtrlLooping
 
+/** IndexCounter and lane info */
+case class IndexCounterInfo[A](val ctr: Counter[A], val lane: Int)
+
 /** A controller's level in the control hierarchy. Flag marks whether this is an outer controller.
   *
   * Getter:  sym.rawLevel
@@ -36,7 +39,6 @@ case class ControlLevel(level: CtrlLevel) extends Data[ControlLevel](SetBy.Flow.
   * Default: undefined
   */
 case class CounterOwner(owner: Sym[_]) extends Data[CounterOwner](SetBy.Flow.Consumer)
-
 
 /** The control schedule determined by the compiler.
   *
@@ -114,10 +116,10 @@ case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
   *
   * Option:  sym.getCounter
   * Getter:  sym.counter
-  * Setter:  sym.counter = (Counter)
+  * Setter:  sym.counter = (IndexCounterInfo)
   * Default: undefined
   */
-case class IndexCounter(ctr: Counter[_]) extends Data[IndexCounter](SetBy.Flow.Consumer)
+case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Flow.Consumer)
 
 
 /** Latency of a given inner pipe body - used for control signal generation.
@@ -153,7 +155,7 @@ case class UserII(interval: Double) extends Data[UserII](SetBy.User)
   * Setter: sym.writtenMems = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Self)
+case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Consumer)
 
 /** Memories which are read in a given controller.
   *
@@ -161,4 +163,4 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.S
   * Setter: sym.readMems = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Self)
+case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)

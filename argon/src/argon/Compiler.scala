@@ -5,6 +5,8 @@ import utils.io.files
 import utils._
 import utils.implicits.terminal._
 
+import scala.concurrent.TimeoutException
+
 trait Compiler extends DSLRunnable { self =>
 
   private val instrument = new Instrument()
@@ -176,7 +178,9 @@ trait Compiler extends DSLRunnable { self =>
       override def reportWarning(msg: String): Unit = { System.out.warn(msg); IR.logWarning() }
     }
     parser.head(script, desc)
-    parser.help("help").text("prints this usage text")
+    parser.help("halp").text("prints this usage text")
+    parser.help("H").text("prints this usage text")
+    parser.help("HELP").text("prints this usage text")
     defineOpts(parser)
     parser.parse(other, ())         // Initialize the Config (from commandline)
     settings()                     // Override config with any DSL or app-specific settings

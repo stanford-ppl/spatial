@@ -5,6 +5,7 @@ import forge.tags._
 import spatial.lang._
 
 @op case class RegNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
+@op case class FIFORegNew[A:Bits](init: Bits[A]) extends MemAlloc[A,FIFOReg] { def dims = Nil }
 @op case class ArgInNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
 @op case class ArgOutNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
 @op case class HostIONew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
@@ -15,12 +16,25 @@ import spatial.lang._
     ens:  Set[Bit])
   extends Enqueuer[A]
 
+@op case class FIFORegEnq[A:Bits](
+    mem:  FIFOReg[A],
+    data: Bits[A],
+    ens:  Set[Bit])
+  extends Enqueuer[A]
 
 @op case class RegRead[A:Bits](mem: Reg[A]) extends Reader[A,A] {
   override def effects: Effects = super.effects andAlso Effects.Unique
   override val isTransient = true
   // Register read never takes enables
   override var ens: Set[Bit] = Set.empty
+  override def addr: Seq[Idx] = Nil
+  override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
+  override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)
+}
+
+@op case class FIFORegDeq[A:Bits](mem: FIFOReg[A], ens: Set[Bit]) extends Dequeuer[A,A] {
+  override def effects: Effects = super.effects andAlso Effects.Unique
+  override val isTransient = true
   override def addr: Seq[Idx] = Nil
   override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)

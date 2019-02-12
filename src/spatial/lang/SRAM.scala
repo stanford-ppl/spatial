@@ -17,20 +17,24 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def rank: Int
   /** Returns the total capacity (in elements) of this SRAM. */
   @api def size: I32 = product(dims:_*)
-
   /** Returns the dimensions of this SRAM as a Sequence. */
   @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
+  /** Returns dim0 of this DRAM, or else 1 if SRAM is lower dimensional */
   @api def dim0: I32 = dims.indexOrElse(0, I32(1))
+  /** Returns dim1 of this DRAM, or else 1 if SRAM is lower dimensional */
   @api def dim1: I32 = dims.indexOrElse(1, I32(1))
+  /** Returns dim2 of this DRAM, or else 1 if SRAM is lower dimensional */
   @api def dim2: I32 = dims.indexOrElse(2, I32(1))
+  /** Returns dim3 of this DRAM, or else 1 if SRAM is lower dimensional */
   @api def dim3: I32 = dims.indexOrElse(3, I32(1))
+  /** Returns dim4 of this DRAM, or else 1 if SRAM is lower dimensional */
   @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 
   /** Creates an alias of this SRAM with parallel access in the last dimension. */
   @api def par(p: I32): C[A] = {
     implicit val C: Type[C[A]] = this.selfType
     val ds = this.dims
-    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => i.toSeries } :+ (ds.last par p)
+    val ranges: Seq[Series[I32]] = ds.dropRight(1).map{i => Series(I32(0),i,I32(1),I32(1)) } :+ (ds.last par p)
     stage(MemDenseAlias(me,ranges))
   }
 
@@ -54,13 +58,28 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 
   @rig private def checkDims(given: Int): Unit = {
     if (given != rank) {
-      error(ctx, s"Expected a $rank-dimensional address, got a $given-dimensional address.")
+      error(ctx, s"Expected a $rank-dimensional address for $this (${this.name}), got a $given-dimensional address.")
       error(ctx)
     }
   }
 
+  /** Indicate that the memory should be buffered and ignore
+    * potential situation where result from running sequentially
+    * does not match with resurt from running pipelined
+    */
   def buffer: C[A] = { this.isWriteBuffer = true; me }
+  /** Do not buffer memory */
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
+  /** Do not attempt to bank memory hierarchically */
+  def nohierarchical: C[A] = { this.isNoHierarchicalBank = true; me }
+  /** Do not attempt to bank memory in a flattened manner */
+  def noflat: C[A] = { this.isNoFlatBank = true; me }
+  /** Do not attempt to bank memory at all, and only use bank-by-duplication */
+  def nobank: C[A] = { this.isNoBank = true; me }
+  /** Do not attempt to bank memory by duplication */
+  def noduplicate: C[A] = { this.isNoDuplicate = true; me }
+
+  def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)

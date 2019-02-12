@@ -13,15 +13,18 @@ trait ReduceUnrolling extends UnrollingBase {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case op :OpReduce[a] =>
-      val OpReduce(ens,cchain,accum,map,load,reduce,store,ident,fold,iters) = op
+      val OpReduce(ens,cchain,accum,map,load,reduce,store,ident,fold,iters,stopWhen) = op
       implicit val A: Bits[a] = op.A
       val accum2 = accumHack(accum, load)
 
-      if (cchain.willFullyUnroll) {
-        fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters)
+      val stopWhen2 = if (stopWhen.isDefined) Some(memories((stopWhen.get,0)).asInstanceOf[Reg[Bit]]) else stopWhen
+      var fullyUnroll = cchain.willFullyUnroll
+      if (spatialConfig.enablePIR) fullyUnroll &= !lhs.isInnerControl
+      if (fullyUnroll) {
+        fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2)
       }
       else {
-        partiallyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters)
+        partiallyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2)
       }
 
     case _ => super.unrollCtrl(lhs, rhs)
@@ -39,7 +42,8 @@ trait ReduceUnrolling extends UnrollingBase {
     store:  Lambda2[Reg[A],A,Void],
     func:   Block[A],
     reduce: Lambda2[A,A,A],
-    iters:  Seq[I32]
+    iters:  Seq[I32],
+    stopWhen: Option[Reg[Bit]]
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     dbgs(s"Fully unrolling reduce $lhs")
     val mapLanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
@@ -82,7 +86,8 @@ trait ReduceUnrolling extends UnrollingBase {
     store:  Lambda2[Reg[A],A,Void], // Store function for accumulator
     func:   Block[A],               // Map function
     reduce: Lambda2[A,A,A],         // Reduce function
-    iters:  Seq[I32]                // Bound iterators for map loop
+    iters:  Seq[I32],                // Bound iterators for map loop
+    stopWhen: Option[Reg[Bit]]
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     dbgs(s"Unrolling reduce $lhs -> $accum")
     val mapLanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
@@ -107,7 +112,7 @@ trait ReduceUnrolling extends UnrollingBase {
       }
     }
 
-    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs)){lhs2 => transferData(lhs,lhs2) }
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs, stopWhen)){lhs2 => transferData(lhs,lhs2) }
     //accumulatesTo(lhs2) = accum
     dbgs(s"Created reduce ${stm(lhs2)}")
     accum.accumType = AccumType.Reduce

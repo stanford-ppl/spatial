@@ -7,6 +7,7 @@ import utils.implicits.collections._
 
 import spatial.lang._
 import spatial.node._
+import spatial.util.modeling
 import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
@@ -30,7 +31,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     iters ++= is
     iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
-    scopes ++= is.map{_ -> scope}
+    scopes ++= is.map{i => (i -> modeling.consumersDfs(i.consumers,Set(), scope)) }
     visitBlock(block)
 
     iters = saveIters
@@ -49,7 +50,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Op(RegRead(reg)) =>
       val loop = loops(i)
       reg.writers.forall{writer => LCA(writer.parent,x.parent) != loop.toCtrl }
-    case _ => !scopes(i).contains(x)
+    case _ => dbgs(s"isInvariant $i, $x?  check against ${scopes(i)}");!scopes(i).contains(x)
   }
 
   /** True if all symbols in xs are invariant to all iterators in is. */
@@ -77,6 +78,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   object Mod   { def unapply[W](x: Ind[W]): Option[(Ind[W], Int)] = x.op.collect{case FixMod(a,b) if b.isConst => (a,b.toInt)}}
   object Index { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x).filter(iters.contains) }
   object LU    { def unapply[W](x: Ind[W]): Option[Ind[W]] = Some(x.op.collect{case RegRead(reg) if mostRecentWrite.contains(reg) => mostRecentWrite(reg).asInstanceOf[Ind[W]]}.getOrElse(x))}
+  object Read  { def unapply[W](x: Ind[W]): Option[Ind[W]] = x.op.collect{case RegRead(reg) if mostRecentWrite.contains(reg) => mostRecentWrite(reg).asInstanceOf[Ind[W]]}}
 
   private lazy val Zero = Sum.single(0)
   private lazy val One  = Prod.single(1)
@@ -113,6 +115,21 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     }
   }
 
+  def combine(a1: Seq[AffineComponent], a2: Seq[AffineComponent]): Seq[AffineComponent] = {
+    val combined = a1 ++ a2
+    var remainingIndices = Seq.tabulate(combined.size){i => i}.toSet
+    combined.zipWithIndex.foreach{
+      case (a,i) if (remainingIndices.contains(i)) => 
+        val matches = combined.zipWithIndex.collect{case (x,j) if (-a == x) => j}.filter(remainingIndices.contains)
+        if (matches.nonEmpty) {
+          remainingIndices -= matches.head
+          remainingIndices -= i
+        }
+      case _ => 
+    }
+    remainingIndices.toSeq.sorted.map(combined)
+  }
+
   private object Affine {
     /** Recursively finds affine patterns in the dataflow graph starting from the given symbol x.
       * Examples of patterns:
@@ -129,10 +146,10 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       case Index(i) if isNullIndex(i)  => Some(Nil, Zero, NotSet)
 
       // Any affine component plus any other affine component (e.g. (4*i + 5) + (3*j + 2))
-      case Plus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set  => Some(a1 ++ a2, b1 + b2, NotSet)
+      case Plus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set  => Some(combine(a1, a2), b1 + b2, NotSet)
 
       // Any affine component minus any other affine component (e.g. j - 1)
-      case Minus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set => Some(a1 ++ (-a2), b1 - b2, NotSet)
+      case Minus(Affine(a1,b1,m1), Affine(a2,b2,m2)) if !m1.set && !m2.set => Some(combine(a1, -a2), b1 - b2, NotSet)
 
       // Product of an affine component with a loop independent value, e.g. 4*i or (i + j)*32
       // Note: the multiplier only has to be loop invariant w.r.t. to iterators in a.
@@ -142,6 +159,8 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       case Times(Offset(b1), Affine(a,b2,m)) if isAllInvariant(a.inds, b1.syms) && !m.set => Some(a * b1, b1 * b2, NotSet)
 
       //case Mod(Affine(a,b,m1), m2) => Some(a, b, m1 % Modulus(m2))
+
+      case Read(Affine(a,b,m)) => Some(a, b, m)
 
       //case Divide(Affine(a,b1,m), Offset(b2)) if isAllInvariant(a.inds, b2.syms) && a.canBeDividedBy(b2) && b1.canBeDividedBy(b2) =>
       //  Some(a / b2, b1 / b2, m)
@@ -245,7 +264,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       dbgs(s"  end: ${end.accessPattern}")
       dbgs(s"  step: ${step.accessPattern}")
 
-    case Op(loop: Loop[_]) =>
+    case Op(loop: Loop[_]) if loop.cchains.forall(!_._1.isForever) =>
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
         scope.blocks.foreach{case (iters, block) =>
@@ -255,19 +274,36 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
           dbgs(s"  Blocks: $block")
           inLoop(lhs, iters, iterStarts, block)
         }
+      }
 
+    case Op(loop: Loop[_]) =>
+      loop.bodies.foreach{scope =>
+        dbgs(s"$lhs = $rhs [LOOP]")
+        scope.blocks.foreach{case (iters, block) =>
+          val iterStarts = iters.map{_ => I32(0)}
+          dbgs(s"  Iters:  $iters")
+          dbgs(s"  Starts:  $iterStarts")
+          dbgs(s"  Blocks: $block")
+          inLoop(lhs, iters, iterStarts, block)
+        }
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
-    case Enqueuer(mem,_,adr,_) if adr.isEmpty => 
+    case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
+    case Reader(mem,adr,_)   => 
       lhs match {
-        case Op(RegWrite(reg, data, _)) =>
-          dbgs(s"adding recent write of $data to $reg")
-          mostRecentWrite += reg -> data
+        case Op(RegRead(reg)) if !reg.isRemoteMem => 
+          val reachingWrite = reachingWritesToReg(lhs, reg.writers.toSet)
+          if (reachingWrite.size == 1 && reachingWrite.head.accumType == AccumType.Unknown) {
+            val data = reachingWrite.head match {
+              case Op(x: Enqueuer[_]) => x.data
+              case _ => throw new Exception(s"Unexpected write to $reg: ${reachingWrite.head}")
+            }
+            dbgs(s"Creating reaching write subst rule for $lhs = $data")
+            mostRecentWrite += (reg -> data)
+          }
         case _ =>
       }
-      setStreamingPattern(mem, lhs)
-    case Reader(mem,adr,_)   => 
       setAccessPattern(mem, lhs, adr)
     case Writer(mem,_,adr,_) => 
       setAccessPattern(mem, lhs, adr)

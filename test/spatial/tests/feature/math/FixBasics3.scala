@@ -36,22 +36,22 @@ import spatial.dsl._
       // Test exp_taylor from -4 to 4
       // NOTE: This saturates to 0 if x < -3.5, linear from -3.5 to -1.2, and 5th degree taylor above -1.2
       val expo = SRAM[T](1024)
-      Foreach(1024 by 1){ i =>
-        val x = (i.as[T] - 512) / 128
+      'EXP.Foreach(1024 by 1){ i =>
+        val x = (i.to[T] - 512) / 128
         expo(i) = exp_taylor(x)
       }
       // Test sqrt_approx from 0 to 1024
       // NOTE: This does a 3rd degree taylor centered at 1 if x < 2, and then linearizes for every order of magnitude after that
       val sqroot = SRAM[T](512)
-      Foreach(512 by 1){ i =>
-        sqroot(i) = sqrt_approx(i.as[T]*50 + 5)
+      'SQRT.Foreach(512 by 1){ i =>
+        sqroot(i) = sqrt_approx(i.to[T]*50 + 5)
       }
       // Test sin and cos from 0 to 2pi
       // NOTE: These do an amazing job if phi is inside +/- pi/2
       val sin = SRAM[T](1024)
       val cos = SRAM[T](1024)
-      Foreach(1024 by 1){ i =>
-        val phi = TWOPI*(i.as[T] / 1024) - TWOPI/2
+      'TRIG.Foreach(1024 by 1){ i =>
+        val phi = TWOPI*(i.to[T] / 1024) - TWOPI/2
         val beyond_left = phi < -TWOPI/4
         val beyond_right = phi > TWOPI/4
         val phi_shift = mux(beyond_left, phi + TWOPI/2, mux(beyond_right, phi - TWOPI/2, phi))
@@ -100,6 +100,15 @@ import spatial.dsl._
     // printArray(expo_gold.zip(expo_got){_-_.as[Float]}, "e^x error: ")
     // printArray(expo_gold.zip(expo_got){_.as[T]-_}, "e^x error: ")
 
+    // println(r"check expo: ${expo_got == expo_gold}")
+    // assert(expo_got == expo_gold)
+    // println(r"check sin: ${sin_got == sin_gold}")
+    // assert(sin_got == sin_gold)
+    // println(r"check cos: ${cos_got == cos_gold}")
+    // assert(cos_got == cos_gold)
+    // println(r"check sqrt: ${sqroot_got == sqroot_gold}")
+    // assert(sqroot_got == sqroot_gold)
+    println(r"check mul: ${gold == result}")
     assert(gold == result)
   }
 }

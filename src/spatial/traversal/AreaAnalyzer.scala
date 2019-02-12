@@ -90,7 +90,7 @@ case class AreaAnalyzer(IR: State) extends AccelTraversal with RerunTraversal {
         totalArea
       }
 
-    case op @ OpReduce(_, cchain, _, map, load, reduce, store, _, _, _) =>
+    case op @ OpReduce(_, cchain, _, map, load, reduce, store, _, _, _, _) =>
       /** The number of nodes in a binary tree with P leaves is P - 1 */
       val P = cchain.constPars.product  // Parallelization factor of map
 
@@ -121,7 +121,7 @@ case class AreaAnalyzer(IR: State) extends AccelTraversal with RerunTraversal {
       dbgs(s"   - Store:  $cycleArea_store")
       totalArea
 
-    case op @ OpMemReduce(_, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, ident, fold, itersMap, itersRed) =>
+    case op @ OpMemReduce(_, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, ident, fold, itersMap, itersRed, _) =>
       val Pm = cchainMap.constPars.product
       val Pr = cchainRed.constPars.product
 

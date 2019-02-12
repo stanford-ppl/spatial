@@ -1,8 +1,9 @@
 package spatial.metadata
 
 import argon._
+import argon.lang.Ind
 import argon.node._
-import forge.tags.stateful
+import forge.tags.{stateful,rig}
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.access._
@@ -10,7 +11,7 @@ import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
-import spatial.issues.AmbiguousMetaPipes
+import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
 import scala.util.Try
 
@@ -44,6 +45,10 @@ package object control {
       case _:Switch[_] | _:SwitchCase[_] | _:IfThenElse[_] => true
       case _ => false
     }
+    def isSwitchCase: Boolean = op match {
+      case _:SwitchCase[_] => true
+      case _ => false
+    }
 
     def isParallel: Boolean = op.isInstanceOf[ParallelPipe]
 
@@ -68,6 +73,38 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _ => false
     }
+
+    def isTileLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_]  => true
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isTileStore: Boolean = op match {
+      case _:FringeDenseStore[_,_]  => true
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
+
+    def isLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isGather: Boolean = op match {
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isStore: Boolean = op match {
+      case _:FringeDenseStore[_,_] => true
+      case _ => false
+    }
+
+    def isScatter: Boolean = op match {
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
   }
 
   abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
@@ -85,6 +122,7 @@ package object control {
 
     def isAccel: Boolean = op.exists(_.isAccel)
     def isSwitch: Boolean = op.exists(_.isSwitch)
+    def isSwitchCase: Boolean = op.exists(_.isSwitchCase)
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
@@ -94,6 +132,13 @@ package object control {
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
+    def isTileLoad: Boolean = op.exists(_.isTileLoad)
+    def isTileStore: Boolean = op.exists(_.isTileStore)
+
+    def isLoad: Boolean = op.exists(_.isLoad)
+    def isGather: Boolean = op.exists(_.isGather)
+    def isStore: Boolean = op.exists(_.isStore)
+    def isScatter: Boolean = op.exists(_.isScatter)
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
@@ -271,6 +316,11 @@ package object control {
       */
     @stateful def children: Seq[Ctrl.Node]
 
+    /** Returns a sequence of all controllers and subcontrollers which are siblings (children of parent) in the
+      * control hierarchy of this symbol or controller.
+      */
+    @stateful def siblings: Seq[Ctrl.Node]
+
     /** Returns all ancestors of the controller or symbol.
       * Ancestors are ordered outermost to innermost
       */
@@ -312,14 +362,14 @@ package object control {
       * If reference is defined, only accounts for the stages up to and including the reference.
       * This is currently trivially true for inner controllers.
       */
-    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]]): Boolean = {
+    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val ctrls = child.map{c => childrenPriorTo(c) }.getOrElse(children)
-      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false) } &&
-      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true) }
+      val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
+      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
     }
 
-    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean): Boolean = {
+    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean, forkNode: Option[Ctrl]): Boolean = {
       if (isFSM) false
       else if (isSwitch && isOuterControl) {
         allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
@@ -328,10 +378,7 @@ package object control {
       else {
         // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
         isLockstepAcross(iters, reference) &&
-        cchains.forall{cchain => cchain.counters.forall{ctr => ctr.nIters match {
-          case Some(Expect(_)) => true
-          case _ => false
-        }}}
+        (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.isFixed(forkNode)}})
       }
     }
 
@@ -455,6 +502,11 @@ package object control {
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
+    @stateful def siblings: Seq[Ctrl.Node] = {
+      if (s.isControl) parent.children
+      else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
+    }
+
     def parent: Ctrl = s.rawParent
     def scope: Scope = s.rawScope
 
@@ -531,6 +583,7 @@ package object control {
     def isControl: Boolean = true
 
     @stateful def children: Seq[Ctrl.Node] = toCtrl.children
+    @stateful def siblings: Seq[Ctrl.Node] = toCtrl.siblings
     def parent: Ctrl = toCtrl.parent
     def scope: Scope = scp
 
@@ -578,6 +631,8 @@ package object control {
       case Ctrl.Host => AccelScopes.all
     }
 
+    @stateful def siblings: Seq[Ctrl.Node] = parent.children
+
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent
       case Ctrl.Node(sym, _) => Ctrl.Node(sym, -1)
@@ -615,6 +670,8 @@ package object control {
 
     def counters: Seq[Counter[_]] = x.node.counters
     def pars: Seq[I32] = counters.map(_.ctrPar)
+    def parsOr1: Seq[Int] = counters.map(_.ctrParOr1)
+    @rig def widths: Seq[Int] = counters.map(_.ctrWidth)
     def constPars: Seq[Int] = pars.map(_.toInt)
     def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
     def isUnit: Boolean = counters.forall(_.isUnit)
@@ -633,11 +690,26 @@ package object control {
     def start: Sym[F] = x.node.start
     def step: Sym[F] = x.node.step
     def end: Sym[F] = x.node.end
-    def ctrPar: I32 = x.node.par
+    def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
+    def ctrParOr1: Int = ctrPar.toInt
+    @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits
     def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
     }
+    def isStaticStartAndStep: Boolean = (start,step) match {
+      case (Final(a: scala.Int), Final(b: scala.Int)) => true
+      case _ => false
+    }
+    def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
+      case Some(Expect(_)) => true
+      case _ => 
+        val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+        val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+        val endFixed = end match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+        startFixed && stepFixed && endFixed
+    }
+
     def nIters: Option[Bound] = (start,step,end) match {
       case (Final(min), Final(stride), Final(max)) =>
         Some(Final(Math.ceil((max - min).toDouble / stride).toInt))
@@ -647,28 +719,34 @@ package object control {
 
       case _ => None
     }
-    def willFullyUnroll: Boolean = (nIters,ctrPar) match {
-      case (Some(Expect(nIter)), Expect(par)) => par >= nIter
-      case _ => false
+    def willFullyUnroll: Boolean = {
+      if (x.isForever) false
+      else (nIters,ctrPar) match {
+        case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+        case _ => false
+      }
     }
-    def isUnit: Boolean = nIters match {
-      case (Some(Final(1))) => true
-      case _ => false
+    def isUnit: Boolean = {
+      if (x.isForever) false 
+      else nIters match {
+        case (Some(Final(1))) => true
+        case _ => false
+      }
     }
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
-    def ctrStart: Ind[W] = i.counter.start.unbox
-    def ctrStep: Ind[W] = i.counter.step.unbox
-    def ctrEnd: Ind[W] = i.counter.end.unbox
-    def ctrPar: I32 = i.counter.ctrPar
-    def ctrParOr1: Int = i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
+    def ctrStart: Ind[W] = i.counter.ctr.start.unbox
+    def ctrStep: Ind[W] = i.counter.ctr.step.unbox
+    def ctrEnd: Ind[W] = i.counter.ctr.end.unbox
+    @rig def ctrPar: I32 = if (i.counter.ctr.isForever) I32(1) else i.counter.ctr.ctrPar
+    def ctrParOr1: Int = if (i.counter.ctr.isForever) 1 else i.getCounter.map(_.ctr.ctrPar.toInt).getOrElse(1)
   }
 
   implicit class IndexCounterOps[A](i: Num[A]) {
-    def getCounter: Option[Counter[A]] = metadata[IndexCounter](i).map(_.ctr.asInstanceOf[Counter[A]])
-    def counter: Counter[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
-    def counter_=(ctr: Counter[_]): Unit = metadata.add(i, IndexCounter(ctr))
+    def getCounter: Option[IndexCounterInfo[A]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[A]])
+    def counter: IndexCounterInfo[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
+    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
   }
 
 
@@ -743,11 +821,11 @@ package object control {
       val pathB = b.ancestors
       val ctrlIdxA = pathA.indexOf(ctrl)
       val ctrlIdxB = pathB.indexOf(ctrl)
-      logs(s"  PathA: " + pathA.mkString(", "))
-      logs(s"  PathB: " + pathB.mkString(", "))
-      logs(s"  Ctrl: $ctrl")
-      logs(s"  ctrlIdxA: $ctrlIdxA")
-      logs(s"  ctrlIdxB: $ctrlIdxB")
+      // logs(s"  PathA: " + pathA.mkString(", "))
+      // logs(s"  PathB: " + pathB.mkString(", "))
+      // logs(s"  Ctrl: $ctrl")
+      // logs(s"  ctrlIdxA: $ctrlIdxA")
+      // logs(s"  ctrlIdxB: $ctrlIdxB")
 
       if (ctrlIdxA < 0 || ctrlIdxB < 0) None        // ctrl is not common to a and b
       else if (ctrlIdxA >= pathA.length - 1) None   // implies ctrl == a
@@ -758,10 +836,10 @@ package object control {
         val topB = pathB(ctrlIdxB + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
-        logs(s"  A: $a, B: $b")
-        logs(s"  ${ctrl.children.mkString(" ")}")
-        logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
-        logs(s"  Dist = ${idxB - idxA}")
+        // logs(s"  A: $a, B: $b")
+        // logs(s"  ${ctrl.children.mkString(" ")}")
+        // logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
+        // logs(s"  Dist = ${idxB - idxA}")
         if (idxA < 0 || idxB < 0) None
         Some(idxB - idxA)
       }
@@ -792,7 +870,7 @@ package object control {
     */
   @stateful def getCoarseDistance(ctrl: Ctrl, a: Ctrl, b: Ctrl): Option[Int] = {
     val dist = getStageDistance(ctrl, a, b)
-    if (ctrl.isOuterPipeLoop || ctrl.isOuterStreamLoop) dist else None
+    if (ctrl.isOuterPipeLoop) dist else None
   }
 
   @stateful def getCoarseDistance(ctrl: Ctrl, a: Sym[_], b: Sym[_]): Option[Int] = {
@@ -870,7 +948,7 @@ package object control {
     else {
       val metapipeLCAs = findAllMetaPipes(readers, writers)
       val hierarchicalBuffer = metapipeLCAs.keys.size > 1
-      val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
+      val hierIssue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
 
       metapipeLCAs.keys.headOption match {
         case Some(metapipe) =>
@@ -885,10 +963,14 @@ package object control {
           val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
           val minDist = buffers.minOrElse(0)
           val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
+          val bufferHazards = ports.toList.collect{case (a, i) if (a.isWriter && i.getOrElse(0) > 0) => (a,i.getOrElse(0))}
+          val bufIssue = if (bufferHazards.nonEmpty && !mem.isWriteBuffer && !mem.isNonBuffer) Some(PotentialBufferHazard(mem, bufferHazards)) else None
+          val issue = if (hierIssue.isDefined) hierIssue else bufIssue
+
           (Some(metapipe), ports, issue)
 
         case None =>
-          (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+          (None, accesses.map{a => a -> Some(0)}.toMap, hierIssue)
       }
     }
   }
@@ -925,16 +1007,14 @@ package object control {
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getReadStreams).toSet ++
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamIn || mem.isFIFO }
+      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg }
     // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
     // ctrl.children.flatMap(getWriteStreams).toSet ++
     LocalMemories.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamOut || mem.isFIFO }
+      .filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg }
     // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
-
-
 }

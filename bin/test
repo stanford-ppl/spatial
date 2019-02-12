@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+
+import os, sys, datetime
+sys.path.insert(0, 'pir/bin')
+import spatial_test
+
+def main():
+    spatial_test.main()
+
+if __name__ == "__main__":
+    main()

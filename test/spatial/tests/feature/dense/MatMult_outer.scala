@@ -4,99 +4,96 @@ import spatial.dsl._
 
 @spatial class MatMult_outer extends SpatialTest {
   override def runtimeArgs: Args = "32 128 128"
+
   type X = FixPt[TRUE,_16,_16]
 
-  val innerPar = 4
-  val midPar = 2
-  val outerPar = 2
+  def main(args: Array[String]): Unit = {
+    // Get sizes for matrices from command line
+    val m = args(0).to[Int]
+    val n = args(1).to[Int]
+    val p = args(2).to[Int]
 
-  val tsm = 16
-  val tsn = 64
-  val tsp = 64
+    // Generate data for input matrices A and B, and initialize C
+    val a = (0::m, 0::p){(i,j) => ((i + j * p) % 8).to[X] }
+    val b = (0::p, 0::n){(i,j) => ((i + j * n) % 8).to[X] }
+    val c_init = (0::m, 0::n){(_,_) => 0.to[X] }
 
-
-  def MatMult_outer[T:Num](A: Array[T], B: Array[T], C_init: Array[T], mm: Int, nn: Int, pp: Int): Array[T] = {
+    // Communicate dimensions to FPGA with ArgIns
     val M = ArgIn[Int]
     val N = ArgIn[Int]
     val P = ArgIn[Int]
-    setArg(M,mm)
-    setArg(N,nn)
-    setArg(P,pp)
+    setArg(M,m)
+    setArg(N,n)
+    setArg(P,p)
 
-    val a = DRAM[T](M, P)
-    val b = DRAM[T](P, N)
-    // val c_init = DRAM[T](M, N)
-    val c = DRAM[T](M, N)
+    // Create pointers to matrices
+    val A = DRAM[X](M, P)
+    val B = DRAM[X](P, N)
+    val C = DRAM[X](M, N)
 
-    val op = outerPar (1 -> 1)
-    val mp = midPar (1 -> 16)
-    val ip = innerPar (1 -> 64)
-    val px = 1 (1 -> 1) // Cannot parallelize accum across k blocks
+    // Set up parallelizations
+    val op = 1
+    val mp = 1
+    val ip = 1
 
-    val bm = tsm (48 -> 48 -> 1920)
-    val bn = tsn (48 -> 48 -> 1920)
-    val bp = tsp (48 -> 48 -> 1920)
+    val bm = 16
+    val bn = 64
+    val bp = 64
 
-    setMem(a, A)
-    setMem(b, B)
-    setMem(c, C_init)
+    setMem(A, a)
+    setMem(B, b)
+    setMem(C, c_init)
 
     Accel {
-      Sequential.Foreach(M by bm, N by bn par op) { (i,j) =>
-        val tileC = SRAM[T](bm, bn)
-        tileC load c(i::i+bm, j::j+bn par ip)
+      // Tile by output regions in C
+      Foreach(M by bm par op, N by bn par op) { (i,j) =>
+        val tileC = SRAM[X](bm, bn).buffer
+                                                   
+        // Prefetch C tile
+        tileC load C(i::i+bm, j::j+bn par ip)
+                                                   
+        // Accumulate on top of C tile over all tiles in P dimension
         MemFold(tileC)(P by bp) { k =>
-          val tileA = SRAM[T](bm, bp)
-          val tileB = SRAM[T](bp, bn)
-          val accum = SRAM[T](bm, bn)
+          val tileA = SRAM[X](bm, bp)
+          val tileB = SRAM[X](bp, bn)
+          val accum = SRAM[X](bm, bn)
+                                 
+          // Load A and B tiles
           Parallel {
-            tileA load a(i::i+bm, k::k+bp par ip)
-            tileB load b(k::k+bp, j::j+bn par ip)
+            tileA load A(i::i+bm, k::k+bp par ip)
+            tileB load B(k::k+bp, j::j+bn par ip)
           }
+          
+          // Perform matrix multiply on tile
           MemReduce(accum)(bp by 1 par mp){ kk =>
-            val tileC_partial = SRAM[T](bm,bn)
+            val tileC_partial = SRAM[X](bm,bn)
             Foreach(bm by 1, bn by 1 par ip){ (ii,jj) =>
               tileC_partial(ii,jj) = tileA(ii,kk) * tileB(kk,jj)
             }
             tileC_partial
           }{_+_}
         }{_+_}
-        c(i::i+bm, j::j+bn par ip) store tileC
+                                                   
+        // Store C tile to DRAM
+        C(i::i+bm, j::j+bn par ip) store tileC
       }
     }
-    getMem(c)
-  }
+    
+  // Fetch result on host
+    val result = getMatrix(C)
 
+    // Compute correct answer
+    val gold = (0::m, 0::n){(i,j) => 
+      Array.tabulate(p){k => a(i,k) * b(k,j)}.reduce{_+_}
+    }
 
-  def main(args: Array[String]): Unit = {
-    val M = args(0).to[Int]
-    val N = args(1).to[Int]
-    val P = args(2).to[Int]
+    // Show results
+    println(r"expected cksum: ${gold.map(a => a).reduce{_+_}}")
+    println(r"result cksum: ${result.map(a => a).reduce{_+_}}")
+    printMatrix(gold, "Gold: ")
+    printMatrix(result, "Result: ")
 
-    val a = Array.tabulate(M){ j => Array.tabulate(P){ i => ((i + j * P) % 8).to[X] } } // Standard array
-    val b = Array.tabulate(P){ j => Array.tabulate(N){ i => ((i + j * N) % 8).to[X] } } // Standard array
-    val c_init = Array.fill(M){ Array.fill(N){ 0.to[X] } }
-    // val a = Array.fill(M){ Array.fill(P){random[T](100)} }
-    // val b = Array.fill(P){ Array.fill(N){random[T](100)} }
-
-    val result = MatMult_outer(a.flatten, b.flatten, c_init.flatten, M, N, P)
-
-    val gold = Array.tabulate(M){i =>
-      val aRow = a(i)
-      Array.tabulate(N){j =>
-        val bCol = b.map{row => row(j)}
-        aRow.zip(bCol){_*_}.reduce{_+_}
-      }
-    }.flatten
-
-    println("expected cksum: " + gold.map(a => a).reduce{_+_})
-    println("result cksum: " + result.map(a => a).reduce{_+_})
-    printArray(gold, "Gold: ")
-    printArray(result, "Result: ")
-
-    val cksum = result.zip(gold){_ == _}.reduce{_&&_}
-    println("PASS: " + cksum + " (MatMult_outer)")
-    assert(cksum)
+    assert(gold == result)
   }
 
 }

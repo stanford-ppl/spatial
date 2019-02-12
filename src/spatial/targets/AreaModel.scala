@@ -174,8 +174,8 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
 
     /** Zero area cost */
     case Transient(_)       => NoArea
-    case _:DRAMNew[_,_]     => NoArea
-    case GetDRAMAddress(_)  => NoArea
+    case _:DRAMHostNew[_,_]     => NoArea
+    case DRAMAddress(_)  => NoArea
     case _:SwitchCase[_]    => NoArea
 
     // LUTs

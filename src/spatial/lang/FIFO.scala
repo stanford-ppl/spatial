@@ -3,6 +3,7 @@ package spatial.lang
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.metadata.memory._
 
 import scala.collection.mutable.Queue
 
@@ -42,6 +43,12 @@ import scala.collection.mutable.Queue
   /** Creates a non-destructive read port to this FIFO. **/
   @api def peek(): A = stage(FIFOPeek(this,Set.empty))
 
+  /** Allow "unsafe" banking, where two enq's can technically happen simultaneously and one will be dropped.
+    * Use in cases where FIFOs are used in stream controllers and have enq's in multiple places that the user
+    * knows are mutually exclusive
+    */
+  def conflictable: FIFO[A] = { this.shouldIgnoreConflicts = true; me }
+
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(FIFODeq(this,ens))
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = stage(FIFOEnq(this,data,ens))
@@ -49,4 +56,14 @@ import scala.collection.mutable.Queue
 }
 object FIFO {
   @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
+  @rig def alloc[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))
+  @rig def deq[A](fifo: FIFO[A], ens: Set[Bit] = Set.empty): A = {
+    implicit val tA: Bits[A] = fifo.A
+    stage(FIFODeq(fifo, ens))
+  }
+  @rig def enq[A](fifo: FIFO[A], data: Bits[A], ens: Set[Bit] = Set.empty): Void = {
+    implicit val tA: Bits[A] = fifo.A
+    stage(FIFOEnq(fifo,data,ens))
+  }
+
 }

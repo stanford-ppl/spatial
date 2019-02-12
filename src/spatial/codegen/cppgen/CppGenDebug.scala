@@ -15,7 +15,7 @@ trait CppGenDebug extends CppGenCommon {
         open(src"""for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i ++){""")
             emit(src"""${lhs} += (*${array})[${lhs}_i];""")
         close("}")
-    case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::stod($x);")
+    case TextToFix(x, fmt) => emit(src"${lhs.tp} $lhs = std::${conv(lhs.tp)}($x);")
       // lhs.tp match {
       //   case IntType()  => emit(src"int32_t $lhs = atoi(${x}.c_str());")
       //   case LongType() => emit(src"long $lhs = std::stol($x);")
@@ -29,7 +29,7 @@ trait CppGenDebug extends CppGenCommon {
       //     }
       // }
 
-    case TextToFlt(x, fmt) => emit(src"${lhs.tp} $lhs = std::stod($x);")
+    case TextToFlt(x, fmt) => emit(src"${lhs.tp} $lhs = std::${conv(lhs.tp)}($x);")
     case TextLength(x) => emit(src"${lhs.tp} $lhs = ${x}.length();")
     case TextApply(x,el) => emit(src"${lhs.tp} $lhs = $x.at($el);")
     case TextSlice(x,start,end) => emit(src"${lhs.tp} $lhs = $x.substr($start,${end}-${start});")
@@ -38,7 +38,7 @@ trait CppGenDebug extends CppGenCommon {
     case GenericToText(x) => emit(src"""${lhs.tp} $lhs = $x.toString();""")
 
     case TextConcat(strings) => 
-    	val paired = strings.map(quote).reduceRight{(r,c) => "string_plus(" + r + "," + c} + ")" * (strings.length-1)
+    	val paired = strings.map(quote).reduceRight{(r,c) => "(" + r + " + " + c} + ")" * (strings.length-1)
     	emit(src"${lhs.tp} $lhs = $paired;")
     case PrintIf(cond,x)   => 
     	if (cond.isEmpty) emit(src"""std::cout << $x;""")

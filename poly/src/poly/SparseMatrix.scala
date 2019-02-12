@@ -4,6 +4,18 @@ import utils.implicits.collections._
 
 case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def keys: Set[K] = rows.map(_.cols.keySet).fold(Set.empty)(_++_)
+  def replaceKeys(keySwap: Map[K,K]): SparseMatrix[K] = {
+    val rows2 = rows.map{r => 
+      val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,k) -> v)}
+      SparseVector[K](cols2, r.c, r.lastIters)
+    }
+    SparseMatrix[K](rows2)
+  }
+
+  def prependBlankRow: SparseMatrix[K] = {
+    val rows2 = Seq(SparseVector[K](Map[K,Int](), 0, Map[K,Option[K]]())) ++ rows
+    SparseMatrix[K](rows2)
+  }
 
   def sliceDims(dims: Seq[Int]): SparseMatrix[K] = SparseMatrix[K](dims.map{i => rows(i) })
 

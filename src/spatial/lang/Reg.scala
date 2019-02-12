@@ -17,7 +17,12 @@ import spatial.metadata.memory._
   @api def reset(): Void = stage(RegReset(this,Set.empty))
   @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))
 
+  /** Indicate that the memory should be buffered and ignore
+    * ignore potential situation where result from running sequentially
+    * does not match with resurt from running pipelined
+    */
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
+  /** Do not buffer memory */
   def nonbuffer: Reg[A] = { this.isNonBuffer = true; me }
 
   // --- Typeclass Methods
@@ -43,6 +48,39 @@ object Reg {
   @rig def write[A](reg: Reg[A], data: Bits[A], ens: Set[Bit] = Set.empty): Void = {
     implicit val tA: Bits[A] = reg.A
     stage(RegWrite(reg,data,ens))
+  }
+}
+
+@ref class FIFOReg[A:Bits] extends LocalMem0[A,FIFOReg] with StagedVarLike[A] with Ref[Ptr[Any],FIFOReg[A]] {
+  val A: Bits[A] = Bits[A]
+  private implicit val evA: A <:< Bits[A] = Bits[A].box
+  override val evMem: FIFOReg[A] <:< LocalMem[A,FIFOReg] = implicitly[FIFOReg[A] <:< LocalMem[A,FIFOReg]]
+
+  @api def value: A = FIFOReg.deq(this, Set())
+  @api def deq(): A = value
+  @api def enq(data: A): Void = FIFOReg.enq(this, data)
+
+  // --- Typeclass Methods
+  @rig def __sread(): A = FIFOReg.deq(this, Set())
+  @rig def __sassign(x: A): Unit = FIFOReg.enq(this, x)
+
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = FIFOReg.deq(this, ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit] ): Void = FIFOReg.enq(this, data, ens)
+  @rig def __reset(ens: Set[Bit]): Void = void
+}
+
+object FIFOReg {
+  @api def apply[A:Bits]: FIFOReg[A] = FIFOReg.alloc[A](zero[A])
+  @api def apply[A:Bits](reset: A): FIFOReg[A] = FIFOReg.alloc[A](reset)
+
+  @rig def alloc[A:Bits](reset: A): FIFOReg[A] = stage(FIFORegNew[A](Bits[A].box(reset)))
+  @rig def deq[A](reg: FIFOReg[A], ens: Set[Bit] = Set.empty): A = {
+    implicit val tA: Bits[A] = reg.A
+    stage(FIFORegDeq(reg, ens))
+  }
+  @rig def enq[A](reg: FIFOReg[A], data: Bits[A], ens: Set[Bit] = Set.empty): Void = {
+    implicit val tA: Bits[A] = reg.A
+    stage(FIFORegEnq(reg,data,ens))
   }
 }
 

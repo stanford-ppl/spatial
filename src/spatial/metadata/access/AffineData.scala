@@ -2,9 +2,11 @@ package spatial.metadata.access
 
 import forge.tags._
 import argon._
+import utils.implicits.collections._
 import spatial.lang._
 import spatial.metadata.control._
-import poly.{ConstraintMatrix, ISL, SparseMatrix}
+import spatial.metadata.memory._
+import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
 /** A wrapper class representing a (optionally unrolled) access and its corresponding address space
   * as an affine, sparse matrix.
@@ -23,6 +25,11 @@ case class AccessMatrix(
 ) {
   def keys: Set[Idx] = matrix.keys
   @stateful def parent: Ctrl = access.parent
+  def randomizeKeys(keySwap: Map[Idx,Idx]): AccessMatrix = {
+    keySwap.foreach{case (old, swp) => swp.domain = old.domain.replaceKeys(keySwap)}
+    val matrix2 = matrix.replaceKeys(keySwap) 
+    AccessMatrix(access, matrix2, unroll)
+  }
 
   /** True if there exists a reachable multi-dimensional index I such that a(I) = b(I).
     * True if all given dimensions may intersect.
@@ -41,6 +48,23 @@ case class AccessMatrix(
   }
 
   def short: String = s"$access {${unroll.mkString(",")}}"
+
+  implicit class SeqMath(a: Seq[Int]) {
+    def *(b: SparseMatrix[Idx]): SparseVector[Idx] = {
+      val vec = b.keys.mapping{k => b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i(k)*a_i }.sum }
+      val c = b.rows.zip(a).iterator.map{case (row_i,a_i) => row_i.c*a_i}.sum
+      SparseVector[Idx](vec,c,Map.empty)
+    }
+  }
+
+  /** True if the matrix always resolves to the same bank under banking scheme N, B, alpha */
+  def isDirectlyBanked(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): Boolean = {
+    val bank = alpha*matrix 
+    bank.cols.forall{case (k,v) => (v/B.head /*?*/) % N.head /*?*/ == 0}
+  }
+
+  /** Get segments that each unroll belongs to */
+  def segmentAssignments: Seq[Int] = access.segmentMapping.map(_._2).toSeq
 }
 
 /** The unrolled access patterns of an optionally parallelized memory access represented as affine matrices.

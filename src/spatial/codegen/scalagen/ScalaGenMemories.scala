@@ -9,6 +9,8 @@ import utils.multiLoopWithIndex
 trait ScalaGenMemories extends ScalaGenBits {
   var globalMems: Boolean = false
 
+  val lineBufSwappers: scala.collection.mutable.Map[Sym[_], Set[Sym[_]]] = scala.collection.mutable.Map.empty
+
   override def emitPreMain(): Unit = {
     emit(src"OOB.open()")
     super.emitPreMain()
@@ -64,16 +66,41 @@ trait ScalaGenMemories extends ScalaGenBits {
     }
   }
 
-  def emitBankedInitMem(mem: Sym[_], init: Option[Seq[Sym[_]]], tp: ExpType[_,_]): Unit = {
+  private def expandInits(mem: Sym[_], inits: Option[Seq[Sym[_]]]): Option[Seq[Sym[_]]] = {
+    if (inits.isDefined) {
+      val dims = mem.constDims
+      val padding = mem.padding
+      val pDims = dims.zip(padding).map{case (d:Int,p:Int) => d+p}
+      val paddedInits = Seq.tabulate(pDims.product){i => 
+        val coords = pDims.zipWithIndex.map{ case (b,j) =>
+          i % (pDims.drop(j).product) / pDims.drop(j+1).product
+        }
+        if (coords.zip(dims).map{case(c:Int,d:Int) => c < d}.reduce{_&&_}) {
+          val flatCoord = coords.zipWithIndex.map{ case (b,j) => 
+            b * dims.drop(j+1).product
+          }.sum
+          inits.get(flatCoord)
+        }
+        else 
+          inits.get.head
+      }
+      Some(paddedInits)
+    }
+    else None
+  }
+
+  def emitBankedInitMem(mem: Sym[_], rawinit: Option[Seq[Sym[_]]], tp: ExpType[_,_]): Unit = {
     val inst = mem.instance
     val dims = mem.constDims.zip(mem.padding).map{case(a,b) => a+b}
     val size = dims.product
+    val init = expandInits(mem, rawinit)
+
     implicit val ctx: SrcCtx = mem.ctx
 
     val dimensions = dims.map(_.toString).mkString("Seq(", ",", ")")
     val numBanks = inst.nBanks.map(_.toString).mkString("Seq(", ",", ")")
 
-    if (mem.isRegFile) {
+    if (mem.isRegFile || mem.isLUT) {
       val name = s""""${mem.fullname}""""
       val data = init match {
         case Some(elems) if elems.length >= size => src"Array[$tp](${elems.take(size)})"

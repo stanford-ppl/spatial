@@ -34,12 +34,14 @@ trait NodeParams {
       }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 
-    case op:FltOp[_,_,_]   => (s"${op.name}_${op.fmt.mbits}_${op.fmt.ebits}", Nil)
+    case op:FltOp[_,_,_]   => (op.name, Nil)
 
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
 
     case _:SRAMRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMAsyncRead", Nil)
     case _:SRAMBankedRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMBankedAsyncRead", Nil)
+
+    case _@RegFileVectorRead(rf,_,_) => ("RegFileVectorRead", Seq("e" -> rf.constDims.product.toDouble))
 
     case op:Switch[_] if s.isBits => ("SwitchMux", Seq("n" -> op.selects.length, "b" -> nbits(s)))
     case op:Switch[_] => ("Switch", Seq("n" -> op.selects.length))

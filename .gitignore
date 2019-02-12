@@ -10,6 +10,7 @@ target/
 /gen/
 /poly/emptiness
 
+resources/files_list
 resources/synth/cpp-templates/fringeDE1SoC/
 resources/synth/cpp-templates/fringeArria10/
 resources/synth/cpp-templates/fringeXSIM/
@@ -45,3 +46,9 @@ resources/synth/chisel-templates/fringeXSIM/
 *.tags
 
 resources/synth/chisel-templates/test_run_dir/*
+bin/get
+test-data/
+branchname
+reghash
+bin/spatialfast
+lib_managed

@@ -13,9 +13,10 @@ import socket
 
 def write(wksh, row, col, txt):
 	try:
-		if (col > wksh.cols):
-        		wksh.insert_cols(col-1, inherit=True)
-		wksh.update_cell((row,col),txt)
+		if (wksh.title != "Probe"): # Never write to probe
+			if (col > wksh.cols):
+	        		wksh.insert_cols(col-1, inherit=True)
+			wksh.update_cell((row,col),txt)
 	except:
 		print("WARN: pygsheets failed write %s @ %d,%d... -_-" % (txt, row, col))
 
@@ -47,6 +48,14 @@ def getCols(wksh, appname):
 	except:
 		print("ERROR: pygsheets failed getCols... -_-")	
 		exit()
+
+def getStampCol(wksh):
+	try: 
+		lol = readAllVals(wksh)
+		cols = [i+1 for i,x in enumerate(lol[1]) if (re.match("Test Time",x))]
+		return cols[0]
+	except:
+		return -1
 
 def getRuntimeCol(wksh, appname):
 	try: 
@@ -95,6 +104,12 @@ def getDoc(title):
 	elif (title == "vcs"):
 		try: 
 			sh = gc.open_by_key("1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM")
+		except:
+			print("ERROR: Couldn't get sheet")
+			exit()
+	elif (title == "scalasim"):
+		try: 
+			sh = gc.open_by_key("1BAf6e1_ckRwrJNW-t09pjGDFixt2GsobCYyzaue0qcA")
 		except:
 			print("ERROR: Couldn't get sheet")
 			exit()
@@ -151,6 +166,22 @@ def getRow(sh, hash, apphash):
 	if (row == -1):	print("ERROR: Could not find row for %s, %s" % (hash, apphash))
 	return row
 
+def getRowByBranch(sh, branchname, start):
+	if (branchname == "any"): 
+		print("branch %s is row %d" % (branchname, start))
+		return start
+	else:
+		worksheet = sh.worksheet('index', 0)
+		lol = readAllVals(worksheet)
+		row = -1
+		for i in range(start, len(lol)):
+			if (lol[i][1] == branchname):
+				row = i
+				break
+		if (row == -1):	print("ERROR: Could not find row for %s, starting from %s" % (branchname, start))
+		print("branch %s is row %d" % (branchname, row))
+		return row
+
 def isPerf(title):
 	if (title == "Zynq"):
 		perf=False
@@ -161,6 +192,8 @@ def isPerf(title):
 	elif (title == "AWS"):
 		perf=False
 	elif (title == "vcs"):
+		perf=True
+	elif (title == "scalasim"):
 		perf=True
 	elif (title == "vcs-noretime"):
 		perf=True
@@ -173,7 +206,7 @@ def isPerf(title):
 
 
 
-def report_regression_results(branch, appname, passed, cycles, hash, apphash, spatialcompile, vcscompile, csv, args):
+def report_regression_results(branch, appname, passed, cycles, hash, apphash, spatialcompile, backendcompile, csv, args):
 	sh = getDoc(branch)
 	row = getRow(sh, hash, apphash)
 
@@ -195,10 +228,10 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, sp
 	col = getColOrAppend(worksheet, appname)
 	write(worksheet, row, col, spatialcompile)
 
-	# Page 3 - VCS compile time
-	worksheet = sh.worksheet_by_title('VCSCompile')
+	# Page 3 - Backend compile time
+	worksheet = sh.worksheet_by_title('BackendCompile')
 	col = getColOrAppend(worksheet, appname)
-	write(worksheet, row, col, vcscompile)
+	write(worksheet, row, col, backendcompile)
 
 	# Page 4 - Properties
 	worksheet = sh.worksheet_by_title('Properties')
@@ -344,6 +377,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	lolhash = [x[0] for x in lol if x[0] != '']
 	# id = len(lolhash) + 1
 	freq = os.environ['CLOCK_FREQ_MHZ']
+	numthreads = os.environ['NUM_THREADS']
 	if ("hash" in lol[1]):
 		hcol=lol[1].index("hash")
 	if ("app hash" in lol[1]):
@@ -372,12 +406,16 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	if (new_entry):
 		link='=HYPERLINK("https://github.com/stanford-ppl/spatial/tree/' + hash + '", "' + hash + '")'
 		alink=apphash
+		count_success="=sum ( COUNTIF ( k3:3, \"=Y\" ) )"
+		count_fail="=sum ( COUNTIF ( k3:3, \"=N\" ) )"
+		count_crash="=sum ( COUNTIF ( k3:3, \"\" ) ) / 2"
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
 			worksheet = sh.worksheet('index', x)
-			if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
-				worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
+			if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
+				if (worksheet.title == "Runtime" and isPerf): worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1], count_success, count_fail, count_crash ])
+				else: worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
 				if (not keep_row_75): deleteRows(worksheet, 75)
 				# worksheet.update_cell(id,1, link)
 				# worksheet.update_cell(id,2, alink)
@@ -399,8 +437,8 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 			for x in range(0,numsheets):
 				# worksheet = sh.get_worksheet(x)
 				worksheet = sh.worksheet('index', x)
-				if (worksheet.title != "STATUS" and worksheet.title != "Properties"):
-					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz', os.uname()[1] ])
+				if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
+					worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)", os.uname()[1] ])
 					if (not keep_row_75): deleteRows(worksheet, 75)
 					# worksheet.update_cell(id,1, link)
 					# worksheet.update_cell(id,2, alink)
@@ -425,14 +463,29 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 
 	# sh.share('feldman.matthew1@gmail.com', perm_type='user', role='writer')
 
-
-def report_changes(backend):
+def finish_test(backend, branch, runtime):
+	sh = getDoc(backend)
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		worksheet = sh.worksheet('index', x)
+		print("Stamping %s" % worksheet.title)
+		lol = worksheet.get_all_values()
+		stampcol = getStampCol(worksheet)
+		if (stampcol >= 0):
+			row = getRowByBranch(sh, branch, 2) + 1
+			write(worksheet, row, stampcol, runtime)
+		else:
+			print("No Test Time field for %s" % worksheet.title)
+def report_changes(backend, newbranch, oldbranch):
 	sh = getDoc(backend)
 
 	worksheet = sh.worksheet_by_title("Runtime")
 	lol = worksheet.get_all_values()
+
 	start = getCols(worksheet, "Test:")[0]
 	tests = list(filter(None, lol[0][start:]))
+	newrow = getRowByBranch(sh, newbranch, 2)
+	oldrow = getRowByBranch(sh, oldbranch, newrow+1)
 	pass_list = []
 	fail_list = []
 	nocompile_list = []
@@ -441,12 +494,12 @@ def report_changes(backend):
 	for t in tests:
 		col = lol[0].index(t) + 1
 		if (len(lol[0]) > col): 
-			now_pass = lol[2][col] == '1'
-			now_fail = lol[2][col] == '0'
-			now_nocompile = lol[2][col] == ''
-			b4_pass = lol[3][col] == '1'
-			b4_fail = lol[3][col] == '0'
-			b4_nocompile = lol[3][col] == ''
+			now_pass = (lol[newrow][col] == 'Y') or (lol[newrow][col] == '1')
+			now_fail = (lol[newrow][col] == 'N') or (lol[newrow][col] == '0')
+			now_nocompile = lol[newrow][col] == ''
+			b4_pass = (lol[oldrow][col] == 'Y') or (lol[oldrow][col] == '1')
+			b4_fail = (lol[oldrow][col] == 'N') or (lol[oldrow][col] == '0')
+			b4_nocompile = lol[oldrow][col] == ''
 			if (now_pass): pass_list.append(t)
 			if (now_fail): fail_list.append(t)
 			if (now_nocompile): nocompile_list.append(t)
@@ -471,6 +524,82 @@ def report_changes(backend):
 	print(sorted(improved_list))
 	print("Worsened:")
 	print(sorted(worsened_list))
+	print("Diffed rows %d (%s) and %d (%s)" % (newrow, newbranch, oldrow, oldbranch))
+
+def combine_and_strip_prefixes(backend):
+	sh = getDoc(backend)
+
+	numsheets = len(sh.worksheets())
+	for x in range(0,numsheets):
+		# worksheet = sh.get_worksheet(x)
+		worksheet = sh.worksheet('index', x)
+		if (worksheet.title != "STATUS" and worksheet.title != "Probe"):
+			print("Scrubbing %s" % worksheet.title)
+			lol = worksheet.get_all_values()
+			start = getCols(worksheet, "Test:")[0]
+			tests = list(filter(None, lol[0][start:]))
+			for t in tests:
+				if "spatial." in t:
+					col = lol[0].index(t)
+					purename = re.sub(r".*\.","",t)
+					merge_apps_columns(purename, t, backend, True)
+					print("Replace %s with %s" % (t, purename))
+
+
+def report_slowdowns(prop, backend, newbranch, oldbranch):
+	sh = getDoc(backend)
+
+	if (prop == "runtime"):
+		worksheet = sh.worksheet_by_title("Runtime")
+	elif (prop == "spatial"):
+		worksheet = sh.worksheet_by_title("SpatialCompile")
+	else:
+		worksheet = sh.worksheet_by_title("BackendCompile")
+
+	lol = worksheet.get_all_values()
+	start = getCols(worksheet, "Test:")[0]
+	tests = list(filter(None, lol[0][start:]))
+	newrow = getRowByBranch(sh, newbranch, 2)
+	oldrow = getRowByBranch(sh, oldbranch, newrow+1)
+	better_apps = []
+	better_raw = []
+	better_change = []
+	worse_apps = []
+	worse_raw = []
+	worse_change = []
+	for t in tests:
+		col = lol[0].index(t)
+		if (len(lol[0]) > col and lol[newrow][col] != "" and lol[oldrow][col] != ""): 
+			nowtime = float(lol[newrow][col])
+			try:
+				lasttime = float(lol[oldrow][col])
+				percent_change = ((nowtime - lasttime) / lasttime) * 100
+				if (percent_change < -2):
+					better_apps.append(t)
+					better_raw.append(nowtime)
+					better_change.append(percent_change)
+				elif (percent_change > 2):
+					worse_apps.append(t)
+					worse_raw.append(nowtime)
+					worse_change.append(percent_change)
+			except:
+				1
+
+	print("SUMMARY FOR %s: %s" % (backend, prop))
+	print("-------")
+	better_apps_s = [x for _,x in sorted(zip(better_change,better_apps))]
+	better_raw_s = [x for _,x in sorted(zip(better_change,better_raw))]
+	better_change_s = sorted(better_change)
+	for i in range(0,len(better_apps)):
+		print("    %-30s: %.1f%% faster (now %.1f)" % (better_apps_s[i], -better_change_s[i], better_raw_s[i]))
+	print("-----------------------------------------")
+	worse_apps_s = [x for _,x in sorted(zip(worse_change,worse_apps))]
+	worse_raw_s = [x for _,x in sorted(zip(worse_change,worse_raw))]
+	worse_change_s = sorted(worse_change)
+	for i in range(0,len(worse_apps)):
+		print("    %-30s: %.1f%% slower (now %.1f)" % (worse_apps_s[i], worse_change_s[i], worse_raw_s[i]))
+	print("Improved: %d" % len(better_apps))
+	print("Worsened: %d" % len(worse_apps))
 
 
 # ofs = 0 means start deleting from spreadsheet "row 3" and down
@@ -506,7 +635,7 @@ def delete_app_column(appname, backend):
 					print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
 
 # This will take rows from new_appname column 0 until the last row with data and paste it into old_appname column
-def merge_apps_columns(old_appname, new_appname, backend):
+def merge_apps_columns(old_appname, new_appname, backend, keepOldname = False):
 	sh = getDoc(backend)
 	perf = isPerf(backend)
 
@@ -542,6 +671,8 @@ def merge_apps_columns(old_appname, new_appname, backend):
 						write(worksheet, i+1, old_col_in_sheet[0], data[i])
 						# print("write(%d %d, %s)" %(i,old_col_in_sheet[0], data[i]))
 				deleteCols(worksheet, new_col_in_sheet[0])
+			if keepOldname:
+				write(worksheet, 1, old_col_in_sheet[0], old_appname)
 
 			# print("delete app column")
 
@@ -562,8 +693,14 @@ elif (sys.argv[1] == "prepare_sheet"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! prepare_sheet('%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]))
 	prepare_sheet(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 elif (sys.argv[1] == "report_changes"):
-	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s')" % (sys.argv[2]))
-	report_changes(sys.argv[2])
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_changes('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	report_changes(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "finish_test"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! finish_test('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
+	finish_test(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "report_slowdowns"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_slowdowns('%s', '%s')" % (sys.argv[2], sys.argv[3]))
+	report_slowdowns(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 elif (sys.argv[1] == "delete_n_rows"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! delete_n_rows('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	delete_n_rows(sys.argv[2], sys.argv[3], sys.argv[4])
@@ -573,6 +710,9 @@ elif (sys.argv[1] == "delete_app_column"):
 elif (sys.argv[1] == "merge_apps_columns"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! merge_apps_columns('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4]))
 	merge_apps_columns(sys.argv[2], sys.argv[3], sys.argv[4])
+elif (sys.argv[1] == "combine_and_strip_prefixes"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! combine_and_strip_prefixes('%s')" % (sys.argv[2]))
+	combine_and_strip_prefixes(sys.argv[2])
 elif (sys.argv[1] == "dev"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! dev('%s', '%s', '%s')" % (sys.argv[2], sys.argv[3]))
 	dev(sys.argv[2], sys.argv[3], sys.argv[4])
@@ -582,8 +722,11 @@ else:
 	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")
-	print(" - report_changes(backend)")
-	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, vcs-noretime, Zynq, etc...))")
-	print(" - delete_app_column(appname (regex supported), backend (vcs, vcs-noretime, Zynq, etc...))")
+	print(" - combine_and_strip_prefixes(backend)")
+	print(" - report_changes(backend, newbranch, oldbranch (master, misc_fixes, any, etc.))")
+	print(" - finish_test(backend, branch, runtime)")
+	print(" - report_slowdowns(property [runtime, spatial, backend], newbranch, oldbranch, backend)")
+	print(" - delete_n_rows(n, ofs (use 0 for row 3, 1 for row 4, etc...), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
+	print(" - delete_app_column(appname (regex supported), backend (vcs, scalasim, vcs-noretime, Zynq, etc...))")
 	print(" - merge_apps_columns(old appname, new appname, backend)")
 	exit()

@@ -28,7 +28,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   }
 }
 
-/** Bitwise inversion of a fixed point value */
+/** Reciprocal of a number */
 @op case class FixInv[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](a => ~a) {
   @rig override def rewrite: Fix[S, I, F] = a match {
     case Op(FixInv(x)) => x
@@ -63,8 +63,16 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   override def isAssociative: Boolean = true
 
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (_, Literal(0)) => a
+    case (Literal(0), _) => b
+
     case (Op(FixSub(x,c)), _) if c == b => x  // (x - b) + b = x
     case (_, Op(FixSub(x,c))) if c == a => x  // a + (x - a) = x
+
+    case (Op(FixAdd(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
+    case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
+    case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
+    case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
     case _ => super.rewrite
   }
 }
@@ -80,6 +88,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 
     case (_,Op(FixAdd(x,c))) if c == a => -x // a - (x + a) = -x
     case (_,Op(FixAdd(c,x))) if c == a => -x // a - (a + x) = -x
+
+    case (Op(FixAdd(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r - q)))
+    case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixSub(x, Type[Fix[S,I,F]].from(r + q)))
+    case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixSub(Type[Fix[S,I,F]].from(q - r), x))
+    case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(Type[Fix[S,I,F]].from(q + r), x))
+
     case _ => super.rewrite
   }
 }
@@ -89,6 +103,15 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   override def absorber: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(1))
   override def isAssociative: Boolean = true
+  @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (Const(q), Const(r)) => R.from(q*r)
+    case (_, Const(r)) if r.isPow2 && r > 0 => a << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r.isPow2 && r < 0 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case _ => super.rewrite
+  }
+
 }
 
 /** Fixed fused multiply add */
@@ -105,8 +128,8 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
     case (Literal(1), _) => stage(FixRecip(b))
-    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[S,I,_0]].from(Number.log2(r))
-    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[S,I,_0]].from(Number.log2(-r))
+    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case _ => super.rewrite
   }
 }
@@ -124,27 +147,30 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point arithmetic shift left */
-@op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
+@op case class FixSLA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[TRUE,_16,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x << y)
+    case (Const(x), Const(y)) if y >= 0 => R.from(x << y)
+    case (Const(x), Const(y)) if y < 0 => R.from(x >> -y)
     case (x, Literal(0))      => x
     case _ => super.rewrite
   }
 }
 
 /** Fixed point arithmetic shift right */
-@op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
+@op case class FixSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[TRUE,_16,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x >> y)
+    case (Const(x), Const(y)) if y >= 0 => R.from(x >> y)
+    case (Const(x), Const(y)) if y < 0 => R.from(x << -y)
     case (x, Literal(0))      => x
     case _ => super.rewrite
   }
 }
 
 /** Fixed point logical (unsigned) shift right */
-@op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,_0]) extends FixOp1[S,I,F] {
+@op case class FixSRU[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[TRUE,_16,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x >>> y)
+    case (Const(x), Const(y)) if y >= 0 => R.from(x >>> y)
+    case (Const(x), Const(y)) if y > 0 => R.from(x << -y)
     case (x, Literal(0))      => x
     case _ => super.rewrite
   }
@@ -229,7 +255,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(2))    => a * a
     case (_, Literal(0.5))  => stage(FixSqrt(a))
     case (_, Literal(-0.5)) => stage(FixRecipSqrt(a))
-    case (_, Literal(-1))   => stage(FixInv(a))
+    case (_, Literal(-1))   => stage(FixRecip(a))
     case _ => super.rewrite
   }
 }
@@ -266,7 +292,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 @op case class FixAtan[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.atan)
 
 /** Fixed point reciprocal **/
-@op case class FixRecip[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recip)
+@op case class FixRecip[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recip){
+  @rig override def rewrite: Fix[S, I, F] = a match {
+    case Op(FixRecip(x)) => x
+    case _ => super.rewrite
+  }
+}
 
 /** Fixed point inverse square root */
 @op case class FixRecipSqrt[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](Number.recipSqrt)
@@ -276,6 +307,42 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 
 /** Fixed point type conversion */
 @op case class FixToFix[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Fix[S1,I1,F1],
+    f2: FixFmt[S2,I2,F2])
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
+  override val isTransient = true
+  @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
+    case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
+    case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]
+    case _ => super.rewrite
+  }
+}
+
+@op case class FixToFixSat[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Fix[S1,I1,F1],
+    f2: FixFmt[S2,I2,F2])
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
+  override val isTransient = true
+  @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
+    case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
+    case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]
+    case _ => super.rewrite
+  }
+}
+
+@op case class FixToFixUnb[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
+    a:  Fix[S1,I1,F1],
+    f2: FixFmt[S2,I2,F2])
+  extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {
+  override val isTransient = true
+  @rig override def rewrite :Fix[S2,I2,F2] = (a,f2) match {
+    case (Const(c),_) => const[Fix[S2,I2,F2]](c.toFixedPoint(f2.toEmul))
+    case (_, fmt2) if fmt2 == a.fmt => a.asInstanceOf[Fix[S2,I2,F2]]
+    case _ => super.rewrite
+  }
+}
+
+@op case class FixToFixUnbSat[S1:BOOL,I1:INT,F1:INT,S2:BOOL,I2:INT,F2:INT](
     a:  Fix[S1,I1,F1],
     f2: FixFmt[S2,I2,F2])
   extends FixOp[S1,I1,F1,Fix[S2,I2,F2]] {

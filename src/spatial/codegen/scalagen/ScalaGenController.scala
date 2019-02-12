@@ -7,6 +7,7 @@ import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.lang._
 import spatial.node._
+import spatial.util.spatialConfig
 
 trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaGenMemories {
 
@@ -14,7 +15,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
   def getReadStreamsAndFIFOs(ctrl: Ctrl): Set[Sym[_]] = {
     ctrl.children.flatMap(getReadStreamsAndFIFOs).toSet ++
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent == ctrl }}
-                     .filter{mem => mem.isStreamIn || mem.isFIFO }
+                     .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer }
                      .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
@@ -69,12 +70,28 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
           emit(src"def hasItems_$lhs: Boolean = { val has = ${lhs}_ctr_$i < ${lhs}_iters_$i ; ${lhs}_ctr_$i += 1; has }")
         }
 
-        open(src"while(hasItems_$lhs) {")
+        lhs match {
+          case Op(UnrolledForeach(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+            warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
+            open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
+          case Op(UnrolledReduce(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+            warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
+            open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
+          case _ => open(src"while(hasItems_$lhs) {")
+        }        
         iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = FixedPoint.fromInt(1)") }
         valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = Bool(true,true)") }
       }
       else {
-        open(src"$cchain($i).foreach{case (is,vs) => ")
+        lhs match {
+          case Op(UnrolledForeach(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+            warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
+            open(src"$cchain($i).takeWhile(!${stopWhen.get}.value){case (is,vs) => ")
+          case Op(UnrolledReduce(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+            warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
+            open(src"$cchain($i).takeWhile(!${stopWhen.get}.value){case (is,vs) => ")
+          case _ => open(src"$cchain($i).foreach{case (is,vs) => ")
+        }        
         iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = is($j)") }
         valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = vs($j)") }
       }
@@ -88,17 +105,19 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
   }
 
   private def emitControlObject(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
-    val ins    = func.flatMap(_.nestedInputs)
-    val binds  = lhs.op.map{d => d.binds ++ d.blocks.map(_.result) }.getOrElse(Set.empty).toSeq
-    val inputs = (lhs.op.map{_.inputs}.getOrElse(Nil) ++ ins).filterNot(_.isMem).distinct diff binds
+    // Find everything that is used in this scope
+    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
+    val used: Set[Sym[_]] = lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs }
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty)
+    val inputs: Seq[Sym[_]] = (used diff made).filterNot{s => s.isMem || s.isValue }.toSeq
 
     dbgs(s"${stm(lhs)}")
     inputs.foreach{in => dbgs(s" - ${stm(in)}") }
     val gate = if (ens.nonEmpty) src"if (${and(ens)})" else ""
     val els  = if (ens.nonEmpty) src"else null.asInstanceOf[${lhs.tp}]" else ""
 
-    val used = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
-    scoped --= used.map(_._1)
+    val useMap = inputs.flatMap{s => scoped.get(s).map{v => s -> v}}
+    scoped --= useMap.map(_._1)
 
     inGen(kernel(lhs)){
       emitHeader()
@@ -108,12 +127,13 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
           inputs.zipWithIndex.foreach{case (in,i) => emit(src"$in: ${in.tp}" + (if (i == inputs.size-1) "" else ",")) }
         closeopen(src"): ${lhs.tp} = $gate{")
           contents
+          lineBufSwappers.getOrElse(lhs, Set()).foreach{x => emit(src"$x.swap()")}
         close(s"} $els")
       close("}")
       emit(src"/** END ${lhs.op.get.name} $lhs **/")
       emitFooter()
     }
-    scoped ++= used
+    scoped ++= useMap
     emit(src"val $lhs = ${lhs}_kernel.run($inputs)")
   }
 
@@ -121,6 +141,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
     case AccelScope(func) =>
       emitControlObject(lhs, Set.empty, func){
         open("try {")
+        if (spatialConfig.enableResourceReporter) emit("StatTracker.pushState(true)")
         globalMems = true
         if (!lhs.willRunForever) {
           gen(func)
@@ -146,6 +167,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
         bufferedOuts.foreach{buff => emit(src"$buff.close()") }
         globalMems = false
+        if (spatialConfig.enableResourceReporter) emit("StatTracker.popState()")
         close("}")
         open("catch {")
           emit(src"""case x: Exception if x.getMessage == "exit" =>  """)
@@ -166,7 +188,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)
@@ -174,7 +196,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)

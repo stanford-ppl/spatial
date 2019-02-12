@@ -6,7 +6,7 @@ import utils.io.NullOutputStream
 
 import scala.collection.mutable
 
-class State(app: DSLRunnable) extends forge.AppState {
+class State(val app: DSLRunnable) extends forge.AppState {
   /** Config */
   var config: Config = _
 
@@ -94,6 +94,7 @@ class State(app: DSLRunnable) extends forge.AppState {
     case _ => Nil
   }
 
+  def resetErrors(): Unit = errors = 0
   def reset(): Unit = {
     config.reset()
     id = -1

@@ -2,32 +2,32 @@
 
 organization := "edu.stanford.ppl"
 
-version := "3.0-SNAPSHOT"
+version := "1.1"
 
 name := "spatial-app"
 
-scalaVersion := "2.11.7"
+scalaVersion     := "2.12.6"
 
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls")
+scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls", "-Xsource:2.11")
 
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 // The following are the default development versions, not the "release" versions.
 val defaultVersions = Map(
-  "chisel3" -> "3.0-SNAPSHOT_2017-10-06",
-  "chisel-iotesters" -> "1.1-SNAPSHOT"
+  "chisel3" -> "3.1.6",
+  "chisel-iotesters" -> "1.2.8"
   )
 
 libraryDependencies ++= (Seq("chisel3","chisel-iotesters").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep)) })
 
 libraryDependencies ++= Seq(
-  "org.spire-math" %% "spire" % "0.11.0",
-  "org.scalanlp" %% "breeze" % "0.12",
+  "org.typelevel" %% "spire" % "0.16.0",
+  "org.scalanlp" %% "breeze" % "0.13.2",
   "org.scalatest" %% "scalatest" % "2.2.5",
   "org.scalacheck" %% "scalacheck" % "1.12.4"
 )
 
-libraryDependencies += "edu.stanford.ppl" %% "templateresources" % "1.0"
+libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

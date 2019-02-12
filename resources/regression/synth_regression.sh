@@ -11,24 +11,28 @@ fi
 if [[ $1 = "zynq" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
 	export CLOCK_FREQ_MHZ=125
+	export FRINGE_PACKAGE="zynq"
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}
 	tid=`python3 ${REGRESSION_HOME}/next-spatial/spatial/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "Zynq"`
 elif [[ $1 = "zcu" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
 	export CLOCK_FREQ_MHZ=100
+	export FRINGE_PACKAGE="zcu"
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}
 	tid=`python3 ${REGRESSION_HOME}/next-spatial/spatial/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "ZCU"`
 elif [[ $1 = "arria10" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
 	export CLOCK_FREQ_MHZ=125
+	export FRINGE_PACKAGE="arria10"
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}
 	tid=`python3 ${REGRESSION_HOME}/next-spatial/spatial/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "Arria10"`
 elif [[ $1 = "aws" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
 	export CLOCK_FREQ_MHZ=250
+	export FRINGE_PACKAGE="aws"
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}
 	tid=`python3 ${REGRESSION_HOME}/next-spatial/spatial/resources/regression/gdocs.py "prepare_sheet" "$hash" "$branchname" "$timestamp" "AWS"`
@@ -72,5 +76,5 @@ else
 	cd ${REGRESSION_HOME}/current-spatial/spatial
 
 	make install
-	./tests.sh $1 ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
+	./test.sh $1 ${REGRESSION_HOME}/current-spatial/spatial/regressions/${1}.list
 fi

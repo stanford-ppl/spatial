@@ -109,8 +109,18 @@ trait CppGenArray extends CppGenCommon {
     case op@ArrayNew(size)      => emitNewArray(lhs, lhs.tp, src"$size")
     case ArrayLength(array)     => emit(src"${lhs.tp} $lhs = ${getSize(array)};")
     case DataAsBits(bits)       => 
-      emit(src"${lhs.tp} $lhs;")
-      emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & 1); }")
+      bits.tp match {
+        case FltPtType(_,_) =>
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"float* ${lhs}_ptr = &${toTrueFix(quote(bits), bits.tp)};")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(*reinterpret_cast<int32_t*>(${lhs}_ptr) >> ${lhs}_i & 1); }")
+        case FixPtType(s,i,f) => 
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & 1); }")
+        case BitType() => 
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${bitWidth(lhs.tp)}; ${lhs}_i++) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & 1); }")
+      }
     case BitsAsData(v,mT) => mT match {
       case FltPtType(_,_)   => throw new Exception("Bit-wise operations not supported on floating point values yet")
       case FixPtType(s,i,f) => 
@@ -128,16 +138,16 @@ trait CppGenArray extends CppGenCommon {
         struct_list = struct_list :+ struct
         inGen(out, "structs.hpp") {
           open(src"struct ${struct} {")
-            st.foreach{f => emit(src"${f._2.tp}${ptr(f._2.tp)} ${f._1};")}
+            st.foreach{f => emit(src"${asIntType(f._2.tp)}${ptr(f._2.tp)} ${f._1}; // ${f._2.tp}")}
             open(src"${struct}(${st.map{f => src"${f._2.tp}${ptr(f._2.tp)} ${f._1}_in"}.mkString(",")}){ /* Normal Constructor */")
               st.foreach{f => emit(src"set${f._1}(${ptr(f._2.tp)}${f._1}_in);")}
             close("}")
             emit(src"${struct}(){} /* For creating empty array */")
             open(src"std::string toString(){")
-              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${f._1}) """}.mkString("+ \", \" + ")
+              val all = st.map{f => src""" "${f._1}: " + std::to_string(${ptr(f._2.tp)}${toApproxFix(src"${f._1}", f._2.tp)})"""}.mkString("+ \", \" + ")
               emit(src"return $all;")
             close("}")
-            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = ${amp(f._2.tp)}x; }")}
+            st.foreach{f => emit(src"void set${f._1}(${f._2.tp} x){ this->${f._1} = ${amp(f._2.tp)}${toTrueFix("x",f._2.tp)}; }")}
 
           try {
             val rawtp = asIntType(lhs.tp)
@@ -211,9 +221,9 @@ trait CppGenArray extends CppGenCommon {
     case ArrayMkString(array,start,delim,end) =>
       emit(src"""${lhs.tp} $lhs = $start;""")
       open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i++){ ")
-        emit(src"${lhs} = string_plus(string_plus(${lhs}, ${delim}), std::to_string((*${array})[${lhs}_i]));")
+        emit(src"${lhs} = ((${lhs}, ${delim}) + std::to_string((*${array})[${lhs}_i]));")
       close("}")
-      emit(src"""$lhs = string_plus($lhs, $end);""")
+      emit(src"""$lhs = ($lhs + $end);""")
 
     case op @ IfThenElse(cond, thenp, elsep) =>
       val star = lhs.tp match {case _: host.Array[_] => "*"; case _ => ""}
@@ -275,7 +285,7 @@ trait CppGenArray extends CppGenCommon {
 
     case ArrayUpdate(arr, id, data) => emitUpdate(arr, data, src"${id}", data.tp)
 
-    case UnrolledForeach(ens,cchain,func,iters,valids) if (!inHw) => 
+    case UnrolledForeach(ens,cchain,func,iters,valids,_) if (!inHw) => 
       val starts = cchain.counters.map(_.start)
       val ends = cchain.counters.map(_.end)
       val steps = cchain.counters.map(_.step)

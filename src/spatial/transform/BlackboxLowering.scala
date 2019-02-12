@@ -7,7 +7,7 @@ import spatial.node._
 import spatial.lang._
 import spatial.traversal.AccelTraversal
 
-case class BlackboxLowering(IR: State) extends MutateTransformer with AccelTraversal {
+case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTransformer with AccelTraversal {
 
   def lowerSLA[S,I,F](op: FixSLA[S,I,F]): Fix[S,I,F] = {
     implicit val S: BOOL[S] = op.a.fmt.S
@@ -63,8 +63,8 @@ case class BlackboxLowering(IR: State) extends MutateTransformer with AccelTrave
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
-    case op: DenseTransfer[_,_,_] => op.lower()
-    case op: SparseTransfer[_,_]  => op.lower()
+    case op: DenseTransfer[_,_,_] if lowerTransfers => op.lower()
+    case op: SparseTransfer[_,_] if lowerTransfers => op.lower()
     case op: FixSLA[_,_,_] if inHw => lowerSLA(op)
     case op: FixSRA[_,_,_] if inHw => lowerSRA(op)
     case op: FixSRU[_,_,_] if inHw => lowerSRU(op)

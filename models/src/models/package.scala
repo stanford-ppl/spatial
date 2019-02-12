@@ -29,10 +29,6 @@ package object models {
 
   implicit class NodeModelOps(x: NodeModel) {
     def eval(args: (String,Double)*): Double = x match {
-      case Left(model) => Math.max(0.0, Math.ceil(model.eval(args:_*)))
-      case Right(num) => Math.max(0.0, Math.ceil(num))
-    }
-    def exactEval(args: (String,Double)*): Double = x match {
       case Left(model) => Math.max(0.0, model.eval(args:_*))
       case Right(num) => Math.max(0.0, num)
     }
@@ -75,7 +71,6 @@ package object models {
 
     def apply(xs: (String,Double)*): Model[Double,C] = a.map(_.eval(xs:_*))
     def eval(xs: (String,Double)*): Model[Double,C] = a.map(_.eval(xs:_*))
-    def exactEval(xs: (String,Double)*): Model[Double,C] = a.map(_.exactEval(xs:_*))
     def partial(xs: (String,Double)*): Model[LinearModel,C] = a.map(_.partial(xs:_*))
 
     def cleanup: Model[LinearModel,C] = a.map(_.cleanup)
@@ -86,6 +81,5 @@ package object models {
     implicit val dbl: C[Double] = a.config.convert(d = 0.0)
     def apply(xs: (String,Double)*): Model[Double,C] = a.map{nm => nm.eval(xs:_*) }
     def eval(xs: (String,Double)*): Model[Double,C] = a.map(_.eval(xs:_*))
-    def exactEval(xs: (String,Double)*): Model[Double,C] = a.map(_.exactEval(xs:_*))
   }
 }

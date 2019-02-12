@@ -82,7 +82,13 @@ case class AreaAnalyzer(IR: State) extends AccelTraversal with RerunTraversal {
   private def nestedAreaOfNode(lhs: Sym[_], rhs: Op[_]): Area = rhs match {
     case AccelScope(block) =>
       savedArea = totalArea
-      inAccel{ areaOfBlock(block, lhs.isInnerControl, par = 1) }
+      inAccel{
+        val body = areaOfBlock(block, lhs.isInnerControl, par = 1)
+        val totalArea = body + areaOfNode(lhs)
+        dbgs(s"Accel: $lhs: $totalArea")
+        dbgs(s" - Body: $body")
+        totalArea
+      }
 
     case op @ OpReduce(_, cchain, _, map, load, reduce, store, _, _, _, _) =>
       /** The number of nodes in a binary tree with P leaves is P - 1 */

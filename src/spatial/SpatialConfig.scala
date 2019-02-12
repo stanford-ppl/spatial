@@ -24,7 +24,6 @@ class SpatialConfig extends Config {
   var enableResourceReporter: Boolean = false
   var enableTree: Boolean = true
   var enableDot: Boolean = false
-  var enablePythonModel = false
 
   var enableInstrumentation: Boolean = false
   var enableModular: Boolean = true
@@ -79,10 +78,10 @@ class SpatialConfig extends Config {
       dstSC.useCheapFifos = useCheapFifos
       dstSC.enableOptimizedReduce = enableOptimizedReduce
       dstSC.enableForceBanking = enableForceBanking
-      dstSC.enableSplitting = enableSplitting
+      // dstSC.enableSplitting = enableSplitting
       dstSC.enableArchDSE = enableArchDSE
       dstSC.addRetimeRegisters = addRetimeRegisters
-      dstSC.compressWires = compressWires
+      // dstSC.compressWires = compressWires
       dstSC.sramThreshold = sramThreshold
       dstSC.enableAsyncMem = enableAsyncMem
       dstSC.enableRetiming = enableRetiming

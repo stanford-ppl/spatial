@@ -43,21 +43,21 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
     */
   @stateful def builtInLatencyOfNode(s: Sym[_]): Double = model(s, "BuiltInLatency")
 
-  def parallelModel(stages: Seq[Double], lhs: Sym[_]): Double = {
+  @stateful def parallelModel(stages: Seq[Double], lhs: Sym[_]): Double = {
     stages.max + latencyOfNode(lhs)
   }
 
   // TODO: These models assume linear sequence of stages. Support arbitrary dataflow graphs.
-  def streamingModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+  @stateful def streamingModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
     stages.max * (N - 1)*ii + latencyOfNode(lhs)
   }
-  def metaPipeModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+  @stateful def metaPipeModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
     stages.max * (N - 1)*ii + stages.sum + latencyOfNode(lhs)
   }
-  def sequentialModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+  @stateful def sequentialModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
     stages.sum * N + latencyOfNode(lhs)
   }
-  def outerControlModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+  @stateful def outerControlModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
     if (lhs.isOuterPipeControl) metaPipeModel(N, ii, stages, lhs)
     else if (lhs.isSeqLoop)     sequentialModel(N, ii, stages, lhs)
     else                        streamingModel(N, ii, stages, lhs)

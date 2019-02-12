@@ -31,7 +31,7 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
   private def latencyOfNode(sym: Sym[_]): Double = latencyModel.latencyOf(sym, inCycle)
 
   private def latencyOfBlock(b: Block[_], parMask: Boolean = false): Seq[Double] = {
-
+    Seq(0) // ???
   }
 
   private def ctrlHeader(lhs: Sym[_]): Unit = {
@@ -95,7 +95,8 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
       }
       (total, II)
 
-    case OpForeach(ens,cchain,block,_) if lhs.isInnerControl =>
+    // case OpForeach(ens,cchain,block,_,_) if lhs.isInnerControl =>
+    case _ => (0,0) // ??
       
 
   }

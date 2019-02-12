@@ -26,6 +26,8 @@
 #define PAGEMAP_LENGTH 8
 #define USE_PHYS_ADDR
 
+using namespace std;
+
 /**
  * ZCU Fringe Context
  */

@@ -21,7 +21,8 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
 
   override def named(s: Sym[_], id: Int): String = {
     dbgs(s"Checking scoped for symbol $s: ${scoped.contains(s)}")
-    scoped.getOrElse(s, super.named(s,id))
+    if (scoped.contains(s)) scoped(s).assemble()
+    else super.named(s,id)
   }
 
   override def emitHeader(): Unit = {
@@ -34,12 +35,12 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
   private def arg(tp: Type[_], node: Option[Sym[_]]): String = remap(tp)
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
-    def printableStms(stms: Seq[Sym[_]]): Seq[(Sym[_], Int)] = stms.map{x => (x, 1)} // Should scala be weighted also?
+    def printableStms(stms: Seq[Sym[_]]): Seq[StmWithWeight[Sym[_]]] = stms.map{x => StmWithWeight[Sym[_]](x, 1, Seq[String]())} // Should scala be weighted also?
     def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = !s.isMem && (b.result == s || remaining.exists(_.nestedInputs.contains(s)))
     def branchSfx(s: Sym[_], n: Option[String] = None): String = src""""${n.getOrElse(quote(s))}" -> $s"""
     def initChunkState(): Unit = {}
 
-    val hierarchyDepth = (scala.math.log(printableStms(b.stms).map(_._2).sum) / scala.math.log(CODE_WINDOW)).toInt
+    val hierarchyDepth = (scala.math.log(printableStms(b.stms).map(_.weight).sum) / scala.math.log(CODE_WINDOW)).toInt
     globalBlockID = javaStyleChunk[Sym[_]](
       printableStms(b.stms), 
       CODE_WINDOW, 

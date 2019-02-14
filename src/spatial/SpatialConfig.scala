@@ -52,6 +52,7 @@ class SpatialConfig extends Config {
   var enableBufferCoalescing: Boolean = true
 
   var enablePIR = false
+  var enableTsth = false
 
   var paramSavePath:Option[String] = None
 

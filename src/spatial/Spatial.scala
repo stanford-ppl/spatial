@@ -182,7 +182,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
-        (spatialConfig.enablePIR ? tsthCodegen)
+        (spatialConfig.enableTsth ? tsthCodegen)
     }
 
     isl.shutdown(100)
@@ -231,6 +231,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("pir").action { (_,_) =>
       spatialConfig.enablePIR = true
+      spatialConfig.enableTsth = true
       spatialConfig.enableInterpret = false
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
@@ -241,7 +242,22 @@ trait Spatial extends Compiler with ParamLoader {
       //spatialConfig.enableDot = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
-    }.text("Enable codegen to PIR (disables synthesis and retiming) [false]")
+    }.text("Enable codegen to PIR [false]")
+
+    cli.opt[Unit]("tsth").action { (_,_) =>
+      spatialConfig.enablePIR = false
+      spatialConfig.enableTsth = true
+      spatialConfig.enableInterpret = false
+      spatialConfig.enableSynth = false
+      spatialConfig.enableRetiming = false
+      //spatialConfig.enableBroadcast = false
+      spatialConfig.noInnerLoopUnroll = true
+      //spatialConfig.ignoreParEdgeCases = true
+      spatialConfig.enableBufferCoalescing = false
+      //spatialConfig.enableDot = true
+      spatialConfig.targetName = "Plasticine"
+      spatialConfig.enableForceBanking = true
+    }.text("Enable Tungsten Host Codegen [false]")
 
     cli.note("")
     cli.note("Experimental:")

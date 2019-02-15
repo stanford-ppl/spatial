@@ -198,7 +198,7 @@ object modeling {
         dbgs(s"pseudo cycles for $mem:")
         val rds = readersByMem(mem)
         val wrs = writersByMem(mem)
-        rds.cross(wrs).collect{case (rd, wr) if (paths(rd) < paths(wr)) =>
+        rds.cross(wrs).collect{case (rd, wr) if (paths(rd) < paths(wr) && !accums.contains(AccumTriple(mem, rd, wr))) =>
           val cycleLengthExact = paths(wr).toInt - paths(rd).toInt + latencyOf(rd, true)
           dbgs(s" - $rd $wr cycle = $cycleLengthExact")
 
@@ -293,14 +293,16 @@ object modeling {
       }
     }
 
-    val warCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
+    val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
       val symbols = cycles(writer)
       val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
 
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?
       val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
       WARCycle(reader, writer, mem, symbols, cycleLength)
-    } ++ findPseudoWARCycles(schedule)
+    }
+    val pseudoWarCycles = findPseudoWARCycles(schedule)
+    val warCycles = trueWarCycles ++ pseudoWarCycles
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){

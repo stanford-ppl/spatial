@@ -103,7 +103,8 @@ object modeling {
     cycles:  mutable.Map[Sym[_], mutable.Set[AccumTriple]]
   )
 
-  @stateful def findAccumCycles(scope: Set[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
+  @stateful def findAccumCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
+    val scope = schedule.toSet
     val cycles = mutable.HashMap[Sym[_],mutable.Set[AccumTriple]]()
     def addCycle(sym: Sym[_], triple: AccumTriple): Unit = {
       val set = cycles.getOrElseAdd(sym, () => mutable.HashSet.empty)
@@ -122,6 +123,7 @@ object modeling {
       case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
       case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
     }
+
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val memories = readersByMem.keySet intersect writersByMem.keySet
@@ -147,7 +149,6 @@ object modeling {
     ScopeAccumInfo(readersByMem, writersByMem, accums, cycles)
   }
 
-
   @stateful def pipeLatencies(
     result:   Seq[Sym[_]],
     schedule: Seq[Sym[_]],
@@ -163,7 +164,7 @@ object modeling {
 
     val scope = schedule.toSet
 
-    val accumInfo = findAccumCycles(scope,verbose)
+    val accumInfo = findAccumCycles(schedule,verbose)
     val accums      = accumInfo.accums
     val accumReads  = accums.map(_.read)
     val accumWrites = accums.map(_.write)
@@ -173,6 +174,41 @@ object modeling {
     val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
     accumReads.foreach{reader => cycles(reader) = Set(reader) }
+
+    def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): Set[WARCycle] = {
+      val scope = schedule.toSet
+
+      val readers = scope.collect{
+        case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
+        case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
+        case reader @ BankedReader(mem,_,_,_) => AccessPair(mem, reader)
+        case reader @ VectorReader(mem,_,_) => AccessPair(mem, reader)
+      }
+      val writers = scope.collect{
+        case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
+        case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
+        case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
+        case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
+      }
+
+      val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
+      val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
+      val memories = readersByMem.keySet intersect writersByMem.keySet
+      memories.flatMap{mem =>
+        dbgs(s"pseudo cycles for $mem:")
+        val rds = readersByMem(mem)
+        val wrs = writersByMem(mem)
+        rds.cross(wrs).collect{case (rd, wr) if (paths(rd) < paths(wr)) =>
+          val cycleLengthExact = paths(wr).toInt - paths(rd).toInt + latencyOf(rd, true)
+          dbgs(s" - $rd $wr cycle = $cycleLengthExact")
+
+          // TODO[2]: FIFO/Stack operations need extra cycle for status update?
+          val cycleLength = if (rd.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
+          WARCycle(rd, wr, mem, Set(rd,wr,mem), cycleLength)
+        }
+      }
+
+    }
 
     def fullDFS(cur: Sym[_]): Double = {
       def precedingWrites: Set[Sym[_]] = {
@@ -264,7 +300,7 @@ object modeling {
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?
       val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
       WARCycle(reader, writer, mem, symbols, cycleLength)
-    }
+    } ++ findPseudoWARCycles(schedule)
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){

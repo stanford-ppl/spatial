@@ -29,7 +29,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
     ctrl.bodies.foreach{body =>
       body.blocks.foreach{case (iters, block) =>
         val stms = block.stms
-        val cycles = findAccumCycles(stms.toSet).accums
+        val cycles = findAccumCycles(stms).accums
         if (cycles.nonEmpty) {
           dbgs(s"\n\nFound cycles in $lhs ($iters): ")
           cycles.foreach{c => dbgs(s"  $c")}

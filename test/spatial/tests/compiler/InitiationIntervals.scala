@@ -292,3 +292,43 @@ import spatial.metadata.control._
   // }
 
 }
+
+
+@spatial class MultiTriplet extends SpatialTest {
+  // App that contains multiple accumulator triplets 
+
+  override def runtimeArgs: Args = "2"
+
+  def main(args: Array[String]): Unit = {
+
+    val x = ArgIn[Int]
+    val in = args(0).to[Int]
+    assert(in == 2, "Must make input arg == 2")
+    setArg(x, in)
+    val y = ArgOut[Int]
+
+    Accel {
+      val r1 = Reg[Int](0)
+      val r2 = Reg[Int](0)
+      val first = Reg[Bit](false)
+      Foreach(5 by 1){i =>
+        val v = i
+        val t = x.value
+        if (v > 0) {
+          val t = r1.value
+          r2 := t * 2 + x.value - 1
+          r1 := t * 2
+        } else {
+          r1 := (x.value + 3) / 5
+        }
+      }
+      y := r2.value
+    }
+
+    val result = getArg(y)
+    val gold = 17
+    println(r"Got $result, wanted $gold")
+    assert(result == gold)
+  }
+
+}

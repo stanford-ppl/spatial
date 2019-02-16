@@ -644,6 +644,15 @@ package object control {
       case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
       case Ctrl.Host         => Scope.Host
     }
+
+    def stopWhen: Option[Sym[_]] = ctrl match {
+      case Ctrl.Node(x:UnrolledForeach, _) => x.stopWhen
+      case Ctrl.Node(x:OpForeach, _) => x.stopWhen
+      case Ctrl.Node(x:UnrolledReduce, _) => x.stopWhen
+      case Ctrl.Node(x:OpReduce[_], _) => x.stopWhen
+      case Ctrl.Node(x:OpMemReduce[_,_], _) => x.stopWhen
+      case _ => None
+    }
   }
 
   implicit class BlkOps(blk: Blk) {

@@ -379,15 +379,17 @@ object modeling {
     }
 
     def pushBreakNodes(regWrite: Sym[_]): Unit = {
-      val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
-      val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
-      toPush.foreach{
-        case x if (paths.contains(x)) => 
-          dbgs(s"  $x - Originally at ${paths(x)}, but must push by ${paths(regWrite)}")
-          paths(x) = if (paths(x) < paths(regWrite)) paths(regWrite) + 1 else paths(x)
-        case _ => 
+      if (regWrite.ancestors.exists(_.stopWhen == Some(regWrite))) {
+        val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
+        val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
+        toPush.foreach{
+          case x if (paths.contains(x)) => 
+            dbgs(s"  $x - Originally at ${paths(x)}, but must push by ${paths(regWrite)}")
+            paths(x) = if (paths(x) < paths(regWrite)) paths(regWrite) + 1 else paths(x)
+          case _ => 
 
-      }
+        }
+      } else dbgs(s"  $regWrite is not modifying its Reg inside the loop it breaks")
 
     }
 

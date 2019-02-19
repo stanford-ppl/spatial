@@ -28,6 +28,8 @@ std::stringstream stopsim;
     }
   }
 
+  val bytePerBurst = 64 //TODO
+
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case ArgInNew(init)  => 
       genIO {
@@ -60,7 +62,9 @@ std::stringstream stopsim;
     case DRAMHostNew(dims, _) =>
       val tp = lhs.tp.typeArgs.head
       genIO {
-        emit(src"""void* $lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")});""")
+        // Make sure allocated address is burst aligned
+        emit(src"""void* $lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});""")
+        emit(src"$lhs = (${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst")
       }
       emit(src"""cout << "Allocate mem of size ${dims.map(quote).mkString("*")} at " << ($tp*)${lhs} << endl;""")
 

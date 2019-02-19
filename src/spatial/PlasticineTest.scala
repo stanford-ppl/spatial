@@ -55,7 +55,7 @@ trait PlasticineTest extends DSLTest { test =>
       val logPath = IR.config.logDir + s"/$pass.log"
       var res:Result = Unknown
       var rerunPass = rerun
-      rerunPass |= checkFlag(s"rerun.${pass}")
+      rerunPass |= checkFlag(s"rerun.${pass}") || checkFlag(s"rerun.all")
       if (Files.exists(Paths.get(logPath)) && !rerunPass) {
         res = scala.io.Source.fromFile(logPath).getLines.map { parse }.fold(res){ _ orElse _ }
       }
@@ -70,7 +70,7 @@ trait PlasticineTest extends DSLTest { test =>
       val pirPath = IR.config.genDir + "/pir/AccelMain.scala"
       val pirExists = Files.exists(Paths.get(pirPath))
       val buildExists = Files.exists(Paths.get(IR.config.genDir + "/build.sbt"))
-      val rerunPass = checkFlag(s"rerun.genpir")
+      val rerunPass = checkFlag(s"rerun.genpir") || checkFlag(s"rerun.all")
       if (pirExists && buildExists && !rerunPass) {
         println(s"${Console.GREEN}${pirPath}${Console.RESET} succeeded. Skipping")
         Pass 
@@ -117,7 +117,7 @@ trait PlasticineTest extends DSLTest { test =>
       "--ckpt=0" :+
       "--codegen=true" :+
       "--end-id=5" :+
-      "--trace=true" :+
+      //"--trace=true" :+
       "--psim=true" :+
       "--run-psim=false"
       gentracecmd ++= args.split(" ").map(_.trim).toList

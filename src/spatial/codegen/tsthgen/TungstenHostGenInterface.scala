@@ -63,9 +63,10 @@ std::stringstream stopsim;
       val tp = lhs.tp.typeArgs.head
       genIO {
         // Make sure allocated address is burst aligned
-        emit(src"""void* $lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});""")
-        emit(src"$lhs = (${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst")
+        emit(src"""void* $lhs;""")
       }
+      emit(src"$lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});")
+      emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
       emit(src"""cout << "Allocate mem of size ${dims.map(quote).mkString("*")} at " << ($tp*)${lhs} << endl;""")
 
     case SetMem(dram, data) =>

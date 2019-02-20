@@ -9,10 +9,12 @@ import spatial.util.spatialConfig
 trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
   /** By default, SpatialTests have no runtime arguments. Override to add list(s) of arguments. */
   override def runtimeArgs: Args = NoArgs
+  override def dseModelArgs: Args = NoArgs
+  override def finalModelArgs: Args = NoArgs
 
 
-  abstract class ChiselBackend(name: String, args: String, make: String, run: String)
-    extends Backend(name,args,make,run) {
+  abstract class ChiselBackend(name: String, args: String, make: String, run: String, shouldRunModels: Boolean = false)
+    extends Backend(name,args,make,run, shouldRunModels) {
 
     private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
 
@@ -57,7 +59,8 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     name = "Zynq",
     args = "--synth --insanity --fpga Zynq",
     make = "make",
-    run  = "bash scripts/scrape.sh Zynq"
+    run  = "bash scripts/scrape.sh Zynq",
+    shouldRunModels = true
   ) {
     override def shouldRun: Boolean = checkFlag("test.Zynq")
     override val makeTimeout: Long = 13000

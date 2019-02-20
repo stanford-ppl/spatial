@@ -5,6 +5,7 @@ import forge.tags._
 
 import spatial.lang._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 import spatial.util.memops._
 import spatial.util.modeling.target
 
@@ -47,7 +48,7 @@ object SparseTransfer {
     dram:    DRAMSparseTile[A],
     local:   Local[A],
     ens:     Set[Bit],
-    isLoad:  Boolean
+    isLoad:  scala.Boolean
   )(implicit
     A:     Bits[A],
     Local: Type[Local[A]]
@@ -67,7 +68,7 @@ object SparseTransfer {
                mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) )))
     }
 
-    Stream {
+    val top = Stream {
       val addrsFIFO = addrs.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
       val localFIFO = local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
       // Gather
@@ -127,7 +128,7 @@ object SparseTransfer {
         }
       }
     }
-
+    // top.loweredTransfer = if (isLoad) SparseLoad else SparseStore // TODO: Work around @virtualize to set this metadata
   }
 
 }

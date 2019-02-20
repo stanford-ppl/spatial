@@ -37,7 +37,7 @@ resolvers ++= Seq(
 
 // resourceDirectory in Compile := baseDirectory.value / "chisel" / "template-level" / "resources"
 
-scalaSource in Compile := baseDirectory.value / "chisel" 
+scalaSource in Compile := baseDirectory.value / "chisel"
 
 scalaSource in Test := baseDirectory.value / "chisel" / "app-tests"
 
@@ -52,3 +52,29 @@ logBuffered in Test := false
 //  Running tests in parallel on Jenkins currently fails.
 parallelExecution in Test := false
 
+val common = Seq(
+  name := "RuntimeModel",
+
+  scalaVersion := "2.12.5",
+  scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls"),
+
+  scalaSource in Compile := baseDirectory.value,
+  scalaSource in Test := baseDirectory.value,
+
+  libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT",
+
+  resolvers ++= Seq(
+    Resolver.sonatypeRepo("snapshots"),
+    Resolver.sonatypeRepo("releases")
+  ),
+
+  // Recommendations from http://www.scalatest.org/user_guide/using_scalatest_with_sbt 
+  logBuffered in Test := false,
+
+  // Disable parallel execution when running te 
+  //  Running tests in parallel on Jenkins currently fails. 
+  parallelExecution in Test := false
+)
+
+
+lazy val model = project.settings(common)

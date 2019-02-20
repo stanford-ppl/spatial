@@ -11,17 +11,12 @@ import spatial.util.modeling._
 trait ControlModels { this: RuntimeModelGenerator =>
   import spatial.dsl._
 
-  val common = src"""
-       |import models.RuntimeModel
-       |
-       |object AppRuntimeModel extends App{
-  """.stripMargin
 }
 
-case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
+case class RuntimeModelGenerator(IR: State, version: String) extends Codegen with ControlModels {
   override val ext: String = ".scala"
   override val lang: String = "model"
-  override val entryFile: String = "model.scala"
+  override val entryFile: String = s"model_${version}.scala"
 
   var inCycle: Boolean = false
   var undefinedSyms: Set[Sym[_]] = Set.empty
@@ -101,44 +96,27 @@ case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
     emit(src"package model")
     emit(src"import models.Runtime._")
     emit(src"")
-    open(src"object AppRuntimeModel extends App {")
-    open(src"def build_model(): ControllerModel = {")
-    visitBlock(block)
-    close("}")
-    emit("")
-    emit("  val root = build_model()")
-    emit("  root.initializeAskMap(AskMap.map)")
-    emit("  root.loadPreviousAskMap(PreviousAskMap.map) // Load previous run's askmap")
-    emit("  root.printStructure()")
-    emit("  root.execute()")
-    emit("""  root.printResults()""")
-    emit("""  root.storeAskMap(sys.env("PWD") + "/PreviousAskMap.scala") // Store this run's askmap""")
-    emit(s"""  println(s"Total Cycles for App ${config.name}: $${root.totalCycles()}")""")
+    open(src"object AppRuntimeModel_${version} extends App {")
+      open(src"def build_model(): ControllerModel = {")
+        visitBlock(block)
+      close("}")
+      emit("")
+      open("main(args: Array[String]): Unit = {")
+        emit("""println(s"args: $args") """)
+        // emit("if (args.size > 1")
+        emit("val root = build_model()")
+        emit("root.initializeAskMap(AskMap.map)")
+        emit("root.loadPreviousAskMap(PreviousAskMap.map) // Load previous run's askmap")
+        emit(s"""println(s"[$version] Structure for app ${config.name}")""")
+        emit("root.printStructure()")
+        emit("root.execute()")
+        emit(s"""println(s"[$version] Runtime results for app ${config.name}")""")
+        emit("""root.printResults()""")
+        emit("""root.storeAskMap(sys.env("PWD") + "/PreviousAskMap.scala") // Store this run's askmap""")
+        emit(s"""println(s"[$version] Total Cycles for App ${config.name}: $${root.totalCycles()}")""")
+      close("}")
     close("}")
 
-    withGen(out, "build.sbt"){
-      emit("""name := "RuntimeModel" """)
-      emit(""" """)
-      emit("""scalaVersion := "2.12.5" """)
-      emit("""scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls") """)
-      emit(""" """)
-      emit("""scalaSource in Compile := baseDirectory.value """)
-      emit("""scalaSource in Test := baseDirectory.value """)
-      emit(""" """)
-      emit("""libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT" """)
-      emit(""" """)
-      emit("""resolvers ++= Seq( """)
-      emit("""  Resolver.sonatypeRepo("snapshots"), """)
-      emit("""  Resolver.sonatypeRepo("releases") """)
-      emit(""") """)
-      emit(""" """)
-      emit("""// Recommendations from http://www.scalatest.org/user_guide/using_scalatest_with_sbt """)
-      emit("""logBuffered in Test := false """)
-      emit(""" """)
-      emit("""// Disable parallel execution when running te """)
-      emit("""//  Running tests in parallel on Jenkins currently fails. """)
-      emit("""parallelExecution in Test := false """)
-    }
     withGen(out, "InitAskMap.scala"){
       emit(src"package model")
       open(src"object AskMap {")
@@ -217,6 +195,14 @@ case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
       emit(src"${lhs}")
 
+    case OpForeach(ens,cchain,block,_,_) if (lhs.getLoweredTransfer.isDefined) =>
+      // TODO: Include last level counter?
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+      createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+
     case OpForeach(ens,cchain,block,_,_) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
@@ -225,12 +211,35 @@ case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
+    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) if (lhs.getLoweredTransfer.isDefined) =>
+      // TODO: Include last level counter?
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+      createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+
+    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      visitBlock(func)
+      lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
+
     case ParallelPipe(_,block) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), 0, 0, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
+
+    case UnitPipe(_, block) if (lhs.getLoweredTransfer.isDefined) =>
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+      createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnitPipe(_, block) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
@@ -251,6 +260,14 @@ case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
       visitBlock(store)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
+    case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      visitBlock(func)
+      lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
+
     case tx:DenseTransfer[_,_,_] =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
 
@@ -261,7 +278,7 @@ case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
 
       // Generate ctrs
       List.tabulate(pars.size){i => createCtrObject(lhs, Bits[I32].zero,lens(i),steps(i),pars(i), false, s"_ctr$i")}
-      emit(src"""val ${lhs}_cchain = CChainModel(List[CtrModel](${pars.zipWithIndex.map{case (_,i) => s"${lhs}_ctr$i"}.mkString(",")}), $ctx)""")
+      emit(src"""val ${lhs}_cchain = List(CChainModel(List[CtrModel](${pars.dropRight(1).zipWithIndex.map{case (_,i) => s"${lhs}_ctr$i"}.mkString(",")}), $ctx), CChainModel(List(${lhs}_ctr${pars.size-1}), $ctx))""")
 
       val lat = 0.0
       val ii = 0.0
@@ -275,45 +292,38 @@ case class RuntimeModelGenerator(IR: State) extends Codegen with ControlModels {
       createCtrObject(lhs, Bits[I32].zero,lhs,Bits[I32].one,1, false, s"_fsm")
       emit(src"""val ${lhs}_cchain = CChainModel(List[CtrModel](${lhs}_fsm), $ctx)""")
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, ${lhs}_cchain, ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      visitBlock(notDone)
       visitBlock(action)
+      visitBlock(nextState)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
+
+    case OpMemReduce(ens, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, _, _, _, _, _) =>
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, List($cchainMap, $cchainRed), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      visitBlock(map)
+      visitBlock(loadRes)
+      visitBlock(loadAcc)
+      visitBlock(storeAcc)
+      lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
+
 
     case Switch(selects, body) if lhs.isInnerControl =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      // emit(src"""val ${lhs}_cchain = CChainModel(List[CtrModel](${lhs}_fsm), $ctx)""")
-      // emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, ${lhs}_cchain, ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
-      // visitBlock(action)
-      // lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
-
-
-    case OpMemReduce(ens, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, _, _, _, _, _) =>
-      visitBlock(map)
-      val nodeLat = latencyOfPipe(reduce)
-      val loadLat = latencyOfPipe(loadRes)
-      val cycle   = latencyOfCycle(loadAcc) + latencyOfCycle(reduce) + latencyOfCycle(storeAcc)
-
-      ctrHead(src"${lhs}_map", cchainMap)
-      ctrHead(src"${lhs}_reduce", cchainRed)
-      emit(src"# Execution schedule [SEQUENTIAL | OUTER_PIPELINE]")
-      emit(src"${lhs}_schedule = ${lhs.rawSchedule.toString}")
-      emit(src"")
-      nIters(src"${lhs}_map", cchainMap, src"${lhs}_Nmap", src"${lhs}_Pmap")
-      nIters(src"${lhs}_reduce", cchainRed, src"${lhs}_Nreduce", src"${lhs}_Preduce")
-      emit(src"${lhs}_tree_depth = ceil(log(${lhs}_P, 2))")
-      emit(src"${lhs}_tree_L = $cycle + $loadLat + $nodeLat * ${lhs}_tree_depth")
-      emit(src"${lhs}_stages_times = [${lhs.children.map{c => src"${c}_time"}.mkString(", ")}, ${lhs}_tree_L]")
-      emit(src"${lhs}_stages_IIs = [${lhs.children.map{c => src"${c}_II"}.mkString(", ")}, $cycle]")
-      emit(src"${lhs}_II = max(${lhs}_stages_IIs)")
-      emit(src"${lhs}_time = control_model(${lhs}_Nmap, ${lhs}_II, ${lhs}_stages_times, ${lhs}_schedule)")
+      visitBlock(body)
+      emit(src"val ${lhs} = new ControllerModel(OuterControl, ${lhs.rawSchedule.toString}, CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case SwitchCase(body) =>
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+      val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       visitBlock(body)
-      emit(src"${lhs}_stages_times = [${lhs.children.map{c => src"${c}_time"}.mkString(", ")}]")
-      emit(src"${lhs}_stages_IIs = [${lhs.children.map{c => src"${c}_II"}.mkString(", ")}]")
-      emit(src"${lhs}_time = sum(${lhs}_stages_times)")
-      emit(src"${lhs}_II = max(${lhs}_stages_IIs)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case _ => lhs.blocks.foreach{block => visitBlock(block) }
   }

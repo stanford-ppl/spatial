@@ -106,6 +106,9 @@ val common = base ++ Seq(
 )
 
 
+val models_settings = base ++ Seq(
+  name := "models" + sys.env.get("MODELS_PACKAGE").getOrElse("")
+)
 val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.1.6")
 val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.2.8")
 val fringe_settings = base ++ Seq(
@@ -126,7 +129,7 @@ val fringe_settings = base ++ Seq(
 lazy val utils  = project.settings(common)
 lazy val emul   = project.settings(emul_settings)
 lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
-lazy val models = project.settings(common)
+lazy val models = project.settings(models_settings)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)

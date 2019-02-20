@@ -49,6 +49,10 @@ import spatial.util.memops._
       val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
       (dram.sparsePars().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil }).toSeq
     }
+    @rig def ctrSteps: Seq[I32] = {
+      val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+      (dram.sparseSteps().map(_._2) ++ {if (!normalCounting) Seq(I32(0)) else Nil }).toSeq
+    }
     @rig def lens: Seq[I32] = {
       val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
       (dram.sparseLens().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil}).toSeq

@@ -156,13 +156,10 @@ object modeling {
     verbose:  Boolean = false
   ): (Map[Sym[_],Double], Set[Cycle]) = {
 
-    def debugs(x: => Any): Unit = if (verbose) dbgs(x)
-
-    debugs(s"----------------------------------")
-    debugs(s"Computing pipeLatencies for scope:")
-    schedule.foreach{ e => debugs(s"  ${stm(e)}") }
-
     val scope = schedule.toSet
+
+    val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
+    val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
 
     val accumInfo = findAccumCycles(schedule,verbose)
     val accums      = accumInfo.accums
@@ -170,10 +167,7 @@ object modeling {
     val accumWrites = accums.map(_.write)
     val knownCycles = accumInfo.cycles
 
-    val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
-    val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
-
-    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+    def debugs(x: => Any): Unit = if (verbose) dbgs(x)
 
     def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): Set[WARCycle] = {
       val scope = schedule.toSet
@@ -281,28 +275,6 @@ object modeling {
       case _ => // Do nothing
     }
 
-    if (scope.nonEmpty) {
-      // Perform forwards pass for normal data dependencies
-      result.foreach{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
-
-      // TODO[4]: What to do in case where a node is contained in multiple cycles?
-      accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
-        val cycle = cycles.getOrElse(writer, Set.empty)
-        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
-        reverseDFS(writer, cycle)
-      }
-    }
-
-    val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
-      val symbols = cycles(writer)
-      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
-
-      // TODO[2]: FIFO/Stack operations need extra cycle for status update?
-      val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
-      WARCycle(reader, writer, mem, symbols, cycleLength)
-    }
-    val pseudoWarCycles = findPseudoWARCycles(schedule)
-    val warCycles = trueWarCycles ++ pseudoWarCycles
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){
@@ -393,6 +365,35 @@ object modeling {
 
     }
 
+    debugs(s"----------------------------------")
+    debugs(s"Computing pipeLatencies for scope:")
+    schedule.foreach{ e => debugs(s"  ${stm(e)}") }
+
+    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+
+    if (scope.nonEmpty) {
+      // Perform forwards pass for normal data dependencies
+      result.foreach{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
+
+      // TODO[4]: What to do in case where a node is contained in multiple cycles?
+      accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
+        val cycle = cycles.getOrElse(writer, Set.empty)
+        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
+        reverseDFS(writer, cycle)
+      }
+    }
+
+    val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
+      val symbols = cycles(writer)
+      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
+
+      // TODO[2]: FIFO/Stack operations need extra cycle for status update?
+      val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
+      WARCycle(reader, writer, mem, symbols, cycleLength)
+    }
+    val pseudoWarCycles = findPseudoWARCycles(schedule)
+    val warCycles = trueWarCycles ++ pseudoWarCycles
+
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
     val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet      
@@ -433,6 +434,7 @@ object modeling {
     cycles:     Set[Sym[_]],
     createLine: Option[(Int, Sym[_], SrcCtx) => Sym[_]]
   ): Seq[(Sym[_], ValueDelay)] = {
+    dbgs(s"computing delay lines for $scope $latencies $delayLines $cycles")
     val innerScope = scope.flatMap(_.blocks.flatMap(_.stms)).toSet
 
     def delayOf(x: Sym[_]): Double = latencies.getOrElse(x, 0.0)

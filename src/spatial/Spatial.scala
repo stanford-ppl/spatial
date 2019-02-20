@@ -110,7 +110,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
-    lazy val runtimeModelGen = RuntimeModelGenerator(state)
+    lazy val dseRuntimeModelGen = RuntimeModelGenerator(state, version = "dse")
+    lazy val finalRuntimeModelGen = RuntimeModelGenerator(state, version = "final")
     lazy val pirCodegen    = PIRGenSpatial(state)
     lazy val tsthCodegen   = TungstenHostGenSpatial(state)
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
@@ -129,7 +130,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** Optional python model generator */
         ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? retimingAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? initiationAnalyzer) ==>
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? runtimeModelGen) ==>
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? dseRuntimeModelGen) ==>
         printer ==>
         /** More black box lowering */
         (!spatialConfig.bootAtDSE ? blackboxLowering2)   ==> printer ==> transformerChecks ==>
@@ -178,6 +179,8 @@ trait Spatial extends Compiler with ParamLoader {
         broadcastCleanup    ==> printer ==>
         /** Schedule finalization */
         initiationAnalyzer  ==>
+        /** final model generation */
+        ((spatialConfig.enableRuntimeModel) ? finalRuntimeModelGen) ==>
         /** Reports */
         memoryReporter      ==>
         finalIRPrinter      ==>

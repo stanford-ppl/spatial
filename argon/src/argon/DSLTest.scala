@@ -39,6 +39,11 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     *   Use the second version to generate a large number of runtime arguments using some pattern.
     */
   def runtimeArgs: Args
+
+  /** Override to supply list of input arguments to run during the dse/final performance models */
+  def dseModelArgs: Args
+  def finalModelArgs: Args
+
   lazy val DATA = sys.env.getOrElse("TEST_DATA_HOME", { throw MissingDataFolder() })
 
   //-------------------//
@@ -91,10 +96,12 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     val name: String,
     val args: String,
     val make: String,
-    val run:  String
-  ) extends Serializable { backend =>
+    val run:  String,
+    val shouldRunModels: Boolean = false
+  ){ backend =>
     val makeTimeout: Long = 3000 // Timeout for compiling, in seconds
     val runTimeout: Long  = 3000 // Timeout for running, in seconds
+    val modelTimeout: Long  = 30 // Timeout for running, in seconds
     var prev: String = ""
 
     def shouldRun: Boolean
@@ -109,6 +116,10 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     def parseRunError(line: String): Result = {
       if (line.contains("PASS: 1") || line.contains("PASS: true")) Pass
       else if (line.contains("PASS: 0") || line.contains("PASS: false")) Fail
+      else Unknown
+    }
+    def parseModelError(line: String): Result = {
+      if (line.toLowerCase.contains("total cycles for app")) Pass
       else Unknown
     }
     def genDir(name:String):String = s"${IR.config.cwd}/gen/$backend/$name/"
@@ -204,6 +215,20 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       result orElse Pass
     }
 
+    /** Run dse and final models. */
+    final def runModels(): Result = {
+      var result: Result = Unknown
+      if (shouldRunModels) {
+        dseModelArgs.cmds.foreach{ args => 
+          result = result orElse command(";project model; runMain model.AppRuntimeModel_dse noninteractive", runArgs :+ args, backend.modelTimeout, backend.parseModelError, ModelError.apply)
+        }
+        finalModelArgs.cmds.foreach{ args => 
+          result = result orElse command(";project model; runMain model.AppRuntimeModel_final noninteractive", runArgs :+ args, backend.modelTimeout, backend.parseModelError, ModelError.apply)
+        }
+        result orElse Pass
+      } else Pass
+    }
+
     /** Run everything for this backend, including DSL compile, backend make, and backend run. */
     def runBackend(): Unit = {
       s"${test.name}" should s"compile, run, and verify for backend $name" in {
@@ -214,7 +239,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
           result = result.orElse{
             generate() ==>
               runMake() ==>
-              runApp()
+              runApp() ==> 
+              runModels()
           }
         }
         result.resolve()
@@ -234,8 +260,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       s"${test.name}" should s"have $errors compiler errors" in {
         compile(expectErrors = true).foreach{err =>
           err()
-          // IR.hadErrors shouldBe true
-          // IR.errors shouldBe errors
+          IR.hadErrors shouldBe true
+          IR.errors shouldBe errors
         }
       }
     }

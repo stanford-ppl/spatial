@@ -7,6 +7,7 @@ trait Testbench extends FlatSpecLike with Matchers /* with Serializable */ {
   type CompileError = Result.CompileError
   type MakeError = Result.MakeError
   type RunError = Result.RunError
+  type ModelError = Result.ModelError
   implicit def resultToBoolean(x: Boolean): Result = if (x) Pass else Fail
   lazy val Pass         = Result.Pass
   lazy val Fail         = Result.Fail
@@ -14,5 +15,6 @@ trait Testbench extends FlatSpecLike with Matchers /* with Serializable */ {
   lazy val CompileError = Result.CompileError
   lazy val MakeError    = Result.MakeError
   lazy val RunError     = Result.RunError
+  lazy val ModelError     = Result.ModelError
 
 }

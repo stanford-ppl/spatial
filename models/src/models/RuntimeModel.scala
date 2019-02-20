@@ -8,6 +8,10 @@ import scala.io.Source
 
 object Runtime {
 
+  var interactive = true
+  var currentAsk = 0
+  var cliParams = Seq[Int]()
+
   /** Asked values mapping */
   // Mapping between Ask ids and their values
   val askMap = scala.collection.mutable.Map[Int, Int]()
@@ -23,6 +27,8 @@ object Runtime {
   case object Fork       extends CtrlSchedule
   case object DenseStore extends CtrlSchedule // modeled as a schedule
   case object DenseLoad  extends CtrlSchedule // modeled as a schedule
+  case object SparseStore extends CtrlSchedule // modeled as a schedule
+  case object SparseLoad  extends CtrlSchedule // modeled as a schedule
 
 
   /** Control node level. */
@@ -43,6 +49,11 @@ object Runtime {
   case class Ask(val id: Int, val whatAmI: String, ctx: Ctx) {
     def lookup: Int = {
       if (cached.contains(id)) askMap(id)
+      else if (!interactive) {
+        val t = cliParams(currentAsk)
+        currentAsk = currentAsk + 1
+        t
+      }
       else {
         val default = askMap.getOrElse(id, 1)
         print(s"Value for $whatAmI (${ctx.toString}) [default: $default] : ")
@@ -87,11 +98,13 @@ object Runtime {
   class ControllerModel(
     val level: CtrlLevel,
     val schedule: CtrlSchedule,
-    val cchain: CChainModel,
+    val cchain: List[CChainModel],
     val L: Int,
     val II: Int,
     val ctx: Ctx
   ){
+    def this(level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(level, schedule, List(cchain), L, II, ctx)
+
     // Control overhead
     val seqSync = 1 // cycles from end of one child to start of next
     val metaSync = 1 // cycles from end of one child to start of next
@@ -99,19 +112,19 @@ object Runtime {
     val dpMask = 1 // cycles that datapath is enabled but masked by done signal
     val startup = 2
     val shutdown = 1
-    val baselineDRAMDelay = 200 // Cycles between single dram cmd and its response, with no competitors
+    val baselineDRAMDelay = 170 // Cycles between single dram cmd and its response, with no competitors
     val congestionPenalty = 10 // Interference due to conflicting DRAM accesses
     def transfersBelow: Int = { // Count number of transfer nodes below self
       if (this.schedule == DenseLoad || this.schedule == DenseStore) 1
-      else this.cchain.unroll * this.children.map(_.transfersBelow).sum
+      else this.cchain.head.unroll * this.children.map(_.transfersBelow).sum
     }
     def competitors(c: Int): Int = { // Count number of other transfer nodes trigger simultaneously with this self
       // Number of conflicting DRAM accesses
       if (!parent.isDefined) c
       else {
         parent.get.schedule match {
-          case Sequenced => parent.get.cchain.unroll * c
-          case _ => parent.get.cchain.unroll * (parent.get.children.filter(_.ctx.id != this.ctx.id).map{x => x.transfersBelow}.sum + c)
+          case Sequenced => parent.get.cchain.head.unroll * c
+          case _ => parent.get.cchain.head.unroll * (parent.get.children.filter(_.ctx.id != this.ctx.id).map{x => x.transfersBelow}.sum + c)
         }
       }
     }
@@ -130,6 +143,18 @@ object Runtime {
       children += child
     }
 
+    /** Extract num iters from cchain, or else 1 */
+    def cchainIters: Int = if (cchain.size >= 1) cchain.head.N else 1
+
+    /** Extract num iters from cchains excluding last level, or else 1 */
+    def upperCChainIters: Int = if (cchain.size == 2) cchain.head.N else 1
+
+    /** Extract max child or else 1 */
+    def maxChild: Int = if (children.size >= 1) children.map(_.cycsPerParent).max else 1
+
+    /** Extract sum of all children or else 1 */
+    def sumChildren: Int = if (children.size >= 1) children.map(_.cycsPerParent).sum else 1
+
     /** Get ancestors of current node */
     def ancestors: Seq[ControllerModel] = {
       if (parent.isDefined) Seq(parent.get) ++ parent.get.ancestors
@@ -138,24 +163,32 @@ object Runtime {
     /** Define equations for computing runtime */
     def cycsPerParent: Int = level match {
       case OuterControl => schedule match {
-        case Sequenced       => startup + shutdown + children.map(_.cycsPerParent).sum * cchain.N + seqSync * children.map(_.cycsPerParent).size * cchain.N + cchain.N * seqAdvance
-        case Pipelined       => startup + shutdown + children.map(_.cycsPerParent).max * (cchain.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.N * children.map(_.cycsPerParent).size
-        case ForkJoin        => startup + shutdown + children.map(_.cycsPerParent).max * cchain.N + metaSync
-        case Streaming       => startup + shutdown + children.map(_.cycsPerParent).max * cchain.N + metaSync // TODO: lookup and use baselineDRAMDelay
-        case Fork            => startup + shutdown + children.map(_.cycsPerParent).max * cchain.N + metaSync // TODO: lookup and use duty cycle
-        case DenseLoad       => cchain.ctrs.dropRight(1).map(_.N).product * (competitors(1) * congestionPenalty + cchain.ctrs.last.N) + baselineDRAMDelay
-        case DenseStore      => cchain.ctrs.dropRight(1).map(_.N).product * (competitors(1) * congestionPenalty + cchain.ctrs.last.N) + baselineDRAMDelay
+        case Sequenced       => 
+          if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
+          else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
+        case Pipelined       => 
+          if (cchain.size <= 1) startup + shutdown + maxChild * (cchainIters - 1) + children.map(_.cycsPerParent).sum + metaSync * cchainIters * children.size
+          else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
+        case ForkJoin        => startup + shutdown + maxChild * cchainIters + metaSync
+        case Streaming       => 
+          if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
+          else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
+        case Fork            => startup + shutdown + maxChild * cchainIters + metaSync 
+        case DenseLoad       => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N) + baselineDRAMDelay
+        case DenseStore      => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N) + baselineDRAMDelay
+        case SparseLoad       => 1 // TODO
+        case SparseStore      => 1 // TODO
       }
       case InnerControl => schedule match {
-        case Sequenced => cchain.N*L + startup + shutdown
-        case _ => (cchain.N - 1)*II + L + startup + shutdown + dpMask
+        case Sequenced => cchainIters*L + startup + shutdown
+        case _ => (cchainIters - 1)*II + L + startup + shutdown + dpMask
       }
     }
 
     /** Simulate all Controllers in self's subtree and set their num_cycles and num_iters fields, using DFS */
     def execute(): Unit = {
       children.foreach{c => 
-        c.num_iters = this.num_iters * this.cchain.N
+        c.num_iters = this.num_iters * this.cchainIters
         c.execute()
       }
       num_cycles = cycsPerParent * this.num_iters

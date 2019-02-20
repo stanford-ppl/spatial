@@ -396,6 +396,25 @@ package object control {
       s.foreach{sym => metadata.add(sym, ReadMems(mems)) }
     }
 
+    def getLoweredTransfer: Option[TransferType] = {
+      s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ).headOption }.headOption
+    }
+    def loweredTransfer: TransferType = {
+      s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ) }.head
+    }
+    def loweredTransfer_=(typ: TransferType): Unit = {
+      s.foreach{sym => metadata.add(sym, LoweredTransfer(typ)) }
+    }
+
+    def getLoweredTransferSize: Option[(Sym[_], Int)] = {
+      s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption
+    }
+    def loweredTransferSize: (Sym[_], Int) = {
+      s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info) }.head
+    }
+    def loweredTransferSize_=(info: (Sym[_], Int)): Unit = {
+      s.foreach{sym => metadata.add(sym, LoweredTransferSize(info)) }
+    }
 
 
     // --- Streaming Controllers --- //

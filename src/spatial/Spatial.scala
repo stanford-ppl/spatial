@@ -127,7 +127,10 @@ trait Spatial extends Compiler with ParamLoader {
         (!spatialConfig.bootAtDSE ? switchOptimizer)     ==> printer ==> transformerChecks ==>
         (!spatialConfig.bootAtDSE ? blackboxLowering1)   ==> printer ==> transformerChecks ==>
         /** Optional python model generator */
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE)? runtimeModelGen) ==>
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? retimingAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? initiationAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? runtimeModelGen) ==>
+        printer ==>
         /** More black box lowering */
         (!spatialConfig.bootAtDSE ? blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
@@ -168,6 +171,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
         /** Retiming */
+        retimingAnalyzer    ==> printer ==>
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>
         /** Broadcast cleanup */

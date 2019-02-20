@@ -1,6 +1,6 @@
 // Build file for testing spatial apps
 
-organization := "edu.stanford.ppl"
+organization := "edu.stanford.cs.dawn"
 
 version := "1.1"
 
@@ -28,6 +28,7 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
+libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

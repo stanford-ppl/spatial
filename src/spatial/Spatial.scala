@@ -173,9 +173,9 @@ trait Spatial extends Compiler with ParamLoader {
         finalIRPrinter      ==>
         finalSanityChecks   ==>
         /** Code generation */
-        treeCodegen         ==>
+        //treeCodegen         ==>
         irCodegen           ==>
-        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        //(spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>

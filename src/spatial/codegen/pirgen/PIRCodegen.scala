@@ -95,6 +95,15 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case x => x.toString
   }
 
+  override protected def remap(tp: Type[_]): String = tp match {
+    case FixPtType(s, i, f) => src"Fix(${s}, ${i}, ${f})"
+    case FltPtType(m, e) => src"Flt(${m}, ${e})"
+    case _:Bit => src"Bool"
+    case tp:Vec[_] => remap(tp.A) //TODO
+    //case tp:Vec[_] => src"Vec(${tp.A}, ${tp.width})"
+    case tp => super.remap(tp)
+  }
+
   protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
     //hostGen.genHost(lhs, rhs)
     rhs.blocks.foreach(ret)

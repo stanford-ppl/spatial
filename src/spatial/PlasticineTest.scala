@@ -15,8 +15,8 @@ trait PlasticineTest extends DSLTest { test =>
   protected def pirArgs:List[String] = 
     "bash" ::
     "run.sh" ::
-    "--dot=true" ::
-    "--debug=true" ::
+    //"--dot=true" ::
+    //"--debug=true" ::
     Nil
 
   abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "") {

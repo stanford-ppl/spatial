@@ -13,13 +13,13 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
       val dimStr = lhs.getConstDims.fold("") { dims =>
         s".dims($dims)"
       }
-      state(lhs)(s"""DRAM("${lhs.name.getOrElse(s"$lhs")}")$dimStr""")
+      state(lhs)(src"""DRAM("${lhs.name.getOrElse(src"$lhs")}")$dimStr.tp(${op.A})""")
 
     case DRAMAddress(dram) =>
-      state(lhs, tp=Some("MemRead"))(src"""dramAddress($dram).name("${dram.toString}_addr")""")
+      state(lhs, tp=Some("MemRead"))(src"""dramAddress($dram).name("${dram.toString}_addr").tp(${lhs.tp})""")
 
     case DRAMIsAlloc(dram) =>
-      state(lhs)(src"Const(true)") //HACK for now
+      state(lhs)(src"Const(true).tp(Bool)") //HACK for now
 
     // Fringe templates expect byte-based addresses and sizes, while PIR gen expects word-based
     case e@FringeDenseLoad(dram,cmdStream,dataStream) =>

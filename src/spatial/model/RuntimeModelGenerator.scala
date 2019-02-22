@@ -116,7 +116,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
         emit("root.execute()")
         emit(s"""emit(s"[$version] Runtime results for app ${config.name}")""")
         emit("""root.printResults()""")
-        emit("""root.storeAskMap(sys.env("PWD") + "/PreviousAskMap.scala") // Store this run's askmap""")
+        emit("""root.storeAskMap(sys.env("PWD") + "/model/PreviousAskMap.scala") // Store this run's askmap""")
         emit(s"""emit(s"[$version] Total Cycles for App ${config.name}: $${root.totalCycles()}")""")
         emit("end()")
       close("}")
@@ -145,7 +145,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
   protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean, sfx: String = ""): Unit = {
     val w = try {bitWidth(lhs.tp.typeArgs.head)} catch {case e: Exception => 32}
-    val ctx = s"""Ctx("${lhs}$sfx", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+    val ctx = s"""Ctx("${lhs}$sfx", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
     val strt = start match {
                  case _ if forever => "Left(0)"
                  case Final(s) => src"Left($s)"
@@ -177,7 +177,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
   protected def createCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
     var isForever = lhs.isForever
-    val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${ctrs.map{stm}}")"""
+    val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${ctrs.map{stm}}")"""
     emit(src"""val $lhs = CChainModel(List[CtrModel](${ctrs.map(quote).mkString(",")}), $ctx)""")
   }
 
@@ -194,7 +194,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
     case AccelScope(block) =>
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       emit(src"val $lhs = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
@@ -202,14 +202,14 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
     case OpForeach(ens,cchain,block,_,_) if (lhs.getLoweredTransfer.isDefined) =>
       // TODO: Include last level counter?
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case OpForeach(ens,cchain,block,_,_) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
@@ -218,14 +218,14 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
     case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) if (lhs.getLoweredTransfer.isDefined) =>
       // TODO: Include last level counter?
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
@@ -233,21 +233,21 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case ParallelPipe(_,block) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), 0, 0, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
 
     case UnitPipe(_, block) if (lhs.getLoweredTransfer.isDefined) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnitPipe(_, block) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
@@ -255,7 +255,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case OpReduce(ens, cchain, _, map, load, reduce, store, _,_,_,_) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
@@ -266,7 +266,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
@@ -274,7 +274,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case tx:DenseTransfer[_,_,_] =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
 
       val tp = if (tx.isStore) "DenseStore" else "DenseLoad"
       val pars = tx.pars.map(_.asInstanceOf[Sym[_]]).map(_ match {case Final(s) => s.toInt; case Expect(s) => s.toInt; case _ => 1})
@@ -291,7 +291,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
 
     case StateMachine(ens, start, notDone, action, nextState) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs,Bits[I32].one,1, false, s"_fsm")
@@ -303,7 +303,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case OpMemReduce(ens, cchainMap, cchainRed, _, map, loadRes, loadAcc, reduce, storeAcc, _, _, _, _, _) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, List($cchainMap, $cchainRed), ${lat.toInt}, ${ii.toInt}, $ctx)")
@@ -314,8 +314,8 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
 
-    case Switch(selects, body) if lhs.isInnerControl =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+    case Switch(selects, body) =>
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       visitBlock(body)
@@ -323,7 +323,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case SwitchCase(body) =>
-      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs)}", "${stm(lhs)}")"""
+      val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       visitBlock(body)

@@ -203,6 +203,8 @@ import spatial.dsl._
 }
 
 @spatial class Kmeans_slow extends SpatialTest { // ReviveMe (groupByReduce)
+  override def dseModelArgs: Args = "3 64"
+  override def finalModelArgs: Args = "3 64"
   override def runtimeArgs: Args = "3 64"
 
   type X = Int

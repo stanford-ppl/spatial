@@ -80,7 +80,7 @@ object Runtime {
       else {
         val default = askMap.getOrElse(id, 1)
         print(s"Value for $whatAmI (${ctx.toString}) [default: $default] : ")
-        val t = scala.io.StdIn.readLine()
+        val t = scala.io.StdIn.readLine().trim()
         val x = if (t != "") t.toInt else default
         println("")
         askMap += (id -> x)
@@ -196,7 +196,9 @@ object Runtime {
         case Streaming       => 
           if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
           else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
-        case Fork            => startup + shutdown + maxChild * cchainIters + metaSync 
+        case Fork            => 
+          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
+          children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
         case DenseLoad       => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N) + baselineDRAMDelay
         case DenseStore      => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N) + baselineDRAMDelay
         case SparseLoad       => 1 // TODO

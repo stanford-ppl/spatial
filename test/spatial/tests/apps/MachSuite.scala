@@ -4,6 +4,8 @@ import spatial.dsl._
 import spatial.targets._
 
 @spatial class AES extends SpatialTest {
+  override def dseModelArgs: Args = "800 93 93 87 45"
+  override def finalModelArgs: Args = "800 93 93 87 45"
   override def runtimeArgs: Args = "50"
 
   /*
@@ -661,6 +663,8 @@ import spatial.targets._
  */
 
 
+  override def dseModelArgs: Args = "33 6 1 19 9"
+  override def finalModelArgs: Args = "1 19 9 1 19 9"
 
   def main(args: Array[String]): Unit = {
 
@@ -1069,6 +1073,9 @@ import spatial.targets._
 }      
 
 @spatial class MD_Grid extends SpatialTest {
+  override def dseModelArgs: Args = "0 4 0 4 0 4 4 4 1"
+  override def finalModelArgs: Args = "0 4 0 4 0 4 4 4 4 4 4 4 4 4"
+
  /*
   
   Moleckaler Dynamics via the grid, a digital frontier
@@ -1413,6 +1420,8 @@ import spatial.targets._
 }      
 
 @spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+  override def dseModelArgs: Args = "128 128 128"
+  override def finalModelArgs: Args = "128 128 128"
   override def runtimeArgs: Args = "128"
                                                                                                   
                                                                                                   
@@ -1848,6 +1857,8 @@ import spatial.targets._
                                                                                                                                                                            
  */
 
+  override def dseModelArgs: Args = "16 50 50 50 50 50"
+  override def finalModelArgs: Args = "16 50 50 50 50 50"
 
   def main(args: Array[String]): Unit = {
 

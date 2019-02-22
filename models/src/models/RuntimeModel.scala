@@ -10,6 +10,8 @@ object Runtime {
 
   var interactive = true
   var currentAsk = 0
+  var logfilename: String = ""
+  var logfile: Option[PrintWriter] = None
   var cliParams = Seq[Int]()
 
   /** Asked values mapping */
@@ -36,6 +38,21 @@ object Runtime {
   case object InnerControl extends CtrlLevel
   case object OuterControl extends CtrlLevel
 
+  /** Open logfile */
+  def begin(file: String): Unit = {
+    logfile = Some(new PrintWriter(new File(file)))
+    logfilename = file
+  }
+
+  /** Close logfile */
+  def end(): Unit = logfile.get.close()
+
+  /** Tee string to both logfile and stdout */
+  def emit(x: String): Unit = {
+    println(x)
+    logfile.get.write(x + "\n")
+  }
+
   /** Info about node */ 
   case class Ctx(
     val id: String, // Sym name (i.e. x####)
@@ -49,10 +66,16 @@ object Runtime {
   case class Ask(val id: Int, val whatAmI: String, ctx: Ctx) {
     def lookup: Int = {
       if (cached.contains(id)) askMap(id)
-      else if (!interactive) {
+      else if (!interactive && !cached.contains(id)) {
+        println(s"asking for param $currentAsk: ${cliParams(currentAsk)}")
         val t = cliParams(currentAsk)
         currentAsk = currentAsk + 1
+        askMap += (id -> t)
+        cached += id
         t
+      }
+      else if (!interactive && cached.contains(id)) {
+        askMap(id)
       }
       else {
         val default = askMap.getOrElse(id, 1)
@@ -220,28 +243,28 @@ object Runtime {
 
     /** Indicates whether this is the last child of its parent or not, used for pretty printing */
     def lastChild: Boolean = if (!parent.isDefined) true else {(parent.get.children.map(_.ctx.id).indexOf(this.ctx.id) == (parent.get.children.size-1))}
-    
+
     /** DFS through hierarchy and report performance results */
     def printResults(entry: Boolean = true): Unit = {
-      if (entry) println(s"Printing Runtime Model Results:")
-      if (entry) println("============================================")
+      if (entry) emit(s"Printing Runtime Model Results:")
+      if (entry) emit("============================================")
       val cycles_per_iter = if (num_iters > 0) num_cycles / num_iters else num_cycles
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
-      println(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${cycles_per_iter} (${num_cycles} / ${num_iters}) [${iters_per_parent} iters/parent execution]")
+      emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${cycles_per_iter} (${num_cycles} / ${num_iters}) [${iters_per_parent} iters/parent execution]")
       children.foreach(_.printResults(false))
-      if (entry) println("============================================")
+      if (entry) emit("============================================")
     }
 
     /** DFS through hierarchy and print structure */
     def printStructure(entry: Boolean = true): Unit = {
-      if (entry) println(s"Controller Structure:")
-      if (entry) println("============================================")
+      if (entry) emit(s"Controller Structure:")
+      if (entry) emit("============================================")
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
       val competitors = if (this.schedule == DenseLoad || this.schedule == DenseStore) s" (${this.competitors(1)} competitors)" else ""
-      // if (cchain.isDefined) println(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
-      println(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)
+      // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
+      emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)
       children.foreach(_.printStructure(false))
-      if (entry) println("============================================")
+      if (entry) emit("============================================")
     }
 
     def totalCycles(): Int = this.num_cycles

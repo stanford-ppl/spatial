@@ -8,6 +8,8 @@ import spatial.metadata.params._
 import scala.reflect.ClassTag
 
 @spatial class DotProduct extends SpatialTest {
+  override def dseModelArgs: Args = "640"
+  override def finalModelArgs: Args = "640"
   override def runtimeArgs: Args = "640"
   type X = FixPt[TRUE,_32,_0]
 

@@ -23,7 +23,7 @@ trait PlasticineTest extends DSLTest { test =>
     s"--tungsten=false" ::
     Nil
 
-  abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "") {
+  abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "", "") {
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
     def compileOnly = checkFlag(s"test.compileOnly")

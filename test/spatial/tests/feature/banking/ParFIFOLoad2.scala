@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class ParFIFOLoad2 extends SpatialTest {
+  override def dseModelArgs: Args = "384"
+  override def finalModelArgs: Args = "384"
   override def runtimeArgs: Args = "384"
 
   val tileSize = 64

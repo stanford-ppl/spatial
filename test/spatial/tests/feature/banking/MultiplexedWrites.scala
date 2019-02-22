@@ -3,6 +3,9 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 @spatial class MultiplexedWrites extends SpatialTest {
+  override def dseModelArgs: Args = "3"
+  override def finalModelArgs: Args = "3"
+  
   val tileSize = 16
   val I = 5
   val N = 192

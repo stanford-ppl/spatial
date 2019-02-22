@@ -256,6 +256,19 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, sp
 	write(worksheet,22,4,appname)
 	write(worksheet,22,5,os.uname()[1])
 
+def report_model_results(branch, appname, hash, apphash, true_runtime, dse_runtime, final_runtime, args):
+	sh = getDoc(branch)
+	row = getRow(sh, hash, apphash)
+
+	final_error = 100.0 * float(final_runtime) / float(true_runtime)
+	dse_error = 100.0 * float(dse_runtime) / float(true_runtime)
+	
+	worksheet = sh.worksheet_by_title('Models')
+	col = getColOrAppend(worksheet, appname)
+	write(worksheet, 2,  col,  args)
+	write(worksheet, row,col, "%s (%.1f%%)\n%s (%.1f%%)\n%s" % (dse_runtime, dse_error, final_runtime, final_error, true_runtime))
+
+
 def report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash):
 	sh = getDoc(backend)
 	row = getRow(sh, hash, apphash)
@@ -683,6 +696,9 @@ def merge_apps_columns(old_appname, new_appname, backend, keepOldname = False):
 if (sys.argv[1] == "report_regression_results"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_regression_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11]))
 	report_regression_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11])
+if (sys.argv[1] == "report_model_results"):
+	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_regression_results('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]))
+	report_model_results(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9])
 elif (sys.argv[1] == "report_board_runtime"):
 	# print("WARNING: THIS PRINT WILL BREAK REGRESSION. PLEASE COMMENT IT OUT! report_board_runtime('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10]))
 	report_board_runtime(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10])
@@ -719,6 +735,7 @@ elif (sys.argv[1] == "dev"):
 else:
 	print("Commands:")
 	print(" - report_regression_results(branch, appname, passed, cycles, hash, apphash, csv, args)")
+	print(" - report_model_results(branch, appname, hash, apphash, true_runtime, dse_runtime, final_runtime, args)")
 	print(" - report_board_runtime(appname, timeout, runtime, passed, args, backend, locked_board, hash, apphash)")
 	print(" - report_synth_results(appname, lut, reg, ram, uram, dsp, lal, lam, synth_time, timing_met, backend, hash, apphash)")
 	print(" - prepare_sheet(hash, apphash, timestamp, backend)")

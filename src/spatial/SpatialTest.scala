@@ -13,8 +13,8 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
   override def finalModelArgs: Args = NoArgs
 
 
-  abstract class ChiselBackend(name: String, args: String, make: String, run: String, shouldRunModels: Boolean = false)
-    extends Backend(name,args,make,run, shouldRunModels) {
+  abstract class ChiselBackend(name: String, args: String, make: String, run: String, model: String, shouldRunModels: Boolean = false)
+    extends Backend(name,args,make,run,model,shouldRunModels) {
 
     private lazy val err = "ERROR.*Value '[0-9]+' is out of the range".r
 
@@ -34,7 +34,8 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     name = "Scala",
     args = "--sim",
     make = "make",
-    run  = "bash scripts/regression_run.sh scalasim"
+    run  = "bash scripts/regression_run.sh scalasim",
+    model = "noninteractive"
   ) {
     def shouldRun: Boolean = checkFlag("test.Scala")
     override def parseRunError(line: String): Result = {
@@ -47,9 +48,11 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --insanity --instrument --fpga VCS",
+    args = "--synth --insanity --instrument --runtime --fpga VCS",
     make = "make",
-    run  = "bash scripts/regression_run.sh vcs"
+    run  = "bash scripts/regression_run.sh vcs",
+    model  = "bash scripts/model_run.sh vcs",
+    shouldRunModels = true
   ) {
     override def shouldRun: Boolean = checkFlag("test.VCS")
     override val makeTimeout: Long = 3600
@@ -60,7 +63,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     args = "--synth --insanity --fpga Zynq",
     make = "make",
     run  = "bash scripts/scrape.sh Zynq",
-    shouldRunModels = true
+    model = "noninteractive"
   ) {
     override def shouldRun: Boolean = checkFlag("test.Zynq")
     override val makeTimeout: Long = 13000
@@ -70,7 +73,8 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     name = "ZCU",
     args = "--synth --insanity --fpga ZCU",
     make = "make",
-    run  = "bash scripts/scrape.sh ZCU"
+    run  = "bash scripts/scrape.sh ZCU",
+    model = "noninteractive"
   ) {
     override def shouldRun: Boolean = checkFlag("test.ZCU")
     override val makeTimeout: Long = 13000
@@ -80,7 +84,8 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     name = "AWS",
     args = "--synth --insanity --fpga AWS_F1",
     make = "make aws-F1-afi",
-    run  = "bash scripts/scrape.sh AWS"
+    run  = "bash scripts/scrape.sh AWS",
+    model = "noninteractive"
   ) {
     override def shouldRun: Boolean = checkFlag("test.AWS")
     override val makeTimeout: Long = 32400

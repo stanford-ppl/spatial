@@ -52,10 +52,10 @@ sw-clean:
 clean: hw-clean sw-clean
 
 dse-model: 
-	sbt "; project model; runMain model.AppRuntimeModel_dse"
+	sbt "; project model; runMain model.AppRuntimeModel_dse ${ARGS}"
 
 final-model: 
-	sbt "; project model; runMain model.AppRuntimeModel_final"
+	sbt "; project model; runMain model.AppRuntimeModel_final ${ARGS}"
 
 
 null: # Null target for regression testing purposes

@@ -24,9 +24,9 @@ package object math {
 	      val Final(start) = s.trace.asInstanceOf[Num[_]].counter.ctr.start
 	      val Final(step) = s.trace.asInstanceOf[Num[_]].counter.ctr.step
 	      val par = s.trace.asInstanceOf[Num[_]].counter.ctr.ctrPar.toInt
-	      val lane = s.trace.asInstanceOf[Num[_]].counter.lane
+	      val lanes = s.trace.asInstanceOf[Num[_]].counter.lanes
 	      val A = par * step
-	      val B = start + lane * step
+        val B = lanes.map { lane => start + lane * step }
 	      ResidualGenerator(A, B, 0)
     	}
     	else ResidualGenerator(1,0,0))

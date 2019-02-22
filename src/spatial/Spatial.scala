@@ -236,7 +236,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
       //spatialConfig.enableBroadcast = false
-      spatialConfig.noInnerLoopUnroll = true
+      spatialConfig.vecInnerLoop = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       //spatialConfig.enableDot = true
@@ -251,7 +251,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
       //spatialConfig.enableBroadcast = false
-      spatialConfig.noInnerLoopUnroll = true
+      spatialConfig.vecInnerLoop = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       //spatialConfig.enableDot = true

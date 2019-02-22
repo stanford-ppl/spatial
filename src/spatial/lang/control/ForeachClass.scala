@@ -4,6 +4,7 @@ package control
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.metadata.control._
 
 class ForeachClass(opt: CtrlOpt) {
   @api def apply(ctr: Counter[I32])(func: I32 => Any): Void = {
@@ -25,6 +26,7 @@ class ForeachClass(opt: CtrlOpt) {
   @rig def apply(ctrs: Seq[Counter[I32]])(func: Seq[I32] => Any): Void = {
     val iters  = ctrs.map{_ => boundVar[I32] }
     val cchain = CounterChain(ctrs)
+    cchain.counters.zip(iters).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
     stageWithFlow(OpForeach(Set.empty, cchain, stageBlock{ func(iters); void }, iters, opt.stopWhen)){pipe =>
       opt.set(pipe)
     }

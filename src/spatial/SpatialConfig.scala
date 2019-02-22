@@ -48,7 +48,7 @@ class SpatialConfig extends Config {
   var allowPrimitivesInOuterControl = true
 
   var ignoreParEdgeCases: Boolean = false
-  var noInnerLoopUnroll: Boolean = false
+  var vecInnerLoop: Boolean = false
   var enableBufferCoalescing: Boolean = true
 
   var enablePIR = false

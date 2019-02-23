@@ -103,7 +103,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       emit("")
       open("override def main(args: Array[String]): Unit = {")
         emit(s"""begin(sys.env("PWD") + "/results_$version")""")
-        emit("""if (args.size >= 1 && args(0) == "noninteractive") {""")
+        emit("""if (args.size >= 1 && (args(0) == "noninteractive" || args(0) == "ni")) {""")
         emit("""    interactive = false""")
         emit("""    cliParams = args.drop(1).map(_.toInt)""")
         emit("""    emit(s"Noninteractive Args: ${cliParams.mkString(" ")}") """)

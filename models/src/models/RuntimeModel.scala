@@ -100,7 +100,11 @@ object Runtime {
       val realStart = start match {case Left(x) => x; case Right(x) => x.lookup}
       val realStop = stop match {case Left(x) => x; case Right(x) => x.lookup}
       val realStride = stride match {case Left(x) => x; case Right(x) => x.lookup}
-      scala.math.ceil((realStop - realStart).toDouble / (realStride * par).toDouble).toInt
+      /** Round n up to the nearest multiple of t */
+      def roundUp(n: Int, t: Int): Int = {
+        if (n == 0) 0 else {((n + t - 1).toDouble / t.toDouble).toInt * t}
+      }
+      roundUp(scala.math.ceil((realStop - realStart).toDouble / realStride.toDouble).toInt, par) / par
     }
   }
 
@@ -135,7 +139,8 @@ object Runtime {
     val dpMask = 1 // cycles that datapath is enabled but masked by done signal
     val startup = 2
     val shutdown = 1
-    val baselineDRAMDelay = 170 // Cycles between single dram cmd and its response, with no competitors
+    val baselineDRAMLoadDelay = 170 // Cycles between single dram cmd and its response, with no competitors
+    val baselineDRAMStoreDelay = 185 // Cycles between single dram cmd and its response, with no competitors
     val congestionPenalty = 10 // Interference due to conflicting DRAM accesses
     def transfersBelow: Int = { // Count number of transfer nodes below self
       if (this.schedule == DenseLoad || this.schedule == DenseStore) 1
@@ -199,8 +204,8 @@ object Runtime {
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad       => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N) + baselineDRAMDelay
-        case DenseStore      => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N) + baselineDRAMDelay
+        case DenseLoad       => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N + baselineDRAMLoadDelay)
+        case DenseStore      => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N + baselineDRAMStoreDelay)
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }

@@ -740,6 +740,8 @@ import spatial.dsl._
 
 @spatial class SingleLayerConv_OIRC extends SpatialTest {
   type T = FixPt[TRUE,_16,_0]
+  override def dseModelArgs: Args = "16 16 16 16 16 2 16 2 16 32 32 0 32 2 0 16"
+  override def finalModelArgs: Args = "16 16 16 16 16 2 16 2 16 32 32 0 32 2 0 16"
 
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
 

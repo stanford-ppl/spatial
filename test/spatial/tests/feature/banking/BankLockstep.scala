@@ -4,6 +4,8 @@ import argon.Block
 import spatial.dsl._
 
 @spatial class BankLockstep extends SpatialTest {
+  override def dseModelArgs: Args = "6"
+  override def finalModelArgs: Args = "6"
 
   // Inspired by MD_Grid
   def main(args: Array[String]): Unit = {
@@ -50,6 +52,9 @@ import spatial.dsl._
 }
 
 @spatial class DephasingDuplication extends SpatialTest {
+  override def dseModelArgs: Args = "16"
+  override def finalModelArgs: Args = "16"
+
 
   // Inspired by MD_Grid
   def main(args: Array[String]): Unit = {

@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class UnalignedMemCopyFIFO extends SpatialTest {
+  override def dseModelArgs: Args = "400"
+  override def finalModelArgs: Args = "400"
   override def runtimeArgs: Args = "400"
 
   val tileSize = 20

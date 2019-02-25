@@ -140,7 +140,7 @@ object Runtime {
     val startup = 2
     val shutdown = 1
     val baselineDRAMLoadDelay = 170 // Cycles between single dram cmd and its response, with no competitors
-    val baselineDRAMStoreDelay = 185 // Cycles between single dram cmd and its response, with no competitors
+    val baselineDRAMStoreDelay = 175 // Cycles between single dram cmd and its response, with no competitors
     val congestionPenalty = 10 // Interference due to conflicting DRAM accesses
     def transfersBelow: Int = { // Count number of transfer nodes below self
       if (this.schedule == DenseLoad || this.schedule == DenseStore) 1

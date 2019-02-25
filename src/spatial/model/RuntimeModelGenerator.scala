@@ -108,6 +108,10 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
         emit("""    cliParams = args.drop(1).map(_.toInt)""")
         emit("""    emit(s"Noninteractive Args: ${cliParams.mkString(" ")}") """)
         emit("""}""")
+        emit("""else {""")
+        val example = if (version == "dse") IR.dseModelArgs.toString else IR.finalModelArgs.toString
+        emit(s"""    println(s"Suggested args: ${example}")""")
+        emit("""}""")
         emit("val root = build_model()")
         emit("root.initializeAskMap(AskMap.map)")
         emit("root.loadPreviousAskMap(PreviousAskMap.map) // Load previous run's askmap")

@@ -93,6 +93,14 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
     case test: DSLTest => test.runtimeArgs.cmds
     case _ => Nil
   }
+  def dseModelArgs: Seq[String] = app match {
+    case test: DSLTest => test.dseModelArgs.cmds
+    case _ => Nil
+  }
+  def finalModelArgs: Seq[String] = app match {
+    case test: DSLTest => test.finalModelArgs.cmds
+    case _ => Nil
+  }
 
   def resetErrors(): Unit = errors = 0
   def reset(): Unit = {

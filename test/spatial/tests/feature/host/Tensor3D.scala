@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class Tensor3D extends SpatialTest {
+  override def dseModelArgs: Args = "32 4 4"
+  override def finalModelArgs: Args = "32 4 4"
   override def runtimeArgs: Args = "32 4 4"
 
 

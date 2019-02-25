@@ -2188,6 +2188,8 @@ import spatial.targets._
 
 
 @spatial class Backprop extends SpatialTest {
+  override def dseModelArgs: Args = "5 13 3"
+  override def finalModelArgs: Args = "5 13 3"
   override def runtimeArgs: Args = "5"
 
  /*                                                                                                  

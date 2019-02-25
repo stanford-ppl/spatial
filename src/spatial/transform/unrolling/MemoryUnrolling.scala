@@ -429,10 +429,6 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:StreamInRead[_]  => UVecRead(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
     case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))
-    case op:MergeBufferBound[_] => UWrite[A](stage(MergeBufferBound(mem.asInstanceOf[MergeBuffer[A]],
-                                             op.way, data.head.asInstanceOf[Bits[I32]], enss.head)))
-    case op:MergeBufferInit[_] => UWrite[A](stage(MergeBufferInit(mem.asInstanceOf[MergeBuffer[A]],
-                                              data.head.asInstanceOf[Bits[Bit]], enss.head)))
     case _:FIFOEnq[_]        => UWrite[A](stage(FIFOBankedEnq(mem.asInstanceOf[FIFO[A]], data, enss)))
     case _:LIFOPush[_]       => UWrite[A](stage(LIFOBankedPush(mem.asInstanceOf[LIFO[A]], data, enss)))
     case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileVectorWrite(mem.asInstanceOf[RegFilex[A]], data, bank, enss)))

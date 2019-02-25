@@ -132,7 +132,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
         emit(src"val map = scala.collection.mutable.Map[Int,Int]()")
         undefinedSyms.foreach{sym =>
           val value = sym match{case Param(c) => s"$c"; case _ => "100" } // TODO: Choose some default value. Should warn?
-          emit(src"map += ($sym -> $value)")
+          emit(src"""map += (${sym.hashCode} -> $value)""")
         }
       close("}")
     }

@@ -112,6 +112,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
         val example = if (version == "dse") IR.dseModelArgs.toString else IR.finalModelArgs.toString
         emit(s"""    println(s"Suggested args: ${example}")""")
         emit("""}""")
+        if (version == "final") emit("isFinal = true")
         emit("val root = build_model()")
         emit("root.initializeAskMap(AskMap.map)")
         emit("root.loadPreviousAskMap(PreviousAskMap.map) // Load previous run's askmap")
@@ -206,11 +207,12 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
     case OpForeach(ens,cchain,block,_,_) if (lhs.getLoweredTransfer.isDefined) =>
       // TODO: Include last level counter?
+      val gated = if (lhs.children.filter(_.s.get != lhs).size == 1) "Gated" else ""
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case OpForeach(ens,cchain,block,_,_) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
@@ -222,11 +224,12 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
     case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) if (lhs.getLoweredTransfer.isDefined) =>
       // TODO: Include last level counter?
+      val gated = if (lhs.children.filter(_.s.get != lhs).size == 1) "Gated" else ""
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
@@ -244,11 +247,12 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
 
 
     case UnitPipe(_, block) if (lhs.getLoweredTransfer.isDefined) =>
+      val gated = if (lhs.children.filter(_.s.get != lhs).size == 1) "Gated" else ""
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnitPipe(_, block) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""

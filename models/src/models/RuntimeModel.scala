@@ -13,6 +13,7 @@ object Runtime {
   var logfilename: String = ""
   var logfile: Option[PrintWriter] = None
   var cliParams = Seq[Int]()
+  var isFinal = false
 
   /** Asked values mapping */
   // Mapping between Ask ids and their values
@@ -28,6 +29,7 @@ object Runtime {
   case object ForkJoin   extends CtrlSchedule
   case object Fork       extends CtrlSchedule
   case object DenseStore extends CtrlSchedule // modeled as a schedule
+  case object GatedDenseStore extends CtrlSchedule // modeled as a schedule, used for unaligned stores 
   case object DenseLoad  extends CtrlSchedule // modeled as a schedule
   case object SparseStore extends CtrlSchedule // modeled as a schedule
   case object SparseLoad  extends CtrlSchedule // modeled as a schedule
@@ -117,7 +119,7 @@ object Runtime {
       else ctrs.map(_.N).product
     }
     def unroll: Int = { 
-      ctrs.map(_.par).product
+      if (isFinal) 1 else ctrs.map(_.par).product
     }
     def isDefined: Boolean = !ctrs.isEmpty
   }
@@ -132,6 +134,7 @@ object Runtime {
   ){
     def this(level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(level, schedule, List(cchain), L, II, ctx)
 
+    val targetBurstSize = 512
     // Control overhead
     val seqSync = 1 // cycles from end of one child to start of next
     val metaSync = 1 // cycles from end of one child to start of next
@@ -140,21 +143,36 @@ object Runtime {
     val startup = 2
     val shutdown = 1
     val baselineDRAMLoadDelay = 170 // Cycles between single dram cmd and its response, with no competitors
-    val baselineDRAMStoreDelay = 175 // Cycles between single dram cmd and its response, with no competitors
-    val congestionPenalty = 10 // Interference due to conflicting DRAM accesses
-    def transfersBelow: Int = { // Count number of transfer nodes below self
-      if (this.schedule == DenseLoad || this.schedule == DenseStore) 1
-      else this.cchain.head.unroll * this.children.map(_.transfersBelow).sum
+    val baselineDRAMStoreDelay = 150 // Cycles between single dram cmd and its response, with no competitors
+    val storeFudge = 50 // Penalty for dram store when children are run sequentially
+    val congestionPenalty = 5 // Interference due to conflicting DRAM accesses
+    def transfersBelow(exempt: List[ControllerModel]): Int = { // Count number of transfer nodes below self
+      if (this.schedule == DenseLoad || this.schedule == DenseStore || this.schedule == GatedDenseStore) 1
+      else {
+        this.cchain.head.unroll * this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).sum
+      }
     }
-    def competitors(c: Int): Int = { // Count number of other transfer nodes trigger simultaneously with this self
+    def competitors(c: Int = 0, exempt: List[ControllerModel] = List()): Int = { // Count number of other transfer nodes trigger simultaneously with this self
       // Number of conflicting DRAM accesses
       if (!parent.isDefined) c
       else {
         parent.get.schedule match {
-          case Sequenced => parent.get.cchain.head.unroll * c
-          case _ => parent.get.cchain.head.unroll * (parent.get.children.filter(_.ctx.id != this.ctx.id).map{x => x.transfersBelow}.sum + c)
+          case Sequenced => parent.get.competitors(parent.get.cchain.head.unroll * c, exempt ++ List(this) ++ parent.get.children)
+          case _ => 
+            val contribution = parent.get.cchain.head.unroll * (this.transfersBelow(exempt) + c)
+            parent.get.competitors(contribution, exempt ++ List(this))
         }
       }
+    }
+
+    def congestionModel(competitors: Int): Int = {
+      // Linear for the first 4 competitors
+      val linear1 = if (competitors < 2) competitors * congestionPenalty else 4 * congestionPenalty
+      // Exponential for the next 8 competitors
+      val exp = if (competitors < 2) 0 else if (competitors < 12) scala.math.pow(2.3, competitors - 2).toInt else scala.math.pow(2.3, 8).toInt
+      // Linear for the rest
+      val linear2 = if (competitors < 12) 0 else (competitors - 12) * congestionPenalty
+      linear1 + exp + linear2
     }
 
     // Result fields
@@ -204,8 +222,9 @@ object Runtime {
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad       => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N + baselineDRAMLoadDelay)
-        case DenseStore      => upperCChainIters * (competitors(1) * congestionPenalty + cchain.last.N + baselineDRAMStoreDelay)
+        case DenseLoad       => upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
+        case DenseStore      => upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
+        case GatedDenseStore      => upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }
@@ -267,7 +286,7 @@ object Runtime {
       if (entry) emit(s"Controller Structure:")
       if (entry) emit("============================================")
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
-      val competitors = if (this.schedule == DenseLoad || this.schedule == DenseStore) s" (${this.competitors(1)} competitors)" else ""
+      val competitors = if (this.schedule == DenseLoad || this.schedule == DenseStore || this.schedule == GatedDenseStore) s" (${this.competitors(0)} competitors)" else ""
       // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
       emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)
       children.foreach(_.printStructure(false))

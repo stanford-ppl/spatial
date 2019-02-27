@@ -10,7 +10,7 @@ import six
 import tensorflow as tf
 import tensorflow_lattice as tfl
 import timeit
-
+import numpy as np
 
 flags = tf.flags
 FLAGS = flags.FLAGS
@@ -75,7 +75,6 @@ flags.DEFINE_bool(
 #   label defaults to normal (i.e. a non-malicious packet)
 #   rtl_seed is a random seed to intialize lattices   
 flags.DEFINE_string("target", "loadCycs", "")
-# flags.DEFINE_string("label", "normal.", "")
 flags.DEFINE_integer("rtl_seed", 337893, "")
 flags.DEFINE_integer("num_lattices", 4, "")
 flags.DEFINE_float("learning_rate", 0.02, "")
@@ -91,6 +90,7 @@ CSV_COLUMNS = ['loads',
                'storeCycs',
                'gatedCycs']
 
+targets = {"loadCycs", "storeCycs", "gatedCycs"}
 
 # Set up test and train functions with relevant parameters
 def get_test_input_fn(batch_size, num_epochs, shuffle):
@@ -119,21 +119,12 @@ def get_input_fn(file_path, batch_size, num_epochs, shuffle):
         sep='\t',
         names=CSV_COLUMNS,
         skipinitialspace=True,
-        engine="python")
-
-    if (FLAGS.target == 'loadCycs'): 
-    	del _df_data[file_path]['storeCycs']
-    	del _df_data[file_path]['gatedCycs']
-    elif (FLAGS.target == 'storeCycs'): 
-    	del _df_data[file_path]['loadCycs']
-    	del _df_data[file_path]['gatedCycs']
-    elif (FLAGS.target == 'gatedCycs'): 
-    	del _df_data[file_path]['storeCycs']
-    	del _df_data[file_path]['loadCycs']
-    print(_df_data)
+        engine="python",
+        dtype=np.float32)
+    _df_data[file_path].drop(columns=list(targets - {FLAGS.target}), errors="ignore", inplace=True)
 
     # Mark labels
-    _df_data_labels[file_path] = (_df_data[file_path][FLAGS.target]).astype(int)
+    _df_data_labels[file_path] = (_df_data[file_path][FLAGS.target])
 
   # set up data with labels
   return tf.estimator.inputs.pandas_input_fn(
@@ -147,24 +138,7 @@ def get_input_fn(file_path, batch_size, num_epochs, shuffle):
 
 # Create feature columns with correct categorical vocabularies
 def create_feature_columns():
-
-  # Column list to return 
-  columns = []
-
-  # Add either numerical or categorical features
-  for feature in CSV_COLUMNS:
-
-      # Skip attack feature since this will just become a label
-      if feature == 'loadCycs' or feature == 'storeCycs' or feature == 'gatedCycs':
-          continue
-
-      columns.append(tf.feature_column.numeric_column(feature))
-    
-
-  # Return feature columns
-  return columns
-
-
+  return [tf.feature_column.numeric_column(feat) for feat in CSV_COLUMNS if feat not in targets]
 
 # Create quantiles based on batch size
 def create_quantiles(quantiles_dir):
@@ -203,12 +177,13 @@ def create_calibrated_rtl(feature_columns, config, quantiles_dir):
       lattice_l2_torsion_reg=1.0e-4,
       lattice_size=2,
       lattice_rank=4,
-      num_lattices=FLAGS.num_lattices)
+      num_lattices=FLAGS.num_lattices,
+      optimizer=tf.train.AdamOptimizer)
 
   # Specific feature parameters.
   hparams.parse(FLAGS.hparams)
   _pprint_hparams(hparams)
-  return tfl.calibrated_rtl_classifier(
+  return tfl.calibrated_rtl_regressor(
       feature_columns=feature_columns,
       model_dir=config.model_dir,
       config=config,
@@ -233,7 +208,6 @@ def create_estimator(config, quantiles_dir):
 def evaluate_on_data(estimator, data):
   """Evaluates and prints results, set data to FLAGS.test or FLAGS.train."""
   name = os.path.basename(data)
-  estimator = tf.contrib.estimator.add_metrics(estimator, additional_evals)
   evaluation = estimator.evaluate(
       input_fn=get_input_fn(
           file_path=data,
@@ -244,7 +218,6 @@ def evaluate_on_data(estimator, data):
 
 
   metrics = [
-          "accuracy", 
           "average_loss"
           ]
   metric_string = "\t".join("{}={:.8f}".format(metric, evaluation[metric]) for metric in metrics)
@@ -275,8 +248,10 @@ def train(estimator):
       estimator.train(input_fn=inp)
       print("Trained for {} epochs, total so far {}:".format(
           epochs, epochs_trained))
-      evaluate_on_data(estimator, FLAGS.train)
-      evaluate_on_data(estimator, FLAGS.test)
+      if FLAGS.train_evaluate_on_train:
+          evaluate_on_data(estimator, FLAGS.train)
+      if FLAGS.train_evaluate_on_test:
+          evaluate_on_data(estimator, FLAGS.test)
 
 
 # Train before testing

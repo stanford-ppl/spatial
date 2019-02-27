@@ -3,7 +3,11 @@ package emul.ResidualGenerator
 /** ResidualGenerator elaborates the possible banks that a lane of an access may access. */
 
 case class ResidualGenerator(A: Int, B: Seq[Int], M: Int) {
-  override def toString: String = if (A == M) s"RG([${B.mkString(",")}])" else s"RG($A,[${B.mkString(",")}],$M)"
+  // Used in chisel gen
+  override def toString: String = {
+    assert(B.size == 1)
+    if (A == M) s"RG(${B.head})" else s"RG($A,${B.head},$M)"
+  }
 
   def static: Boolean = (A == M)
   def full: Boolean = A == 1

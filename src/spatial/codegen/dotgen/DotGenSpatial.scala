@@ -43,17 +43,20 @@ trait DotGenSpatial extends DotCodegen {
     case _ => Nil
   })
 
-  override def label(lhs:Sym[_]) = lhs match {
-    case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
-    case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
-    case Def(UnrolledReduce(ens, cchain, func, iters, valids, _)) =>
-      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-    case Def(UnrolledForeach(ens, cchain, func, iters, valids, _)) =>
-      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-    case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-    case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
-    case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
-    case _ => super.label(lhs)
+  override def label(lhs:Sym[_]) = {
+    var l = lhs match {
+      case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
+      case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
+      case Def(UnrolledReduce(ens, cchain, func, iters, valids, _)) =>
+        super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+      case Def(UnrolledForeach(ens, cchain, func, iters, valids, _)) =>
+        super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+      case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+      case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
+      case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
+      case _ => super.label(lhs)
+    }
+    l
   }
 
   override def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = lhs match {

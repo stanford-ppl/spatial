@@ -756,6 +756,11 @@ package object control {
     def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
   }
 
+  implicit class BitsCounterOps(i: Bits[_]) {
+    def getCounter: Option[IndexCounterInfo[_]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[_]])
+    def counter: IndexCounterInfo[_] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
+    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
+  }
 
   /** True if the given symbol is allowed to be defined on the Host and used in Accel
     * This is true for the following types:

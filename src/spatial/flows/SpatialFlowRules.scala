@@ -231,18 +231,19 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ => // No schedule for non-control nodes
   }
 
-  @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
-    case uloop: UnrolledLoop[_] => 
-      uloop.cchainss.foreach{case (cchain,is) =>
-        cchain.counters.zip(is).foreach{case (ctr, i) => i.zipWithIndex.foreach{case (it, j) => it.counter = IndexCounterInfo(ctr, j)} }
-      }
-    case loop: Loop[_] =>
-      loop.cchains.foreach{case (cchain,is) =>
-        cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, 0) }
-      }
+  // Now set in unroller and ForeachClass, ReduceClass, and MemReduceClass
+  //@flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
+    //case uloop: UnrolledLoop[_] => 
+      //uloop.cchainss.foreach{case (cchain,is) =>
+        //cchain.counters.zip(is).foreach{case (ctr, i) => i.zipWithIndex.foreach{case (it, j) => it.counter = IndexCounterInfo(ctr, Seq(j))} }
+      //}
+    //case loop: Loop[_] =>
+      //loop.cchains.foreach{case (cchain,is) =>
+        //cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
+      //}
 
-    case _ =>
-  }
+    //case _ =>
+  //}
 
   @flow def streams(s: Sym[_], op: Op[_]): Unit = {
     if (s.isStreamLoad)   StreamLoads += s

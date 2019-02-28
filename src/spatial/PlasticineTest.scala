@@ -15,8 +15,8 @@ trait PlasticineTest extends DSLTest { test =>
   protected def pirArgs:List[String] = 
     "bash" ::
     "run.sh" ::
-    "--dot=true" ::
-    "--debug=true" ::
+    //"--dot=true" ::
+    //"--debug=true" ::
     Nil
 
   abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "") {
@@ -86,15 +86,19 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runpir(args:String="") = {
+    def pirpass(pass:String, args:List[String]) = {
+      var cmd = pirArgs ++ args
+      cmd ++= cmdlnArgs
+      val timeout = 3000
+      scommand(pass, cmd, timeout, parsepir _, RunError.apply)
+    }
+
+    def runpir() = {
       var cmd = pirArgs :+
       "--load=false" :+
       "--mapping=false" :+
       "--codegen=false"
-      cmd ++= args.split(" ").map(_.trim).toList
-      cmd ++= cmdlnArgs
-      val timeout = 3000
-      scommand(s"runpir", cmd, timeout, parsepir _, RunError.apply)
+      pirpass("runpir", cmd)
     }
 
     def mappir(args:String, fifo:Int=20, rerun:Boolean=false) = {
@@ -106,12 +110,10 @@ trait PlasticineTest extends DSLTest { test =>
       "--codegen=false" :+
       "--stat" 
       cmd ++= args.split(" ").map(_.trim).toList
-      cmd ++= cmdlnArgs
-      val timeout = 3000
-      scommand(s"mappir", cmd, timeout, parsepir _, RunError.apply, rerun)
+      pirpass("mappir", cmd)
     }
 
-    def genpsim(args:String="", fifo:Int=20, rerun:Boolean=false) = {
+    def genpsim(fifo:Int=20, rerun:Boolean=false) = {
       var gentracecmd = pirArgs :+
       "--load=true" :+
       "--ckpt=0" :+
@@ -132,13 +134,13 @@ trait PlasticineTest extends DSLTest { test =>
       genpsimcmd ++= args.split(" ").map(_.trim).toList
       genpsimcmd ++= cmdlnArgs
       val timeout = 3000
-      scommand(s"gentrace", gentracecmd, timeout, parsepir _, RunError.apply, rerun) >>
-      scommand(s"genpsim", genpsimcmd, timeout, parsepir _, RunError.apply, rerun)
+      //pirpass("gentrace", gentracecmd)
+      pirpass("genpsim", genpsimcmd)
     }
 
     def parseMake(line:String) = {
       if (line.contains("error")) Fail
-      else Pass
+      else Unknown
     }
 
     def parseTst(line:String) = {
@@ -269,8 +271,8 @@ trait PlasticineTest extends DSLTest { test =>
       runpir() >>
       mappir(s"--net=p2p --row=$row --col=$col") 
       val psimres = mapres >> genpsim() >> runpsim()
-      val tstres = mapres >> runtst()
-      psimres >> tstres
+      //val tstres = mapres >> runtst()
+      psimres //>> tstres
     }
   }
 
@@ -336,12 +338,25 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
+  case object Dot extends Backend("Dot", args="--sim --dot","","") {
+    override def shouldRun: Boolean = checkFlag(s"test.Dot")
+    override def runBackend() = {
+      s"${test.name}" should s"run for backend $name" in {
+        (compile().next()() match {
+          case Unknown => Pass
+          case res => res
+        }).resolve()
+      }
+    }
+  }
+
   override def backends: Seq[Backend] = 
     Asic +:
     P2PNoSim +:
     P2P(row=14,col=14) +:
     Hybrid(row=14,col=14,vlink=4,slink=4) +: 
     Static(row=14,col=14,vlink=4,slink=4) +: 
+    Dot +:
     super.backends
 
 }

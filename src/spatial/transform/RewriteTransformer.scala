@@ -29,11 +29,15 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     else x & (scala.math.pow(2,log2(y.toDouble))-1).to[Fix[S,I,F]] 
   }
 
-  def constMod[S,I,F](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
+  def constMod[S,I,F](x: FixPt[S,I,F], y: Seq[Int]): FixPt[S,I,F] = {
     implicit val S: BOOL[S] = x.fmt.s
     implicit val I: INT[I] = x.fmt.i
     implicit val F: INT[F] = x.fmt.f
-    x.from(y)
+    if (y.size==1) {
+      x.from(y.head)
+    } else {
+      stage(FixVecConstNew[S,I,F](y))
+    }
   }
 
   def writeReg[A](lhs: Sym[_], reg: Reg[_], data: Bits[A], ens: Set[Bit]): Void = {
@@ -99,16 +103,16 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       val Final(start) = iter.counter.ctr.start
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt
-      val lane = iter.counter.lane
+      val lanes = iter.counter.lanes
       val A = gcd(par * step * lin, y)
-      val B = (((start + ofs + lane * step * lin) % y) + y) % y
-      dbgs(s"Residual Generator for lane $lane with step $step, lin $lin and start $start + $ofs under mod $y = $A, $B")
+      val B = lanes.map { lane => (((start + ofs + lane * step * lin) % y) + y) % y }
+      dbgs(s"Residual Generator for lane $lanes with step $step, lin $lin and start $start + $ofs under mod $y = $A, $B")
       ResidualGenerator(A, B, y)
     }
     else ResidualGenerator(1, 0, y)
   }
 
-  def getPosMod(lin: scala.Int, x: Num[_], ofs: scala.Int, mod: scala.Int): Int = {
+  def getPosMod(lin: scala.Int, x: Num[_], ofs: scala.Int, mod: scala.Int) = {
     val res = residual(lin, x, ofs, mod)
     res.resolvesTo.get
   }

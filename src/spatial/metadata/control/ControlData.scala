@@ -22,7 +22,7 @@ case object Single extends CtrlLooping
 case object Looped extends CtrlLooping
 
 /** IndexCounter and lane info */
-case class IndexCounterInfo[A](val ctr: Counter[A], val lane: Int)
+case class IndexCounterInfo[A](ctr: Counter[A], lanes: Seq[Int])
 
 /** A controller's level in the control hierarchy. Flag marks whether this is an outer controller.
   *
@@ -119,7 +119,7 @@ case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
   * Setter:  sym.counter = (IndexCounterInfo)
   * Default: undefined
   */
-case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Flow.Consumer)
+case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self)
 
 
 /** Latency of a given inner pipe body - used for control signal generation.

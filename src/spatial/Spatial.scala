@@ -173,9 +173,9 @@ trait Spatial extends Compiler with ParamLoader {
         finalIRPrinter      ==>
         finalSanityChecks   ==>
         /** Code generation */
-        treeCodegen         ==>
+        //treeCodegen         ==>
         irCodegen           ==>
-        (spatialConfig.enableDot ? dotFlatGen)      ==>
+        //(spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
@@ -236,7 +236,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
       //spatialConfig.enableBroadcast = false
-      spatialConfig.noInnerLoopUnroll = true
+      spatialConfig.vecInnerLoop = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       //spatialConfig.enableDot = true
@@ -251,7 +251,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableSynth = false
       spatialConfig.enableRetiming = false
       //spatialConfig.enableBroadcast = false
-      spatialConfig.noInnerLoopUnroll = true
+      spatialConfig.vecInnerLoop = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
       //spatialConfig.enableDot = true

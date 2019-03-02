@@ -7,7 +7,7 @@ set -e # die if anything fails
 export FRINGE_PACKAGE=''
 export EMUL_PACKAGE=''
 
-if [[ $1 = "remoteSnapshot" ]]; then 
+if [[ $1 = "remoteSnapshot" ]]; then
 	changes=`git ls-files -m | wc -l`
 	files=`git ls-files -m`
 	snapshot=`cat build.sbt | grep "version[ ]*:=.*-SNAPSHOT" | wc -l`
@@ -28,7 +28,7 @@ if [[ $1 = "remoteSnapshot" ]]; then
 		sbt "; project poly; publishSigned"
 		sbt "; project utils; publishSigned"
 	fi
-elif [[ $1 = "remoteRelease" ]]; then 
+elif [[ $1 = "remoteRelease" ]]; then
 	changes=`git ls-files -m | wc -l`
 	files=`git ls-files -m`
 	bash bin/update_resources.sh
@@ -53,7 +53,7 @@ elif [[ $1 = "remoteRelease" ]]; then
 		sbt "; project poly; publishSigned"
 		sbt "; project utils; publishSigned"
 	fi
-elif [[ $1 = "local" ]]; then 
+elif [[ $1 = "local" ]]; then
 	bin/update_resources.sh
 	make clean
 	sbt "; project emul; +publishLocal"

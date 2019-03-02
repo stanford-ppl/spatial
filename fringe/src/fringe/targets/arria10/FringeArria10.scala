@@ -35,6 +35,12 @@ class FringeArria10 (
     // DRAM interface
     val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 
+    // AXI Debuggers
+    val TOP_AXI = new AXI4Probe(axiLiteParams)
+    val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
+    val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
+    val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
+
     // Accel Control IO
     val enable = Output(Bool())
     val done   = Input(Bool())
@@ -46,9 +52,8 @@ class FringeArria10 (
     val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(w.W)))
 
     // Accel memory IO
-    val heap = Vec(numAllocators, new HeapIO())
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
-    // TODO: need to add memory stream support
+    val heap = Vec(numAllocators, new HeapIO())
 
     // External enable
     val externalEnable = Input(Bool()) // For AWS, enable comes in as input to top module
@@ -57,8 +62,16 @@ class FringeArria10 (
 //    val genericStreams = new GenericStreams(streamInsInfo, streamOutsInfo)
   })
 
+  io <> DontCare
+
   // Common Fringe
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
+  fringeCommon.io <> DontCare
+
+  fringeCommon.io.TOP_AXI <> io.TOP_AXI
+  fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI
+  fringeCommon.io.PROTOCOL_AXI <> io.PROTOCOL_AXI
+  fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   // Connect to Avalon Slave
   fringeCommon.reset := reset
@@ -71,16 +84,15 @@ class FringeArria10 (
   io.enable := fringeCommon.io.enable
   fringeCommon.io.done := io.done
 
-  if (io.argIns.length > 0) {
-    io.argIns := fringeCommon.io.argIns
-  }
+  io.argIns := fringeCommon.io.argIns
+  fringeCommon.io.argOuts <> io.argOuts
 
-  if (io.argOuts.length > 0) {
-    fringeCommon.io.argOuts.zip(io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
-      fringeArgOut.bits := accelArgOut.bits
-      fringeArgOut.valid := accelArgOut.valid
-    }
-  }
+//  if (io.argOuts.length > 0) {
+//    fringeCommon.io.argOuts.zip(io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
+//      fringeArgOut.bits := accelArgOut.bits
+//      fringeArgOut.valid := accelArgOut.valid
+//    }
+//  }
 
   // Memory interface
   io.memStreams <> fringeCommon.io.memStreams

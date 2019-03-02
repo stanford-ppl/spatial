@@ -1,9 +1,9 @@
 package fringe.targets.arria10
 
 import chisel3._
-import fringe.TopInterface
 import fringe.globals._
-import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AvalonSlave}
+import fringe.TopInterface
+import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AvalonSlave, AXI4Probe}
 
 class Arria10Interface extends TopInterface {
   // To fit the sysid interface, we only want to have 7 bits for 0x0000 ~ 0x01ff
@@ -12,4 +12,10 @@ class Arria10Interface extends TopInterface {
   val axiParams = new AXI4BundleParameters(DATA_WIDTH, 512, 6)
   val S_AVALON = new AvalonSlave(axiLiteParams) // scalars
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
+
+  // AXI debugging loopbacks
+  val TOP_AXI = new AXI4Probe(axiLiteParams)
+  val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
+  val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
+  val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
 }

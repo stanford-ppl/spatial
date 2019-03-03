@@ -92,7 +92,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Assumption: Global memories are never duplicated, since they correspond to external pins / memory spaces
     */
   def unrollGlobalMemory[A](mem: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    val mem2 = lanes.inLane(0){ mirror(mem, rhs) }
+    val mem2 = lanes.mapFirst { mirror(mem, rhs) }
     memories += (mem,0) -> mem2
     lanes.unify(mem, mem2)
   }
@@ -103,7 +103,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
       isolateSubstWith(escape=Nil, mem -> memories(dup)){
-        val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
+        val lhs2 = lanes.mapFirst { mirror(lhs, rhs) }
         lhs2
       }
     }
@@ -116,7 +116,9 @@ trait MemoryUnrolling extends UnrollingBase {
     implicit val vT: Type[Vec[Tup2[A,Bit]]] = Vec.bits[Tup2[A,Bit]](in.length)
     val shuffle = stage(ShuffleCompressVec(in))
     lanes.unify(lhs, shuffle)
-    val vec = lanes.map { i =>
+    val vec = lanes.map { is =>
+      assert(is.size == 1, s"Unhandled vectorized shuffle for lanes $is")
+      val i = is.head
       val elem: Sym[Tup2[A,Bit]] = shuffle(i)
       register(lhs -> elem)
       elem
@@ -339,9 +341,9 @@ trait MemoryUnrolling extends UnrollingBase {
 
     val words = len.map{l => Range(0,l)}.getOrElse(Range(0,1)) // For vectors
 
-    val mems = lanes.map{laneId =>
+    val mems = lanes.map {laneIds =>
       words.flatMap{w =>
-        val uid = is.map{i => unrollNum(i) }
+        val uid = is.flatMap{i => unrollNum(i) }
         val wid = if (len.isDefined) Seq(w) else Nil
         val vid = uid ++ wid
         val dispatches = access.dispatch(vid)
@@ -356,7 +358,7 @@ trait MemoryUnrolling extends UnrollingBase {
           UnrollInstance(
             memory  = memories((mem, dispatchId)),
             dispIds = Seq(dispatchId),
-            laneIds = Seq(laneId),
+            laneIds = laneIds,
             port    = access.port(dispatchId, vid),
             vecOfs  = wid
           )

@@ -20,23 +20,18 @@ trait PIRGenController extends PIRCodegen {
     case _ => super.genHost(lhs, rhs)
   }
 
-  def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Sym[_]]], valids:Seq[Seq[Sym[_]]]) = {
-    def quoteIdx(j:Int):String = {
-      if (lhs.isInnerControl) {
-        assert(j == 0, s"InnerControl $lhs is unrolled for pir backend")
-        s"None"
-      } else {
-        s"Some($j)"
-      }
+  def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Bits[_]]], valids:Seq[Seq[Bits[_]]]) = {
+    def quoteIdx(sym:Bits[_]):String = {
+      sym.counter.lanes.toString
     }
     iters.zipWithIndex.foreach { case (iters, i) =>
       iters.zipWithIndex.foreach { case (iter, j) =>
-        state(iter)(src"CounterIter(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${iter.tp})")
+        state(iter)(src"CounterIter(${quoteIdx(iter)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${iter.tp})")
       }
     }
     valids.zipWithIndex.foreach { case (valids, i) =>
       valids.zipWithIndex.foreach { case (valid, j) =>
-        state(valid)(src"CounterValid(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valid.tp})")
+        state(valid)(src"CounterValid(${quoteIdx(valid)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valid.tp})")
       }
     }
   }
@@ -46,8 +41,8 @@ trait PIRGenController extends PIRCodegen {
     ctrler:Option[String]=None,
     schedule:Option[Any]=None,
     cchain:Option[Sym[_]]=None, 
-    iters:Seq[Seq[Sym[_]]]=Nil, 
-    valids: Seq[Seq[Sym[_]]]=Nil, 
+    iters:Seq[Seq[Bits[_]]]=Nil, 
+    valids: Seq[Seq[Bits[_]]]=Nil, 
     ens:Set[Bit]=Set.empty
   )(blk: => Unit) = {
     val newCtrler = ctrler.getOrElse("UnitController()")

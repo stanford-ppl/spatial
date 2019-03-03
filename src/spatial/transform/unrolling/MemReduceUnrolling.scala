@@ -7,7 +7,6 @@ import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
 import utils.tags.instrument
-
 trait MemReduceUnrolling extends ReduceUnrolling {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
@@ -309,7 +308,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val mvalids = () => mapLanes.valids.map{_.andTree}
 
     val values: Seq[Seq[A]] = inReduce(redType,false){
-      mapLanes.map{i =>
+      mapLanes.map{ case List(i) =>
         register(intermed -> mems(i))
         unroll(loadRes, redLanes)
       }
@@ -322,7 +321,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     }
 
     logs(s"[Accum-fold $lhs] Unrolling reduction trees and cycles")
-    val results = redLanes.map{p =>
+    val results = redLanes.map{ case List(p) =>
       val laneValid = if (redLanes.valids(p).isEmpty) Bit(true) else redLanes.valids(p).andTree
 
       logs(s"Lane #$p:")

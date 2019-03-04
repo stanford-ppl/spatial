@@ -35,10 +35,10 @@ flags.DEFINE_string(
     "Directory where to store the model. If not set a temporary directory "
     "will be automatically created.")
 flags.DEFINE_string(
-    "model_type", "calibrated_rtl",
+    "model_type", "calibrated_lattice",
     "Types defined in this example: calibrated_linear, calibrated_lattice, "
-    " calibrated_rtl, calibrated_etl, calibrated_dnn")
-flags.DEFINE_integer("batch_size", 50,
+    " calibrated_lattice, calibrated_etl, calibrated_dnn")
+flags.DEFINE_integer("batch_size", 100,
                      "Number of examples to include in one batch. Increase "
                      "this number to improve parallelism, at cost of memory.")
 flags.DEFINE_string("hparams", None,
@@ -59,14 +59,14 @@ flags.DEFINE_string(
     "directory.")
 
 # Training flags.
-flags.DEFINE_integer("train_epochs", 10,
+flags.DEFINE_integer("train_epochs", 50,
                      "How many epochs over data during training.")
 flags.DEFINE_bool(
     "train_evaluate_on_train", True,
     "If set, every 1/10th of the train_epochs runs an evaluation on the "
     "full train data.")
 flags.DEFINE_bool(
-    "train_evaluate_on_test", True,
+    "train_evaluate_on_test", False,
     "If set, every 1/10th of the train_epochs runs an evaluation on the "
     "full test data.")
 
@@ -76,8 +76,8 @@ flags.DEFINE_bool(
 #   rtl_seed is a random seed to intialize lattices   
 flags.DEFINE_string("target", "loadCycs", "")
 flags.DEFINE_integer("rtl_seed", 337893, "")
-flags.DEFINE_integer("num_lattices", 4, "")
-flags.DEFINE_float("learning_rate", 0.02, "")
+flags.DEFINE_integer("num_lattices", 1, "")
+flags.DEFINE_float("learning_rate", 20.0, "")
 
 CSV_COLUMNS = ['loads',
                'stores',
@@ -89,6 +89,9 @@ CSV_COLUMNS = ['loads',
                'loadCycs',
                'storeCycs',
                'gatedCycs']
+
+competitors = ['loads', 'stores', 'gateds']
+payloads = ['outerIters', 'innerIters']
 
 targets = {"loadCycs", "storeCycs", "gatedCycs"}
 
@@ -163,32 +166,125 @@ def _pprint_hparams(hparams):
   print("]")
 
 
+# # Create network
+# def create_network(model_fn1, model_fn2, feature_columns, config, quantiles_dir):
+#   """Creates a calibrated Lattice estimator."""
+#   """ Lattice 0 (Competitors) """
+#   feature_names = [fc.name for fc in feature_columns if fc not in payloads]
+#   hparams = tfl.CalibratedLatticeHParams(
+#       feature_names=feature_names,
+#       learning_rate=FLAGS.learning_rate,
+#       lattice_l2_laplacian_reg=5.0e-4,
+#       # lattice_l2_torsion_reg=1.0e-4,
+#       interpolation_type='hypercube',
+#       num_keypoints=8,
+#       lattice_size=5,
+#       lattice_rank=len(feature_names),
+#       num_lattices=1,
+#       optimizer=tf.train.AdamOptimizer)
+#   hparams.parse(FLAGS.hparams)
+#   _pprint_hparams(hparams)
+#   (layer00, _, _, _) = tfl.calibrated_lattice_regressor(
+#     model_fn1,
+#     feature_columns=feature_columns,
+#     model_dir=config.model_dir,
+#     config=config,
+#     quantiles_dir=quantiles_dir,
+#     keypoints_initializers_fn=None,
+#     optimizer=tf.train.AdamOptimizer,
+#     hparams=hparams
+#   )
+
+#   """ Lattice 1 (Transfer info) """
+#   feature_names = [fc.name for fc in feature_columns if fc not in competitors]
+#   hparams = tfl.CalibratedLatticeHParams(
+#       feature_names=feature_names,
+#       learning_rate=FLAGS.learning_rate,
+#       lattice_l2_laplacian_reg=5.0e-4,
+#       # lattice_l2_torsion_reg=1.0e-4,
+#       interpolation_type='hypercube',
+#       num_keypoints=8,
+#       lattice_size=16,
+#       lattice_rank=len(feature_names),
+#       num_lattices=1,
+#       optimizer=tf.train.AdamOptimizer)
+#   hparams.parse(FLAGS.hparams)
+#   _pprint_hparams(hparams)
+#   (layer01, _, _, _) = tfl.calibrated_lattice_regressor(
+#     model_fn2,
+#     feature_columns=feature_columns,
+#     model_dir=config.model_dir,
+#     config=config,
+#     quantiles_dir=quantiles_dir,
+#     keypoints_initializers_fn=None,
+#     optimizer=tf.train.AdamOptimizer,
+#     hparams=hparams
+#   )
+
+#   """ Lattice 2 (combine lattices 0 and 1) """
+#   feature_names = ['lattice0','lattice1']
+#   hparams = tfl.CalibratedLatticeHParams(
+#       feature_names=feature_names,
+#       learning_rate=FLAGS.learning_rate,
+#       lattice_l2_laplacian_reg=5.0e-4,
+#       # lattice_l2_torsion_reg=1.0e-4,
+#       interpolation_type='hypercube',
+#       num_keypoints=8,
+#       lattice_size=16,
+#       lattice_rank=len(feature_names),
+#       num_lattices=1,
+#       optimizer=tf.train.AdamOptimizer)
+#   hparams.parse(FLAGS.hparams)
+#   _pprint_hparams(hparams)
+#   layer10 = tfl.calibrated_lattice_regressor(
+#     feature_columns=feature_columns,
+#     model_dir=config.model_dir,
+#     config=config,
+#     quantiles_dir=quantiles_dir,
+#     keypoints_initializers_fn=None,
+#     optimizer=tf.train.AdamOptimizer,
+#     hparams=hparams
+#   )
+
+#   layer10
+
 
 # Create a set of randomly initialized lattices with calibrator inputs
-def create_calibrated_rtl(feature_columns, config, quantiles_dir):
-  
-  """Creates a calibrated RTL estimator."""
+def create_calibrated_lattice(feature_columns, config, quantiles_dir):
+  """Creates a calibrated Lattice estimator."""
   feature_names = [fc.name for fc in feature_columns]
-  hparams = tfl.CalibratedRtlHParams(
+  hparams = tfl.CalibratedLatticeHParams(
       feature_names=feature_names,
-      num_keypoints=10,
       learning_rate=FLAGS.learning_rate,
       lattice_l2_laplacian_reg=5.0e-4,
-      lattice_l2_torsion_reg=1.0e-4,
-      lattice_size=2,
-      lattice_rank=4,
+      # lattice_l2_torsion_reg=1.0e-4,
+      interpolation_type='hypercube',
+      num_keypoints=8,
+      # feature__outerIters__monotonicity=1,
+      # feature__innerIters__monotonicity=1,
+      # feature__innerIters__lattice_size=3,
+      # feature__outerIters__lattice_size=3,
+      # monotonicity=frozenset({'outerIters': 1}.items),
+      lattice_size=3,
+      lattice_rank=5,
       num_lattices=FLAGS.num_lattices,
       optimizer=tf.train.AdamOptimizer)
 
   # Specific feature parameters.
   hparams.parse(FLAGS.hparams)
   _pprint_hparams(hparams)
-  return tfl.calibrated_rtl_regressor(
-      feature_columns=feature_columns,
-      model_dir=config.model_dir,
-      config=config,
-      hparams=hparams,
-      quantiles_dir=quantiles_dir)
+
+  return tfl.calibrated_lattice_regressor(
+    feature_columns=feature_columns,
+    model_dir=config.model_dir,
+    config=config,
+    quantiles_dir=quantiles_dir,
+    keypoints_initializers_fn=None,
+    optimizer=tf.train.AdamOptimizer,
+    hparams=hparams
+  )
+
+
 
 
 
@@ -198,7 +294,7 @@ def create_estimator(config, quantiles_dir):
   """Creates estimator for given configuration based on --model_type."""
   feature_columns = create_feature_columns()
   #FLAGS.model_type == "calibrated_rtl":
-  return create_calibrated_rtl(feature_columns, config, quantiles_dir)
+  return create_calibrated_lattice(feature_columns, config, quantiles_dir)
 
   #raise ValueError("Unknown model_type={}".format(FLAGS.model_type))
 
@@ -220,6 +316,8 @@ def evaluate_on_data(estimator, data):
   metrics = [
           "average_loss"
           ]
+  print(estimator)
+  print(evaluation)
   metric_string = "\t".join("{}={:.8f}".format(metric, evaluation[metric]) for metric in metrics)
   print(metric_string)
 

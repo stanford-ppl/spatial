@@ -2,6 +2,7 @@ package spatial.tests.apps
 
 import spatial.dsl._
 import spatial.targets._
+import utils.io.files._
 
 @spatial class AES extends SpatialTest {
   override def dseModelArgs: Args = "800 93 93 87 45"

@@ -127,15 +127,14 @@ trait Spatial extends Compiler with ParamLoader {
         (!spatialConfig.bootAtDSE ? switchTransformer)   ==> printer ==> transformerChecks ==>
         (!spatialConfig.bootAtDSE ? switchOptimizer)     ==> printer ==> transformerChecks ==>
         (!spatialConfig.bootAtDSE ? blackboxLowering1)   ==> printer ==> transformerChecks ==>
-        /** Optional python model generator */
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? retimingAnalyzer) ==>
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? initiationAnalyzer) ==>
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? dseRuntimeModelGen) ==>
-        printer ==>
         /** More black box lowering */
         (!spatialConfig.bootAtDSE ? blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
         ((spatialConfig.enableArchDSE && !spatialConfig.bootAtDSE) ? paramAnalyzer) ==> 
+        /** Optional python model generator */
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? retimingAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? initiationAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? dseRuntimeModelGen) ==>
         (spatialConfig.enableArchDSE ? dsePass) ==> 
         //blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
@@ -211,14 +210,14 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.note("")
     cli.note("Design Tuning:")
-    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true}.text("Enable default design tuning (bruteforce)")
-    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true }.text("Enable brute force tuning.")
-    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic; spatialConfig.enableArchDSE = true }.text("Enable heuristic tuning.")
-    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true }.text("Enable DSE experimental mode.").hidden()
-    cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true }.text("Enable hypermapper dse.").hidden()
+    cli.opt[Unit]("tune").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true}.text("Enable default design tuning (bruteforce)")
+    cli.opt[Unit]("bruteforce").action{(_,_) => spatialConfig.dseMode = DSEMode.Bruteforce; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable brute force tuning.")
+    cli.opt[Unit]("heuristic").action{(_,_) => spatialConfig.dseMode = DSEMode.Heuristic; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable heuristic tuning.")
+    cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable DSE experimental mode.").hidden()
+    cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable hypermapper dse.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
-    cli.opt[Unit]("quitAtDSE").action{(_,_) => spatialConfig.quitAtDSE = true; spatialConfig.bootAtDSE = false; spatialConfig.enableArchDSE = true }.text("Save state at start of DSE and quit")
-    cli.opt[Unit]("bootAtDSE").action{(_,_) => spatialConfig.bootAtDSE = true; spatialConfig.quitAtDSE = false; spatialConfig.enableArchDSE = true }.text("Load state and enter at start of DSE")
+    cli.opt[Unit]("quitAtDSE").action{(_,_) => spatialConfig.quitAtDSE = true; spatialConfig.bootAtDSE = false; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Save state at start of DSE and quit")
+    cli.opt[Unit]("bootAtDSE").action{(_,_) => spatialConfig.bootAtDSE = true; spatialConfig.quitAtDSE = false; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Load state and enter at start of DSE")
 
     cli.note("")
     cli.note("Backends:")

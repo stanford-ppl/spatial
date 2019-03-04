@@ -5,6 +5,8 @@ import java.nio.file._
 import java.util.function.Consumer
 import java.nio.file.{Files,Paths}
 
+import scala.io.Source
+
 object files {
   def sep: String = java.io.File.separator
   def cwd: String = new java.io.File("").getAbsolutePath
@@ -26,6 +28,15 @@ object files {
         file.delete()
       }
     }
+  }
+
+  /** 
+    * Parse data out of CSV
+    */
+  def loadCSVNow[A](filename: String, delim: String)(func: String => A): Seq[A] = {
+    Source.fromFile(filename).getLines().flatMap{line =>
+      line.split(delim).map(_.trim).flatMap(_.split(" ")).map{x => func(x.trim) }
+    }.toSeq
   }
 
   /**

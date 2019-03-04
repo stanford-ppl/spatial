@@ -40,6 +40,18 @@ object Runtime {
   case object InnerControl extends CtrlLevel
   case object OuterControl extends CtrlLevel
 
+  /** Structure for tracking who competes with given transfer */
+  case class Competitors(loads: Int, stores: Int, gateds: Int) {
+    def toSeq: Seq[Int] = Seq(loads, stores, gateds)
+    def +(b: Competitors): Competitors = Competitors(loads + b.loads, stores + b.stores, gateds + b.gateds)
+    def *(b: Int): Competitors = Competitors(loads*b, stores*b, gateds*b)
+  }
+  object Competitors {
+    def DenseLoad = Competitors(1,0,0)
+    def DenseStore = Competitors(0,1,0)
+    def GatedDenseStore = Competitors(0,0,1)
+  }
+
   /** Open logfile */
   def begin(file: String): Unit = {
     logfile = Some(new PrintWriter(new File(file)))
@@ -146,33 +158,38 @@ object Runtime {
     val baselineDRAMStoreDelay = 150 // Cycles between single dram cmd and its response, with no competitors
     val storeFudge = 50 // Penalty for dram store when children are run sequentially
     val congestionPenalty = 5 // Interference due to conflicting DRAM accesses
-    def transfersBelow(exempt: List[ControllerModel]): Int = { // Count number of transfer nodes below self
-      if (this.schedule == DenseLoad || this.schedule == DenseStore || this.schedule == GatedDenseStore) 1
+    def transfersBelow(exempt: List[ControllerModel]): Competitors = { // Count number of transfer nodes below self
+      if (this.schedule == DenseLoad) Competitors.DenseLoad
+      else if (this.schedule == DenseStore) Competitors.DenseStore
+      else if (this.schedule == GatedDenseStore) Competitors.GatedDenseStore
       else {
-        this.cchain.head.unroll * this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).sum
+        this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).reduce{_+_} * this.cchain.head.unroll 
       }
     }
-    def competitors(c: Int = 0, exempt: List[ControllerModel] = List()): Int = { // Count number of other transfer nodes trigger simultaneously with this self
+    def competitors(c: Competitors = Competitors(0,0,0), exempt: List[ControllerModel] = List()): Competitors = { // Count number of other transfer nodes trigger simultaneously with this self
       // Number of conflicting DRAM accesses
       if (!parent.isDefined) c
       else {
         parent.get.schedule match {
-          case Sequenced => parent.get.competitors(parent.get.cchain.head.unroll * c, exempt ++ List(this) ++ parent.get.children)
+          case Sequenced => parent.get.competitors(c * parent.get.cchain.head.unroll, exempt ++ List(this) ++ parent.get.children)
           case _ => 
-            val contribution = parent.get.cchain.head.unroll * (this.transfersBelow(exempt) + c)
+            val contribution = (this.transfersBelow(exempt) + c) * parent.get.cchain.head.unroll
             parent.get.competitors(contribution, exempt ++ List(this))
         }
       }
     }
 
-    def congestionModel(competitors: Int): Int = {
-      // Linear for the first 4 competitors
-      val linear1 = if (competitors < 2) competitors * congestionPenalty else 4 * congestionPenalty
-      // Exponential for the next 8 competitors
-      val exp = if (competitors < 2) 0 else if (competitors < 12) scala.math.pow(2.3, competitors - 2).toInt else scala.math.pow(2.3, 8).toInt
-      // Linear for the rest
-      val linear2 = if (competitors < 12) 0 else (competitors - 12) * congestionPenalty
-      linear1 + exp + linear2
+    def congestionModel(competitors: Competitors): Int = {
+      CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads, stores = competitors.stores, gateds = competitors.gateds, outerIters = upperCChainIters, innerIters = cchain.last.N), this.schedule)
+      // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
+
+      // // Linear for the first 4 competitors
+      // val linear1 = if (competitors < 2) competitors * congestionPenalty else 4 * congestionPenalty
+      // // Exponential for the next 8 competitors
+      // val exp = if (competitors < 2) 0 else if (competitors < 12) scala.math.pow(2.3, competitors - 2).toInt else scala.math.pow(2.3, 8).toInt
+      // // Linear for the rest
+      // val linear2 = if (competitors < 12) 0 else (competitors - 12) * congestionPenalty
+      // linear1 + exp + linear2
     }
 
     // Result fields
@@ -222,9 +239,9 @@ object Runtime {
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad       => upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
-        case DenseStore      => upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
-        case GatedDenseStore      => upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
+        case DenseLoad            => congestionModel(competitors(Competitors.DenseLoad)) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
+        case DenseStore           => congestionModel(competitors(Competitors.DenseStore)) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
+        case GatedDenseStore      => congestionModel(competitors(Competitors.GatedDenseStore)) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }
@@ -286,7 +303,10 @@ object Runtime {
       if (entry) emit(s"Controller Structure:")
       if (entry) emit("============================================")
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
-      val competitors = if (this.schedule == DenseLoad || this.schedule == DenseStore || this.schedule == GatedDenseStore) s" (${this.competitors(0)} competitors)" else ""
+      val competitors = if (this.schedule == DenseLoad) s" (${this.competitors(Competitors.DenseLoad)})"
+                        else if (this.schedule == DenseStore) s" (${this.competitors(Competitors.DenseStore)})"
+                        else if (this.schedule == GatedDenseStore) s" (${this.competitors(Competitors.GatedDenseStore)})"
+                        else ""
       // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
       emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)
       children.foreach(_.printStructure(false))

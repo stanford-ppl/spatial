@@ -19,8 +19,8 @@ trait PIRGenBit extends PIRCodegen {
       //emit(src"val $lhs = Bool(java.util.concurrent.ThreadLocalRandom.current().nextBoolean())")
     case BitRandom(Some(max)) => genOp(lhs)
       //emit(src"val $lhs = Bool(java.util.concurrent.ThreadLocalRandom.current().nextBoolean() && $max)")
-    //case TextToBit(x)         =>
-    //case BitToText(x)         =>
+    //case TextToBit(x)         =>  genOp(lhs)
+    case BitToText(x)         => genOp(lhs)
     case _ => super.genAccel(lhs, rhs)
   }
 }

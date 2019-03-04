@@ -10,16 +10,6 @@ import spatial.node._
 
 trait PIRGenController extends PIRCodegen {
 
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case AccelScope(func) => 
-      emit("runAccel()")
-      inAccel { 
-        genInAccel(lhs, rhs)
-      }
-
-    case _ => super.genHost(lhs, rhs)
-  }
-
   def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Bits[_]]], valids:Seq[Seq[Bits[_]]]) = {
     def quoteIdx(sym:Bits[_]):String = {
       sym.counter.lanes.toString

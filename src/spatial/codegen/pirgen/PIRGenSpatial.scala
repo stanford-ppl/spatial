@@ -10,10 +10,10 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenFixPt
   with PIRGenFltPt
   with PIRGenStructs
-  //with PIRGenText
+  with PIRGenText
   //with PIRGenVoid
   //with PIRGenVar
-  //with PIRGenDebugging
+  with PIRGenDebugging
   //with PIRGenLIFO
   with PIRGenCounter
   with PIRGenDRAM

@@ -110,7 +110,7 @@ clear:
 ###-----------------------------------###
 ## Clean all compiled Scala projects   ##
 ###-----------------------------------###
-clean: clean-argon clean-forge clean-spatial clean-emul
+clean: clean-argon clean-forge clean-spatial clean-emul clean-pir
 	sbt clean
 
 ###-----------------------------------###
@@ -140,3 +140,9 @@ clean-forge:
 clean-emul:
 	rm -f $(HOME)/bin/emptiness
 	sbt "; emul/clean"
+
+###-----------------------------------###
+## Clean pir projects                ##
+###-----------------------------------###
+clean-pir:
+	cd pir && make clean 

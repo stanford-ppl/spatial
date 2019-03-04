@@ -146,9 +146,14 @@ trait PlasticineTest extends DSLTest { test =>
     def parseTst(line:String) = {
       if (line.contains("Simulation complete at cycle")) {
         println(line)
+        Unknown
+      } else if (line.contains("PASS: true")) {
+        println(line)
         Pass
-      }
-      else if (line.contains("fail")) Fail
+      } else if (line.contains("PASS: false")) {
+        println(line)
+        Fail
+      } 
       else Unknown
     }
 

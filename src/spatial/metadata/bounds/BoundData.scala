@@ -73,7 +73,10 @@ object Expect {
 }
 
 object Upper {
-  def unapply(x: Sym[_]): Option[Int] = x.getBound.map(_.toInt)
+  def unapply(x: Sym[_]): Option[Int] = x.getBound match {
+    case Some(y: UpperBound) => Some(y.toInt)
+    case _ => None
+  }
 }
 
 object Bounded {

@@ -55,6 +55,9 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs("Space: ")
     params.zip(space).foreach{case (p,d) => dbgs(s"  $p: $d (${p.ctx})") }
 
+    // Compile generated dse model
+    compileLatencyModel()
+
     spatialConfig.dseMode match {
       case DSEMode.Disabled => 
       case DSEMode.Heuristic => heuristicDSE(params, space, Restrictions.all, block, false)
@@ -70,7 +73,85 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     block
   }
 
+  def compileLatencyModel(): Unit = {
+    import utils.process.BackgroundProcess
+    import scala.language.postfixOps
 
+    val user_bin = s"""${sys.env.getOrElse("HOME", "")}/bin"""
+    val bin_path = java.nio.file.Paths.get(user_bin)
+    val bin_exists = java.nio.file.Files.exists(bin_path)
+    if (!bin_exists) {
+      java.nio.file.Files.createDirectories(bin_path)
+    }
+
+
+    val emptiness_bin = s"""${user_bin}/emptiness"""
+
+    val emptiness_lock = java.nio.file.Paths.get(emptiness_bin + ".lock")
+    val emptiness_path = java.nio.file.Paths.get(emptiness_bin)
+
+    {
+      // step 1: Acquire channel to emptiness_lock
+      val channel = {
+        try {
+          java.nio.channels.FileChannel.open(emptiness_lock, CREATE_NEW, WRITE)
+        } catch {
+          case _: Throwable => java.nio.channels.FileChannel.open(emptiness_lock, WRITE)
+        }
+      }
+
+      // step 2: Acquire lock on emptiness_lock, spin-wait otherwise.
+      var lock: FileLock = null
+      while (lock == null) {
+        try {
+          lock = channel.lock()
+        } catch {
+          case ofe: OverlappingFileLockException => Unit
+        }
+      }
+
+      // step 3: check if emptiness exists && is correct version
+      val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
+      println(s"Emptiness: $emptiness_exists, $emptiness_bin")
+      // TODO: Check if emptiness -version is correct!
+
+      // step 4: if emptiness does not exist, compile it.
+      if (!emptiness_exists) {
+        val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
+        val pkg_config = pkg_config_proc.blockOnLine()
+
+        println(s"Pkg Config: $pkg_config")
+
+        val split_config = pkg_config.split("\\s") map {
+          _.trim
+        } filter {
+          _.nonEmpty
+        }
+
+        val compile_proc = BackgroundProcess("",
+          List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin", "-") ++ split_config)
+        val source_string = scala.io.Source.fromInputStream(
+          getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
+        println(source_string)
+        compile_proc send source_string
+        val retcode = compile_proc.waitFor()
+        println(s"Compile Retcode: $retcode")
+        compile_proc.checkErrors()
+
+        println("Finished Compiling")
+      }
+
+      // step 4: Now that emptiness is guaranteed to exist, release lock
+      lock.release()
+
+
+      // close FileChannel
+      channel.close()
+    }
+
+    BackgroundProcess("", emptiness_bin)
+
+  }
 
   def heuristicDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], restrictions: Set[Restrict], program: Block[_], EXPERIMENT: Boolean): Unit = {
     dbgs("Intial Space Statistics: ")

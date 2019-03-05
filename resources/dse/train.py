@@ -15,7 +15,8 @@ import numpy as np
 flags = tf.flags
 FLAGS = flags.FLAGS
 
-
+# Train example: python train.py --create_quantiles --output_dir=evaluations/output --quantiles_dir=evaluations/ --target=loadCycs --learning_rate=1 --train_epochs=100
+# Test example: python train.py --output_dir=evaluations/output --quantiles_dir=evaluations/ --target=loadCycs
 
 # test and train data set paths
 project_dir = "./data/"
@@ -260,8 +261,8 @@ def create_calibrated_lattice(feature_columns, config, quantiles_dir):
       # lattice_l2_torsion_reg=1.0e-4,
       interpolation_type='hypercube',
       num_keypoints=8,
-      # feature__outerIters__monotonicity=1,
-      # feature__innerIters__monotonicity=1,
+      feature__outerIters__monotonicity=1,
+      feature__innerIters__monotonicity=1,
       # feature__innerIters__lattice_size=3,
       # feature__outerIters__lattice_size=3,
       # monotonicity=frozenset({'outerIters': 1}.items),

@@ -80,7 +80,7 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
       dbg(s"  bound($step) = " + step.getBound)
 
       val pars = collectParams(par)
-      pars.foreach{x => dbgs(s"Found Counter Step param in $lhs = $x"); ParParams += x}
+      pars.foreach{x => dbgs(s"Found Counter Par param in $lhs = $x"); ParParams += x}
       val steps = collectParams(step)
       steps.foreach{x => dbgs(s"Found Counter Step param in $lhs = $x"); TileSizes += x}
       val ends = collectParams(end)

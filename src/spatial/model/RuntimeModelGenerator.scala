@@ -4,6 +4,7 @@ import argon._
 import argon.codegen.Codegen
 import spatial.node._
 import spatial.lang._
+import spatial.metadata.params._
 import spatial.metadata.control._
 import spatial.metadata.bounds._
 import spatial.util.modeling._
@@ -26,17 +27,30 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
   def getCtx(lhs: Sym[_]): String = s"${lhs.ctx.content.map(_.trim).getOrElse("(Inserted by compiler)")}"
 
 
+  def isTuneable(s: Sym[_]): Boolean = {
+    TileSizes.all.contains(s) ||
+    ParParams.all.contains(s)
+  }
+
+
   override def quote(s: Sym[_]): String = s.rhs match {
     case Def.TypeRef  => super.quote(s)
+    // case Def.Const(x) if (isTuneable(s)) => s"""Tuneable(${s.hashCode}, $x, "$s")"""
+    // case Def.Node(id,op) if (isTuneable(s)) => // TODO
+    //   if (s.isInstanceOf[Fix[_,_,_]]) undefinedSyms += s
+      s"Tuneable(${s.hashCode}, ${super.quote(s)})"
+    // case Def.Param(id, _) if (isTuneable(s)) => // TODO
+    //   if (s.isInstanceOf[Fix[_,_,_]]) undefinedSyms += s
+    //   s"Tuneable(${s.hashCode}, p$id)"
     case Def.Const(x) => s"$x"
-    case Def.Bound(_) => super.quote(s)
-    case Def.Error(_,_) => super.quote(s)
     case Def.Node(id,op) =>
       if (s.isInstanceOf[Fix[_,_,_]]) undefinedSyms += s
       super.quote(s)
     case Def.Param(id, _) =>
       if (s.isInstanceOf[Fix[_,_,_]]) undefinedSyms += s
       s"p$id"
+    case Def.Bound(_) => super.quote(s)
+    case Def.Error(_,_) => super.quote(s)
   }
 
   def ctrHead(lhs: String, cchain: CounterChain): Unit = {
@@ -99,18 +113,26 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
     open(src"object AppRuntimeModel_${version} extends App {")
       open(src"def build_model(): ControllerModel = {")
         visitBlock(block)
+
       close("}")
       emit("")
       open("override def main(args: Array[String]): Unit = {")
         emit(s"""begin(sys.env("PWD") + "/results_$version")""")
-        emit("""if (args.size >= 1 && (args(0) == "noninteractive" || args(0) == "ni")) {""")
+        emit("""if (args.size >= 1 && (args.contains("noninteractive") || args.contains("ni"))) {""")
         emit("""    interactive = false""")
-        emit("""    cliParams = args.drop(1).map(_.toInt)""")
+        emit("""    val idx = {0 max args.indexOf("noninteractive")} + {0 max args.indexOf("ni")}""")
+        emit("""    cliParams = args.drop(idx+1).takeWhile{_ != "tune"}.map(_.toInt)""")
         emit("""    emit(s"Noninteractive Args: ${cliParams.mkString(" ")}") """)
         emit("""}""")
         emit("""else {""")
         val example = if (version == "dse") IR.dseModelArgs.toString else IR.finalModelArgs.toString
         emit(s"""    println(s"Suggested args: ${example}")""")
+        emit("""}""")
+        emit("""if (args.size >= 1 && (args.contains("tune"))) {""")
+        emit("""    retune = true""")
+        emit("""    val idx = 0 max args.indexOf("tune")""")
+        emit("""    tuneParams = args.drop(idx+1).takeWhile{x => x != "noninteractive" && x != "ni"}.map(_.toInt).grouped(2).map{x => (x(0) -> x(1))}.toMap""")
+        emit("""    emit(s"Retuning Params: ${tuneParams.mkString(" ")}") """)
         emit("""}""")
         if (version == "final") emit("isFinal = true")
         emit("val root = build_model()")
@@ -127,19 +149,21 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       close("}")
     close("}")
 
-    withGen(out, "InitAskMap.scala"){
-      emit(src"package model")
-      open(src"object AskMap {")
-        emit(src"val map = scala.collection.mutable.Map[Int,Int]()")
-        undefinedSyms.foreach{sym =>
-          val value = sym match{case Param(c) => s"$c"; case _ => "100" } // TODO: Choose some default value. Should warn?
-          emit(src"""map += (${sym.hashCode} -> $value)""")
-        }
-      close("}")
-    }
-    withGen(out, "PreviousAskMap.scala"){
-      emit("package model")
-      open("object PreviousAskMap{val map = scala.collection.mutable.Map[Int,Int]()}")
+    if (version == "dse") {
+      withGen(out, "InitAskMap.scala"){
+        emit(src"package model")
+        open(src"object AskMap {")
+          emit(src"val map = scala.collection.mutable.Map[Int,Int]()")
+          undefinedSyms.foreach{sym =>
+            val value = sym match{case Param(c) => s"$c"; case Upper(c) => s"$c"; case _ => "100" } // TODO: Choose some default value. Should warn?
+            emit(src"""map += (${sym.hashCode} -> $value)""")
+          }
+        close("}")
+      }
+      withGen(out, "PreviousAskMap.scala"){
+        emit("package model")
+        open("object PreviousAskMap{val map = scala.collection.mutable.Map[Int,Int]()}")
+      }
     }
   }
 
@@ -148,35 +172,48 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
     case _ => -1
   }
 
-  protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean, sfx: String = ""): Unit = {
+  protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: Sym[_], forever: Boolean, sfx: String = ""): Unit = {
     val w = try {bitWidth(lhs.tp.typeArgs.head)} catch {case e: Exception => 32}
     val ctx = s"""Ctx("${lhs}$sfx", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
     val strt = start match {
-                 case _ if forever => "Left(0)"
-                 case Final(s) => src"Left($s)"
-                 case Expect(s) => src"Left($s)"
-                 case Param(s) => undefinedSyms += start; src"""Right(Ask(${start.hashCode}, "ctr start", $ctx))"""
-                 case _ => src"""Right(Ask(${start.hashCode}, "ctr start", $ctx))"""
+                 case _ if forever => "0"
+                 case Final(s) => src"$s"
+                 case Upper(s) => undefinedSyms += start; src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
+                 case Expect(s) if (isTuneable(start)) => src"""Tuneable(${start.hashCode}, $s, "${start}") """
+                 case Expect(s) => src"$s"
+                 case Param(s) => undefinedSyms += start; src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
+                 case _ => src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
                 }
     val question = 
       if (sfx.contains("_ctr")) s"""length of dim #${sfx.replace("_ctr","")}""" 
       else if (sfx.contains("_fsm")) s"expected # iters for fsm"
       else "ctr stop"
     val stp = stop match {
-                 case _ if forever => "Left(Some(5))"
-                 case Final(s) => src"Left($s)"
-                 case Expect(s) => src"Left($s)"
-                 case Param(s) => undefinedSyms += stop; src"""Right(Ask(${start.hashCode}, "$question", $ctx))"""
-                 case _ => src"""Right(Ask(${stop.hashCode}, "$question", $ctx))"""
+                 case _ if forever => "Some(5)"
+                 case Final(s) => src"$s"
+                 case Upper(s) => undefinedSyms += stop; src"""Ask(${stop.hashCode}, "$question", $ctx)"""
+                 case Expect(s) if (isTuneable(stop)) => src"""Tuneable(${stop.hashCode}, $s, "${stop}") """
+                 case Expect(s) => src"$s"
+                 case Param(s) => undefinedSyms += stop; src"""Ask(${stop.hashCode}, "$question", $ctx)"""
+                 case _ => src"""Ask(${stop.hashCode}, "$question", $ctx)"""
                 }
     val ste = step match {
-                 case _ if forever => "Left(Some(0))"
-                 case Final(s) => src"Left($s)"
-                 case Expect(s) => src"Left($s)"
-                 case Param(s) => undefinedSyms += step; src"""Right(Ask(${start.hashCode}, "ctr step", $ctx))"""
-                 case _ => src"""Right(Ask(${step.hashCode}, "ctr step", $ctx))"""
+                 case _ if forever => "Some(0)"
+                 case Final(s) => src"$s"
+                 case Upper(s) => undefinedSyms += step; src"""Ask(${step.hashCode}, "ctr step", $ctx)"""
+                 case Expect(s) if (isTuneable(step)) => src"""Tuneable(${step.hashCode}, $s, "${step}") """
+                 case Expect(s) => src"$s"
+                 case Param(s) => undefinedSyms += step; src"""Ask(${stop.hashCode}, "ctr step", $ctx)"""
+                 case _ => src"""Ask(${step.hashCode}, "ctr step", $ctx)"""
                 }
-    val p = par match {case Final(s) => s"$s"; case Expect(s) => s"$s"; case _ => s"$par"}
+    val p = par match {
+                 case Final(s) => src"$s"
+                 case Upper(s) => undefinedSyms += par; src"""Ask(${par.hashCode}, "ctr par", $ctx)"""
+                 case Expect(s) if (isTuneable(par)) => src"""Tuneable(${par.hashCode}, $s, "${par}") """
+                 case Expect(s) => src"$s"
+                 case Param(s) => undefinedSyms += par; src"""Ask(${par.hashCode}, "ctr par", $ctx)"""
+                 case _ => src"""Ask(${par.hashCode}, "ctr par", $ctx)"""
+    }
     emit(src"val ${lhs}$sfx = CtrModel($strt, $stp, $ste, $p)")
   }
 
@@ -285,7 +322,15 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
 
       val tp = if (tx.isStore) "DenseStore" else "DenseLoad"
-      val pars = tx.pars.map(_.asInstanceOf[Sym[_]]).map(_ match {case Final(s) => s.toInt; case Expect(s) => s.toInt; case _ => 1})
+      val pars = tx.pars.map(_.asInstanceOf[Sym[_]])
+                                        // .map{p => p match {
+                                        //          case Final(s) => src"${s.toInt}"
+                                        //          case Upper(s) => undefinedSyms += p; src"""Ask(${p.hashCode}, "load par", $ctx)"""
+                                        //          case Expect(s) if (isTuneable(p)) => src"""Tuneable(${p.hashCode}, $s, "${p}") """
+                                        //          case Expect(s) => src"${s.toInt}"
+                                        //          case Param(s) => undefinedSyms += p; src"""Ask(${p.hashCode}, "load par", $ctx)"""
+                                        //          case _ => src"""Ask(${p.hashCode}, "load par", $ctx)"""
+                                        // }}
       val steps = tx.ctrSteps.map(_.asInstanceOf[Sym[_]])
       val lens = tx.lens.map(_.asInstanceOf[Sym[_]])
 
@@ -302,7 +347,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      createCtrObject(lhs, Bits[I32].zero,lhs,Bits[I32].one,1, false, s"_fsm")
+      createCtrObject(lhs, Bits[I32].zero,lhs,Bits[I32].one,Bits[I32].one, false, s"_fsm")
       emit(src"""val ${lhs}_cchain = CChainModel(List[CtrModel](${lhs}_fsm), $ctx)""")
       emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, ${lhs}_cchain, ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
       visitBlock(notDone)

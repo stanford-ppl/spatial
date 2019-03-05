@@ -406,13 +406,13 @@ package object control {
       s.foreach{sym => metadata.add(sym, LoweredTransfer(typ)) }
     }
 
-    def getLoweredTransferSize: Option[(Sym[_], Int)] = {
+    def getLoweredTransferSize: Option[(Sym[_], Sym[_])] = {
       s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption
     }
-    def loweredTransferSize: (Sym[_], Int) = {
+    def loweredTransferSize: (Sym[_], Sym[_]) = {
       s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info) }.head
     }
-    def loweredTransferSize_=(info: (Sym[_], Int)): Unit = {
+    def loweredTransferSize_=(info: (Sym[_], Sym[_])): Unit = {
       s.foreach{sym => metadata.add(sym, LoweredTransferSize(info)) }
     }
 

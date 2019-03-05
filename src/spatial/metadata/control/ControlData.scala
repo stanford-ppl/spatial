@@ -188,4 +188,4 @@ case class LoweredTransfer(typ: TransferType) extends Data[LoweredTransfer](SetB
   * Setter: sym.loweredTransferSize = (length, par)
   * Default: None
   */
-case class LoweredTransferSize(info: (Sym[_], Int)) extends Data[LoweredTransferSize](SetBy.Analysis.Self)
+case class LoweredTransferSize(info: (Sym[_], Sym[_])) extends Data[LoweredTransferSize](SetBy.Analysis.Self)

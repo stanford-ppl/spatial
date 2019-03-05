@@ -9,17 +9,22 @@ import scala.io.Source
 object Runtime {
 
   var interactive = true
+  var retune = false
   var currentAsk = 0
   var logfilename: String = ""
   var logfile: Option[PrintWriter] = None
   var cliParams = Seq[Int]()
+  var tuneParams = Map[Int, Int]()
   var isFinal = false
+  var suppressWarns = false
 
   /** Asked values mapping */
   // Mapping between Ask ids and their values
   val askMap = scala.collection.mutable.Map[Int, Int]()
   // Asked values for this execution
-  val cached = scala.collection.mutable.ListBuffer[Int]()
+  val cachedAsk = scala.collection.mutable.ListBuffer[Int]()
+  // Tuned values for this execution
+  val cachedTune = scala.collection.mutable.ListBuffer[Int]()
 
   /** Control node schedule */
   sealed abstract class CtrlSchedule
@@ -76,19 +81,44 @@ object Runtime {
   ){
     override def toString: String = s"line $line: $id"
   }
+  object Ctx {
+    def empty: Ctx = Ctx("??","??","","")
+  }
 
-  case class Ask(val id: Int, val whatAmI: String, ctx: Ctx) {
+  /** Base class for numbers used in model (parallelizations, counter starts/steps/ends, tile sizes, etc.) */
+  abstract class ModelValue(id: Int, whatAmI: String, ctx: Ctx){
+    def lookup: Int
+  }
+
+  /** Value that can be hot-swapped by compiler during DSE */
+  case class Tuneable(id: Int, val default: Int, whatAmI: String) extends ModelValue(id, whatAmI, Ctx.empty) {
     def lookup: Int = {
-      if (cached.contains(id)) askMap(id)
-      else if (!interactive && !cached.contains(id)) {
+      if (!suppressWarns) {
+        if (!tuneParams.contains(id) && !cachedTune.contains(id)) {println(s"[warn] Using default value $default for tuneable param $whatAmI ($id)"); cachedTune += id}
+        else if (!cachedTune.contains(id)) {println(s"[warn] Using retuned value ${tuneParams(id)} for tuneable param $whatAmI ($id) (default was $default)"); cachedTune += id}
+      }
+      tuneParams.getOrElse(id, default)
+    }
+  }
+
+  /** Value that is a constant from point of view of compiler and user */
+  case class Locked(id: Int, val value: Int) extends ModelValue(id, "", Ctx.empty) {
+    def lookup: Int = value
+  }
+
+  /** Value that must be set by user at command line, or dseModelArgs/finalModelArgs in noninteractive mode */
+  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends ModelValue(id, whatAmI, ctx) {
+    def lookup: Int = {
+      if (cachedAsk.contains(id)) askMap(id)
+      else if (!interactive && !cachedAsk.contains(id)) {
         println(s"asking for param $currentAsk: ${cliParams(currentAsk)}")
         val t = cliParams(currentAsk)
         currentAsk = currentAsk + 1
         askMap += (id -> t)
-        cached += id
+        cachedAsk += id
         t
       }
-      else if (!interactive && cached.contains(id)) {
+      else if (!interactive && cachedAsk.contains(id)) {
         askMap(id)
       }
       else {
@@ -98,27 +128,46 @@ object Runtime {
         val x = if (t != "") t.toInt else default
         println("")
         askMap += (id -> x)
-        cached += id
+        cachedAsk += id
         x
       }
     }
   }
 
-  case class CtrModel(
-    val start: Either[Int, Ask],
-    val stop: Either[Int, Ask], 
-    val stride: Either[Int, Ask],
-    val par: Int
+  object CtrModel {
+    def apply(start: Int, stop: Int, stride: Int, par: Int) = new CtrModel(Locked(-1, start), Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
+    def apply(start: Int, stop: Int, stride: Int, par: ModelValue) = new CtrModel(Locked(-1, start), Locked(-1, stop), Locked(-1, stride), par)
+    def apply(start: Int, stop: Int, stride: ModelValue, par: Int) = new CtrModel(Locked(-1, start), Locked(-1, stop), stride, Locked(-1, par))
+    def apply(start: Int, stop: Int, stride: ModelValue, par: ModelValue) = new CtrModel(Locked(-1, start), Locked(-1, stop), stride, par)
+    def apply(start: Int, stop: ModelValue, stride: Int, par: Int) = new CtrModel(Locked(-1, start), stop, Locked(-1, stride), Locked(-1, par))
+    def apply(start: Int, stop: ModelValue, stride: Int, par: ModelValue) = new CtrModel(Locked(-1, start), stop, Locked(-1, stride), par)
+    def apply(start: Int, stop: ModelValue, stride: ModelValue, par: Int) = new CtrModel(Locked(-1, start), stop, stride, Locked(-1, par))
+    def apply(start: Int, stop: ModelValue, stride: ModelValue, par: ModelValue) = new CtrModel(Locked(-1, start), stop, stride, par)
+    def apply(start: ModelValue, stop: Int, stride: Int, par: Int) = new CtrModel(start, Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
+    def apply(start: ModelValue, stop: Int, stride: Int, par: ModelValue) = new CtrModel(start, Locked(-1, stop), Locked(-1, stride), par)
+    def apply(start: ModelValue, stop: Int, stride: ModelValue, par: Int) = new CtrModel(start, Locked(-1, stop), stride, Locked(-1, par))
+    def apply(start: ModelValue, stop: Int, stride: ModelValue, par: ModelValue) = new CtrModel(start, Locked(-1, stop), stride, par)
+    def apply(start: ModelValue, stop: ModelValue, stride: Int, par: Int) = new CtrModel(start, stop, Locked(-1, stride), Locked(-1, par))
+    def apply(start: ModelValue, stop: ModelValue, stride: Int, par: ModelValue) = new CtrModel(start, stop, Locked(-1, stride), par)
+    def apply(start: ModelValue, stop: ModelValue, stride: ModelValue, par: Int) = new CtrModel(start, stop, stride, Locked(-1, par))    
+    def apply(start: ModelValue, stop: ModelValue, stride: ModelValue, par: ModelValue) = new CtrModel(start, stop, stride, par)    
+  }
+  class CtrModel(
+    val start: ModelValue,
+    val stop: ModelValue, 
+    val stride: ModelValue,
+    val par: ModelValue
   ) {
     def N: Int = {
-      val realStart = start match {case Left(x) => x; case Right(x) => x.lookup}
-      val realStop = stop match {case Left(x) => x; case Right(x) => x.lookup}
-      val realStride = stride match {case Left(x) => x; case Right(x) => x.lookup}
+      val realStart = start.lookup
+      val realStop = stop.lookup
+      val realStride = stride.lookup
+      val realPar = par.lookup
       /** Round n up to the nearest multiple of t */
       def roundUp(n: Int, t: Int): Int = {
         if (n == 0) 0 else {((n + t - 1).toDouble / t.toDouble).toInt * t}
       }
-      roundUp(scala.math.ceil((realStop - realStart).toDouble / realStride.toDouble).toInt, par) / par
+      roundUp(scala.math.ceil((realStop - realStart).toDouble / realStride.toDouble).toInt, realPar) / realPar
     }
   }
 
@@ -131,7 +180,7 @@ object Runtime {
       else ctrs.map(_.N).product
     }
     def unroll: Int = { 
-      if (isFinal) 1 else ctrs.map(_.par).product
+      if (isFinal) 1 else ctrs.map(_.par.lookup).product
     }
     def isDefined: Boolean = !ctrs.isEmpty
   }
@@ -239,9 +288,9 @@ object Runtime {
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad            => congestionModel(competitors(Competitors.DenseLoad)) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
-        case DenseStore           => congestionModel(competitors(Competitors.DenseStore)) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
-        case GatedDenseStore      => congestionModel(competitors(Competitors.GatedDenseStore)) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
+        case DenseLoad            => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
+        case DenseStore           => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
+        case GatedDenseStore      => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }
@@ -300,17 +349,19 @@ object Runtime {
 
     /** DFS through hierarchy and print structure */
     def printStructure(entry: Boolean = true): Unit = {
+      suppressWarns = true
       if (entry) emit(s"Controller Structure:")
       if (entry) emit("============================================")
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
-      val competitors = if (this.schedule == DenseLoad) s" (${this.competitors(Competitors.DenseLoad)})"
-                        else if (this.schedule == DenseStore) s" (${this.competitors(Competitors.DenseStore)})"
-                        else if (this.schedule == GatedDenseStore) s" (${this.competitors(Competitors.GatedDenseStore)})"
+      val competitors = if (this.schedule == DenseLoad) s" (${this.competitors()})"
+                        else if (this.schedule == DenseStore) s" (${this.competitors()})"
+                        else if (this.schedule == GatedDenseStore) s" (${this.competitors()})"
                         else ""
       // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
       emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)
       children.foreach(_.printStructure(false))
       if (entry) emit("============================================")
+      suppressWarns = false
     }
 
     def totalCycles(): Int = this.num_cycles

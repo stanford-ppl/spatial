@@ -14,6 +14,8 @@ import poly.ISL
 import spatial.util.spatialConfig
 
 import java.io.PrintWriter
+import java.nio.file.StandardOpenOption
+import java.nio.channels._
 import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
 
 case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
@@ -94,9 +96,9 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
       // step 1: Acquire channel to emptiness_lock
       val channel = {
         try {
-          java.nio.channels.FileChannel.open(emptiness_lock, CREATE_NEW, WRITE)
+          java.nio.channels.FileChannel.open(emptiness_lock, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
         } catch {
-          case _: Throwable => java.nio.channels.FileChannel.open(emptiness_lock, WRITE)
+          case _: Throwable => java.nio.channels.FileChannel.open(emptiness_lock, StandardOpenOption.WRITE)
         }
       }
 

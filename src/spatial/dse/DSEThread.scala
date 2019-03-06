@@ -40,7 +40,7 @@ case class DSEThread(
 
   private def endBnd(): Unit = { bndTime += System.currentTimeMillis - clockRef; resetClock() }
   private def endMem(): Unit = { memTime += System.currentTimeMillis - clockRef; resetClock() }
-  private def endCon(): Unit = { conTime += System.currentTimeMillis - clockRef; resetClock() }
+  // private def endCon(): Unit = { conTime += System.currentTimeMillis - clockRef; resetClock() }
   private def endArea(): Unit = { areaTime += System.currentTimeMillis - clockRef; resetClock() }
   private def endCycles(): Unit = { cyclTime += System.currentTimeMillis - clockRef; resetClock() }
   private def resetAllTimers(): Unit = { memTime = 0; bndTime = 0; conTime = 0; areaTime = 0; cyclTime = 0 }
@@ -58,7 +58,7 @@ case class DSEThread(
   private lazy val scalarAnalyzer = new ScalarAnalyzer(state)
   private lazy val memoryAnalyzer = new MemoryAnalyzer(state)
 
-  private lazy val contentionAnalyzer = new ContentionAnalyzer(state)
+  // private lazy val contentionAnalyzer = new ContentionAnalyzer(state)
   private lazy val areaAnalyzer  = target.areaAnalyzer(state)
   private lazy val cycleAnalyzer = target.cycleAnalyzer(state)
 
@@ -67,28 +67,28 @@ case class DSEThread(
     cycleAnalyzer.init()
     scalarAnalyzer.init()
     memoryAnalyzer.init()
-    contentionAnalyzer.init()
+    // contentionAnalyzer.init()
 
     config.setV(-1)
     scalarAnalyzer.silence()
     memoryAnalyzer.silence()
-    contentionAnalyzer.silence()
+    // contentionAnalyzer.silence()
     areaAnalyzer.silence()
     cycleAnalyzer.silence()
     // areaAnalyzer.run(program)//(mtyp(program.tp)) // Can't run analyzer if we haven't banked yet...
   }
 
   def run(): Unit = {
-    //println(s"[$threadId] Started.")
+    println(s"[$threadId] Started.")
 
     while(isAlive) {
       val requests = workQueue.take() // Blocking dequeue
 
       if (requests.nonEmpty) {
-        //println(s"[$threadId] Received batch of ${requests.length}. Working...")
+        println(s"[$threadId] Received batch of ${requests.length}. Working...")
         try {
           val result = run(requests)
-          //println(s"[$threadId] Completed batch of ${requests.length}. ${workQueue.size()} items remain in the queue")
+          println(s"[$threadId] Completed batch of ${requests.length}. ${workQueue.size()} items remain in the queue")
           outQueue.put(result) // Blocking enqueue
         }
         catch {case e: Throwable =>
@@ -99,12 +99,12 @@ case class DSEThread(
         }
       }
       else {
-        //println(s"[$threadId] Received kill signal, terminating!")
+        println(s"[$threadId] Received kill signal, terminating!")
         requestStop()
       } // Somebody poisoned the work queue!
     }
 
-    //println(s"[$threadId] Ending now!")
+    println(s"[$threadId] Ending now!")
     hasTerminated = true
   }
 
@@ -131,16 +131,16 @@ case class DSEThread(
 
   private def evaluate(): (Area, Long) = {
     if (PROFILING) resetClock()
-    scalarAnalyzer.rerun(accel, program)
+    // scalarAnalyzer.rerun(accel, program)
     if (PROFILING) endBnd()
 
-    memoryAnalyzer.run()
+    // memoryAnalyzer.run()
     if (PROFILING) endMem()
 
-    contentionAnalyzer.run()
-    if (PROFILING) endCon()
+    // contentionAnalyzer.run()
+    // if (PROFILING) endCon()
 
-    areaAnalyzer.rerun(accel, program)
+    // areaAnalyzer.rerun(accel, program)
     if (PROFILING) endArea()
 
     cycleAnalyzer.rerun(accel, program)

@@ -52,6 +52,7 @@ object Runtime {
     def *(b: Int): Competitors = Competitors(loads*b, stores*b, gateds*b)
   }
   object Competitors {
+    def empty = Competitors(0,0,0)
     def DenseLoad = Competitors(1,0,0)
     def DenseStore = Competitors(0,1,0)
     def GatedDenseStore = Competitors(0,0,1)
@@ -111,8 +112,8 @@ object Runtime {
     def lookup: Int = {
       if (cachedAsk.contains(id)) askMap(id)
       else if (!interactive && !cachedAsk.contains(id)) {
-        println(s"asking for param $currentAsk: ${cliParams(currentAsk)}")
-        val t = cliParams(currentAsk)
+        val t = if (cliParams.size < currentAsk) {println(s"asking for param $currentAsk: ${cliParams(currentAsk)}"); cliParams(currentAsk)}
+                else {println(s"[WARNING] Param $currentAsk not provided! Using value ${askMap.getOrElse(id, 1)}"); askMap.getOrElse(id, 1)}
         currentAsk = currentAsk + 1
         askMap += (id -> t)
         cachedAsk += id
@@ -195,6 +196,7 @@ object Runtime {
   ){
     def this(level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(level, schedule, List(cchain), L, II, ctx)
 
+    override def toString: String = ctx.toString
     val targetBurstSize = 512
     // Control overhead
     val seqSync = 1 // cycles from end of one child to start of next
@@ -212,24 +214,26 @@ object Runtime {
       else if (this.schedule == DenseStore) Competitors.DenseStore
       else if (this.schedule == GatedDenseStore) Competitors.GatedDenseStore
       else {
-        this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).reduce{_+_} * this.cchain.head.unroll 
+        this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).foldLeft(Competitors.empty){_+_} * this.cchain.head.unroll 
       }
     }
-    def competitors(c: Competitors = Competitors(0,0,0), exempt: List[ControllerModel] = List()): Competitors = { // Count number of other transfer nodes trigger simultaneously with this self
+    def competitors(c: Competitors = Competitors.empty, exempt: List[ControllerModel] = List()): Competitors = { // Count number of other transfer nodes trigger simultaneously with this self
       // Number of conflicting DRAM accesses
       if (!parent.isDefined) c
       else {
-        parent.get.schedule match {
-          case Sequenced => parent.get.competitors(c * parent.get.cchain.head.unroll, exempt ++ List(this) ++ parent.get.children)
-          case _ => 
-            val contribution = (this.transfersBelow(exempt) + c) * parent.get.cchain.head.unroll
-            parent.get.competitors(contribution, exempt ++ List(this))
-        }
+        val contribution = (this.transfersBelow(exempt) + c) * parent.get.cchain.head.unroll
+        val newExempt = exempt ++ List(this) ++ {if (parent.get.schedule == Sequenced) parent.get.children else List()}
+        parent.get.competitors(contribution, newExempt)
       }
     }
 
     def congestionModel(competitors: Competitors): Int = {
-      CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads, stores = competitors.stores, gateds = competitors.gateds, outerIters = upperCChainIters, innerIters = cchain.last.N), this.schedule)
+      val numel = cchain.last.N * cchain.last.ctrs.last.par.lookup
+      CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads, 
+                                                             stores = competitors.stores, 
+                                                             gateds = competitors.gateds, 
+                                                             outerIters = upperCChainIters, 
+                                                             innerIters = numel), this.schedule)
       // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
 
       // // Linear for the first 4 competitors

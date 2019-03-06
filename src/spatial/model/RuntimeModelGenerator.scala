@@ -1,7 +1,7 @@
 package spatial.model
 
 import argon._
-import argon.codegen.Codegen
+import argon.codegen.FileDependencies
 import spatial.node._
 import spatial.lang._
 import spatial.metadata.params._
@@ -14,7 +14,7 @@ trait ControlModels { this: RuntimeModelGenerator =>
 
 }
 
-case class RuntimeModelGenerator(IR: State, version: String) extends Codegen with ControlModels {
+case class RuntimeModelGenerator(IR: State, version: String) extends FileDependencies with ControlModels {
   override val ext: String = ".scala"
   override val lang: String = "model"
   override val entryFile: String = s"model_${version}.scala"
@@ -117,7 +117,8 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
       close("}")
       emit("")
       open("override def main(args: Array[String]): Unit = {")
-        emit(s"""begin(sys.env("PWD") + "/results_$version")""")
+        val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}"
+        emit(s"""begin("${gen_dir}/results_$version")""")
         emit("""if (args.size >= 1 && (args.contains("noninteractive") || args.contains("ni"))) {""")
         emit("""    interactive = false""")
         emit("""    val idx = {0 max args.indexOf("noninteractive")} + {0 max args.indexOf("ni")}""")
@@ -143,7 +144,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
         emit("root.execute()")
         emit(s"""emit(s"[$version] Runtime results for app ${config.name}")""")
         emit("""root.printResults()""")
-        emit("""root.storeAskMap(sys.env("PWD") + "/model/PreviousAskMap.scala") // Store this run's askmap""")
+        emit(s"""root.storeAskMap("${gen_dir}/model/PreviousAskMap.scala") // Store this run's askmap""")
         emit(s"""emit(s"[$version] Total Cycles for App ${config.name}: $${root.totalCycles()}")""")
         emit("end()")
       close("}")
@@ -386,4 +387,10 @@ case class RuntimeModelGenerator(IR: State, version: String) extends Codegen wit
     case _ => lhs.blocks.foreach{block => visitBlock(block) }
   }
 
+  override def copyDependencies(out: String): Unit = {
+    dependencies ::= DirDep("synth", "project", "../", Some("project/"))
+    dependencies ::= DirDep("synth", "scripts", "../", Some("scripts/"))
+    dependencies ::= FileDep("synth", "build.sbt", "../", Some("build.sbt"))
+    super.copyDependencies(out)
+  }
 }

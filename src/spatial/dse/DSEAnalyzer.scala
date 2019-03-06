@@ -78,27 +78,26 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
   def compileLatencyModel(): Unit = {
     import utils.process.BackgroundProcess
     import scala.language.postfixOps
+    import java.io.File
+    import sys.process._
 
-    val user_bin = s"""${sys.env.getOrElse("HOME", "")}/bin"""
-    val bin_path = java.nio.file.Paths.get(user_bin)
-    val bin_exists = java.nio.file.Files.exists(bin_path)
-    if (!bin_exists) {
-      java.nio.file.Files.createDirectories(bin_path)
+    val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+    val model_dir = gen_dir + "model/"
+    val file_path = model_dir + "model_dse.scala"
+    val lock_path = file_path + ".lock"
+    val lock_file = java.nio.file.Paths.get(lock_path)
+    val model = java.nio.file.Paths.get(file_path) 
+    if (!java.nio.file.Files.exists(model)) {
+      throw new Exception(s"No DSE model found at ${file_path}")
     }
-
-
-    val emptiness_bin = s"""${user_bin}/emptiness"""
-
-    val emptiness_lock = java.nio.file.Paths.get(emptiness_bin + ".lock")
-    val emptiness_path = java.nio.file.Paths.get(emptiness_bin)
 
     {
       // step 1: Acquire channel to emptiness_lock
       val channel = {
         try {
-          java.nio.channels.FileChannel.open(emptiness_lock, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+          java.nio.channels.FileChannel.open(lock_file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
         } catch {
-          case _: Throwable => java.nio.channels.FileChannel.open(emptiness_lock, StandardOpenOption.WRITE)
+          case _: Throwable => java.nio.channels.FileChannel.open(lock_file, StandardOpenOption.WRITE)
         }
       }
 
@@ -112,36 +111,18 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
         }
       }
 
-      // step 3: check if emptiness exists && is correct version
-      val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
-      println(s"Emptiness: $emptiness_exists, $emptiness_bin")
-      // TODO: Check if emptiness -version is correct!
+      // step 3: compile (SO DIRTY)
+      val output = Process(s"""bash scripts/assemble.sh""", new File(gen_dir)).!!
+      println(s"sbt assembly: $output")
 
-      // step 4: if emptiness does not exist, compile it.
-      if (!emptiness_exists) {
-        val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
-        val pkg_config = pkg_config_proc.blockOnLine()
+      // val compile_proc = BackgroundProcess("",
+      //   List(s"sbt", s"""";project model; assembly""""))
+      // compile_proc send ""
+      // val retcode = compile_proc.waitFor()
+      // println(s"Compile Retcode: $retcode")
+      // compile_proc.checkErrors()
 
-        println(s"Pkg Config: $pkg_config")
-
-        val split_config = pkg_config.split("\\s") map {
-          _.trim
-        } filter {
-          _.nonEmpty
-        }
-
-        val compile_proc = BackgroundProcess("",
-          List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin", "-") ++ split_config)
-        val source_string = scala.io.Source.fromInputStream(
-          getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
-        println(source_string)
-        compile_proc send source_string
-        val retcode = compile_proc.waitFor()
-        println(s"Compile Retcode: $retcode")
-        compile_proc.checkErrors()
-
-        println("Finished Compiling")
-      }
+      println("Finished Compiling DSE Model!")
 
       // step 4: Now that emptiness is guaranteed to exist, release lock
       lock.release()
@@ -150,8 +131,6 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
       // close FileChannel
       channel.close()
     }
-
-    BackgroundProcess("", emptiness_bin)
 
   }
 

@@ -158,7 +158,7 @@ lazy val test = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
 ).dependsOn(spatial)
 
-lazy val pirTest = project 
+lazy val pirTest = project
 .settings(common)
 .settings(
   scalaSource in Test := baseDirectory.in(spatial).value/"pir/regression"

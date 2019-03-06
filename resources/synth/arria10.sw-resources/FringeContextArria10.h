@@ -36,7 +36,7 @@ class FringeContextArria10 : public FringeContextBase<void> {
 
   const uint32_t burstSizeBytes = 64;
   int fd = 0;
-  u32 fringeScalarBase = 0;
+  u32* fringeScalarBase = 0;
   u32 fringeMemBase    = 0;
   u32 fpgaMallocPtr    = 0;
   u32 fpgaFreeMemSize  = MEM_SIZE;
@@ -97,8 +97,10 @@ class FringeContextArria10 : public FringeContextBase<void> {
 
 public:
   uint32_t numArgIns = 0;
+  uint32_t numArgIOs = 0;
   uint32_t numArgOuts = 0;
   uint32_t numArgOutInstrs = 0;
+  uint32_t numArgEarlyExits = 0;
   std::string bitfile = "";
 
   FringeContextArria10(std::string path = "") : FringeContextBase(path) {
@@ -113,9 +115,8 @@ public:
     }
 
     // Initialize pointers to fringeScalarBase
-    void *ptr;
-    ptr = mmap(NULL, MAP_LEN, PROT_READ|PROT_WRITE, MAP_SHARED, fd, FRINGE_SCALAR_BASEADDR);
-    fringeScalarBase = (u32) ((char *)ptr + FREEZE_BRIDGE_OFFSET);
+    void *ptr = (void *)mmap(NULL, MAP_LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fd, FPGA_BASE);
+    fringeScalarBase = (u32 *)((char *)ptr + FREEZE_BRIDGE_OFFSET + TOP_OFFSET);
 
     // Initialize pointer to fringeMemBase
     ptr = mmap(NULL, MEM_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, FRINGE_MEM_BASEADDR);
@@ -124,9 +125,8 @@ public:
   }
 
   virtual void load() {
-    // std::string cmd = "prog_fpga " + bitfile;
-    std::string cmd = "cp pr_region_alt.rbf /lib/firmware/ && cd /boot && dtbt -r pr_region_alt.dtbo -p /boot && dtbt -a pr_region_alt.dtbo -p /boot";
-    system(cmd.c_str());
+    // For a10, the FPGA is only partially programmed through deploying the overlay.
+    // Handling it through run.sh seems to be a more natual way...
   }
 
   size_t alignedSize(uint32_t alignment, size_t size) {
@@ -315,6 +315,10 @@ public:
     numArgIns = number;
   }
 
+  virtual void setNumEarlyExits(uint32_t number) {
+    numArgEarlyExits = number;
+  }
+
   virtual void setNumArgIOs(uint32_t number) {
   }
 
@@ -327,30 +331,36 @@ public:
   }
 
   virtual void setArg(uint32_t arg, uint64_t data, bool isIO) {
+    EPRINTF("setting arg");
     writeReg(arg+2, data);
   }
 
   virtual uint64_t getArg(uint32_t arg, bool isIO) {
-    return readReg(numArgIns+2+arg);
-
+    if (numArgIns == 0) return readReg(3+arg);
+    else return readReg(2+arg);
   }
-
   virtual void writeReg(uint32_t reg, uint64_t data) {
     sleep(0.2); // Prevents zcu crash for some unknown reason
-    Xil_Out32(fringeScalarBase+reg*sizeof(u32), data);
+    // fprintf(stderr, "fringeScalarBase = %x \n", fringeScalarBase);
+    // fprintf(stderr, "[writeReg] fringeScalarBase = %x, writing register to %x, data = %d \n",
+    //   fringeScalarBase, fringeScalarBase + reg, data);
+    *(fringeScalarBase + reg) = data;
   }
 
   virtual uint64_t readReg(uint32_t reg) {
-    uint32_t value = Xil_In32(fringeScalarBase+reg*sizeof(u32));
-//    fprintf(stderr, "[readReg] Reading register %d, value = %lx\n", reg, value);
+    uint32_t value = *(fringeScalarBase + reg);
+    // fprintf(stderr, "fringeScalarBase = %x \n", fringeScalarBase);
+    // fprintf(stderr, "[readReg] fringeScalarBase = %x, reading register at %x, value = %lx\n",
+    //   fringeScalarBase, fringeScalarBase + reg, value);
     return value;
   }
 
   void dumpAllRegs() {
     int argIns = numArgIns == 0 ? 1 : numArgIns;
-    int argOuts = (numArgOuts == 0 & numArgOutInstrs == 0) ? 1 : numArgOuts;
-    int debugRegStart = 2 + argIns + argOuts + numArgOutInstrs;
-    int totalRegs = argIns + argOuts + numArgOutInstrs + 2 + NUM_DEBUG_SIGNALS;
+
+    int argOuts = (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0) ? 1 : numArgOuts;
+    int debugRegStart = 2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
+    int totalRegs = argIns + argOuts + numArgOutInstrs + numArgEarlyExits + 2 + NUM_DEBUG_SIGNALS;
 
     for (int i=0; i<100; i++) {
       uint32_t value = readReg(i);

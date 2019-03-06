@@ -19,7 +19,7 @@ import scala.collection.mutable
 case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal  {
   private def NoArea: Area = areaModel.NoArea
 
-  var totalArea: (Area, String) = _
+  var totalArea: (Area, String) = (NoArea, "")
   var scopeArea: Seq[Area] = Nil
   var savedArea: Area = _
 

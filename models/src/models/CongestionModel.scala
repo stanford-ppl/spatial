@@ -114,6 +114,8 @@ object CongestionModel {
 
 		val calibrated_features = calibrate_features(features)
 		val result = hypercube_features(calibrated_features)
-		result.toInt
+		// TODO: Model is naughty if it returns <170
+		// println(s"evaluating $features = ${170 max result.toInt}")
+		170 max result.toInt
 	}
 }

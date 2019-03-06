@@ -185,11 +185,11 @@ trait PlasticineTest extends DSLTest { test =>
 
     def runproute(row:Int=16, col:Int=8, vlink:Int=2, slink:Int=4, time:Int = -1, iter:Int=1000, vcLimit:Int=4, stopScore:Int= -1, rerun:Boolean=false) = {
       var cmd = s"${buildPath(IR.config.cwd, "pir", "plastiroute", "plastiroute")}" :: 
-      "-n" :: s"${IR.config.genDir}/pir/plastisim/node.csv" ::
-      "-l" :: s"${IR.config.genDir}/pir/plastisim/link.csv" ::
-      "-v" :: s"${IR.config.genDir}/pir/plastisim/summary.csv" ::
-      "-g" :: s"${IR.config.genDir}/pir/plastisim/proute.dot" ::
-      "-o" :: s"${IR.config.genDir}/pir/plastisim/final.place" ::
+      "-n" :: s"${IR.config.genDir}/plastisim/node.csv" ::
+      "-l" :: s"${IR.config.genDir}/plastisim/link.csv" ::
+      "-v" :: s"${IR.config.genDir}/plastisim/summary.csv" ::
+      "-g" :: s"${IR.config.genDir}/plastisim/proute.dot" ::
+      "-o" :: s"${IR.config.genDir}/plastisim/final.place" ::
       "-T" :: "checkerboard" ::
       "-a" :: "route_min_directed_valient" ::
       "-r" :: s"$row" ::
@@ -219,7 +219,7 @@ trait PlasticineTest extends DSLTest { test =>
 
     def runpsim(name:String="runpsim", flit:Int=512, linkTp:String="B", placefile:String="", rerun:Boolean=false) = {
       var cmd = s"${buildPath(IR.config.cwd, "pir", "plastisim", "plastisim")}" :: 
-      "-f" :: s"${IR.config.genDir}/pir/plastisim/psim.conf" ::
+      "-f" :: s"${IR.config.genDir}/plastisim/psim.conf" ::
       s"-i$flit" ::
       "-l" :: s"$linkTp" ::
       "-q1" ::
@@ -310,7 +310,7 @@ trait PlasticineTest extends DSLTest { test =>
       mappir(s"--row=$row --col=$col --pattern=checkerboard --vc=$vcLimit --scheduled=${scheduled}", fifo=fifo) >>
       genpsim() >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit) >>
-      runpsim(placefile=s"${IR.config.genDir}/pir/plastisim/final.place", linkTp=linkTp, flit=flit)
+      runpsim(placefile=s"${IR.config.genDir}/plastisim/final.place", linkTp=linkTp, flit=flit)
     }
   }
 
@@ -339,7 +339,7 @@ trait PlasticineTest extends DSLTest { test =>
       mappir(s"--row=$row --col=$col --pattern=checkerboard --vc=0 --scheduled=${scheduled}", fifo=fifo) >>
       genpsim() >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=0, stopScore=25) >>
-      runpsim(placefile=s"${IR.config.genDir}/pir/plastisim/final.place", linkTp=linkTp)
+      runpsim(placefile=s"${IR.config.genDir}/plastisim/final.place", linkTp=linkTp)
     }
   }
 

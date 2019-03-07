@@ -72,7 +72,7 @@ trait CppCodegen extends FileDependencies with AccelTraversal  {
         dependencies ::= FileDep("synth", "asic.Makefile", "../", Some("Makefile"))
     }
     
-    // dependencies ::= FileDep("synth", "build.sbt", "../", Some("build.sbt"))
+    dependencies ::= FileDep("synth", "build.sbt", "../", Some("build.sbt"))
 
     dependencies ::= FileDep("synth", "run.sh", "../", Some("run.sh"))
 

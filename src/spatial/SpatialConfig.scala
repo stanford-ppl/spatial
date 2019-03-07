@@ -90,7 +90,7 @@ class SpatialConfig extends Config {
       dstSC.enableBroadcast = enableBroadcast
       dstSC.allowPrimitivesInOuterControl = allowPrimitivesInOuterControl
       dstSC.ignoreParEdgeCases = ignoreParEdgeCases
-      dstSC.noInnerLoopUnroll = noInnerLoopUnroll
+      dstSC.vecInnerLoop = vecInnerLoop
       dstSC.enableBufferCoalescing = enableBufferCoalescing
       dstSC.enablePIR = enablePIR
       dstSC.paramSavePath = paramSavePath

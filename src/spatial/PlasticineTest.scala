@@ -338,7 +338,13 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
-  case object Dot extends Backend("Dot", args="--sim --dot","","") {
+  case object Dot extends Backend(
+    name="Dot", 
+    args="--sim --dot",
+    make="",
+    run="",
+    model=""
+  ) {
     override def shouldRun: Boolean = checkFlag(s"test.Dot")
     override def runBackend() = {
       s"${test.name}" should s"run for backend $name" in {

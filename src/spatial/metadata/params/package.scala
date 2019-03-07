@@ -3,6 +3,7 @@ package spatial.metadata
 import argon._
 import spatial.lang.I32
 import forge.tags.stateful
+import spatial.metadata.bounds._
 import spatial.metadata.control._
 
 package object params {
@@ -16,15 +17,15 @@ package object params {
     def contention: Int = getContention.getOrElse(0)
     def contention_=(d: Int): Unit = metadata.add(p, MemoryContention(d))
 
-    def getIntValue: Option[Int] = metadata[IntParamValue](p).map{d => d.v }
-    @stateful def intValue: Int = getIntValue.getOrElse(1)
-    @stateful def setIntValue(d: Int): Unit = metadata.add(p, IntParamValue(d))
-    def intValue_=(d: Int): Unit = metadata.add(p, IntParamValue(d))
+    def getIntValue: Option[Int] = if (p.getBound.isDefined) Some(p.bound.toInt) else None
+    @stateful def intValue: Int = p.bound.toInt
+    @stateful def setIntValue(d: Int): Unit = p.bound = Expect(d)
+    def intValue_=(d: Int): Unit = p.bound = Expect(d)
 
-    def getSchedValue: Option[CtrlSchedule] = metadata[SchedParamValue](p).map{d => d.v }
-    @stateful def schedValue: CtrlSchedule = getSchedValue.getOrElse(p.schedule)
-    @stateful def setSchedValue(d: CtrlSchedule): Unit = metadata.add(p, SchedParamValue(d))
-    def schedValue_=(d: CtrlSchedule): Unit = metadata.add(p, SchedParamValue(d))
+    def getSchedValue: Option[CtrlSchedule] = p.getRawSchedule
+    @stateful def schedValue: CtrlSchedule = p.rawSchedule
+    @stateful def setSchedValue(d: CtrlSchedule): Unit = p.rawSchedule = d
+    def schedValue_=(d: CtrlSchedule): Unit = p.rawSchedule = d
   }
 
   object Parameter {

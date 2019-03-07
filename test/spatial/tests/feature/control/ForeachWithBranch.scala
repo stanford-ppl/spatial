@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class ForeachWithBranch extends SpatialTest {
+  override def dseModelArgs: Args = "1"
+  override def finalModelArgs: Args = ""
   override def runtimeArgs: Args = "16 16"
 
   def simpleSeq(xIn: Int, yIn: Int): Int = {

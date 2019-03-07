@@ -4,6 +4,8 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 @spatial class AXICommandSplit extends SpatialTest {
+  override def dseModelArgs: Args = "12288"
+  override def finalModelArgs: Args = "12288"
   override def runtimeArgs: Args = "12288"
 
   val rows = 4

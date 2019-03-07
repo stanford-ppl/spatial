@@ -5,6 +5,8 @@ import spatial.targets._
 
 @spatial class SHA1 extends SpatialTest {
 
+  override def dseModelArgs: Args = "8192 8192 50 14 64 100 56 14 5 50 50 "
+  override def finalModelArgs: Args = "8192 8192 50 14 64 100 56 14 5 50 50 "
 
   def main(args: Array[String]): Unit = {
     // Setup off-chip data

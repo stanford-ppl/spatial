@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class FIFOLoadStore extends SpatialTest {
+  override def dseModelArgs: Args = "192"
+  override def finalModelArgs: Args = "192"
   override def runtimeArgs: Args = "192"
 
 

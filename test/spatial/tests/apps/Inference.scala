@@ -3,7 +3,10 @@ package spatial.tests.apps
 import spatial.dsl._
 
 @spatial class SingleLayerConv_RCIO extends SpatialTest {
+  override def dseModelArgs: Args = "16 16 16 0 0 8 16 16 16 16 16 16 0 0 16"
+  override def finalModelArgs: Args = "16 16 16 0 0 8 16 16 16 16 16 16 16 16"
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
+  
   type T = FixPt[TRUE,_16,_0]
   type T2 = FixPt[TRUE,_32,_0]
   type REALT = FixPt[TRUE,_4,_12]
@@ -556,10 +559,12 @@ import spatial.dsl._
 
 
 @spatial class SingleLayerConv_IRCO extends SpatialTest {
-  type T = FixPt[TRUE,_16,_0]
+  override def dseModelArgs: Args = "16 16 16 16 2 16 1 16 1 16 1 32 32 1 32 2 1 16 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 16 1 8"
+  override def finalModelArgs: Args = "16 16 16 16 2 16 1 16 1 16 6 32 32 0 32 2 0 16 16 1 16 "
 
+  type T = FixPt[TRUE,_16,_0] 
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
-
+  
   def main(args: Array[String]): Unit = {
 
     val debug:scala.Boolean = false
@@ -740,6 +745,8 @@ import spatial.dsl._
 
 @spatial class SingleLayerConv_OIRC extends SpatialTest {
   type T = FixPt[TRUE,_16,_0]
+  override def dseModelArgs: Args = "16 16 16 16 16 2 16 2 16 32 32 0 32 2 0 16"
+  override def finalModelArgs: Args = "16 16 16 16 16 2 16 2 16 32 32 0 32 2 0 16"
 
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
 
@@ -894,4 +901,5 @@ import spatial.dsl._
 
   }
 }
+
 

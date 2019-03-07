@@ -5,3 +5,9 @@ all:
 
 clean:
 	rm -rf target
+
+dse-model: 
+	sbt "; project model; runMain model.AppRuntimeModel_dse ${ARGS}"
+
+final-model: 
+	sbt "; project model; runMain model.AppRuntimeModel_final ${ARGS}"

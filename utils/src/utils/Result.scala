@@ -58,6 +58,13 @@ object Result {
     def continues: Boolean = false
   }
 
+
+  case class ModelError(msg: String) extends Exception(msg) with Result with NoStackTrace {
+    def ==>(func: => Result): Result = this
+    def orElse(result: => Result): Result = this
+    def resolve(): Unit = throw this
+    def continues: Boolean = false
+  }
 }
 
 

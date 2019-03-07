@@ -3,6 +3,8 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 @spatial class ReduceArbitraryLambda extends SpatialTest {
+  override def dseModelArgs: Args = "8 8"
+  override def finalModelArgs: Args = "8 8"
   override def runtimeArgs: Args = "8"
 
 

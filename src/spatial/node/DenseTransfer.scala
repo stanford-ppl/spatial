@@ -45,6 +45,18 @@ import spatial.util.memops._
     @rig def lower(): Void = {
       DenseTransfer.transfer(dram,local,forceAlign,ens,isLoad)
     }
+    @rig def pars: Seq[I32] = {
+      val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+      (dram.sparsePars().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil }).toSeq
+    }
+    @rig def ctrSteps: Seq[I32] = {
+      val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+      (dram.sparseSteps().map(_._2) ++ {if (!normalCounting) Seq(I32(0)) else Nil }).toSeq
+    }
+    @rig def lens: Seq[I32] = {
+      val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+      (dram.sparseLens().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil}).toSeq
+    }
 }
 
 object DenseTransfer {
@@ -72,13 +84,14 @@ object DenseTransfer {
     val counters: Seq[() => Counter[I32]] = sparseRank.map{d => () => Counter[I32](start = 0, end = lens(d), par = pars(d)) }
 
     val p = pars.toSeq.maxBy(_._1)._2
+    val lastPar = pars.last._2 match {case Expect(p) => p.toInt; case _ => 1}
     val requestLength: I32 = lens.toSeq.maxBy(_._1)._2
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
     p match {case Expect(p) => assert(p.toInt*A.nbits <= target.burstSize, s"Cannot parallelize by more than the burst size! Please shrink par (par ${p.toInt} * ${A.nbits} > ${target.burstSize})"); case _ =>}
 
     val outerLoopCounters = counters.dropRight(1)
     if (outerLoopCounters.nonEmpty) {
-      Stream.Foreach(outerLoopCounters.map{ctr => ctr()}){ is =>
+      val top = Stream.Foreach(outerLoopCounters.map{ctr => ctr()}){ is =>
         val indices = is :+ 0.to[I32]
 
         // Pad indices, strides with 0's against rawDramOffsets
@@ -90,15 +103,23 @@ object DenseTransfer {
         if (isLoad) load(dramAddr, localAddr)
         else        store(dramAddr, localAddr)
       }
+      top.loweredTransfer = if (isLoad) DenseLoad else DenseStore
+      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
+      top.loweredTransferSize = (alignedSize, pars.last._2)
     }
     else {
-      Stream {
+      val top = Stream {
         val dramAddr = () => flatIndex(rawDramOffsets, rawDims)
         val localAddr = {i: I32 => Seq(i) }
         if (isLoad) load(dramAddr, localAddr)
         else        store(dramAddr, localAddr)
       }
+      top.loweredTransfer = if (isLoad) DenseLoad else DenseStore
+      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
+      top.loweredTransferSize = (alignedSize, pars.last._2)
     }
+
+    // struc.loweredTransfer = if (isLoad) DenseLoad else DenseStore
 
     def store(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = requestLength match {
       case Expect(c) if (c*A.nbits) % target.burstSize == 0 | forceAlign =>

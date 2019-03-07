@@ -4,6 +4,8 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 @spatial class SwitchCaseController extends SpatialTest {
+  override def dseModelArgs: Args = "0 50" // Not sure about 2nd
+  override def finalModelArgs: Args = "0 50" // Not sure about 2nd
   override def runtimeArgs: Args = "1 32"
 
   def main(args: Array[String]): Unit = {

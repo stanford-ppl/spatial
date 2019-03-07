@@ -3,9 +3,12 @@ package spatial.tests.apps
 import spatial.dsl._
 
 @spatial class BTC extends SpatialTest {
+  override def dseModelArgs: Args = "160 64 25 50 95 59 64 25 10 50 25 12 50"
+  override def finalModelArgs: Args = "160 64 50 95 59 64 10 50 12 12 12 12 12 12 12 12 50"
   override def runtimeArgs: Args = {
     "0100000081cd02ab7e569e8bcd9317e2fe99f2de44d49ab2b8851ba4a308000000000000e320b6c2fffc8d750423db8b1eb942ae710e951ed797f7affc8892b0f1fc122bc7f5d74df2b9441a42a14695"
   }
+
 
   /*
     According to https://en.bitcoin.it/wiki/Block_hashing_algorithm

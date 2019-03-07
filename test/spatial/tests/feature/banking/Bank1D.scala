@@ -3,6 +3,8 @@ package spatial.tests.feature.banking
 import spatial.dsl._
 
 @spatial class Bank1D extends SpatialTest {
+  override def dseModelArgs: Args = "16 16 16 16 16"
+  override def finalModelArgs: Args = "16 16 16 16 16"
   override def runtimeArgs: Args = "16 7 2"
 
   val C = 64

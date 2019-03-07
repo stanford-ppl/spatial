@@ -11,9 +11,10 @@ import spatial.metadata.memory._
 import spatial.metadata.control._
 import spatial.metadata.access._
 import spatial.metadata.types._
+import spatial.traversal._
 import spatial.util.spatialConfig
 
-case class ScalarAnalyzer(IR: State) extends argon.passes.Traversal { 
+case class ScalarAnalyzer(IR: State) extends RerunTraversal { 
 
   private var insideLoop = false
   def maybeLoop[T](isLoop: Boolean)(x: => T): T = {

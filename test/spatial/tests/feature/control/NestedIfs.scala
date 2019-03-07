@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class NestedIfs extends SpatialTest {
+  override def dseModelArgs: Args = "100 0 100"
+  override def finalModelArgs: Args = "100" // Not sure what was optimized here
   override def runtimeArgs: Args = "43" and "2"
 
 

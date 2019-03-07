@@ -11,6 +11,14 @@ case object Streaming extends CtrlSchedule
 case object ForkJoin extends CtrlSchedule
 case object Fork extends CtrlSchedule
 
+/** Transfer type. */
+sealed abstract class TransferType
+case object DenseStore extends TransferType
+case object DenseLoad  extends TransferType
+case object SparseStore extends TransferType
+case object SparseLoad  extends TransferType
+
+
 /** Control node level. */
 sealed abstract class CtrlLevel
 case object Inner extends CtrlLevel { override def toString = "InnerControl" }
@@ -164,3 +172,20 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.C
   * Default: empty set
   */
 case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)
+
+/** Marks top-level streaming controller as one derived from DRAM transfer during blackbox lowering.
+  * Used for runtime performance modeling post-blackbox lowering
+  *
+  * Getter: sym.loweredTransfer
+  * Setter: sym.loweredTransfer = TransferType
+  * Default: None
+  */
+case class LoweredTransfer(typ: TransferType) extends Data[LoweredTransfer](SetBy.Analysis.Self)
+
+/** Tracks the size of the last-level counter, for modeling purposes
+  *
+  * Getter: sym.loweredTransferSize
+  * Setter: sym.loweredTransferSize = (length, par)
+  * Default: None
+  */
+case class LoweredTransferSize(info: (Sym[_], Sym[_])) extends Data[LoweredTransferSize](SetBy.Analysis.Self)

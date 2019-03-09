@@ -18,7 +18,7 @@ package object params {
     def contention_=(d: Int): Unit = metadata.add(p, MemoryContention(d))
 
     def getIntValue: Option[Int] = if (p.getBound.isDefined) Some(p.bound.toInt) else None
-    @stateful def intValue: Int = p.bound.toInt
+    @stateful def intValue: Int = {Console.println(s"getting int value for $p in state $state = ${p.bound.toInt}");p.bound.toInt}
     @stateful def setIntValue(d: Int): Unit = p.bound = Expect(d)
     def intValue_=(d: Int): Unit = p.bound = Expect(d)
 

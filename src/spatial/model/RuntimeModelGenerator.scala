@@ -115,40 +115,44 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
         visitBlock(block)
 
       close("}")
+      
+      val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}"
+      val example = if (version == "dse") IR.dseModelArgs.toString else IR.finalModelArgs.toString
+
       emit("")
-      open("override def main(args: Array[String]): Unit = {")
-        val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}"
-        emit(s"""begin("${gen_dir}/results_$version")""")
-        emit("""if (args.size >= 1 && (args.contains("noninteractive") || args.contains("ni"))) {""")
-        emit("""    interactive = false""")
-        emit("""    val idx = {0 max args.indexOf("noninteractive")} + {0 max args.indexOf("ni")}""")
-        emit("""    cliParams = args.drop(idx+1).takeWhile{_ != "tune"}.map(_.toInt)""")
-        emit("""    emit(s"Noninteractive Args: ${cliParams.mkString(" ")}") """)
-        emit("""}""")
-        emit("""else {""")
-        val example = if (version == "dse") IR.dseModelArgs.toString else IR.finalModelArgs.toString
-        emit(s"""    println(s"Suggested args: ${example}")""")
-        emit("""}""")
-        emit("""if (args.size >= 1 && (args.contains("tune"))) {""")
-        emit("""    retune = true""")
-        emit("""    val idx = 0 max args.indexOf("tune")""")
-        emit("""    tuneParams = args.drop(idx+1).takeWhile{x => x != "noninteractive" && x != "ni"}.map(_.toInt).grouped(2).map{x => (x(0) -> x(1))}.toMap""")
-        emit("""    emit(s"Retuning Params: ${tuneParams.mkString(" ")}") """)
-        emit("""}""")
-        if (version == "final") emit("isFinal = true")
-        emit("val root = build_model()")
-        emit("root.initializeAskMap(AskMap.map)")
-        emit("root.loadPreviousAskMap(PreviousAskMap.map) // Load previous run's askmap")
-        emit(s"""emit(s"[$version] Structure for app ${config.name}")""")
-        emit("root.printStructure()")
-        emit("root.execute()")
-        emit(s"""emit(s"[$version] Runtime results for app ${config.name}")""")
-        emit("""root.printResults()""")
-        emit(s"""root.storeAskMap("${gen_dir}/model/PreviousAskMap.scala") // Store this run's askmap""")
-        emit(s"""emit(s"[$version] Total Cycles for App ${config.name}: $${root.totalCycles()}")""")
-        emit("end()")
-      close("}")
-    close("}")
+      emit("""override def main(args: Array[String]): Unit = {""")
+      emit(s"""  begin("${gen_dir}/results_$version")""")
+      emit("""  if (args.size >= 1 && (args.contains("noninteractive") || args.contains("ni"))) {""")
+      emit("""      interactive = false""")
+      emit("""      val idx = {0 max args.indexOf("noninteractive")} + {0 max args.indexOf("ni")}""")
+      emit("""      cliParams = args.drop(idx+1).takeWhile{_ != "tune"}.map(_.toInt)""")
+      emit("""      emit(s"Noninteractive Args: ${cliParams.mkString(" ")}") """)
+      emit("""  }""")
+      emit("""  else {""")
+      emit(s"""    println(s"Suggested args: ${example}")""")
+      emit("""  }""")
+      emit("""  val allTuneParams: Seq[Map[Int, Any]] = if (args.size >= 1 && (args.contains("tune"))) {""")
+      emit("""      retune = true""")
+      emit("""      val indices: Seq[Int] = args.zipWithIndex.filter(_._1 == "tune").map(_._2)""")
+      emit("""      indices.map{idx => args.drop(idx+1).takeWhile{x => x != "noninteractive" && x != "ni" && x != "tune"}.grouped(2).map{x => (x(0).toInt -> {try {x(1).toInt} catch {case _: Throwable => x(1)}} )}.toMap}""")
+      emit("""  } else {Seq(Map[Int, Any]())}""")
+      if (version == "final") emit("  isFinal = true")
+      emit("""  val root = build_model()""")
+      emit("""  root.initializeAskMap(AskMap.map)""")
+      emit("""  root.loadPreviousAskMap(PreviousAskMap.map) // Load previous run's askmap""")
+      emit(s"""  emit(s"[$version] Structure for app ${config.name}")""")
+      emit("""  allTuneParams.foreach{tuneTo => """)
+      emit("""      tuneParams = tuneTo""")
+      emit("""      root.printStructure()""")
+      emit("""      root.execute()""")
+      emit(s"""      emit(s"[$version] Runtime results for app ${config.name}")""")
+      emit("""      root.printResults()""")
+      emit(s"""      root.storeAskMap("${gen_dir}/model/PreviousAskMap.scala") // Store this run's askmap""")
+      emit(s"""      emit(s"[$version] Total Cycles for App ${config.name}: $${root.totalCycles()}")""")
+      emit("""  }""")
+      emit("""  end()""")
+      emit("""}""")
+      close("""}""")
 
     if (version == "dse") {
       withGen(out, "InitAskMap.scala"){
@@ -238,7 +242,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
-      emit(src"val $lhs = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
       emit(src"${lhs}")
@@ -250,13 +254,13 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case OpForeach(ens,cchain,block,_,_) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
@@ -267,19 +271,19 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(func)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case ParallelPipe(_,block) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), 0, 0, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), 0, 0, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
@@ -290,13 +294,13 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
 
     case UnitPipe(_, block) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
@@ -304,7 +308,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(map)
       visitBlock(load)
       visitBlock(reduce)
@@ -315,7 +319,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, $cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(func)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
@@ -341,7 +345,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
 
       val lat = 0.0
       val ii = 0.0
-      emit(src"val ${lhs} = new ControllerModel(OuterControl, ${tp}, ${lhs}_cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, OuterControl, ${tp}, ${lhs}_cchain, ${lat.toInt}, ${ii.toInt}, $ctx)")
 
 
     case StateMachine(ens, start, notDone, action, nextState) =>
@@ -350,7 +354,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs,Bits[I32].one,Bits[I32].one, false, s"_fsm")
       emit(src"""val ${lhs}_cchain = CChainModel(List[CtrModel](${lhs}_fsm), $ctx)""")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, ${lhs}_cchain, ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, ${lhs}_cchain, ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
       visitBlock(notDone)
       visitBlock(action)
       visitBlock(nextState)
@@ -360,7 +364,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, List($cchainMap, $cchainRed), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, List($cchainMap, $cchainRed), ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(map)
       visitBlock(loadRes)
       visitBlock(loadAcc)
@@ -373,7 +377,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       visitBlock(body)
-      emit(src"val ${lhs} = new ControllerModel(OuterControl, ${lhs.rawSchedule.toString}, CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, OuterControl, ${lhs.rawSchedule.toString}, CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case SwitchCase(body) =>
@@ -381,7 +385,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       visitBlock(body)
-      emit(src"val ${lhs} = new ControllerModel(${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${lhs.rawSchedule.toString}, CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case _ => lhs.blocks.foreach{block => visitBlock(block) }

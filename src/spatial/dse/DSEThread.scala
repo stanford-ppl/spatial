@@ -79,16 +79,16 @@ case class DSEThread(
   }
 
   def run(): Unit = {
-    println(s"[$threadId] Started.")
+    // println(s"[$threadId] Started.")
 
     while(isAlive) {
       val requests = workQueue.take() // Blocking dequeue
 
       if (requests.nonEmpty) {
-        println(s"[$threadId] Received batch of ${requests.length}. Working...")
+        // println(s"[$threadId] Received batch of ${requests.length}. Working...")
         try {
           val result = run(requests)
-          println(s"[$threadId] Completed batch of ${requests.length}. ${workQueue.size()} items remain in the queue")
+          // println(s"[$threadId] Completed batch of ${requests.length}. ${workQueue.size()} items remain in the queue")
           outQueue.put(result) // Blocking enqueue
         }
         catch {case e: Throwable =>
@@ -99,37 +99,43 @@ case class DSEThread(
         }
       }
       else {
-        println(s"[$threadId] Received kill signal, terminating!")
+        // println(s"[$threadId] Received kill signal, terminating!")
         requestStop()
       } // Somebody poisoned the work queue!
     }
 
-    println(s"[$threadId] Ending now!")
+    // println(s"[$threadId] Ending now!")
     hasTerminated = true
   }
 
   def run(requests: Seq[BigInt]): Array[String] = {
     val array = new Array[String](requests.size)
     var i: Int = 0
+    val paramRewrites = requests.map{pt => indexedSpace.flatMap{case (domain,d) => Seq(domain.id, domain.options( ((pt / prods(d)) % dims(d)).toInt ))}}
+    val runtimes = evaluateLatency(paramRewrites)
     requests.foreach{pt =>
       state.resetErrors()
-      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt ) }
+      indexedSpace.foreach{case (domain,d) => domain.set( ((pt / prods(d)) % dims(d)).toInt )(state) }
 
-      //println(params.map{case p @ Bound(c) => p.name.getOrElse(p.toString) + s": $c" }.mkString(", "))
-
-      val (area, runtime) = evaluate()
+      val area = evaluate(paramRewrites)
       val valid = area <= capacity && !state.hadErrors // Encountering errors makes this an invalid design point
       val time = System.currentTimeMillis() - START
 
       // Only report the area resources that the target gives maximum capacities for
-      array(i) = space.map(_.value).mkString(",") + "," + area.seq(areaHeading:_*).mkString(",") + "," + runtime + "," + valid + "," + time
+      array(i) = space.map(_.value).mkString(",") + "," + area.seq(areaHeading:_*).mkString(",") + "," + runtimes(i) + "," + valid + "," + time
 
       i += 1
     }
     array
   }
 
-  private def evaluate(): (Area, Long) = {
+  private def evaluateLatency(paramRewrites: Seq[Seq[Any]]): Seq[Long] = {
+    cycleAnalyzer.test(paramRewrites)//rerun(accel, program)
+    if (PROFILING) endCycles()
+    cycleAnalyzer.totalCycles
+  }
+
+  private def evaluate(paramRewrites: Seq[Any]): Area = {
     if (PROFILING) resetClock()
     // scalarAnalyzer.rerun(accel, program)
     if (PROFILING) endBnd()
@@ -143,9 +149,7 @@ case class DSEThread(
     // areaAnalyzer.rerun(accel, program)
     if (PROFILING) endArea()
 
-    cycleAnalyzer.rerun(accel, program)
-    if (PROFILING) endCycles()
-    (areaAnalyzer.totalArea._1, cycleAnalyzer.totalCycles)
+    areaAnalyzer.totalArea._1
   }
 
 }

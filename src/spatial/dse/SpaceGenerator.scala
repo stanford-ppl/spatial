@@ -19,6 +19,7 @@ trait SpaceGenerator {
     if (restricts.nonEmpty) {
       Domain.restricted(
         name   = p.name.getOrElse(s"$p"),
+        id     = p.hashCode,
         range  = p.paramDomain.toRange,
         setter = {(v: Int, state: State) => p.setIntValue(v)(state) },
         getter = {(state: State) => p.intValue(state).toInt },
@@ -29,6 +30,7 @@ trait SpaceGenerator {
     else {
       Domain(
         name  = p.name.getOrElse(s"$p"),
+        id = p.hashCode,
         range = p.paramDomain.toRange,
         setter = { (v: Int, state: State) => p.setIntValue(v)(state) },
         getter = { (state: State) => p.intValue(state).toInt },
@@ -54,6 +56,7 @@ trait SpaceGenerator {
     metapipes.map{mp =>
       new Domain[Boolean](
         name    = mp.name.getOrElse(s"$mp"),
+        id      = mp.hashCode,
         options = Seq(false, true),
         setter  = {(c: Boolean, state:State) => if (c) mp.setSchedValue(Pipelined)(state)
                                                 else   mp.setSchedValue(Sequenced)(state) },

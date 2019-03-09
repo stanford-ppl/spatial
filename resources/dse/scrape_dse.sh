@@ -2,7 +2,8 @@
 
 # Scrape app directories for cycle counts
 
-for file in `find ~/sp_dse/spatial/gen/DSE/ -name "sim.log"`; do
+rm data/train
+for file in `find ~/sp_dse/spatial/gen/VCS/ -name "sim.log"`; do
 	in_loads=0
 	max_load=0
 	in_stores=0
@@ -31,6 +32,7 @@ for file in `find ~/sp_dse/spatial/gen/DSE/ -name "sim.log"`; do
 	done <<< $(cat $file | grep "^      x")
 	# cycs=`cat $file | grep "Design ran for " | sed "s/^.*Design ran for //g" | sed "s/ cycles.*//g"`
 	h=`echo $file | sed "s/.*Dims//g" | sed "s/x.*//g"`
-	w=`echo $file | sed "s/.*Dims.*x//g" | sed "s/\/sim.log//g"`
-	echo -e "$loads\t$stores\t$gateds\t$h\t$w\t${max_load}\t${max_store}\t${max_gated}"
+	w=`echo $file | sed "s/.*Dims.*x//g" | sed "s/P.*//g"`
+	bpc=`echo $file | sed "s/.*P//g" | sed "s/\/sim.log//g"`
+	echo -e "$loads\t$stores\t$gateds\t$h\t$w\t$bpc\t${max_load}\t${max_store}\t${max_gated}" | tee -a data/train
 done

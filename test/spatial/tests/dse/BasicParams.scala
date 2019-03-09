@@ -15,14 +15,14 @@ import scala.reflect.ClassTag
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
-    val P1 = 1 (1 -> 2)
-    val P2 = 2 (2 -> 2 -> 8)
+    val OP = 1 (1 -> 2)
+    val IP = 2 (2 -> 2 -> 8)
     val B  = 32 (32 -> 64 -> 192)
-    val P3 = 4 (1 -> 16)
+    val LP = 4 (1 -> 4)
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
 
-    val size = aIn.length; bound(size) = 1920000
+    val size = aIn.length; bound(size) = 19200
 
     val N = ArgIn[Int]
     setArg(N, size)
@@ -35,15 +35,15 @@ import scala.reflect.ClassTag
 
     Accel {
       val accO = Reg[T](0.to[T])
-      out0 := Reduce(accO)(N by B par P1){i =>
+      out0 := Reduce(accO)(N by B par OP){i =>
         val aBlk = SRAM[T](B)
         val bBlk = SRAM[T](B)
         Parallel {
-          aBlk load a(i::i+B par P3)
-          bBlk load b(i::i+B par P3)
+          aBlk load a(i::i+B par LP)
+          bBlk load b(i::i+B par LP)
         }
         val accI = Reg[T](0.to[T])
-        Reduce(accI)(B par P2){ii => aBlk(ii) * bBlk(ii) }{_+_}
+        Reduce(accI)(B par IP){ii => aBlk(ii) * bBlk(ii) }{_+_}
       }{_+_}
     }
     getArg(out0)

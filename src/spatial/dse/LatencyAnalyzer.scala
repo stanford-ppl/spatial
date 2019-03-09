@@ -12,10 +12,10 @@ import models._
 import argon.node._
 
 
-case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal {
+case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelTraversal {
   var cycleScope: List[Double] = Nil
   var intervalScope: List[Double] = Nil
-  var totalCycles: Long = 0L
+  var totalCycles: Seq[Long] = Seq()
 
   def getListOfFiles(d: String):List[String] = {
     import java.nio.file.{FileSystems, Files}
@@ -28,28 +28,28 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends RerunT
     super.silence()
   }
 
-  override def rerun(e: Sym[_], blk: Block[_]): Unit = {
-    isRerun = true
-    preprocess(blk)
-    super.rerun(e, blk)
-    postprocess(blk)
-    isRerun = false
-  }
 
-  override protected def preprocess[A](b: Block[A]): Block[A] = {
-    import utils.process.BackgroundProcess
+  def test(rewriteParams: Seq[Seq[Any]]): Unit = {
     import scala.language.postfixOps
     import java.io.File
     import sys.process._
 
     val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
     val modelJar = getListOfFiles(gen_dir + "/model").filter(_.contains("RuntimeModel-assembly")).head
-    val output = Process(s"""scala ${modelJar} ni""", new File(gen_dir)).!!
-    val result = output.split("\n").filter(_.contains("Total Cycles for App")).headOption
-    if (result.isDefined) {
-      totalCycles = "^.*: ".r.replaceAllIn(result.get,"").trim.toInt
-      println(s"DSE Model result: $totalCycles")
-    }
+    totalCycles = rewriteParams.grouped(200).flatMap{params => 
+      val batchedParams = params.map{rp => "tune " + rp.mkString(" ")}.mkString(" ")
+      val cmd = s"""java -jar ${modelJar} ni ${batchedParams}"""
+      // println(s"running cmd: $cmd")
+      val output = Process(cmd, new File(gen_dir)).!!
+      output.split("\n").filter(_.contains("Total Cycles for App")).map{r => 
+        "^.*: ".r.replaceAllIn(r,"").trim.toLong
+      }.toSeq
+    }.toSeq
+    // println(s"DSE Model result: $totalCycles")
+
+  }
+
+  override protected def preprocess[A](b: Block[A]): Block[A] = {
 
     super.preprocess(b)
   }

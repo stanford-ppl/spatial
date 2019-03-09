@@ -50,8 +50,49 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                   val nextIterReads  = reader.affineMatrices.map(_.matrix.increment(iters.last,1))
                   val diff = thisIterWrites.last - thisIterReads.head // How far is the last write from the first read?
                   val advancePerInc = nextIterReads.head - thisIterReads.head // How far do we advance in one tick?
-                  val minIterDiff = diff.collapse.zip(advancePerInc.collapse).map{case (a,b) => if(a != 0 && b == 0) 0 else if(a == 0 && b == 0) 1 else  a / b}.sorted.headOption
-                  dbgs(s"Iteration Diff = ${minIterDiff}")
+
+                  // Figure out how many iterations pass between writing to an addr and then needing that addr due to iterator advancement
+                  val dynamicDiff = diff.collapse.zip(advancePerInc.collapse).map{case (a,b) => 
+                    if(a != 0 && b == 0) 0       // i.e. A(i,j) = A(i-1,j) + 1, relative to iterator i advances "0" per iter, reads from 1 ago each iter
+                    else if(a == 0 && b == 0) 1  // i.e. A(0) = A(0) + 1, iterators involved in access don't increment with cchain AND don't change from iter to iter
+                    else  a / b}
+                  .sorted.headOption
+
+                  // Also figure out how many iterations pass before an addr is used a second time (i.e. Foreach(0::L,0::M,0::N){(l,m,n) => A(l,n) = A(l,n) + 1} requires A(l,n) every N iters)
+                  dbgs(s"iterators $iters, keys ${thisIterWrites.head.keys}")
+                  val repeatDist: Option[Int] = if (!iters.forall(thisIterWrites.head.keys.contains)) {
+                    val missingIterator = iters.reverse.collectFirst{case iter if !thisIterWrites.head.keys.contains(iter) => iter}.get
+                    val otherIters = iters.reverse.takeWhile(_ != missingIterator)//.filter(_ != missingIterator)
+                    dbgs(s"$missingIterator is missing!  Iter Diff could be dependent on $otherIters")
+                    val starts: Seq[Option[Int]] = otherIters.map(_.ctrStart match {case Expect(c) => Some(c.toInt); case _ => None})
+                    val stops: Seq[Option[Int]] = otherIters.map(_.ctrEnd match {case Expect(c) => Some(c.toInt); case _ => None})
+                    val steps: Seq[Option[Int]] = otherIters.map(_.ctrStep match {case Expect(c) => Some(c.toInt); case _ => None})
+                    val pars: Seq[Int] = otherIters.map(_.ctrParOr1)
+                    if (starts.forall(_.isDefined) && stops.forall(_.isDefined) && steps.forall(_.isDefined)) {
+                      Some((starts,stops,steps).zipped.toList.zip(pars).map{case ((s,e,st),p) => (scala.math.ceil((e.get - s.get) / (st.get)) / p).toInt}.product)
+                    }
+                    else if (spatialConfig.enableLooseIterDiffs) {
+                      warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but --looseIterDiffs flag is set!  Assuming you won't reduce on ${mem.ctx} so rapidly that you run into data correctness issues!")
+                      None
+                    } else if (lhs.userII.isDefined) {
+                      warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but II for this controller is set so this is ok (II = ${lhs.userII.get}).")
+                      None
+                    } else {
+                      warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx})! You should:")
+                      warn(s"    1) Set iterators $otherIters to static start/stop/step values")
+                      warn(s"    2) Be ok with compiler using the most conservative possible II for this loop")
+                      warn(s"    3) Compile with --looseIterDiffs flag to ignore potential loop-carry dependency issues on ${mem.ctx}")
+                      warn(s"    4) Explicitly set II for this loop")
+                      Some(1)
+                    }
+                  } else None
+
+                  val minIterDiff = if (repeatDist.isDefined && dynamicDiff.isDefined && dynamicDiff.get != 0) Some(repeatDist.get min dynamicDiff.get)
+                                    else if (repeatDist.isDefined && dynamicDiff.isDefined) repeatDist
+                                    else if (dynamicDiff.isDefined) dynamicDiff
+                                    else if (repeatDist.isDefined) repeatDist
+                                    else None
+                  dbgs(s"Each iter needs result written ${minIterDiff} (or more) iters ago (i.e. Iter Diff = ${minIterDiff} (dynamic: $dynamicDiff min repeat: $repeatDist)")
                   if (minIterDiff.isDefined) {
                     reader.iterDiff = minIterDiff.get
                     writer.iterDiff = minIterDiff.get

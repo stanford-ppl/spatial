@@ -277,6 +277,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
+    cli.opt[Unit]("looseIterDiffs").action{ (_,_) => 
+      spatialConfig.enableLooseIterDiffs = true
+    }.text("Ignore iteration difference analysis for loops where some iterators are not part of the accumulator cycle but its leading iterators run for an unknown duration")
+
     cli.opt[Unit]("retime").action{ (_,_) =>
       spatialConfig.enableRetiming = true
       overrideRetime = true

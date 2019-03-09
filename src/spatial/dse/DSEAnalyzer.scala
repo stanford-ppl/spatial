@@ -294,6 +294,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     val workers = workerIds.map{id =>
       val threadState = new State(state.app)
       threadState.config = new SpatialConfig
+      Console.println(s"base thread $state, new thread $threadState")
       state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
       DSEThread(
         threadId  = id,
@@ -314,7 +315,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
 
     //val superHeader = List.tabulate(names.length){i => if (i == 0) "INPUTS" else "" }.mkString(",") + "," +
     //  List.tabulate(workers.head.areaHeading.length){i => if (i == 0) "OUTPUTS" else "" }.mkString(",") + ", ,"
-    val header = names.mkString(",") + "," + workers.head.areaHeading.mkString(",") + ", Cycles, Valid"
+    val header = names.mkString(",") + "," + workers.head.areaHeading.mkString(",") + ",Cycles,Valid"
 
     val writer = DSEWriterThread(
       threadId  = T,
@@ -379,6 +380,23 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     }
 
     println(s"[Master] Completed space search in $totalTime seconds.")
+
+    val string_table = utils.io.files.loadCSVNow[String](filename, "\n")(x => x).toList
+    val data_table = string_table.drop(1).map(_.split(",")).sortBy(_.dropRight(2).last.toInt).reverse
+    if (data_table.size > 8) {
+      println(string_table(0))
+      println(data_table(0).mkString(","))
+      println(data_table(1).mkString(","))
+      println(data_table(2).mkString(","))
+      println("...".mkString(","))
+      println(data_table.dropRight(5).last.mkString(","))
+      println(data_table.dropRight(4).last.mkString(","))
+      println(data_table.dropRight(3).last.mkString(","))
+      println(data_table.dropRight(2).last.mkString(","))
+      println(data_table.dropRight(1).last.mkString(","))
+      println(data_table.last.mkString(","))
+
+    }
   }
 
   def bruteForceDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_]): Unit = {

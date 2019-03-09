@@ -101,7 +101,8 @@ case class HyperMapperThread(
     state.resetErrors()
     request.indices.foreach{i => space(i).setValueUnsafe(request(i)) }
 
-    val (area, runtime) = evaluate()
+    val runtime = 0L // TODO: cycleAnalyzer.totalCycles
+    val area = evaluate()
     val valid = area <= capacity && !state.hadErrors // Encountering errors makes this an invalid design point
     val time  = System.currentTimeMillis()
     val timestamp = time - start
@@ -110,22 +111,22 @@ case class HyperMapperThread(
     space.map(_.value).mkString(",") + "," + area.seq(areaHeading:_*).mkString(",") + "," + runtime + "," + valid + "," + timestamp
   }
 
-  private def evaluate(): (Area, Long) = {
-    scalarAnalyzer.rerun(accel, program)
+  private def evaluate(): Area = {
+    // scalarAnalyzer.rerun(accel, program)
     if (PROFILING) endBnd()
 
-    memoryAnalyzer.run()
+    // memoryAnalyzer.run()
     if (PROFILING) endMem()
 
-    contentionAnalyzer.run()
+    // contentionAnalyzer.run()
     if (PROFILING) endCon()
 
-    areaAnalyzer.rerun(accel, program)
+    // areaAnalyzer.rerun(accel, program)
     if (PROFILING) endArea()
 
-    cycleAnalyzer.rerun(accel, program)
+    // cycleAnalyzer.rerun(accel, program)
     if (PROFILING) endCycles()
-    (areaAnalyzer.totalArea._1, cycleAnalyzer.totalCycles)
+    areaAnalyzer.totalArea._1
   }
 
 }

@@ -14,7 +14,7 @@ object Runtime {
   var logfilename: String = ""
   var logfile: Option[PrintWriter] = None
   var cliParams = Seq[Int]()
-  var tuneParams = Map[Int, Int]()
+  var tuneParams = Map[Int, Any]()
   var isFinal = false
   var suppressWarns = false
 
@@ -98,7 +98,8 @@ object Runtime {
         if (!tuneParams.contains(id) && !cachedTune.contains(id)) {println(s"[warn] Using default value $default for tuneable param $whatAmI ($id)"); cachedTune += id}
         else if (!cachedTune.contains(id)) {println(s"[warn] Using retuned value ${tuneParams(id)} for tuneable param $whatAmI ($id) (default was $default)"); cachedTune += id}
       }
-      tuneParams.getOrElse(id, default)
+      // println(s"looking up $id default $default in params $tuneParams")
+      tuneParams.getOrElse(id, default).asInstanceOf[Int]
     }
   }
 
@@ -187,6 +188,7 @@ object Runtime {
   }
 
   class ControllerModel(
+    val id: Int,
     val level: CtrlLevel,
     val schedule: CtrlSchedule,
     val cchain: List[CChainModel],
@@ -194,7 +196,7 @@ object Runtime {
     val II: Int,
     val ctx: Ctx
   ){
-    def this(level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(level, schedule, List(cchain), L, II, ctx)
+    def this(id: Int, level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(id, level, schedule, List(cchain), L, II, ctx)
 
     override def toString: String = ctx.toString
     val targetBurstSize = 512
@@ -282,7 +284,10 @@ object Runtime {
         case Sequenced       => 
           if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
           else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
-        case Pipelined       => 
+        case Pipelined if (tuneParams.contains(id) && tuneParams(id).asInstanceOf[String] == "false")      => 
+          if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
+          else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
+        case Pipelined      => 
           if (cchain.size <= 1) startup + shutdown + maxChild * (cchainIters - 1) + children.map(_.cycsPerParent).sum + metaSync * cchainIters * children.size
           else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
         case ForkJoin        => startup + shutdown + maxChild * cchainIters + metaSync

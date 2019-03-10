@@ -138,9 +138,13 @@ class DRAMArbiter(
       val wdataCount = debugCounter(io.dram.wdata.valid & io.dram.wdata.ready)
       val appWdataCount = debugCounter(io.app.stores.head.data.valid & io.app.stores.head.data.ready)
       connectDbgSig(wdataCount, "[FRINGE] num wdata transferred (wvalid & wready)")
+      connectDbgSig(rdataEnqCount, "[FRINGE] num rdata enqueued (rresp.valid & rresp.ready")
 
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid), "[FRINGE] # DRAM Commands Issued")
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid & !io.dram.cmd.bits.isWr), "[FRINGE] # Read Commands Sent")
+      connectDbgSig(debugCounter(io.dram.cmd.ready),                                              "[FRINGE]      # io.dram.cmd.ready")
+      connectDbgSig(debugCounter(io.dram.cmd.valid),                                              "[FRINGE]      # io.dram.cmd.valid")
+      connectDbgSig(debugCounter(!io.dram.cmd.bits.isWr),                                         "[FRINGE]      # !io.dram.cmd.bits.isWr")
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid & io.dram.cmd.bits.isWr), "[FRINGE] # Write Commands Sent")
 
       // Count number of load commands issued from accel per stream

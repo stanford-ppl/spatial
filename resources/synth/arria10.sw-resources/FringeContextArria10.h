@@ -292,7 +292,7 @@ public:
       if (num % 10000000 == 0) {
         double endTime = getTime();
         EPRINTF("Elapsed time: %lf ms, status = %08x\n", endTime - startTime, status);
-        // dumpAllRegs();
+        dumpAllRegs();
         if (endTime - startTime > timeout * 1000) {
           timed_out = 1;
           fprintf(stderr, "TIMEOUT, %lf seconds elapsed..\n", (endTime - startTime) / 1000 );
@@ -362,7 +362,7 @@ public:
     int debugRegStart = 2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
     int totalRegs = argIns + argOuts + numArgOutInstrs + numArgEarlyExits + 2 + NUM_DEBUG_SIGNALS;
 
-    for (int i=0; i<100; i++) {
+    for (int i=0; i<50; i++) {
       uint32_t value = readReg(i);
       if (i < debugRegStart) {
         if (i == 0) EPRINTF(" ******* Non-debug regs *******\n");

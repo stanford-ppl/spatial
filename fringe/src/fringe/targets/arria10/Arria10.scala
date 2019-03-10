@@ -17,7 +17,8 @@ class Arria10 extends DeviceTarget {
     fringe.io.S_AVALON <> io.S_AVALON
 
     // Fringe <-> DRAM Connections
-    io.M_AXI <> fringe.io.M_AXI
+//    io.M_AXI <> fringe.io.M_AXI
+    io.M_AVALON <> fringe.io.M_AVALON
 
     io.TOP_AXI <> fringe.io.TOP_AXI
     io.DWIDTH_AXI <> fringe.io.DWIDTH_AXI
@@ -41,7 +42,9 @@ class Arria10 extends DeviceTarget {
     fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
-    accel.io.reset := reset.toBool | fringe.io.reset
+    fringe.reset := reset.toBool
+    accel.reset := fringe.io.reset
+//    accel.io.reset := reset.toBool | fringe.io.reset
 
     io
   }

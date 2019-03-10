@@ -33,7 +33,8 @@ class FringeArria10 (
     val S_AVALON = new AvalonSlave(axiLiteParams)
 
     // DRAM interface
-    val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
+//    val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
+    val M_AVALON = Vec(NUM_CHANNELS, new AvalonMaster(axiParams))
 
     // AXI Debuggers
     val TOP_AXI = new AXI4Probe(axiLiteParams)
@@ -74,15 +75,20 @@ class FringeArria10 (
   fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   // Connect to Avalon Slave
-  fringeCommon.reset := reset
+
+  // Avalon-slave bridge
   fringeCommon.io.raddr := io.S_AVALON.address
   fringeCommon.io.wen := io.S_AVALON.write
   fringeCommon.io.waddr := io.S_AVALON.address
   fringeCommon.io.wdata := io.S_AVALON.writedata
   io.S_AVALON.readdata := fringeCommon.io.rdata
 
+  fringeCommon.io.aws_top_enable := io.externalEnable
+
   io.enable := fringeCommon.io.enable
   fringeCommon.io.done := io.done
+  fringeCommon.reset := reset.toBool
+  io.reset := fringeCommon.io.reset
 
   io.argIns := fringeCommon.io.argIns
   fringeCommon.io.argOuts <> io.argOuts
@@ -99,9 +105,16 @@ class FringeArria10 (
   io.heap <> fringeCommon.io.heap
 
   // AXI bridge
-  io.M_AXI.zipWithIndex.foreach { case (maxi, i) =>
-    val axiBridge = Module(new MAGToAXI4Bridge(axiParams))
-    axiBridge.io.in <> fringeCommon.io.dram(i)
-    maxi <> axiBridge.io.M_AXI
+//  io.M_AXI.zipWithIndex.foreach { case (maxi, i) =>
+//    val axiBridge = Module(new MAGToAXI4Bridge(axiParams))
+//    axiBridge.io.in <> fringeCommon.io.dram(i)
+//    maxi <> axiBridge.io.M_AXI
+//  }
+
+  // AVALON Master bridge
+  io.M_AVALON.zipWithIndex.foreach { case (maxi, i) =>
+    val avalonBridge = Module(new MAGToAvalonBridge(axiParams))
+    avalonBridge.io.in <> fringeCommon.io.dram(i)
+    maxi <> avalonBridge.io.M_AVALON
   }
 }

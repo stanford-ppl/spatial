@@ -223,19 +223,20 @@ class AvalonSlave(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 class AvalonMaster(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   // datawidth = 512, byteenable = 512 / 8 = 64. Right now just hard code it...
   val address = Output(UInt(params.addrBits.W)) // 32
-  val byteenable = Output(64.U) // I actually need it for wstrb
+  val byteenable = Output(UInt(64.W)) // I actually need it for wstrb
 //  val debugaccess = Output(1.U)
-  val read = Output(1.U)
+  val read = Output(Bool())
   val readdata = Input(UInt(params.dataBits.W))
   val readdatavalid = Input(Bool())
 //  val response = Input(2.U) // This signal is used for checking data integrity. Dont' really need it.
   val write = Output(Bool())
   val writedata = Output(UInt(params.dataBits.W))
-  val writerespondvalid = Input(Bool())
+  val writeresponsevalid = Input(Bool())
 //  val lock = Output(1.U) // Don't need this signal since we don't arbitrate
   val waitrequest = Input(Bool())
   val burstcount = Output(UInt(params.lenBits.W))
 //  val beginbursttransfer = Output(Bool()) // deprecated by Intel
+  val response = Input(UInt(2.W)) // Do not connect this signal as I don't really use it.
 }
 
 // Avalon streaming interface

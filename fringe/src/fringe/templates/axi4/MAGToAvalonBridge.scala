@@ -3,7 +3,7 @@ package fringe.templates.axi4
 import chisel3._
 import chisel3.util.Cat
 import fringe.globals
-import fringe.{DRAMStream}
+import fringe.DRAMStream
 
 class MAGToAvalonBridge(val p: AXI4BundleParameters) extends Module {
   Predef.assert(
@@ -45,6 +45,6 @@ class MAGToAvalonBridge(val p: AXI4BundleParameters) extends Module {
   io.in.rresp.bits.rdata := rdataAsVec
   io.in.cmd.ready := !io.M_AVALON.waitrequest
   io.in.rresp.valid := io.M_AVALON.readdatavalid
-  io.in.wresp.valid := io.M_AVALON.writerespondvalid
+  io.in.wresp.valid := io.M_AVALON.writeresponsevalid
   io.in.wdata.ready := !io.M_AVALON.waitrequest
 }

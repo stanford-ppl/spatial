@@ -144,7 +144,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Lanes ID:  0    1    2    3    4    5    6   [Parallelized loop iterations]
     *            |    |    |    |         |    |
     *            V    V    V    V         V    V
-    * Masters:                  3         5        [Broadcaster lanes in this chunk]
+    * Masters:                  3         5        [Lane IDs of non-repeat addresses]
     *           |_|  |______|  |___________|  |_|
     * Chunk:     0    0    1    0    1    2    0   [Index of lane within chunk]
     *            |         |    |         |    |
@@ -176,29 +176,31 @@ trait MemoryUnrolling extends UnrollingBase {
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
           val a2 = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
-          dbgs(s"a2 = $a2, from in lanes $laneIds in $a")
+          dbgs(s"a2 = ")
+          a2.foreach{aa => dbgs(s"  lane ${aa.lane} (castgrp/broadcast ${port.castgroup(laneIds.indexOf(aa.lane))}/${port.broadcast(laneIds.indexOf(aa.lane))}) = ${aa.addr}")}
           val distinct = a2.groupBy{_.addr}
                            .mapValues{pairs => pairs.map(_.lane)}
                            .toSeq.map{case (adr, ls) => NDAddressAcrossLanes(adr, ls) }
                            .sortBy(_.lanes.last)                        // (ND address, lane IDs) pairs
-
+          val portReordering = distinct.flatMap{d => d.lanes}.map(laneIds.indexOf)
           val addr: Seq[Seq[Idx]] = distinct.map(_.addr)                // Vector of ND addresses
           val masters: Seq[Int] = distinct.map(_.lanes.last)            // Lane ID for each distinct address
           val lane2Vec: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => laneId -> aId }}.toMap
           val vec2Lane: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => aId -> laneId }}.toMap
-          (addr, masters, lane2Vec, vec2Lane)
+          (addr, masters, lane2Vec, vec2Lane, portReordering)
         }
         val addr2      = addrOpt.map(_._1)                          // Vector of ND addresses
-        val masters    = addrOpt.map(_._2).getOrElse(laneIds)       // List of broadcaster lane IDs
+        val masters    = addrOpt.map(_._2).getOrElse(laneIds)       // List of lane IDs of non-repeat addresses
         val lane2Vec   = addrOpt.map(_._3)                          // Lane -> Vector ID
         val vec2Lane   = addrOpt.map(_._4)                          // Vector ID -> Lane ID
         val vecIds     = masters.indices                            // List of Vector IDs
+        val portReordering: Seq[Int] = addrOpt.map(_._5).getOrElse(Seq.tabulate(laneIds.size){i => i})
         def vecLength: Int = addr2.map(_.length).getOrElse(laneIds.length)
         def laneIdToVecId(lane: Int): Int = lane2Vec.map(_.apply(lane)).getOrElse(laneIds.indexOf(lane))
         def laneIdToChunkId(lane: Int): Int = laneIds.indexOf(lane)
         def vecToLaneAddr(vec: Int): Int = vec2Lane.map(_.apply(vec)).getOrElse(laneIds.apply(vec))
 
-        dbgs(s"  Masters: $masters // Non-duplicated lane indices")
+        dbgs(s"  Masters: $masters // Lanes that do not have duplicated address")
         // Writing two different values to the same address currently just writes the last value
         // Note this defines a race condition, so its behavior is undefined by the language
         val data2 = data.map{d =>
@@ -238,8 +240,10 @@ trait MemoryUnrolling extends UnrollingBase {
         banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, i) =>
           val segmentBase = banked.flatMap(_._2).take(i).length
           val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
-          val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(port.castgroup) else port.castgroup
-          val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(port.broadcast) else port.broadcast
+          val reorderedCastgroup = portReordering.map(port.castgroup(_))
+          val reorderedBroadcast = portReordering.map(port.broadcast(_))
+          val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(reorderedCastgroup) else reorderedCastgroup
+          val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(reorderedBroadcast) else reorderedBroadcast
           if (s.getPorts(0).isDefined) {
             val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,s.port.broadcast.zip(broadcast2).map{case (a,b) => scala.math.min(a,b)})
             s.addPort(dispatch=0, Nil, port2)

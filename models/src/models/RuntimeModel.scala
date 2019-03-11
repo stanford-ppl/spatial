@@ -194,7 +194,8 @@ object Runtime {
     val cchain: List[CChainModel],
     val L: Int,
     val II: Int,
-    val ctx: Ctx
+    val ctx: Ctx,
+    val bitsPerCycle: Double = 32.0 // Defined for transfers
   ){
     def this(id: Int, level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(id, level, schedule, List(cchain), L, II, ctx)
 
@@ -235,7 +236,8 @@ object Runtime {
                                                              stores = competitors.stores, 
                                                              gateds = competitors.gateds, 
                                                              outerIters = upperCChainIters, 
-                                                             innerIters = numel), this.schedule)
+                                                             innerIters = numel,
+                                                             bitsPerCycle = this.bitsPerCycle), this.schedule)
       // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
 
       // // Linear for the first 4 competitors

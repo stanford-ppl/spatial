@@ -3,7 +3,7 @@
 # Scrape app directories for cycle counts
 
 rm data/train
-for file in `find ~/sp_dse/spatial/gen/VCS/ -name "sim.log"`; do
+for file in `find ~/sp_dse/spatial/gen/DSE/ -name "sim.log"`; do
 	in_loads=0
 	max_load=0
 	in_stores=0

@@ -26,6 +26,11 @@ object ModelData{
     case "DenseStore" => DenseStoreModelData.outerIters_keypoints_inputs
     case "GatedDenseStore" => GatedDenseStoreModelData.outerIters_keypoints_inputs
   }
+  def bitsPerCycle_keypoints_inputs(schedule: String) = schedule match {
+    case "DenseLoad" => DenseLoadModelData.bitsPerCycle_keypoints_inputs
+    case "DenseStore" => DenseStoreModelData.bitsPerCycle_keypoints_inputs
+    case "GatedDenseStore" => GatedDenseStoreModelData.bitsPerCycle_keypoints_inputs
+  }
   def loads_keypoints_inputs(schedule: String) = schedule match {
     case "DenseLoad" => DenseLoadModelData.loads_keypoints_inputs
     case "DenseStore" => DenseStoreModelData.loads_keypoints_inputs
@@ -50,6 +55,11 @@ object ModelData{
     case "DenseLoad" => DenseLoadModelData.innerIters_keypoints_outputs
     case "DenseStore" => DenseStoreModelData.innerIters_keypoints_outputs
     case "GatedDenseStore" => GatedDenseStoreModelData.innerIters_keypoints_outputs
+  }
+  def bitsPerCycle_keypoints_outputs(schedule: String) = schedule match {
+    case "DenseLoad" => DenseLoadModelData.bitsPerCycle_keypoints_outputs
+    case "DenseStore" => DenseStoreModelData.bitsPerCycle_keypoints_outputs
+    case "GatedDenseStore" => GatedDenseStoreModelData.bitsPerCycle_keypoints_outputs
   }
   def loads_keypoints_outputs(schedule: String) = schedule match {
     case "DenseLoad" => DenseLoadModelData.loads_keypoints_outputs

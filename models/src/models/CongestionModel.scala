@@ -15,15 +15,16 @@ object CongestionModel {
 		def gateds: T
 		def outerIters: T
 		def innerIters: T
-		def toSeq: Seq[T] = Seq(stores, outerIters, loads, innerIters, gateds)
+		def bitsPerCycle: T
+		def toSeq: Seq[T] = Seq(stores, outerIters, loads, innerIters, gateds, bitsPerCycle)
 	}
-	case class RawFeatureVec(loads: Double, stores: Double, gateds: Double, outerIters: Double, innerIters: Double) extends FeatureVec[Double]
-	case class CalibFeatureVec(loads: Double, stores: Double, gateds: Double, outerIters: Double, innerIters: Double) extends FeatureVec[Double]
+	case class RawFeatureVec(loads: Double, stores: Double, gateds: Double, outerIters: Double, innerIters: Double, bitsPerCycle: Double) extends FeatureVec[Double]
+	case class CalibFeatureVec(loads: Double, stores: Double, gateds: Double, outerIters: Double, innerIters: Double, bitsPerCycle: Double) extends FeatureVec[Double]
 
 	// Set up lattice properties
-	val feature_dims = 5
-	val lattice_rank = 5
-	val lattice_size = Seq(3,3,3,3,3)
+	val feature_dims = 6
+	val lattice_rank = 6
+	val lattice_size = Seq(3,3,3,3,3,3)
 	val num_keypoints = 8
 	val num_lattices = 1
 	var model: String = ""
@@ -46,6 +47,8 @@ object CongestionModel {
 	lazy val outerIters_keypoints_outputs = ModelData.outerIters_keypoints_outputs(model).map(_.toDouble) //loadCSVNow[Double](s"../data/${model}/CALIBRATOR_OUTPUT_PARAMS/outerIters_keypoints_outputs.csv", ","){x => x.toDouble}
 	lazy val innerIters_keypoints_inputs = ModelData.innerIters_keypoints_inputs(model).map(_.toDouble) //loadCSVNow[Int](s"../data/${model}/CALIBRATOR_INPUT_PARAMS/innerIters_keypoints_inputs.csv", ","){x => x.toDouble}
 	lazy val innerIters_keypoints_outputs = ModelData.innerIters_keypoints_outputs(model).map(_.toDouble) //loadCSVNow[Double](s"../data/${model}/CALIBRATOR_OUTPUT_PARAMS/innerIters_keypoints_outputs.csv", ","){x => x.toDouble}
+	lazy val bitsPerCycle_keypoints_inputs = ModelData.bitsPerCycle_keypoints_inputs(model).map(_.toDouble) //loadCSVNow[Int](s"../data/${model}/CALIBRATOR_INPUT_PARAMS/bitsPerCycle_keypoints_inputs.csv", ","){x => x.toDouble}
+	lazy val bitsPerCycle_keypoints_outputs = ModelData.bitsPerCycle_keypoints_outputs(model).map(_.toDouble) //loadCSVNow[Double](s"../data/${model}/CALIBRATOR_OUTPUT_PARAMS/bitsPerCycle_keypoints_outputs.csv", ","){x => x.toDouble}
     lazy val params = ModelData.params(model).map(_.toDouble) //loadCSVNow[Double](s"../data/${model}/LATTICE_PARAMS.csv", ","){x => x.toDouble}
 
     /** Calibrate one element in a feature */
@@ -70,7 +73,8 @@ object CongestionModel {
     	val gateds = calibrate(gateds_keypoints_inputs, gateds_keypoints_outputs, features.gateds, lattice_size(2))
     	val outerIters = calibrate(outerIters_keypoints_inputs, outerIters_keypoints_outputs, features.outerIters, lattice_size(3))
     	val innerIters = calibrate(innerIters_keypoints_inputs, innerIters_keypoints_outputs, features.innerIters, lattice_size(4))
-    	val calib = CalibFeatureVec(loads = loads, stores = stores, gateds = gateds, outerIters = outerIters, innerIters = innerIters)
+    	val bitsPerCycle = calibrate(bitsPerCycle_keypoints_inputs, bitsPerCycle_keypoints_outputs, features.bitsPerCycle, lattice_size(4))
+    	val calib = CalibFeatureVec(loads = loads, stores = stores, gateds = gateds, outerIters = outerIters, innerIters = innerIters, bitsPerCycle = bitsPerCycle)
     	calib
     }
 

@@ -254,7 +254,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx, bitsPerCycle = ${lhs.loweredTransferSize._3})")
 
     case OpForeach(ens,cchain,block,_,_) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
@@ -271,7 +271,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx, bitsPerCycle = ${lhs.loweredTransferSize._3})")
 
     case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
@@ -294,7 +294,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
-      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx)")
+      emit(src"val ${lhs} = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, ${gated}${lhs.loweredTransfer.toString}, List(CChainModel(Seq()), CChainModel(Seq(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx, bitsPerCycle = ${lhs.loweredTransferSize._3})")
 
     case UnitPipe(_, block) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""

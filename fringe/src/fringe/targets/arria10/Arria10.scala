@@ -17,8 +17,8 @@ class Arria10 extends DeviceTarget {
     fringe.io.S_AVALON <> io.S_AVALON
 
     // Fringe <-> DRAM Connections
-//    io.M_AXI <> fringe.io.M_AXI
-    io.M_AVALON <> fringe.io.M_AVALON
+    io.M_AXI <> fringe.io.M_AXI
+//    io.M_AVALON <> fringe.io.M_AVALON
 
     io.TOP_AXI <> fringe.io.TOP_AXI
     io.DWIDTH_AXI <> fringe.io.DWIDTH_AXI

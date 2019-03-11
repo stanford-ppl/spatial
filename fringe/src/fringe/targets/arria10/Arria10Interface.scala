@@ -11,8 +11,8 @@ class Arria10Interface extends TopInterface {
   // TODO: This group of params is for memory
   val axiParams = new AXI4BundleParameters(DATA_WIDTH, 512, 6)
   val S_AVALON = new AvalonSlave(axiLiteParams) // scalars
-//  val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
-  val M_AVALON = Vec(NUM_CHANNELS, new AvalonMaster(axiParams))
+  val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
+//  val M_AVALON = Vec(NUM_CHANNELS, new AvalonMaster(axiParams))
 
   // AXI debugging loopbacks
   val TOP_AXI = new AXI4Probe(axiLiteParams)

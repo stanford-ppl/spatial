@@ -22,7 +22,7 @@ class MAGToAvalonBridge(val p: AXI4BundleParameters) extends Module {
 
   // Outputs
   val size = io.in.cmd.bits.size // 512
-  io.M_AVALON.burstcount := size - 1.U
+  io.M_AVALON.burstcount := size - 1.U // remove this -1
   io.M_AVALON.address := io.in.cmd.bits.addr
   io.M_AVALON.byteenable := io.in.wdata.bits.wstrb.reverse.reduce[UInt] {
     Cat(_, _)

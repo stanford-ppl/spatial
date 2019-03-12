@@ -365,6 +365,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
       case Some(Op(_: HostIONew[_])) => "MultiArgOut"
       case Some(Op(_: CounterNew[_])) => "CtrObject"
+      case Some(Op(_: ForeverNew)) => "CtrObject"
       case Some(Op(_: CounterChainNew)) => "CounterChainInterface"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccumBundle"
       case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccumBundle"

@@ -45,7 +45,6 @@ var used = Set[String]()
 }
 
 */
-class
 
 @spatial abstract class GenericLoadStore(loads: scala.Int, stores: scala.Int, gated: scala.Int, height: scala.Int, width: scala.Int, bitsPerCycle: scala.Int) extends SpatialTest {
   override def backends: Seq[Backend] = DISABLED

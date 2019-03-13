@@ -57,8 +57,8 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs("Space: ")
     params.zip(space).foreach{case (p,d) => dbgs(s"  $p: $d (${p.ctx})") }
 
-    // Compile generated dse model
-    compileLatencyModel()
+    // // Compile generated dse model
+    // compileLatencyModel()
 
     spatialConfig.dseMode match {
       case DSEMode.Disabled => 
@@ -70,8 +70,8 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
   
     dbg("Freezing parameters")
     // TODO: setIntValues and set schedValue for all params to the best values??
-    TileSizes.all.foreach{t => t.makeFinal }
-    ParParams.all.foreach{p => p.makeFinal }
+    TileSizes.all.foreach{t => println(s"finalizing $t to ${t.getIntValue} in state $IR ?");t.makeFinal }
+    ParParams.all.foreach{p => println(s"finalizing $p to ${p.getIntValue} in state $IR ?");p.makeFinal }
     block
   }
 
@@ -294,7 +294,18 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     val workers = workerIds.map{id =>
       val threadState = new State(state.app)
       threadState.config = new SpatialConfig
-      Console.println(s"base thread $state, new thread $threadState")
+
+
+
+      val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+      val filename_block = dir + config.name+"_block"
+      new java.io.File(dir).mkdirs()
+      saveToFile(program, filename_block)
+      val copyOfProgram = loadFromFile(filename_block)
+   
+
+
+      Console.println(s"base thread $state, new thread $threadState, original prog = $program, copy is $copyOfProgram")
       state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
       DSEThread(
         threadId  = id,

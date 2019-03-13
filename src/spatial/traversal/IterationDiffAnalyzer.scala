@@ -79,11 +79,12 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                       None
                     } else {
                       warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx})! You should:")
+                      val conservative = Some((starts,stops,steps).zipped.collect{case (s,e,st) if s.isDefined && e.isDefined && st.isDefined => (s,e,st)}.toList.zip(pars).map{case ((s,e,st),p) => (scala.math.ceil((e.get - s.get) / (st.get)) / p).toInt}.product)
                       warn(s"    1) Set iterators $otherIters to static start/stop/step values")
-                      warn(s"    2) Be ok with compiler using the most conservative possible II for this loop")
+                      warn(s"    2) Be ok with compiler using the most conservative possible II for this loop ($conservative)")
                       warn(s"    3) Compile with --looseIterDiffs flag to ignore potential loop-carry dependency issues on ${mem.ctx}")
                       warn(s"    4) Explicitly set II for this loop")
-                      Some(1)
+                      conservative
                     }
                   } else None
 

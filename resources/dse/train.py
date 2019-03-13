@@ -85,6 +85,7 @@ CSV_COLUMNS = ['loads',
                'gateds',
                'outerIters',
                'innerIters',
+               'bitsPerCycle',
                # 'bitwidth',
                # 'innerPar',
                'loadCycs',
@@ -92,7 +93,7 @@ CSV_COLUMNS = ['loads',
                'gatedCycs']
 
 competitors = ['loads', 'stores', 'gateds']
-payloads = ['outerIters', 'innerIters']
+payloads = ['outerIters', 'innerIters', 'bitsPerCycle']
 
 targets = {"loadCycs", "storeCycs", "gatedCycs"}
 
@@ -126,6 +127,9 @@ def get_input_fn(file_path, batch_size, num_epochs, shuffle):
         engine="python",
         dtype=np.float32)
     _df_data[file_path].drop(columns=list(targets - {FLAGS.target}), errors="ignore", inplace=True)
+    if (FLAGS.target == "loadCycs"): _df_data[file_path] = _df_data[file_path][_df_data[file_path].loadCycs != 0]
+    elif (FLAGS.target == "storeCycs"): _df_data[file_path] = _df_data[file_path][_df_data[file_path].storeCycs != 0]
+    elif (FLAGS.target == "gatedCycs"): _df_data[file_path] = _df_data[file_path][_df_data[file_path].gatedCycs != 0]
 
     # Mark labels
     _df_data_labels[file_path] = (_df_data[file_path][FLAGS.target])
@@ -147,7 +151,7 @@ def create_feature_columns():
 # Create quantiles based on batch size
 def create_quantiles(quantiles_dir):
   """Creates quantiles directory if it doesn't yet exist."""
-  batch_size = 50
+  batch_size = 100
   input_fn = get_train_input_fn(
       batch_size=batch_size, num_epochs=1, shuffle=False)
   # Reads until input is exhausted, 50 at a time.
@@ -263,11 +267,12 @@ def create_calibrated_lattice(feature_columns, config, quantiles_dir):
       num_keypoints=8,
       feature__outerIters__monotonicity=1,
       feature__innerIters__monotonicity=1,
+      feature__bitsPerCycle__monotonicity=-1,
       # feature__innerIters__lattice_size=3,
       # feature__outerIters__lattice_size=3,
       # monotonicity=frozenset({'outerIters': 1}.items),
       lattice_size=3,
-      lattice_rank=5,
+      lattice_rank=len(feature_columns),
       num_lattices=FLAGS.num_lattices,
       optimizer=tf.train.AdamOptimizer)
 

@@ -1,5 +1,7 @@
 package argon
 
+import forge.tags.stateful
+
 /** The effects summary of a symbol.
   *
   * Effects metadata is "Ignore" since it should never be removed, but we always take the "old"
@@ -25,7 +27,7 @@ case class Effects(
   reads:   Set[Sym[_]] = Set.empty,
   writes:  Set[Sym[_]] = Set.empty,
   antiDeps: Seq[Impure] = Nil
-) extends Data[Effects](transfer = Transfer.Ignore) {
+) extends Data[Effects](transfer = Transfer.Ignore) with Serializable {
 
   private def combine(that: Effects, m1: Boolean, m2: Boolean) = Effects(
     unique  = this.unique || that.unique,

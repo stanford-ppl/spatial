@@ -2,9 +2,10 @@ package spatial.metadata.bounds
 
 import argon._
 import spatial.metadata.params._
+import spatial.metadata.SpatialMetadata
 
 // TODO[2]: Bound is in terms of Int right now?
-abstract class Bound(x: Int) { 
+abstract class Bound(x: Int) extends SpatialMetadata { 
   def toInt: Int = x 
 
   var isFinal: Boolean = false

@@ -5,7 +5,7 @@ import emul.FixedPoint
 
 package object bounds {
 
-  implicit class BoundOps(s: Sym[_]) {
+  implicit class BoundOps(s: Sym[_]) extends SpatialMetadata {
     def getBound: Option[Bound] = s match {
       case Literal(c: Int) => Some(Final(c))
       case Param(c: FixedPoint) if c.isExactInt & !metadata[SymbolBound](s).isDefined => Some(Expect(c.toInt))

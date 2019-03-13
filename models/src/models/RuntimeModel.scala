@@ -231,13 +231,14 @@ object Runtime {
     }
 
     def congestionModel(competitors: Competitors): Int = {
-      val numel = cchain.last.N * cchain.last.ctrs.last.par.lookup
-      CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads, 
-                                                             stores = competitors.stores, 
-                                                             gateds = competitors.gateds, 
-                                                             outerIters = upperCChainIters, 
+      val numel = cchain.last.N
+      val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
+                                                             stores = competitors.stores,
+                                                             gateds = competitors.gateds,
+                                                             outerIters = upperCChainIters,
                                                              innerIters = numel,
                                                              bitsPerCycle = this.bitsPerCycle), this.schedule)
+      Console.println(s"congestion of ${competitors.loads}, ${competitors.stores}, ${competitors.gateds}, ${upperCChainIters}, ${numel}, ${this.bitsPerCycle} = $res")
       // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
 
       // // Linear for the first 4 competitors
@@ -247,6 +248,7 @@ object Runtime {
       // // Linear for the rest
       // val linear2 = if (competitors < 12) 0 else (competitors - 12) * congestionPenalty
       // linear1 + exp + linear2
+      res
     }
 
     // Result fields

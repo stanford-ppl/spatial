@@ -1,6 +1,7 @@
 package spatial.metadata.control
 
 import argon._
+import spatial.metadata.SpatialMetadata
 import spatial.node._
 
 /** Control hierarchy: References the stage for a statement in a controller in Accel.
@@ -10,7 +11,7 @@ import spatial.node._
   *
   * Most useful for determining concurrency and buffer depths.
   */
-sealed abstract class Ctrl(val s: Option[Sym[_]], val stage: Int) {
+sealed abstract class Ctrl(val s: Option[Sym[_]], val stage: Int) extends SpatialMetadata  {
   def master: Ctrl
   /** True if this stage is an outer stage when the corresponding controller is outer. */
   def mayBeOuterBlock: Boolean

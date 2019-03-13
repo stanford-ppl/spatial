@@ -12,7 +12,7 @@ import scala.reflect.{ClassTag, classTag}
   * method of implicit priority search by trait mix-in/inheritance level.
   */
 
-trait ImplicitsPriority3 { this: Implicits =>
+trait ImplicitsPriority3 extends Serializable { this: Implicits =>
   implicit def numericCast[A:Num,B:Num]: Cast[A,B] = Right(new CastFunc[A,B]{
     @api def apply(a: A): B = (Num[B] match {
       case tp:Fix[s,i,f] =>

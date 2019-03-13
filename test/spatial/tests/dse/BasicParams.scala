@@ -1,4 +1,4 @@
-package spatial.tests.feature.dense
+package spatial.tests.dse
 
 import spatial.dsl._
 import com.typesafe.config.ConfigFactory
@@ -15,10 +15,10 @@ import scala.reflect.ClassTag
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
-    val OP = 1 (1 -> 2)
-    val IP = 2 (2 -> 2 -> 8)
-    val B  = 32 (32 -> 64 -> 192)
-    val LP = 4 (1 -> 4)
+    val OP = 1 (1 -> 1)
+    val IP = 2 (2 -> 2 -> 2)
+    val B  = 32 (64 -> 64 -> 64)
+    val LP = 4 (4 -> 4)
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
 

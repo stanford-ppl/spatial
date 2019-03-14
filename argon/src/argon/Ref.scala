@@ -14,7 +14,7 @@ import scala.reflect.{ClassTag,classTag}
   *
   * Note that ExpType is NOT covariant with A
   */
-abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:< Ref[C,A]) extends Serializable with Equals {
+abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:< Ref[C,A]) extends Equals {
   type L = C@uV
 
   protected def me: A = this.asInstanceOf[A]
@@ -114,7 +114,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   *   3. A parameter of type C (mutable literal value, no defining node)
   *   4. The result of an operation of type S (has a defining node)
   */
-sealed trait Exp[+C,+A] extends Serializable with Equals { self =>
+sealed trait Exp[+C,+A] extends Equals { self =>
   type L = C@uV
 
   private[argon] var _tp: ExpType[C@uV,A@uV] = _
@@ -139,7 +139,7 @@ sealed trait Exp[+C,+A] extends Serializable with Equals { self =>
   *
   * All staged types should mix in this trait last.
   */
-trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A] {
+trait Ref[+C,+A] extends ExpType[C,A@uV] with Exp[C,A]  {
   override type L = C@uV
 
   final override def hashCode(): Int = this.rhs match {

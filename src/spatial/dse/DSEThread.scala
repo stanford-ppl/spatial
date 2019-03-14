@@ -112,6 +112,7 @@ case class DSEThread(
     val array = new Array[String](requests.size)
     var i: Int = 0
     val paramRewrites = requests.map{pt => indexedSpace.flatMap{case (domain,d) => Seq(domain.id, domain.options( ((pt / prods(d)) % dims(d)).toInt ))}}
+    // println(s"paramRewrites for thread $threadId = ${paramRewrites.mkString(" ")}")
     val runtimes = evaluateLatency(paramRewrites)
     requests.foreach{pt =>
       state.resetErrors()

@@ -34,8 +34,6 @@ class SpatialConfig extends Config {
   var allowInsanity: Boolean = false
 
   var enableArchDSE: Boolean = false
-  var quitAtDSE: Boolean = false
-  var bootAtDSE: Boolean = false
 
   var addRetimeRegisters = true // Enable adding registers after specified comb. logic
 

@@ -108,27 +108,27 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
   }
 
-  /** Mark the given stateless symbols as being consumed by a user (sync).
-    * @param user Consumer symbol
+  /** Mark the given transient symbols as being consumed by a user.
+    * @param consumer Consumer symbol
     * @param used Consumed symbol(s)
     * @param block The control block this use occurs in
     */
-  private def addUse(user: Sym[_], used: Set[Sym[_]], block: Blk): Unit = {
+  private def addUse(consumer: Sym[_], used: Set[Sym[_]], block: Blk): Unit = {
     dbgs(s"  Uses [Block: $block]:")
-    dbgs(s"    user $user")
+    dbgs(s"    consumer $consumer")
     dbgs(s"    used $used")
     dbgs(s"    ")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
     // Bound symbols should always be the result of a block if they are defined elsewhere
     (used diff boundSyms).foreach{use =>
-      use.users += User(user, blkOfUser(user, block))
-      dbgs(s"  Adding direct ($user ${blkOfUser(user, block)}) to uses for $use")
+      use.users += User(consumer, blkOfUser(consumer, block))
+      dbgs(s"  Adding direct ($consumer ${blkOfUser(consumer, block)}) to uses for $use")
 
       // Also add stateless nodes that this node uses
       (PendingUses(use) - use).foreach{pend =>
-        dbgs(s"  Adding pending ($use ${blkOfUser(user, block)}) to uses for $pend")
-        pend.users += User(use, blkOfUser(user, block))
+        dbgs(s"  Adding pending ($use ${blkOfUser(consumer, block)}) to uses for $pend")
+        pend.users += User(use, blkOfUser(consumer, block))
       }
     }
   }

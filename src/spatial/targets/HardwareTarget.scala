@@ -44,7 +44,7 @@ abstract class HardwareTarget {
   val defaultResource: MemoryResource
 
   @stateful final def areaAnalyzer: AreaAnalyzer = AreaAnalyzer(state, makeAreaModel, makeLatencyModel)
-  // @stateful final def cycleAnalyzer: LatencyAnalyzer = LatencyAnalyzer(state, makeLatencyModel)
+  @stateful final def cycleAnalyzer: LatencyAnalyzer = LatencyAnalyzer(state, makeLatencyModel)
 
 }
 

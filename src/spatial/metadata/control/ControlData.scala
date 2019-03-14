@@ -11,6 +11,14 @@ case object Streaming extends CtrlSchedule
 case object ForkJoin extends CtrlSchedule
 case object Fork extends CtrlSchedule
 
+/** Transfer type. */
+sealed abstract class TransferType
+case object DenseStore extends TransferType
+case object DenseLoad  extends TransferType
+case object SparseStore extends TransferType
+case object SparseLoad  extends TransferType
+
+
 /** Control node level. */
 sealed abstract class CtrlLevel
 case object Inner extends CtrlLevel { override def toString = "InnerControl" }
@@ -22,7 +30,7 @@ case object Single extends CtrlLooping
 case object Looped extends CtrlLooping
 
 /** IndexCounter and lane info */
-case class IndexCounterInfo[A](val ctr: Counter[A], val lane: Int)
+case class IndexCounterInfo[A](ctr: Counter[A], lanes: Seq[Int])
 
 /** A controller's level in the control hierarchy. Flag marks whether this is an outer controller.
   *
@@ -119,7 +127,7 @@ case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
   * Setter:  sym.counter = (IndexCounterInfo)
   * Default: undefined
   */
-case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Flow.Consumer)
+case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self)
 
 
 /** Latency of a given inner pipe body - used for control signal generation.
@@ -164,3 +172,20 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.C
   * Default: empty set
   */
 case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)
+
+/** Marks top-level streaming controller as one derived from DRAM transfer during blackbox lowering.
+  * Used for runtime performance modeling post-blackbox lowering
+  *
+  * Getter: sym.loweredTransfer
+  * Setter: sym.loweredTransfer = TransferType
+  * Default: None
+  */
+case class LoweredTransfer(typ: TransferType) extends Data[LoweredTransfer](SetBy.Analysis.Self)
+
+/** Tracks the size of the last-level counter, for modeling purposes
+  *
+  * Getter: sym.loweredTransferSize
+  * Setter: sym.loweredTransferSize = (length, par)
+  * Default: None
+  */
+case class LoweredTransferSize(info: (Sym[_], Sym[_], Int)) extends Data[LoweredTransferSize](SetBy.Analysis.Self)

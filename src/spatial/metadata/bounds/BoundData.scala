@@ -1,10 +1,14 @@
 package spatial.metadata.bounds
 
 import argon._
+import spatial.metadata.params._
+import spatial.metadata.SpatialMetadata
 
 // TODO[2]: Bound is in terms of Int right now?
-abstract class Bound(x: Int) { 
+abstract class Bound(x: Int) extends SpatialMetadata { 
   def toInt: Int = x 
+
+  var isFinal: Boolean = false
 
   def meet(that: Bound): Bound = {
     if (this.isInstanceOf[Expect] && that.isInstanceOf[Expect])
@@ -54,21 +58,26 @@ case class FixedBits(flag: Boolean) extends Data[FixedBits](SetBy.Flow.Self)
 object Final {
   def unapply(x: Bound): Option[Int] = x match {
     case f: Final => Some(f.x)
+    // case f: Expect if f.isFinal => x.getIntValue //TODO
     case _ => None
   }
   def unapply(x: Sym[_]): Option[Int] = x.getBound match {
-    case Some(x: Final) => Some(x.toInt)
+    case Some(y: Final) => Some(y.toInt)
+    case Some(y: Expect) if y.isFinal => x.getIntValue
     case _ => None
   }
 }
 
 object Expect {
   def unapply(x: Bound): Option[Int] = Some(x.toInt)
-  def unapply(x: Sym[_]): Option[Int] = x.getBound.map(_.toInt)
+  def unapply(x: Sym[_]): Option[Int] = if (x.getIntValue.isDefined) x.getIntValue else x.getBound.map(_.toInt)
 }
 
 object Upper {
-  def unapply(x: Sym[_]): Option[Int] = x.getBound.map(_.toInt)
+  def unapply(x: Sym[_]): Option[Int] = x.getBound match {
+    case Some(y: UpperBound) => Some(y.toInt)
+    case _ => None
+  }
 }
 
 object Bounded {

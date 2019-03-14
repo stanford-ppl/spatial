@@ -55,6 +55,14 @@ if [[ $type == "sim" ]]; then
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "vcs" ]]; then
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "dse" ]]; then
+  export FRINGE_PACKAGE="vcs-gdocs-${branchname}"
+  export EMUL_PACKAGE="vcs-gdocs-${branchname}"
+  export UTILS_PACKAGE="vcs-gdocs-${branchname}"
+  export MODELS_PACKAGE="vcs-gdocs-${branchname}"
+  make resources
+  make publish
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly spatial.tests.dse.*" 2>&1 | tee $fileout
 
 # Synthesis tests
 elif [[ $type == "zynq" ]]; then
@@ -76,6 +84,8 @@ elif [[ $type == "vcs-gdocs" ]]; then
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="vcs-gdocs-${branchname}"
   export EMUL_PACKAGE="vcs-gdocs-${branchname}"
+  export UTILS_PACKAGE="vcs-gdocs-${branchname}"
+  export MODELS_PACKAGE="vcs-gdocs-${branchname}"
   make resources
   make publish
   hash=`git rev-parse HEAD`

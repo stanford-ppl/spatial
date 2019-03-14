@@ -3,6 +3,8 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 @spatial class GEMV extends SpatialTest {
+    override def dseModelArgs: Args = "512 512"
+    override def finalModelArgs: Args = "512 512"
     override def runtimeArgs: Args = "512 512"
    def main(args: Array[String]): Unit = {
     val M = ArgIn[Int] //8192

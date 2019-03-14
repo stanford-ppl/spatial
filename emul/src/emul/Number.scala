@@ -1,6 +1,6 @@
 package emul
 
-abstract class Number extends Equals {
+abstract class Number extends Serializable with Equals {
   def bits: Array[Bool]
   final def bitString: String = "0b" + bits.reverse.map{x =>
     if (x.valid && x.value) "1" else if (x.valid) "0" else "X"

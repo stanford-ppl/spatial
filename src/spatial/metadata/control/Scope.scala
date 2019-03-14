@@ -1,6 +1,7 @@
 package spatial.metadata.control
 
 import argon._
+import spatial.metadata.SpatialMetadata
 
 /** Scope hierarchy: References the exact stage and block for a statement in a controller in Accel.
   *
@@ -8,7 +9,7 @@ import argon._
   *
   * This is most useful for determining which iterators are defined over a given scope.
   */
-sealed abstract class Scope(val s: Option[Sym[_]], val stage: Int, val block: Int) {
+sealed abstract class Scope(val s: Option[Sym[_]], val stage: Int, val block: Int) extends SpatialMetadata {
   def master: Scope
 }
 object Scope {

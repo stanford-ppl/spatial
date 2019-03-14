@@ -132,22 +132,26 @@ class SortPipe(val w: Int, val v: Int) extends Module {
 
   val en = io.out.ready | ~io.out.valid
 
-  val stages = List.fill(sortMap.length) { Wire(Vec(v, UInt(w.W))) }
+  val stages = List.fill(sortMap.length) { Wire(Valid(Vec(v, UInt(w.W)))) }
   sortMap.zipWithIndex.foreach { case (s, i) =>
-    val stageIn = if (i == 0) io.in.bits else stages(i - 1)
-    val stageOut = Wire(Vec(v, UInt(w.W)))
+    val first = Wire(Valid(Vec(v, UInt(w.W))))
+    first.valid := io.in.valid
+    first.bits := io.in.bits
+    val stageIn = if (i == 0) first else stages(i - 1)
+    val stageOut = Wire(Valid(Vec(v, UInt(w.W))))
+    stageOut.valid := stageIn.valid
     s.foreach { case (a, b) =>
-      val inA = stageIn(a)
-      val inB = stageIn(b)
-      stageOut(a) := Mux(inA < inB, inA, inB)
-      stageOut(b) := Mux(inA < inB, inB, inA)
+      val inA = stageIn.bits(a)
+      val inB = stageIn.bits(b)
+      stageOut.bits(a) := Mux(inA < inB, inA, inB)
+      stageOut.bits(b) := Mux(inA < inB, inB, inA)
     }
     stages(i) := getRetimed(stageOut, 1, en)
   }
 
-  io.out.valid := getRetimed(io.in.valid, stages.length, en)
   io.in.ready := en
-  io.out.bits := stages.last
+  io.out.valid := stages.last.valid
+  io.out.bits := stages.last.bits
 }
 
 class MergeBufferIO(val ways: Int, val w: Int, val v: Int) extends Bundle {
@@ -292,7 +296,7 @@ class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val read
     val in_wen = Input(Vec(ways, Vec(par, Bool())))
     val in_data = Input(Vec(ways, Vec(par, UInt(bitWidth.W))))
     val initMerge_wen = Input(Bool())
-    val initMerge_data = Input(UInt(bitWidth.W))
+    val initMerge_data = Input(Bool())
     val inBound_wen = Input(Vec(ways, Bool()))
     val inBound_data = Input(Vec(ways, UInt(bitWidth.W)))
     val out_ren = Input(Vec(readers, Vec(par, Bool())))
@@ -310,7 +314,7 @@ class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val read
       cxn.mergeEnq.foreach{p => input.in_wen(p) := op.input.in_wen(p); input.in_data(p) := op.input.in_data(p)}
       cxn.mergeDeq.foreach{p => input.out_ren(p) := op.input.out_ren(p)}
       cxn.mergeBound.foreach{p => input.inBound_data(p) := op.input.inBound_data(p); input.inBound_wen(p) := op.input.inBound_wen(p)}
-      cxn.mergeInit.foreach{p => input.initMerge_wen := op.input.initMerge_wen; input.initMerge_data := op.input.initMerge_data}
+      cxn.mergeInit.foreach{p => input.initMerge_data := op.input.initMerge_data; input.initMerge_wen := op.input.initMerge_wen }
       Ledger.substitute(op.hashCode, this.hashCode)
     }
   }
@@ -330,9 +334,9 @@ class MergeBufferFullIO(val ways: Int, val par: Int, val bitWidth: Int, val read
     input.inBound_wen(lane) := en
     Ledger.connectMergeBound(this.hashCode, lane)
   }
-  def connectMergeInit(data: UInt, en: Bool)(implicit stack: List[KernelHash]): Unit = {
-    input.initMerge_wen := en
+  def connectMergeInit(data: Bool, en: Bool)(implicit stack: List[KernelHash]): Unit = {
     input.initMerge_data := data
+    input.initMerge_wen := en
     Ledger.connectMergeInit(this.hashCode, 0)
   }
 

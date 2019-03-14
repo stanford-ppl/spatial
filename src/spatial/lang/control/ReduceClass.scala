@@ -4,6 +4,7 @@ package control
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.metadata.control._
 
 sealed abstract class ReduceLike[A] {
   @api def apply(domain1: Counter[I32])(map: I32 => A)(reduce: (A,A) => A)(implicit A: Bits[A]): Reg[A]
@@ -40,6 +41,7 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
     val lA = boundVar[A]
     val rA = boundVar[A]
     val iters  = List.fill(domain.length){ boundVar[I32] }
+    domain.zip(iters).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
     val mapBlk = stageBlock{ map(iters) }
     val ldBlk  = stageLambda1(acc){ acc.value }
     val redBlk = stageLambda2(lA,rA){ reduce(lA,rA) }

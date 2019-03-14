@@ -5,6 +5,8 @@ import spatial.dsl._
 @spatial class FatConstructor extends SpatialTest {
   // Should have more than 255 inputs to construct its Foreach kernel
 
+  override def dseModelArgs: Args = "3"
+  override def finalModelArgs: Args = "3"
   override def runtimeArgs: Args = "3"
   def main(args: Array[String]): Unit = {
     val x = ArgIn[Int]

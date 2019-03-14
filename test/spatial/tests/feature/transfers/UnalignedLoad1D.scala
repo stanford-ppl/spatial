@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class UnalignedLoad1D extends SpatialTest {
+  override def dseModelArgs: Args = "100 9 9"
+  override def finalModelArgs: Args = "100 9 9"
   override def runtimeArgs: Args = "100 9"
   val N = 19200
 

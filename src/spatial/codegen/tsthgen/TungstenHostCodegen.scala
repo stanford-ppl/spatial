@@ -42,17 +42,6 @@ using namespace std;
 
   override def copyDependencies(out: String): Unit = {
 
-    // // Register files that are always there for cppgen
-    //dependencies ::= DirDep("synth", "datastructures")
-    //dependencies ::= DirDep("synth", "SW")
-
-
-    //dependencies ::= DirDep("synth", "scripts", "../", Some("scripts/"))
-    
-    //dependencies ::= FileDep("synth", "build.sbt", "../", Some("build.sbt"))
-
-    //dependencies ::= FileDep("synth", "run.sh", "../", Some("run.sh"))
-
     super[FileDependencies].copyDependencies(out)
   }
 

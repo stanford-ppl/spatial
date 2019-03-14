@@ -101,11 +101,10 @@ abstract class Transformer extends Pass with TransformerInterface {
     if (dest != src) {
       dest.prevNames = (state.paddedPass(state.pass - 1), s"$src") +: src.prevNames
     }
-
     metadata.all(src).toList.foreach{case (k,m) => m.transfer match {
-      case Transfer.Mirror => metadata.add(dest, k, mirror(m)); logs(s"  Mirrored data: $k")
-      case Transfer.Remove => metadata.remove(dest, k); logs(s"  Removed data: $k")
-      case Transfer.Ignore => logs(s"  Ignored data: $k") // Do nothing
+      case Transfer.Mirror => metadata.add(dest, k, mirror(m))
+      case Transfer.Remove => metadata.remove(dest, k) 
+      case Transfer.Ignore =>  // Do nothing
     }}
   }
 

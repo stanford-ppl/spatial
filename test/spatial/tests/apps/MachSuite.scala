@@ -2,8 +2,11 @@ package spatial.tests.apps
 
 import spatial.dsl._
 import spatial.targets._
+import utils.io.files._
 
 @spatial class AES extends SpatialTest {
+  override def dseModelArgs: Args = "800 93 93 87 45"
+  override def finalModelArgs: Args = "800 93 93 87 45"
   override def runtimeArgs: Args = "50"
 
   /*
@@ -661,6 +664,8 @@ import spatial.targets._
  */
 
 
+  override def dseModelArgs: Args = "33 6 1 19 9"
+  override def finalModelArgs: Args = "1 19 9 1 19 9"
 
   def main(args: Array[String]): Unit = {
 
@@ -1069,6 +1074,9 @@ import spatial.targets._
 }      
 
 @spatial class MD_Grid extends SpatialTest {
+  override def dseModelArgs: Args = "0 4 0 4 0 4 4 4 1"
+  override def finalModelArgs: Args = "0 4 0 4 0 4 4 4 4 4 4 4 4 4"
+
  /*
   
   Moleckaler Dynamics via the grid, a digital frontier
@@ -1413,6 +1421,8 @@ import spatial.targets._
 }      
 
 @spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+  override def dseModelArgs: Args = "128 128 128"
+  override def finalModelArgs: Args = "128 128 128"
   override def runtimeArgs: Args = "128"
                                                                                                   
                                                                                                   
@@ -1809,33 +1819,23 @@ import spatial.targets._
   def main(args: Array[String]): Unit = {
 
     val numel = 2048
-    val START = 0
-    val STOP = numel
-    val levels = STOP-START //ArgIn[Int]
-    // setArg(levels, args(0).to[Int])
 
-    val raw_data = loadCSV1D[Int](s"$DATA/sort/sort_data.csv", "\n")
+    val value = Array.tabulate(numel) { i => numel - i - 1 }
 
-    val data_dram = DRAM[Int](numel)
-    // val sorted_dram = DRAM[Int](numel)
+    val valueDRAM = DRAM[Int](numel)
+    val sortValueDRAM = DRAM[Int](2 * numel)
 
-    setMem(data_dram, raw_data)
-
-    val result_dram = DRAM[Int](numel)
+    setMem(valueDRAM, value)
 
     Accel{
-      Sort.mergeSort(data_dram, result_dram, 16, 2, numel)
+      Sort.mergeSort(valueDRAM, sortValueDRAM, 16, 2, numel)
     }
 
-    val sorted_gold = loadCSV1D[Int](s"$DATA/sort/sort_gold.csv", "\n")
-    val sorted_result = getMem(result_dram)
+    val valueSort = getMem(sortValueDRAM(0::numel))
 
-    printArray(sorted_gold, "Sorted Gold: ")
-    printArray(sorted_result, "Sorted Result: ")
+    printArray(valueSort, "Sorted Result: ")
 
-    val cksum = sorted_gold.zip(sorted_result){_==_}.reduce{_&&_}
-    // // Use the real way to check if list is sorted instead of using machsuite gold
-    // val cksum = Array.tabulate(STOP-1){ i => pack(sorted_result(i), sorted_result(i+1)) }.map{a => a._1 <= a._2}.reduce{_&&_}
+     val cksum = Array.tabulate(numel - 1){ i => pack(valueSort(i), valueSort(i+1)) }.map{a => a._1 <= a._2}.reduce{_&&_}
     println("PASS: " + cksum + " (Sort_Merge)")
     assert(cksum)
   }
@@ -1848,6 +1848,8 @@ import spatial.targets._
                                                                                                                                                                            
  */
 
+  override def dseModelArgs: Args = "16 50 50 50 50 50"
+  override def finalModelArgs: Args = "16 50 50 50 50 50"
 
   def main(args: Array[String]): Unit = {
 
@@ -2177,6 +2179,8 @@ import spatial.targets._
 
 
 @spatial class Backprop extends SpatialTest {
+  override def dseModelArgs: Args = "5 13 3"
+  override def finalModelArgs: Args = "5 13 3"
   override def runtimeArgs: Args = "5"
 
  /*                                                                                                  

@@ -3,6 +3,8 @@ package spatial.tests.feature.memories.fifo
 import spatial.dsl._
 
 @spatial class FIFOLoad extends SpatialTest {
+  override def dseModelArgs: Args = "960"
+  override def finalModelArgs: Args = "960"
   override def runtimeArgs: Args = "960"
 
 

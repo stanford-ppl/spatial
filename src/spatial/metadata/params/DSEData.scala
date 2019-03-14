@@ -143,7 +143,7 @@ case object Categorical extends SpaceType { override def toString = "categorical
 case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) => Unit, getter: State => T, tp: SpaceType) {
   def apply(i: Int): T = options(i)
   @stateful def value: T = getter(state)
-  @stateful def set(i: Int): Unit = {Console.println(s"setting options $i for $state");setter(options(i), state)}
+  @stateful def set(i: Int): Unit = setter(options(i), state)
   @stateful def setValue(v: T): Unit = setter(v, state)
   @stateful def setValueUnsafe(v: Any): Unit = setValue(v.asInstanceOf[T])
   def len: Int = options.length

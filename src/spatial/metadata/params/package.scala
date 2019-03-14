@@ -17,15 +17,16 @@ package object params {
     def contention: Int = getContention.getOrElse(0)
     def contention_=(d: Int): Unit = metadata.add(p, MemoryContention(d))
 
-    def getIntValue: Option[Int] = if (p.getBound.isDefined) Some(p.bound.toInt) else None
-    @stateful def intValue: Int = {Console.println(s"getting int value for $p in state $state = ${p.bound.toInt}");p.bound.toInt}
+    @stateful def getIntValue: Option[Int] = if (p.getBound.isDefined) Some(p.bound.toInt) else None
+    @stateful def intValue: Int = p.bound.toInt
+    @stateful def intValueOrLowest: Int = if (p.getBound.isDefined) p.bound.toInt else p.paramDomain._1
     @stateful def setIntValue(d: Int): Unit = p.bound = Expect(d)
-    def intValue_=(d: Int): Unit = p.bound = Expect(d)
+    @stateful def intValue_=(d: Int): Unit = p.bound = Expect(d)
 
-    def getSchedValue: Option[CtrlSchedule] = p.getRawSchedule
+    @stateful def getSchedValue: Option[CtrlSchedule] = p.getRawSchedule
     @stateful def schedValue: CtrlSchedule = p.rawSchedule
     @stateful def setSchedValue(d: CtrlSchedule): Unit = p.rawSchedule = d
-    def schedValue_=(d: CtrlSchedule): Unit = p.rawSchedule = d
+    @stateful def schedValue_=(d: CtrlSchedule): Unit = p.rawSchedule = d
   }
 
   object Parameter {

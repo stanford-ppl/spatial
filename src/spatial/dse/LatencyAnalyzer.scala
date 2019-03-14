@@ -39,7 +39,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelT
     totalCycles = rewriteParams.grouped(200).flatMap{params => 
       val batchedParams = params.map{rp => "tune " + rp.mkString(" ")}.mkString(" ")
       val cmd = s"""java -jar ${modelJar} ni ${batchedParams}"""
-      println(s"running cmd: $cmd")
+      // println(s"running cmd: $cmd")
       val output = Process(cmd, new File(gen_dir)).!!
       output.split("\n").filter(_.contains("Total Cycles for App")).map{r => 
         "^.*: ".r.replaceAllIn(r,"").trim.toLong

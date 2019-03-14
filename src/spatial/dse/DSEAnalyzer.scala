@@ -29,24 +29,31 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs("Metapipelining toggles:")
     PipelineParams.all.foreach{m => dbgs(s"  $m (${m.ctx})")}
 
-    if (spatialConfig.quitAtDSE) {
-      val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
-      val filename_block = dir + config.name+"_block"
-      val filename_state = dir + config.name+"_state"
-      new java.io.File(dir).mkdirs()
-      saveToFile(IR, filename_state)
-      saveToFile(block, filename_block)
-      println(s"Saved state to ${filename_state} and top level block to ${filename_block}. Quitting Spatial...")
-      sys.exit(0)
-    } else if (spatialConfig.bootAtDSE) {
-      val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
-      val filename_block = dir + config.name+"_block"
-      val filename_state = dir + config.name+"_state"
-      new java.io.File(dir).mkdirs()
-      val IR2 = loadFromFile(filename_state)
-      val block2 = loadFromFile(filename_block)
-      println(s"Loaded state from ${filename_state} and top level block from ${filename_block}.")
-    }
+    /** Tried but failed to get IR serialized and deserialized.  Made all the 
+      * relevant classes extend Serializable, and it serialized to file OK but 
+      * crashed with undefined _rhs upon deserializing.  Used xstream to inspect
+      * serialization and everything seemed to be good, so Serialization of IR is
+      * on hold for now because it was too challenging to figure out what was going
+      * wrong
+      */
+    // if (spatialConfig.quitAtDSE) {
+    //   val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+    //   val filename_block = dir + config.name+"_block"
+    //   val filename_state = dir + config.name+"_state"
+    //   new java.io.File(dir).mkdirs()
+    //   saveToFile(IR, filename_state)
+    //   saveToFile(block, filename_block)
+    //   println(s"Saved state to ${filename_state} and top level block to ${filename_block}. Quitting Spatial...")
+    //   sys.exit(0)
+    // } else if (spatialConfig.bootAtDSE) {
+    //   val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+    //   val filename_block = dir + config.name+"_block"
+    //   val filename_state = dir + config.name+"_state"
+    //   new java.io.File(dir).mkdirs()
+    //   val IR2 = loadFromFile[Block[R]](filename_state)
+    //   val block2 = loadFromFile[Block[R]](filename_block)
+    //   println(s"Loaded state from ${filename_state} and top level block from ${filename_block}.")
+    // }
 
     val intParams = (TileSizes.all ++ ParParams.all).toSeq
     val intSpace = createIntSpace(intParams, Restrictions.all)
@@ -57,8 +64,8 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs("Space: ")
     params.zip(space).foreach{case (p,d) => dbgs(s"  $p: $d (${p.ctx})") }
 
-    // // Compile generated dse model
-    // compileLatencyModel()
+    // Compile generated dse model
+    compileLatencyModel()
 
     spatialConfig.dseMode match {
       case DSEMode.Disabled => 
@@ -70,8 +77,9 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
   
     dbg("Freezing parameters")
     // TODO: setIntValues and set schedValue for all params to the best values??
-    TileSizes.all.foreach{t => println(s"finalizing $t to ${t.getIntValue} in state $IR ?");t.makeFinal }
-    ParParams.all.foreach{p => println(s"finalizing $p to ${p.getIntValue} in state $IR ?");p.makeFinal }
+    TileSizes.all.foreach{t => t.makeFinal(t.intValueOrLowest) }
+    ParParams.all.foreach{p => p.makeFinal(p.intValueOrLowest) }
+    // PipelineParams.all.foreach{p => p.makeFinal(p.schedValue) }
     block
   }
 
@@ -297,15 +305,14 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
 
 
 
-      val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
-      val filename_block = dir + config.name+"_block"
-      new java.io.File(dir).mkdirs()
-      saveToFile(program, filename_block)
-      val copyOfProgram = loadFromFile(filename_block)
+      // val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
+      // val filename_block = dir + config.name+"_block"
+      // new java.io.File(dir).mkdirs()
+      // saveToFile(program, filename_block)
+      // val copyOfProgram = loadFromFile[Block[_]](filename_block)
    
 
 
-      Console.println(s"base thread $state, new thread $threadState, original prog = $program, copy is $copyOfProgram")
       state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
       DSEThread(
         threadId  = id,
@@ -425,25 +432,33 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     }
   }
 
-  import java.io._
-  def saveToFile(node:Serializable, path:String) = {
-    val oos = new ObjectOutputStream(new FileOutputStream(path))
-    println(s"Saving node $node to $path")
-    oos.writeObject(node)
-    oos.close
-  }
+  // import java.io._
+  // def saveToFile(node:Serializable, path:String) = {
+  //   val oos = new ObjectOutputStream(new FileOutputStream(path))
+  //   println(s"Saving node $node to $path")
+  //   oos.writeObject(node)
+  //   oos.close
 
-  def loadFromFile[T](path:String) = {
-    println(s"Loading from $path")
-    val ois = new ObjectInputStream(new FileInputStream(path)) {
-      override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
-        try { Class.forName(desc.getName, false, getClass.getClassLoader) }
-        catch { case ex: ClassNotFoundException => super.resolveClass(desc) } // Magic. Don't know why this fix ClassNotFound exception
-      }
-    }
-    val obj = ois.readObject.asInstanceOf[T]
-    println(s"Loading $obj from $path")
-    obj
-  }
+  //   /** XML Debugging */
+  //   // import com.thoughtworks.xstream._
+  //   // import com.thoughtworks.xstream.io.xml.DomDriver
+  //   // val xstream = new XStream(new DomDriver)
+  //   // val xml = xstream.toXML(node)
+  //   // val xmlBack = xstream.fromXML(xml);
+  //   // // println(xml)
+  // }
+
+  // def loadFromFile[T](path:String) = {
+  //   println(s"Loading from $path")
+  //   val ois = new ObjectInputStream(new FileInputStream(path)) {
+  //     override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
+  //       try { Class.forName(desc.getName, false, getClass.getClassLoader) }
+  //       catch { case ex: ClassNotFoundException => super.resolveClass(desc) } // Magic. Don't know why this fix ClassNotFound exception
+  //     }
+  //   }
+  //   val obj = ois.readObject.asInstanceOf[T]
+  //   println(s"Loading $obj from $path")
+  //   obj
+  // }
 
 }

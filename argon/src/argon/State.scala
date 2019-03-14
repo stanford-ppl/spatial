@@ -46,6 +46,7 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
 
   /** Graph Metadata */
   val globals: GlobalMetadata = new GlobalMetadata
+  val scratchpad: ScratchpadMetadata = new ScratchpadMetadata
 
   /** Compiler passes */
   var pass: Int = 0

@@ -121,20 +121,20 @@ trait Spatial extends Compiler with ParamLoader {
 
         block ==> printer     ==>
         cliNaming           ==>
-        (!spatialConfig.bootAtDSE ? friendlyTransformer) ==> printer ==> transformerChecks ==>
+        (friendlyTransformer) ==> printer ==> transformerChecks ==>
         userSanityChecks    ==>
         /** Black box lowering */
-        (!spatialConfig.bootAtDSE ? switchTransformer)   ==> printer ==> transformerChecks ==>
-        (!spatialConfig.bootAtDSE ? switchOptimizer)     ==> printer ==> transformerChecks ==>
-        (!spatialConfig.bootAtDSE ? blackboxLowering1)   ==> printer ==> transformerChecks ==>
+        (switchTransformer)   ==> printer ==> transformerChecks ==>
+        (switchOptimizer)     ==> printer ==> transformerChecks ==>
+        (blackboxLowering1)   ==> printer ==> transformerChecks ==>
         /** More black box lowering */
-        (!spatialConfig.bootAtDSE ? blackboxLowering2)   ==> printer ==> transformerChecks ==>
+        (blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
-        ((spatialConfig.enableArchDSE && !spatialConfig.bootAtDSE) ? paramAnalyzer) ==> 
+        ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
         /** Optional python model generator */
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? retimingAnalyzer) ==>
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? initiationAnalyzer) ==>
-        ((spatialConfig.enableRuntimeModel && !spatialConfig.bootAtDSE) ? dseRuntimeModelGen) ==>
+        ((spatialConfig.enableRuntimeModel) ? retimingAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel) ? initiationAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel) ? dseRuntimeModelGen) ==>
         (spatialConfig.enableArchDSE ? dsePass) ==> 
         //blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
@@ -216,8 +216,6 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable hypermapper dse.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
-    cli.opt[Unit]("quitAtDSE").action{(_,_) => spatialConfig.quitAtDSE = true; spatialConfig.bootAtDSE = false; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Save state at start of DSE and quit")
-    cli.opt[Unit]("bootAtDSE").action{(_,_) => spatialConfig.bootAtDSE = true; spatialConfig.quitAtDSE = false; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Load state and enter at start of DSE")
 
     cli.note("")
     cli.note("Backends:")

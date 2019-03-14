@@ -83,7 +83,7 @@ import spatial.dsl._
       Foreach(16 by 1, 16 by 1 par 4) { (i,j) =>
         b2(i,j) = b1(i,j) * x
       }
-      Foreach(16 by 1 par 1) {i => 
+      Foreach(16 by 1 par 1) {i =>
         dstFPGA(i::i+1, 0::16 par 1) store b2(i::i+1, 0::16)
       }
     }

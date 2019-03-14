@@ -42,7 +42,7 @@ class DRAMArbiter(
 
   // Print all debugging signals into a header file
   val debugFileName = "cpp/generated_debugRegs.h"
-  
+
   val debugPW = if (isDebugChannel) {
     val debugPW = new PrintWriter(new File(debugFileName))
     debugPW.println(s"""#ifndef __DEBUG_REGS_H__""")
@@ -140,12 +140,32 @@ class DRAMArbiter(
       connectDbgSig(wdataCount, "[FRINGE] num wdata transferred (wvalid & wready)")
       connectDbgSig(rdataEnqCount, "[FRINGE] num rdata enqueued (rresp.valid & rresp.ready")
 
+      def getDbgStr(sigName: java.lang.String): java.lang.String = {
+        "[FRINGE] # io.M_AXI." + sigName
+      }
+
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid), "[FRINGE] # DRAM Commands Issued")
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid & !io.dram.cmd.bits.isWr), "[FRINGE] # Read Commands Sent")
-      connectDbgSig(debugCounter(io.dram.cmd.ready),                                              "[FRINGE]      # io.dram.cmd.ready")
+      connectDbgSig(debugCounter(io.dram.cmd.ready), "[FRINGE]      # io.dram.cmd.ready")
       connectDbgSig(debugCounter(io.dram.cmd.valid),                                              "[FRINGE]      # io.dram.cmd.valid")
       connectDbgSig(debugCounter(!io.dram.cmd.bits.isWr),                                         "[FRINGE]      # !io.dram.cmd.bits.isWr")
       connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.valid & io.dram.cmd.bits.isWr), "[FRINGE] # Write Commands Sent")
+      connectDbgSig(debugCounter(io.dram.cmd.valid & !io.dram.cmd.bits.isWr),  getDbgStr("ARVALID"))
+      connectDbgSig(debugCounter(io.dram.cmd.ready & io.dram.cmd.bits.isWr),  getDbgStr("AWREADY"))
+      connectDbgSig(debugCounter(io.dram.cmd.ready & !io.dram.cmd.bits.isWr), getDbgStr("ARREADY"))
+      connectDbgSig(debugCounter(io.dram.cmd.valid & io.dram.cmd.bits.isWr), getDbgStr("AWVALID"))
+      connectDbgSig(debugCounter(io.dram.wdata.bits.wlast), getDbgStr("WLAST"))
+      connectDbgSig(debugCounter(io.dram.wdata.valid), getDbgStr("WVALID"))
+      connectDbgSig(debugCounter(io.dram.wdata.ready), getDbgStr("WREADY"))
+      connectDbgSig(debugCounter(io.dram.rresp.ready), getDbgStr("RREADY"))
+      connectDbgSig(debugCounter(io.dram.wresp.ready), getDbgStr("BREADY"))
+      connectDbgSig(debugCounter(io.dram.rresp.valid), getDbgStr("RVALID"))
+      connectDbgSig(debugCounter(io.dram.wresp.valid), getDbgStr("BVALID"))
+
+//      connectDbgSig(debugCounter(io.dram.wdata.ready), "[FRINGE] # io.M_AXI.WREADY")
+//      connectDbgSig(debugCounter(io.dram.wresp.ready), "[FRINGE] # io.M_AXI.BREADY")
+//      connectDbgSig(debugCounter(io.dram.wresp.valid), "[FRINGE] # io.M_AXI.BVALID")
+//      connectDbgSig(debugCounter(io.dram.wdata.valid), "[FRINGE] # io.M_AXI.WVALID")
 
       // Count number of load commands issued from accel per stream
       io.app.loads.zipWithIndex.foreach { case (load, i) =>

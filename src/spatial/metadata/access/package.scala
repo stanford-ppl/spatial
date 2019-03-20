@@ -190,6 +190,8 @@ package object access {
       case Op(_:RegFileShiftIn[_,_])        => 1
       case Op(op:RegFileShiftInVector[_,_]) => op.data.width
       case Op(ua: UnrolledAccessor[_,_])    => ua.width
+      case Op(MergeBufferBound(_,_,_,_)) => 1
+      case Op(MergeBufferInit(_,_,_)) => 1
       case Op(RegWrite(_,_,_)) => 1
       case Op(RegRead(_))      => 1
       case Op(FIFORegDeq(_,_))      => 1

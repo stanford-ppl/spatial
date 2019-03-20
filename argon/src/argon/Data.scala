@@ -68,7 +68,7 @@ object Transfer extends Enumeration {
   * If you're not sure which one is right, use the SetBy subclasses instead to specify how the
   * metadata is created.
   */
-abstract class Data[T](val transfer: Transfer.Transfer) { self =>
+abstract class Data[T](val transfer: Transfer.Transfer) extends Serializable { self =>
   final type Tx = TransformerInterface
 
   type Transfer = Transfer.Transfer

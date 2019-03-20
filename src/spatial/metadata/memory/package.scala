@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.metadata.bounds.Expect
 import spatial.metadata.access._
 import spatial.metadata.control._
+import forge.tags.stateful
 
 package object memory {
 
@@ -69,7 +70,7 @@ package object memory {
     def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
 
     /** Stride info for LineBuffer */
-    def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}
+    @stateful def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}
 
     /** Post-unrolling duplicates (exactly one Memory instance per node) */
 
@@ -161,7 +162,7 @@ package object memory {
     }
 
     /** Returns constant values of the dimensions of the given memory. */
-    def constDims: Seq[Int] = {
+    @stateful def constDims: Seq[Int] = {
       if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
         stagedDims.collect{case Expect(c) => c.toInt }
       }
@@ -170,7 +171,7 @@ package object memory {
       }
     }
 
-    def getConstDims: Option[Seq[Int]] = {
+    @stateful def getConstDims: Option[Seq[Int]] = {
       if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
         Some(stagedDims.collect{case Expect(c) => c.toInt })
       } else None

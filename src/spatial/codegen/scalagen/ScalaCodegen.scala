@@ -87,6 +87,7 @@ trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
 
   override def copyDependencies(out: String): Unit = {
     dependencies ::= DirDep("synth", "scripts", "../", Some("scripts/"))
+    dependencies ::= DirDep(".", "project", "../", Some("project/"))
     super.copyDependencies(out)
   }
 

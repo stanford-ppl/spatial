@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <map>
 #include <unistd.h>
 #include "generated_debugRegs.h"
 // Some key code snippets have been borrowed from the following source:
@@ -21,6 +22,8 @@
 #define PAGE_SHIFT 12
 #define PAGEMAP_LENGTH 8
 #define USE_PHYS_ADDR
+
+using namespace std;
 
 /**
  * Zynq Fringe Context

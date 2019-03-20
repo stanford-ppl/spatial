@@ -3,6 +3,8 @@ package spatial.tests.feature.control.fsm
 import spatial.dsl._
 
 @spatial class FSMDotProduct extends SpatialTest {
+  override def dseModelArgs: Args = "8"
+  override def finalModelArgs: Args = "8"
 
   def main(args: Array[String]): Unit = {
     val vectorA = Array.fill(128) { random[Int](10) }

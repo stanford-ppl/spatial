@@ -4,6 +4,7 @@ import argon._
 import forge.tags._
 import utils.implicits.collections._
 import spatial.util._
+import utils.io.files._
 
 import spatial.node._
 import spatial.lang.types._

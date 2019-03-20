@@ -36,7 +36,7 @@ object types extends UtilsIRLowPriority {
   }
 
   implicit class ParamHelpers(x: Sym[_]) {
-    def toInt: Int = x match {
+    @stateful def toInt: Int = x match {
       case Expect(c) => c
       case _ => throw new Exception(s"Cannot convert symbol $x to a constant Int")
     }

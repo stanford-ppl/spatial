@@ -4,17 +4,14 @@ CROSS_COMPILE=/usr/bin/aarch64-linux-gnu-
 
 FRINGE_SRC=../zcu.sw-resources
 HOST_SRC=./
-STATIC_SRC=./datastructures/static
 
-SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${STATIC_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
+SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
 
 INCLUDES +=													\
 			-I${HOST_SRC}/                \
 			-I${HOST_SRC}/datastructures 	\
 			-I$(JAVA_HOME)/include 				\
 			-I$(JAVA_HOME)/include/linux 	\
-			-I${STATIC_SRC} 							\
-			-I${STATIC_SRC}/standalone  	\
 			-I${FRINGE_SRC} 					  	\
 			-I${HOST_SRC}/SW/xil_libs					\
 
@@ -23,8 +20,7 @@ OBJECTS=$(SOURCES:.cpp=.o)
 
 DEFINES=$(OBJECTS:.o=.d)
 
-CXXFLAGS=-DZCU -D__DELITE_CPP_STANDALONE__ -D__USE_STD_STRING__  -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 -O0 -g -march=armv8-a -mcpu=cortex-a53
-#CXXFLAGS=-DZCU -D__DELITE_CPP_STANDALONE__  -std=c++11
+CXXFLAGS=-DZCU -D__USE_STD_STRING__  -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 -O0 -g -march=armv8-a -mcpu=cortex-a53
 LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm # -L${HOST_SRC}/SW/xil_libs -lxil
 
 all: pre-build-checks Top

@@ -1,6 +1,7 @@
 #ifndef __FRINGE_CONTEXT_AWS_H__
 #define __FRINGE_CONTEXT_AWS_H__
 
+#include <assert.h>
 #include "FringeContextBase.h"
 //#include "commonDefs.h"
 
@@ -12,6 +13,8 @@
 #ifndef EPRINTF
 #define EPRINTF(...) fprintf(stderr, __VA_ARGS__)
 #endif
+
+using namespace std;
 
 #ifndef ASSERT
 #define ASSERT(cond, ...) \
@@ -149,7 +152,7 @@ private:
 
 public:
   
-  FringeContextAWS(std::string path = "") : FringeContextBase(path) {
+  FringeContextAWS(string path = "") : FringeContextBase(path) {
 #ifdef SIM
 #else // F1
     slot_id = 0; // For now fix slot to 0
@@ -441,7 +444,7 @@ public:
     // // Iterate through an array the size of the L2$, to "flush" the cache aka fill it with garbage
     // int cacheSizeWords = kb * (1 << 10) / sizeof(int); // 512kB on Zynq, 1MB on ZCU
     // int arraySize = cacheSizeWords * 10;
-    // int *dummyBuf = (int*) std::malloc(arraySize * sizeof(int));
+    // int *dummyBuf = (int*) malloc(arraySize * sizeof(int));
     // EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", dummyBuf, getFPGAPhys((uint64_t) dummyBuf), arraySize);
     // for (int i = 0; i<arraySize; i++) {
     //   if (i == 0) {

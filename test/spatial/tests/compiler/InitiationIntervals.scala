@@ -292,3 +292,108 @@ import spatial.metadata.control._
   // }
 
 }
+
+@spatial class LoopInvariantCycle extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--forceBanking"
+
+  def main(args: Array[String]): Unit = {
+    type T = Int
+    val out = DRAM[Int](3,3,8)
+    val A = ArgIn[Int]
+    val B = ArgIn[Int]
+    val C = ArgIn[Int]
+    val D = ArgIn[Int]
+    val E = ArgIn[Int]
+    val ONE = ArgIn[Int]
+    setArg(A, 16)
+    setArg(B, 16)
+    setArg(C, 9)
+    setArg(D, 3)
+    setArg(E, 8)
+    setArg(ONE, 1)
+    val m = ArgOut[Int]
+    Accel {
+      val x = SRAM[T](8, 16).noflat.noduplicate
+      Foreach(8 by 1, A by 1 par 4){(i,j) => x(i,j) = (i + j).to[T]}
+
+      val y = SRAM[T](3, 3, 8).buffer
+      Foreach(A by B par 1) { i =>
+        val z = SRAM[T](3136)
+        Foreach(B*C by 1 par 4){i => z(i) = i.to[T]}
+
+        // If you want II of 1, you have to reorder the loops so that ib is the outermost (or just outermore) iterator
+        Foreach(0::D par 1, 0::D par 1 /*7*/, 0::B par 1, 0::E par 2) { case List(r,c,ib,b) =>  // Should choose iterDiff = Some(1) (maximally conservative)
+          val loaded_val = z(ib.to[Int]*C + r*D + c)
+          val partial_sum = loaded_val * x(b, i.to[Int] + ib.to[Int])
+          println(r"ib $ib, i $i: y($r,$c,$b) = z($ib*$C + $r*$D + $c) * x($b, $i, $ib) ($loaded_val * ${x(b, i.to[Int] + ib.to[Int])})")
+          y(r,c,b) = mux(ib == 0  &&  i == 0, partial_sum, y(r,c,b) + partial_sum)
+        }
+      }
+      out store y
+
+      // Dumb example of loop invariant accumulation cycle
+      val sram = SRAM[Int](8,2)
+      Foreach(8 by 1, 2 by 1){(i,j) => sram(i,j) = 0}
+      Foreach(5 by 1, 2 by 1){(i,j) => sram(0,j) = sram(0,j) + i * ONE.value * ONE.value}
+      m := sram(0,0)
+    }
+
+
+    printTensor3(getTensor3(out), "Got:")
+    val gold = Array[Int](11160,12240,13320,14400,15480,16560,17640,18720,
+                          11280,12376,13472,14568,15664,16760,17856,18952,
+                          11400,12512,13624,14736,15848,16960,18072,19184,
+                          11520,12648,13776,14904,16032,17160,18288,19416,
+                          11640,12784,13928,15072,16216,17360,18504,19648,
+                          11760,12920,14080,15240,16400,17560,18720,19880,
+                          11880,13056,14232,15408,16584,17760,18936,20112,
+                          12000,13192,14384,15576,16768,17960,19152,20344,
+                          12120,13328,14536,15744,16952,18160,19368,20576,
+                         ).reshape(3,3,8) // Too lazy to derive the answer... :(
+    printTensor3(gold, "Gold:")
+    println(r"Dumb test got ${getArg(m)}, wanted ${0 + 1 + 2 + 3 + 4}")
+    assert(getTensor3(out) == gold)
+    assert(getArg(m) == 0 + 1 + 2 + 3 + 4)
+  }
+
+}
+
+
+@spatial class MultiTriplet extends SpatialTest {
+  // App that contains multiple accumulator triplets 
+
+  override def runtimeArgs: Args = "2"
+
+  def main(args: Array[String]): Unit = {
+
+    val x = ArgIn[Int]
+    val in = args(0).to[Int]
+    assert(in == 2, "Must make input arg == 2")
+    setArg(x, in)
+    val y = ArgOut[Int]
+
+    Accel {
+      val r1 = Reg[Int](0)
+      val r2 = Reg[Int](0)
+      val first = Reg[Bit](false)
+      Foreach(5 by 1){i =>
+        val v = i
+        val t = x.value
+        if (v > 0) {
+          val t = r1.value
+          r2 := t * 2 + x.value - 1
+          r1 := t * 2
+        } else {
+          r1 := (x.value + 3) / 5
+        }
+      }
+      y := r2.value
+    }
+
+    val result = getArg(y)
+    val gold = 17
+    println(r"Got $result, wanted $gold")
+    assert(result == gold)
+  }
+
+}

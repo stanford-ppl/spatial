@@ -129,8 +129,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
 
   def inReduce[T](red: Option[ReduceFunction], isInner: Boolean)(blk: => T): T = withFlow("inReduce",{e =>
-    if (spatialConfig.noInnerLoopUnroll && !isInner) e.reduceType = None
-    else e.reduceType = red
+    e.reduceType = red
   }){ blk }
 
 
@@ -317,16 +316,14 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def isCommon(e: Sym[_]): Boolean = contexts.map{p => f(e)}.forall{e2 => e2 == f(e)}
   }
 
-  case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
-    // HACK: Don't unroll inner loops for CGRA generation
-    val Ps: Seq[Int] = if (isInnerLoop && spatialConfig.noInnerLoopUnroll) inds.map{_ => 1}
-                       else cchain.pars.map(_.toInt)
+  trait LoopUnroller extends Unroller {
+    def isInnerLoop:Boolean
+    def cchain:CounterChain
+    def indices: Seq[Seq[I32]]
+    def indexValids: Seq[Seq[Bit]]
 
-    val fs: Seq[Boolean] = cchain.counters.map(_.isForever)
-
-    val indices: Seq[Seq[I32]] = Ps.map{p => List.fill(p){ boundVar[I32] }}
-    val indexValids:  Seq[Seq[Bit]] = Ps.map{p => List.fill(p){ boundVar[Bit] }}
-
+    val vectorize = isInnerLoop && spatialConfig.vecInnerLoop
+    val Ps: Seq[Int] = if (vectorize) inds.map{_ => 1} else cchain.pars.map(_.toInt)
     // Valid bits corresponding to each lane
     protected def createLaneValids(): Seq[Seq[Bit]] = List.tabulate(P){p =>
       val laneIdxValids = indexValids.zip(parAddr(p)).map{case (vec,i) => vec(i)}
@@ -334,40 +331,44 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
 
     // Substitution for each duplication "lane"
-    val contexts: Array[Map[Sym[_],Sym[_]]] = Array.tabulate(P){p =>
-      val inds2 = indices.zip(parAddr(p)).map{case (vec, i) => vec(i) }
-      Map.empty[Sym[_],Sym[_]] ++ inds.zip(inds2)
-    }
-  }
-
-
-
-  case class FullUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends Unroller {
-    val Ps: Seq[Int] = cchain.pars.map(_.toInt)
-
-    val indices: Seq[Seq[I32]] = cchain.counters.map{ctr =>
-      List.tabulate(ctr.ctrPar.toInt){i => I32(ctr.start.toInt + ctr.step.toInt*i) }
-    }
-    val indexValids: Seq[Seq[Bit]] = indices.zip(cchain.counters).map{case (is,ctr) =>
-      is.map{case Const(i) => Bit(i < ctr.end.toInt) }
-    }
-
-    protected def createLaneValids(): Seq[Seq[Bit]] = List.tabulate(P){p =>
-      val laneIdxValids = indexValids.zip(parAddr(p)).map{case (vec,i) => vec(i) }
-      laneIdxValids ++ validBits
-    }
-
     val contexts: Array[Map[Sym[_], Sym[_]]] = Array.tabulate(P){p =>
       val inds2 = indices.zip(parAddr(p)).map{case (vec, i) => vec(i) }
       Map.empty[Sym[_],Sym[_]] ++ inds.zip(inds2)
     }
+
+    List(indices, valids).foreach { iss =>
+      cchain.counters.zip(iss).foreach{case (ctr, is) => 
+        if (vectorize) {
+          is.head.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrPar.toInt) { i => i })
+        } else {
+          is.zipWithIndex.foreach{case (i, j) => i.counter = IndexCounterInfo(ctr, Seq(j))} 
+        }
+      }
+    }
+  }
+
+  case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends LoopUnroller {
+    // Counters[Pars]
+    lazy val indices: Seq[Seq[I32]] = Ps.map{p => List.fill(p){ boundVar[I32] }}
+    lazy val indexValids:  Seq[Seq[Bit]] = Ps.map{p => List.fill(p){ boundVar[Bit] }}
+
+  }
+
+
+  case class FullUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean) extends LoopUnroller {
+    // Counters[Pars]
+    lazy val indices: Seq[Seq[I32]] = cchain.counters.map{ctr =>
+      List.tabulate(ctr.ctrPar.toInt){i => I32(ctr.start.toInt + ctr.step.toInt*i) }
+    }
+    lazy val indexValids: Seq[Seq[Bit]] = indices.zip(cchain.counters).map{case (is,ctr) =>
+      is.map{case Const(i) => Bit(i < ctr.end.toInt) }
+    }
+
   }
 
   case class UnitUnroller(name: String, isInnerLoop: Boolean) extends Unroller {
     val Ps: Seq[Int] = Seq(1)
-    val inds: Seq[I32] = Nil
-    val indices: Seq[Seq[I32]] = Seq(Nil)
-    val indexValids: Seq[Seq[Bit]] = Seq(Nil)
+    val inds: Seq[Idx] = Nil
     protected def createLaneValids(): Seq[Seq[Bit]] = Seq(Nil)
     val contexts: Array[Map[Sym[_], Sym[_]]] = Array.tabulate(1){_ => Map.empty[Sym[_],Sym[_]] }
   }

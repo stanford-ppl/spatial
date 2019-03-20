@@ -31,6 +31,8 @@ trait AccelTraversal extends argon.passes.Traversal {
     result
   }
 
+  protected def getControlNodes(blks: Block[_]*): Seq[Sym[_]] = blks.flatMap(_.stms.filter(_.isControl))
+
 }
 
 trait BlkTraversal extends AccelTraversal {

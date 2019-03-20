@@ -3,6 +3,8 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 @spatial class SmallTensorLoad extends SpatialTest { // This test stresses the unaligned load similar to a multichannel convolution which used to fail because the unaligned fifo in the accel
+  override def dseModelArgs: Args = "16 8 16 8"
+  override def finalModelArgs: Args = "16 8 16 8"
   override def runtimeArgs: Args = "8 16"
   type T = FixPt[TRUE,_16,_0]
 

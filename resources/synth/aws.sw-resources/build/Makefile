@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-INCLUDES = -I$(SDK_DIR)/userspace/include -I ../include -I ./datastructures -I ./datastructures/static -I ./datastructures/static/standalone
+INCLUDES = -I$(SDK_DIR)/userspace/include -I ../include -I ./datastructures
 
 CC = g++
 CFLAGS = -DCONFIG_LOGLEVEL=4 -D__USE_STD_STRING__ -std=c++11 -g -Wall $(INCLUDES)
@@ -24,7 +24,7 @@ LDLIBS = -lfpga_mgmt -lrt -lpthread
 SRC = TopHost.cpp
 OBJ = $(SRC:.c=.o)
 BIN = Top
-OTHER_SRCS = $(wildcard datastructures/*.cpp) $(wildcard datastructures/static/*.cpp)
+OTHER_SRCS = $(wildcard datastructures/*.cpp) 
 
 all: check_env $(BIN)
 

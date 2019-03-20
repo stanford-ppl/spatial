@@ -50,7 +50,6 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 
 
 class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
-
   def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int],
            WMapping: List[Access], RMapping: List[Access],
            bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "sram") = this(MemParams(StandardInterfaceType, logicalDims,bitWidth,banks,strides,WMapping,RMapping,bankingMode,inits,syncMem,fracBits, numActives = numActives, myName = myName))
@@ -75,7 +74,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   // Handle Writes
   m.foreach{ mem =>
     // See which W ports can see this mem
-    val connected: Seq[(W_Port, Seq[Int])] = io.wPort.collect{case x if (canSee(x.visibleBanks, mem._2, p.banks)) => (x, lanesThatCanSee(x.visibleBanks, mem._2, p.banks))}
+    val connected: Seq[(W_Port, Seq[Int])] = p.WMapping.zip(io.wPort).collect{case (access, port) if (canSee(access.coreBroadcastVisibleBanks, mem._2, p.banks)) => (port, lanesThatCanSee(access.coreBroadcastVisibleBanks, mem._2, p.banks))}
 
     if (connected.size > 0) {
       val (ens, datas, ofs) = connected.map{case (port, lanes) => 
@@ -102,8 +101,8 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
 
 
   // Handle Reads
- m.foreach{ mem =>
-    val connected: Seq[(R_Port, Seq[Int])] = io.rPort.collect{case x if (canSee(x.visibleBanks, mem._2, p.banks)) => (x, lanesThatCanSee(x.visibleBanks, mem._2, p.banks))}
+  m.foreach{ mem =>
+    val connected: Seq[(R_Port, Seq[Int])] = p.RMapping.zip(io.rPort).collect{case (access, port) if (canSee(access.coreBroadcastVisibleBanks, mem._2, p.banks)) => (port, lanesThatCanSee(access.coreBroadcastVisibleBanks, mem._2, p.banks))}
 
     if (connected.size > 0) {
       val (rawEns, ofs, backpressures) = connected.map{case (port, lanes) => 
@@ -123,7 +122,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
 
       val stickyEns = Module(new StickySelects(rawEns.size)) // Fixes bug exposed by ScatterGatherSRAM app
       stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
-      val ens = stickyEns.io.outs.map(_.toBool)
+      val ens = stickyEns.io.outs.map(_.asBool)
 
       // Unmask write port if any of the above match
       val finalChoice = fatMux("PriorityMux", ens, ens, backpressures, ofs)
@@ -139,7 +138,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     port.output.zipWithIndex.foreach{case (out, lane) => 
       if (rm.broadcast(lane) > 0) { // Go spelunking for wire that makes true connection
         val castgrp = rm.castgroup(lane)
-        out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.collect{case (cg, b, o) if (b == 0 && cg == castgrp) => o}.head
+        out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.toList.zip(p.RMapping.flatMap{r => List.fill(r.castgroup.size)(r.muxPort)}).collect{case ((cg, b, o),mp) if (b == 0 && cg == castgrp && mp == rm.muxPort) =>  o}.head
       }
       else {
         val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.banks(j))}
@@ -432,11 +431,11 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val flatCoord = mem._4
     // See which W ports can see this mem
     val connectedNormals: Seq[(W_Port, Seq[Int])] = p.WMapping.zipWithIndex.collect{
-      case (x,i) if (!x.shiftAxis.isDefined && canSee(io.wPort(i).visibleBanks, mem._2, p.banks)) => (io.wPort(i), lanesThatCanSee(io.wPort(i).visibleBanks, mem._2, p.banks))
+      case (x,i) if (!x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.banks)) => (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.banks))
     }
     val connectedShifters: Seq[(W_Port, Seq[Int], Int)] = p.WMapping.zipWithIndex.collect{
-      case (x,i) if (x.shiftAxis.isDefined && canSee(io.wPort(i).visibleBanks.map(_.patch(x.shiftAxis.get,Nil,1)), mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1))) => 
-        (io.wPort(i), lanesThatCanSee(io.wPort(i).visibleBanks.map(_.patch(x.shiftAxis.get,Nil,1)), mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1)), x.shiftAxis.get)
+      case (x,i) if (x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1))) => 
+        (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1)), x.shiftAxis.get)
     }
 
     val (normalEns, normalDatas) = if (connectedNormals.size > 0) {

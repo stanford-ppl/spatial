@@ -18,7 +18,7 @@ val base = Seq(
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
-
+    // "com.thoughtworks.xstream" % "xstream" % "1.4.3",
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",
     //"commons-io" % "commons-io" % "2.5"
@@ -106,6 +106,12 @@ val common = base ++ Seq(
 )
 
 
+val models_settings = base ++ Seq(
+  name := "models" + sys.env.get("MODELS_PACKAGE").getOrElse("")
+)
+val utils_settings = common ++ Seq(
+  name := "utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")
+)
 val chisel3_version   = sys.props.getOrElse("chisel3Version", "3.2-SNAPSHOT")
 val testers_version   = sys.props.getOrElse("chisel-iotestersVersion", "1.2.+")
 val fringe_settings = base ++ Seq(
@@ -123,10 +129,10 @@ val fringe_settings = base ++ Seq(
 )
 
 /** Projects **/
-lazy val utils  = project.settings(common)
+lazy val utils  = project.settings(utils_settings)
 lazy val emul   = project.settings(emul_settings)
 lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
-lazy val models = project.settings(common)
+lazy val models = project.settings(models_settings).dependsOn(utils)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)

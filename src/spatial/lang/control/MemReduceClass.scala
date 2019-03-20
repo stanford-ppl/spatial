@@ -5,6 +5,7 @@ import argon._
 import forge.tags._
 import spatial.node._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 import spatial.util.memops._
 
 protected class MemReduceAccum[A,C[T]](
@@ -57,6 +58,8 @@ protected class MemReduceAccum[A,C[T]](
 
     val itersMap = List.fill(domain.length){ boundVar[I32] }
     val itersRed = List.fill(acc.sparseRank.length){ boundVar[I32] }
+    domain.zip(itersMap).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
+    ctrsRed.zip(itersRed).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")

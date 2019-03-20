@@ -50,7 +50,6 @@ abstract class MemPrimitive(val p: MemParams) extends Module {
 
 
 class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
-
   def this(logicalDims: List[Int], bitWidth: Int, banks: List[Int], strides: List[Int],
            WMapping: List[Access], RMapping: List[Access],
            bankingMode: BankingMode, inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "sram") = this(MemParams(StandardInterfaceType, logicalDims,bitWidth,banks,strides,WMapping,RMapping,bankingMode,inits,syncMem,fracBits, numActives = numActives, myName = myName))
@@ -139,7 +138,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
     port.output.zipWithIndex.foreach{case (out, lane) => 
       if (rm.broadcast(lane) > 0) { // Go spelunking for wire that makes true connection
         val castgrp = rm.castgroup(lane)
-        out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.collect{case (cg, b, o) if (b == 0 && cg == castgrp) => o}.head
+        out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.toList.zip(p.RMapping.flatMap{r => List.fill(r.castgroup.size)(r.muxPort)}).collect{case ((cg, b, o),mp) if (b == 0 && cg == castgrp && mp == rm.muxPort) =>  o}.head
       }
       else {
         val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.banks(j))}

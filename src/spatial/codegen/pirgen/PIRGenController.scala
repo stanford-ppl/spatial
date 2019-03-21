@@ -31,12 +31,12 @@ trait PIRGenController extends PIRCodegen {
     }
     iters.zipWithIndex.foreach { case (iters, i) =>
       iters.zipWithIndex.foreach { case (iter, j) =>
-        state(iter)(src"CounterIter(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs)")
+        state(iter)(src"CounterIter(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${iter.tp})")
       }
     }
     valids.zipWithIndex.foreach { case (valids, i) =>
       valids.zipWithIndex.foreach { case (valid, j) =>
-        state(valid)(src"CounterValid(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs)")
+        state(valid)(src"CounterValid(${quoteIdx(j)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valid.tp})")
       }
     }
   }

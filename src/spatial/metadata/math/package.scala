@@ -7,6 +7,7 @@ import spatial.metadata.retiming._
 import spatial.metadata.types._
 import spatial.metadata.control._
 import emul.ResidualGenerator._
+import forge.tags.stateful
 
 import utils.math.{isPow2,log2}
 
@@ -18,15 +19,15 @@ package object math {
     def modulus_=(mod: Int): Unit = metadata.add(s, Modulus(mod))
 
     def getResidual: Option[ResidualGenerator] = metadata[Residual](s.trace).map(_.equ)
-    def residual: ResidualGenerator = getResidual.getOrElse(
+    @stateful def residual: ResidualGenerator = getResidual.getOrElse(
     	if (s.trace.isConst) ResidualGenerator(s.traceToInt) 
     	else if (s.trace.asInstanceOf[Num[_]].getCounter.isDefined && s.trace.asInstanceOf[Num[_]].counter.ctr.isStaticStartAndStep) {
 	      val Final(start) = s.trace.asInstanceOf[Num[_]].counter.ctr.start
 	      val Final(step) = s.trace.asInstanceOf[Num[_]].counter.ctr.step
 	      val par = s.trace.asInstanceOf[Num[_]].counter.ctr.ctrPar.toInt
-	      val lane = s.trace.asInstanceOf[Num[_]].counter.lane
+	      val lanes = s.trace.asInstanceOf[Num[_]].counter.lanes
 	      val A = par * step
-	      val B = start + lane * step
+        val B = lanes.map { lane => start + lane * step }
 	      ResidualGenerator(A, B, 0)
     	}
     	else ResidualGenerator(1,0,0))

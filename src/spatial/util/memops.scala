@@ -7,6 +7,10 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
 
+import argon.node._
+import spatial.metadata.control._
+import utils.tags.instrument
+
 import utils.implicits.collections._
 
 object memops {
@@ -43,6 +47,12 @@ object memops {
     @rig def rawDims(): Seq[I32] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get rawDims of sparse alias")
       mem.rawRank.map{d => stage(MemDim(mem, d)) }
+    }
+
+    def parsImm: Seq[I32] = mem match {
+      case Op(alias: MemDenseAlias[_,_,_]) => alias.ranges.map(_.head.par)
+      case Op(alloc: MemAlloc[_,_])      => Seq.fill(alloc.rank.length){ I32(1) }
+      case _ => Nil
     }
 
     @rig def rawSeries(): Seq[Series[I32]] = {

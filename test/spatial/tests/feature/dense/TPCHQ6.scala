@@ -3,6 +3,8 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 @spatial class TPCHQ6 extends SpatialTest {
+  override def dseModelArgs: Args = "3840"
+  override def finalModelArgs: Args = "3840"
   override def runtimeArgs: Args = "3840"
 
   type FT = Int

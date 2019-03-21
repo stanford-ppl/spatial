@@ -55,6 +55,8 @@ if [[ $type == "sim" ]]; then
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.Scala=true "; project test; testOnly $tests" 2>&1 | tee $fileout
 elif [[ $type == "vcs" ]]; then
   nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly $tests" 2>&1 | tee $fileout
+elif [[ $type == "dse" ]]; then
+  nice -n 20 sbt -Dmaxthreads=${NUM_THREADS} -Dtest.VCS=true "; project test; testOnly spatial.tests.dse.*" 2>&1 | tee $fileout
 
 # Synthesis tests
 elif [[ $type == "zynq" ]]; then

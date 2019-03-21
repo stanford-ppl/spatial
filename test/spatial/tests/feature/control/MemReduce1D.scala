@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class MemReduce1D extends SpatialTest {
+  override def dseModelArgs: Args = "-1920 64"
+  override def finalModelArgs: Args = "-1920 64"
   override def runtimeArgs: Args = "1920"
   val tileSize = 64
   val p = 1
@@ -116,6 +118,8 @@ import spatial.dsl._
 
 
 @spatial class MemReduceFIFO extends SpatialTest {
+  override def dseModelArgs: Args = "-1920 64"
+  override def finalModelArgs: Args = "-1920 64"
   override def runtimeArgs: Args = "1920"
   val tileSize = 64
   val p = 1

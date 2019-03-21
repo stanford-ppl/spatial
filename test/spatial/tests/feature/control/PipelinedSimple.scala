@@ -4,6 +4,8 @@ package spatial.tests.feature.control
 import spatial.dsl._
 
 @spatial class SimplePipelined extends SpatialTest { 
+  override def dseModelArgs: Args = "24 6 6 6 6"
+  override def finalModelArgs: Args = "24 24 6 6"
   override def runtimeArgs: Args = "3"
 
 

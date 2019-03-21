@@ -14,8 +14,8 @@ trait PIRGenVec extends PIRCodegen {
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case VecApply(vector, i) => 
       assert(i==0, s"VecApply of i != 0 for plasticine")
-      stateStruct(lhs, lhs.tp) { name =>
-        Lhs(vector,name)
+      stateStruct(lhs, lhs.tp) { field =>
+        Lhs(vector,field.map{_._1})
       }
 
     case VecSlice(vector, end, start) =>

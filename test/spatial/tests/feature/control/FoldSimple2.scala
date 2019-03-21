@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class FoldSimple2 extends SpatialTest {
+  override def dseModelArgs: Args = "1920"
+  override def finalModelArgs: Args = "1920"
   override def runtimeArgs: Args = "1920"
   val constTileSize = 96
 

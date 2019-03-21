@@ -29,5 +29,6 @@ case class Access(
   val port: PortInfo
 ) {
   def par: Int = castgroup.size
+  def coreBroadcastVisibleBanks: List[(List[ResidualGenerator], Int)] = port.visibleBanks.zipWithIndex.collect{case (vb, i) if (broadcast(i) == 0) => (vb, i)}
   def randomBanks: Access = Access(accHash, muxPort, muxOfs, castgroup, broadcast, shiftAxis, port.randomBanks)
 }

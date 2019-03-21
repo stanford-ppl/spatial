@@ -6,7 +6,7 @@ import utils.implicits.Readable._
 
 import scala.reflect.ClassTag
 
-class ExpTypeLowPriority[C,A](t: ExpType[C,A]) {
+class ExpTypeLowPriority[C,A](t: ExpType[C,A]) extends Serializable {
   def unbox: A = tp.asInstanceOf[A]
   def isType: Boolean = t match {case ref: Ref[_,_] => ref.isType }
   def tp: ExpType[C,A] = if (isType) t else t match {case ref: Ref[_,_] => ref.tp.asInstanceOf[ExpType[C,A]] }
@@ -29,7 +29,7 @@ class ExpTypeLowPriority[C,A](t: ExpType[C,A]) {
   * These are implicits rather than defined in the classes themselves to avoid
   * having them polluting the application namespace by default.
   */
-trait LowPriorityImplicits { this: Implicits =>
+trait LowPriorityImplicits  extends Serializable { this: Implicits =>
   implicit def lowPriorityExpType[C,A](tp: ExpType[C,A]): ExpTypeLowPriority[C,A] = new ExpTypeLowPriority[C,A](tp)
 }
 
@@ -38,7 +38,7 @@ trait Implicits extends LowPriorityImplicits { this: Staging =>
   implicit def expOps[C,A](exp: Exp[C,A]): ExpMiscOps[C,A] = new ExpMiscOps[C,A](exp)
 
 
-  class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) {
+  class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) extends Serializable {
     lazy val boxed: A <:< Ref[C,A] = tp.evRef
 
     /** Create an (optionally checked) parameter */
@@ -76,7 +76,7 @@ trait Implicits extends LowPriorityImplicits { this: Staging =>
     def neverMutable: Boolean = tp._neverMutable
   }
 
-  class ExpMiscOps[C,A](exp: Exp[C,A]) {
+  class ExpMiscOps[C,A](exp: Exp[C,A]) extends Serializable {
     def unbox: A = exp.asInstanceOf[A]
     def asSym: Sym[A] = exp
 

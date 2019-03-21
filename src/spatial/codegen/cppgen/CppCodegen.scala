@@ -54,6 +54,10 @@ trait CppCodegen extends FileDependencies with AccelTraversal  {
         dependencies ::= DirDep("synth", "zcu.sw-resources", "../")
         dependencies ::= DirDep("synth", "zcu.hw-resources", "../")
         dependencies ::= FileDep("synth", "zcu.Makefile", "../", Some("Makefile"))
+      case KCU1500 => 
+        dependencies ::= DirDep("synth", "kcu1500.sw-resources", "../")
+        dependencies ::= DirDep("synth", "kcu1500.hw-resources", "../")
+        dependencies ::= FileDep("synth", "kcu1500.Makefile", "../", Some("Makefile"))
       case AWS_F1 => 
         dependencies ::= DirDep("synth", "aws.sw-resources", "../")
         dependencies ::= DirDep("synth", "aws.hw-resources", "../")

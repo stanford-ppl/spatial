@@ -12,6 +12,7 @@ import spatial.metadata.types._
 import spatial.traversal._
 import poly.ISL
 import spatial.util.spatialConfig
+import models.Sensitivity
 
 import java.io.PrintWriter
 import java.nio.file.StandardOpenOption
@@ -413,8 +414,10 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
       println(data_table.dropRight(2).last.mkString(","))
       println(data_table.dropRight(1).last.mkString(","))
       println(data_table.last.mkString(","))
-
     }
+    
+    val center = TileSizes.all.map{t => (t.name.get -> t.intValueOrLowest.toString) } ++ ParParams.all.map{p => (p.name.get -> p.intValueOrLowest.toString)} ++ PipelineParams.all.map{m => (m.toString -> {if (m.schedValue == Pipelined) "true" else "false"})}
+    Sensitivity.around(filename, center.toMap)
   }
 
   def bruteForceDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_]): Unit = {

@@ -14,6 +14,7 @@ import poly.ISL
 import spatial.util.spatialConfig
 import models.Sensitivity
 
+import models.Sensitivity
 import java.io.PrintWriter
 import java.nio.file.StandardOpenOption
 import java.nio.channels._

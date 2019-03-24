@@ -11,7 +11,7 @@ object Sensitivity {
 	def rowsWhere(property: String, value: String): Seq[Int] = {
 		val col = getCol(property)
 		val col_data = filtered_data.drop(1).map(_(col))
-		val rows = col_data.zipWithIndex.collect{case (d,i) if d == value => i}
+		val rows = col_data.zipWithIndex.collect{case (d,i) if d == value => i + 1}
 		rows
 	}
 
@@ -54,13 +54,15 @@ object Sensitivity {
 		}
 	}
 
-	def around(dse_file: String, params: Map[String,String]): Map[String, Int] = {
+	def around(dse_file: String, params: Map[String,String]): Unit = {
 		val data = loadCSVNow2D[String](dse_file, ",")(x => x)
 
 		// Filter out area and timestamp cols
 		val filter_idx = area_cols.map(data(0).indexOf)
 		filtered_data = data.map{r => r.zipWithIndex.collect{case (x,i) if !filter_idx.contains(i) => x}}.toSeq
 		params.toList.zipWithIndex.foreach{case ((name, value), i) => 
+			println(s"                  Sensitivity for $name:")
+
 			val others = params.toList.patch(i, Nil, 1)
 			// Find current row, row above, row below
 			val current_runtime = getProp("Cycles", findRow(others ++ List((name,value)))).toInt
@@ -71,7 +73,6 @@ object Sensitivity {
 
 			// Print Sensitivity
 			val segment_width = 20
-			println(s"Sensitivity for $name:")
 			val right_string_param = if (valBelow.isDefined) "-"*(segment_width - 1 - s"${valBelow.get}".length) + s"${valBelow.get}" else " "*segment_width
 			val left_string_param = if (valAbove.isDefined) s"${valAbove.get}" + "-"*(segment_width - 1 - s"${valAbove.get}".length) else " "*segment_width
 			val right_string_runtime = if (below_runtime.isDefined) {
@@ -86,6 +87,5 @@ object Sensitivity {
 			println(s"Cycles: ${left_string_runtime}${current_runtime}${right_string_runtime}")
 			println("")
 		}
-		Map()
 	}
 }

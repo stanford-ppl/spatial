@@ -7,7 +7,12 @@ import spatial.util.spatialConfig
 import spatial.metadata.params._
 import scala.reflect.ClassTag
 
-@spatial class BasicParams extends SpatialTest {
+class BasicParamsV1 extends BasicParams(1,4,64,8,true)
+class BasicParamsV2 extends BasicParams(1,4,64,8,false)
+class BasicParamsV3 extends BasicParams(2,4,64,8,true)
+
+
+@spatial abstract class BasicParams(val op: scala.Int, val ip: scala.Int, val bs: scala.Int, val lp: scala.Int, pipeline: scala.Boolean) extends SpatialTest {
   override def dseModelArgs: Args = "640"
   override def finalModelArgs: Args = "640"
   override def runtimeArgs: Args = "640"
@@ -15,10 +20,10 @@ import scala.reflect.ClassTag
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
-    val OP = 1 (1 -> 2)
-    val IP = 2 (2 -> 2 -> 16)
-    val B  = 32 (32 -> 32 -> 192)
-    val LP = 8 (4 -> 4 -> 8)
+    val OP = op (1 -> 3)
+    val IP = ip (2 -> 2 -> 8)
+    val B  = bs (32 -> 32 -> 192)
+    val LP = lp (4 -> 4 -> 8)
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
 
@@ -35,16 +40,30 @@ import scala.reflect.ClassTag
 
     Accel {
       val accO = Reg[T](0.to[T])
-      out0 := Reduce(accO)(N by B par OP){i =>
-        val aBlk = SRAM[T](B)
-        val bBlk = SRAM[T](B)
-        Parallel {
-          aBlk load a(i::i+B par LP)
-          bBlk load b(i::i+B par LP)
-        }
-        val accI = Reg[T](0.to[T])
-        Reduce(accI)(B par IP){ii => aBlk(ii) * bBlk(ii) }{_+_}
-      }{_+_}
+      if (pipeline) {
+        out0 := Reduce(accO)(N by B par OP){i =>
+          val aBlk = SRAM[T](B)
+          val bBlk = SRAM[T](B)
+          Parallel {
+            aBlk load a(i::i+B par LP)
+            bBlk load b(i::i+B par LP)
+          }
+          val accI = Reg[T](0.to[T])
+          Reduce(accI)(B par IP){ii => aBlk(ii) * bBlk(ii) }{_+_}
+        }{_+_}
+      }
+      else {
+        out0 := Sequential.Reduce(accO)(N by B par OP){i =>
+          val aBlk = SRAM[T](B)
+          val bBlk = SRAM[T](B)
+          Parallel {
+            aBlk load a(i::i+B par LP)
+            bBlk load b(i::i+B par LP)
+          }
+          val accI = Reg[T](0.to[T])
+          Reduce(accI)(B par IP){ii => aBlk(ii) * bBlk(ii) }{_+_}
+        }{_+_}        
+      }
     }
     getArg(out0)
   }

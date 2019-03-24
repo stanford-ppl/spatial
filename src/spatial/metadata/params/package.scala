@@ -23,6 +23,7 @@ package object params {
     @stateful def setIntValue(d: Int): Unit = p.bound = Expect(d)
     @stateful def intValue_=(d: Int): Unit = p.bound = Expect(d)
 
+    @stateful def makeFinalSched(d: CtrlSchedule): Unit = p.finalizeRawSchedule(d)
     @stateful def getSchedValue: Option[CtrlSchedule] = p.getRawSchedule
     @stateful def schedValue: CtrlSchedule = p.rawSchedule
     @stateful def setSchedValue(d: CtrlSchedule): Unit = p.rawSchedule = d

@@ -14,7 +14,7 @@ object Runtime {
   var logfilename: String = ""
   var logfile: Option[PrintWriter] = None
   var cliParams = Seq[Int]()
-  var tuneParams = Map[Int, Any]()
+  var tuneParams = Map[String, Any]()
   var isFinal = false
   var suppressWarns = false
 
@@ -24,7 +24,7 @@ object Runtime {
   // Asked values for this execution
   val cachedAsk = scala.collection.mutable.ListBuffer[Int]()
   // Tuned values for this execution
-  val cachedTune = scala.collection.mutable.ListBuffer[Int]()
+  val cachedTune = scala.collection.mutable.ListBuffer[String]()
 
   /** Control node schedule */
   sealed abstract class CtrlSchedule
@@ -87,29 +87,29 @@ object Runtime {
   }
 
   /** Base class for numbers used in model (parallelizations, counter starts/steps/ends, tile sizes, etc.) */
-  abstract class ModelValue(id: Int, whatAmI: String, ctx: Ctx){
-    def lookup: Int
+  abstract class ModelValue[K,V](id: K, whatAmI: String, ctx: Ctx){
+    def lookup: V
   }
 
   /** Value that can be hot-swapped by compiler during DSE */
-  case class Tuneable(id: Int, val default: Int, whatAmI: String) extends ModelValue(id, whatAmI, Ctx.empty) {
-    def lookup: Int = {
+  case class Tuneable[V](id: String, val default: V, whatAmI: String) extends ModelValue[String,V](id, whatAmI, Ctx.empty) {
+    def lookup: V = {
       if (!suppressWarns) {
         if (!tuneParams.contains(id) && !cachedTune.contains(id)) {println(s"[warn] Using default value $default for tuneable param $whatAmI ($id)"); cachedTune += id}
         else if (!cachedTune.contains(id)) {println(s"[warn] Using retuned value ${tuneParams(id)} for tuneable param $whatAmI ($id) (default was $default)"); cachedTune += id}
       }
       // println(s"looking up $id default $default in params $tuneParams")
-      tuneParams.getOrElse(id, default).asInstanceOf[Int]
+      tuneParams.getOrElse(id, default).asInstanceOf[V]
     }
   }
 
   /** Value that is a constant from point of view of compiler and user */
-  case class Locked(id: Int, val value: Int) extends ModelValue(id, "", Ctx.empty) {
+  case class Locked(id: Int, val value: Int) extends ModelValue[Int,Int](id, "", Ctx.empty) {
     def lookup: Int = value
   }
 
   /** Value that must be set by user at command line, or dseModelArgs/finalModelArgs in noninteractive mode */
-  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends ModelValue(id, whatAmI, ctx) {
+  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends ModelValue[Int,Int](id, whatAmI, ctx) {
     def lookup: Int = {
       if (cachedAsk.contains(id)) askMap(id)
       else if (!interactive && !cachedAsk.contains(id)) {
@@ -137,28 +137,28 @@ object Runtime {
   }
 
   object CtrModel {
-    def apply(start: Int, stop: Int, stride: Int, par: Int) = new CtrModel(Locked(-1, start), Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
-    def apply(start: Int, stop: Int, stride: Int, par: ModelValue) = new CtrModel(Locked(-1, start), Locked(-1, stop), Locked(-1, stride), par)
-    def apply(start: Int, stop: Int, stride: ModelValue, par: Int) = new CtrModel(Locked(-1, start), Locked(-1, stop), stride, Locked(-1, par))
-    def apply(start: Int, stop: Int, stride: ModelValue, par: ModelValue) = new CtrModel(Locked(-1, start), Locked(-1, stop), stride, par)
-    def apply(start: Int, stop: ModelValue, stride: Int, par: Int) = new CtrModel(Locked(-1, start), stop, Locked(-1, stride), Locked(-1, par))
-    def apply(start: Int, stop: ModelValue, stride: Int, par: ModelValue) = new CtrModel(Locked(-1, start), stop, Locked(-1, stride), par)
-    def apply(start: Int, stop: ModelValue, stride: ModelValue, par: Int) = new CtrModel(Locked(-1, start), stop, stride, Locked(-1, par))
-    def apply(start: Int, stop: ModelValue, stride: ModelValue, par: ModelValue) = new CtrModel(Locked(-1, start), stop, stride, par)
-    def apply(start: ModelValue, stop: Int, stride: Int, par: Int) = new CtrModel(start, Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
-    def apply(start: ModelValue, stop: Int, stride: Int, par: ModelValue) = new CtrModel(start, Locked(-1, stop), Locked(-1, stride), par)
-    def apply(start: ModelValue, stop: Int, stride: ModelValue, par: Int) = new CtrModel(start, Locked(-1, stop), stride, Locked(-1, par))
-    def apply(start: ModelValue, stop: Int, stride: ModelValue, par: ModelValue) = new CtrModel(start, Locked(-1, stop), stride, par)
-    def apply(start: ModelValue, stop: ModelValue, stride: Int, par: Int) = new CtrModel(start, stop, Locked(-1, stride), Locked(-1, par))
-    def apply(start: ModelValue, stop: ModelValue, stride: Int, par: ModelValue) = new CtrModel(start, stop, Locked(-1, stride), par)
-    def apply(start: ModelValue, stop: ModelValue, stride: ModelValue, par: Int) = new CtrModel(start, stop, stride, Locked(-1, par))    
-    def apply(start: ModelValue, stop: ModelValue, stride: ModelValue, par: ModelValue) = new CtrModel(start, stop, stride, par)    
+    def apply(start: Int, stop: Int, stride: Int, par: Int) =                                                                   new CtrModel[Int,Int,Int,Int](Locked(-1, start), Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
+    def apply[K4](start: Int, stop: Int, stride: Int, par: ModelValue[K4,Int]) =                                                new CtrModel[Int,Int,Int,K4](Locked(-1, start), Locked(-1, stop), Locked(-1, stride), par)
+    def apply[K3](start: Int, stop: Int, stride: ModelValue[K3,Int], par: Int) =                                                new CtrModel[Int,Int,K3,Int](Locked(-1, start), Locked(-1, stop), stride, Locked(-1, par))
+    def apply[K3,K4](start: Int, stop: Int, stride: ModelValue[K3,Int], par: ModelValue[K4,Int]) =                              new CtrModel[Int,Int,K3,K4](Locked(-1, start), Locked(-1, stop), stride, par)
+    def apply[K2](start: Int, stop: ModelValue[K2,Int], stride: Int, par: Int) =                                                new CtrModel[Int,K2,Int,Int](Locked(-1, start), stop, Locked(-1, stride), Locked(-1, par))
+    def apply[K2,K4](start: Int, stop: ModelValue[K2,Int], stride: Int, par: ModelValue[K4,Int]) =                              new CtrModel[Int,K2,Int,K4](Locked(-1, start), stop, Locked(-1, stride), par)
+    def apply[K2,K3](start: Int, stop: ModelValue[K2,Int], stride: ModelValue[K3,Int], par: Int) =                              new CtrModel[Int,K2,K3,Int](Locked(-1, start), stop, stride, Locked(-1, par))
+    def apply[K2,K3,K4](start: Int, stop: ModelValue[K2,Int], stride: ModelValue[K3,Int], par: ModelValue[K4,Int]) =            new CtrModel[Int,K2,K3,K4](Locked(-1, start), stop, stride, par)
+    def apply[K1](start: ModelValue[K1,Int], stop: Int, stride: Int, par: Int) =                                                new CtrModel[K1,Int,Int,Int](start, Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
+    def apply[K1,K4](start: ModelValue[K1,Int], stop: Int, stride: Int, par: ModelValue[K4,Int]) =                              new CtrModel[K1,Int,Int,K4](start, Locked(-1, stop), Locked(-1, stride), par)
+    def apply[K1,K3](start: ModelValue[K1,Int], stop: Int, stride: ModelValue[K3,Int], par: Int) =                              new CtrModel[K1,Int,K3,Int](start, Locked(-1, stop), stride, Locked(-1, par))
+    def apply[K1,K3,K4](start: ModelValue[K1,Int], stop: Int, stride: ModelValue[K3,Int], par: ModelValue[K4,Int]) =            new CtrModel[K1,Int,K3,K4](start, Locked(-1, stop), stride, par)
+    def apply[K1,K2](start: ModelValue[K1,Int], stop: ModelValue[K2,Int], stride: Int, par: Int) =                              new CtrModel[K1,K2,Int,Int](start, stop, Locked(-1, stride), Locked(-1, par))
+    def apply[K1,K2,K4](start: ModelValue[K1,Int], stop: ModelValue[K2,Int], stride: Int, par: ModelValue[K4,Int]) =            new CtrModel[K1,K2,Int,K4](start, stop, Locked(-1, stride), par)
+    def apply[K1,K2,K3](start: ModelValue[K1,Int], stop: ModelValue[K2,Int], stride: ModelValue[K3,Int], par: Int) =            new CtrModel[K1,K2,K3,Int](start, stop, stride, Locked(-1, par))    
+    def apply[K1,K2,K3,K4](start: ModelValue[K1,Int], stop: ModelValue[K2,Int], stride: ModelValue[K3,Int], par: ModelValue[K4,Int]) = new CtrModel[K1,K2,K3,K4](start, stop, stride, par)    
   }
-  class CtrModel(
-    val start: ModelValue,
-    val stop: ModelValue, 
-    val stride: ModelValue,
-    val par: ModelValue
+  class CtrModel[K1,K2,K3,K4](
+    val start: ModelValue[K1,Int],
+    val stop: ModelValue[K2,Int], 
+    val stride: ModelValue[K3,Int],
+    val par: ModelValue[K4,Int]
   ) {
     def N: Int = {
       val realStart = start.lookup
@@ -174,7 +174,7 @@ object Runtime {
   }
 
   case class CChainModel(
-    val ctrs: Seq[CtrModel],
+    val ctrs: Seq[CtrModel[_,_,_,_]],
     val ctx: Ctx = Ctx("","","","")
   ) {
     def N: Int = { // Num iters for lane
@@ -190,14 +190,14 @@ object Runtime {
   class ControllerModel(
     val id: Int,
     val level: CtrlLevel,
-    val schedule: CtrlSchedule,
+    val schedule: Either[CtrlSchedule,Tuneable[String]],
     val cchain: List[CChainModel],
     val L: Int,
     val II: Int,
     val ctx: Ctx,
     val bitsPerCycle: Double = 32.0 // Defined for transfers
   ){
-    def this(id: Int, level: CtrlLevel, schedule: CtrlSchedule, cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(id, level, schedule, List(cchain), L, II, ctx)
+    def this(id: Int, level: CtrlLevel, schedule: Either[CtrlSchedule,Tuneable[String]], cchain: CChainModel, L: Int, II: Int, ctx: Ctx) = this(id, level, schedule, List(cchain), L, II, ctx)
 
     override def toString: String = ctx.toString
     val targetBurstSize = 512
@@ -212,12 +212,25 @@ object Runtime {
     val baselineDRAMStoreDelay = 150 // Cycles between single dram cmd and its response, with no competitors
     val storeFudge = 50 // Penalty for dram store when children are run sequentially
     val congestionPenalty = 5 // Interference due to conflicting DRAM accesses
+
+    // Schedule helpers to handle tuneable nodes
+    def isSeq = schedule match {
+      case Left(Sequenced) => true
+      case Right(x) if x.lookup == "false" => true
+      case _ => false
+    }
+    def resolvedSchedule = schedule match {
+      case Left(x) => x
+      case Right(x) if x.lookup == "false" => Sequenced
+      case _ => Pipelined
+    }
+
     def transfersBelow(exempt: List[ControllerModel]): Competitors = { // Count number of transfer nodes below self
-      if (this.schedule == DenseLoad) Competitors.DenseLoad
-      else if (this.schedule == DenseStore) Competitors.DenseStore
-      else if (this.schedule == GatedDenseStore) Competitors.GatedDenseStore
-      else {
-        this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).foldLeft(Competitors.empty){_+_} * this.cchain.head.unroll 
+      this.schedule match {
+        case Left(DenseLoad) => Competitors.DenseLoad
+        case Left(DenseStore) => Competitors.DenseStore
+        case Left(GatedDenseStore) => Competitors.GatedDenseStore
+        case _ => this.children.filterNot{x => exempt.map(_.ctx.id).contains(x.ctx.id)}.map(_.transfersBelow(exempt)).foldLeft(Competitors.empty){_+_} * this.cchain.head.unroll 
       }
     }
     def competitors(c: Competitors = Competitors.empty, exempt: List[ControllerModel] = List()): Competitors = { // Count number of other transfer nodes trigger simultaneously with this self
@@ -225,7 +238,7 @@ object Runtime {
       if (!parent.isDefined) c
       else {
         val contribution = (this.transfersBelow(exempt) + c) * parent.get.cchain.head.unroll
-        val newExempt = exempt ++ List(this) ++ {if (parent.get.schedule == Sequenced) parent.get.children else List()}
+        val newExempt = exempt ++ List(this) ++ {if (parent.get.isSeq) parent.get.children else List()}
         parent.get.competitors(contribution, newExempt)
       }
     }
@@ -237,8 +250,8 @@ object Runtime {
                                                              gateds = competitors.gateds,
                                                              outerIters = upperCChainIters,
                                                              innerIters = numel,
-                                                             bitsPerCycle = this.bitsPerCycle), this.schedule)
-      Console.println(s"congestion of ${competitors.loads}, ${competitors.stores}, ${competitors.gateds}, ${upperCChainIters}, ${numel}, ${this.bitsPerCycle} = $res")
+                                                             bitsPerCycle = this.bitsPerCycle), this.resolvedSchedule)
+      // Console.println(s"congestion of ${competitors.loads}, ${competitors.stores}, ${competitors.gateds}, ${upperCChainIters}, ${numel}, ${this.bitsPerCycle} = $res")
       // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
 
       // // Linear for the first 4 competitors
@@ -284,11 +297,8 @@ object Runtime {
     }
     /** Define equations for computing runtime */
     def cycsPerParent: Int = level match {
-      case OuterControl => schedule match {
+      case OuterControl => resolvedSchedule match {
         case Sequenced       => 
-          if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
-          else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
-        case Pipelined if (tuneParams.contains(id) && tuneParams(id).asInstanceOf[String] == "false")      => 
           if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
           else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
         case Pipelined      => 
@@ -307,7 +317,7 @@ object Runtime {
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }
-      case InnerControl => schedule match {
+      case InnerControl => resolvedSchedule match {
         case Sequenced => cchainIters*L + startup + shutdown
         case _ => (cchainIters - 1)*II + L + startup + shutdown + dpMask
       }

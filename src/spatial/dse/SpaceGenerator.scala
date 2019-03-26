@@ -17,10 +17,14 @@ trait SpaceGenerator {
 
   def domain(p: Sym[_], restricts: Iterable[Restrict])(implicit baseIR: State): Domain[Int] = {
     if (restricts.nonEmpty) {
+      val range = p.paramDomain match {
+        case Left(x) => Left(x.toRange)
+        case Right(x) => Right(x)
+      }
       Domain.restricted(
         name   = p.name.getOrElse(s"$p"),
         id     = p.hashCode,
-        range  = p.paramDomain.toRange,
+        range  = range,
         setter = {(v: Int, state: State) => p.setIntValue(v)(state) },
         getter = {(state: State) => p.intValue(state).toInt },
         cond   = {state => restricts.forall(_.evaluate()(state)) },
@@ -28,10 +32,14 @@ trait SpaceGenerator {
       )
     }
     else {
+      val range = p.paramDomain match {
+        case Left(x) => Left(x.toRange)
+        case Right(x) => Right(x)
+      }
       Domain(
         name  = p.name.getOrElse(s"$p"),
         id = p.hashCode,
-        range = p.paramDomain.toRange,
+        range = range,
         setter = { (v: Int, state: State) => p.setIntValue(v)(state) },
         getter = { (state: State) => p.intValue(state).toInt },
         tp     = Ordinal

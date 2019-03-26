@@ -23,7 +23,7 @@ class BasicParamsV3 extends BasicParams(2,4,64,8,true)
     val OP = op (1 -> 3)
     val IP = ip (2 -> 2 -> 8)
     val B  = bs (32 -> 32 -> 192)
-    val LP = lp (4 -> 4 -> 8)
+    val LP = lp (1, 2, 4, 8, 16)
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
 

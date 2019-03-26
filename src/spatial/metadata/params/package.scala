@@ -9,9 +9,20 @@ import spatial.metadata.control._
 package object params {
 
   implicit class ParamDomainOps(p: Sym[_]) {
-    def getParamDomain: Option[(Int,Int,Int)] = metadata[ParamDomain](p).map{d => (d.min,d.step,d.max) }
-    def paramDomain: (Int,Int,Int) = getParamDomain.getOrElse((1,1,1))
-    def paramDomain_=(d: (Int,Int,Int)): Unit = metadata.add(p, ParamDomain(d._1,d._2,d._3))
+    def getParamDomain: Option[Either[(Int,Int,Int), Seq[Int]]] = {
+      if (getExplicitParamDomain.isDefined) Some(Right(explicitParamDomain))
+      else if (getRangeParamDomain.isDefined) Some(Left(rangeParamDomain))
+      else None
+    }
+    def paramDomain: Either[(Int,Int,Int), Seq[Int]] = getParamDomain.getOrElse(Left((1,1,1)))
+
+    def getExplicitParamDomain: Option[Seq[Int]] = metadata[ExplicitParamDomain](p).map{d => d.values }
+    def explicitParamDomain: Seq[Int] = getExplicitParamDomain.getOrElse(Seq(1))
+    def explicitParamDomain_=(d: Seq[Int]): Unit = metadata.add(p, ExplicitParamDomain(d))
+
+    def getRangeParamDomain: Option[(Int,Int,Int)] = metadata[RangeParamDomain](p).map{d => (d.min,d.step,d.max) }
+    def rangeParamDomain: (Int,Int,Int) = getRangeParamDomain.getOrElse((1,1,1))
+    def rangeParamDomain_=(d: (Int,Int,Int)): Unit = metadata.add(p, RangeParamDomain(d._1,d._2,d._3))
 
     def getContention: Option[Int] = metadata[MemoryContention](p).map{d => d.contention }
     def contention: Int = getContention.getOrElse(0)
@@ -19,7 +30,7 @@ package object params {
 
     @stateful def getIntValue: Option[Int] = if (p.getBound.isDefined) Some(p.bound.toInt) else None
     @stateful def intValue: Int = p.bound.toInt
-    @stateful def intValueOrLowest: Int = if (p.getBound.isDefined) p.bound.toInt else p.paramDomain._1
+    @stateful def intValueOrLowest: Int = if (p.getBound.isDefined) p.bound.toInt else {p.paramDomain match {case Left((min,_,_)) => min; case Right(vals) => vals.sorted.head}}
     @stateful def setIntValue(d: Int): Unit = p.bound = Expect(d)
     @stateful def intValue_=(d: Int): Unit = p.bound = Expect(d)
 

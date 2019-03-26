@@ -161,24 +161,34 @@ case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) =
   @stateful def filter(cond: => Boolean) = new Domain(name, id, options.filter{t => setValue(t); cond}, setter, getter, tp)
 }
 object Domain {
-  def apply(name: String, id: Int, range: Range, setter: (Int,State) => Unit, getter: State => Int, tp: SpaceType): Domain[Int] = {
-    if (range.start % range.step != 0) {
-      val start = range.step*(range.start/range.step + 1)
-      new Domain[Int](name, id, (start to range.end by range.step) :+ range.start, setter, getter, tp)
+  def apply(name: String, id: Int, range: Either[Range, Seq[Int]], setter: (Int,State) => Unit, getter: State => Int, tp: SpaceType): Domain[Int] = {
+    range match {
+      case Left(x) => 
+        if (x.start % x.step != 0) {
+          val start = x.step*(x.start/x.step + 1)
+          new Domain[Int](name, id, (start to x.end by x.step) :+ x.start, setter, getter, tp)
+        }
+        else new Domain[Int](name, id, x, setter, getter, tp)
+      case Right(x) => 
+        new Domain[Int](name, id, x, setter, getter, tp)
     }
-    else new Domain[Int](name, id, range, setter, getter, tp)
   }
-  @stateful def restricted(name: String, id: Int, range: Range, setter: (Int,State) => Unit, getter: State => Int, cond: State => Boolean, tp: SpaceType): Domain[Int] = {
-    val (start, first) = if (range.start % range.step != 0) {
-      val start = range.step*((range.start/range.step) + 1)
-      setter(range.start, state)
-      val first = if (cond(state)) Some(range.start) else None
-      (start, first)
-    }
-    else (range.start, None)
+  @stateful def restricted(name: String, id: Int, range: Either[Range, Seq[Int]], setter: (Int,State) => Unit, getter: State => Int, cond: State => Boolean, tp: SpaceType): Domain[Int] = {
+    range match {
+      case Left(x) => 
+        val (start, first) = if (x.start % x.step != 0) {
+          val start = x.step*((x.start/x.step) + 1)
+          setter(x.start, state)
+          val first = if (cond(state)) Some(x.start) else None
+          (start, first)
+        }
+        else (x.start, None)
 
-    val values = (start to range.end by range.step).filter{i => setter(i, state); cond(state) } ++ first
-    new Domain[Int](name, id, values, setter, getter, tp)
+        val values = (start to x.end by x.step).filter{i => setter(i, state); cond(state) } ++ first
+        new Domain[Int](name, id, values, setter, getter, tp)
+      case Right(x) => 
+        new Domain[Int](name, id, x, setter, getter, tp)
+    }
   }
 }
 

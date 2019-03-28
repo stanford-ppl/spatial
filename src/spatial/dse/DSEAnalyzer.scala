@@ -13,6 +13,7 @@ import spatial.traversal._
 import poly.ISL
 import spatial.util.spatialConfig
 
+import models.Sensitivity
 import java.io.PrintWriter
 import java.nio.file.StandardOpenOption
 import java.nio.channels._
@@ -79,7 +80,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     // TODO: setIntValues and set schedValue for all params to the best values??
     TileSizes.all.foreach{t => t.makeFinal(t.intValueOrLowest) }
     ParParams.all.foreach{p => p.makeFinal(p.intValueOrLowest) }
-    // PipelineParams.all.foreach{p => p.makeFinal(p.schedValue) }
+    PipelineParams.all.foreach{p => p.makeFinalSched(p.schedValue) }
     block
   }
 
@@ -413,8 +414,12 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
       println(data_table.dropRight(2).last.mkString(","))
       println(data_table.dropRight(1).last.mkString(","))
       println(data_table.last.mkString(","))
-
     }
+    
+    try {
+      val center = TileSizes.all.map{t => (t.name.get -> t.intValueOrLowest.toString) } ++ ParParams.all.map{p => (p.name.get -> p.intValueOrLowest.toString)} ++ PipelineParams.all.map{m => (m.toString -> {if (m.schedValue == Pipelined) "true" else "false"})}
+      Sensitivity.around(filename, center.toMap)
+    } catch {case _: Throwable => }
   }
 
   def bruteForceDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_]): Unit = {

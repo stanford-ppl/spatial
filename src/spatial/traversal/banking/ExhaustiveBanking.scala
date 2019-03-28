@@ -339,9 +339,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       *   For all Cheap Ns, For all Other As
       *   For all Other Ns, For all Other As
       */
-    val Ns_1 = (n2Head ++ n2).iterator
+    val Ns_1 = (n2Head ++ grps.map(_.size) ++ n2).sorted.iterator
     val Ns_2 = (nx).iterator
-    val Ns_3 = (n2Head ++ n2).iterator
+    val Ns_3 = (n2Head ++ grps.map(_.size) ++ n2).sorted.iterator
     val Ns_4 = (nx).iterator
 
     def exhaustIterators(Ns: Iterator[Int], cheapAs: Boolean): Unit = {

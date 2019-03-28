@@ -538,15 +538,16 @@ package object control {
     def isRawOuter: Boolean = rawLevel == Outer
     def isRawInner: Boolean = rawLevel == Inner
 
-    def getRawSchedule: Option[CtrlSchedule] = metadata[ControlSchedule](s).map(_.sched)
-    def rawSchedule: CtrlSchedule = getRawSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
-    def rawSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, ControlSchedule(sched))
+    @stateful def getRawSchedule: Option[CtrlSchedule] = if (state.scratchpad[ControlSchedule](s).isDefined) state.scratchpad[ControlSchedule](s).map(_.sched) else metadata[ControlSchedule](s).map(_.sched)
+    @stateful def rawSchedule: CtrlSchedule = getRawSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
+    @stateful def rawSchedule_=(sched: CtrlSchedule): Unit = state.scratchpad.add(s, ControlSchedule(sched))
+    @stateful def finalizeRawSchedule(sched: CtrlSchedule): Unit = metadata.add(s, ControlSchedule(sched))
 
-    def isRawSeq: Boolean = rawSchedule == Sequenced
-    def isRawPipe: Boolean = rawSchedule == Pipelined
-    def isRawStream: Boolean = rawSchedule == Streaming
-    def isForkJoin: Boolean = rawSchedule == ForkJoin
-    def isFork: Boolean = rawSchedule == Fork
+    @stateful def isRawSeq: Boolean = rawSchedule == Sequenced
+    @stateful def isRawPipe: Boolean = rawSchedule == Pipelined
+    @stateful def isRawStream: Boolean = rawSchedule == Streaming
+    @stateful def isForkJoin: Boolean = rawSchedule == ForkJoin
+    @stateful def isFork: Boolean = rawSchedule == Fork
 
     def getUserSchedule: Option[CtrlSchedule] = metadata[UserScheduleDirective](s).map(_.sched)
     def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }

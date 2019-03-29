@@ -20,10 +20,12 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
   }
 
   private def setRange(x: Sym[_], min: Int, max: Int, stride: Int = 1): Unit = x.getParamDomain match {
-    case Some((start,end,step)) =>
-      x.paramDomain = (Math.max(min,start), Math.min(max,end), Math.max(stride,step))
+    case Some(Left((start,end,step))) =>
+      x.rangeParamDomain = (Math.max(min,start), Math.min(max,end), Math.max(stride,step))
+    case Some(Right(vals)) => 
+      x.explicitParamDomain = vals
     case None =>
-      x.paramDomain = (min,max,stride)
+      x.rangeParamDomain = (min,max,stride)
   }
 
   private def collectParams(x: Sym[_]): Seq[Sym[_]] = {

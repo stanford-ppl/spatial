@@ -178,8 +178,11 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
           open(s"override def main(args: Array[String]): Unit = {")
             val center = TileSizes.all.map{t => (t.name.get -> t.intValueOrLowest.toString) } ++ ParParams.all.map{p => (p.name.get -> p.intValueOrLowest.toString)} ++ PipelineParams.all.map{m => (m.toString -> {if (m.schedValue == Pipelined) "true" else "false"})}
             val center_string = center.map{case (p,v) => s""" "$p" -> "$v" """}.mkString("Map(", ",", ")")
-            emit(s"""println(s"Center: ${center}") """)
-            emit(s"""Sensitivity.around("${gen_dir}/${config.name}_data.csv", ${center_string})""")
+            emit(s"""val center = ${center_string}""")
+            emit(s"""println(s"Center: $$center") """)
+            emit("""println(s"Hashcode mapping:")""")
+            (TileSizes.all ++ ParParams.all ++ PipelineParams.all).foreach{x => emit(s"""println(s"${x.name.getOrElse(x.toString)} = ${x.hashCode}")""")}
+            emit(s"""Sensitivity.around("${gen_dir}/${config.name}_data.csv", center)""")
           close("}")
         close("}")
       }

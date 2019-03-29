@@ -70,6 +70,13 @@ resources:
 	bash bin/update_resources.sh
 	sbt "; project fringe; publishLocal"
 
+
+###-----------------------------------###
+## Update the models package.          ##
+###-----------------------------------###
+models:
+	sbt "; project models; publishLocal"
+
 ###-----------------------------------###
 ## Update local emul package.          ##
 ###-----------------------------------###

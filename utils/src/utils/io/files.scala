@@ -39,6 +39,15 @@ object files {
     }.toSeq
   }
 
+  /** 
+    * Parse data out of 2D CSV
+    */
+  def loadCSVNow2D[A](filename: String, delim: String)(func: String => A): List[Seq[A]] = {
+    Source.fromFile(filename).getLines().map{line =>
+      line.split(delim).map(_.trim).flatMap(_.split(" ")).map{x => func(x.trim) }.toSeq
+    }.toList
+  }
+
   /**
     * Delete a directory
     */

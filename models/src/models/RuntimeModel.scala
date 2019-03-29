@@ -208,10 +208,6 @@ object Runtime {
     val dpMask = 1 // cycles that datapath is enabled but masked by done signal
     val startup = 2
     val shutdown = 1
-    val baselineDRAMLoadDelay = 170 // Cycles between single dram cmd and its response, with no competitors
-    val baselineDRAMStoreDelay = 150 // Cycles between single dram cmd and its response, with no competitors
-    val storeFudge = 50 // Penalty for dram store when children are run sequentially
-    val congestionPenalty = 5 // Interference due to conflicting DRAM accesses
 
     // Schedule helpers to handle tuneable nodes
     def isSeq = schedule match {
@@ -257,15 +253,15 @@ object Runtime {
       // curve_fit
       def params(x: Seq[Double]): (Double, Double, Double, Double, Double, Double) = (x(0), x(1), x(2), x(3), x(4), x(5))
 
-      def fitFunc3(x: Seq[Double], congestion: Double, stallPenalty: Double, idle: Double, startup: Double, parFactor: Double, a: Double, b: Double, c: Double, d: Double, e: Double, f: Double, g: Double, h: Double, i: Double, j: Double): Double = {
+      def fitFunc4(x: Seq[Double], congestion: Double, stallPenalty: Double, idle: Double, startup: Double, parFactor: Double, a: Double, b: Double, c: Double, d: Double, e: Double, f: Double, g: Double, h: Double, i: Double, j: Double): Double = {
         val (loads, stores, gateds, outerIters, innerIters, bitsPerCycle) = params(x)
         val countersContribution = outerIters * (innerIters + idle)
         val congestionContribution = (loads*a + stores*b + gateds*c)*congestion
         val parallelizationScale = bitsPerCycle * parFactor
-        (countersContribution * stallPenalty * congestionContribution + startup) * parallelizationScale
+        (countersContribution * stallPenalty * (congestionContribution + countersContribution / bitsPerCycle * j) + startup) * parallelizationScale
       }
       val p = ModelData.curve_fit(this.resolvedSchedule.toString).map(_.toDouble)
-      170 min fitFunc3(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
+      170 max fitFunc3(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
     }
 
     // Result fields
@@ -315,9 +311,9 @@ object Runtime {
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad            => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
-        case DenseStore           => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
-        case GatedDenseStore      => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
+        case DenseLoad            => congestionModel(competitors())
+        case DenseStore           => congestionModel(competitors())
+        case GatedDenseStore      => congestionModel(competitors())
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }

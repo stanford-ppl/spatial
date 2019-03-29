@@ -78,6 +78,8 @@ elif [[ $type == "vcs-gdocs" ]]; then
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="vcs-gdocs-${branchname}"
   export EMUL_PACKAGE="vcs-gdocs-${branchname}"
+  export MODELS_PACKAGE="vcs-gdocs-${branchname}"
+  export UTILS_PACKAGE="vcs-gdocs-${branchname}"
   make resources
   make publish
   hash=`git rev-parse HEAD`

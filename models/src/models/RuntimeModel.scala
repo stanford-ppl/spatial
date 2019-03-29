@@ -245,23 +245,27 @@ object Runtime {
 
     def congestionModel(competitors: Competitors): Int = {
       val numel = cchain.last.N
-      val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
-                                                             stores = competitors.stores,
-                                                             gateds = competitors.gateds,
-                                                             outerIters = upperCChainIters,
-                                                             innerIters = numel,
-                                                             bitsPerCycle = this.bitsPerCycle), this.resolvedSchedule)
-      // Console.println(s"congestion of ${competitors.loads}, ${competitors.stores}, ${competitors.gateds}, ${upperCChainIters}, ${numel}, ${this.bitsPerCycle} = $res")
-      // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
+      // // Lattice regression
+      // val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
+      //                                                        stores = competitors.stores,
+      //                                                        gateds = competitors.gateds,
+      //                                                        outerIters = upperCChainIters,
+      //                                                        innerIters = numel,
+      //                                                        bitsPerCycle = this.bitsPerCycle), this.resolvedSchedule)
+      // res
 
-      // // Linear for the first 4 competitors
-      // val linear1 = if (competitors < 2) competitors * congestionPenalty else 4 * congestionPenalty
-      // // Exponential for the next 8 competitors
-      // val exp = if (competitors < 2) 0 else if (competitors < 12) scala.math.pow(2.3, competitors - 2).toInt else scala.math.pow(2.3, 8).toInt
-      // // Linear for the rest
-      // val linear2 = if (competitors < 12) 0 else (competitors - 12) * congestionPenalty
-      // linear1 + exp + linear2
-      res
+      // curve_fit
+      def params(x: Seq[Double]): (Double, Double, Double, Double, Double, Double) = (x(0), x(1), x(2), x(3), x(4), x(5))
+
+      def fitFunc3(x: Seq[Double], congestion: Double, stallPenalty: Double, idle: Double, startup: Double, parFactor: Double, a: Double, b: Double, c: Double, d: Double, e: Double, f: Double, g: Double, h: Double, i: Double, j: Double): Double = {
+        val (loads, stores, gateds, outerIters, innerIters, bitsPerCycle) = params(x)
+        val countersContribution = outerIters * (innerIters + idle)
+        val congestionContribution = (loads*a + stores*b + gateds*c)*congestion
+        val parallelizationScale = bitsPerCycle * parFactor
+        (countersContribution * stallPenalty * congestionContribution + startup) * parallelizationScale
+      }
+      val p = ModelData.curve_fit(this.resolvedSchedule.toString).map(_.toDouble)
+      170 min fitFunc3(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
     }
 
     // Result fields
@@ -376,9 +380,9 @@ object Runtime {
       if (entry) emit(s"Controller Structure:")
       if (entry) emit("============================================")
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
-      val competitors = if (this.schedule == DenseLoad) s" (${this.competitors()})"
-                        else if (this.schedule == DenseStore) s" (${this.competitors()})"
-                        else if (this.schedule == GatedDenseStore) s" (${this.competitors()})"
+      val competitors = if (this.schedule == Left(DenseLoad)) s" (${this.competitors()})"
+                        else if (this.schedule == Left(DenseStore)) s" (${this.competitors()})"
+                        else if (this.schedule == Left(GatedDenseStore)) s" (${this.competitors()})"
                         else ""
       // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
       emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)

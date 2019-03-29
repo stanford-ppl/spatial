@@ -261,7 +261,7 @@ object Runtime {
         (countersContribution * stallPenalty * (congestionContribution + countersContribution / bitsPerCycle * j) + startup) * parallelizationScale
       }
       val p = ModelData.curve_fit(this.resolvedSchedule.toString).map(_.toDouble)
-      170 max fitFunc3(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
+      170 max fitFunc4(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
     }
 
     // Result fields

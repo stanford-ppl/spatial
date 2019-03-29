@@ -104,6 +104,8 @@ elif [[ $type == "scalasim-gdocs" ]]; then
   branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
   export FRINGE_PACKAGE="scalasim-gdocs-${branchname}"
   export EMUL_PACKAGE="scalasim-gdocs-${branchname}"
+  export MODELS_PACKAGE="scalasim-gdocs-${branchname}"
+  export UTILS_PACKAGE="scalasim-gdocs-${branchname}"
   make resources
   make publish
   hash=`git rev-parse HEAD`

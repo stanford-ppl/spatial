@@ -171,7 +171,7 @@ trait PlasticineTest extends DSLTest { test =>
       val timeout = 3000
       scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply, rerun) >>
       scommand(s"maketst", "make -C tungsten/".split(" "), timeout, parseMake, MakeError.apply, rerun) >>
-      scommand(s"runtst", "./tungsten/tungsten 1000".split(" "), timeout, parseTst, RunError.apply, rerun)
+      scommand(s"runtst", "./tungsten/tungsten".split(" "), timeout, parseTst, RunError.apply, rerun)
     }
 
     def parseProute(vcLimit:Int)(line:String) = {

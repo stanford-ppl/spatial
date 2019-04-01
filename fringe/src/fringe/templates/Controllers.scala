@@ -82,13 +82,13 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
   // Tie down the asyn_resets
   active.foreach(_.io.input.asyn_reset := false.B)
   done.foreach(_.io.input.asyn_reset := false.B)
-  done.foreach(_.io.input.reset := io.rst | allDone | io.parentAck)
+  done.foreach(_.io.input.reset := io.rst | allDone | io.parentAck | risingEdge(~io.break))
 
   // Create SRFFs that synchronize children on each iter
   val synchronize = Wire(Bool())
   val iterDone = List.tabulate(p.depth){i => Module(new SRFF())} 
   iterDone.foreach(_.io.input.asyn_reset := false.B)
-  iterDone.foreach(_.io.input.reset := synchronize | io.rst | io.parentAck)
+  iterDone.foreach(_.io.input.reset := synchronize | io.rst | io.parentAck | risingEdge(~io.break))
 
   // Wire up stage communication
   p.sched match {
@@ -164,9 +164,9 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
         active(i).io.input.set := ~iterDone(i).io.output & !io.doneIn(i) & !done(i).io.output & !io.ctrDone & io.enable & io.backpressure & !io.ctrCopyDone(i)
         active(i).io.input.reset := io.ctrCopyDone(i) | io.rst | io.parentAck | io.break
         iterDone(i).io.input.set := ((io.doneIn(i) | !io.maskIn(i).D(1)) & io.enable & io.backpressure) | io.break
-        iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck // Override iterDone reset
+        iterDone(i).io.input.reset := io.doneIn(i).D(1) | io.parentAck | risingEdge(~io.break) // Override iterDone reset
         done(i).io.input.set := ((io.ctrCopyDone(i) & !io.rst) | (!io.maskIn(i).D(1) & io.enable & io.backpressure)) | io.break
-        done(i).io.input.reset := io.parentAck // Override done reset
+        done(i).io.input.reset := io.parentAck | risingEdge(~io.break) // Override done reset
       }
 
     case Fork => 
@@ -263,7 +263,7 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
   active.io.input.set := io.enable & !io.rst & ~io.ctrDone & ~done.io.output & io.backpressure
   active.io.input.reset := io.ctrDone | io.rst | io.parentAck | io.break
   active.io.input.asyn_reset := false.B
-  done.io.input.reset := io.rst | io.parentAck
+  done.io.input.reset := io.rst | io.parentAck | risingEdge(~io.break)
   done.io.input.asyn_reset := false.B
   p.sched match { case Fork => done.io.input.set := io.doneIn.reduce{_|_}; case _ => done.io.input.set := risingEdge(io.ctrDone) | io.break}
 

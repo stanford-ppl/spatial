@@ -7,6 +7,7 @@ import spatial.node._
 import spatial.lang.I32
 import spatial.metadata.bounds._
 import spatial.metadata.types._
+import spatial.metadata.memory._
 
 case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
 
@@ -19,10 +20,12 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
   }
 
   private def setRange(x: Sym[_], min: Int, max: Int, stride: Int = 1): Unit = x.getParamDomain match {
-    case Some((start,end,step)) =>
-      x.paramDomain = (Math.max(min,start), Math.min(max,end), Math.max(stride,step))
+    case Some(Left((start,end,step))) =>
+      x.rangeParamDomain = (Math.max(min,start), Math.min(max,end), Math.max(stride,step))
+    case Some(Right(vals)) => 
+      x.explicitParamDomain = vals
     case None =>
-      x.paramDomain = (min,max,stride)
+      x.rangeParamDomain = (min,max,stride)
   }
 
   private def collectParams(x: Sym[_]): Seq[Sym[_]] = {
@@ -34,8 +37,15 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
     dfs(Seq(x))
   }
 
+  private def copyBound(src: Sym[_], dst: Sym[_]): Unit = {
+    src.getBound.map(dst.bound = _)
+  }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case AccelScope(func) => TopCtrl.set(lhs); super.visit(lhs,rhs)
+
+    case SetReg(reg, x) if reg.isArgIn => 
+      reg.readers.foreach(copyBound(x,_))
 
     case FIFONew(c@Expect(_)) =>
       warn(s"FIFO $lhs has parametrized size. Tuning of FIFO depths is not yet supported.")
@@ -55,9 +65,15 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
         p.foreach(TileSizes += _)
       }
 
-    // case e: DenseTransfer[_,_,_] =>
-    //   val pars = collectParams(e.p)
-    //   pars.foreach(ParParams += _)
+    case e: DenseTransfer[_,_,_] =>
+      val pars = e.pars.map(_.asInstanceOf[Sym[_]]).flatMap(collectParams)
+      e.pars.collect{case p if !p.isParam => p.setIntValue(p.toInt)}
+      pars.foreach(ParParams += _)
+
+    case e: SparseTransfer[_,_] =>
+      val pars = e.pars.map(_.asInstanceOf[Sym[_]]).flatMap(collectParams)
+      e.pars.collect{case p if !p.isParam => p.setIntValue(p.toInt)}
+      pars.foreach(ParParams += _)
 
     case CounterNew(start,end,step,par) =>
       dbg(s"Found counter with start=$start, end=$end, step=$step, par=$par")
@@ -66,7 +82,7 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
       dbg(s"  bound($step) = " + step.getBound)
 
       val pars = collectParams(par)
-      pars.foreach{x => dbgs(s"Found Counter Step param in $lhs = $x"); ParParams += x}
+      pars.foreach{x => dbgs(s"Found Counter Par param in $lhs = $x"); ParParams += x}
       val steps = collectParams(step)
       steps.foreach{x => dbgs(s"Found Counter Step param in $lhs = $x"); TileSizes += x}
       val ends = collectParams(end)
@@ -151,18 +167,17 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
 
       }
 
-
     case e: OpForeach =>
       val pars = e.cchain.pars
       pars.foreach{x => dbgs(s"Found OpForeach par param in $lhs = $x"); ParParams += _}
-      if (lhs.isOuterControl) PipelineParams += lhs
+      if (lhs.isOuterControl && !lhs.getUserSchedule.isDefined) PipelineParams += lhs
       super.visit(lhs, rhs)
 
     case e: OpReduce[_] =>
       val pars = e.cchain.pars
       pars.foreach{x => dbgs(s"Found OpReduce par param in $lhs = $x"); ParParams += _}
       dbgs(s"visit $lhs, ${lhs.isOuterControl}? ${lhs.level}")
-      if (lhs.isOuterControl) PipelineParams += lhs
+      if (lhs.isOuterControl && !lhs.getUserSchedule.isDefined) PipelineParams += lhs
       super.visit(lhs, rhs)
 
     case e: OpMemReduce[_,_] =>
@@ -170,106 +185,10 @@ case class ParameterAnalyzer(IR: State) extends argon.passes.Traversal {
       val ipars = e.cchainRed.pars
       opars.foreach{x => dbgs(s"Found OpMemReduce par param in $lhs = $x"); ParParams += _}
       ipars.foreach{x => dbgs(s"Found OpMemReduce par param in $lhs = $x"); ParParams += _}
-      if (lhs.isOuterControl) PipelineParams += lhs
+      if (lhs.isOuterControl && !lhs.getUserSchedule.isDefined) PipelineParams += lhs
       super.visit(lhs, rhs)
-
-
 
     case _ => super.visit(lhs, rhs)
   }
-
-  // // Sort of arbitrary limits right now
-  // val MIN_TILE_SIZE = 96    // words
-  // val MAX_TILE_SIZE = 96000 // words
-  // val MAX_TILE      = 51340 // words, unused
-
-  // val MAX_PAR_FACTOR = 192  // duplications
-  // val MAX_OUTER_PAR  = 15
-
-  // var tileSizes  = Set[Param[Index]]()
-  // var parFactors = Set[Param[Index]]()
-  // var innerLoop  = false
-
-  // var ignoreParams = Set[Param[Index]]()
-
-  // def collectParams(x: Exp[_]): Seq[Param[_]] = {
-  //   def dfs(frontier: Seq[Exp[_]]): Seq[Param[_]] = frontier.flatMap{
-  //     case s: Param[_] => Seq(s)
-  //     case Def(d) => dfs(d.inputs)
-  //     case _ => Nil
-  //   }
-  //   dfs(Seq(x))
-  // }
-  // def onlyIndex(x: Seq[Const[_]]): Seq[Param[Index]] = {
-  //   x.collect{case p: Param[_] if isInt32Type(p.tp) => p.asInstanceOf[Param[Index]] }
-  // }
-
-  // def setRange(x: Param[Index], min: Int, max: Int, stride: Int = 1): Unit = domainOf.get(x) match {
-  //   case Some((start,end,step)) =>
-  //     domainOf(x) = (Math.max(min,start), Math.min(max,end), Math.max(stride,step))
-  //   case None =>
-  //     domainOf(x) = (min,max,stride)
-  // }
-
-  // // TODO: Should have better analysis for this
-  // def isParallelizableLoop(e: Exp[_]): Boolean = {
-  //   (isInnerPipe(e) || isMetaPipe(e)) && !childrenOf(e).exists(isDRAMTransfer)
-  // }
-
-  // override protected def postprocess[S: Type](block: Block[S]): Block[S] = {
-  //   val params = tileSizes ++ parFactors
-  //   params.foreach{p => if (domainOf.get(p).isEmpty) domainOf(p) = (1, 1, 1) }
-  //   super.postprocess(block)
-  // }
-
-  // override protected def visit(lhs: Sym[_], rhs: Op[_]) = rhs match {
-  //   case FIFONew(c@Exact(_)) =>
-  //     warn(u"FIFO $lhs has parametrized size. Tuning of FIFO depths is not yet supported.")
-  //     ignoreParams ++= onlyIndex(collectParams(c))
-
-  //   case SRAMNew(dims) =>
-  //     val params = dims.flatMap(collectParams)
-  //     val tsizes = onlyIndex(params)
-  //     dbg(u"Found SRAM with parametrized in dimensions: $tsizes")
-
-  //     (tsizes intersect dims).foreach{p =>
-  //       if (dims.indexOf(p) == dims.length - 1) setRange(p, 1, MAX_TILE_SIZE, MIN_TILE_SIZE)
-  //       else setRange(p, 1, MAX_TILE_SIZE)
-  //     }
-  //     tileSizes ++= tsizes
-
-  //   case e: DenseTransfer[_,_] =>
-  //     val pars = onlyIndex(collectParams(e.p))
-  //     pars.foreach{p => setRange(p, 1, MAX_PAR_FACTOR) }
-  //     parFactors ++= pars
-
-  //   case e: SparseTransfer[_] =>
-  //     val pars = onlyIndex(collectParams(e.p))
-  //     pars.foreach{p => setRange(p, 1, MAX_PAR_FACTOR) }
-  //     parFactors ++= pars
-
-  //   case CounterNew(_,_,_,par) =>
-  //     val pars = onlyIndex(collectParams(par))
-  //     pars.foreach{p => setRange(p, 1, MAX_PAR_FACTOR) }
-  //     // TODO: Restrictions on counter parallelization
-  //     parFactors ++= pars
-
-  //   case e: OpForeach =>
-  //     val pars = onlyIndex(parFactorsOf(e.cchain))
-  //     if (!isParallelizableLoop(lhs)) pars.foreach{p => setRange(p, 1, 1) }
-  //     else if (!isInnerPipe(lhs)) pars.foreach{p => setRange(p, 1, MAX_OUTER_PAR) }
-
-  //   case e: OpReduce[_] =>
-  //     val pars = onlyIndex(parFactorsOf(e.cchain))
-  //     if (!isParallelizableLoop(lhs)) pars.foreach{p => setRange(p, 1, 1) }
-  //     else if (!isInnerPipe(lhs)) pars.foreach{p => setRange(p, 1, MAX_OUTER_PAR) }
-
-  //   case e: OpMemReduce[_,_] =>
-  //     val opars = onlyIndex(parFactorsOf(e.cchainMap))
-  //     val ipars = onlyIndex(parFactorsOf(e.cchainRed))
-  //     if (!isParallelizableLoop(lhs)) opars.foreach{p => setRange(p, 1, 1) }
-
-  //   case _ => super.visit(lhs, rhs)
-  // }
 
 }

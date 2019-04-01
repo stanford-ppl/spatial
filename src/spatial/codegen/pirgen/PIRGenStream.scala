@@ -30,8 +30,8 @@ trait PIRGenStream extends PIRCodegen {
       bus match {
         case BurstAckBus =>
           val count = s"countAck_$lhs"
-          emit(src"""val $count = CountAck().input($lhs)""")
-          emit(src"""MemWrite().setMem(argOut().name("$count")).data($count)""")
+          emit(src"""val $count = CountAck().input($lhs).tp(Bool)""")
+          emit(src"""MemWrite().setMem(argOut().name("$count").tp(Bool)).data($count)""")
         case bus =>
       }
 

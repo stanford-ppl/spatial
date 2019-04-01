@@ -15,11 +15,16 @@ trait SpaceGenerator {
     def toRange: Range = x._1 to x._3 by x._2
   }
 
-  def domain(p: Sym[_], restricts: Iterable[Restrict])(implicit ir: State): Domain[Int] = {
+  def domain(p: Sym[_], restricts: Iterable[Restrict])(implicit baseIR: State): Domain[Int] = {
     if (restricts.nonEmpty) {
+      val range = p.paramDomain match {
+        case Left(x) => Left(x.toRange)
+        case Right(x) => Right(x)
+      }
       Domain.restricted(
         name   = p.name.getOrElse(s"$p"),
-        range  = p.paramDomain.toRange,
+        id     = p.hashCode,
+        range  = range,
         setter = {(v: Int, state: State) => p.setIntValue(v)(state) },
         getter = {(state: State) => p.intValue(state).toInt },
         cond   = {state => restricts.forall(_.evaluate()(state)) },
@@ -27,9 +32,14 @@ trait SpaceGenerator {
       )
     }
     else {
+      val range = p.paramDomain match {
+        case Left(x) => Left(x.toRange)
+        case Right(x) => Right(x)
+      }
       Domain(
         name  = p.name.getOrElse(s"$p"),
-        range = p.paramDomain.toRange,
+        id = p.hashCode,
+        range = range,
         setter = { (v: Int, state: State) => p.setIntValue(v)(state) },
         getter = { (state: State) => p.intValue(state).toInt },
         tp     = Ordinal
@@ -37,7 +47,7 @@ trait SpaceGenerator {
     }
   }
 
-  def createIntSpace(params: Seq[Sym[_]], restrict: Set[Restrict])(implicit ir: State): Seq[Domain[Int]] = {
+  def createIntSpace(params: Seq[Sym[_]], restrict: Set[Restrict])(implicit baseIR: State): Seq[Domain[Int]] = {
     if (PRUNE) {
       val pruneSingle = params.map { p =>
         val restricts = restrict.filter(_.dependsOnlyOn(p))
@@ -50,10 +60,11 @@ trait SpaceGenerator {
     }
   }
 
-  def createCtrlSpace(metapipes: Seq[Sym[_]])(implicit ir: State): Seq[Domain[Boolean]] = {
+  def createCtrlSpace(metapipes: Seq[Sym[_]])(implicit baseIR: State): Seq[Domain[Boolean]] = {
     metapipes.map{mp =>
       new Domain[Boolean](
         name    = mp.name.getOrElse(s"$mp"),
+        id      = mp.hashCode,
         options = Seq(false, true),
         setter  = {(c: Boolean, state:State) => if (c) mp.setSchedValue(Pipelined)(state)
                                                 else   mp.setSchedValue(Sequenced)(state) },

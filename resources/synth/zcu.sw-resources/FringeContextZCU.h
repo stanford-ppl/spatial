@@ -298,7 +298,7 @@ public:
     // Iterate through an array the size of the L2$, to "flush" the cache aka fill it with garbage
     int cacheSizeWords = kb * (1 << 10) / sizeof(int); // 512kB on ZCU, 1MB on ZCU
     int arraySize = cacheSizeWords * 10;
-    int *dummyBuf = (int*) malloc(arraySize * sizeof(int));
+    int *dummyBuf = (int*) std::malloc(arraySize * sizeof(int));
     EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", dummyBuf, getFPGAPhys((uint64_t) dummyBuf), arraySize);
     for (int i = 0; i<arraySize; i++) {
       if (i == 0) {

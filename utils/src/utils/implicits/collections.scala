@@ -63,6 +63,12 @@ object collections {
       }
       res
     }
+
+    /**
+      * Map over Seq and return default if it is empty
+      */
+    def mapOrElse[B](func: A => B)(default: B): Seq[B] = if (x.isEmpty) Seq(default) else x.map(func)
+
   }
 
   implicit class IterableHelpers[A](x: Iterable[A]) {

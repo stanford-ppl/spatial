@@ -315,6 +315,8 @@ import spatial.dsl._
 }
 
 @spatial class Convolution extends SpatialTest {
+  override def dseModelArgs: Args = "32 16 64 128 128 128 128 128 128 128 128 128 32 16 16 16"
+  override def finalModelArgs: Args = "32 16 64 128 128 128 128 128 128 128 128 128 32 16 16 16"
   override def runtimeArgs: Args = "128 64 32 16 2"
   type T = FixPt[TRUE,_32,_0]
 
@@ -1063,7 +1065,9 @@ import spatial.dsl._
   }
 }
 @spatial class ConvolutionFlatSRAM extends SpatialTest {
-  override def runtimeArgs: Args = "128 64 32 16 2"
+   override def dseModelArgs: Args = "32 16 64 128 128 128 128 128 128 128 128 128 32 16 64"
+   override def finalModelArgs: Args = "32 16 64 128 128 128 128 128 128 128 128 128 32 16 64"
+   override def runtimeArgs: Args = "128 64 32 16 2"
   type T = FixPt[TRUE,_32,_0]
 
   def main(args: Array[String]): Unit = {

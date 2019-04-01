@@ -666,11 +666,11 @@ package object control {
     }
 
     def stopWhen: Option[Sym[_]] = ctrl match {
-      case Ctrl.Node(x:UnrolledForeach, _) => x.stopWhen
-      case Ctrl.Node(x:OpForeach, _) => x.stopWhen
-      case Ctrl.Node(x:UnrolledReduce, _) => x.stopWhen
-      case Ctrl.Node(x:OpReduce[_], _) => x.stopWhen
-      case Ctrl.Node(x:OpMemReduce[_,_], _) => x.stopWhen
+      case Ctrl.Node(Op(x:UnrolledForeach), _) => x.stopWhen
+      case Ctrl.Node(Op(x:OpForeach), _) => x.stopWhen
+      case Ctrl.Node(Op(x:UnrolledReduce), _) => x.stopWhen
+      case Ctrl.Node(Op(x:OpReduce[_]), _) => x.stopWhen
+      case Ctrl.Node(Op(x:OpMemReduce[_,_]), _) => x.stopWhen
       case _ => None
     }
   }

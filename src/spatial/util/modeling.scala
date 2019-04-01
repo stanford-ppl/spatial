@@ -351,7 +351,8 @@ object modeling {
     }
 
     def pushBreakNodes(regWrite: Sym[_]): Unit = {
-      if (regWrite.ancestors.exists(_.stopWhen == Some(regWrite))) {
+      val reg = regWrite match {case Op(_@RegWrite(x,_,_)) => x; case _ => throw new Exception(s"Cannot break loop with non-reg ($regWrite)")}
+      if (regWrite.ancestors.exists(_.stopWhen == Some(reg))) {
         val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
         val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
         toPush.foreach{

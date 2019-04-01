@@ -113,7 +113,7 @@ object Runtime {
     def lookup: Int = {
       if (cachedAsk.contains(id)) askMap(id)
       else if (!interactive && !cachedAsk.contains(id)) {
-        val t = if (cliParams.size < currentAsk) {println(s"asking for param $currentAsk: ${cliParams(currentAsk)}"); cliParams(currentAsk)}
+        val t = if (currentAsk < cliParams.size) {println(s"asking for param $currentAsk: ${cliParams(currentAsk)}"); cliParams(currentAsk)}
                 else {println(s"[WARNING] Param $currentAsk not provided! Using value ${askMap.getOrElse(id, 1)}"); askMap.getOrElse(id, 1)}
         currentAsk = currentAsk + 1
         askMap += (id -> t)

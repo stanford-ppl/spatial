@@ -205,30 +205,14 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     import spatial.metadata.access._
     import spatial.metadata.memory._
     dbgs(s"Retiming block $block:")
-    //scope.foreach{e => dbgs(s"  ${stm(e)}") }
+    scope.foreach{e => dbgs(s"  ${stm(e)} (${e.fullDelay})") }
     //dbgs(s"Result: ")
     //result.foreach{e => dbgs(s"  ${stm(e)}") }
     // The position AFTER the given node
-    val (newLatencies, newCycles) = pipeLatencies(result, scope)
-    val adjustedLatencies = newLatencies.map{case (k,v) => (k , v + lastLatency)}
+    val (_, newCycles) = pipeLatencies(result, scope)
+    val adjustedLatencies: Map[Sym[_], Double] = scope.map{s => (s -> (s.fullDelay + latencyOf(s, inReduce = cycles.contains(s))))}.toMap
     latencies ++= adjustedLatencies
     cycles ++= newCycles.flatMap(_.symbols)
-
-    adjustedLatencies.toList.sortBy(_._2).foreach{case (s,l) => dbgs(s"[$l] ${stm(s)}") }
-
-    dbgs("")
-    dbgs("")
-    dbgs("Sym Delays:")
-    adjustedLatencies.toList.map{case (s,l) => s -> scrubNoise(l - latencyOf(s, inReduce = cycles.contains(s))) }
-      .sortBy(_._2)
-      .foreach{case (s,l) =>
-        s.fullDelay = l
-        dbgs(s"  [$l = ${adjustedLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
-      }
-    if (saveLatency) {
-      lastLatency = adjustedLatencies.toList.map(_._2).sorted.reverse.headOption.getOrElse(0.0)
-      dbgs(s"Storing latency of block: $lastLatency")
-    } else lastLatency = 0.0
 
     isolateSubst(){ retimeStms(block) }
   }

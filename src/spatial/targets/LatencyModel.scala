@@ -3,6 +3,7 @@ package spatial.targets
 import argon._
 import models._
 import forge.tags._
+import spatial.metadata.control._
 import spatial.util.spatialConfig
 
 class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](target) {
@@ -16,7 +17,7 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
     if (inReduce) latencyInReduce(s) else latencyOfNode(s)
   }
 
-  @stateful def latencyInReduce(s: Sym[_]): Double = exactModel(s, "LatencyInReduce")
+  @stateful def latencyInReduce(s: Sym[_]): Double = model(s, "LatencyInReduce")
 
 
   @stateful def requiresRegisters(s: Sym[_], inReduce: Boolean): Boolean = {
@@ -24,13 +25,13 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
   }
 
   @stateful def requiresRegistersInReduce(s: Sym[_]): Boolean = {
-    spatialConfig.addRetimeRegisters && exactModel(s, "RequiresInReduce") > 0
+    spatialConfig.addRetimeRegisters && model(s, "RequiresInReduce") > 0
   }
   @stateful def requiresRegisters(s: Sym[_]): Boolean = {
-    spatialConfig.addRetimeRegisters && exactModel(s, "RequiresRegs") > 0
+    spatialConfig.addRetimeRegisters && model(s, "RequiresRegs") > 0
   }
 
-  @stateful def latencyOfNode(s: Sym[_]): Double = exactModel(s, "LatencyOf")
+  @stateful def latencyOfNode(s: Sym[_]): Double = model(s, "LatencyOf")
 
 
   /** For some templates, I have to manually put a delay inside the template to break a
@@ -40,5 +41,25 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
     * stick a register on this input and then treat the output as having a latency of 2 but needing
     * only 1 injected by transformer
     */
-  @stateful def builtInLatencyOfNode(s: Sym[_]): Double = exactModel(s, "BuiltInLatency")
+  @stateful def builtInLatencyOfNode(s: Sym[_]): Double = model(s, "BuiltInLatency")
+
+  @stateful def parallelModel(stages: Seq[Double], lhs: Sym[_]): Double = {
+    stages.max + latencyOfNode(lhs)
+  }
+
+  // TODO: These models assume linear sequence of stages. Support arbitrary dataflow graphs.
+  @stateful def streamingModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+    stages.max * (N - 1)*ii + latencyOfNode(lhs)
+  }
+  @stateful def metaPipeModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+    stages.max * (N - 1)*ii + stages.sum + latencyOfNode(lhs)
+  }
+  @stateful def sequentialModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+    stages.sum * N + latencyOfNode(lhs)
+  }
+  @stateful def outerControlModel(N: Double, ii: Double, stages: Seq[Double], lhs: Sym[_]): Double = {
+    if (lhs.isOuterPipeControl) metaPipeModel(N, ii, stages, lhs)
+    else if (lhs.isSeqLoop)     sequentialModel(N, ii, stages, lhs)
+    else                        streamingModel(N, ii, stages, lhs)
+  }
 }

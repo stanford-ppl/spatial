@@ -37,7 +37,7 @@ abstract class SpatialModel[F[A]<:Fields[A,F]](target: HardwareTarget) extends N
 
   var models: Map[String,ResModel] = Map.empty
   def exactModel(name: String)(args: (String,Double)*): Resources = {
-    models.get(name).map{model => model.exactEval(args:_*) }.getOrElse{
+    models.get(name).map{model => model.eval(args:_*) }.getOrElse{
       val params = if (args.isEmpty) "" else " [optional parameters: " + args.map(_._1).mkString(", ") + "]"
       miss(s"$name (csv)" + params)
       NONE
@@ -51,20 +51,12 @@ abstract class SpatialModel[F[A]<:Fields[A,F]](target: HardwareTarget) extends N
     }
   }
   @stateful def model(sym: Sym[_], key: String): Double = model(sym).apply(key)
-  @stateful def exactModel(sym: Sym[_], key: String): Double = exactModel(sym).apply(key)
 
   @stateful def model(sym: Sym[_]): Resources = sym match {
     case Expect(_) => NONE
     case Op(op) =>
       val (name, params) = nodeParams(sym, op)
       model(name)(params:_*)
-    case _ => NONE
-  }
-  @stateful def exactModel(sym: Sym[_]): Resources = sym match {
-    case Expect(_) => NONE
-    case Op(op) =>
-      val (name, params) = nodeParams(sym, op)
-      exactModel(name)(params:_*)
     case _ => NONE
   }
 

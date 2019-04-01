@@ -2,7 +2,7 @@ CC=g++-4.8
 LINK=g++-4.8
 CROSS_COMPILE=/usr/bin/arm-linux-gnueabihf-
 
-FRINGE_SRC=../zynq.sw-resources
+FRINGE_SRC=../zedboard.sw-resources
 HOST_SRC=./
 
 SOURCES := $(wildcard ${HOST_SRC}/*.cpp  ${FRINGE_SRC}/*.cpp)

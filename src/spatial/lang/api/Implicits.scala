@@ -30,6 +30,13 @@ trait Implicits extends argon.lang.api.Implicits { this: MuxAPI =>
       * creates a parameter with a default of 1 with a range in [2,8] with step of 4.
       */
     def apply(range: ((Int, Int), Int))(implicit ov2: Overload1): I32 = createParam(b, range._1._1, range._1._2, range._2)
+    /**
+      * Creates a parameter with this value as the default, and the given alternatives.
+      *
+      * ``1 (1,2,4,8,16)``
+      * creates a parameter with a default of 1 with possible alternative values of 2, 4, 8, and 16.
+      */
+    def apply(possibilities: Int*)(implicit ov2: Overload1): I32 = createParam(b, possibilities)
   }
 
   @api def param[A](c: Lift[A]): A = {
@@ -38,7 +45,13 @@ trait Implicits extends argon.lang.api.Implicits { this: MuxAPI =>
 
   @rig def createParam(default: Int, start: Int, stride: Int, end: Int): I32 = {
     val p = I32.p(default)
-    p.paramDomain = (start, stride, end)
+    p.rangeParamDomain = (start, stride, end)
+    p
+  }
+
+  @rig def createParam(default: Int, possible: Seq[Int]): I32 = {
+    val p = I32.p(default)
+    p.explicitParamDomain = possible
     p
   }
 

@@ -29,8 +29,10 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def -(that: SparseMatrix[K]): SparseMatrix[K] = this.zip(that){_-_}
   def increment(key: K, value: Int): SparseMatrix[K] = {
     val rows2 = this.rows.map{r => 
-      val cols2 = r.cols.map{case (k,v) => k -> (if (k == key) {v + v*value} else v) }
-      SparseVector[K](cols2, r.c, r.lastIters)
+      // val cols2 = r.cols.map{case (k,v) => k -> (if (k == key) {v + v*value} else v) }
+      // SparseVector[K](cols2, r.c, r.lastIters)
+      val stepsize = r.cols.collect{case (k,v) if (k == key) => v}.headOption.getOrElse(0)
+      SparseVector[K](r.cols, r.c + value * stepsize, r.lastIters)
     }
     SparseMatrix[K](rows2)
   }

@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class MemReduce2D extends SpatialTest {
+  override def dseModelArgs: Args = "192 384"
+  override def finalModelArgs: Args = "192 384"
   override def runtimeArgs: Args = "192 384"
 
   val N = 1920
@@ -57,6 +59,8 @@ import spatial.dsl._
 }
 
 @spatial class PartialMemReduce2D extends SpatialTest { // Regression (Unit) // Args: 192 384
+  override def dseModelArgs: Args = "192 384 16 16"
+  override def finalModelArgs: Args = "192 384 16 16"
   override def runtimeArgs: Args = "192 384"
 
 

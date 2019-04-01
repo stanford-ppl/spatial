@@ -64,7 +64,7 @@ case class Prod(xs: Seq[Idx], m: Int = 1) {
 }
 object Prod {
   def single(c: Int): Prod = Prod(Nil, c)
-  def single(x: Idx): Prod = x match {
+  @stateful def single(x: Idx): Prod = x match {
     case Expect(c) => Prod.single(c)
     case _ => Prod(Seq(x))
   }
@@ -152,7 +152,7 @@ case class Sum(ps: Seq[Prod], b: Int = 0) {
 }
 object Sum {
   def single(c: Int): Sum = Sum(Nil, c)
-  def single(x: Idx): Sum = x match {
+  @stateful def single(x: Idx): Sum = x match {
     case Expect(c) => Sum.single(c)
     case _ => Sum(Seq(Prod.single(x)))
   }

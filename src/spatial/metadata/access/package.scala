@@ -116,7 +116,7 @@ package object access {
       case _ => false
     }
 
-    def residualGenerators: List[List[ResidualGenerator]] = {
+    @stateful def residualGenerators: List[List[ResidualGenerator]] = {
       if (a.banks.isEmpty) List(List(ResidualGenerator(1,0,0))) else a.banks.map(_.map(_.residual).toList).toList
     }
 

@@ -48,7 +48,7 @@ import argon.Block
       Foreach(3 by 1, 3 by 1){(i,j) => z(i,j) = i+j}
 
       Foreach(10 by 1){i => 
-        Foreach(3 by 1, 3 by 1 par 1 /*2*/, 64 by 1 par 16){ (j,k,l) => 
+        Foreach(3 by 1, 3 by 1 par 2 /*2*/, 64 by 1 par 16){ (j,k,l) => 
           val cond1 = i % 2 == 0
           val cond2 = i % 3 == 0
           y(j,k,l) = x(mux(cond1, j, j*2) + mux(cond2, k, k*2)) + z(j,k)

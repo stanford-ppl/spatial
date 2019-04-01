@@ -51,6 +51,7 @@ trait ParamLoader { self:Spatial =>
   private val fullRange = raw"(\d+)\s*\(\s*(\d+)\s*->\s*(\d+)\s*->\s*(\d)+\s*\)".r
   private val minMax = raw"(\d+)\s*\(\s*(\d+)\s*->\s*(\d+)\s*\)".r
   private val int = raw"(\d+)".r
+  private val explicit = raw"(\d+)\s*\(([0-9,]+)\)".r
   private def parseParam(x:Any):I32 = x match {
     case x:Int => I32.p(x)
     case x:String =>
@@ -58,6 +59,7 @@ trait ParamLoader { self:Spatial =>
         case fullRange(v,min,step,max) => createParam(v.toInt, min.toInt, step.toInt, max.toInt)
         case minMax(v, min, max) => createParam(v.toInt, min.toInt, 1, max.toInt)
         case int(v) => v.toInt.to[I32]
+        case explicit(v, possible) => createParam(v.toInt, possible.split(",").map(_.trim.toInt))
         case s => throw new Exception(s"Unexpected string format $s for param of $name")
       }
     case s => throw new Exception(s"Unexpected format $s for param of $name")
@@ -74,7 +76,8 @@ trait ParamLoader { self:Spatial =>
       params.foreach { case (name, param) =>
         val c = param.rhs.getValue.get
         val line = param.getParamDomain match {
-          case Some((min, step, max)) => s"$name=$c ($min -> $step -> $max)"
+          case Some(Left((min, step, max))) => s"$name=$c ($min -> $step -> $max)"
+          case Some(Right(x)) => s"$name=$c (${x.mkString(",")})"
           case None => s"$name=$c"
         }
         state.gen.println(line)

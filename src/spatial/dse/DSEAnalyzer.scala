@@ -63,7 +63,10 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     val space = intSpace ++ ctrlSpace
 
     dbgs("Space: ")
-    params.zip(space).foreach{case (p,d) => dbgs(s"  $p: $d (${p.ctx})") }
+    params.zip(space).foreach{case (p,d) => dbgs(s"  $p (${p.name}): $d (${p.ctx})") }
+
+    println("Space: ")
+    params.zip(space).foreach{case (p,d) => println(s"  $p (${p.name}): $d (${p.ctx})") }
 
     // Compile generated dse model
     compileLatencyModel()
@@ -149,6 +152,12 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs(s"  # of parameters: ${space.size}")
     dbgs(s"  # of points:     ${space.map(d => BigInt(d.len)).product}")
     dbgs("")
+
+    println("Intial Space Statistics: ")
+    println("-------------------------")
+    println(s"  # of parameters: ${space.size}")
+    println(s"  # of points:     ${space.map(d => BigInt(d.len)).product}")
+    println("")
 
     dbgs("Found the following space restrictions: ")
     restrictions.foreach{r => dbgs(s"  $r") }
@@ -291,6 +300,14 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
     dbgs("")
     dbgs(s"Using $T threads with block size of $BLOCK_SIZE")
     dbgs(s"Writing results to file $filename")
+
+    println("Space Statistics: ")
+    println("-------------------------")
+    println(s"  # of parameters: $N")
+    println(s"  # of points:     $P")
+    println("")
+    println(s"Using $T threads with block size of $BLOCK_SIZE")
+    println(s"Writing results to file $filename")
 
     val workQueue = new LinkedBlockingQueue[Seq[BigInt]](5000)  // Max capacity specified here
     val fileQueue = new LinkedBlockingQueue[Array[String]](5000)

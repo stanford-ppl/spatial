@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.lang._
 import spatial.metadata.params._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.metadata.bounds._
 import spatial.util.modeling._
 
@@ -204,6 +205,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case Expect(s) if (isTuneable(start)) => src"""Tuneable("${start.name.get}", $s, "${start}") """
                  case Expect(s) => src"$s"
                  case Param(s) => undefinedSyms += start; src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
+                 case Op(RegRead(x)) if x.isArgIn => src"""Ask(${x.hashCode}, "ArgIn $x (ctr start)", $ctx)"""
                  case _ => src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
                 }
     val question = 
@@ -217,6 +219,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case Expect(s) if (isTuneable(stop)) => src"""Tuneable("${stop.name.get}", $s, "${stop}") """
                  case Expect(s) => src"$s"
                  case Param(s) => undefinedSyms += stop; src"""Ask(${stop.hashCode}, "$question", $ctx)"""
+                 case Op(RegRead(x)) if x.isArgIn => src"""Ask(${x.hashCode}, "ArgIn $x ($question)", $ctx)"""
                  case _ => src"""Ask(${stop.hashCode}, "$question", $ctx)"""
                 }
     val ste = step match {
@@ -226,6 +229,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case Expect(s) if (isTuneable(step)) => src"""Tuneable("${step.name.get}", $s, "${step}") """
                  case Expect(s) => src"$s"
                  case Param(s) => undefinedSyms += step; src"""Ask(${stop.hashCode}, "ctr step", $ctx)"""
+                 case Op(RegRead(x)) if x.isArgIn => src"""Ask(${x.hashCode}, "ArgIn $x (ctr step)", $ctx)"""
                  case _ => src"""Ask(${step.hashCode}, "ctr step", $ctx)"""
                 }
     val p = par match {

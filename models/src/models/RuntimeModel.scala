@@ -109,12 +109,14 @@ object Runtime {
   }
 
   /** Value that must be set by user at command line, or dseModelArgs/finalModelArgs in noninteractive mode */
-  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends ModelValue[Int,Int](id, whatAmI, ctx) {
+  case class Branch(id: Int, whatAmI: String, ctx: Ctx) extends AskBase(id, whatAmI, ctx, 50)
+  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends AskBase(id, whatAmI, ctx, 1)
+  abstract class AskBase(id: Int, whatAmI: String, ctx: Ctx, val base: Int = 1) extends ModelValue[Int,Int](id, whatAmI, ctx) {
     def lookup: Int = {
       if (cachedAsk.contains(id)) askMap(id)
       else if (!interactive && !cachedAsk.contains(id)) {
         val t = if (currentAsk < cliParams.size) {println(s"asking for param $currentAsk: ${cliParams(currentAsk)}"); cliParams(currentAsk)}
-                else {println(s"[WARNING] Param $currentAsk not provided! Using value ${askMap.getOrElse(id, 1)}"); askMap.getOrElse(id, 1)}
+                else {println(s"[WARNING] Param $currentAsk not provided! Using value ${askMap.getOrElse(id, base)}"); askMap.getOrElse(id, base)}
         currentAsk = currentAsk + 1
         askMap += (id -> t)
         cachedAsk += id
@@ -124,7 +126,7 @@ object Runtime {
         askMap(id)
       }
       else {
-        val default = askMap.getOrElse(id, 1)
+        val default = askMap.getOrElse(id, base)
         print(s"Value for $whatAmI (${ctx.toString}) [default: $default] : ")
         val t = scala.io.StdIn.readLine().trim()
         val x = if (t != "") t.toInt else default
@@ -239,8 +241,15 @@ object Runtime {
       }
     }
 
+    private def burstAlign(numel: Int, bitsPerCycle: Int): Int = {
+      val burstSize = 512 // bits
+      val bitsPerCommand = numel * bitsPerCycle
+      val x = if (bitsPerCommand % burstSize == 0) numel
+              else ((burstSize - (bitsPerCommand % burstSize)) / bitsPerCycle).toInt + numel
+      x
+    }
     def congestionModel(competitors: Competitors): Int = {
-      val numel = cchain.last.N
+      val numel = burstAlign(cchain.last.N, this.bitsPerCycle.toInt)
       // // Lattice regression
       // val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
       //                                                        stores = competitors.stores,
@@ -261,7 +270,9 @@ object Runtime {
         (countersContribution * stallPenalty * (congestionContribution + countersContribution / bitsPerCycle * j) + startup) * parallelizationScale
       }
       val p = ModelData.curve_fit(this.resolvedSchedule.toString).map(_.toDouble)
-      170 max fitFunc4(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
+      val r = 170 max fitFunc4(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
+      Console.println(s"infer on ${Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble)} = $r")
+      r
     }
 
     // Result fields
@@ -309,7 +320,7 @@ object Runtime {
           if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
           else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
         case Fork            => 
-          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
+          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Branch(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
         case DenseLoad            => congestionModel(competitors())
         case DenseStore           => congestionModel(competitors())

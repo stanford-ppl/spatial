@@ -27,10 +27,13 @@ class BasicParamsV3 extends BasicParams(2,4,64,8,true)
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
 
-    val size = aIn.length; bound(size) = 640
+    val size = aIn.length
+    val sizePlus1 = size + 1; bound(sizePlus1) = 640
 
     val N = ArgIn[Int]
-    setArg(N, size)
+    val tileSizeAsArg = ArgIn[Int]
+    setArg(N, size + 1)
+    setArg(tileSizeAsArg, B)
 
     val a = DRAM[T](N)
     val b = DRAM[T](N)
@@ -45,7 +48,7 @@ class BasicParamsV3 extends BasicParams(2,4,64,8,true)
           val aBlk = SRAM[T](B)
           val bBlk = SRAM[T](B)
           Parallel {
-            aBlk load a(i::i+B par LP)
+            Pipe{if (size > 0) aBlk load a(i::i+tileSizeAsArg par LP)}
             bBlk load b(i::i+B par LP)
           }
           val accI = Reg[T](0.to[T])

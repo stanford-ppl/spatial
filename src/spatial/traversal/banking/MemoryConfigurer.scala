@@ -139,7 +139,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   def canBroadcast(a: AccessMatrix, b: AccessMatrix): Boolean = {
     // TODO[3]: What about accesses of the same form across different loops?
     // Should we rely on loop fusion for this? Are there cases where that wouldn't work?
-    if (isGlobal || a == b) return true
+    if (mem.isArgIn || a == b) return true // isGlobal isn't correct if we are using an ArgOut to mediate stream control across different unrolled bodies
     val isWrite = a.access.isWriter || b.access.isWriter
     if (isWrite || a.access != b.access || a.matrix != b.matrix) return false
 

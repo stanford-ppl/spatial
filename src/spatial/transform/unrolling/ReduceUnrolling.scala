@@ -11,7 +11,7 @@ import utils.tags.instrument
 
 trait ReduceUnrolling extends UnrollingBase {
 
-  override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[_] = rhs match {
+  override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A], mop: Boolean)(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case op :OpReduce[a] =>
       val OpReduce(ens,cchain,accum,map,load,reduce,store,ident,fold,iters,stopWhen) = op
       implicit val A: Bits[a] = op.A
@@ -21,13 +21,13 @@ trait ReduceUnrolling extends UnrollingBase {
       var fullyUnroll = cchain.willFullyUnroll
       if (spatialConfig.enablePIR) fullyUnroll &= !lhs.isInnerControl
       if (fullyUnroll) {
-        fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2)
+        fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2, mop)
       }
       else {
-        partiallyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2)
+        partiallyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2, mop)
       }
 
-    case _ => super.unrollCtrl(lhs, rhs)
+    case _ => super.unrollCtrl(lhs, rhs, mop)
   }
 
 
@@ -43,10 +43,11 @@ trait ReduceUnrolling extends UnrollingBase {
     func:   Block[A],
     reduce: Lambda2[A,A,A],
     iters:  Seq[I32],
-    stopWhen: Option[Reg[Bit]]
+    stopWhen: Option[Reg[Bit]],
+    mop: Boolean
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     dbgs(s"Fully unrolling reduce $lhs")
-    val mapLanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
+    val mapLanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl, mop)
     val redLanes = UnitUnroller(s"${lhs}_reduce", isInnerLoop=true)
     val rfunc = reduce.toFunction2
 
@@ -87,10 +88,11 @@ trait ReduceUnrolling extends UnrollingBase {
     func:   Block[A],               // Map function
     reduce: Lambda2[A,A,A],         // Reduce function
     iters:  Seq[I32],                // Bound iterators for map loop
-    stopWhen: Option[Reg[Bit]]
+    stopWhen: Option[Reg[Bit]],
+    mop: Boolean
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
     dbgs(s"Unrolling reduce $lhs -> $accum")
-    val mapLanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl)
+    val mapLanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl, mop)
     val inds2 = mapLanes.indices
     val vs = mapLanes.indexValids
     val start = cchain.counters.map(_.start.asInstanceOf[I32])

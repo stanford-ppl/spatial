@@ -2,7 +2,7 @@ package spatial.traversal.banking
 
 import argon._
 import utils.implicits.collections._
-import utils.math.isPow2
+import utils.math._
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 
 import spatial.lang._
@@ -289,10 +289,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           ofs = ofschunk * exp(B,D) + intrablockofs
 
     */
-    def combs(lol: List[List[Int]]): List[List[Int]] = lol match {
-        case Nil => List(Nil)
-        case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
-      }
     def allLoops(maxes: Seq[Int], a: Seq[Int], B: Int, iterators: Seq[Int]): Seq[Int] = maxes match {
       case Nil => Nil
       case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}

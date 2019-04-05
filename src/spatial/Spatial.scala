@@ -276,40 +276,38 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("Experimental:")
 
     cli.opt[Unit]("mop").action{ (_,_) => 
-      spatialConfig.unrollMetapipeOfParallels = false
+      spatialConfig.unrollMetapipeOfParallels = true
     }.text("""
       Unroll outer loops into a metapipe of parallel controllers (default).  i.e: 
       Foreach(10 by 1 par 2)
        |-- Pipe1{...}
        |-- Pipe2{...}
-     
-          becomes 
-     
+          * becomes *
       Foreach(10 by 1 par 2)
        |-- Parallel 
        |    |-- Pipe1{...}
        |    |-- Pipe1{...}
        |-- Parallel 
             |-- Pipe2{...}
-            |-- Pipe2{...}""")
+            |-- Pipe2{...}
+""")
 
     cli.opt[Unit]("pom").action{ (_,_) => 
-      spatialConfig.unrollMetapipeOfParallels = true
+      spatialConfig.unrollParallelOfMetapipes = true
     }.text("""
       Unroll outer loops into a parallel of metapipe controllers.  i.e: 
       Foreach(10 by 1 par 2)
        |-- Pipe1{...}
        |-- Pipe2{...}
-     
-          becomes 
-     
+          * becomes * 
       Parallel
        |-- Foreach(0 until 10 by 2) 
        |    |-- Pipe1{...}
        |    |-- Pipe2{...}
        |-- Foreach(1 until 10 by 2)
             |-- Pipe1{...}
-            |-- Pipe2{...}""")
+            |-- Pipe2{...}
+""")
 
     cli.opt[Unit]("looseIterDiffs").action{ (_,_) => 
       spatialConfig.enableLooseIterDiffs = true

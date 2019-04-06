@@ -3,8 +3,9 @@ package utils
 package object math {
   def log2(x: Double): Double = Math.log10(x)/Math.log10(2)
   def isPow2(x: Int): Boolean = (x & (x-1)) == 0
-
-  /** Find all combinations out of list of lists.  i.e.
+  
+  // TODO: fix scaladoc here
+  /* Find all combinations out of list of lists.  i.e.
     *   combs(List( List(a,b),
     *               List(x,y,z),
     *               List(m,n)

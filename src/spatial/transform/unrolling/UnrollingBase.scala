@@ -145,11 +145,20 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
         val lhs2 = stage(ParallelPipe(enables,block))
         lanes.unify(lhs, lhs2)        
     }
-    else {
+    else if (!mop) {
       dbgs(s"$lhs = $rhs [duplicate 1/1] in lanes $lanes")
       val first = lanes.foreach{p => duplicate() }
+      // val first = lanes.inLane(0){ duplicate() }
+
       lanes.unify(lhs, first)
     }
+    else {
+      dbgs(s"$lhs = $rhs [duplicate 1/1] in lane 0")
+      val first = lanes.inLane(0){ duplicate() }
+
+      lanes.unify(lhs, first)
+    }
+
   }
 
   final override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
@@ -288,7 +297,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     def map[A](block: Int => A): List[A] = if (__doLanes.nonEmpty) __doLanes.map{p => inLane(p){ block(p) } } else List.tabulate(P){p => inLane(p){ block(p) } }
 
-    def foreach(block: Int => Unit): Unit = { map(block) }
+    def foreach(block: Int => Unit): Unit = { dbgs(s"dolanes ${__doLanes}"); map(block) }
 
     // --- Each unrolling rule should do at least one of three things:
 

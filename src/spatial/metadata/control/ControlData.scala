@@ -200,4 +200,5 @@ case class LoweredTransferSize(info: (Sym[_], Sym[_], Int)) extends Data[Lowered
   * Setter: sym.unrollDirective = UnrollStyle
   * Default: None
   */
-case class UnrollDirective(typ: UnrollStyle) extends Data[UnrollDirective](SetBy.User)
+case class UnrollAsPOM(should: Boolean) extends Data[UnrollAsPOM](SetBy.User)
+case class UnrollAsMOP(should: Boolean) extends Data[UnrollAsMOP](SetBy.User)

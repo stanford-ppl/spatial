@@ -407,13 +407,18 @@ package object control {
     }
 
     def getUnrollDirective: Option[UnrollStyle] = {
-      s.flatMap{sym => metadata[UnrollDirective](sym).map(_.typ).headOption }.headOption
+      s.flatMap{sym => 
+        val pom: Option[Boolean] = metadata[UnrollAsPOM](sym).map(_.should).headOption 
+        val mop: Option[Boolean] = metadata[UnrollAsMOP](sym).map(_.should).headOption
+        if (pom.isDefined) Some(ParallelOfMetapipes) else if (mop.isDefined) Some(MetapipeOfParallels) else None
+      }.headOption
     }
-    def unrollDirective: UnrollStyle = {
-      s.flatMap{sym => metadata[UnrollDirective](sym).map(_.typ) }.head
+    def unrollDirective: UnrollStyle = getUnrollDirective.get
+    def unrollAsPOM: Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollAsPOM(true)) }
     }
-    def unrollDirective_=(typ: UnrollStyle): Unit = {
-      s.foreach{sym => metadata.add(sym, UnrollDirective(typ)) }
+    def unrollAsMOP: Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollAsMOP(true)) }
     }
 
     def getLoweredTransferSize: Option[(Sym[_], Sym[_], Int)] = {

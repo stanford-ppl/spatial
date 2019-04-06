@@ -32,7 +32,7 @@ trait ForeachUnrolling extends UnrollingBase {
     dbgs(s"Fully unrolling foreach $lhs for $cchain $iters $mop")
     val unrLanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl, mop)
     val newEns = enables ++ ens
-    if (mop || unrLanes.size == 1) {
+    if (mop || unrLanes.size == 1 || lhs.isInnerControl) {
       val blk   = inLanes(unrLanes){ substituteBlock(func) }
       val lhs2  = stageWithFlow(UnitPipe(newEns, blk)){lhs2 => transferData(lhs,lhs2) }
       dbgs(s"Created unit pipe ${stm(lhs2)}")
@@ -65,7 +65,7 @@ trait ForeachUnrolling extends UnrollingBase {
     val is    = unrLanes.indices
     val vs    = unrLanes.indexValids
     val newEns = enables ++ ens
-    if (mop || unrLanes.size == 1) {
+    if (mop || unrLanes.size == 1 || lhs.isInnerControl) {
       val blk   = inLanes(unrLanes){ substituteBlock(func) }
       val lhs2  = stageWithFlow(UnrolledForeach(newEns, cchain, blk, is, vs, stopWhen)){lhs2 => transferData(lhs,lhs2) }
       dbgs(s"Created foreach ${stm(lhs2)}")

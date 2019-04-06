@@ -155,7 +155,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               grp.foreach{matrix => dbgss("    ", matrix.toString) }
             }
             // If only 1 acc left per group, Unit banking, otherwise search
-            if (selGrps.forall(_.lengthLessThan(2))) ModBanking.Unit(1) else findBanking(selGrps, dims, stagedDims)
+            if (selGrps.forall(_.lengthLessThan(2))) ModBanking.Unit(1) else findBanking(selGrps, dims, stagedDims, mem)
           }
           val dimsInStrategy = strategy.flatten.distinct
           val prunedGrps = myGrps.map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.distinct}
@@ -246,7 +246,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     ((pow2As ++ likelyAs), xAs)
   }
 
-  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int]): Seq[Int] = {
+  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Seq[Int] = {
     /* Offset correction not mentioned in Wang et. al., FPGA '14
        0. Equations in paper must be wrong.  Example 
            ex-     alpha = 1,2    N = 4     B = 1
@@ -313,12 +313,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       PandCost.minBy(_._2)._1
     }
     catch { case t:Throwable =>
-      bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha")
+      bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha (memory $mem ${mem.ctx})")
       throw t
     }
   }
 
-  protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int]): ModBanking = {
+  protected def findBanking(grps: Set[Seq[SparseMatrix[Idx]]], dims: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): ModBanking = {
     val rank = dims.length
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = stagedDims.product max Nmin
@@ -352,14 +352,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           attempts = attempts + 1
           if (checkCyclic(N,alpha,grps)) {
             dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
-            val P = computeP(N,1,alpha,stagedDims)
+            val P = computeP(N,1,alpha,stagedDims,mem)
             banking = Some(ModBanking(N,1,alpha,dims,P))
           }
           else {
             val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
             banking = B.map{b =>
               dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-              val P = computeP(N, b, alpha, stagedDims)
+              val P = computeP(N, b, alpha, stagedDims,mem)
               ModBanking(N, b, alpha, dims, P) 
             }
           }

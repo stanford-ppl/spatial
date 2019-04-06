@@ -384,7 +384,6 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
         if (vectorize) {
           is.head.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrPar.toInt) { i => i })
         } else {
-          // pom???
           is.zipWithIndex.foreach{case (i, j) => i.counter = IndexCounterInfo(ctr, Seq(j))} 
         }
       }
@@ -413,10 +412,20 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       if (mop) default else List.tabulate(P){p => default.zip(parAddr(p)).map{case (vec,i) => vec(i)}}
     }
     lazy val indexValids: Seq[Seq[Bit]] = {
-      val default = indices.zip(cchain.counters).map{case (is,ctr) =>
-        is.map{case Const(i) => Bit(i < ctr.end.toInt) }
+      // Note: indices for FullUnroller are already regrouped based on mop
+      dbgs(s"full unroll index valids $indices zip ${cchain.counters}")
+      if (mop) {
+        indices.zip(cchain.counters).map{case (is,ctr) =>
+          is.map{case Const(i) => Bit(i < ctr.end.toInt) }
+        }        
+      } else {
+        List.tabulate(P){p => 
+          val inds = indices(p)
+          inds.zip(cchain.counters).map{case (i, ctr) => 
+            i match {case Const(i) => Bit(i < ctr.end.toInt) }
+          }
+        }
       }
-      if (mop) default else List.tabulate(P){p => default.zip(parAddr(p)).map{case (vec,i) => vec(i)}}
     }
 
   }

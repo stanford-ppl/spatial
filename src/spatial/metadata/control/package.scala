@@ -406,6 +406,16 @@ package object control {
       s.foreach{sym => metadata.add(sym, LoweredTransfer(typ)) }
     }
 
+    def getUnrollDirective: Option[UnrollStyle] = {
+      s.flatMap{sym => metadata[UnrollDirective](sym).map(_.typ).headOption }.headOption
+    }
+    def unrollDirective: UnrollStyle = {
+      s.flatMap{sym => metadata[UnrollDirective](sym).map(_.typ) }.head
+    }
+    def unrollDirective_=(typ: UnrollStyle): Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollDirective(typ)) }
+    }
+
     def getLoweredTransferSize: Option[(Sym[_], Sym[_], Int)] = {
       s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption
     }

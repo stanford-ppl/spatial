@@ -29,7 +29,7 @@ trait ForeachUnrolling extends UnrollingBase {
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit ctx: SrcCtx): Void = {
-    dbgs(s"Fully unrolling foreach $lhs")
+    dbgs(s"Fully unrolling foreach $lhs for $cchain $iters $mop")
     val unrLanes = FullUnroller(s"$lhs", cchain, iters, lhs.isInnerControl, mop)
     val newEns = enables ++ ens
     if (mop || unrLanes.size == 1) {

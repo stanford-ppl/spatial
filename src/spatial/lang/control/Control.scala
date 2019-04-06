@@ -19,12 +19,15 @@ abstract class Directives(options: CtrlOpt) {
   }
 }
 
-class Pipe(name: Option[String], ii: Option[Int]) extends Directives(CtrlOpt(name,Some(Pipelined),ii)) {
+class Pipe(name: Option[String], ii: Option[Int], directive: Option[UnrollStyle]) 
+    extends Directives(CtrlOpt(name,Some(Pipelined),ii, mop = directive == Some(MetapipeOfParallels), pom = directive == Some(ParallelOfMetapipes))) {
   /** "Pipelined" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)
   @rig def apply(ens: Set[Bit], func: => Any): Void = unit_pipe(func, ens)
 
-  def II(ii: Int) = new Pipe(name, Some(ii))
+  def II(ii: Int) = new Pipe(name, Some(ii), directive)
+  def POM = new Pipe(name, ii, Some(ParallelOfMetapipes))
+  def MOP = new Pipe(name, ii, Some(MetapipeOfParallels))
 }
 class Stream(name: Option[String], stopWhen: Option[Reg[Bit]]) extends Directives(CtrlOpt(name,Some(Streaming),None,stopWhen)) {
   /** "Streaming" unit controller */
@@ -53,7 +56,7 @@ object Named {
   def apply(name: String) = new NamedClass(name)
 }
 
-object Pipe extends Pipe(ii = None, name = None)
+object Pipe extends Pipe(ii = None, name = None, directive = None)
 object Sequential extends Sequential(name = None, stopWhen = None)
 object Stream extends Stream(name = None, stopWhen = None)
 

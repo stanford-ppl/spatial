@@ -27,6 +27,39 @@ import spatial.dsl._
   }
 }
 
+@spatial class OuterForeachUnrollingFlagged extends OuterForeachUnrollingFlaggedBase {  // compilerArg --mop should not change anything
+  // override def backends: Seq[Backend] = Seq(Scala)
+}
+@spatial class OuterForeachUnrollingFlaggedPOM extends OuterForeachUnrollingFlaggedBase {  // compilerArg --pom should not change anything
+  override def compileArgs = super.compileArgs and "--pom"
+}
+@spatial abstract trait OuterForeachUnrollingFlaggedBase extends SpatialTest {
+  def main(args: Array[String]): Unit = {
+    val dram = DRAM[Int](2,16)
+    Accel {
+      Pipe.POM.Foreach(32 by 16 par 2){i => // Controller annotation overrides compiler flag
+        val sram = SRAM[Int](16)
+        Foreach(16 by 1){ii =>
+          sram(ii) = i + ii
+        }
+        dram(i/16, 0::16) store sram
+      }
+
+      Pipe.MOP.Foreach(32 by 16 par 2){i => // Controller annotation overrides compiler flag
+        val sram = SRAM[Int](16)
+        Foreach(16 by 1){ii =>
+          sram(ii) = i + ii
+        }
+        dram(i/16, 0::16) store sram
+      }
+
+    }
+
+    val result = getMatrix(dram)
+    val golden = (0::2,0::16){(i,j) => j + 16*i}
+    assert(result == golden)
+  }
+}
 class OuterForeachUnrolling2 extends OuterForeachUnrolling2Base {
   // override def backends: Seq[Backend] = Seq(Scala)
 }

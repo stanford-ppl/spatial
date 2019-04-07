@@ -145,16 +145,16 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
         val lhs2 = stage(ParallelPipe(enables,block))
         lanes.unify(lhs, lhs2)        
     }
-    else if (!mop) {
-      dbgs(s"$lhs = $rhs [duplicate 1/1] in lanes $lanes")
-      val first = lanes.foreach{p => duplicate() }
-      // val first = lanes.inLane(0){ duplicate() }
+    else if (!inHw) {
+      dbgs(s"$lhs = $rhs [duplicate 1/1] in lane 0")
+      val first = lanes.inLane(0){ duplicate() }
 
       lanes.unify(lhs, first)
     }
     else {
-      dbgs(s"$lhs = $rhs [duplicate 1/1] in lane 0")
-      val first = lanes.inLane(0){ duplicate() }
+      dbgs(s"$lhs = $rhs [duplicate 1/1] in lanes $lanes")
+      val first = lanes.foreach{p => duplicate() }
+      // val first = lanes.inLane(0){ duplicate() }
 
       lanes.unify(lhs, first)
     }

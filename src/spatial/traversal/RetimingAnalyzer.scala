@@ -4,6 +4,7 @@ import argon._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.math._
 import spatial.metadata.retiming._
 import spatial.lang._
 import spatial.node._
@@ -48,6 +49,7 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
       .sortBy(_._2)
       .foreach{case (s,l) =>
         s.fullDelay = l
+        if (cycles.contains(s)) s.inCycle = true
         dbgs(s"  [$l = ${adjustedLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
       }
     if (saveLatency) {

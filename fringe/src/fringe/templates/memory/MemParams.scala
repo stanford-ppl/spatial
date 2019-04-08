@@ -1,10 +1,6 @@
 package fringe.templates.memory
 
-import fringe.utils.DMap._
-import fringe.utils.XMap._
-import fringe.utils.NBufDMap._
 import fringe.Ledger._
-import fringe.utils.NBufXMap._
 import fringe.utils.log2Up
 import emul.ResidualGenerator._
 import fringe.utils.{PortInfo, Access}

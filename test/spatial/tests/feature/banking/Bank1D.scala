@@ -76,3 +76,21 @@ import spatial.dsl._
     assert(cksum1)
   }
 }
+
+@spatial class Cyclic1D extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+    val RESULT = ArgOut[Int]
+
+    Accel {
+      val x = SRAM[Int](128)
+      Foreach(128 by 1){i => x(i) = i}
+      RESULT := Reduce(Reg[Int])(128 by 4 par 3){i => x(i+1) + x(i+2) + x(i+3)}{_+_}
+    }
+
+    val gold = (0 to 127 by 4).map{i => i+1 + i+2 + i+3}.reduce{_+_}
+    val result = getArg(RESULT)
+    println(r"got $result, wanted $gold")
+    assert(result == gold)
+  }
+}

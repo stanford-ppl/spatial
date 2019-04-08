@@ -7,8 +7,6 @@ import fringe.Ledger._
 import fringe.templates.counters.{CompactingCounter, CompactingIncDincCtr, IncDincCtr, SingleSCounterCheap}
 import fringe.templates.math.Math
 import fringe.utils._
-import fringe.utils.XMap._
-import fringe.utils.DMap._
 import fringe.utils.HVec
 import fringe.utils.{getRetimed, log2Up}
 import fringe.utils.implicits._

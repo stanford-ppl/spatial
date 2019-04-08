@@ -9,10 +9,6 @@ import fringe.templates.math.FixedPoint
 import fringe.utils.{getRetimed, log2Up, risingEdge}
 import fringe.utils.HVec
 import fringe.utils._
-import fringe.utils.XMap._
-import fringe.utils.DMap._
-import fringe.utils.NBufDMap._
-import fringe.utils.NBufXMap._
 import fringe.utils.implicits._
 
 /* Controller that is instantiated in NBuf templates to handle port -> module muxing */

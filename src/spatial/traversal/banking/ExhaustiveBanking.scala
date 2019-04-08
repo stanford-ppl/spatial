@@ -263,7 +263,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
            P_i = NB / gcd(NB,alpha_i)
                ** if alpha_i = 0, then P_i = infinity **
 
-           ex-     alpha = 3,4    N = 6     B = 1
+
+           ex1-     alpha = 3,4    N = 6     B = 1
                         _____
                banks:  |0 4 2|0 4 2 0 4 2
                        |3_1_5|3 1 5 3 1 5
@@ -272,6 +273,15 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                banking pattern: 0 4 2
                                 3 1 5
                P_raw = 2,3
+        
+           ex2-     alpha = 3     N = 9     B = 4
+                       _______________________
+               banks: |0_0_1_2_3_3_4_5_6_6_7_8|0 0 1 2 3 3 4 5 6 6 7 8
+              
+               banking pattern: 0 0* 1 2 3 3* 4 5 6 6* 7 8
+               P_raw = 12
+               * need to know that each field contains two 0s, 3s, and 6s
+
        2. Create P_expanded: List[List[Int]], where P_i is a list containing P_raw, all divisors of P_raw, and dim_i
        2. Find list, selecting one element from each list in P, whose product == N*B and whose ranges, (0 until p*a by a), touches each bank exactly once, with 
           preference given to smallest volume after padding, and this will fence off a region that contains each bank
@@ -355,14 +365,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             val P = computeP(N,1,alpha,stagedDims,mem)
             banking = Some(ModBanking(N,1,alpha,dims,P))
           }
-          else {
-            val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
-            banking = B.map{b =>
-              dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-              val P = computeP(N, b, alpha, stagedDims,mem)
-              ModBanking(N, b, alpha, dims, P) 
-            }
-          }
+          // else {
+          //   val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          //   banking = B.map{b =>
+          //     dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
+          //     val P = computeP(N, b, alpha, stagedDims,mem)
+          //     ModBanking(N, b, alpha, dims, P) 
+          //   }
+          // }
         }
       }
     }

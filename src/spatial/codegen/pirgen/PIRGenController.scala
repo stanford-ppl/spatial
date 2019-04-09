@@ -10,17 +10,24 @@ import spatial.node._
 
 trait PIRGenController extends PIRCodegen {
 
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case AccelScope(func) => 
-      emit("runAccel()")
-      inAccel { 
-        genInAccel(lhs, rhs)
-      }
-
-    case _ => super.genHost(lhs, rhs)
-  }
-
-  def emitIterValids(lhs:Sym[_], iters:Seq[Seq[Bits[_]]], valids:Seq[Seq[Bits[_]]]) = {
+  def emitController(
+    lhs:Lhs, 
+    ctrler:Option[String]=None,
+    schedule:Option[Any]=None,
+    cchain:Option[Sym[_]]=None, 
+    iters:Seq[Seq[Bits[_]]]=Nil, 
+    valids: Seq[Seq[Bits[_]]]=Nil, 
+    ens:Set[Bit]=Set.empty
+  )(blk: => Unit) = {
+    var newCtrler = ctrler.getOrElse("UnitController()")
+    val tp = newCtrler.trim.split("\\(")(0).split(" ").last
+    newCtrler += cchain.ms(chain => src".cchain($chain)")
+    if (ens.nonEmpty) {
+      newCtrler += src".en($ens)"
+    }
+    state(lhs, tp=Some(tp))(
+      src"""createCtrl(schedule="${schedule.getOrElse(lhs.sym.schedule)}")(${newCtrler})"""
+    )
     def quoteIdx(sym:Bits[_]):String = {
       sym.counter.lanes.toString
     }
@@ -34,25 +41,6 @@ trait PIRGenController extends PIRCodegen {
         state(valid)(src"CounterValid(${quoteIdx(valid)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valid.tp})")
       }
     }
-  }
-
-  def emitController(
-    lhs:Lhs, 
-    ctrler:Option[String]=None,
-    schedule:Option[Any]=None,
-    cchain:Option[Sym[_]]=None, 
-    iters:Seq[Seq[Bits[_]]]=Nil, 
-    valids: Seq[Seq[Bits[_]]]=Nil, 
-    ens:Set[Bit]=Set.empty
-  )(blk: => Unit) = {
-    val newCtrler = ctrler.getOrElse("UnitController()")
-    val tp = newCtrler.trim.split("\\(")(0).split(" ").last
-    state(lhs, tp=Some(tp))(
-      src"""create(schedule="${schedule.getOrElse(lhs.sym.schedule)}")(${newCtrler})""" + 
-      cchain.ms(chain => src".cchain($chain)") +
-      (if (ens.isEmpty) "" else src".en($ens)")
-    )
-    emitIterValids(lhs.sym, iters, valids)
     blk
     emit(src"endState[Ctrl]")
   }

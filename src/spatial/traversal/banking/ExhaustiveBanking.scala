@@ -69,7 +69,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     def findSchemes(myGrps: Set[Seq[SparseMatrix[Idx]]]): Seq[Seq[Banking]] = {
       if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Seq(Seq(ModBanking.Unit(rank)))
-      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Seq(Seq(ModBanking.Simple(1, Seq(1), 1)))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Seq(Seq(ModBanking.Simple(1, Seq(1), 1, 0)))
       else {
         dimGrps.flatMap{ strategy: Seq[Seq[Int]] => 
           dbgs(s"Working on strategy $strategy")
@@ -246,7 +246,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     ((pow2As ++ likelyAs), xAs)
   }
 
-  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Seq[Int] = {
+  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): (Seq[Int], Int) = {
     /* Offset correction not mentioned in Wang et. al., FPGA '14
        0. Equations in paper must be wrong.  Example 
            ex-     alpha = 1,2    N = 4     B = 1
@@ -260,7 +260,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
        1. Proposed correction: Add field P: Seq[Int] to ModBanking.  Divide memory into "offset chunks" by finding the 
           periodicity of the banking pattern and fencing off a portion that contains each bank exactly once
-           P_i = NB / gcd(NB,alpha_i)
+           P_i = NB / gcd(N,alpha_i)
                ** if alpha_i = 0, then P_i = infinity **
 
 
@@ -283,10 +283,15 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                * need to know that each field contains two 0s, 3s, and 6s
 
        2. Create P_expanded: List[List[Int]], where P_i is a list containing P_raw, all divisors of P_raw, and dim_i
-       2. Find list, selecting one element from each list in P, whose product == N*B and whose ranges, (0 until p*a by a), touches each bank exactly once, with 
+       2. Find list, selecting one element from each list in P, whose product == N*B and whose ranges, (0 until p*a by a), touches each bank exactly once (at least once for B > 1), with 
           preference given to smallest volume after padding, and this will fence off a region that contains each bank
           exactly once.
+            NOTE: If B > 1, then we are just going to assume that all banks have as many elements per yard as the most populous bank in that yard (some addresses end up being untouchable,
+                  but the addressing logic would be insane otherwise).  Distinguish the degenerate elements simply by taking pure address % # max degenerates (works because of magic, 
+                  but may be wrong at some point)
        3. Pad the memory so that P evenly divides its respective dim (Currently stored as .padding metadata)
+       --------------------------
+            # Address resolution steps in metadata/memory/BankingData.scala:
        4. Compute offset chunk
           ofsdim_i = floor(x_i/P_i)
        5. Flatten these ofsdims (w_* is stagedDim_* + pad_*)
@@ -299,28 +304,27 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           ofs = ofschunk * exp(B,D) + intrablockofs
 
     */
-    def allLoops(maxes: Seq[Int], a: Seq[Int], B: Int, iterators: Seq[Int]): Seq[Int] = maxes match {
-      case Nil => Nil
-      case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}
-      case h::tail if tail.isEmpty => (0 to h-1).map{i => i*a.head/B + iterators.sum}
-    }
-    def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int, allPossible: Seq[Int]): Boolean = {
-      val banksInFence = allLoops(p,a,B,Nil).map(_%N)
-      allPossible.forall{b => banksInFence.count(_==b) == B}
-    }
     def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
     try {
-      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
-      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted.distinct
+      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n,alpha(i))}
+      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted
+      val hist = allBanksAccessible.distinct.map{x => (x -> allBanksAccessible.count(_ == x))}
       val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1) List(stagedDims(i)) else List()}}
-      val options = combs(P_expanded.map(_.toList).toList).filter(_.product == allBanksAccessible.length * b).collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible) => p}
-      val PandCost = options.map{option => 
+      val options = combs(P_expanded.map(_.toList).toList)
+            .filter{x => if (b == 1) x.product == allBanksAccessible.distinct.length else x.product >= allBanksAccessible.distinct.length} // pre-filter yards that don't have enough entries to touch each bank
+            .collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible.distinct) => p}
+      val PandCostandBloat = options.map{option => 
+        // Extra elements per dimension so that yards cover entire memory
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
-        val volume = stagedDims.zip(padding).map{case(x,y)=>x+y}.product
-        (option,volume)
+        val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
+        // Number of inaccessible address (caused by B > 1).  TODO: Does it matter which dimension we add these to?
+        val degenerate = hist.map(_._2).max
+        val darkVolume = computeDarkVolume(paddedDims, option, hist.toMap)
+        val volume = paddedDims.product + darkVolume
+        (option,volume,darkVolume)
       }
-      PandCost.minBy(_._2)._1
+      (PandCostandBloat.minBy(_._2)._1, PandCostandBloat.minBy(_._2)._3)
     }
     catch { case t:Throwable =>
       bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha (memory $mem ${mem.ctx})")
@@ -362,17 +366,21 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           attempts = attempts + 1
           if (checkCyclic(N,alpha,grps)) {
             dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
-            val P = computeP(N,1,alpha,stagedDims,mem)
-            banking = Some(ModBanking(N,1,alpha,dims,P))
+            val t = computeP(N,1,alpha,stagedDims,mem)
+            val P = t._1
+            val darkVolume = t._2
+            banking = Some(ModBanking(N,1,alpha,dims,P,darkVolume))
           }
-          // else {
-          //   val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
-          //   banking = B.map{b =>
-          //     dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-          //     val P = computeP(N, b, alpha, stagedDims,mem)
-          //     ModBanking(N, b, alpha, dims, P) 
-          //   }
-          // }
+          else if (!mem.noBlockCyclic) {
+            val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+            banking = B.map{b =>
+              dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
+              val t = computeP(N, b, alpha, stagedDims,mem)
+              val P = t._1
+              val darkVolume = t._2
+              ModBanking(N, b, alpha, dims, P, darkVolume) 
+            }
+          }
         }
       }
     }

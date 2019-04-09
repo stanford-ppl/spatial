@@ -74,6 +74,7 @@ trait MemoryUnrolling extends UnrollingBase {
       mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
       mem2.padding = inst.padding
+      mem2.darkVolume = inst.darkVolume
       dbgs(s"  ${stm(mem2)}")
       //strMeta(mem2)
       (mem2,d)

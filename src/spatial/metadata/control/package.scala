@@ -59,6 +59,12 @@ package object control {
       case _ => false
     }
 
+    def isAnyReduce: Boolean = op match {
+      case _:OpMemReduce[_,_] => true
+      case _:OpReduce[_] => true
+      case _ => false
+    }
+
     def isFSM: Boolean = op.isInstanceOf[StateMachine[_]]
 
     def isStreamLoad: Boolean = op match {
@@ -129,6 +135,7 @@ package object control {
     def isFSM: Boolean = op.exists(_.isFSM)
 
     def isMemReduce: Boolean = op.exists(_.isMemReduce)
+    def isAnyReduce: Boolean = op.exists(_.isAnyReduce)
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)

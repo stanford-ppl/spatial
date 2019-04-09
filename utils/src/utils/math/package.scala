@@ -18,4 +18,26 @@ package object math {
       case Nil => List(Nil)
       case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
     }
+
+  /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),
+    * determine what elements are possible via the equation: (address * a) / B.  This is used to figure out what banks
+    * are visible within a certain region of a memory
+    */
+  def allLoops(maxes: Seq[Int], a: Seq[Int], B: Int, iterators: Seq[Int]): Seq[Int] = maxes match {
+    case Nil => Nil
+    case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}
+    case h::tail if tail.isEmpty => (0 to h-1).map{i => i*a.head/B + iterators.sum}
+  }
+  def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int, allPossible: Seq[Int]): Boolean = {
+    val banksInFence = allLoops(p,a,B,Nil).map(_%N)
+    allPossible.forall{b => val occurs = banksInFence.count(_==b); occurs >= 1 && occurs <= B}
+  }
+  /** Given (padded) dims of a memory, P for that memory, and histogram mapping bank to number of degenerates for that bank per yard,
+    * figure out how many inaccessible physical addresses exist
+    */
+  def computeDarkVolume(paddedDims: Seq[Int], P: Seq[Int], hist: Map[Int,Int]): Int = { 
+    val degenerate = hist.map(_._2).max
+    hist.map(_._2).map(degenerate - _).sum * paddedDims.zip(P).map{case(x,y) => x/y}.product 
+  }
+
 }

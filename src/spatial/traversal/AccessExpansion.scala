@@ -86,8 +86,6 @@ trait AccessExpansion {
           }
           else {
             // Determine all iterators used in access pattern
-            // dbgs(s"vec $vec, all iters ${vec.allIters}, x $x, vec(x) = ${vec(x)}")
-            // val usedIters: Seq[Idx] = vec.allIters.flatMap(_._2).toSeq.distinct
             val requiredIters: Seq[Idx] = vec.allIters(x)
             // Drop any iterator who is NOT used in indexing and is in lockstep with i
             val uidWithIters = is.zip(uid)

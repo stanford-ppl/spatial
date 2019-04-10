@@ -108,7 +108,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   def unroll[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     dbgs(s"Unrolling $lhs = $rhs")
-    val mop = if (lhs.isAnyReduce)                                              true // PoM only implemented on Foreach for now
+    val mop = if (lhs.isAnyReduce | lhs.isInnerControl)                          true // PoM only implemented on Foreach for now
               else if      (lhs.getUnrollDirective == Some(MetapipeOfParallels)) true
               else if (lhs.getUnrollDirective == Some(ParallelOfMetapipes)) false
               else if (spatialConfig.unrollMetapipeOfParallels)             true

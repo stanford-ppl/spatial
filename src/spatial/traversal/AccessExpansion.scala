@@ -86,19 +86,21 @@ trait AccessExpansion {
           }
           else {
             // Determine all iterators used in access pattern
-            val usedIters: Seq[Idx] = vec.allIters.flatMap(_._2).toSeq.distinct
+            // dbgs(s"vec $vec, all iters ${vec.allIters}, x $x, vec(x) = ${vec(x)}")
+            // val usedIters: Seq[Idx] = vec.allIters.flatMap(_._2).toSeq.distinct
+            val requiredIters: Seq[Idx] = vec.allIters(x)
             // Drop any iterator who is NOT used in indexing and is in lockstep with i
             val uidWithIters = is.zip(uid)
-            val xid = uidWithIters.collect{case iu if (usedIters.contains(iu._1) /* || usedIters.exists(!lockstep(_,iu._1))*/) => iu._2 }
+            val xid = uidWithIters.collect{case iu if (requiredIters.contains(iu._1)) => iu._2 }
             val a = vec(x)
             val b = 0
             val x2 = unrolled(x, xid)
             dbgs(s"  Other: $x")
             dbgs(s"    Iterators: ${is.mkString(",")}")
-            dbgs(s"    All used iterators: $usedIters")
+            dbgs(s"    All used iterators: $requiredIters")
             dbgs(s"    Full UID: {${uid.mkString(",")}}")
             dbgs(s"    Unrolling $x {${xid.mkString(",")}} -> $x2")
-            (a,x2,b,usedIters)
+            (a,x2,b,requiredIters)
           }
         }
         val as  = components.map(_._1)

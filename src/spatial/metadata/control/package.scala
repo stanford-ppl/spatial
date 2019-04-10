@@ -369,9 +369,11 @@ package object control {
       * If reference is defined, only accounts for the stages up to and including the reference.
       * This is currently trivially true for inner controllers.
       */
+    // TODO: Update to incorporate pom vs mop unrolling
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      val pom = (s.isDefined && s.get.getUnrollDirective == Some(ParallelOfMetapipes)) || (spatialConfig.unrollParallelOfMetapipes && s.isDefined && s.get.getUnrollDirective != Some(MetapipeOfParallels))
+      val ctrls = if (op.isDefined && op.get.isLoop && pom) children else if (pom) child.map{c => childrenPriorTo(c) }.getOrElse(children) else child.map{c => Seq(c) }.getOrElse(children)
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
     }

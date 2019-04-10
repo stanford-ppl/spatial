@@ -192,7 +192,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
           dbgs(s"filter $samePort")
-          val conflicts = samePort.filter{b => dbgs(s" on $b: ovlap ${a.overlapsAddress(b)} canbcast${!canBroadcast(a, b)} segass ${a.segmentAssignments == b.segmentAssignments}");a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)}
+          val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)}
           samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")

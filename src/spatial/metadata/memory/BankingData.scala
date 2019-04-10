@@ -210,20 +210,23 @@ case class Memory(
       val b = banking.map(_.stride)
       val P = banking.map(_.Ps).flatten
       val alpha = banking.map(_.alphas).flatten
-      val banksInFence = allLoops(P,alphas,b.head,Nil) // TODO: Are all b's the same?
-      val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-      val degenerate = hist.map(_._2).max
 
       val ofschunk = (0 until D).map{t =>
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
+        val degenerate = hist.map(_._2).max
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
-        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
+        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product * degenerate
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        addr(t) 
-      }.sumTree % degenerate // Appears to work, but may not if bank degenerates are not adjacent
-      ofschunk * degenerate + intrablockofs
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
+        val degenerate = hist.map(_._2).max
+        addr(t) % degenerate
+      }.sumTree 
+      ofschunk + intrablockofs
     }
     else {
       // TODO: Bank address for mixed dimension groups

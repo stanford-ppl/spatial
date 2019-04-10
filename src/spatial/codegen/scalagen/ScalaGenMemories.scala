@@ -121,7 +121,7 @@ trait ScalaGenMemories extends ScalaGenBits {
       val data = init match {
         case Some(elems) =>
           val nBanks = inst.nBanks.product
-          val bankDepth = Math.ceil(dims.product.toDouble / nBanks).toInt
+          val bankDepth = Math.ceil((dims.product.toDouble + mem.darkVolume) / nBanks).toInt
 
           dbg(s"Generating initialized memory: ${stm(mem)}")
           dbg(s"# Banks: $nBanks")
@@ -143,7 +143,7 @@ trait ScalaGenMemories extends ScalaGenBits {
           src"""Array[Array[$tp]](${banks.mkString(",\n")})"""
         case None =>
           val banks = inst.totalBanks
-          val bankDepth = Math.ceil(dims.product.toDouble / banks).toInt
+          val bankDepth = Math.ceil((dims.product.toDouble + mem.darkVolume) / banks).toInt
           src"""Array.fill($banks){ Array.fill($bankDepth)(${invalid(tp)}) }"""
       }
 

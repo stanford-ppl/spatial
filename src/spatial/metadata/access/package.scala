@@ -228,12 +228,13 @@ package object access {
     */
   @stateful def dephasingIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Set[(Idx,Seq[Int])] = {
     val aIters = accessIterators(a.access, mem)
-    val bIters = accessIterators(a.access, mem)
+    val bIters = accessIterators(b.access, mem)
     // For any iters a and b have in common, check if the iterator's owner's parent has children running in lockstep. 
     //   return false if we find at least one who is not in lockstep
     val forkLayer = a.unroll.zip(b.unroll).zipWithIndex.collectFirst{case ((u0,u1),i) if (u0 != u1) => i}
     if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {
       val forkNode = aIters(forkLayer.get).parent.s.get
+
       val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access), Some(forkNode.toCtrl))
       if (mustClone) aIters.zipWithIndex.collect{case (x,i) if i > forkLayer.get => (x, a.unroll.take(i))}.toSet
       else Set()

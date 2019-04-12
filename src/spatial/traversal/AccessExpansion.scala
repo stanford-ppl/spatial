@@ -87,7 +87,8 @@ trait AccessExpansion {
           else {
             // Determine all iterators used in access pattern
             val requiredIters: Seq[Idx] = vec.allIters(x)
-            // Drop any iterator who is NOT used in indexing and is in lockstep with i
+            // Drop any iterator who is NOT used in indexing
+            // NOTE: Non-lockstepness for "random" syms will be handled during memory unrolling
             val uidWithIters = is.zip(uid)
             val xid = uidWithIters.collect{case iu if (requiredIters.contains(iu._1)) => iu._2 }
             val a = vec(x)

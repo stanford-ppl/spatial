@@ -372,8 +372,13 @@ package object control {
     // TODO: Update to incorporate pom vs mop unrolling
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val pom = (s.isDefined && s.get.getUnrollDirective == Some(ParallelOfMetapipes)) || (spatialConfig.unrollParallelOfMetapipes && s.isDefined && s.get.getUnrollDirective != Some(MetapipeOfParallels))
-      val ctrls = if (op.isDefined && op.get.isLoop && pom) children else if (pom) child.map{c => childrenPriorTo(c) }.getOrElse(children) else child.map{c => Seq(c) }.getOrElse(children)
+      val wu = s.isDefined && s.get.isOuterControl && s.get.cchains.exists(_.willUnroll)
+      val ctrls = {
+        if      (s.isDefined && s.get.willUnrollAsPOM) return false
+        else if (op.isDefined && op.get.isLoop && !wu) children 
+        else if (op.isDefined && !wu) child.map{c => childrenPriorTo(c) }.getOrElse(children) 
+        else child.map{c => Seq(c) }.getOrElse(children)
+      }
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
     }
@@ -423,12 +428,15 @@ package object control {
       }.headOption
     }
     def unrollDirective: UnrollStyle = getUnrollDirective.get
+    @stateful def willUnrollAsPOM: Boolean = {getUnrollDirective == Some(ParallelOfMetapipes) || (getUnrollDirective != Some(MetapipeOfParallels) && spatialConfig.unrollParallelOfMetapipes)} && willUnroll
+    @stateful def willUnrollAsMOP: Boolean = {getUnrollDirective == Some(MetapipeOfParallels) || (getUnrollDirective != Some(ParallelOfMetapipes) && spatialConfig.unrollMetapipeOfParallels)} && willUnroll
     def unrollAsPOM: Unit = {
       s.foreach{sym => metadata.add(sym, UnrollAsPOM(true)) }
     }
     def unrollAsMOP: Unit = {
       s.foreach{sym => metadata.add(sym, UnrollAsMOP(true)) }
     }
+    @stateful def willUnroll: Boolean = cchains.exists(_.willUnroll)
 
     def getLoweredTransferSize: Option[(Sym[_], Sym[_], Int)] = {
       s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption
@@ -727,6 +735,7 @@ package object control {
     @rig def widths: Seq[Int] = counters.map(_.ctrWidth)
     @stateful def constPars: Seq[Int] = pars.map(_.toInt)
     @stateful def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
+    @stateful def willUnroll: Boolean = parsOr1.exists(_ > 1)
     @stateful def isUnit: Boolean = counters.forall(_.isUnit)
     @stateful def isStatic: Boolean = counters.forall(_.isStatic)
   }

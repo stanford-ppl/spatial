@@ -75,7 +75,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   override protected def quoteConst(tp: Type[_], c: Any): String = c match {
     case c:String => s"""Const("${c.replace("\n","\\n")}")"""
-    case c => s"Const($c)"
+    case c => src"Const($c).tp(${tp})"
   }
 
   override protected def quoteOrRemap(arg: Any): String = arg match {

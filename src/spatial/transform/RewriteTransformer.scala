@@ -9,6 +9,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.metadata.rewrites._
+import spatial.metadata.retiming._
 import spatial.metadata.math._
 import spatial.lang._
 import spatial.node._
@@ -296,17 +297,49 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       super.transform(lhs,rhs)
 
     // m1*m2 + add --> fma(m1,m2,add)
-    case FixAdd((mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA && (lhs.inCycle == mul.inCycle) =>
-      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
+    case FixAdd((mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
+      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
+        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
+        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
+        case _ => false
+      }} else false
+      if (lhs.inCycle == mul.inCycle || specialAccum)
+        transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
+      else 
+        super.transform(lhs,rhs)
 
-    case FixAdd(F(add: Fix[s,i,f]), F(mul@Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA && (lhs.inCycle == mul.inCycle) =>
-      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
+    case FixAdd(F(add: Fix[s,i,f]), F(mul@Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
+      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
+        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
+        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
+        case _ => false
+      }} else false
+      if (lhs.inCycle == mul.inCycle || specialAccum)
+        transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
+      else 
+        super.transform(lhs,rhs)
 
-    case FltAdd(F(mul@Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA && (lhs.inCycle == mul.inCycle) =>
-      transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+    case FltAdd(F(mul@Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
+      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
+        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
+        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
+        case _ => false
+      }} else false
+      if (lhs.inCycle == mul.inCycle || specialAccum)
+        transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+      else 
+        super.transform(lhs,rhs)
 
-    case FltAdd(F(add: Flt[m,e]), F(mul@Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA && (lhs.inCycle == mul.inCycle) =>
-      transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+    case FltAdd(F(add: Flt[m,e]), F(mul@Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
+      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
+        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
+        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
+        case _ => false
+      }} else false
+      if (lhs.inCycle == mul.inCycle || specialAccum)
+        transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
+      else 
+        super.transform(lhs,rhs)
 
     // Not rewrite, but set residual metadata on certain patterns
     case Op(FixAdd(F(xx), Final(ofs))) if inHw => 

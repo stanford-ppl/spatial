@@ -41,24 +41,32 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     dimGrps: Seq[Seq[Seq[Int]]]
   ): Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]] = {
 
+    def unrollTake(root: Idx, iter: AccessMatrix, take: Int): Seq[Int] = {
+      if (root.parent.s.get.willUnrollAsPOM) iter.unroll
+      else iter.unroll.take(take)
+    }
     // Modify access matrices due to lockstep dephasing
     val readIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = reads.map{grp => grp.map{a => 
       grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
     }.flatten}.flatten.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
     if (readIterSubsts.nonEmpty) dbgs(s"General dephasng rules for $mem: ${readIterSubsts}")
+    val a = writes.map{grp => grp.map{a => 
+      grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
+    }.flatten}
+    dbgs(s"for $mem: $a")
     val writeIterSubsts: scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = writes.map{grp => grp.map{a => 
       grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
     }.flatten}.flatten.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
     if (writeIterSubsts.nonEmpty) dbgs(s"General dephasng rules for $mem: ${writeIterSubsts}")
     val newReads = reads.map{grp => grp.map{a => 
       val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
-            .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> readIterSubsts((iter,a.unroll.take(i))))}.toMap
+            .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,unrollTake(iter,a,i)))) => (iter -> readIterSubsts((iter,unrollTake(iter,a,i))))}.toMap
       if (keyRules.nonEmpty) {mem.addDephasedAccess(a.access); dbgs(s"Substituting due to dephasing: $keyRules")}
       a.randomizeKeys(keyRules)
     }.toSet}.toSet
     val newWrites = writes.map{grp => grp.map{a => 
       val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
-            .zipWithIndex.collect{case(iter,i) if (writeIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> writeIterSubsts((iter,a.unroll.take(i))))}.toMap
+            .zipWithIndex.collect{case(iter,i) if (writeIterSubsts.contains((iter,unrollTake(iter,a,i)))) => (iter -> writeIterSubsts((iter,unrollTake(iter,a,i))))}.toMap
       if (keyRules.nonEmpty) {mem.addDephasedAccess(a.access); dbgs(s"Substituting due to dephasing: $keyRules")}
       a.randomizeKeys(keyRules)
     }.toSet}.toSet
@@ -174,7 +182,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       // Regroup based on lockstepiness
       val regroupedReads: Seq[Set[Set[AccessMatrix]]] = reads.map{grp => grp.map{a => 
           val keyRules: scala.collection.immutable.Map[Idx,Idx] = accessIterators(a.access, mem)
-              .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,a.unroll.take(i)))) => (iter -> readIterSubsts((iter,a.unroll.take(i))))}.toMap
+              .zipWithIndex.collect{case(iter,i) if (readIterSubsts.contains((iter,unrollTake(iter,a,i)))) => (iter -> readIterSubsts((iter,unrollTake(iter,a,i))))}.toMap
           (a,keyRules)
         }.groupBy(_._2).map{case(rules,grp) => Set(grp.map(_._1.randomizeKeys(rules)).toSet)}.toSeq}.toSeq.flatten
       dbgs(s"Attempting to regroup reads and bank by duplication with the following groups:")

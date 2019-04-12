@@ -162,6 +162,7 @@ trait Spatial extends Compiler with ParamLoader {
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
         flatteningTransformer ==> 
@@ -277,6 +278,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("mop").action{ (_,_) => 
       spatialConfig.unrollMetapipeOfParallels = true
+      spatialConfig.unrollParallelOfMetapipes = false
     }.text("""
       Unroll outer loops into a metapipe of parallel controllers (default).  i.e: 
       Foreach(10 by 1 par 2)
@@ -294,6 +296,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("pom").action{ (_,_) => 
       spatialConfig.unrollParallelOfMetapipes = true
+      spatialConfig.unrollMetapipeOfParallels = false
     }.text("""
       Unroll outer loops into a parallel of metapipe controllers.  i.e: 
       Foreach(10 by 1 par 2)

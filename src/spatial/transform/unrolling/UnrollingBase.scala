@@ -9,6 +9,8 @@ import utils.math.combs
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.params._
+import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
@@ -87,8 +89,11 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     import argon.lang._
 
     val ctrs2 = cchain.counters.zip(addr).map{case (ctr, i) => 
-      val newStart = ctr.start.asInstanceOf[I32] + i.to[I32] * ctr.step.asInstanceOf[I32]
-      val newStep = ctr.step.asInstanceOf[I32] * ctr.ctrPar
+      // TODO: x.getIntValue.getOrElse(c.toInt) is only necessary if we allow dse to retune parameters (currently not the case)
+      val start = ctr.start.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr start a constant or mark controller with Pipe.MOP!")}
+      val step = ctr.step.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr step a constant or mark controller with Pipe.MOP!")}
+      val newStart = start + i.to[I32] * step
+      val newStep = step * ctr.ctrParOr1
       Counter[I32](newStart, ctr.end.asInstanceOf[I32], newStep, 1)
     }
     stage(CounterChainNew(ctrs2))
@@ -108,12 +113,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   def unroll[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     dbgs(s"Unrolling $lhs = $rhs")
-    val mop = if (lhs.isAnyReduce | lhs.isInnerControl)                          true // PoM only implemented on Foreach for now
-              else if      (lhs.getUnrollDirective == Some(MetapipeOfParallels)) true
-              else if (lhs.getUnrollDirective == Some(ParallelOfMetapipes)) false
-              else if (spatialConfig.unrollMetapipeOfParallels)             true
-              else if (spatialConfig.unrollParallelOfMetapipes)             false
-              else true
+    val mop = !lhs.willUnrollAsPOM
     val lhs2 =  if (rhs.isControl) duplicateController(lhs,rhs,mop)
                 else lanes.duplicate(lhs,rhs)
     dbgs(s"[$lhs] ${lhs2.zipWithIndex.map{case (l2,i) => s"$i: $l2"}.mkString(", ")}")

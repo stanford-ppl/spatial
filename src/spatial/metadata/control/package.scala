@@ -428,7 +428,7 @@ package object control {
       }.headOption
     }
     def unrollDirective: UnrollStyle = getUnrollDirective.get
-    @stateful def willUnrollAsPOM: Boolean = {getUnrollDirective == Some(ParallelOfMetapipes) || (getUnrollDirective != Some(MetapipeOfParallels) && spatialConfig.unrollParallelOfMetapipes)} && willUnroll
+    @stateful def willUnrollAsPOM: Boolean = {getUnrollDirective == Some(ParallelOfMetapipes) || (getUnrollDirective != Some(MetapipeOfParallels) && spatialConfig.unrollParallelOfMetapipes)} && willUnroll && !isAnyReduce
     @stateful def willUnrollAsMOP: Boolean = {getUnrollDirective == Some(MetapipeOfParallels) || (getUnrollDirective != Some(ParallelOfMetapipes) && spatialConfig.unrollMetapipeOfParallels)} && willUnroll
     def unrollAsPOM: Unit = {
       s.foreach{sym => metadata.add(sym, UnrollAsPOM(true)) }

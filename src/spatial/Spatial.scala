@@ -131,7 +131,7 @@ trait Spatial extends Compiler with ParamLoader {
         (blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
         ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
-        /** Optional python model generator */
+        /** Optional scala model generator */
         ((spatialConfig.enableRuntimeModel) ? retimingAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? initiationAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? dseRuntimeModelGen) ==>

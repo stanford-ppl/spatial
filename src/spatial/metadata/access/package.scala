@@ -242,7 +242,6 @@ package object access {
     val forkLayer = if (pomForkLayer.isDefined && uidForkLayer.isDefined) Some(pomForkLayer.get min uidForkLayer.get) 
                     else if (pomForkLayer.isDefined || uidForkLayer.isDefined) Some(pomForkLayer.getOrElse(0) + uidForkLayer.getOrElse(0))
                     else None
-    dbgs(s"fucklayer $pomForkLayer $uidForkLayer")
     // For any iters a and b have in common, check if the iterator's owner's parent has children running in lockstep. 
     //   return false if we find at least one who is not in lockstep
     if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {

@@ -9,8 +9,8 @@ import spatial.dsl._
     val N = 16
     val K = 16
     val MP = 1
-    val NP = 8
-    val KP = 4
+    val NP = 2
+    val KP = 2
     val alpha = 1
     val beta = 0
 
@@ -24,7 +24,8 @@ import spatial.dsl._
     setMem(dram2, data2)
 
     Accel {
-      val a = SRAM[Int](M,K) // Should have 1 copy
+      // 4 SRAMNews total
+      val a = SRAM[Int](M,K) // Should have 2 copies with POM, 1 copy with MOP
       val b = SRAM[Int](K,N) // Should have 1 copy
       val y = SRAM[Int](M,N)
       a load dram1
@@ -75,7 +76,8 @@ import spatial.dsl._
     val P3 = 3
     val P2 = 2
 
-    // App should have 30 SRAMNew
+    // App should have 26 SRAMNew for mop (29 for pom because sram5 needs to be fully duplicated)
+      // NOTE: Spatial seems to kill off dummy srams
     Accel {
       val accum = SRAM[Int](8,32,3,3)
       val sram1 = SRAM[Int](9999) // Should have 3 duplicates, each broadcast to 2 readers (NOT 3*2 duplicates)
@@ -130,7 +132,7 @@ import spatial.dsl._
         dummy load dram
         Foreach(A by 1, C by 1, C by 1 par P3){(a,c2,c1) =>                         // Should broadcast with 3 duplicates
           val x = sram5(a * A + mux(S == 1, c2, c2*2)*C + mux(S == 1, c1, c1*2)) 
-          accum(a,b,c1,c2) = x
+          accum(a,b,c1,c2) = x + dummy(0)
         }
       }
 
@@ -141,7 +143,7 @@ import spatial.dsl._
         dummy load dram
         Foreach(A by 1, C by 1, C by 1 par P3){(a,c2,c1) =>                         // Should NOT broadcast because lockstepness broken in b loop
           val x = sram6(a * A + mux(S == 1, c2, c2*2)*C + mux(S == 1, c1, c1*2)) 
-          accum(a,b,c1,c2) = x
+          accum(a,b,c1,c2) = x + dummy(0)
         }
       }
 

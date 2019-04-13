@@ -436,7 +436,7 @@ package object control {
     def unrollAsMOP: Unit = {
       s.foreach{sym => metadata.add(sym, UnrollAsMOP(true)) }
     }
-    @stateful def willUnroll: Boolean = cchains.exists(_.willUnroll)
+    @stateful def willUnroll: Boolean = cchains.exists(_.willUnroll) && isOuterControl
 
     def getLoweredTransferSize: Option[(Sym[_], Sym[_], Int)] = {
       s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption

@@ -45,7 +45,7 @@ import spatial.dsl._
     setMem(b, B)
 
     Accel {
-      Foreach(M by bm, N by bn par op){(i,j) =>
+      Pipe.POM.Foreach(M by bm, N by bn par op){(i,j) =>
         val tileC = SRAM[T](bm, bn)
 
         Foreach(P by bp par px){k =>

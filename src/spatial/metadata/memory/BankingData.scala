@@ -167,6 +167,7 @@ case class Memory(
   def updateDepth(d: Int): Memory = Memory(banking, d, padding, darkVolume, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def Ps: Seq[Int] = banking.map(_.Ps).flatten
+  def Bs: Seq[Int] = banking.map(_.stride)
   def alphas: Seq[Int] = banking.map(_.alphas).flatten
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {

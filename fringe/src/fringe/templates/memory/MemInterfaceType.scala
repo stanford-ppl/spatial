@@ -4,10 +4,6 @@ import chisel3._
 import chisel3.util._
 import fringe.utils.HVec
 import fringe.Ledger._
-import fringe.utils.DMap._
-import fringe.utils.XMap._
-import fringe.utils.NBufDMap._
-import fringe.utils.NBufXMap._
 import fringe.utils.implicits._
 import fringe._
 import fringe.utils.{PortInfo,Access}

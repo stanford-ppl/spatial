@@ -136,6 +136,9 @@ def main():
 
   name, isTest, found = getFullyQualifiedClassName(app=opts.app, errorIfNone=True)
 
+  print("Updating resources with bin/update_resources.sh...")
+  os.system("bin/update_resources.sh")
+  
   java_cmd = ""
   if isTest:
     ciArgs = "export TEST_ARGS=\"--name " + opts.app + " " + ' '.join(args) + "\""

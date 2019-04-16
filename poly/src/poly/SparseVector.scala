@@ -7,9 +7,10 @@ package poly
   *
   * @param cols Map of keys of type K to integer values
   * @param c Constant entry
+  * @param allIters Mapping from symbol key in cols to all iterators it varies with
   * @param lastIters Mapping from symbol to the innermost iterator it varies with, None if it is entirely loop invariant
   */
-case class SparseVector[K](cols: Map[K,Int], c: Int, lastIters: Map[K,Option[K]])
+case class SparseVector[K](cols: Map[K,Int], c: Int, allIters: Map[K,Seq[K]])
    extends SparseVectorLike[K]
 {
   import ConstraintType._
@@ -26,26 +27,26 @@ case class SparseVector[K](cols: Map[K,Int], c: Int, lastIters: Map[K,Option[K]]
 
   def map(func: Int => Int): SparseVector[K] = {
     val cols2 = cols.mapValues{v => func(v) }
-    SparseVector(cols2, func(c), lastIters)
+    SparseVector(cols2, func(c), allIters)
   }
 
   def empty(cst: Int): SparseVector[K] = {
     val cols2 = cols.mapValues{_ => 0}
-    SparseVector(cols2, cst, lastIters)
+    SparseVector(cols2, cst, allIters)
   }
 
   def zip(that: SparseVector[K])(func: (Int,Int) => Int): SparseVector[K] = {
     val keys = this.keys ++ that.keys
     val cols2 = keys.map{k => k -> func(this(k), that(k)) }.toMap
-    SparseVector(cols2, func(this.c, that.c), this.lastIters ++ that.lastIters)
+    SparseVector(cols2, func(this.c, that.c), this.allIters ++ that.allIters)
   }
 
   def unary_-(): SparseVector[K] = this.map{x => -x}
   def +(that: SparseVector[K]): SparseVector[K] = this.zip(that){_+_}
   def -(that: SparseVector[K]): SparseVector[K] = this.zip(that){_-_}
-  def +(b: (K,Int)): SparseVector[K] = SparseVector[K](this.cols + b, c, lastIters)
-  def -(b: (K,Int)): SparseVector[K] = SparseVector[K](this.cols + ((b._1,-b._2)), c, lastIters)
-  def +(b: Int): SparseVector[K] = SparseVector[K](this.cols, c + b, lastIters)
-  def -(b: Int): SparseVector[K] = SparseVector[K](this.cols, c - b, lastIters)
+  def +(b: (K,Int)): SparseVector[K] = SparseVector[K](this.cols + b, c, allIters)
+  def -(b: (K,Int)): SparseVector[K] = SparseVector[K](this.cols + ((b._1,-b._2)), c, allIters)
+  def +(b: Int): SparseVector[K] = SparseVector[K](this.cols, c + b, allIters)
+  def -(b: Int): SparseVector[K] = SparseVector[K](this.cols, c - b, allIters)
 }
 

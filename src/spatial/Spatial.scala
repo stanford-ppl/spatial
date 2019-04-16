@@ -131,7 +131,7 @@ trait Spatial extends Compiler with ParamLoader {
         (blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
         ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
-        /** Optional python model generator */
+        /** Optional scala model generator */
         ((spatialConfig.enableRuntimeModel) ? retimingAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? initiationAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? dseRuntimeModelGen) ==>
@@ -162,6 +162,7 @@ trait Spatial extends Compiler with ParamLoader {
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
         flatteningTransformer ==> 
@@ -274,6 +275,42 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.note("")
     cli.note("Experimental:")
+
+    cli.opt[Unit]("mop").action{ (_,_) => 
+      spatialConfig.unrollMetapipeOfParallels = true
+      spatialConfig.unrollParallelOfMetapipes = false
+    }.text("""
+      Unroll outer loops into a metapipe of parallel controllers (default).  i.e: 
+      Foreach(10 by 1 par 2)
+       |-- Pipe1{...}
+       |-- Pipe2{...}
+          * becomes *
+      Foreach(10 by 1 par 2)
+       |-- Parallel 
+       |    |-- Pipe1{...}
+       |    |-- Pipe1{...}
+       |-- Parallel 
+            |-- Pipe2{...}
+            |-- Pipe2{...}
+""")
+
+    cli.opt[Unit]("pom").action{ (_,_) => 
+      spatialConfig.unrollParallelOfMetapipes = true
+      spatialConfig.unrollMetapipeOfParallels = false
+    }.text("""
+      Unroll outer loops into a parallel of metapipe controllers.  i.e: 
+      Foreach(10 by 1 par 2)
+       |-- Pipe1{...}
+       |-- Pipe2{...}
+          * becomes * 
+      Parallel
+       |-- Foreach(0 until 10 by 2) 
+       |    |-- Pipe1{...}
+       |    |-- Pipe2{...}
+       |-- Foreach(1 until 10 by 2)
+            |-- Pipe1{...}
+            |-- Pipe2{...}
+""")
 
     cli.opt[Unit]("looseIterDiffs").action{ (_,_) => 
       spatialConfig.enableLooseIterDiffs = true

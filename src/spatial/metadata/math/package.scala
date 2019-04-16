@@ -18,6 +18,9 @@ package object math {
     def modulus: Int = getModulus.getOrElse(-1)
     def modulus_=(mod: Int): Unit = metadata.add(s, Modulus(mod))
 
+    def inCycle: Boolean = metadata[InCycle](s).map(_.is).getOrElse(false)
+    def inCycle_=(is: Boolean): Unit = metadata.add(s, InCycle(is))
+    
     def getResidual: Option[ResidualGenerator] = metadata[Residual](s.trace).map(_.equ)
     @stateful def residual: ResidualGenerator = getResidual.getOrElse(
     	if (s.trace.isConst) ResidualGenerator(s.traceToInt) 

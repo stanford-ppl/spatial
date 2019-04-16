@@ -59,6 +59,12 @@ package object control {
       case _ => false
     }
 
+    def isAnyReduce: Boolean = op match {
+      case _:OpMemReduce[_,_] => true
+      case _:OpReduce[_] => true
+      case _ => false
+    }
+
     def isFSM: Boolean = op.isInstanceOf[StateMachine[_]]
 
     def isStreamLoad: Boolean = op match {
@@ -129,6 +135,7 @@ package object control {
     def isFSM: Boolean = op.exists(_.isFSM)
 
     def isMemReduce: Boolean = op.exists(_.isMemReduce)
+    def isAnyReduce: Boolean = op.exists(_.isAnyReduce)
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
@@ -362,9 +369,16 @@ package object control {
       * If reference is defined, only accounts for the stages up to and including the reference.
       * This is currently trivially true for inner controllers.
       */
+    // TODO: Update to incorporate pom vs mop unrolling
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      val wu = s.isDefined && s.get.isOuterControl && s.get.cchains.exists(_.willUnroll)
+      val ctrls = {
+        if      (s.isDefined && s.get.willUnrollAsPOM) return false
+        else if (op.isDefined && op.get.isLoop && !wu) children 
+        else if (op.isDefined && !wu) child.map{c => childrenPriorTo(c) }.getOrElse(children) 
+        else child.map{c => Seq(c) }.getOrElse(children)
+      }
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
     }
@@ -405,6 +419,24 @@ package object control {
     def loweredTransfer_=(typ: TransferType): Unit = {
       s.foreach{sym => metadata.add(sym, LoweredTransfer(typ)) }
     }
+
+    def getUnrollDirective: Option[UnrollStyle] = {
+      s.flatMap{sym => 
+        val pom: Option[Boolean] = metadata[UnrollAsPOM](sym).map(_.should).headOption 
+        val mop: Option[Boolean] = metadata[UnrollAsMOP](sym).map(_.should).headOption
+        if (pom.isDefined) Some(ParallelOfMetapipes) else if (mop.isDefined) Some(MetapipeOfParallels) else None
+      }.headOption
+    }
+    def unrollDirective: UnrollStyle = getUnrollDirective.get
+    @stateful def willUnrollAsPOM: Boolean = {getUnrollDirective == Some(ParallelOfMetapipes) || (getUnrollDirective != Some(MetapipeOfParallels) && spatialConfig.unrollParallelOfMetapipes)} && willUnroll && !isAnyReduce
+    @stateful def willUnrollAsMOP: Boolean = {getUnrollDirective == Some(MetapipeOfParallels) || (getUnrollDirective != Some(ParallelOfMetapipes) && spatialConfig.unrollMetapipeOfParallels)} && willUnroll
+    def unrollAsPOM: Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollAsPOM(true)) }
+    }
+    def unrollAsMOP: Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollAsMOP(true)) }
+    }
+    @stateful def willUnroll: Boolean = cchains.exists(_.willUnroll) && isOuterControl
 
     def getLoweredTransferSize: Option[(Sym[_], Sym[_], Int)] = {
       s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption
@@ -703,6 +735,7 @@ package object control {
     @rig def widths: Seq[Int] = counters.map(_.ctrWidth)
     @stateful def constPars: Seq[Int] = pars.map(_.toInt)
     @stateful def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
+    @stateful def willUnroll: Boolean = parsOr1.exists(_ > 1)
     @stateful def isUnit: Boolean = counters.forall(_.isUnit)
     @stateful def isStatic: Boolean = counters.forall(_.isStatic)
   }

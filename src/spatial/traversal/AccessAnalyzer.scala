@@ -59,10 +59,15 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   /** Returns the innermost iterator which the symbols in xs vary with.
-    * If x is entirely loop invariant, returns None.
+    * If x is entirely loop invariant, returns None.  Deprecated?
     */
   private def lastVariantIter(is: Seq[Idx], x: Sym[_]): Option[Idx] = {
     is.reverseIterator.find{i => !isInvariant(i,x) }
+  }
+
+  /** Returns all iterators which the symbols in xs vary with. */
+  private def allVariantIters(is: Seq[Idx], x: Sym[_]): Seq[Idx] = {
+    is.filter{i => !isInvariant(i,x) }
   }
 
   object Plus  { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixAdd(LU(a),LU(b)) => (a,b) }}
@@ -171,12 +176,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum, modulus: Modulus): AddressPattern = {
     val starts = iterStarts.filterKeys(is.filter{i => offset.syms.contains(i) || components.exists{prod => prod.syms.contains(i)}}.contains)
-    val lastIters = offset.syms.mapping{x => lastVariantIter(is,x) } ++
-                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }} ++
-                    starts.values.mapping{x => lastVariantIter(is,x)}
-
-    val lastIter  = lastIters.values.maxByOrElse(None){i => i.map{is.indexOf}.getOrElse(-1) }
-    AddressPattern(components, offset, lastIters, lastIter, starts)
+    val allIters = offset.syms.mapping{x => allVariantIters(is,x) } ++
+                    components.flatMap{prod => prod.syms.mapping{x => allVariantIters(is,x) }} ++
+                    components.map{prod => (prod.i -> Seq(prod.i))} ++
+                    starts.values.mapping{x => allVariantIters(is,x)}
+    AddressPattern(components, offset, allIters, starts)
   }
 
   /** Return the affine access pattern of the given address component x as an AddressPattern.

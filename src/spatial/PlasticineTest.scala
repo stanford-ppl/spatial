@@ -50,11 +50,11 @@ trait PlasticineTest extends DSLTest { test =>
       }
     }
 
-    def scommand(pass: String, args: Seq[String], timeout: Long, parse: String => Result, Error: String => Result, rerun:Boolean=false): Result = {
+    def scommand(pass: String, args: Seq[String], timeout: Long, parse: String => Result, Error: String => Result, wd:String=IR.config.genDir): Result = {
       import java.nio.file.{Paths, Files}
       val logPath = IR.config.logDir + s"/$pass.log"
       var res:Result = Unknown
-      var rerunPass = rerun
+      var rerunPass = false
       rerunPass |= checkFlag(s"rerun.${pass}") || checkFlag(s"rerun.all")
       if (Files.exists(Paths.get(logPath)) && !rerunPass) {
         res = scala.io.Source.fromFile(logPath).getLines.map { parse }.fold(res){ _ orElse _ }
@@ -62,7 +62,7 @@ trait PlasticineTest extends DSLTest { test =>
       if (res == Pass) {
         println(s"${Console.GREEN}${logPath}${Console.RESET} succeeded. Skipping")
         Pass 
-      } else command(pass, args, timeout, parse, Error)
+      } else command(pass, args, timeout, parse, Error, wd)
     }
 
     def genpir():Result = {
@@ -101,7 +101,7 @@ trait PlasticineTest extends DSLTest { test =>
       pirpass("runpir", cmd)
     }
 
-    def mappir(args:String, fifo:Int=20, rerun:Boolean=false) = {
+    def mappir(args:String, fifo:Int=20) = {
       var cmd = pirArgs :+
       "--load=true" :+
       "--ckpt=1" :+
@@ -113,7 +113,7 @@ trait PlasticineTest extends DSLTest { test =>
       pirpass("mappir", cmd)
     }
 
-    def genpsim(fifo:Int=20, rerun:Boolean=false) = {
+    def genpsim(fifo:Int=20) = {
       var gentracecmd = pirArgs :+
       "--load=true" :+
       "--ckpt=0" :+
@@ -157,7 +157,7 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runtst(args:String="", fifo:Int=20, rerun:Boolean=false) = {
+    def runtst(args:String="", fifo:Int=20) = {
       var gentstcmd = pirArgs :+
       "--load=true" :+
       "--ckpt=2" :+
@@ -169,9 +169,9 @@ trait PlasticineTest extends DSLTest { test =>
       gentstcmd ++= args.split(" ").map(_.trim).toList
       gentstcmd ++= cmdlnArgs
       val timeout = 3000
-      scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply, rerun) >>
-      scommand(s"maketst", "make -C tungsten/".split(" "), timeout, parseMake, MakeError.apply, rerun) >>
-      scommand(s"runtst", "./tungsten/tungsten".split(" "), timeout, parseTst, RunError.apply, rerun)
+      scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply) >>
+      scommand(s"maketst", "make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runtst", "./tungsten".split(" "), timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
     }
 
     def parseProute(vcLimit:Int)(line:String) = {
@@ -183,7 +183,7 @@ trait PlasticineTest extends DSLTest { test =>
       }
     }
 
-    def runproute(row:Int=16, col:Int=8, vlink:Int=2, slink:Int=4, time:Int = -1, iter:Int=1000, vcLimit:Int=4, stopScore:Int= -1, rerun:Boolean=false) = {
+    def runproute(row:Int=16, col:Int=8, vlink:Int=2, slink:Int=4, time:Int = -1, iter:Int=1000, vcLimit:Int=4, stopScore:Int= -1) = {
       var cmd = s"${buildPath(IR.config.cwd, "pir", "plastiroute", "plastiroute")}" :: 
       "-n" :: s"${IR.config.genDir}/plastisim/node.csv" ::
       "-l" :: s"${IR.config.genDir}/plastisim/link.csv" ::
@@ -205,7 +205,7 @@ trait PlasticineTest extends DSLTest { test =>
       cmd ++= "-p100 -t1 -d100".split(" ").map(_.trim).toList
       val timeout = 10800 * 2 // 6 hours
       val name = "runproute"
-      scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply, rerun)
+      scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply)
     }
 
     def parsePsim(line:String) = {
@@ -217,7 +217,7 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runpsim(name:String="runpsim", flit:Int=512, linkTp:String="B", placefile:String="", rerun:Boolean=false) = {
+    def runpsim(name:String="runpsim", flit:Int=512, linkTp:String="B", placefile:String="") = {
       var cmd = s"${buildPath(IR.config.cwd, "pir", "plastisim", "plastisim")}" :: 
       "-f" :: s"${IR.config.genDir}/plastisim/psim.conf" ::
       s"-i$flit" ::
@@ -229,7 +229,7 @@ trait PlasticineTest extends DSLTest { test =>
         cmd :+= placefile
       }
       val timeout = 10800 * 4 // 12 hours
-      scommand(name, cmd, timeout, parsePsim _, RunError.apply, rerun)
+      scommand(name, cmd, timeout, parsePsim _, RunError.apply)
     }
 
     def psh(ckpt:String) = {
@@ -361,6 +361,20 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
+  case object Tst extends PIRBackend {
+    val row:Int=14
+    val col:Int=14
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/P14x14/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/P14x14/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/P14x14/$name/report"
+    def runPasses():Result = {
+      genpir() >>
+      pirpass("gentst", s"--mapping=true --codegen=true --net=p2p --row=$row --col=$col --tungsten --psim=false".split(" ").toList) >>
+      scommand(s"maketst", "make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runtst", "./tungsten".split(" "), timeout=1000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+    }
+  }
+
   override def backends: Seq[Backend] = 
     Asic +:
     P2PNoSim +:
@@ -368,6 +382,7 @@ trait PlasticineTest extends DSLTest { test =>
     Hybrid(row=14,col=14,vlink=4,slink=4) +: 
     Static(row=14,col=14,vlink=4,slink=4) +: 
     Dot +:
+    Tst +:
     super.backends
 
 }

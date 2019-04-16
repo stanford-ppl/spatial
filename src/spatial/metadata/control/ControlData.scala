@@ -18,6 +18,10 @@ case object DenseLoad  extends TransferType
 case object SparseStore extends TransferType
 case object SparseLoad  extends TransferType
 
+/** Unroll scheme. */
+sealed abstract class UnrollStyle
+case object MetapipeOfParallels  extends UnrollStyle
+case object ParallelOfMetapipes  extends UnrollStyle
 
 /** Control node level. */
 sealed abstract class CtrlLevel
@@ -189,3 +193,12 @@ case class LoweredTransfer(typ: TransferType) extends Data[LoweredTransfer](SetB
   * Default: None
   */
 case class LoweredTransferSize(info: (Sym[_], Sym[_], Int)) extends Data[LoweredTransferSize](SetBy.Analysis.Self)
+
+/** Identifies whether this controller should be unrolled as MoP or PoM
+  *
+  * Getter: sym.unrollDirective
+  * Setter: sym.unrollDirective = UnrollStyle
+  * Default: None
+  */
+case class UnrollAsPOM(should: Boolean) extends Data[UnrollAsPOM](SetBy.User)
+case class UnrollAsMOP(should: Boolean) extends Data[UnrollAsMOP](SetBy.User)

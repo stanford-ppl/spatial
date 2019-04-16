@@ -71,38 +71,42 @@ trait AccessExpansion {
     val iMap = is.zipWithIndex.toMap
     val matrix = getAccessCompactMatrix(access, addr, pattern)
 
-    multiLoop(ps).map{uid =>
-      val mat = matrix.map{vec =>
+    multiLoop(ps).map{uid: Seq[Int] =>
+      val mat = matrix.map{vec: SparseVector[Idx] =>
         val xsOrig: Seq[Idx] = vec.cols.keys.toSeq
         dbgs(s"    xs: ${xsOrig.mkString(", ")}")
-        val components: Seq[(Int,Idx,Int,Option[Idx])] = xsOrig.map{x =>
+        val components: Seq[(Int,Idx,Int,Seq[Idx])] = xsOrig.map{x =>
           val idx = iMap.getOrElse(x,-1)
           if (idx >= 0) {
             dbgs(s"  Iterator: $x")
-            val i = Some(is(idx))
+            val i = Seq(is(idx))
             val a = vec(x)*ps(idx)
             val b = vec(x)*uid(idx)
             (a,x,b,i)
           }
           else {
-            val i = vec.lastIters(x)
-            val xid = uid.dropRight(is.length - i.map(is.indexOf).getOrElse(-1) - 1)
+            // Determine all iterators used in access pattern
+            val requiredIters: Seq[Idx] = vec.allIters(x)
+            // Drop any iterator who is NOT used in indexing
+            // NOTE: Non-lockstepness for "random" syms will be handled during memory unrolling
+            val uidWithIters = is.zip(uid)
+            val xid = uidWithIters.collect{case iu if (requiredIters.contains(iu._1)) => iu._2 }
             val a = vec(x)
             val b = 0
             val x2 = unrolled(x, xid)
             dbgs(s"  Other: $x")
             dbgs(s"    Iterators: ${is.mkString(",")}")
-            dbgs(s"    Last variant iterator: $i")
+            dbgs(s"    All used iterators: $requiredIters")
             dbgs(s"    Full UID: {${uid.mkString(",")}}")
             dbgs(s"    Unrolling $x {${xid.mkString(",")}} -> $x2")
-            (a,x2,b,i)
+            (a,x2,b,requiredIters)
           }
         }
         val as  = components.map(_._1)
         val xs  = components.map(_._2)
         val c   = components.map(_._3).sum + vec.c
-        val lI = components.collectAsMap{case (_,x,_,i) if !i.contains(x) => (x, i): (Idx,Option[Idx]) }  // Scala really doesn't like Option with wildcards
-        SparseVector[Idx](xs.zip(as).toMap, c, lI)
+        val uI = components.collectAsMap{case (_,x,_,i) if !i.contains(x) => (x, i): (Idx, Seq[Idx]) }
+        SparseVector[Idx](xs.zip(as).toMap, c, uI)
       }
       val amat = AccessMatrix(access, mat, uid ++ vecID)
       amat.keys.foreach{x => getOrAddDomain(x) }

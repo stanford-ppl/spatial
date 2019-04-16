@@ -48,7 +48,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --insanity --instrument --runtime --fpga VCS",
+    args = "--synth --insanity --instrument --runtime --fpga VCS --pom",
     make = "make",
     run  = "bash scripts/regression_run.sh vcs",
     model  = "bash scripts/model_run.sh vcs",

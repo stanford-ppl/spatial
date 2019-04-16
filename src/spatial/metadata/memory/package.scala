@@ -42,6 +42,9 @@ package object memory {
     def isNoHierarchicalBank: Boolean = metadata[NoHierarchicalBank](s).exists(_.flag)
     def isNoHierarchicalBank_=(flag: Boolean): Unit = metadata.add(s, NoHierarchicalBank(flag))
 
+    def noBlockCyclic: Boolean = metadata[NoBlockCyclic](s).exists(_.flag)
+    def noBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, NoBlockCyclic(flag))
+
     def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
     def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
 
@@ -68,6 +71,10 @@ package object memory {
     def getPadding: Option[Seq[Int]] = metadata[Padding](s).map(_.dims)
     def padding: Seq[Int] = getPadding.getOrElse{throw new Exception(s"No padding defined for $s")}
     def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
+
+    def getDarkVolume: Option[Int] = metadata[DarkVolume](s).map(_.b)
+    def darkVolume: Int = getDarkVolume.getOrElse{throw new Exception(s"No darkVolume defined for $s")}
+    def darkVolume_=(b: Int): Unit = metadata.add(s, DarkVolume(b))
 
     /** Stride info for LineBuffer */
     @stateful def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}

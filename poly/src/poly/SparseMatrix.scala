@@ -7,13 +7,13 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def replaceKeys(keySwap: Map[K,K]): SparseMatrix[K] = {
     val rows2 = rows.map{r => 
       val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,k) -> v)}
-      SparseVector[K](cols2, r.c, r.lastIters)
+      SparseVector[K](cols2, r.c, r.allIters)
     }
     SparseMatrix[K](rows2)
   }
 
   def prependBlankRow: SparseMatrix[K] = {
-    val rows2 = Seq(SparseVector[K](Map[K,Int](), 0, Map[K,Option[K]]())) ++ rows
+    val rows2 = Seq(SparseVector[K](Map[K,Int](), 0, Map[K,Seq[K]]())) ++ rows
     SparseMatrix[K](rows2)
   }
 
@@ -30,15 +30,15 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def increment(key: K, value: Int): SparseMatrix[K] = {
     val rows2 = this.rows.map{r => 
       // val cols2 = r.cols.map{case (k,v) => k -> (if (k == key) {v + v*value} else v) }
-      // SparseVector[K](cols2, r.c, r.lastIters)
+      // SparseVector[K](cols2, r.c, r.allIters)
       val stepsize = r.cols.collect{case (k,v) if (k == key) => v}.headOption.getOrElse(0)
-      SparseVector[K](r.cols, r.c + value * stepsize, r.lastIters)
+      SparseVector[K](r.cols, r.c + value * stepsize, r.allIters)
     }
     SparseMatrix[K](rows2)
   }
   def incrementConst(value: Int): SparseMatrix[K] = {
     val rows2 = this.rows.map{r => 
-      SparseVector[K](r.cols, r.c + value, r.lastIters)
+      SparseVector[K](r.cols, r.c + value, r.allIters)
     }
     SparseMatrix[K](rows2)
   }
@@ -58,7 +58,7 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
         val a = row.cols.values.filter(_ != 0)
         val p = a.map{x => row.mod/gcd(row.mod,x)}
         val possible = if (p.toSeq.contains(row.mod)) Seq.tabulate(row.mod){i => i} else allLoops(p.toSeq,a.toSeq,Nil).map(_%row.mod).sorted.distinct
-        if (possible.isEmpty) List(SparseVector[K](row.cols,row.c,row.lastIters))
+        if (possible.isEmpty) List(SparseVector[K](row.cols,row.c,row.allIters))
         else possible.map{i => row.empty(i) }.toList
       }
       else {

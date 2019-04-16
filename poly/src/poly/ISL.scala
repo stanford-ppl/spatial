@@ -46,42 +46,64 @@ trait ISL {
       }
 
       // step 3: check if emptiness exists && is correct version
+      val source_string = {
+        try { scala.io.Source.fromInputStream(
+          getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
+        } catch {
+          case _: Throwable => throw new Exception("Could not get emptiness.c source code")
+        }
+      }
       val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
-      println(s"Emptiness: $emptiness_exists, $emptiness_bin")
-      // TODO: Check if emptiness -version is correct!
-
+      val needsCompile = try {
+        if (emptiness_exists) {
+          import sys.process._
+          val binVersion = "emptiness -version" !!
+          val verFromBin = raw"Version: (\d)\.(\d)".r
+          val verFromBin(binDec,binFrac) = binVersion.split("\n").filter(_.contains("Version:")).head
+          val curVersion = source_string
+          val verFromCode = raw".*float version[ ]+=[ ]+(\d)\.(\d).*".r
+          val verFromCode(curDec,curFrac) = source_string.split("\n").filter(_.contains("float version =")).head
+          println(s"emptiness (${emptiness_path}): Installed Version = $binDec.$binFrac, Required Version = $curDec.$curFrac")
+          binDec != curDec || binFrac != curFrac
+        } else {true}
+      } catch {
+        case _: Throwable => println("Unsure if emptiness needs to be recompiled... Recompiling to be safe"); true 
+      }
+      
       // step 4: if emptiness does not exist, compile it.
-      if (!emptiness_exists) {
-        val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
-        val pkg_config = pkg_config_proc.blockOnLine()
+      try {
+        if (needsCompile) {
+          val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
+          val pkg_config = pkg_config_proc.blockOnLine()
 
-        println(s"Pkg Config: $pkg_config")
+          println(s"Pkg Config: $pkg_config")
 
-        val split_config = pkg_config.split("\\s") map {
-          _.trim
-        } filter {
-          _.nonEmpty
+          val split_config = pkg_config.split("\\s") map {
+            _.trim
+          } filter {
+            _.nonEmpty
+          }
+
+          val compile_proc = BackgroundProcess("",
+            List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin", "-") ++ split_config)
+          println(source_string)
+          compile_proc send source_string
+          val retcode = compile_proc.waitFor()
+          println(s"Compile Retcode: $retcode")
+          compile_proc.checkErrors()
+
+          println("Finished Compiling")
         }
 
-        val compile_proc = BackgroundProcess("",
-          List(s"${sys.env.getOrElse("CC", "gcc")}", s"-xc", "-o", s"$emptiness_bin", "-") ++ split_config)
-        val source_string = scala.io.Source.fromInputStream(
-          getClass.getClassLoader.getResourceAsStream("emptiness.c")).mkString
-        println(source_string)
-        compile_proc send source_string
-        val retcode = compile_proc.waitFor()
-        println(s"Compile Retcode: $retcode")
-        compile_proc.checkErrors()
+        // step 4: Now that emptiness is guaranteed to exist, release lock
+        lock.release()
 
-        println("Finished Compiling")
+
+        // close FileChannel
+        channel.close()
+      } catch {
+        case _: Throwable => throw new Exception("Error compiling emptiness")
       }
-
-      // step 4: Now that emptiness is guaranteed to exist, release lock
-      lock.release()
-
-
-      // close FileChannel
-      channel.close()
     }
 
     BackgroundProcess("", emptiness_bin)

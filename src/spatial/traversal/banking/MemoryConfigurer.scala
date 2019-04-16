@@ -476,7 +476,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
               val isBuffAccum = writes.cross(Set(instRdGroups.flatten.toSeq(i))).exists{case (wr,rd) => rd.parent == wr.parent }
               val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
               val accTyp = mem.accumType | accum
-              Instance(Set(Set(instRdGroups.flatten.toSeq(i))),reachingWrGroups,ctrls,metapipe,wrBanking,depth,wrBankCost,ports,padding,accTyp)
+              Instance(Set(Set(instRdGroups.flatten.toSeq(i))),reachingWrGroups,ctrls,metapipe,wrBanking,depth,wrBankCost,ports,padding,wrBanking.head.darkVolume,accTyp)
             }
           } else if (!mem.isLineBuffer) {
             val padding = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
@@ -486,9 +486,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
             val accTyp = mem.accumType | accum
 
-            Seq(Instance(instRdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,accTyp))
+            Seq(Instance(instRdGroups,reachingWrGroups,ctrls,metapipe,banking,depth,bankCost,ports,padding,banking.head.darkVolume,accTyp))
           } else {
-            val pseudoBanking = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride)) ++ banking
+            val pseudoBanking = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0)) ++ banking
             val padding = mem.stagedDims.map(_.toInt).zip(pseudoBanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
             // TODO[5]: Assumption: All memories are at least simple dual port
             val ports = computePorts(instRdGroups,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
@@ -496,7 +496,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
             val accTyp = mem.accumType | accum
 
-            Seq(Instance(instRdGroups,reachingWrGroups,ctrls,metapipe,pseudoBanking,depth,bankCost,ports,padding,accTyp))
+            Seq(Instance(instRdGroups,reachingWrGroups,ctrls,metapipe,pseudoBanking,depth,bankCost,ports,padding,pseudoBanking.head.darkVolume,accTyp))
           }
         }.flatten.toSeq)
       }

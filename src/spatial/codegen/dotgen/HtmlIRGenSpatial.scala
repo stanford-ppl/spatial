@@ -71,7 +71,7 @@ case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
     case spatial.metadata.memory.Duplicates(d) =>
       text(src"${elem("strong",data.getClass.getSimpleName)}")
       emitElem("ul", "style"->"list-style-type:disc") {
-        d.foreach { case spatial.metadata.memory.Memory(banking, depth, padding, accType) =>
+        d.foreach { case spatial.metadata.memory.Memory(banking, depth, padding, darkVolume, accType) =>
           emitElem("li"){
             text(src"${elem("strong","banking")}")
             emitElem("ul", "style"->"list-style-type:none") {
@@ -81,6 +81,7 @@ case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
             }
             text(src"${elem("strong","depth")}: $depth")
             text(src"${elem("strong","padding")}: $padding")
+            text(src"${elem("strong","darkVolume")}: $darkVolume")
             text(src"${elem("strong","accType")}: $accType")
           }
         }

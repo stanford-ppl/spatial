@@ -2,6 +2,7 @@
 
 import re
 import gspread
+import getpass
 import pygsheets
 import sys
 import os
@@ -26,6 +27,14 @@ def readAllVals(wksh):
 	except:
 		print("WARN: pygsheets failed readAllVals... -_-")
 		exit()
+
+def stampDestructiveCmd(sh,cmd):
+	worksheet = sh.worksheet_by_title('STATUS')
+	stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+	write(worksheet,24,2,"Last Destructive Command:")
+	write(worksheet,24,3,"User = " + getpass.getuser() + " (Machine " + os.uname()[1] + ")")
+	write(worksheet,25,3,"Time = " + stamp)	
+	write(worksheet,26,3,cmd)
 
 def getColOrAppend(wksh, appname):
 	try: 
@@ -250,7 +259,6 @@ def report_regression_results(branch, appname, passed, cycles, hash, apphash, sp
 			write(worksheet, len(lol),col, prop)
 
 	# Page 3 - STATUS
-	worksheet = sh.worksheet_by_title('STATUS')
 	worksheet = sh.worksheet_by_title('STATUS')
 	write(worksheet,22,3,stamp)
 	write(worksheet,22,4,appname)
@@ -557,6 +565,7 @@ def combine_and_strip_prefixes(backend):
 					purename = re.sub(r".*\.","",t)
 					merge_apps_columns(purename, t, backend, True)
 					print("Replace %s with %s" % (t, purename))
+	stampDestructiveCmd(sh,"combine_and_strip_prefixes %s" % (backend))
 
 
 def report_slowdowns(prop, backend, newbranch, oldbranch):
@@ -628,6 +637,8 @@ def delete_n_rows(n, ofs, backend):
 			for i in range(0,int(n)):
 				deleteRows(worksheet, 3 + int(ofs))
 
+	stampDestructiveCmd(sh,"delete_n_rows %s %s %s" % (n,ofs,backend))
+
 def delete_app_column(appname, backend):
 	sh = getDoc(backend)
 	perf = isPerf(backend)
@@ -646,6 +657,8 @@ def delete_app_column(appname, backend):
 						deleteCols(worksheet, col)
 				else:
 					print("ERROR: App %s not found on sheet %s" % (appname, worksheet.title))
+
+	stampDestructiveCmd(sh,"delete_app_column %s %s" % (appname, backend))
 
 # This will take rows from new_appname column 0 until the last row with data and paste it into old_appname column
 def merge_apps_columns(old_appname, new_appname, backend, keepOldname = False):
@@ -688,6 +701,7 @@ def merge_apps_columns(old_appname, new_appname, backend, keepOldname = False):
 				write(worksheet, 1, old_col_in_sheet[0], old_appname)
 
 			# print("delete app column")
+	stampDestructiveCmd(sh,"merge_apps_columns %s %s %s %s %s" % (old_appname, new_appname, backend, keepOldname))
 
 
 

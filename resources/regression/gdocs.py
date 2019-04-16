@@ -32,7 +32,7 @@ def stampDestructiveCmd(sh,cmd):
 	worksheet = sh.worksheet_by_title('STATUS')
 	stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 	write(worksheet,24,2,"Last Destructive Command:")
-	write(worksheet,24,3,"User = " + getpass.getuser())
+	write(worksheet,24,3,"User = " + getpass.getuser() + "(Machine " + os.uname()[1] ")")
 	write(worksheet,25,3,"Time = " + stamp)	
 	write(worksheet,26,3,cmd)
 

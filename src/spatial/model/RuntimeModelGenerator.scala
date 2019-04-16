@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.lang._
 import spatial.metadata.params._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.metadata.bounds._
 import spatial.util.modeling._
 
@@ -178,8 +179,11 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
           open(s"override def main(args: Array[String]): Unit = {")
             val center = TileSizes.all.map{t => (t.name.get -> t.intValueOrLowest.toString) } ++ ParParams.all.map{p => (p.name.get -> p.intValueOrLowest.toString)} ++ PipelineParams.all.map{m => (m.toString -> {if (m.schedValue == Pipelined) "true" else "false"})}
             val center_string = center.map{case (p,v) => s""" "$p" -> "$v" """}.mkString("Map(", ",", ")")
-            emit(s"""println(s"Center: ${center}") """)
-            emit(s"""Sensitivity.around("${gen_dir}/${config.name}_data.csv", ${center_string})""")
+            emit(s"""val center: Map[String,String] = ${center_string}""")
+            emit(s"""println(s"Center: $$center") """)
+            emit("""println(s"Hashcode mapping:")""")
+            (TileSizes.all ++ ParParams.all ++ PipelineParams.all).foreach{x => emit(s"""println(s"${x.name.getOrElse(x.toString)} = ${x.hashCode}")""")}
+            emit(s"""Sensitivity.around("${gen_dir}/${config.name}_data.csv", center)""")
           close("}")
         close("}")
       }
@@ -201,6 +205,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case Expect(s) if (isTuneable(start)) => src"""Tuneable("${start.name.get}", $s, "${start}") """
                  case Expect(s) => src"$s"
                  case Param(s) => undefinedSyms += start; src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
+                 case Op(RegRead(x)) if x.isArgIn => src"""Ask(${x.hashCode}, "ArgIn $x (ctr start)", $ctx)"""
                  case _ => src"""Ask(${start.hashCode}, "ctr start", $ctx)"""
                 }
     val question = 
@@ -214,6 +219,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case Expect(s) if (isTuneable(stop)) => src"""Tuneable("${stop.name.get}", $s, "${stop}") """
                  case Expect(s) => src"$s"
                  case Param(s) => undefinedSyms += stop; src"""Ask(${stop.hashCode}, "$question", $ctx)"""
+                 case Op(RegRead(x)) if x.isArgIn => src"""Ask(${x.hashCode}, "ArgIn $x ($question)", $ctx)"""
                  case _ => src"""Ask(${stop.hashCode}, "$question", $ctx)"""
                 }
     val ste = step match {
@@ -223,6 +229,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case Expect(s) if (isTuneable(step)) => src"""Tuneable("${step.name.get}", $s, "${step}") """
                  case Expect(s) => src"$s"
                  case Param(s) => undefinedSyms += step; src"""Ask(${stop.hashCode}, "ctr step", $ctx)"""
+                 case Op(RegRead(x)) if x.isArgIn => src"""Ask(${x.hashCode}, "ArgIn $x (ctr step)", $ctx)"""
                  case _ => src"""Ask(${step.hashCode}, "ctr step", $ctx)"""
                 }
     val p = par match {

@@ -16,6 +16,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelT
   var cycleScope: List[Double] = Nil
   var intervalScope: List[Double] = Nil
   var totalCycles: Seq[Long] = Seq()
+  val batchSize = 1000
 
   def getListOfFiles(d: String):List[String] = {
     import java.nio.file.{FileSystems, Files}
@@ -36,7 +37,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelT
 
     val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
     val modelJar = getListOfFiles(gen_dir + "/model").filter(_.contains("RuntimeModel-assembly")).head
-    totalCycles = rewriteParams.grouped(200).flatMap{params => 
+    totalCycles = rewriteParams.grouped(batchSize).flatMap{params => 
       val batchedParams = params.map{rp => "tune " + rp.mkString(" ")}.mkString(" ")
       val cmd = s"""java -jar ${modelJar} ni ${batchedParams}"""
       // println(s"running cmd: $cmd")

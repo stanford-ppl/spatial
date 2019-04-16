@@ -109,12 +109,14 @@ object Runtime {
   }
 
   /** Value that must be set by user at command line, or dseModelArgs/finalModelArgs in noninteractive mode */
-  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends ModelValue[Int,Int](id, whatAmI, ctx) {
+  case class Branch(id: Int, whatAmI: String, ctx: Ctx) extends AskBase(id, whatAmI, ctx, 50)
+  case class Ask(id: Int, whatAmI: String, ctx: Ctx) extends AskBase(id, whatAmI, ctx, 1)
+  abstract class AskBase(id: Int, whatAmI: String, ctx: Ctx, val base: Int = 1) extends ModelValue[Int,Int](id, whatAmI, ctx) {
     def lookup: Int = {
       if (cachedAsk.contains(id)) askMap(id)
       else if (!interactive && !cachedAsk.contains(id)) {
-        val t = if (cliParams.size < currentAsk) {println(s"asking for param $currentAsk: ${cliParams(currentAsk)}"); cliParams(currentAsk)}
-                else {println(s"[WARNING] Param $currentAsk not provided! Using value ${askMap.getOrElse(id, 1)}"); askMap.getOrElse(id, 1)}
+        val t = if (currentAsk < cliParams.size) {println(s"asking for param $currentAsk: ${cliParams(currentAsk)}"); cliParams(currentAsk)}
+                else {println(s"[WARNING] Param $currentAsk not provided! Using value ${askMap.getOrElse(id, base)}"); askMap.getOrElse(id, base)}
         currentAsk = currentAsk + 1
         askMap += (id -> t)
         cachedAsk += id
@@ -124,7 +126,7 @@ object Runtime {
         askMap(id)
       }
       else {
-        val default = askMap.getOrElse(id, 1)
+        val default = askMap.getOrElse(id, base)
         print(s"Value for $whatAmI (${ctx.toString}) [default: $default] : ")
         val t = scala.io.StdIn.readLine().trim()
         val x = if (t != "") t.toInt else default
@@ -208,10 +210,6 @@ object Runtime {
     val dpMask = 1 // cycles that datapath is enabled but masked by done signal
     val startup = 2
     val shutdown = 1
-    val baselineDRAMLoadDelay = 170 // Cycles between single dram cmd and its response, with no competitors
-    val baselineDRAMStoreDelay = 150 // Cycles between single dram cmd and its response, with no competitors
-    val storeFudge = 50 // Penalty for dram store when children are run sequentially
-    val congestionPenalty = 5 // Interference due to conflicting DRAM accesses
 
     // Schedule helpers to handle tuneable nodes
     def isSeq = schedule match {
@@ -243,25 +241,38 @@ object Runtime {
       }
     }
 
+    private def burstAlign(numel: Int, bitsPerCycle: Int): Int = {
+      val burstSize = 512 // bits
+      val bitsPerCommand = numel * bitsPerCycle
+      val x = if (bitsPerCommand % burstSize == 0) numel
+              else ((burstSize - (bitsPerCommand % burstSize)) / bitsPerCycle).toInt + numel
+      x
+    }
     def congestionModel(competitors: Competitors): Int = {
-      val numel = cchain.last.N
-      val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
-                                                             stores = competitors.stores,
-                                                             gateds = competitors.gateds,
-                                                             outerIters = upperCChainIters,
-                                                             innerIters = numel,
-                                                             bitsPerCycle = this.bitsPerCycle), this.resolvedSchedule)
-      // Console.println(s"congestion of ${competitors.loads}, ${competitors.stores}, ${competitors.gateds}, ${upperCChainIters}, ${numel}, ${this.bitsPerCycle} = $res")
-      // CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = 4.8007, stores = 9, gateds = 2, outerIters = 2, innerIters = 224), this.schedule)
+      val numel = burstAlign(cchain.last.N, this.bitsPerCycle.toInt)
+      // // Lattice regression
+      // val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
+      //                                                        stores = competitors.stores,
+      //                                                        gateds = competitors.gateds,
+      //                                                        outerIters = upperCChainIters,
+      //                                                        innerIters = numel,
+      //                                                        bitsPerCycle = this.bitsPerCycle), this.resolvedSchedule)
+      // res
 
-      // // Linear for the first 4 competitors
-      // val linear1 = if (competitors < 2) competitors * congestionPenalty else 4 * congestionPenalty
-      // // Exponential for the next 8 competitors
-      // val exp = if (competitors < 2) 0 else if (competitors < 12) scala.math.pow(2.3, competitors - 2).toInt else scala.math.pow(2.3, 8).toInt
-      // // Linear for the rest
-      // val linear2 = if (competitors < 12) 0 else (competitors - 12) * congestionPenalty
-      // linear1 + exp + linear2
-      res
+      // curve_fit
+      def params(x: Seq[Double]): (Double, Double, Double, Double, Double, Double) = (x(0), x(1), x(2), x(3), x(4), x(5))
+
+      def fitFunc4(x: Seq[Double], congestion: Double, stallPenalty: Double, idle: Double, startup: Double, parFactor: Double, a: Double, b: Double, c: Double, d: Double, e: Double, f: Double, g: Double, h: Double, i: Double, j: Double): Double = {
+        val (loads, stores, gateds, outerIters, innerIters, bitsPerCycle) = params(x)
+        val countersContribution = outerIters * (innerIters + idle)
+        val congestionContribution = (loads*a + stores*b + gateds*c)*congestion
+        val parallelizationScale = bitsPerCycle * parFactor
+        (countersContribution * stallPenalty * (congestionContribution + countersContribution / bitsPerCycle * j) + startup) * parallelizationScale
+      }
+      val p = ModelData.curve_fit(this.resolvedSchedule.toString).map(_.toDouble)
+      val r = 170 max fitFunc4(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
+      Console.println(s"infer on ${Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble)} = $r")
+      r
     }
 
     // Result fields
@@ -309,11 +320,11 @@ object Runtime {
           if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
           else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
         case Fork            => 
-          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Ask(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
+          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Branch(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad            => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N) + baselineDRAMLoadDelay
-        case DenseStore           => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync) + baselineDRAMStoreDelay
-        case GatedDenseStore      => congestionModel(competitors()) // upperCChainIters * (congestionModel(competitors()) * congestionPenalty + cchain.last.N + startup + shutdown + metaSync + baselineDRAMStoreDelay + storeFudge)
+        case DenseLoad            => congestionModel(competitors())
+        case DenseStore           => congestionModel(competitors())
+        case GatedDenseStore      => congestionModel(competitors())
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }
@@ -376,9 +387,9 @@ object Runtime {
       if (entry) emit(s"Controller Structure:")
       if (entry) emit("============================================")
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
-      val competitors = if (this.schedule == DenseLoad) s" (${this.competitors()})"
-                        else if (this.schedule == DenseStore) s" (${this.competitors()})"
-                        else if (this.schedule == GatedDenseStore) s" (${this.competitors()})"
+      val competitors = if (this.schedule == Left(DenseLoad)) s" (${this.competitors()})"
+                        else if (this.schedule == Left(DenseStore)) s" (${this.competitors()})"
+                        else if (this.schedule == Left(GatedDenseStore)) s" (${this.competitors()})"
                         else ""
       // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
       emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)

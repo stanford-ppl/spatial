@@ -76,3 +76,26 @@ import spatial.dsl._
     assert(cksum1)
   }
 }
+
+@spatial class Cyclic1D extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+    val RESULT1 = ArgOut[Int]
+    val RESULT2 = ArgOut[Int]
+
+    Accel {
+      val x = SRAM[Int](128)               // N = 9, B = 4, alpha = 3
+      Foreach(128 by 1){i => x(i) = i}
+      RESULT1 := Reduce(Reg[Int])(128 by 4 par 3){i => x(i+1) + x(i+2) + x(i+3)}{_+_}
+      val y = SRAM[Int](128).noduplicate.noblockcyclic // N = 16, B = 1, alpha = 1
+      Foreach(128 by 1){i => y(i) = i}
+      RESULT2 := Reduce(Reg[Int])(128 by 4 par 3){i => y(i+1) + y(i+2) + y(i+3)}{_+_}
+    }
+
+    val gold = (0 to 127 by 4).map{i => i+1 + i+2 + i+3}.reduce{_+_}
+    val result1 = getArg(RESULT1)
+    val result2 = getArg(RESULT2)
+    println(r"got $result1 and $result2, wanted $gold for both")
+    assert(result1 == gold && result2 == gold)
+  }
+}

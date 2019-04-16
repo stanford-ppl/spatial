@@ -6,6 +6,8 @@ set -e # die if anything fails
 
 export FRINGE_PACKAGE=''
 export EMUL_PACKAGE=''
+export MODELS_PACKAGE=''
+export UTILS_PACKAGE=''
 
 if [[ $1 = "remoteSnapshot" ]]; then 
 	changes=`git ls-files -m | wc -l`

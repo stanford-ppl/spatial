@@ -74,8 +74,9 @@ trait MemoryUnrolling extends UnrollingBase {
       mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
       mem2.padding = inst.padding
+      mem2.darkVolume = inst.darkVolume
       dbgs(s"  ${stm(mem2)}")
-      strMeta(mem2)
+      //strMeta(mem2)
       (mem2,d)
     }
   }
@@ -163,7 +164,7 @@ trait MemoryUnrolling extends UnrollingBase {
       val data = rhs.dataOpt // Note that this is the OLD data symbol, if any
       val mems = getInstances(lhs, mem, isLoad = data.isEmpty, None)
 
-      dbgs(s"Unrolling ${stm(lhs)}"); strMeta(lhs)
+      dbgs(s"Unrolling ${stm(lhs)}");// strMeta(lhs)
 
       mems.zipWithIndex.flatMap{case (UnrollInstance(mem2,dispIds,laneIds,port,_),i) =>
         dbgs(s"  Dispatch: $dispIds")
@@ -255,7 +256,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addDispatch(Nil, 0)
           s.segmentMapping = Map(0 -> segment)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
-          dbgs(s"  ${stm(s)}"); strMeta(s)
+          dbgs(s"  ${stm(s)}"); //strMeta(s)
         }
 
         banked.flatMap{

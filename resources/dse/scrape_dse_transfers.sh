@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Scrape app directories for cycle counts
+# Scrape app directories for cycle counts for load/store/gated test apps
 
 rm data/train
 for file in `find ~/sp_dse/spatial/gen/DSE/ -name "sim.log"`; do

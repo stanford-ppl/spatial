@@ -5,7 +5,7 @@ import spatial.targets._
 import utils.implicits._
 
 
-@spatial class DigitRecognition extends SpatialTest {
+@spatial class DigitRecognitionV1 extends SpatialTest {
 	override def runtimeArgs: Args = "18000 2000"
 
     type LabelType	 		= UInt8

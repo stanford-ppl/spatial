@@ -87,7 +87,29 @@ class Node:
 
 
 
-
+def scrapeFor(node): 
+	try:
+		with open(rpt, 'r') as file:
+			results = file.read().split('\n')
+		sym = mem.localname
+		for line in results:
+			if (re.compile('^\|[ ]+' + sym + '.*').match(line)):
+				results = line.replace(' ','').split('|')[3:-1]
+				results = [re.sub('\(.*\)','',x) for x in results]
+				mem.LUTs = results[0]
+				mem.LaL = results[1]
+				mem.LaM = results[2]
+				mem.SRLs = results[3]
+				mem.FFs = results[4]
+				mem.RAMB32 = results[5]
+				mem.RAMB18 = results[6]
+				mem.URAM = results[7]
+				mem.DSPs = results[8]
+				break
+		return True
+	except:
+		print("No results for " + mem.fullname)
+		return False
 
 
 target = 'zcu'
@@ -95,7 +117,7 @@ capstarget = 'ZCU'
 
 # Collect SRAM Data
 # datadir='/home/mattfel/regression/synth/' + target + '/current-spatial/spatial/gen/' + capstarget
-datadir='/home/mattfel/sp_area/spatial/out0'
+datadir='/home/mattfel/sp_area/spatial/'
 ctrltree='controller_tree.html'
 allctrltrees=[]
 for root, dirs, files in os.walk(datadir):
@@ -124,19 +146,42 @@ for app in allctrltrees:
 			sym = re.search('x[0-9]+', line).group(0)
 			current = Node(sym + "_" + appname, sym, "SRAMNew")
 			current.nbufs = '1' # default of 1
+		elif line.find('LineBuffer') >= 0:
+			sym = re.search('x[0-9]+', line).group(0)
+			current = Node(sym + "_" + appname, sym, "LineBufferNew")
+			current.nbufs = '1' # default of 1
+		elif line.find('FIFO') >= 0:
+			sym = re.search('x[0-9]+', line).group(0)
+			current = Node(sym + "_" + appname, sym, "FIFONew")
+			current.nbufs = '1' # default of 1
+		elif line.find('LIFO') >= 0:
+			sym = re.search('x[0-9]+', line).group(0)
+			current = Node(sym + "_" + appname, sym, "LIFONew")
+			current.nbufs = '1' # default of 1
+		elif line.find('(FF') >= 0:
+			sym = re.search('x[0-9]+', line).group(0)
+			current = Node(sym + "_" + appname, sym, "RegNew")
+			current.nbufs = '1' # default of 1
+		elif line.find('ShiftRegFile') >= 0:
+			sym = re.search('x[0-9]+', line).group(0)
+			current = Node(sym + "_" + appname, sym, "RegFileNew")
+			current.nbufs = '1' # default of 1
 
 		if (current != None): 
+			# Get buffer info
 			if line.find('nBufs =') >= 0:
 				current.nbufs = int(re.search('nBufs = ([0-9]+)', line).group(1))
-			if line.find('>volume =') >= 0:
+			# Get bitwidth/dims info
+			if line.find('>volume =') >= 0 and current.nodetype != "RegNew":
 				dims = re.search('dims List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
 				try: current.dim0 = dims[0]; current.dim1 = dims[1]; current.dim2 = dims[2]; current.dim3 = dims[3]; current.dim4 = dims[4]
 				except: pass
+			if line.find('>volume =') >= 0:
 				bitwidth = re.search('bw = ([0-9]+)', line).group(1)
 				try: current.bitwidth = bitwidth
 				except: pass
-				print bitwidth
-			if line.find('nBanks') >= 0:
+			# Get banking info
+			if line.find('nBanks') >= 0 and current.nodetype != "RegNew":
 				Ns = re.search('nBanks = List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
 				try: current.N0 = Ns[0]; current.N1 = Ns[1]; current.N2 = Ns[2]; current.N3 = Ns[3]; current.N4 = Ns[4]
 				except: pass
@@ -149,6 +194,7 @@ for app in allctrltrees:
 				ps = re.search('p = List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
 				try: current.p0 = ps[0]; current.p1 = ps[1]; current.p2 = ps[2]; current.p3 = ps[3]; current.p4 = ps[4]
 				except: pass
+			# Get histogram info
 			if line.find('muxwidth') >= 0:
 				hist = re.findall('>([0-9]+)<', line)
 				if len(hist) > 9:
@@ -166,26 +212,8 @@ for app in allctrltrees:
 	# Collect resource utilization for each sram
 	for i in reversed(range(0,len(app_sram_dict))):
 		mem = app_sram_dict[i]
-		try:
-			with open(rpt, 'r') as file:
-				results = file.read().split('\n')
-			sym = mem.localname
-			for line in results:
-				if (re.compile('^\|[ ]+' + sym + '.*').match(line)):
-					results = line.replace(' ','').split('|')[3:-1]
-					results = [re.sub('\(.*\)','',x) for x in results]
-					mem.LUTs = results[0]
-					mem.LaL = results[1]
-					mem.LaM = results[2]
-					mem.SRLs = results[3]
-					mem.FFs = results[4]
-					mem.RAMB32 = results[5]
-					mem.RAMB18 = results[6]
-					mem.URAM = results[7]
-					mem.DSPs = results[8]
-		except:
-			print("No results for " + mem.fullname)
-			del app_sram_dict[i]
+		success = scrapeFor(mem)
+		if (not success): del app_sram_dict[i]
 
 	# Add srams to master list
 	node_dict = node_dict + app_sram_dict

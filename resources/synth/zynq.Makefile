@@ -11,6 +11,8 @@ endif
 all: hw sw 
 
 help:
+	@echo "------- INFO -------"
+	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make           : Zynq SW + HW build"
 	@echo "make hw        : Build Chisel for Zynq"
@@ -31,6 +33,7 @@ hw:
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zynq.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/Top.v
 	cp zynq.hw-resources/build/* ${ZYNQ_V_DIR}
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
 	mv ${ZYNQ_V_DIR}/fsbl.elf._ ${ZYNQ_V_DIR}/fsbl.elf
 	mv ${ZYNQ_V_DIR}/u-boot.elf._ ${ZYNQ_V_DIR}/u-boot.elf
 	make -C ${ZYNQ_V_DIR}

@@ -41,7 +41,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
   }
 
   def groupsAreConcurrent(grps: Set[Set[AccessMatrix]]): Boolean = grps.cross(grps).exists{case (g1,g2) =>
-    g1 != g2 && g1.cross(g2).exists{case (a,b) => requireConcurrentPortAccess(a,b) }
+    g1 != g2 && g1.cross(g2).exists{case (a,b) => !mem.shouldIgnoreConflicts && requireConcurrentPortAccess(a,b) }
   }
 
   override protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Seq[Instance]] = {
@@ -68,6 +68,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
           cost     = bankingCosts,
           ports    = ports,
           padding  = mem.getPadding.getOrElse(Seq(0)),
+          darkVolume = banking.head.darkVolume,
           accType  = AccumType.None
         )))
       }

@@ -34,6 +34,7 @@ trait DotGenSpatial extends DotCodegen {
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = super.nodeAttr(lhs) ++ (lhs match {
     case lhs:SRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:RegFile[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case lhs:LUT[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs if lhs.isReg => "color" -> "chartreuse2" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:FIFO[_]      => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:StreamIn[_]  => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
@@ -42,17 +43,20 @@ trait DotGenSpatial extends DotCodegen {
     case _ => Nil
   })
 
-  override def label(lhs:Sym[_]) = lhs match {
-    case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
-    case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
-    case Def(UnrolledReduce(ens, cchain, func, iters, valids)) =>
-      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-    case Def(UnrolledForeach(ens, cchain, func, iters, valids)) =>
-      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-    case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-    case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
-    case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
-    case _ => super.label(lhs)
+  override def label(lhs:Sym[_]) = {
+    var l = lhs match {
+      case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
+      case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
+      case Def(UnrolledReduce(ens, cchain, func, iters, valids, _)) =>
+        super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+      case Def(UnrolledForeach(ens, cchain, func, iters, valids, _)) =>
+        super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+      case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+      case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
+      case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
+      case _ => super.label(lhs)
+    }
+    l
   }
 
   override def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = lhs match {
@@ -60,6 +64,8 @@ trait DotGenSpatial extends DotCodegen {
     case Def(SRAMBankedWrite(mem, data, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("data" -> data) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case Def(SRAMBankedRead(mem, bank, ofs, enss)) => 
+      super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
+    case Def(LUTBankedRead(mem, bank, ofs, enss)) => 
       super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
     case Def(StreamInBankedRead(mem, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.flatten)
@@ -84,9 +90,9 @@ trait DotGenSpatial extends DotCodegen {
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
     case Def(ParallelPipe(ens, func)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
-    case Def(UnrolledForeach(ens,cchain,func,iters,valids)) =>
+    case Def(UnrolledForeach(ens,cchain,func,iters,valids, _)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
-    case Def(UnrolledReduce(ens,cchain,func,iters,valids)) =>
+    case Def(UnrolledReduce(ens,cchain,func,iters,valids, _)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
     case Def(Switch(selects, body)) =>
       super.inputGroups(lhs) + ("selects" -> selects.toSeq)

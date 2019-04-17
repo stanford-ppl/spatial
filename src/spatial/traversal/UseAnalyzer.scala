@@ -1,6 +1,7 @@
 package spatial.traversal
 
 import argon._
+import spatial.node._
 import spatial.metadata.PendingUses
 import spatial.metadata.access._
 import spatial.metadata.control._
@@ -21,14 +22,14 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
 
     LocalMemories.all.foreach{mem =>
-      if (mem.isReg && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead))) {
+      if (mem.isReg && ((mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker)) {
         mem.isUnusedMemory = true
         if (mem.name.isDefined) {
           warn(mem.ctx, s"${mem.name.get} is defined here but never read. Unused writes will be dropped.")
           warn(mem.ctx)
         }
       }
-      else if (mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) {
+      else if ((mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker) {
         if (mem.name.isDefined) {
           warn(mem.ctx, s"${mem.name.get} is defined here but never read.")
           warn(mem.ctx)
@@ -49,7 +50,17 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       super.visit(lhs, rhs)
     }
 
-    if (lhs.isControl) inCtrl(lhs){ inspect() } else inspect()
+    if (lhs.isControl) {
+      lhs match {
+        case Op(OpForeach(_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
+        case Op(OpReduce(_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
+        case Op(OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true 
+        case Op(UnrolledForeach(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
+        case Op(UnrolledReduce(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
+        case _ => 
+      }
+      inCtrl(lhs){ inspect() } 
+    } else inspect()
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
@@ -97,27 +108,27 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
   }
 
-  /** Mark the given stateless symbols as being consumed by a user (sync).
-    * @param user Consumer symbol
+  /** Mark the given transient symbols as being consumed by a user.
+    * @param consumer Consumer symbol
     * @param used Consumed symbol(s)
     * @param block The control block this use occurs in
     */
-  private def addUse(user: Sym[_], used: Set[Sym[_]], block: Blk): Unit = {
+  private def addUse(consumer: Sym[_], used: Set[Sym[_]], block: Blk): Unit = {
     dbgs(s"  Uses [Block: $block]:")
-    dbgs(s"    user $user")
+    dbgs(s"    consumer $consumer")
     dbgs(s"    used $used")
     dbgs(s"    ")
     used.foreach{s => dbgs(s"  - ${stm(s)}")}
 
     // Bound symbols should always be the result of a block if they are defined elsewhere
     (used diff boundSyms).foreach{use =>
-      use.users += User(user, blkOfUser(user, block))
-      dbgs(s"  Adding direct ($user ${blkOfUser(user, block)}) to uses for $use")
+      use.users += User(consumer, blkOfUser(consumer, block))
+      dbgs(s"  Adding direct ($consumer ${blkOfUser(consumer, block)}) to uses for $use")
 
       // Also add stateless nodes that this node uses
       (PendingUses(use) - use).foreach{pend =>
-        dbgs(s"  Adding pending ($use ${blkOfUser(user, block)}) to uses for $pend")
-        pend.users += User(use, blkOfUser(user, block))
+        dbgs(s"  Adding pending ($use ${blkOfUser(consumer, block)}) to uses for $pend")
+        pend.users += User(use, blkOfUser(consumer, block))
       }
     }
   }

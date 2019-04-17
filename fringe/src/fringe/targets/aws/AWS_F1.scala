@@ -14,9 +14,11 @@ class AWS_F1 extends DeviceTarget {
 
   override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
     val io = IO(new AWSInterface)
+    io <> DontCare
 
     val blockingDRAMIssue = false  // Allow only one in-flight request, block until response comes back
     val fringe = Module(new FringeZynq(blockingDRAMIssue, io.axiLiteParams, io.axiParams))
+    fringe.io <> DontCare
 
     // Fringe <-> DRAM connections
     //      topIO.dram <> fringe.io.dram
@@ -26,7 +28,7 @@ class AWS_F1 extends DeviceTarget {
 
     // Accel: Scalar and control connections
     accel.io.argIns := io.scalarIns
-    io.scalarOuts.zip(accel.io.argOuts).foreach{case (ioOut, accelOut) => ioOut := getFF(accelOut.bits, accelOut.valid) }
+    io.scalarOuts.zip(accel.io.argOuts).foreach{case (ioOut, accelOut) => ioOut := getFF(accelOut.port.bits, accelOut.port.valid) }
     accel.io.enable := io.enable
     io.done := accel.io.done
     accel.io.reset := fringe.io.reset

@@ -9,6 +9,7 @@ import spatial.metadata.access.AccessMatrix
 import spatial.metadata.control._
 import spatial.metadata.types._
 import spatial.util.{IntLike, spatialConfig}
+import utils.math._
 
 import utils.implicits.collections._
 
@@ -20,18 +21,21 @@ sealed abstract class Banking {
   def dims: Seq[Int]
   def alphas: Seq[Int]
   def Ps: Seq[Int]
+  def darkVolume: Int
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int]) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], dv: Int) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
+  override def darkVolume: Int = dv
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
+    dbgs(s"BANKSELECT $addr zip $alpha (_*_).sum / $B mod $N = ${(alpha.zip(addr).map{case (a,i) => a*i })}")
     (alpha.zip(addr).map{case (a,i) => a*i }.sumTree / B) % N
   }
   override def toString: String = {
@@ -40,8 +44,8 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   }
 }
 object ModBanking {
-  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1))
-  def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
+  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1), 0)
+  def Simple(banks: Int, dims: Seq[Int], stride: Int, darkVolume: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride), darkVolume)
 }
 
 
@@ -88,9 +92,10 @@ case class Instance(
   cost:     Long,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
+  darkVolume: Int,                  // Number of elements inaccessible due to B > 1
   accType:  AccumType               // Type of accumulator for instance
 ) {
-  def toMemory: Memory = Memory(banking, depth, padding, accType)
+  def toMemory: Memory = Memory(banking, depth, padding, darkVolume, accType)
 
   def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
   def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
@@ -142,7 +147,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,Seq.fill(rank)(0),AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,Seq.fill(rank)(0),0,AccumType.None)
 }
 
 
@@ -153,19 +158,21 @@ case class Memory(
   banking: Seq[Banking],  // Banking information
   depth:   Int,           // Buffer depth
   padding: Seq[Int],      // Padding on each dim
+  darkVolume: Int,        // Number of elements inaccessible due to B > 1
   accType: AccumType      // Flags whether this instance is an accumulator
 ) {
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
-  def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
+  def updateDepth(d: Int): Memory = Memory(banking, d, padding, darkVolume, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def Ps: Seq[Int] = banking.map(_.Ps).flatten
+  def Bs: Seq[Int] = banking.map(_.stride)
   def alphas: Seq[Int] = banking.map(_.alphas).flatten
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
-      val size = bank.dims.map{i => dims(i) }.product
+      val size = if (dims.nonEmpty) bank.dims.map{i => dims(i) }.product else 1
       Math.ceil(size.toDouble / bank.nBanks)    // Assumes evenly divided
     }.product.toInt
   }
@@ -185,6 +192,9 @@ case class Memory(
       val b = banking.head.stride
       val alpha = banking.head.alphas
       val P = banking.head.Ps
+      val banksInFence = allLoops(P,alpha,b,Nil)
+      val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
+      val degenerate = hist.map(_._2).max
 
       val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
@@ -194,22 +204,30 @@ case class Memory(
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
         addr(t)
-      }.sumTree % b // Appears to be modulo magic but may be wrong
-      ofschunk * b + intrablockofs
+      }.sumTree % degenerate // Appears to work, but may not if bank degenerates are not adjacent
+      ofschunk * degenerate + intrablockofs
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)
       val P = banking.map(_.Ps).flatten
+      val alpha = banking.map(_.alphas).flatten
+
       val ofschunk = (0 until D).map{t =>
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
+        val degenerate = hist.map(_._2).max
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
-        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
+        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product * degenerate
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        addr(t) 
-      }.sumTree % b.head.toInt // Appears to be modulo magic but may be wrong 
-      ofschunk * b.head.toInt + intrablockofs
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
+        val degenerate = hist.map(_._2).max
+        addr(t) % degenerate
+      }.sumTree 
+      ofschunk + intrablockofs
     }
     else {
       // TODO: Bank address for mixed dimension groups
@@ -218,7 +236,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, Seq.fill(rank)(0), AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, Seq.fill(rank)(0), 0, AccumType.None)
 }
 
 
@@ -248,6 +266,14 @@ case class Duplicates(d: Seq[Memory]) extends Data[Duplicates](Transfer.Mirror)
   * Default: undefined
   */
 case class Padding(dims: Seq[Int]) extends Data[Padding](SetBy.Analysis.Self)
+
+/** Number of physical addresses in memory that are inaccessible (due to B > 1)
+  * Option:  sym.getDarkVolume
+  * Getter:  sym.darkVolume
+  * Setter:  sym.darkVolume = (Int)
+  * Default: undefined
+  */
+case class DarkVolume(b: Int) extends Data[DarkVolume](SetBy.Analysis.Self)
 
 
 /** Map of a set of memory dispatch IDs for each unrolled instance of an access node.
@@ -303,31 +329,50 @@ case class EnableNonBuffer(flag: Boolean) extends Data[EnableNonBuffer](SetBy.Us
   * Used in cases where it could be tricky to find flattened scheme but hierarchical scheme 
   * is very simple
   *
-  * Getter:  sym.isHierarchicalBank
-  * Setter:  sym.isHierarchicalBank = (true | false)
+  * Getter:  sym.isNoHierarchicalBank
+  * Setter:  sym.isNoHierarchicalBank = (true | false)
   * Default: false
   */
-case class HierarchicalBank(flag: Boolean) extends Data[HierarchicalBank](SetBy.User)
+case class NoHierarchicalBank(flag: Boolean) extends Data[NoHierarchicalBank](SetBy.User)
+
+/** Flag set by the user to disable checking for block-cyclic banking schemes.  In general,
+  * block-cyclic schemes results in fewer banks but more memory overhead, since some physical
+  * addresses are inaccessible by the N,B,alpha equations
+  *
+  * Getter:  sym.noBlockCyclic
+  * Setter:  sym.noBlockCyclic = (true | false)
+  * Default: false
+  */
+case class NoBlockCyclic(flag: Boolean) extends Data[NoBlockCyclic](SetBy.User)
 
 /** Flag set by the user to disable hierarchical banking and only attempt flat banking,
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isFlatBank
-  * Setter:  sym.isFlatBank = (true | false)
+  * Getter:  sym.isNoBank
+  * Setter:  sym.isNoBank = (true | false)
   * Default: false
   */
 case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
+
+/** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
+  * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
+  *
+  * Getter:  sym.isNoDuplicate
+  * Setter:  sym.isNoDuplicate = (true | false)
+  * Default: false
+  */
+case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
 
 /** Flag set by the user to disable banking,
   * Used in cases where it could be tricky or impossible to find any banking scheme scheme and
   * the user does not want the compiler to waste time trying
   *
-  * Getter:  sym.isFlatBank
-  * Setter:  sym.isFlatBank = (true | false)
+  * Getter:  sym.isNoFlatBank
+  * Setter:  sym.isNoFlatBank = (true | false)
   * Default: false
   */
-case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
+case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
 
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
@@ -337,3 +382,12 @@ case class FlatBank(flag: Boolean) extends Data[FlatBank](SetBy.User)
   * Default: false
   */
 case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User)
+
+/** Flag set by the user to permit FIFOs where the enqs are technically not bankable,
+  * based on control structure analysis alone
+  *
+  * Getter:  sym.shouldIgnoreConflicts
+  * Setter:  sym.shouldIgnoreConflicts = (true | false)
+  * Default: false
+  */
+case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)

@@ -11,6 +11,18 @@ case object Streaming extends CtrlSchedule
 case object ForkJoin extends CtrlSchedule
 case object Fork extends CtrlSchedule
 
+/** Transfer type. */
+sealed abstract class TransferType
+case object DenseStore extends TransferType
+case object DenseLoad  extends TransferType
+case object SparseStore extends TransferType
+case object SparseLoad  extends TransferType
+
+/** Unroll scheme. */
+sealed abstract class UnrollStyle
+case object MetapipeOfParallels  extends UnrollStyle
+case object ParallelOfMetapipes  extends UnrollStyle
+
 /** Control node level. */
 sealed abstract class CtrlLevel
 case object Inner extends CtrlLevel { override def toString = "InnerControl" }
@@ -20,6 +32,9 @@ case object Outer extends CtrlLevel { override def toString = "OuterControl" }
 sealed abstract class CtrlLooping
 case object Single extends CtrlLooping
 case object Looped extends CtrlLooping
+
+/** IndexCounter and lane info */
+case class IndexCounterInfo[A](ctr: Counter[A], lanes: Seq[Int])
 
 /** A controller's level in the control hierarchy. Flag marks whether this is an outer controller.
   *
@@ -36,7 +51,6 @@ case class ControlLevel(level: CtrlLevel) extends Data[ControlLevel](SetBy.Flow.
   * Default: undefined
   */
 case class CounterOwner(owner: Sym[_]) extends Data[CounterOwner](SetBy.Flow.Consumer)
-
 
 /** The control schedule determined by the compiler.
   *
@@ -114,10 +128,10 @@ case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
   *
   * Option:  sym.getCounter
   * Getter:  sym.counter
-  * Setter:  sym.counter = (Counter)
+  * Setter:  sym.counter = (IndexCounterInfo)
   * Default: undefined
   */
-case class IndexCounter(ctr: Counter[_]) extends Data[IndexCounter](SetBy.Flow.Consumer)
+case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self)
 
 
 /** Latency of a given inner pipe body - used for control signal generation.
@@ -153,7 +167,7 @@ case class UserII(interval: Double) extends Data[UserII](SetBy.User)
   * Setter: sym.writtenMems = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Self)
+case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Consumer)
 
 /** Memories which are read in a given controller.
   *
@@ -161,4 +175,30 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.S
   * Setter: sym.readMems = (Set[ Sym[_] ])
   * Default: empty set
   */
-case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Self)
+case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)
+
+/** Marks top-level streaming controller as one derived from DRAM transfer during blackbox lowering.
+  * Used for runtime performance modeling post-blackbox lowering
+  *
+  * Getter: sym.loweredTransfer
+  * Setter: sym.loweredTransfer = TransferType
+  * Default: None
+  */
+case class LoweredTransfer(typ: TransferType) extends Data[LoweredTransfer](SetBy.Analysis.Self)
+
+/** Tracks the size of the last-level counter, for modeling purposes
+  *
+  * Getter: sym.loweredTransferSize
+  * Setter: sym.loweredTransferSize = (length, par)
+  * Default: None
+  */
+case class LoweredTransferSize(info: (Sym[_], Sym[_], Int)) extends Data[LoweredTransferSize](SetBy.Analysis.Self)
+
+/** Identifies whether this controller should be unrolled as MoP or PoM
+  *
+  * Getter: sym.unrollDirective
+  * Setter: sym.unrollDirective = UnrollStyle
+  * Default: None
+  */
+case class UnrollAsPOM(should: Boolean) extends Data[UnrollAsPOM](SetBy.User)
+case class UnrollAsMOP(should: Boolean) extends Data[UnrollAsMOP](SetBy.User)

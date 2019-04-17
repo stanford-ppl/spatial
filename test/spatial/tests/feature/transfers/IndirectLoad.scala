@@ -3,6 +3,8 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 @spatial class IndirectLoad extends SpatialTest { // This hangs with retime on in SPMV_CRS
+  override def dseModelArgs: Args = "32"
+  override def finalModelArgs: Args = "32"
 
   def main(args: Array[String]): Void = {
     val ids = Array.tabulate(16){i => 32*i}
@@ -20,7 +22,7 @@ import spatial.dsl._
         val start = id_sram(i)
         val end = id_sram(i+1)
         Parallel{
-          Pipe{data_sram load data_dram(start::end)}
+          data_sram load data_dram(start::end)
         }
         result_dram store data_sram
       }

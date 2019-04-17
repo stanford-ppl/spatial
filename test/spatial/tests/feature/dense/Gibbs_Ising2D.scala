@@ -31,6 +31,8 @@ x_par=4  |       --->       X                XX    |
 
 */
 @spatial class Gibbs_Ising2D extends SpatialTest {
+  override def dseModelArgs: Args = "25 -2 99"
+  override def finalModelArgs: Args = "25 0 -1 -2 -3"
   override def runtimeArgs: Args = "25 0.3 1"
 
 
@@ -96,7 +98,7 @@ x_par=4  |       --->       X                XX    |
     Accel{
       val exp_sram = SRAM[T](lut_size)
       // val grid_sram = SRAM[Int](ROWS,COLS).flat
-      val grid_sram = SRAM[Int](ROWS,COLS).hierarchical
+      val grid_sram = SRAM[Int](ROWS,COLS).noflat.noduplicate
       exp_sram load exp_lut
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
       // Issue #187

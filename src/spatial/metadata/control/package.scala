@@ -1,8 +1,9 @@
 package spatial.metadata
 
 import argon._
+import argon.lang.Ind
 import argon.node._
-import forge.tags.stateful
+import forge.tags.{stateful,rig}
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.access._
@@ -10,7 +11,7 @@ import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
-import spatial.issues.AmbiguousMetaPipes
+import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
 import scala.util.Try
 
@@ -21,11 +22,11 @@ package object control {
 
   implicit class ControlOpOps(op: Op[_]) {
     /** True if this Op is a loop which has a body which is run multiple times at runtime. */
-    def isLoop: Boolean = op match {
+    @stateful def isLoop: Boolean = op match {
       case loop: Loop[_] => !loop.cchains.forall(_._1.willFullyUnroll)
       case _ => false
     }
-    def isFullyUnrolledLoop: Boolean = op match {
+    @stateful def isFullyUnrolledLoop: Boolean = op match {
       case loop: Loop[_] => loop.cchains.forall(_._1.willFullyUnroll)
       case _ => false
     }
@@ -44,6 +45,10 @@ package object control {
       case _:Switch[_] | _:SwitchCase[_] | _:IfThenElse[_] => true
       case _ => false
     }
+    def isSwitchCase: Boolean = op match {
+      case _:SwitchCase[_] => true
+      case _ => false
+    }
 
     def isParallel: Boolean = op.isInstanceOf[ParallelPipe]
 
@@ -51,6 +56,12 @@ package object control {
 
     def isMemReduce: Boolean = op match {
       case _:OpMemReduce[_,_] => true
+      case _ => false
+    }
+
+    def isAnyReduce: Boolean = op match {
+      case _:OpMemReduce[_,_] => true
+      case _:OpReduce[_] => true
       case _ => false
     }
 
@@ -80,6 +91,26 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _ => false
     }
+
+    def isLoad: Boolean = op match {
+      case _:FringeDenseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isGather: Boolean = op match {
+      case _:FringeSparseLoad[_,_] => true
+      case _ => false
+    }
+
+    def isStore: Boolean = op match {
+      case _:FringeDenseStore[_,_] => true
+      case _ => false
+    }
+
+    def isScatter: Boolean = op match {
+      case _:FringeSparseStore[_,_] => true
+      case _ => false
+    }
   }
 
   abstract class CtrlHierarchyOps(s: Option[Sym[_]]) {
@@ -97,17 +128,24 @@ package object control {
 
     def isAccel: Boolean = op.exists(_.isAccel)
     def isSwitch: Boolean = op.exists(_.isSwitch)
+    def isSwitchCase: Boolean = op.exists(_.isSwitchCase)
     def isBranch: Boolean = op.exists(_.isBranch)
     def isParallel: Boolean = op.exists(_.isParallel)
     def isUnitPipe: Boolean = op.exists(_.isUnitPipe)
     def isFSM: Boolean = op.exists(_.isFSM)
 
     def isMemReduce: Boolean = op.exists(_.isMemReduce)
+    def isAnyReduce: Boolean = op.exists(_.isAnyReduce)
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
     def isTileTransfer: Boolean = op.exists(_.isTileTransfer)
     def isTileLoad: Boolean = op.exists(_.isTileLoad)
     def isTileStore: Boolean = op.exists(_.isTileStore)
+
+    def isLoad: Boolean = op.exists(_.isLoad)
+    def isGather: Boolean = op.exists(_.isGather)
+    def isStore: Boolean = op.exists(_.isStore)
+    def isScatter: Boolean = op.exists(_.isScatter)
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
@@ -119,14 +157,14 @@ package object control {
       case _         => Inner
     }
 
-    def innerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+    @stateful def innerBlocks: Seq[(Seq[I32],Block[_])] = op match {
       case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
         val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
         if (!stage.mayBeOuterBlock || this.isInnerControl) body.blocks else Nil
       }
       case _ => Nil
     }
-    def outerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+    @stateful def outerBlocks: Seq[(Seq[I32],Block[_])] = op match {
       case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
         val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
         if (stage.mayBeOuterBlock && this.isOuterControl) body.blocks else Nil
@@ -134,16 +172,16 @@ package object control {
       case _ => Nil
     }
 
-    def innerAndOuterBlocks: (Seq[(Seq[I32],Block[_])], Seq[(Seq[I32],Block[_])]) = {
+    @stateful def innerAndOuterBlocks: (Seq[(Seq[I32],Block[_])], Seq[(Seq[I32],Block[_])]) = {
       (innerBlocks, outerBlocks)
     }
 
     /** Returns whether this control node is a Looped control or Single iteration control.
       * Nodes which will be fully unrolled are considered Single control.
       */
-    def looping: CtrlLooping = if (op.exists(_.isLoop)) Looped else Single
+    @stateful def looping: CtrlLooping = if (op.exists(_.isLoop)) Looped else Single
 
-    def schedule: CtrlSchedule = {
+    @stateful def schedule: CtrlSchedule = {
       val ctrlLoop  = this.looping
       val ctrlLevel = this.level
       s.map(_.rawSchedule) match {
@@ -169,7 +207,7 @@ package object control {
       }
     }
 
-    def isCtrl(
+    @stateful def isCtrl(
       loop:  CtrlLooping = null,
       level: CtrlLevel = null,
       sched: CtrlSchedule = null
@@ -193,60 +231,60 @@ package object control {
     }
 
     /** True if this node will become a fully unrolled loop at unrolling time. */
-    def isFullyUnrolledLoop: Boolean = op.exists(_.isFullyUnrolledLoop)
+    @stateful def isFullyUnrolledLoop: Boolean = op.exists(_.isFullyUnrolledLoop)
 
     /** True if this is a control block which is not run iteratively. */
-    def isSingleControl: Boolean = isCtrl(loop = Single)
+    @stateful def isSingleControl: Boolean = isCtrl(loop = Single)
 
     /** True if this is a loop whose body will be executed for multiple iterations at runtime.
       * False for fully unrolled loops and UnitPipe.
       */
-    def isLoopControl: Boolean = isCtrl(loop = Looped)
+    @stateful def isLoopControl: Boolean = isCtrl(loop = Looped)
 
     /** True if this is an inner scope Ctrl stage or symbol. */
-    def isInnerControl: Boolean = isCtrl(level = Inner)
+    @stateful def isInnerControl: Boolean = isCtrl(level = Inner)
     /** True if this is an outer scope Ctrl stage or symbol. */
-    def isOuterControl: Boolean = isCtrl(level = Outer)
+    @stateful def isOuterControl: Boolean = isCtrl(level = Outer)
 
     /** True if this is a sequential controller. */
-    def isSeqControl: Boolean = isCtrl(sched = Sequenced)
+    @stateful def isSeqControl: Boolean = isCtrl(sched = Sequenced)
     /** True if this is a pipelined controller. */
-    def isPipeControl: Boolean = isCtrl(sched = Pipelined)
+    @stateful def isPipeControl: Boolean = isCtrl(sched = Pipelined)
     /** True if this is a streaming scheduled controller. */
-    def isStreamControl: Boolean = isCtrl(sched = Streaming)
+    @stateful def isStreamControl: Boolean = isCtrl(sched = Streaming)
 
     /** True if this is an inner, sequential controller. */
-    def isInnerSeqControl: Boolean = isCtrl(level = Inner, sched = Sequenced)
+    @stateful def isInnerSeqControl: Boolean = isCtrl(level = Inner, sched = Sequenced)
 
     /** True if this is an outer streaming controller.
       * (Note that all streaming controllers should be outer.)
       */
-    def isOuterStreamControl: Boolean = isCtrl(level = Outer, sched = Streaming)
+    @stateful def isOuterStreamControl: Boolean = isCtrl(level = Outer, sched = Streaming)
 
     /** True if this is an outer pipelined controller.
       * (Note that all outer pipelined controllers are loops.)
       */
-    def isOuterPipeControl: Boolean = isCtrl(level = Outer, sched = Pipelined)
+    @stateful def isOuterPipeControl: Boolean = isCtrl(level = Outer, sched = Pipelined)
 
     /** True if this is an inner controller for a loop. */
-    def isInnerLoop: Boolean = isCtrl(loop = Looped, level = Inner)
+    @stateful def isInnerLoop: Boolean = isCtrl(loop = Looped, level = Inner)
     /** True if this is an outer controller for a loop. */
-    def isOuterLoop: Boolean = isCtrl(loop = Looped, level = Outer)
+    @stateful def isOuterLoop: Boolean = isCtrl(loop = Looped, level = Outer)
 
     /** True if this is a sequential controller for a loop. */
-    def isSeqLoop: Boolean = isCtrl(loop = Looped, sched = Sequenced)
+    @stateful def isSeqLoop: Boolean = isCtrl(loop = Looped, sched = Sequenced)
 
     /** True if this is a pipelined controller for a loop. */
-    def isPipeLoop: Boolean = isCtrl(loop = Looped, sched = Pipelined)
+    @stateful def isPipeLoop: Boolean = isCtrl(loop = Looped, sched = Pipelined)
 
     /** True if this is an inner pipelined controller for a loop. */
-    def isInnerPipeLoop: Boolean = isCtrl(loop = Looped, level = Inner, sched = Pipelined)
+    @stateful def isInnerPipeLoop: Boolean = isCtrl(loop = Looped, level = Inner, sched = Pipelined)
 
     /** True if this is an outer pipelined controller for a loop. */
-    def isOuterPipeLoop: Boolean = isCtrl(loop = Looped, level = Outer, sched = Pipelined)
+    @stateful def isOuterPipeLoop: Boolean = isCtrl(loop = Looped, level = Outer, sched = Pipelined)
 
     /** True if this is an outer streaming controller for a loop. */
-    def isOuterStreamLoop: Boolean = isCtrl(loop = Looped, level = Outer, sched = Streaming)
+    @stateful def isOuterStreamLoop: Boolean = isCtrl(loop = Looped, level = Outer, sched = Streaming)
 
 
     // --- Control Looping / Conditional Execution Functions --- //
@@ -266,7 +304,7 @@ package object control {
     @stateful def willRunForever: Boolean = isForever || children.exists(_.willRunForever)
 
     /** True if this control or symbol is a loop or occurs within a loop. */
-    def willRunMultiple: Boolean = s.exists(_.isLoopControl) || hasLoopAncestor
+    @stateful def willRunMultiple: Boolean = s.exists(_.isLoopControl) || hasLoopAncestor
 
     /** True if this symbol or Ctrl block takes enables as inputs. */
     def takesEnables: Boolean = op.exists{
@@ -310,7 +348,7 @@ package object control {
 
 
     /** True if this control or symbol occurs within a loop. */
-    def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
+    @stateful def hasLoopAncestor: Boolean = ancestors.exists(_.isLoopControl)
 
     /** Returns the child of this controller that contains the given symbol x. None if x does not
       * occur in any of the children.
@@ -331,9 +369,16 @@ package object control {
       * If reference is defined, only accounts for the stages up to and including the reference.
       * This is currently trivially true for inner controllers.
       */
+    // TODO: Update to incorporate pom vs mop unrolling
     @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
       val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val ctrls = if (op.isDefined && op.get.isLoop) children else child.map{c => childrenPriorTo(c) }.getOrElse(children)
+      val wu = s.isDefined && s.get.isOuterControl && s.get.cchains.exists(_.willUnroll)
+      val ctrls = {
+        if      (s.isDefined && s.get.willUnrollAsPOM) return false
+        else if (op.isDefined && op.get.isLoop && !wu) children 
+        else if (op.isDefined && !wu) child.map{c => childrenPriorTo(c) }.getOrElse(children) 
+        else child.map{c => Seq(c) }.getOrElse(children)
+      }
       ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
       child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
     }
@@ -365,6 +410,43 @@ package object control {
       s.foreach{sym => metadata.add(sym, ReadMems(mems)) }
     }
 
+    def getLoweredTransfer: Option[TransferType] = {
+      s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ).headOption }.headOption
+    }
+    def loweredTransfer: TransferType = {
+      s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ) }.head
+    }
+    def loweredTransfer_=(typ: TransferType): Unit = {
+      s.foreach{sym => metadata.add(sym, LoweredTransfer(typ)) }
+    }
+
+    def getUnrollDirective: Option[UnrollStyle] = {
+      s.flatMap{sym => 
+        val pom: Option[Boolean] = metadata[UnrollAsPOM](sym).map(_.should).headOption 
+        val mop: Option[Boolean] = metadata[UnrollAsMOP](sym).map(_.should).headOption
+        if (pom.isDefined) Some(ParallelOfMetapipes) else if (mop.isDefined) Some(MetapipeOfParallels) else None
+      }.headOption
+    }
+    def unrollDirective: UnrollStyle = getUnrollDirective.get
+    @stateful def willUnrollAsPOM: Boolean = {getUnrollDirective == Some(ParallelOfMetapipes) || (getUnrollDirective != Some(MetapipeOfParallels) && spatialConfig.unrollParallelOfMetapipes)} && willUnroll && !isAnyReduce
+    @stateful def willUnrollAsMOP: Boolean = {getUnrollDirective == Some(MetapipeOfParallels) || (getUnrollDirective != Some(ParallelOfMetapipes) && spatialConfig.unrollMetapipeOfParallels)} && willUnroll
+    def unrollAsPOM: Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollAsPOM(true)) }
+    }
+    def unrollAsMOP: Unit = {
+      s.foreach{sym => metadata.add(sym, UnrollAsMOP(true)) }
+    }
+    @stateful def willUnroll: Boolean = cchains.exists(_.willUnroll) && isOuterControl
+
+    def getLoweredTransferSize: Option[(Sym[_], Sym[_], Int)] = {
+      s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info).headOption }.headOption
+    }
+    def loweredTransferSize: (Sym[_], Sym[_], Int) = {
+      s.flatMap{sym => metadata[LoweredTransferSize](sym).map(_.info) }.head
+    }
+    def loweredTransferSize_=(info: (Sym[_], Sym[_], Int)): Unit = {
+      s.foreach{sym => metadata.add(sym, LoweredTransferSize(info)) }
+    }
 
 
     // --- Streaming Controllers --- //
@@ -383,9 +465,9 @@ package object control {
     }
 
     /** True if this controller or symbol has a streaming controller ancestor. */
-    def hasStreamAncestor: Boolean = ancestors.exists(_.isStreamControl)
+    @stateful def hasStreamAncestor: Boolean = ancestors.exists(_.isStreamControl)
     /** True if this controller or symbol has a streaming controller parent. */
-    def hasStreamParent: Boolean = toCtrl.parent.isStreamControl
+    @stateful def hasStreamParent: Boolean = toCtrl.parent.isStreamControl
 
     /** True if this controller or symbol has an ancestor which runs forever. */
     def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
@@ -393,7 +475,7 @@ package object control {
     /** True if this is an inner controller which directly contains
       * stream enablers/holder accesses.
       */
-    def hasStreamAccess: Boolean = isInnerControl && (op match {
+    @stateful def hasStreamAccess: Boolean = isInnerControl && (op match {
       case Some(o) => o.blocks.flatMap(_.nestedStms).exists{ sym =>
         sym.isStreamStageEnabler || sym.isStreamStageHolder
       }
@@ -488,15 +570,16 @@ package object control {
     def isRawOuter: Boolean = rawLevel == Outer
     def isRawInner: Boolean = rawLevel == Inner
 
-    def getRawSchedule: Option[CtrlSchedule] = metadata[ControlSchedule](s).map(_.sched)
-    def rawSchedule: CtrlSchedule = getRawSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
-    def rawSchedule_=(sched: CtrlSchedule): Unit = metadata.add(s, ControlSchedule(sched))
+    @stateful def getRawSchedule: Option[CtrlSchedule] = if (state.scratchpad[ControlSchedule](s).isDefined) state.scratchpad[ControlSchedule](s).map(_.sched) else metadata[ControlSchedule](s).map(_.sched)
+    @stateful def rawSchedule: CtrlSchedule = getRawSchedule.getOrElse{ throw new Exception(s"Undefined schedule for $s") }
+    @stateful def rawSchedule_=(sched: CtrlSchedule): Unit = state.scratchpad.add(s, ControlSchedule(sched))
+    @stateful def finalizeRawSchedule(sched: CtrlSchedule): Unit = metadata.add(s, ControlSchedule(sched))
 
-    def isRawSeq: Boolean = rawSchedule == Sequenced
-    def isRawPipe: Boolean = rawSchedule == Pipelined
-    def isRawStream: Boolean = rawSchedule == Streaming
-    def isForkJoin: Boolean = rawSchedule == ForkJoin
-    def isFork: Boolean = rawSchedule == Fork
+    @stateful def isRawSeq: Boolean = rawSchedule == Sequenced
+    @stateful def isRawPipe: Boolean = rawSchedule == Pipelined
+    @stateful def isRawStream: Boolean = rawSchedule == Streaming
+    @stateful def isForkJoin: Boolean = rawSchedule == ForkJoin
+    @stateful def isFork: Boolean = rawSchedule == Fork
 
     def getUserSchedule: Option[CtrlSchedule] = metadata[UserScheduleDirective](s).map(_.sched)
     def userSchedule: CtrlSchedule = getUserSchedule.getOrElse{throw new Exception(s"Undefined user schedule for $s") }
@@ -613,6 +696,15 @@ package object control {
       case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
       case Ctrl.Host         => Scope.Host
     }
+
+    def stopWhen: Option[Sym[_]] = ctrl match {
+      case Ctrl.Node(Op(x:UnrolledForeach), _) => x.stopWhen
+      case Ctrl.Node(Op(x:OpForeach), _) => x.stopWhen
+      case Ctrl.Node(Op(x:UnrolledReduce), _) => x.stopWhen
+      case Ctrl.Node(Op(x:OpReduce[_]), _) => x.stopWhen
+      case Ctrl.Node(Op(x:OpMemReduce[_,_]), _) => x.stopWhen
+      case _ => None
+    }
   }
 
   implicit class BlkOps(blk: Blk) {
@@ -637,12 +729,15 @@ package object control {
       case _ => throw new Exception(s"Could not find counterchain definition for $x")
     }
 
-    def counters: Seq[Counter[_]] = x.node.counters
-    def pars: Seq[I32] = counters.map(_.ctrPar)
-    def constPars: Seq[Int] = pars.map(_.toInt)
-    def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
-    def isUnit: Boolean = counters.forall(_.isUnit)
-    def isStatic: Boolean = counters.forall(_.isStatic)
+    @stateful def counters: Seq[Counter[_]] = x.node.counters
+    @stateful def pars: Seq[I32] = counters.map(_.ctrPar)
+    @stateful def parsOr1: Seq[Int] = counters.map(_.ctrParOr1)
+    @rig def widths: Seq[Int] = counters.map(_.ctrWidth)
+    @stateful def constPars: Seq[Int] = pars.map(_.toInt)
+    @stateful def willFullyUnroll: Boolean = counters.forall(_.willFullyUnroll)
+    @stateful def willUnroll: Boolean = parsOr1.exists(_ > 1)
+    @stateful def isUnit: Boolean = counters.forall(_.isUnit)
+    @stateful def isStatic: Boolean = counters.forall(_.isStatic)
   }
 
 
@@ -652,15 +747,21 @@ package object control {
       case _ => throw new Exception(s"Could not find counter definition for $x")
     }
 
-    def start: Sym[F] = x.node.start
-    def step: Sym[F] = x.node.step
-    def end: Sym[F] = x.node.end
-    def ctrPar: I32 = x.node.par
-    def isStatic: Boolean = (start,step,end) match {
+    @stateful def start: Sym[F] = x.node.start
+    @stateful def step: Sym[F] = x.node.step
+    @stateful def end: Sym[F] = x.node.end
+    @stateful def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
+    @stateful def ctrParOr1: Int = ctrPar.toInt
+    @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits
+    @stateful def isStatic: Boolean = (start,step,end) match {
       case (Final(_), Final(_), Final(_)) => true
       case _ => false
     }
-    def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
+    @stateful def isStaticStartAndStep: Boolean = (start,step) match {
+      case (Final(a: scala.Int), Final(b: scala.Int)) => true
+      case _ => false
+    }
+    @stateful def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
       case Some(Expect(_)) => true
       case _ => 
         val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
@@ -669,7 +770,7 @@ package object control {
         startFixed && stepFixed && endFixed
     }
 
-    def nIters: Option[Bound] = (start,step,end) match {
+    @stateful def nIters: Option[Bound] = (start,step,end) match {
       case (Final(min), Final(stride), Final(max)) =>
         Some(Final(Math.ceil((max - min).toDouble / stride).toInt))
 
@@ -678,30 +779,41 @@ package object control {
 
       case _ => None
     }
-    def willFullyUnroll: Boolean = (nIters,ctrPar) match {
-      case (Some(Expect(nIter)), Expect(par)) => par >= nIter
-      case _ => false
+    @stateful def willFullyUnroll: Boolean = {
+      if (x.isForever) false
+      else (nIters,ctrPar) match {
+        case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+        case _ => false
+      }
     }
-    def isUnit: Boolean = nIters match {
-      case (Some(Final(1))) => true
-      case _ => false
+    @stateful def isUnit: Boolean = {
+      if (x.isForever) false 
+      else nIters match {
+        case (Some(Final(1))) => true
+        case _ => false
+      }
     }
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
-    def ctrStart: Ind[W] = i.counter.start.unbox
-    def ctrStep: Ind[W] = i.counter.step.unbox
-    def ctrEnd: Ind[W] = i.counter.end.unbox
-    def ctrPar: I32 = i.counter.ctrPar
-    def ctrParOr1: Int = i.getCounter.map(_.ctrPar.toInt).getOrElse(1)
+    @stateful def ctrStart: Ind[W] = i.counter.ctr.start.unbox
+    @stateful def ctrStep: Ind[W] = i.counter.ctr.step.unbox
+    @stateful def ctrEnd: Ind[W] = i.counter.ctr.end.unbox
+    @rig def ctrPar: I32 = if (i.counter.ctr.isForever) I32(1) else i.counter.ctr.ctrPar
+    @stateful def ctrParOr1: Int = if (i.counter.ctr.isForever) 1 else i.getCounter.map(_.ctr.ctrPar.toInt).getOrElse(1)
   }
 
   implicit class IndexCounterOps[A](i: Num[A]) {
-    def getCounter: Option[Counter[A]] = metadata[IndexCounter](i).map(_.ctr.asInstanceOf[Counter[A]])
-    def counter: Counter[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
-    def counter_=(ctr: Counter[_]): Unit = metadata.add(i, IndexCounter(ctr))
+    def getCounter: Option[IndexCounterInfo[A]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[A]])
+    def counter: IndexCounterInfo[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
+    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
   }
 
+  implicit class BitsCounterOps(i: Bits[_]) {
+    def getCounter: Option[IndexCounterInfo[_]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[_]])
+    def counter: IndexCounterInfo[_] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
+    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
+  }
 
   /** True if the given symbol is allowed to be defined on the Host and used in Accel
     * This is true for the following types:
@@ -774,11 +886,11 @@ package object control {
       val pathB = b.ancestors
       val ctrlIdxA = pathA.indexOf(ctrl)
       val ctrlIdxB = pathB.indexOf(ctrl)
-      logs(s"  PathA: " + pathA.mkString(", "))
-      logs(s"  PathB: " + pathB.mkString(", "))
-      logs(s"  Ctrl: $ctrl")
-      logs(s"  ctrlIdxA: $ctrlIdxA")
-      logs(s"  ctrlIdxB: $ctrlIdxB")
+      // logs(s"  PathA: " + pathA.mkString(", "))
+      // logs(s"  PathB: " + pathB.mkString(", "))
+      // logs(s"  Ctrl: $ctrl")
+      // logs(s"  ctrlIdxA: $ctrlIdxA")
+      // logs(s"  ctrlIdxB: $ctrlIdxB")
 
       if (ctrlIdxA < 0 || ctrlIdxB < 0) None        // ctrl is not common to a and b
       else if (ctrlIdxA >= pathA.length - 1) None   // implies ctrl == a
@@ -789,10 +901,10 @@ package object control {
         val topB = pathB(ctrlIdxB + 1)
         val idxA = ctrl.children.indexOf(topA)
         val idxB = ctrl.children.indexOf(topB)
-        logs(s"  A: $a, B: $b")
-        logs(s"  ${ctrl.children.mkString(" ")}")
-        logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
-        logs(s"  Dist = ${idxB - idxA}")
+        // logs(s"  A: $a, B: $b")
+        // logs(s"  ${ctrl.children.mkString(" ")}")
+        // logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
+        // logs(s"  Dist = ${idxB - idxA}")
         if (idxA < 0 || idxB < 0) None
         Some(idxB - idxA)
       }
@@ -823,7 +935,7 @@ package object control {
     */
   @stateful def getCoarseDistance(ctrl: Ctrl, a: Ctrl, b: Ctrl): Option[Int] = {
     val dist = getStageDistance(ctrl, a, b)
-    if (ctrl.isOuterPipeLoop || ctrl.isOuterStreamLoop) dist else None
+    if (ctrl.isOuterPipeLoop) dist else None
   }
 
   @stateful def getCoarseDistance(ctrl: Ctrl, a: Sym[_], b: Sym[_]): Option[Int] = {
@@ -901,7 +1013,7 @@ package object control {
     else {
       val metapipeLCAs = findAllMetaPipes(readers, writers)
       val hierarchicalBuffer = metapipeLCAs.keys.size > 1
-      val issue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
+      val hierIssue = if (hierarchicalBuffer) Some(AmbiguousMetaPipes(mem, metapipeLCAs)) else None
 
       metapipeLCAs.keys.headOption match {
         case Some(metapipe) =>
@@ -916,10 +1028,14 @@ package object control {
           val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
           val minDist = buffers.minOrElse(0)
           val ports = dists.map{case (a,dist) => a -> dist.map{d => d - minDist} }.toMap
+          val bufferHazards = ports.toList.collect{case (a, i) if (a.isWriter && i.getOrElse(0) > 0) => (a,i.getOrElse(0))}
+          val bufIssue = if (bufferHazards.nonEmpty && !mem.isWriteBuffer && !mem.isNonBuffer) Some(PotentialBufferHazard(mem, bufferHazards)) else None
+          val issue = if (hierIssue.isDefined) hierIssue else bufIssue
+
           (Some(metapipe), ports, issue)
 
         case None =>
-          (None, accesses.map{a => a -> Some(0)}.toMap, issue)
+          (None, accesses.map{a => a -> Some(0)}.toMap, hierIssue)
       }
     }
   }

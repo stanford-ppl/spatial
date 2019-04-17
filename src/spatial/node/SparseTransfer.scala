@@ -5,6 +5,7 @@ import forge.tags._
 
 import spatial.lang._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 import spatial.util.memops._
 import spatial.util.modeling.target
 
@@ -34,6 +35,10 @@ import spatial.util.modeling.target
 
   override def effects: Effects = if (isScatter) Effects.Writes(dram) else Effects.Writes(local)
   @rig def lower(): Void = SparseTransfer.transfer(dram,local,ens,isGather)
+  @rig def pars: Seq[I32] = {
+    Seq(dram.addrs[_32]().sparsePars().values.head)
+  }
+
 }
 
 object SparseTransfer {
@@ -43,12 +48,13 @@ object SparseTransfer {
     dram:    DRAMSparseTile[A],
     local:   Local[A],
     ens:     Set[Bit],
-    isLoad:  Boolean
+    isLoad:  scala.Boolean
   )(implicit
     A:     Bits[A],
     Local: Type[Local[A]]
   ): Void = {
-    val addrs = dram.addrs()
+    val addrs = dram.addrs[_32]()
+    val origin = dram.sparseOrigins[_32]().values.head
     val p = addrs.sparsePars().values.head
     val requestLength = dram.sparseLens().values.head
 
@@ -57,39 +63,33 @@ object SparseTransfer {
     // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
     val iters: Reg[I32] = Reg[I32]
     Pipe{
-      iters := mux(requestLength < 16.to[I32], 16.to[I32],
-               mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) ))
+      iters := mux(requestLength == 0.to[I32], 0.to[I32], 
+               mux(requestLength < 16.to[I32], 16.to[I32],
+               mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) )))
     }
 
-    Stream {
+    val top = Stream {
+      val addrsFIFO = addrs.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
+      val localFIFO = local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
       // Gather
       if (isLoad) {
         val addrBus = StreamOut[I64](GatherAddrBus)
         val dataBus = StreamIn[A](GatherDataBus[A]())
 
-        // Save complicated streaming control logic by padding FIFO by 1 here, so that the 
-        //   controller doesn't see backpressure while the fifo is full but more data is 
-        //   waiting to be drained on the input data stream
-        if (local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) local.padding = Seq(1)
+        // // Save complicated streaming control logic by padding FIFO by 1 here, so that the 
+        // //   controller doesn't see backpressure while the fifo is full but more data is 
+        // //   waiting to be drained on the input data stream
+        // if (local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) local.padding = Seq(1)
 
         // If we are reading addrs from FIFO, make sure that FIFO has enough elements to fill the sparse
         //   command or else the controller will stall
-        if (addrs.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) {
-          Foreach(requestLength until iters){i => addrs.__write(0.to[I32],Seq(i),Set())}
-          // Send
-          Foreach(iters par p){i =>
-            val addr: I64 = (addrs.__read(Seq(i),Set()) * bytesPerWord).to[I64] + dram.address
-            val addr_bytes = addr
-            addrBus := (addr_bytes, dram.isAlloc)
-          }
-        }
-        else {
-          Foreach(iters par p){i =>
-            val cond = i >= requestLength
-            val addr: I64 = mux(cond, dram.address, (addrs.__read(Seq(i),Set(!cond)) * bytesPerWord).to[I64] + dram.address)
-            val addr_bytes = addr
-            addrBus := (addr_bytes, dram.isAlloc)
-          }
+        Foreach(iters par p){i =>
+          val lastAddr = Reg[I64]
+          val cond = i < requestLength
+          val addr: I64 = mux(cond, ((addrs.__read(Seq(i),Set(cond)) + origin) * bytesPerWord).to[I64] + dram.address, dram.address)
+          if (cond) lastAddr := addr
+          val addr_bytes = mux(cond, addr, lastAddr.value)
+          addrBus := (addr_bytes, dram.isAlloc)
         }
         // Fringe
         Fringe.sparseLoad(dram, addrBus, dataBus)
@@ -104,32 +104,20 @@ object SparseTransfer {
         val cmdBus = StreamOut[Tup2[A,I64]](ScatterCmdBus[A]())
         val ackBus = StreamIn[Bit](ScatterAckBus)
 
-        // If we are reading addrs from FIFO, make sure that FIFO has enough elements to fill the sparse
-        //   command or else the controller will stall
-        if (addrs.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}) {
-          Foreach(requestLength until iters){i => addrs.__write(0.to[I32],Seq(i),Set())}
-          // Send
-          Foreach(iters par p){i =>
-            val curAddr  = addrs.__read(Seq(i), Set())
-            val data     = local.__read(Seq(i), Set())
-            val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
-            val addr_bytes = addr
+        // Send
+        Foreach(iters par p){i =>
+          val lastAddr = Reg[I64]
+          val lastData = Reg[A]
 
-            cmdBus := (pack(data, addr_bytes), dram.isAlloc)
-          }
-        }
-        else {
-          // Send
-          Foreach(iters par p){i =>
-            val pad_addr = max(requestLength - 1, 0.to[I32])
-            val cond     = i >= requestLength
-            val curAddr  = mux(cond, addrs.__read(Seq(pad_addr), Set(cond)), addrs.__read(Seq(i), Set(!cond)))
-            val data     = mux(cond, local.__read(Seq(pad_addr), Set(cond)), local.__read(Seq(i), Set(!cond)))
-            val addr     = (curAddr * bytesPerWord).to[I64] + dram.address
-            val addr_bytes = addr
+          val pad_addr = max(requestLength - 1, 0.to[I32])
+          val cond     = i < requestLength
+          val curAddr: I64  = ((origin + addrs.__read(Seq(i), Set(cond))) * bytesPerWord).to[I64] + dram.address
+          val data     = local.__read(Seq(i), Set(cond))
+          if (cond) lastAddr := curAddr
+          if (cond) lastData := data
+          val addr_bytes = mux(cond, curAddr, lastAddr.value)
 
-            cmdBus := (pack(data, addr_bytes), dram.isAlloc)
-          }
+          cmdBus := (pack(mux(cond, data, lastData.value), addr_bytes), dram.isAlloc)
         }
         // Fringe
         Fringe.sparseStore(dram, cmdBus, ackBus)
@@ -140,7 +128,7 @@ object SparseTransfer {
         }
       }
     }
-
+    // top.loweredTransfer = if (isLoad) SparseLoad else SparseStore // TODO: Work around @virtualize to set this metadata
   }
 
 }

@@ -11,12 +11,15 @@ all: hw sw
 
 help:
 	@echo "------- SUPPORTED MAKE TARGETS -------"
-	@echo "make           : VCS SW + HW build"
-	@echo "make hw        : Build Chisel for VCS"
-	@echo "make sw        : Build software for VCS"
-	@echo "make hw-clean  : Delete all generated hw files"
-	@echo "make sw-clean  : Delete all generated sw files"
-	@echo "make clean     : Delete all compiled code"
+	@echo "make             : VCS SW + HW build"
+	@echo "make hw          : Build Chisel for VCS"
+	@echo "make sw          : Build software for VCS"
+	@echo "make hw-clean    : Delete all generated hw files"
+	@echo "make sw-clean    : Delete all generated sw files"
+	@echo "make clean       : Delete all compiled code"
+	@echo "make dse-model   : Run dse performance model (optionally takes ARGS=\"tune <param> <value> ... ni <param> <value> ...\" for noninteractive execution or dse tuning) "     
+	@echo "make final-model : Run final performance model (optionally takes ARGS=\"ni <param> <value> ...\" for noninteractive execution) "     
+	@echo "make sensitivity : Run sensitivity analysis for parameters based on model (see model/AppSensitivity.scala for center parameters)"
 	@echo "------- END HELP -------"
 
 sw:
@@ -48,5 +51,20 @@ sw-clean:
 	rm -f verilog TopVCS.tar.gz Top *.log *.vcd ucli.key ${BIGIP_SCRIPT}
 
 clean: hw-clean sw-clean
+
+dse-model: 
+	sbt "; project model; runMain model.AppRuntimeModel_dse ${ARGS}"
+
+final-model: 
+	sbt "; project model; runMain model.AppRuntimeModel_final ${ARGS}"
+
+sensitivity: 
+	sbt "; project model; runMain model.AppSensitivity"
+
+assemble-model:
+	mv model/model_final.scala model/model_final
+	sbt "; project model; assembly"
+	mv model/model_final model/model_final.scala
+
 
 null: # Null target for regression testing purposes

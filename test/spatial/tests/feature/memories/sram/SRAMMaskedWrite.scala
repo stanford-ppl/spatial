@@ -3,6 +3,8 @@ package spatial.tests.feature.memories.sram
 import spatial.dsl._
 
 @spatial class SRAMMaskedWrite extends SpatialTest {
+  override def dseModelArgs: Args = "1 1"
+  override def finalModelArgs: Args = ""
   override def runtimeArgs: Args = "2"
   type T = Int
 

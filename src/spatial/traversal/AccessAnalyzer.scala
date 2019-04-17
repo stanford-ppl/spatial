@@ -7,6 +7,7 @@ import utils.implicits.collections._
 
 import spatial.lang._
 import spatial.node._
+import spatial.util.modeling
 import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
@@ -30,7 +31,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     iters ++= is
     iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
-    scopes ++= is.map{_ -> scope}
+    scopes ++= is.map{i => (i -> modeling.consumersDfs(i.consumers,Set(), scope)) }
     visitBlock(block)
 
     iters = saveIters
@@ -49,7 +50,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Op(RegRead(reg)) =>
       val loop = loops(i)
       reg.writers.forall{writer => LCA(writer.parent,x.parent) != loop.toCtrl }
-    case _ => !scopes(i).contains(x)
+    case _ => dbgs(s"isInvariant $i, $x?  check against ${scopes(i)}");!scopes(i).contains(x)
   }
 
   /** True if all symbols in xs are invariant to all iterators in is. */
@@ -58,10 +59,15 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   }
 
   /** Returns the innermost iterator which the symbols in xs vary with.
-    * If x is entirely loop invariant, returns None.
+    * If x is entirely loop invariant, returns None.  Deprecated?
     */
   private def lastVariantIter(is: Seq[Idx], x: Sym[_]): Option[Idx] = {
     is.reverseIterator.find{i => !isInvariant(i,x) }
+  }
+
+  /** Returns all iterators which the symbols in xs vary with. */
+  private def allVariantIters(is: Seq[Idx], x: Sym[_]): Seq[Idx] = {
+    is.filter{i => !isInvariant(i,x) }
   }
 
   object Plus  { def unapply[W](x: Ind[W]): Option[(Ind[W],Ind[W])] = x.op.collect{case FixAdd(LU(a),LU(b)) => (a,b) }}
@@ -170,12 +176,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   private def makeAddressPattern(is: Seq[Idx], components: Seq[AffineProduct], offset: Sum, modulus: Modulus): AddressPattern = {
     val starts = iterStarts.filterKeys(is.filter{i => offset.syms.contains(i) || components.exists{prod => prod.syms.contains(i)}}.contains)
-    val lastIters = offset.syms.mapping{x => lastVariantIter(is,x) } ++
-                    components.flatMap{prod => prod.syms.mapping{x => lastVariantIter(is,x) }} ++
-                    starts.values.mapping{x => lastVariantIter(is,x)}
-
-    val lastIter  = lastIters.values.maxByOrElse(None){i => i.map{is.indexOf}.getOrElse(-1) }
-    AddressPattern(components, offset, lastIters, lastIter, starts)
+    val allIters = offset.syms.mapping{x => allVariantIters(is,x) } ++
+                    components.flatMap{prod => prod.syms.mapping{x => allVariantIters(is,x) }} ++
+                    components.map{prod => (prod.i -> Seq(prod.i))} ++
+                    starts.values.mapping{x => allVariantIters(is,x)}
+    AddressPattern(components, offset, allIters, starts)
   }
 
   /** Return the affine access pattern of the given address component x as an AddressPattern.
@@ -263,7 +268,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       dbgs(s"  end: ${end.accessPattern}")
       dbgs(s"  step: ${step.accessPattern}")
 
-    case Op(loop: Loop[_]) =>
+    case Op(loop: Loop[_]) if loop.cchains.forall(!_._1.isForever) =>
       loop.bodies.foreach{scope =>
         dbgs(s"$lhs = $rhs [LOOP]")
         scope.blocks.foreach{case (iters, block) =>
@@ -273,7 +278,18 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
           dbgs(s"  Blocks: $block")
           inLoop(lhs, iters, iterStarts, block)
         }
+      }
 
+    case Op(loop: Loop[_]) =>
+      loop.bodies.foreach{scope =>
+        dbgs(s"$lhs = $rhs [LOOP]")
+        scope.blocks.foreach{case (iters, block) =>
+          val iterStarts = iters.map{_ => I32(0)}
+          dbgs(s"  Iters:  $iters")
+          dbgs(s"  Starts:  $iterStarts")
+          dbgs(s"  Blocks: $block")
+          inLoop(lhs, iters, iterStarts, block)
+        }
       }
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)

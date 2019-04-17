@@ -39,6 +39,11 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     *   Use the second version to generate a large number of runtime arguments using some pattern.
     */
   def runtimeArgs: Args
+
+  /** Override to supply list of input arguments to run during the dse/final performance models */
+  def dseModelArgs: Args = ""
+  def finalModelArgs: Args = ""
+
   lazy val DATA = sys.env.getOrElse("TEST_DATA_HOME", { throw MissingDataFolder() })
 
   //-------------------//
@@ -73,7 +78,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
   //      Backends     //
   //-------------------//
 
-  def backends: Seq[Backend]
+  def backends: Seq[Backend] = Nil
   def property(str: String): Option[String] = sys.props.get(str)
   def checkFlag(str: String): Boolean = property(str).exists(v => v.trim.toLowerCase == "true")
 
@@ -91,16 +96,20 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     val name: String,
     val args: String,
     val make: String,
-    val run:  String
+    val run:  String,
+    val model: String,
+    val shouldRunModels: Boolean = false
   ){ backend =>
     val makeTimeout: Long = 3000 // Timeout for compiling, in seconds
     val runTimeout: Long  = 3000 // Timeout for running, in seconds
+    val modelTimeout: Long  = 180 // Timeout for running, in seconds
     var prev: String = ""
 
     def shouldRun: Boolean
     override def toString: String = name
     def makeArgs: Seq[String] = make.split(" ").map(_.trim).filter(_.nonEmpty)
     def runArgs: Seq[String] = run.split(" ").map(_.trim).filter(_.nonEmpty)
+    def modelArgs(version: String): Seq[String] = (model + " " + version).split(" ").map(_.trim).filter(_.nonEmpty)
 
     def parseMakeError(line: String): Result = {
       if (line.contains("error")) MakeError(line)
@@ -111,6 +120,13 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       else if (line.contains("PASS: 0") || line.contains("PASS: false")) Fail
       else Unknown
     }
+    def parseModelError(line: String): Result = {
+      if (line.toLowerCase.contains("total cycles for app")) Pass
+      else Unknown
+    }
+    def genDir(name:String):String = s"${IR.config.cwd}/gen/$backend/$name/"
+    def logDir(name:String):String = s"${IR.config.cwd}/logs/$backend/$name/"
+    def repDir(name:String):String = s"${IR.config.cwd}/reports/$backend/$name/"
 
     /** Run DSL compilation for the given application. */
     final def compile(expectErrors: Boolean = false): Iterator[() => Result] = {
@@ -125,9 +141,9 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
           val args = backArgs ++ stageArgs ++ Seq("-v", "--test")
           val f = Future{ scala.concurrent.blocking {
             init(args)
-            IR.config.genDir = s"${IR.config.cwd}/gen/$backend/$name/"
-            IR.config.logDir = s"${IR.config.cwd}/logs/$backend/$name/"
-            IR.config.repDir = s"${IR.config.cwd}/reports/$backend/$name/"
+            IR.config.genDir = genDir(name)
+            IR.config.logDir = logDir(name)
+            IR.config.repDir = repDir(name)
             compileProgram(args)
           }}
           Await.result(f, duration.Duration(backend.makeTimeout, "sec"))
@@ -150,9 +166,13 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       import scala.concurrent.ExecutionContext.Implicits.global   // implicit execution context for Futures
 
       val cmdLog = new PrintStream(IR.config.logDir + s"/$pass.log")
+      val cmdFile = new PrintStream(IR.config.logDir + s"/$pass.sh")
       var cause: Result = Unknown
       Console.out.println(s"Backend $pass in ${IR.config.logDir}/$pass.log")
-      Console.out.println(args.mkString(" "))
+      val cmdStr = args.mkString(" ")
+      Console.out.println(cmdStr)
+      cmdFile.println(s"${cmdStr}")
+      cmdFile.close()
       val cmd = new Subprocess(args:_*)({case (lline,_) =>
         val line = lline.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt","")
         val err = parse(line)
@@ -194,7 +214,20 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       runtimeArgs.cmds.foreach{ args =>
         result = result orElse command("run", runArgs :+ args, backend.runTimeout, backend.parseRunError, RunError.apply)
       }
+      runModels()
       result orElse Pass
+    }
+
+    /** Run dse and final models. */
+    final def runModels(): Unit = {
+      if (shouldRunModels) {
+        dseModelArgs.cmds.foreach{ args => 
+          command("model", modelArgs("dse") :+ args, backend.modelTimeout, backend.parseModelError, ModelError.apply)
+        }
+        finalModelArgs.cmds.foreach{ args => 
+          command("model", modelArgs("final") :+ args, backend.modelTimeout, backend.parseModelError, ModelError.apply)
+        }
+      }
     }
 
     /** Run everything for this backend, including DSL compile, backend make, and backend run. */
@@ -220,7 +253,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     name = "IllegalExample",
     args = args,
     make = "",
-    run  = ""
+    run  = "",
+    model = ""
   ) {
     def shouldRun: Boolean = true
     override def runBackend(): Unit = {
@@ -241,7 +275,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     name = "Ignore",
     args = "",
     make = "",
-    run  = ""
+    run  = "",
+    model = ""
   ) {
     def shouldRun: Boolean = true
     override def runBackend(): Unit = ignore should "compile, run, and verify" in { () }
@@ -272,7 +307,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     name should "compile" in { compile(args); sys.exit(0) }
   }
   else if (tests.isEmpty) {
-    ignore should "...nothing? (No backends enabled. Enable using -D<backend>=true)" in { () }
+    ignore should s"...nothing? (No backends enabled. Enable using -D<backend>=true). backends:\n${backends.mkString("\n")}" in { () }
   }
   else {
     // Otherwise run all the backend tests (if there are any enabled)

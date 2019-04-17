@@ -49,11 +49,12 @@ class FringeZynq(
     // Accel Scalar IO
     val argIns          = Output(Vec(NUM_ARG_INS, UInt(TARGET_W.W)))
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(TARGET_W.W))))
-    val argOutLoopbacks = Output(Vec(NUM_ARG_LOOPS, UInt(TARGET_W.W)))
+    val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(TARGET_W.W)))
+
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
-    val heap = new HeapIO(numAllocators)
+    val heap = Vec(numAllocators, new HeapIO())
 
     // External enable
     val externalEnable = Input(Bool()) // For AWS, enable comes in as input to top module
@@ -62,8 +63,10 @@ class FringeZynq(
 //    val genericStreams = new GenericStreams(streamInsInfo, streamOutsInfo)
   })
 
+  io <> DontCare
   // Common Fringe
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
+  fringeCommon.io <> DontCare
 
   fringeCommon.io.TOP_AXI <> io.TOP_AXI
   fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI
@@ -104,7 +107,6 @@ class FringeZynq(
   io.reset := fringeCommon.io.reset
 
   io.argIns := fringeCommon.io.argIns
-  io.argOutLoopbacks := fringeCommon.io.argOutLoopbacks
   fringeCommon.io.argOuts <> io.argOuts
   // io.argIOIns := fringeCommon.io.argIOIns
   // fringeCommon.io.argIOOuts <> io.argIOOuts

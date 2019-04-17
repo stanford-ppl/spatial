@@ -5,13 +5,15 @@ import argon._
 import forge.tags._
 import spatial.node._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 import spatial.util.memops._
 
 protected class MemReduceAccum[A,C[T]](
   accum: C[A],
   ident: Option[A],
   fold:  Boolean,
-  opt:   CtrlOpt
+  opt:   CtrlOpt,
+  stopWhen: Option[Reg[Bit]]
 ) {
   /** 1 dimensional memory reduction */
   @api def apply(domain1: Counter[I32])(map: I32 => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
@@ -56,6 +58,8 @@ protected class MemReduceAccum[A,C[T]](
 
     val itersMap = List.fill(domain.length){ boundVar[I32] }
     val itersRed = List.fill(acc.sparseRank.length){ boundVar[I32] }
+    domain.zip(itersMap).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
+    ctrsRed.zip(itersRed).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
 
     //logs(s"  itersMap: $itersMap")
     //logs(s"  itersRed: $itersRed")
@@ -80,7 +84,8 @@ protected class MemReduceAccum[A,C[T]](
       ident,
       fold,
       itersMap,
-      itersRed)
+      itersRed,
+      stopWhen)
     ){pipe =>
       opt.set(pipe)
     }
@@ -89,11 +94,11 @@ protected class MemReduceAccum[A,C[T]](
 }
 
 protected class MemReduceClass(opt: CtrlOpt) {
-  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = false, opt)
-  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = false, opt)
+  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = false, opt, opt.stopWhen)
+  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = false, opt, opt.stopWhen)
 }
 
 protected class MemFoldClass(opt: CtrlOpt) {
-  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = true, opt)
-  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = true, opt)
+  def apply[A,C[T]](accum: C[A]) = new MemReduceAccum[A,C](accum, None, fold = true, opt, opt.stopWhen)
+  def apply[A,C[T]](accum: C[A], zero: A) = new MemReduceAccum[A,C](accum, Some(zero), fold = true, opt, opt.stopWhen)
 }

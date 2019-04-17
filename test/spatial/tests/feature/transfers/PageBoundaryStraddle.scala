@@ -3,6 +3,8 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 @spatial class PageBoundaryStraddle extends SpatialTest { // Regression (Unit) // Args: none
+  override def dseModelArgs: Args = "864"
+  override def finalModelArgs: Args = "864"
   override def runtimeArgs: Args = "864"
 
 

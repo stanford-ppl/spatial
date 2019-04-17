@@ -92,7 +92,7 @@ trait ScalaGenDRAM extends ScalaGenMemories {
         emit(src"else null.asInstanceOf[${lhs.tp}]")
       close("}")
 
-    case MemSparseAlias(cond, mems, _, _) =>
+    case MemSparseAlias(cond, mems, _, _, _) =>
       open(src"val $lhs = {")
       cond.zip(mems).zipWithIndex.foreach{case ((c,mem),idx) =>
         if (idx == 0) emit(src"if ($c) $mem")

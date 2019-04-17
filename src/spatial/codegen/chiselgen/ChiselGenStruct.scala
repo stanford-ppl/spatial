@@ -13,11 +13,11 @@ trait ChiselGenStruct extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case SimpleStruct(st) =>
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Cat(${st.reverse.map{f => if (bitWidth(f._2.tp) > 1) src"${f._2}.r" else src"${f._2}"}.mkString(",")})")
 
     case FieldApply(struct, field) =>
-      emit(src"val $lhs = Wire(${lhs.tp})")
+      emit(createWire(quote(lhs),remap(lhs.tp)))
       val (start, end) = getField(struct.tp, field)
       emit(src"$lhs.r := $struct($start, $end)")
 

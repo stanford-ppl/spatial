@@ -4,6 +4,10 @@ import os
 import shutil
 import re
 import sys
+import json
+from shutil import copyfile
+import os.path
+
 
 def delete_from_index(package): 
 	for dname, dirs, files in os.walk("target/scala-2.12/api/"):
@@ -42,6 +46,12 @@ def delete_implicits():
 	        with open(fpath, "w") as f:
 	            f.write(s)
 
+def delete_from_js(parsed, regex):
+	kill = re.compile(regex)
+	for k in parsed.keys():
+		if (kill.match(k)):
+			parsed[k] = [{"name": "Not Available"}]
+
 def fix_html():
 	delete_implicits()
 	delete_from_index("traversal")
@@ -50,15 +60,42 @@ def fix_html():
 	delete_from_index("codegen")
 	delete_from_index("flows")
 	delete_from_index("issues")
-	delete_from_index("math")
 	delete_from_index("metadata")
 	delete_from_index("node")
 	delete_from_index("report")
 	delete_from_index("rewrites")
 	delete_from_index("util")
 
+def fix_js():
+	if (not os.path.exists("target/scala-2.12/api/index.bakjs")):
+		copyfile("target/scala-2.12/api/index.js", "target/scala-2.12/api/index.bakjs")
+
+	with open("target/scala-2.12/api/index.js", "r") as read_file:
+		raw = read_file.readline()
+		raw = raw.replace("Index.PACKAGES = ", "")[0:-1] # Remove last ; and annoying first part
+		parsed = json.loads(raw)
+
+	delete_from_js(parsed, 'spatial\.metadata\.*')
+	delete_from_js(parsed, 'spatial\.flows\.*')
+	delete_from_js(parsed, 'spatial\.codegen\.*')
+	delete_from_js(parsed, 'spatial\.rewrites\.*')
+	delete_from_js(parsed, 'spatial\.traversal\.*')
+	delete_from_js(parsed, 'spatial\.transform\.*')
+	delete_from_js(parsed, 'spatial\.issues\.*')
+	delete_from_js(parsed, 'spatial\.node\.*')
+
+	with open("target/scala-2.12/api/index.js", "w") as write_file:
+		write_file.write("Index.PACKAGES = ")
+		write_file.write(json.dumps(parsed))
+		write_file.write(";")
+		write_file.close()
+	os.remove("target/scala-2.12/api/index.bakjs")
+
+
+
 def prepare_scala():
 	gut_lang()
+	gut_node()
 	gut_lib()
 
 def gut_lang():
@@ -124,6 +161,37 @@ def gut_lib():
 			dst.close()
 			os.rename(os.path.abspath(fpathdst), os.path.abspath(fpath))
 
+def gut_node():
+	if (os.path.isdir("src/spatial/.node")): shutil.rmtree("src/spatial/.node")
+	shutil.move(os.path.abspath("src/spatial/node"), os.path.abspath("src/spatial/.node"))
+	shutil.copytree("src/spatial/.node","src/spatial/node")
+	for dname, dirs, files in os.walk("src/spatial/node"):
+		for fname in files:
+			fpath    = os.path.join(dname, fname)
+			fpathdst = os.path.join(dname, "%s.dst" % fname)
+			dst = open(fpathdst,"w+")
+			with open(fpath) as f:
+				# print(fpath)
+				openbrackets = 0
+				openargs = 0
+				for num, line in enumerate(f, 1):
+					if (line.find("@rig def") >= 0 or openargs >= 1):
+						openbrackets = openbrackets + line.count('{') - line.count('}')
+						openargs = openargs + line.count('(') - line.count(')')
+						matches = re.findall("[^<>]=[^>=].*?(?= = |\n)", line)
+						if (matches and openargs == 0):
+							dst.write(line.replace("@rig","").replace(matches[-1],' = throw new Exception("dont care! woo!")'))
+						else:
+							dst.write(line)
+
+					elif (openbrackets >= 1):
+						openbrackets = openbrackets + line.count('{') - line.count('}')
+					else:
+						dst.write(line)
+
+			dst.close()
+			os.rename(os.path.abspath(fpathdst), os.path.abspath(fpath))
+
 
 def replace_scala():
 	if (os.path.isdir("src/spatial/.lang")):
@@ -136,11 +204,17 @@ def replace_scala():
 		shutil.move(os.path.abspath("src/spatial/.lib"), os.path.abspath("src/spatial/lib"))	
 	else:
 		print(".lib does not exist!")
+	if (os.path.isdir("src/spatial/.node")):
+		if (os.path.isdir("src/spatial/node")): shutil.rmtree("src/spatial/node")
+		shutil.move(os.path.abspath("src/spatial/.node"), os.path.abspath("src/spatial/node"))	
+	else:
+		print(".node does not exist!")
 
 if (sys.argv[1] == "prep"):
 	prepare_scala()
 elif (sys.argv[1] == "scrub"):
 	fix_html()
+	fix_js()
 elif (sys.argv[1] == "replace"):
 	replace_scala()
 else:

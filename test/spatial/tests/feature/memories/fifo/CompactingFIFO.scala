@@ -12,7 +12,7 @@ import spatial.dsl._
 
     val bitmask = Array.tabulate(arraySize) { i => random[Int](2) }
     printArray(bitmask, "Bitmask: ")
-
+ 
     val P1 = 4 (16 -> 16)
 
     val N = ArgIn[Int]
@@ -35,12 +35,12 @@ import spatial.dsl._
 
         // Fill remainder with 0s
         FSM(0)(filler => filler != 1) { filler =>
-          if (!fifo.isFull) {
+          if (!(fifo.numel == tileSize)) { // Is full turns on prematurely 
             Pipe {
               fifo.enq(-1)
             }
           }
-        }{filler => mux(fifo.isFull, 1, 0) }
+        }{filler => mux(fifo.numel == tileSize, 1, 0) } // Is full turns on prematurely 
 
         // Store back
         out(i :: i + tileSize par 2) store fifo

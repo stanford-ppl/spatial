@@ -195,13 +195,13 @@ class InputNode[PO, PI, EO, EI, B <: Data](imp: NodeImp[PO, PI, EO, EI, B]) exte
 }
 
 class SourceNode[PO, PI, EO, EI, B <: Data](imp: NodeImp[PO, PI, EO, EI, B])(po: PO, num: Range.Inclusive = 1 to 1)
-  extends SimpleNode(imp)({case (n, Seq()) => Seq.fill(n)(po)}, {case (0, _) => Seq()}, num, 0 to 0)
+  extends SimpleNode(imp)({case (n, Seq()) => Seq.fill(n)(po); case _ => Seq()}, {case (0, _) => Seq(); case _ => Seq()}, num, 0 to 0)
 {
   require (num.end >= 1, s"${name} is a source which does not accept outputs${lazyModule.line}")
 }
 
 class SinkNode[PO, PI, EO, EI, B <: Data](imp: NodeImp[PO, PI, EO, EI, B])(pi: PI, num: Range.Inclusive = 1 to 1)
-  extends SimpleNode(imp)({case (0, _) => Seq()}, {case (n, Seq()) => Seq.fill(n)(pi)}, 0 to 0, num)
+  extends SimpleNode(imp)({case (0, _) => Seq(); case _ => Seq()}, {case (n, Seq()) => Seq.fill(n)(pi); case _ => Seq()}, 0 to 0, num)
 {
   require (num.end >= 1, s"${name} is a sink which does not accept inputs${lazyModule.line}")
 }

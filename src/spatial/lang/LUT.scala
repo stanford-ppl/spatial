@@ -4,6 +4,7 @@ import argon._
 import forge.tags._
 import utils.implicits.collections._
 import spatial.util._
+import utils.io.files._
 
 import spatial.node._
 import spatial.lang.types._
@@ -39,7 +40,7 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
 
   @rig private def checkDims(given: Int): Unit = {
     if (given != rank) {
-      error(ctx, s"Expected a $rank-dimensional address, got a $given-dimensional address.")
+      error(ctx, s"Expected a $rank-dimensional address for $this (${this.name}), got a $given-dimensional address.")
       error(ctx)
     }
   }

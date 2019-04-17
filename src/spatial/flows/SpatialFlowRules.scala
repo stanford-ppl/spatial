@@ -12,6 +12,7 @@ import spatial.node._
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
     case MemAlloc(mem) if mem.isLocalMem => LocalMemories += mem
+    case MemAlloc(mem) if (mem.isRemoteMem || a.isStreamIn || a.isStreamOut) => RemoteMemories += a
     case _ =>
   }
 
@@ -230,18 +231,19 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ => // No schedule for non-control nodes
   }
 
-  @flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
-    case uloop: UnrolledLoop[_] => 
-      uloop.cchainss.foreach{case (cchain,is) =>
-        cchain.counters.zip(is).foreach{case (ctr, i) => i.foreach(_.counter = ctr) }
-      }
-    case loop: Loop[_] =>
-      loop.cchains.foreach{case (cchain,is) =>
-        cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = ctr }
-      }
+  // Now set in unroller and ForeachClass, ReduceClass, and MemReduceClass
+  //@flow def loopIterators(s: Sym[_], op: Op[_]): Unit = op match {
+    //case uloop: UnrolledLoop[_] => 
+      //uloop.cchainss.foreach{case (cchain,is) =>
+        //cchain.counters.zip(is).foreach{case (ctr, i) => i.zipWithIndex.foreach{case (it, j) => it.counter = IndexCounterInfo(ctr, Seq(j))} }
+      //}
+    //case loop: Loop[_] =>
+      //loop.cchains.foreach{case (cchain,is) =>
+        //cchain.counters.zip(is).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
+      //}
 
-    case _ =>
-  }
+    //case _ =>
+  //}
 
   @flow def streams(s: Sym[_], op: Op[_]): Unit = {
     if (s.isStreamLoad)   StreamLoads += s

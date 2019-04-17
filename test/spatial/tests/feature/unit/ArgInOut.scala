@@ -16,12 +16,42 @@ import spatial.dsl._
 
     // Create HW accelerator
     Accel {
-      y := x + 4
+      y:=x + 4
     }
 
     val result = getArg(y)
 
     val gold = N + 4
+    println("expected: " + gold)
+    println("result: " + result)
+
+    val cksum = gold == result
+    println("PASS: " + cksum + " (InOutArg)")
+    assert(cksum)
+  }
+}
+
+@spatial class HostIOLoop extends SpatialTest {
+  override def runtimeArgs: Args = "7"
+
+  def main(args: Array[String]): Unit = {
+    // Declare SW-HW interface vals
+    val y = HostIO[Int]
+    val N = args(0).to[Int]
+
+    // Connect SW vals to HW vals
+    setArg(y, N)
+
+    // Create HW accelerator
+    for (i <- 0 until 4) {
+      Accel {
+        y := y + 4
+      }
+    }
+
+    val result = getArg(y)
+
+    val gold = N + 4*4
     println("expected: " + gold)
     println("result: " + result)
 

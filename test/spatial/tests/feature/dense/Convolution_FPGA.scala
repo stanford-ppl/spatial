@@ -3,6 +3,9 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 @spatial class Convolution_FPGA extends SpatialTest { // ReviveMe (LineBuffer)
+  override def dseModelArgs: Args = "16 16 16 16"
+  override def finalModelArgs: Args = "16 16 16 16"
+
   val Kh = 3
   val Kw = 3
   val Cmax = 16

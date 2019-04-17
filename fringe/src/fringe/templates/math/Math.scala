@@ -159,7 +159,7 @@ object Math {
 
     // Compute upcasted type and return type
     val return_type = a.fmt combine b.fmt
-    val upcast_type = if (intMode) return_type else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f)
+    val upcast_type = if (intMode) return_type else if (overflow == Wrapping) return_type.copy(ibits = a.d max b.d, fbits = a.f + b.f) else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f)
 
     // Get upcasted operators
     val result_upcast = Wire(new FixedPoint(upcast_type))
@@ -173,6 +173,13 @@ object Math {
                            else if (b.litVal.isDefined) b.litVal.get.U(a.getWidth.W)
                            else b.r
       result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow) >> scala.math.max(a.f, b.f)
+    }
+    else if (overflow == Wrapping) {
+      val a_upcast: UInt = util.Cat(util.Fill(b.f + 0.max(b.d - a.d), a.msb), a.r)
+      val b_upcast: UInt = if (b.litVal.isDefined) b.litVal.get.U((0.max(a.d - b.d) + a.f+b.d+b.f).W)
+                           else util.Cat(util.Fill(0.max(a.d - b.d) + a.f, b.msb), b.r)
+
+      result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow)      
     }
     else {
       val a_upcast: UInt = util.Cat(util.Fill(b.d+b.f, a.msb), a.r)

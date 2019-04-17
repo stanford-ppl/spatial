@@ -17,8 +17,8 @@ if [[ $GDOCS -eq 1 ]]; then
 	fi
 
 	timeout_wc=`cat log | grep -a "TIMEOUT" | wc -l`
-	runtime_string=`cat log | grep -a "Design ran for" | sed "s/Design ran for //g" | sed "s/ cycles.*//g"`
-	scala_runtime_string=`cat log | grep -a "Total time: " | sed "s/.*Total time: //g" | sed "s/ s,.*//g"`
+	runtime_string=`cat log | grep -a "Design ran for" | sed "s/Design ran for //g" | sed "s/ cycles.*//g" | tail -n1`
+	scala_runtime_string=`cat log | grep -a "Total time: " | sed "s/.*Total time: //g" | sed "s/ s,.*//g" | tail -n1`
 
 	if [[ ${timeout_wc} -gt 0 ]]; then
 		runtime="TIMEOUT"

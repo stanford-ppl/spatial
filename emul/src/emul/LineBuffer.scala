@@ -42,15 +42,19 @@ class LineBuffer[T:ClassTag](
     val bank0 = posMod((stride-1-row.toInt) + bufferRow, fullRows)
     if (bank0 != lastWrRow) wrCounter = 0
     lastWrRow = bank0
+    var numWritten = 0
     elems.indices.foreach{i => 
       val bank1 = posMod((wrCounter + i), banks(1))
       val ofs = (wrCounter + i) / banks(1)
       val addr = s"Bank: $bank0, $bank1; Ofs: $ofs "
       OOB.writeOrElse(name, addr, elems(i), ens(i).value){
-        if (ens(i).value) data.apply(bank0.toInt).update(flattenAddress(FixedPoint(bank1, row.fmt),FixedPoint(ofs, row.fmt)).toInt,elems(i))
+        if (ens(i).value) {
+          numWritten = numWritten + 1
+          data.apply(bank0.toInt).update(flattenAddress(FixedPoint(bank1, row.fmt),FixedPoint(ofs, row.fmt)).toInt,elems(i))
+        }
       }
     }
-    wrCounter = wrCounter + ens.size
+    wrCounter = wrCounter + numWritten
   }
 
   def initMem(size: Int, zero: T): Unit = {}

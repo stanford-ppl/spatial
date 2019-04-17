@@ -4,6 +4,8 @@ import argon.Block
 import spatial.dsl._
 
 @spatial class BankLockstep extends SpatialTest {
+  override def dseModelArgs: Args = "6"
+  override def finalModelArgs: Args = "6"
 
   // Inspired by MD_Grid
   def main(args: Array[String]): Unit = {
@@ -50,6 +52,9 @@ import spatial.dsl._
 }
 
 @spatial class DephasingDuplication extends SpatialTest {
+  override def dseModelArgs: Args = "16"
+  override def finalModelArgs: Args = "16"
+
 
   // Inspired by MD_Grid
   def main(args: Array[String]): Unit = {
@@ -62,7 +67,7 @@ import spatial.dsl._
     setMem(dram, data)
 
     Accel {
-      val sram = SRAM[Int](4,16).hierarchical // Only try to bank hierarchically to expose bug #123
+      val sram = SRAM[Int](4,16).noflat.noduplicate // Only try to bank hierarchically to expose bug #123
       val sram2 = SRAM[Int](4)
       sram load dram
       out := 'LOOP1.Reduce(Reg[Int])(4 by 1 par 2){i => 

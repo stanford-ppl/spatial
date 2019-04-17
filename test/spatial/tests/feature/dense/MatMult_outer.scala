@@ -3,6 +3,8 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 @spatial class MatMult_outer extends SpatialTest {
+  override def dseModelArgs: Args = "32 128 128"
+  override def finalModelArgs: Args = "32 128 128"
   override def runtimeArgs: Args = "32 128 128"
 
   type X = FixPt[TRUE,_16,_16]
@@ -47,7 +49,7 @@ import spatial.dsl._
     Accel {
       // Tile by output regions in C
       Foreach(M by bm par op, N by bn par op) { (i,j) =>
-        val tileC = SRAM[X](bm, bn)
+        val tileC = SRAM[X](bm, bn).buffer
                                                    
         // Prefetch C tile
         tileC load C(i::i+bm, j::j+bn par ip)

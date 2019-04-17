@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class MatMult_inner extends SpatialTest {
+  override def dseModelArgs: Args = "32 128 128"
+  override def finalModelArgs: Args = "32 128 128 128"
   override def runtimeArgs: Args = "32 128 128"
 
   type X = FixPt[TRUE,_16,_16]
@@ -43,7 +45,7 @@ import spatial.dsl._
     setMem(b, B)
 
     Accel {
-      Foreach(M by bm, N by bn par op){(i,j) =>
+      Pipe.POM.Foreach(M by bm, N by bn par op){(i,j) =>
         val tileC = SRAM[T](bm, bn)
 
         Foreach(P by bp par px){k =>
@@ -53,7 +55,7 @@ import spatial.dsl._
             tileA load a(i::i+bm, k::k+bp par 1) // Reads M*N*P times
             tileB load b(k::k+bp, j::j+bn par 1)
           }
-          Foreach(bm by 1, bn by 1 par mp){ (ii,jj) =>    // MetaPipe?
+          Pipe.POM.Foreach(bm by 1, bn by 1 par mp){ (ii,jj) =>    // MetaPipe?
             val prod = Reduce(Reg[T])(bp by 1 par ip){kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
             val prev = mux(k == 0, 0.to[T], tileC(ii,jj))
             tileC(ii,jj) = prev + prod.value // Is a unit pipe that should be recognized as accum

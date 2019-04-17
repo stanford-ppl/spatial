@@ -92,6 +92,8 @@ import spatial.dsl._
 
 
 @spatial class SwitchCondReuse extends SpatialTest {
+  override def dseModelArgs: Args = "100"
+  override def finalModelArgs: Args = "100"
   override def runtimeArgs: Args = "1"
 
   def main(args: Array[String]): Unit = {

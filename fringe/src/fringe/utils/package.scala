@@ -3,6 +3,8 @@ package fringe
 import chisel3._
 import chisel3.util.log2Ceil
 
+import emul.ResidualGenerator._
+
 import fringe.templates.memory.{FringeFF, SRFF}
 import fringe.templates.retiming.{RetimeWrapperWithReset, RetimeWrapper}
 import fringe.templates.math.FixedPoint
@@ -31,6 +33,15 @@ package object utils {
   def mux[T<:Data](cond: Bool, op1: T, op2: T): T = Mux(cond, op1, op2)
   def mux[T<:Data](cond: UInt, op1: T, op2: T): T = Mux(cond(0), op1, op2)
 
+  // Given some list of true-connection (i.e. non-broadcast) ResidualGenerators (and their lane), is the target bank in view?
+  def canSee(gens: List[(List[ResidualGenerator], Int)], target: List[Int], max: List[Int]): Boolean = {
+    lanesThatCanSee(gens, target, max).nonEmpty
+  }
+
+  // Given some list of true-connection (i.e. non-broadcast) ResidualGenerators (and their lane), which lanes can see the target bank?
+  def lanesThatCanSee(gens: List[(List[ResidualGenerator], Int)], target: List[Int], max: List[Int]): Seq[Int] = {
+    gens.collect{case (x,i) if (x.zipWithIndex.map{case (r,j) => r.expand(max(j))}.zip(target).forall{case (inView, trgt) => inView.contains(trgt)}) => i}
+  }
 
   def log2Up(n: Int): Int = if (n < 0) 1 max log2Ceil(1 max (1 + scala.math.abs(n))) else 1 max log2Ceil(1 max n)
   def log2Up(n: BigInt): Int = if (n < 0) log2Ceil((n.abs + 1) max 1) max 1 else log2Ceil(n max 1) max 1
@@ -62,20 +73,32 @@ package object utils {
     out
   }
 
+  def fatMux(muxType: String, sels: Seq[Bool], payloads: Seq[UInt]*): Seq[UInt] = {
+    val numFields = payloads.size
+    val numOptions = payloads.head.size
+    val numSelects = sels.size
+    val fieldWidths = payloads.map(_.head.getWidth)
+    val fatPayloads = Seq.tabulate(numOptions){i => 
+      chisel3.util.Cat(payloads.map(_(i)))
+    }
+    val fatResult = if (numOptions == 2 && numSelects == 1) Mux(sels.head, fatPayloads(0), fatPayloads(1))
+                    else if (muxType == "PriorityMux")      chisel3.util.PriorityMux(sels, fatPayloads)
+                    else                                    chisel3.util.Mux1H(sels, fatPayloads)
+    fieldWidths.zipWithIndex.map{case (w, i) => 
+      val base = fieldWidths.drop(i).sum - w
+      fatResult(base + w-1, base)
+    }
+  }
+
   def getRetimed[T<:Data](sig: T, delay: Int, en: Bool = true.B, init: Long = 0): T = {
     if (delay == 0) {
       sig
     }
     else {
-      if (globals.regression_testing == "1") { // Major hack until someone helps me include the sv file in Driver (https://groups.google.com/forum/#!topic/chisel-users/_wawG_guQgE)
-        chisel3.util.ShiftRegister(sig, delay, en)
-      }
-      else {
-        val sr = Module(new RetimeWrapper(sig.getWidth, delay, init))
-        sr.io.in := sig.asUInt
-        sr.io.flow := en
-        sr.io.out.asTypeOf(sig)
-      }
+      val sr = Module(new RetimeWrapper(sig.getWidth, delay, init))
+      sr.io.in := sig.asUInt
+      sr.io.flow := en
+      sr.io.out.asTypeOf(sig)
     }
   }
 
@@ -85,12 +108,12 @@ package object utils {
     if (retime.toInt > 0) {
       val done_catch = Module(new SRFF())
       val sr = Module(new RetimeWrapperWithReset(1, retime - 1, 0))
-      sr.io.in := done_catch.io.output.data & ready
+      sr.io.in := done_catch.io.output & ready
       sr.io.flow := ready
       done_catch.io.input.asyn_reset := reset
       done_catch.io.input.set := in_done.toBool & ready
       val out = sr.io.out
-      val out_overlap = done_catch.io.output.data
+      val out_overlap = done_catch.io.output
       done_catch.io.input.reset := out & out_overlap & ready
       sr.io.rst := out(0) & out_overlap & ready
       out(0) & out_overlap & ready
@@ -103,6 +126,7 @@ package object utils {
     val ff = Module(new FringeFF(sig))
     ff.io.init := 0.U(sig.getWidth.W).asTypeOf(sig)
     ff.io.in := sig
+    ff.io.reset := false.B
     ff.io.enable := en
     ff.io.out
   }
@@ -120,11 +144,11 @@ package object utils {
   }
 
   def vecSlice[T <: chisel3.core.Data](v: Vec[T], start: Int, end: Int) = {
-    Vec(for (i <- start to end) yield v(i))
+    VecInit(for (i <- start to end) yield v(i))
   }
 
   def vecJoin[T <: chisel3.core.Data](v1: Vec[T], v2: Vec[T]) = {
-    Vec(List.tabulate(v1.length + v2.length) { i =>
+    VecInit(List.tabulate(v1.length + v2.length) { i =>
       if (i < v1.length) v1(i) else v2(i - v1.length)
     })
   }

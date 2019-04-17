@@ -24,13 +24,14 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   override def entryFile: String = s"Main.$ext"
 
   val hostGen = new spatial.codegen.scalagen.ScalaGenSpatial(IR) {
+    override def out = self.out
     override protected def gen(block: Block[_], withReturn: Boolean = false): Unit = self.gen(block, withReturn)
     def genHost(lhs: Sym[_], rhs: Op[_]): Unit = gen(lhs, rhs)
   }
 
   final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genAccel(lhs, rhs) else genHost(lhs, rhs)
 
-  val hostFile = "HostMain.scala"
+  val hostFile = "Main.scala.1"
   val accelFile = "AccelMain.scala"
 
   def openHost(blk: => Unit) = inGen(out, hostFile)(blk)
@@ -41,7 +42,6 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     super.emitHeader()
     openHost { emitHostHeader }
     openAccel { emitAccelHeader }
-    emit(s"object ${spatialConfig.name} extends Host with Accel")
   }
 
   final override def emitFooter():Unit = {
@@ -52,7 +52,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   def emitHostHeader = {
     hostGen.emitHeader
-    open(src"object HostMain {")
+    open(src"object Main {")
       open(src"def main(args: Array[String]): Unit = {")
   }
 
@@ -66,11 +66,12 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   def emitAccelHeader = {
     emit("import pir._")
     emit("import pir.node._")
-    emit("import arch._")
-    emit("import prism.enums._")
+    emit("import spade.param._")
+    emit("import prism.graph._")
     emit("")
-    open(s"""trait Accel extends PIRApp {""")
-    open(src"def accel(top:Controller): Unit = {")
+    open(s"""object AccelMain extends PIRApp {""")
+    open(src"def staging(top:Top) = {")
+    emit("""import top._""")
   }
 
   def emitAccelFooter = {
@@ -94,16 +95,26 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case x => x.toString
   }
 
+  override protected def remap(tp: Type[_]): String = tp match {
+    case FixPtType(s, i, f) => src"Fix(${s}, ${i}, ${f})"
+    case FltPtType(m, e) => src"Flt(${m}, ${e})"
+    case _:Bit => src"Bool"
+    case tp:Vec[_] => remap(tp.A) //TODO
+    //case tp:Vec[_] => src"Vec(${tp.A}, ${tp.width})"
+    case tp => super.remap(tp)
+  }
+
   protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
-    //emit(s"// $lhs = $rhs TODO: Unmatched Node")
-    //rhs.blocks.foreach(ret)
-    hostGen.genHost(lhs, rhs)
+    //hostGen.genHost(lhs, rhs)
+    rhs.blocks.foreach(ret)
   }
 
   protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {
     emit(s"// $lhs = $rhs TODO: Unmatched Node")
     rhs.blocks.foreach(ret)
   }
+
+  final def genInAccel(lhs: Sym[_], rhs: Op[_]): Unit = openAccel { genAccel(lhs, rhs) }
 
   override protected def emitEntry(block: Block[_]): Unit = {
     openHost {

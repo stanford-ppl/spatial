@@ -63,8 +63,16 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   override def isAssociative: Boolean = true
 
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (_, Literal(0)) => a
+    case (Literal(0), _) => b
+
     case (Op(FixSub(x,c)), _) if c == b => x  // (x - b) + b = x
     case (_, Op(FixSub(x,c))) if c == a => x  // a + (x - a) = x
+
+    case (Op(FixAdd(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
+    case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
+    case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
+    case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
     case _ => super.rewrite
   }
 }
@@ -80,6 +88,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 
     case (_,Op(FixAdd(x,c))) if c == a => -x // a - (x + a) = -x
     case (_,Op(FixAdd(c,x))) if c == a => -x // a - (a + x) = -x
+
+    case (Op(FixAdd(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r - q)))
+    case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixSub(x, Type[Fix[S,I,F]].from(r + q)))
+    case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixSub(Type[Fix[S,I,F]].from(q - r), x))
+    case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(Type[Fix[S,I,F]].from(q + r), x))
+
     case _ => super.rewrite
   }
 }
@@ -89,6 +103,15 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   override def absorber: Option[Fix[S,I,F]] = Some(R.uconst(0))
   override def identity: Option[Fix[S,I,F]] = Some(R.uconst(1))
   override def isAssociative: Boolean = true
+  @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (Const(q), Const(r)) => R.from(q*r)
+    case (_, Const(r)) if r.isPow2 && r > 0 => a << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r.isPow2 && r < 0 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case _ => super.rewrite
+  }
+
 }
 
 /** Fixed fused multiply add */

@@ -4,6 +4,8 @@ import argon._
 import spatial.dsl._
 
 @spatial class ScanLines extends SpatialTest {
+  override def dseModelArgs: Args = "4 -1 99"
+  override def finalModelArgs: Args = "4 -2 -1 0"
   override def runtimeArgs: Args = NoArgs
 
 
@@ -31,7 +33,7 @@ import spatial.dsl._
     setArg(iters, 4)
 
     Accel{
-      val grid_sram = SRAM[Int](ROWS,COLS).hierarchical
+      val grid_sram = SRAM[Int](ROWS,COLS).noflat.noduplicate
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
 
       Foreach(iters by 1) { iter =>

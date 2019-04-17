@@ -3,7 +3,10 @@ package spatial.tests.apps
 import spatial.dsl._
 
 @spatial class SingleLayerConv_RCIO extends SpatialTest {
+  override def dseModelArgs: Args = "16 16 16 0 0 8 16 16 16 16 16 16 0 0 16"
+  override def finalModelArgs: Args = "16 16 16 0 0 8 16 16 16 16 16 16 16 16"
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
+  
   type T = FixPt[TRUE,_16,_0]
   type T2 = FixPt[TRUE,_32,_0]
   type REALT = FixPt[TRUE,_4,_12]
@@ -556,10 +559,12 @@ import spatial.dsl._
 
 
 @spatial class SingleLayerConv_IRCO extends SpatialTest {
-  type T = FixPt[TRUE,_16,_0]
+  override def dseModelArgs: Args = "16 16 16 16 2 16 1 16 1 16 1 32 32 1 32 2 1 16 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 16 1 8"
+  override def finalModelArgs: Args = "16 16 16 16 2 16 1 16 1 16 6 32 32 0 32 2 0 16 16 1 16 "
 
+  type T = FixPt[TRUE,_16,_0] 
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
-
+  
   def main(args: Array[String]): Unit = {
 
     val debug:scala.Boolean = false
@@ -628,7 +633,7 @@ import spatial.dsl._
         val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
         Foreach(INPUT_ROWS by STRIDE){ row => 
           // val bias_srams = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX) // / STRIDE?
-          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.flat
+          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.nohierarchical
           Parallel {
             Foreach(OUTPUT_CHANS by 1 par P3) {oc => 
               if (ic == 0) accum_lines(oc::oc+1, 0::INPUT_COLS/STRIDE) load BIAS_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar)
@@ -740,6 +745,8 @@ import spatial.dsl._
 
 @spatial class SingleLayerConv_OIRC extends SpatialTest {
   type T = FixPt[TRUE,_16,_0]
+  override def dseModelArgs: Args = "16 16 16 16 16 2 16 2 16 32 32 0 32 2 0 16"
+  override def finalModelArgs: Args = "16 16 16 16 16 2 16 2 16 32 32 0 32 2 0 16"
 
   override def runtimeArgs: Args = "16 32 16 16 2 0" and "16 32 16 16 1 0"
 
@@ -812,13 +819,11 @@ import spatial.dsl._
             val bias_sram = SRAM[T](INPUT_COLS_MAX) // / STRIDE?
             val accum_line = SRAM[T](INPUT_COLS_MAX).buffer
             if (ic == 0) bias_sram load BIAS_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
-            // Parallel{
-              Pipe{accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)}
-              Pipe{
-                if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
-                else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
-              }
-            // }
+            Parallel{
+              accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
+              if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
+              else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
+            }
             Foreach(INPUT_COLS by STRIDE par PX){ col =>
               val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
               val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
@@ -896,4 +901,5 @@ import spatial.dsl._
 
   }
 }
+
 

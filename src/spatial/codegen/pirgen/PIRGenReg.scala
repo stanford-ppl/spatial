@@ -9,19 +9,19 @@ trait PIRGenReg extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@RegNew(init)    =>
-      stateMem(lhs, "ArgIn", None)
+      stateMem(lhs, "Reg()", Some(List(init)))
 
     case op@ArgInNew(init)  =>
-      stateMem(lhs, "HostIO", None)
+      stateMem(lhs, s"""argIn("${lhs.name.getOrElse(s"$lhs")}")""", tp=Some("Reg"), inits=Some(List(init)))
 
     case op@HostIONew(init)  =>
-      stateMem(lhs, "ArgOut", None)
+      stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(List(init)))
 
     case op@ArgOutNew(init) =>
-      stateStruct(lhs, lhs.asMem.A)(name => src"ArgOut(init=$init)")
+      stateMem(lhs, "argOut()", tp=Some("Reg"), inits=Some(List(init)))
 
     case RegReset(reg, ens) =>
-      stateStruct(lhs, reg)(name => src"RegReset(reg=${Lhs(reg,name)}, ens=$ens)")
+      stateStruct(lhs, reg)(field => src"RegReset(reg=${Lhs(reg,field.map{_._1})}, ens=$ens)")
 
     case RegRead(reg)       => 
       stateRead(lhs, reg, None, None, Seq(Set.empty))
@@ -30,15 +30,31 @@ trait PIRGenReg extends PIRCodegen {
       stateWrite(lhs, reg, None, None, Seq(v), Seq(ens))
 
     case RegAccumOp(reg,in,ens,op,first) =>
-      state(lhs) {
-        src"RegAccumOpDef(op=$op, in=$in, first=$first, ens=$ens)"
+      state(lhs)(src"""RegAccumOp("$op").in($in).en($ens).first($first).tp(${lhs.tp})""")
+      if (reg.readers.filterNot(_ == lhs).nonEmpty) { //HACK
+        state(Lhs(lhs, Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs).port(Some(0))")
       }
+
     case RegAccumFMA(reg,m0,m1,ens,first) =>
-      state(lhs) {
-        src"RegAccumFMADef(m0=$m0, m1=$m1, first=$first, ens=$ens)"
+      genOp(Lhs(lhs,Some("mul")), op=Some("FixMul"),inputs=Some(Seq(m0, m1)))
+      state(lhs)(src"""RegAccumOp("AccumAdd").in(${Lhs(lhs, Some("mul"))}).en($ens).first($first).tp(${lhs.tp})""")
+      if (reg.readers.filterNot(_ == lhs).nonEmpty) { //HACK
+        state(Lhs(lhs, Some("write")))(src"MemWrite().setMem($reg).en(${ens}).data($lhs).port(Some(0))")
       }
 
     case _ => super.genAccel(lhs, rhs)
+  }
+
+  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op@ArgInNew(init)  =>
+      super.genHost(lhs, rhs)
+      genInAccel(lhs, rhs)
+
+    case op@ArgOutNew(init) =>
+      super.genHost(lhs, rhs)
+      genInAccel(lhs, rhs)
+
+    case _ => super.genHost(lhs, rhs)
   }
 
 }

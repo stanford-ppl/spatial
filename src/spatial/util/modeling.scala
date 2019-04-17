@@ -20,6 +20,13 @@ import scala.collection.immutable.SortedSet
 
 object modeling {
 
+  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+    if (scope.contains(x) && !nodes.contains(x)) {
+      consumersDfs(x.consumers, nodes + x, scope)
+    }
+    else nodes
+  }
+
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
     val result   = (block +: schedule.flatMap{_.blocks}).flatMap{b => exps(b) }
@@ -96,7 +103,8 @@ object modeling {
     cycles:  mutable.Map[Sym[_], mutable.Set[AccumTriple]]
   )
 
-  @stateful def findAccumCycles(scope: Set[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
+  @stateful def findAccumCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
+    val scope = schedule.toSet
     val cycles = mutable.HashMap[Sym[_],mutable.Set[AccumTriple]]()
     def addCycle(sym: Sym[_], triple: AccumTriple): Unit = {
       val set = cycles.getOrElseAdd(sym, () => mutable.HashSet.empty)
@@ -115,6 +123,7 @@ object modeling {
       case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
       case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
     }
+
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val memories = readersByMem.keySet intersect writersByMem.keySet
@@ -140,7 +149,6 @@ object modeling {
     ScopeAccumInfo(readersByMem, writersByMem, accums, cycles)
   }
 
-
   @stateful def pipeLatencies(
     result:   Seq[Sym[_]],
     schedule: Seq[Sym[_]],
@@ -148,24 +156,53 @@ object modeling {
     verbose:  Boolean = false
   ): (Map[Sym[_],Double], Set[Cycle]) = {
 
-    def debugs(x: => Any): Unit = if (verbose) dbgs(x)
-
-    debugs(s"----------------------------------")
-    debugs(s"Computing pipeLatencies for scope:")
-    schedule.foreach{ e => debugs(s"  ${stm(e)}") }
-
     val scope = schedule.toSet
 
-    val accumInfo = findAccumCycles(scope,verbose)
+    val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
+    val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
+
+    val accumInfo = findAccumCycles(schedule,verbose)
     val accums      = accumInfo.accums
     val accumReads  = accums.map(_.read)
     val accumWrites = accums.map(_.write)
     val knownCycles = accumInfo.cycles
 
-    val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
-    val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
+    def debugs(x: => Any): Unit = if (verbose) dbgs(x)
 
-    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+    def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): Set[WARCycle] = {
+      val scope = schedule.toSet
+
+      val readers = scope.collect{
+        case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
+        case reader @ StatusReader(mem,_) => AccessPair(mem, reader)
+        case reader @ BankedReader(mem,_,_,_) => AccessPair(mem, reader)
+        case reader @ VectorReader(mem,_,_) => AccessPair(mem, reader)
+      }
+      val writers = scope.collect{
+        case writer @ Writer(mem,_,_,_)     => AccessPair(mem, writer)
+        case writer @ DequeuerLike(mem,_,_) => AccessPair(mem, writer)
+        case writer @ BankedWriter(mem,_,_,_,_)     => AccessPair(mem, writer)
+        case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
+      }
+
+      val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
+      val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
+      val memories = readersByMem.keySet intersect writersByMem.keySet
+      memories.flatMap{mem =>
+        dbgs(s"pseudo cycles for $mem:")
+        val rds = readersByMem(mem)
+        val wrs = writersByMem(mem)
+        rds.cross(wrs).collect{case (rd, wr) if (paths(rd) < paths(wr) && !accums.contains(AccumTriple(mem, rd, wr))) =>
+          val cycleLengthExact = paths(wr).toInt - paths(rd).toInt + latencyOf(rd, true)
+          dbgs(s" - $rd $wr cycle = $cycleLengthExact")
+
+          // TODO[2]: FIFO/Stack operations need extra cycle for status update?
+          val cycleLength = if (rd.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
+          WARCycle(rd, wr, mem, Set(rd,wr,mem), cycleLength)
+        }
+      }
+
+    }
 
     def fullDFS(cur: Sym[_]): Double = {
       def precedingWrites: Set[Sym[_]] = {
@@ -238,33 +275,6 @@ object modeling {
       case _ => // Do nothing
     }
 
-    if (scope.nonEmpty) {
-      // Perform forwards pass for normal data dependencies
-      result.foreach{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
-
-      // TODO[4]: What to do in case where a node is contained in multiple cycles?
-      accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
-        val cycle = cycles.getOrElse(writer, Set.empty)
-        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
-        reverseDFS(writer, cycle)
-      }
-    }
-
-    val warCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
-      val symbols = cycles(writer)
-      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
-
-      // TODO[2]: FIFO/Stack operations need extra cycle for status update?
-      val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
-      WARCycle(reader, writer, mem, symbols, cycleLength)
-    }
-
-    def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
-      if (scope.contains(x) && !nodes.contains(x)) {
-        consumersDfs(x.consumers, nodes + x)
-      }
-      else nodes
-    }
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){
@@ -301,7 +311,7 @@ object modeling {
             if (writeDelay-oldPath > 0) {
               debugs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
-              val affectedNodes = consumersDfs(access.consumers, Set()) intersect scope
+              val affectedNodes = consumersDfs(access.consumers, Set(), scope) intersect scope
               affectedNodes.foreach{case x if (paths.contains(x)) => 
                   debugs(s"  $x")
                   paths(x) = paths(x) + (writeDelay-oldPath)
@@ -328,7 +338,7 @@ object modeling {
           // Place reader at this latency
           val originalReadLatency = paths(reader)
           paths(reader) = baseLatency + 2 /*sram load latency*/
-          val affectedNodes = (consumersDfs(reader.consumers, Set()) intersect scope) diff Set(reader)
+          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope) intersect scope) diff Set(reader)
           dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
           // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
           affectedNodes.foreach{case x if (paths.contains(x)) => 
@@ -339,6 +349,51 @@ object modeling {
         }
       }
     }
+
+    def pushBreakNodes(regWrite: Sym[_]): Unit = {
+      val reg = regWrite match {case Op(_@RegWrite(x,_,_)) => x; case _ => throw new Exception(s"Cannot break loop with non-reg ($regWrite)")}
+      if (regWrite.ancestors.exists(_.stopWhen == Some(reg))) {
+        val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
+        val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
+        toPush.foreach{
+          case x if (paths.contains(x)) => 
+            dbgs(s"  $x - Originally at ${paths(x)}, but must push by ${paths(regWrite)}")
+            paths(x) = if (paths(x) < paths(regWrite)) paths(regWrite) + 1 else paths(x)
+          case _ => 
+
+        }
+      } else dbgs(s"  $regWrite is not modifying its Reg inside the loop it breaks")
+
+    }
+
+    debugs(s"----------------------------------")
+    debugs(s"Computing pipeLatencies for scope:")
+    schedule.foreach{ e => debugs(s"  ${stm(e)}") }
+
+    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+
+    if (scope.nonEmpty) {
+      // Perform forwards pass for normal data dependencies
+      result.foreach{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
+
+      // TODO[4]: What to do in case where a node is contained in multiple cycles?
+      accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
+        val cycle = cycles.getOrElse(writer, Set.empty)
+        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
+        reverseDFS(writer, cycle)
+      }
+    }
+
+    val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
+      val symbols = cycles(writer)
+      val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
+
+      // TODO[2]: FIFO/Stack operations need extra cycle for status update?
+      val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
+      WARCycle(reader, writer, mem, symbols, cycleLength)
+    }
+    val pseudoWarCycles = findPseudoWARCycles(schedule)
+    val warCycles = trueWarCycles ++ pseudoWarCycles
 
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
@@ -356,6 +411,8 @@ object modeling {
         debugs(s"  [${dly(node)}] ${stm(node)}")
       }
     }
+
+    scope.foreach{case x if x.isWriter && x.writtenMem.isDefined && x.writtenMem.get.isBreaker => pushBreakNodes(x); case _ => }
 
     pushSegmentationAccesses()
 
@@ -378,6 +435,7 @@ object modeling {
     cycles:     Set[Sym[_]],
     createLine: Option[(Int, Sym[_], SrcCtx) => Sym[_]]
   ): Seq[(Sym[_], ValueDelay)] = {
+    dbgs(s"computing delay lines for $scope $latencies $delayLines $cycles")
     val innerScope = scope.flatMap(_.blocks.flatMap(_.stms)).toSet
 
     def delayOf(x: Sym[_]): Double = latencies.getOrElse(x, 0.0)
@@ -448,6 +506,46 @@ object modeling {
         }
       }
     }
+  }
+
+
+  /**
+    * Calculate delay line costs:
+    * a. Determine time (in cycles) any given input or internal signal needs to be delayed
+    * b. Distinguish each delay line as a separate entity
+    *
+    * Is there a concise equation that can capture this? Haven't been able to come up with one.
+    * E.g.
+    *   8 inputs => perfectly balanced binary tree, no delay paths
+    *   9 inputs => 1 path of length 3
+    *   85 inputs => 3 paths with lengths 2, 1, and 1
+    **/
+  def reductionTreeDelays(nLeaves: Int): List[Long] = {
+    if ( (nLeaves & (nLeaves - 1)) == 0) Nil // Specialize for powers of 2
+    // Could also have 2^k + 1 case (delay = 1 path of length k)
+    else {
+      def reduceLevel(nNodes: Int, completePaths: List[Long], currentPath: Long): List[Long] = {
+        if (nNodes <= 1) completePaths  // Stop when 1 node is remaining
+        else if (nNodes % 2 == 0) {
+          // For an even number of nodes, we don't need any delays - all current delay paths end
+          val allPaths = completePaths ++ (if (currentPath > 0) List(currentPath) else Nil)
+          reduceLevel(nNodes/2, allPaths, 0L)
+        }
+        // For odd number of nodes, always delay exactly one signal, and keep delaying that signal until it can be used
+        else reduceLevel((nNodes-1)/2 + 1, completePaths, currentPath+1)
+      }
+
+      reduceLevel(nLeaves, Nil, 0L)
+    }
+  }
+
+  def reductionTreeHeight(nLeaves: Int): Int = {
+    def treeLevel(nNodes: Int, curHeight: Int): Int = {
+      if (nNodes <= 1) curHeight
+      else if (nNodes % 2 == 0) treeLevel(nNodes/2, curHeight + 1)
+      else treeLevel((nNodes - 1)/2 + 1, curHeight + 1)
+    }
+    treeLevel(nLeaves, 0)
   }
 
 }

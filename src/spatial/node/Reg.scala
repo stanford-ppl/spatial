@@ -32,11 +32,9 @@ import spatial.lang._
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)
 }
 
-@op case class FIFORegDeq[A:Bits](mem: FIFOReg[A]) extends Dequeuer[A,A] {
+@op case class FIFORegDeq[A:Bits](mem: FIFOReg[A], ens: Set[Bit]) extends Dequeuer[A,A] {
   override def effects: Effects = super.effects andAlso Effects.Unique
   override val isTransient = true
-  // Register read never takes enables
-  override var ens: Set[Bit] = Set.empty
   override def addr: Seq[Idx] = Nil
   override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)

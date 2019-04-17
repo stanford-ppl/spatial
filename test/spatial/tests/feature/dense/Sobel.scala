@@ -4,6 +4,8 @@ import spatial.dsl._
 
 @spatial class Sobel extends SpatialTest {
   override def compileArgs: Args = super.compileArgs and "--forceBanking"
+  override def dseModelArgs: Args = "200 160 160 160 160 99"
+  override def finalModelArgs: Args = "200 160 160 160 160 99 160 160 99"
   override def runtimeArgs: Args = "200 160"
 
 

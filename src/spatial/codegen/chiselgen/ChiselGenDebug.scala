@@ -20,20 +20,20 @@ trait ChiselGenDebug extends ChiselGenCommon {
     case VarAssign(_,_) =>  emit(src"""val $lhs = "" """)
 
     case ExitIf(en) => 
-    	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")
-	    emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${quote(lhs.parent.s.get)}.datapathEn).D(${lhs.fullDelay})")
+    	val ens = and(en)
+	    emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & ($datapathEn).D(${lhs.fullDelay}))")
 	    earlyExits = earlyExits :+ lhs
 
     case AssertIf(en,cond,_) => 
     	if (inHw) {
-	    	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")
-	        emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${quote(lhs.parent.s.get)}.datapathEn).D(${lhs.fullDelay}) & ~${quote(cond)}")
+	    	val ens = and(en)
+	        emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & ($datapathEn).D(${lhs.fullDelay}) & ~${quote(cond)})")
 	        earlyExits = earlyExits :+ lhs
 	    }
 
     case BreakpointIf(en) => 
-    	val ens = if (en.isEmpty) "true.B" else en.map(quote).mkString("&")
-        emit(s"breakpoints(${earlyExits.length}) := ${ens} & (${quote(lhs.parent.s.get)}.datapathEn).D(${lhs.fullDelay})")
+        val ens = and(en)
+        emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & ($datapathEn).D(${lhs.fullDelay}))")
         earlyExits = earlyExits :+ lhs
 
 	case _ => super.gen(lhs, rhs)

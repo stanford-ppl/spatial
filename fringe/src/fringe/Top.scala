@@ -25,6 +25,7 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
     case "aws"  | "AWS_F1"     => new targets.aws.AWS_F1
     case "aws-sim"   => new targets.aws.AWS_Sim
     case "zynq" | "Zynq"      => new targets.zynq.Zynq
+    case "zedboard" | "ZedBoard"      => new targets.zedboard.ZedBoard
     case "zcu"  | "ZCU"       => new targets.zcu.ZCU
     case "arria10" | "Arria10"   => new targets.arria10.Arria10
     case "asic" | "ASIC"     => new targets.asic.ASIC
@@ -33,8 +34,8 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
 
   globals.target.makeIO = { x: Data => IO(x) }
   val accel = accelGen()
+  accel.io <> DontCare
   val io = globals.target.topInterface(reset, accel)
-
   // Accel
 
   // TBD: Accel <-> Fringe Memory connections

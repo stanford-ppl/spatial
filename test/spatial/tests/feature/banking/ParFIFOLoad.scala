@@ -5,6 +5,8 @@ import spatial.dsl._
 
 
 @spatial class ParFIFOLoad extends SpatialTest {
+  override def dseModelArgs: Args = "192"
+  override def finalModelArgs: Args = "192"
   override def runtimeArgs: Args = "192"
 
   def parFifoLoad[T:Num](src1: Array[T], src2: Array[T], in: Int) = {

@@ -15,7 +15,7 @@ object Result {
 
   case object Pass extends Result {
     def ==>(func: => Result): Result = this orElse func
-    def orElse(result: => Result): Result = result match {
+    def orElse(result: => Result): Result = this match {
       case Pass => Pass
       case _ => result
     }
@@ -58,6 +58,13 @@ object Result {
     def continues: Boolean = false
   }
 
+
+  case class ModelError(msg: String) extends Exception(msg) with Result with NoStackTrace {
+    def ==>(func: => Result): Result = this
+    def orElse(result: => Result): Result = this
+    def resolve(): Unit = throw this
+    def continues: Boolean = false
+  }
 }
 
 

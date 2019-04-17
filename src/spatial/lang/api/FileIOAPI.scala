@@ -2,10 +2,9 @@ package spatial.lang.api
 
 import argon._
 import forge.tags._
+import utils.io.files._
 
 import spatial.node._
-
-import scala.io.Source
 
 trait FileIOAPI { this: Implicits =>
 
@@ -32,12 +31,6 @@ trait FileIOAPI { this: Implicits =>
       error(ctx)
       throw t
     }
-  }
-
-  def loadCSVNow[A](filename: String, delim: String)(func: String => A): Seq[A] = {
-    Source.fromFile(filename).getLines().flatMap{line =>
-      line.split(delim).map(_.trim).flatMap(_.split(" ")).map{x => func(x.trim) }
-    }.toSeq
   }
 
   @api def loadConstants[A:Type](filename: String, delim: String = "\n"): Tensor1[A] = {

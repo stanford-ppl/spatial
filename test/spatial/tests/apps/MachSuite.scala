@@ -2,8 +2,11 @@ package spatial.tests.apps
 
 import spatial.dsl._
 import spatial.targets._
+import utils.io.files._
 
 @spatial class AES extends SpatialTest {
+  override def dseModelArgs: Args = "800 93 93 87 45"
+  override def finalModelArgs: Args = "800 93 93 87 45"
   override def runtimeArgs: Args = "50"
 
   /*
@@ -466,27 +469,16 @@ import spatial.targets._
       5.5075111389160156.to[T],5.1880970001220703.to[T],4.8259010314941406.to[T],4.2589011192321777.to[T],5.6381106376647949.to[T],
       3.4522385597229004.to[T],3.5920252799987793.to[T],4.2071061134338379.to[T],5.0856294631958008.to[T],6.0637059211730957.to[T])
 
-    val obs_vec = Array[Int](0,27,49,52,20,31,63,63,29,0,47,4,38,38,38,38,4,43,7,28,31,
-                         7,7,7,57,2,2,43,52,52,43,3,43,13,54,44,51,32,9,9,15,45,21,
-                         33,61,45,62,0,55,15,55,30,13,13,53,13,13,50,57,57,34,26,21,
-                         43,7,12,41,41,41,17,17,30,41,8,58,58,58,31,52,54,54,54,54,
-                         54,54,15,54,54,54,54,52,56,52,21,21,21,28,18,18,15,40,1,62,
-                         40,6,46,24,47,2,2,53,41,0,55,38,5,57,57,57,57,14,57,34,37,
-                         57,30,30,5,1,5,62,25,59,5,2,43,30,26,38,38)
+    val obs_vec_scalatypes = loadCSVNow[scala.Int](s"$DATA/viterbi/obs_vec.csv", ","){_.toInt}
+    val obs_vec = Array[Int](obs_vec_scalatypes.map(_.to[Int]):_*)
 
     val raw_transitions = loadCSV1D[T](s"$DATA/viterbi/viterbi_transition.csv", "\n")
     val raw_emissions = loadCSV1D[T](s"$DATA/viterbi/viterbi_emission.csv", "\n")
     val transitions = raw_transitions.reshape(N_STATES, N_STATES)
     val emissions = raw_emissions.reshape(N_STATES, N_TOKENS)
 
-    val correct_path = Array[Int](27,27,27,27,27,31,63,63,63,63,47,4,38,38,38,38,7,7,7,
-                                  7,7,7,7,7,2,2,2,43,52,52,43,43,43,43,43,44,44,32,9,9,
-                                  15,45,45,45,45,45,45,0,55,55,55,30,13,13,13,13,13,13,
-                                  57,57,21,21,21,21,7,41,41,41,41,17,17,30,41,41,58,58,
-                                  58,31,54,54,54,54,54,54,54,54,54,54,54,54,52,52,52,21,
-                                  21,21,28,18,18,40,40,40,40,40,40,46,46,2,2,2,53,53,53,
-                                  55,38,57,57,57,57,57,57,57,57,57,57,30,30,5,5,5,5,5,5,
-                                  5,5,30,30,26,38,38)
+    val correct_path_scalatypes = loadCSVNow[scala.Int](s"$DATA/viterbi/correct_path.csv", ","){_.toInt}
+    val correct_path = Array[Int](correct_path_scalatypes.map(_.to[Int]):_*)
     // Handle DRAMs
     val init_dram = DRAM[T](N_STATES)
     val obs_dram = DRAM[Int](N_OBS)
@@ -672,6 +664,8 @@ import spatial.targets._
  */
 
 
+  override def dseModelArgs: Args = "33 6 1 19 9"
+  override def finalModelArgs: Args = "1 19 9 1 19 9"
 
   def main(args: Array[String]): Unit = {
 
@@ -936,8 +930,8 @@ import spatial.targets._
 
       // Store result
       Parallel{
-        Sequential{seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned}
-        Sequential{seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned}
+        seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned
+        seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned
       }
 
     }
@@ -1080,6 +1074,9 @@ import spatial.targets._
 }      
 
 @spatial class MD_Grid extends SpatialTest {
+  override def dseModelArgs: Args = "0 4 0 4 0 4 4 4 1"
+  override def finalModelArgs: Args = "0 4 0 4 0 4 4 4 4 4 4 4 4 4"
+
  /*
   
   Moleckaler Dynamics via the grid, a digital frontier
@@ -1424,6 +1421,8 @@ import spatial.targets._
 }      
 
 @spatial class GEMM_Blocked extends SpatialTest { // Regression (Dense) // Args: 128
+  override def dseModelArgs: Args = "128 128 128"
+  override def finalModelArgs: Args = "128 128 128"
   override def runtimeArgs: Args = "128"
                                                                                                   
                                                                                                   
@@ -1859,6 +1858,8 @@ import spatial.targets._
                                                                                                                                                                            
  */
 
+  override def dseModelArgs: Args = "16 50 50 50 50 50"
+  override def finalModelArgs: Args = "16 50 50 50 50 50"
 
   def main(args: Array[String]): Unit = {
 
@@ -2078,8 +2079,8 @@ import spatial.targets._
           val start_id = rowid_sram(i)
           val stop_id = rowid_sram(i+1)
           Parallel{
-            cols_sram load cols_dram(start_id :: stop_id par par_segment_load)
-            values_sram load values_dram(start_id :: stop_id par par_segment_load)
+            Pipe{cols_sram load cols_dram(start_id :: stop_id par par_segment_load)}
+            Pipe{values_sram load values_dram(start_id :: stop_id par par_segment_load)}
           }
           vec_sram gather vec_dram(cols_sram, stop_id - start_id)
           println("row " + {i + tile})
@@ -2188,6 +2189,8 @@ import spatial.targets._
 
 
 @spatial class Backprop extends SpatialTest {
+  override def dseModelArgs: Args = "5 13 3"
+  override def finalModelArgs: Args = "5 13 3"
   override def runtimeArgs: Args = "5"
 
  /*                                                                                                  

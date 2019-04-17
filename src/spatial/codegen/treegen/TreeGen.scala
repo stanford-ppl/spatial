@@ -12,6 +12,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.traversal.AccelTraversal
 import spatial.util.modeling.scrubNoise
+import emul.ResidualGenerator._
 
 import scala.collection.mutable.HashMap
 
@@ -25,15 +26,16 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   override val entryFile: String = "controller_tree.html"
 
   val memColors = Seq("cce6ff", "ccb6ff", "99ddff", "99ff99", "e6b3cc", "ccffcc", "e0e0d1", "ffcccc",
-                      "d1e0e0", "e699ff", "fff7e6", "f2ffcc", "d9b3ff", "cce0ff", "f2e6ff", "ecc6d9") // List of colors I think looks nice
-
+                      "d1e0e0", "e699ff", "fff7e6", "f2ffcc", "d9b3ff", "cce0ff", "f2e6ff", "ecc6d9",
+                      "eefb21", "c5989e", "3add77", "ee6c56", "17eaf7", "22f5e2", 
+                      "50d246", "e0b77a", "14fb82", "efc11b", "aed919") // List of colors I think looks nice
   private val colorMap = HashMap[Sym[_], String]()
   private val nonBufMems = scala.collection.mutable.Set[Sym[_]]()
 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func)     => inAccel{ printControl(lhs,rhs) }
     case _:Control[_] if inHw => printControl(lhs, rhs)
-    case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer) => logMem(lhs, rhs)
+    case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer | lhs.isFIFOReg) => logMem(lhs, rhs)
     case _ => rhs.blocks.foreach{blk => gen(blk) }
   }
 
@@ -112,7 +114,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         inTitledCollapsible(true){
           emit(src"<font size=1>NBuf Connections</font>")
         }{
-          swappers(lhs).foreach{mem => 
+          sortMems(swappers(lhs).toSeq).foreach{mem => 
             printMem(mem)
           }        
         }
@@ -163,6 +165,10 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   """)
   }
 
+  private def sortMems(mems: Seq[Sym[_]]): Seq[Sym[_]] = mems.toList.map{x => (x, totalVolume(x))}.sortBy(_._2).reverse.map(_._1).toSeq
+  private def singleVolume(x: Sym[_]): Int = x.constDims.zip(x.getPadding.getOrElse(Seq.fill(x.constDims.length)(0))).map{case (d:Int,p:Int) => d+p}.product
+  private def totalVolume(x: Sym[_]): Int = x.constDims.product * x.instance.depth
+
   override def emitFooter(): Unit = {
     emit("</TABLE>")
     val nbufs = swappers.flatMap{case (_, mems) => mems}.toList.distinct
@@ -170,18 +176,25 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
     inCell("NBuf Mems", true){
       emit("NBuf Mems")
     }{
-      nbufs.toList.map{x => (x, x.constDims.product * x.instance.depth)}.sortBy(_._2).reverse.map(_._1).foreach{mem => 
+      sortMems(nbufs).foreach{mem => 
         val depth = mem.instance.depth
         val dims = mem.constDims
         val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-        val volume = dims.zip(pads).map{case (d:Int,p:Int) => d+p}.product
+        val volume = singleVolume(mem)
+        val bufVolume = totalVolume(mem)
         val banks = mem.instance.nBanks
+        val B = mem.instance.Bs
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val lca = mem.swappers.head.parent.s.get
-        val hasXBarR = if (mem.readers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarR" else "<s>has XBarR</s>"
-        val hasXBarW = if (mem.writers.exists{x => x.port.bufferPort.isDefined && !x.isDirectlyBanked}) "has XBarW" else "<s>has XBarW</s>"
-        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", s"$hasXBarR, $hasXBarW")
+        val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
+        val histR: Map[Int, Int] = mem.readers.toList.flatMap{x => x.residualGenerators}.zip(mem.readers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
+        val histW: Map[Int, Int] = mem.writers.toList.flatMap{x => x.residualGenerators}.zip(mem.writers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
+        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
+        val hist = 
+          if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
+          else ""
+        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     inCell("Single-Buffered Mems", true) {
@@ -190,13 +203,19 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
       nonBufMems.toList.map{x => (x, x.constDims.product)}.sortBy(_._2).reverse.map(_._1).foreach{mem => 
         val dims = mem.constDims
         val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-        val volume = dims.zip(pads).map{case (d:Int,p:Int) => d+p}.product
+        val volume = singleVolume(mem)
         val banks = mem.instance.nBanks
+        val B = mem.instance.Bs
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
-        val hasXBarR = if (mem.readers.exists{x => !x.isDirectlyBanked}) "has XBarR" else "<s>has XBarR</s>"
-        val hasXBarW = if (mem.writers.exists{x => !x.isDirectlyBanked}) "has XBarW" else "<s>has XBarW</s>"
-        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", s"$hasXBarR, $hasXBarW")
+        val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
+        val histR: Map[Int, Int] = mem.readers.toList.flatMap{x => x.residualGenerators}.zip(mem.readers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
+        val histW: Map[Int, Int] = mem.writers.toList.flatMap{x => x.residualGenerators}.zip(mem.writers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
+        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
+        val hist = 
+          if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
+          else ""
+        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     emit("</body>")

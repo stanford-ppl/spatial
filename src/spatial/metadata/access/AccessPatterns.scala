@@ -64,7 +64,7 @@ case class Prod(xs: Seq[Idx], m: Int = 1) {
 }
 object Prod {
   def single(c: Int): Prod = Prod(Nil, c)
-  def single(x: Idx): Prod = x match {
+  @stateful def single(x: Idx): Prod = x match {
     case Expect(c) => Prod.single(c)
     case _ => Prod(Seq(x))
   }
@@ -152,7 +152,7 @@ case class Sum(ps: Seq[Prod], b: Int = 0) {
 }
 object Sum {
   def single(c: Int): Sum = Sum(Nil, c)
-  def single(x: Idx): Sum = x match {
+  @stateful def single(x: Idx): Sum = x match {
     case Expect(c) => Sum.single(c)
     case _ => Sum(Seq(Prod.single(x)))
   }
@@ -205,16 +205,13 @@ case class AffineProduct(a: Sum, i: Idx) {
   *
   * @param comps A list of sum of products multipliers for distinct loop indices
   * @param ofs   A sum of products representing the symbolic offset
-  * @param lastIters Mapping from symbol to the innermost iterator it varies with, None if it is
-  *                  entirely loop invariant
-  * @param last TODO
-  * @param iterStarts The starting values for each iterator TODO: Why are these tracked here?
+  * @param allIters Mapping from symbol to all iterators it varies with
+  * @param iterStarts The starting values for each iterator
   */
 case class AddressPattern(
     comps: Seq[AffineProduct],
     ofs:   Sum,
-    lastIters: Map[Idx,Option[Idx]],
-    last: Option[Idx],
+    allIters: Map[Idx,Seq[Idx]],
     iterStarts: Map[Idx,Ind[_]])
 {
 
@@ -236,8 +233,8 @@ case class AddressPattern(
       val rand: Seq[(Idx, Int)] = if (others.nonEmpty) Seq((boundVar[I32],1)) else Nil
       val xs_all: Seq[Idx] = affine_comps.map(_._2) ++ rs.map(_._1) ++ starts ++ rand.map(_._1)
       val as_all: Seq[Int] = affine_comps.map(_._1.b) ++ rs.map(_._2) ++ starts.indices.map{_ => 1} ++ rand.map(_._2)
-      if (rand.isEmpty) Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters) )
-      else Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, lastIters ++ Map[Idx, Option[Idx]](rand.head._1 -> last)) )
+      if (rand.isEmpty) Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, allIters) )
+      else Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, allIters ++ Map[Idx, Seq[Idx]](rand.head._1 -> allIters.flatMap(_._2).toSeq)) )
     }
     else None
   }
@@ -248,7 +245,7 @@ case class AddressPattern(
   @stateful def toSparseVector(x: () => Idx): SparseVector[Idx] = {
     getSparseVector.getOrElse{
       val y = x()
-      SparseVector(Map(y -> 1), 0, Map(y -> last))
+      SparseVector(Map(y -> 1), 0, Map(y -> allIters.flatMap(_._2).toSeq))
     }
   }
 

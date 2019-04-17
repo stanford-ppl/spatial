@@ -14,6 +14,7 @@ trait StaticAPI_Internal extends InternalAliases with SpatialVirtualization with
   with MathAPI
   with MiscAPI
   with MuxAPI
+  with ShuffleAPI
   with TensorConstructorAPI
   with TransferAPI
   with TuplesAPI

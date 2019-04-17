@@ -3,6 +3,9 @@ package utils.io
 import java.io._
 import java.nio.file._
 import java.util.function.Consumer
+import java.nio.file.{Files,Paths}
+
+import scala.io.Source
 
 object files {
   def sep: String = java.io.File.separator
@@ -19,12 +22,30 @@ object files {
     files.foreach{filename =>
       val file = new File(path + java.io.File.separator + filename)
       if (file.isDirectory && recursive) {
-        deleteExts(filename, ext, recursive)
+        deleteExts(file.getPath, ext, recursive)
       }
       else if (filename.endsWith("."+ext)) {
         file.delete()
       }
     }
+  }
+
+  /** 
+    * Parse data out of CSV
+    */
+  def loadCSVNow[A](filename: String, delim: String)(func: String => A): Seq[A] = {
+    Source.fromFile(filename).getLines().flatMap{line =>
+      line.split(delim).map(_.trim).flatMap(_.split(" ")).map{x => func(x.trim) }
+    }.toSeq
+  }
+
+  /** 
+    * Parse data out of 2D CSV
+    */
+  def loadCSVNow2D[A](filename: String, delim: String)(func: String => A): List[Seq[A]] = {
+    Source.fromFile(filename).getLines().map{line =>
+      line.split(delim).map(_.trim).flatMap(_.split(" ")).map{x => func(x.trim) }.toSeq
+    }.toList
   }
 
   /**
@@ -119,6 +140,11 @@ object files {
 
   def buildPath(parts:String*):String = {
     parts.mkString(sep)
+  }
+
+  def createDirectories(dir:String) = {
+    val path = Paths.get(dir)
+    if (!Files.exists(path)) Files.createDirectories(path)
   }
 
 }

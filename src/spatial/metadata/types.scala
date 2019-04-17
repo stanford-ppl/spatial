@@ -10,6 +10,7 @@ trait UtilsIRLowPriority {
     def isNum:  Boolean = x.isInstanceOf[Num[_]]
     def isBits: Boolean = x.isInstanceOf[Bits[_]]
     def isVoid: Boolean = x.isInstanceOf[Void]
+    def isString: Boolean = x.typeArgs.headOption.exists(_.isInstanceOf[Text])
   }
 }
 
@@ -25,6 +26,7 @@ object types extends UtilsIRLowPriority {
     def isNum:  Boolean = x.isInstanceOf[Num[_]]
     def isBits: Boolean = x.isInstanceOf[Bits[_]]
     def isVoid: Boolean = x.isInstanceOf[Void]
+    def isString: Boolean = x.tp.isString
 
     def bitInputs: Seq[Sym[_]] = x.op.map(_.bitInputs).getOrElse(Nil)
   }
@@ -34,7 +36,7 @@ object types extends UtilsIRLowPriority {
   }
 
   implicit class ParamHelpers(x: Sym[_]) {
-    def toInt: Int = x match {
+    @stateful def toInt: Int = x match {
       case Expect(c) => c
       case _ => throw new Exception(s"Cannot convert symbol $x to a constant Int")
     }

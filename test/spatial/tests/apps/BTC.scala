@@ -3,9 +3,12 @@ package spatial.tests.apps
 import spatial.dsl._
 
 @spatial class BTC extends SpatialTest {
+  override def dseModelArgs: Args = "160 64 25 50 95 59 64 25 10 50 25 12 50"
+  override def finalModelArgs: Args = "160 64 50 95 59 64 10 50 12 12 12 12 12 12 12 12 50"
   override def runtimeArgs: Args = {
     "0100000081cd02ab7e569e8bcd9317e2fe99f2de44d49ab2b8851ba4a308000000000000e320b6c2fffc8d750423db8b1eb942ae710e951ed797f7affc8892b0f1fc122bc7f5d74df2b9441a42a14695"
   }
+
 
   /*
     According to https://en.bitcoin.it/wiki/Block_hashing_algorithm
@@ -171,14 +174,14 @@ import spatial.dsl._
         }
 
         DBL_INT_ADD(datalen.value.to[ULong] * 8.to[ULong])
-        Pipe{data(63) = (bitlen(0)).to[UInt8]}
-        Pipe{data(62) = (bitlen(0) >> 8).to[UInt8]}
-        Pipe{data(61) = (bitlen(0) >> 16).to[UInt8]}
-        Pipe{data(60) = (bitlen(0) >> 24).to[UInt8]}
-        Pipe{data(59) = (bitlen(1)).to[UInt8]}
-        Pipe{data(58) = (bitlen(1) >> 8).to[UInt8]}
-        Pipe{data(57) = (bitlen(1) >> 16).to[UInt8]}
-        Pipe{data(56) = (bitlen(1) >> 24).to[UInt8]}
+        Pipe{data(63) = bitlen(0).bits(7::0).as[UInt8]}
+        Pipe{data(62) = bitlen(0).bits(15::8).as[UInt8]}
+        Pipe{data(61) = bitlen(0).bits(23::16).as[UInt8]}
+        Pipe{data(60) = bitlen(0).bits(31::24).as[UInt8]}
+        Pipe{data(59) = bitlen(1).bits(7::0).as[UInt8]}
+        Pipe{data(58) = bitlen(1).bits(15::8).as[UInt8]}
+        Pipe{data(57) = bitlen(1).bits(23::16).as[UInt8]}
+        Pipe{data(56) = bitlen(1).bits(31::24).as[UInt8]}
         sha_transform()
 
         // Foreach(8 by 1){i => println(" " + state(i))}

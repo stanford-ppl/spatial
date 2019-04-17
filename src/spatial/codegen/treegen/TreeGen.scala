@@ -183,6 +183,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val volume = singleVolume(mem)
         val bufVolume = totalVolume(mem)
         val banks = mem.instance.nBanks
+        val B = mem.instance.Bs
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val lca = mem.swappers.head.parent.s.get
@@ -193,7 +194,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
           else ""
-        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
+        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     inCell("Single-Buffered Mems", true) {
@@ -204,6 +205,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
         val volume = singleVolume(mem)
         val banks = mem.instance.nBanks
+        val B = mem.instance.Bs
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
@@ -213,7 +215,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
           else ""
-        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
+        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     emit("</body>")

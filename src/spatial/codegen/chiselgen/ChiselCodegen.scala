@@ -406,7 +406,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case FltPtType(m,e) => s"Input(${remap(tp)})"
     case BitType() => "Input(Bool())"
     case tp: Vec[_] => src"Vec(${tp.width},${port(tp.typeArgs.head)})"
-    case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}))"
+    case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}.W))"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
       case Some(x) if x.isNBuffered => src"""Flipped(new NBufInterface(ModuleParams.getParams("${x}_p").asInstanceOf[NBufParams] ))"""

@@ -36,7 +36,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func)     => inAccel{ printControl(lhs,rhs) }
     case _:Control[_] if inHw => printControl(lhs, rhs)
-    case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer | lhs.isFIFOReg) => logMem(lhs, rhs)
+    case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer | lhs.isFIFOReg | lhs.isFIFO | lhs.isLIFO) => logMem(lhs, rhs)
     case _ => rhs.blocks.foreach{blk => gen(blk) }
   }
 

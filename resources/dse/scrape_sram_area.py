@@ -110,6 +110,7 @@ def scrapeFor(node,rpt):
 		with open(rpt, 'r') as file:
 			results = file.read().split('\n')
 		sym = node.localname
+		# print "find %s in %s" % (sym, rpt)
 		for line in results:
 			if (re.compile('^\|[ ]+' + sym + '.*').match(line)):
 				results = line.replace(' ','').split('|')[3:-1]
@@ -164,7 +165,7 @@ def collectMemData():
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "LineBufferNew")
 				current.nbufs = '1' # default of 1
-			elif line.find('FIFO') >= 0:
+			elif line.find('FIFO ') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "FIFONew")
 				current.nbufs = '1' # default of 1
@@ -180,6 +181,7 @@ def collectMemData():
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "RegFileNew")
 				current.nbufs = '1' # default of 1
+
 
 			# Scrape info if currently scanning node
 			if (current != None): 
@@ -278,11 +280,26 @@ def collectIRNodeData():
 					sgn = '1' if (line.find('[TRUE,') >= 0) else '0'
 					try: current.dec = dec; current.frac = frac; current.sgn = sgn
 					except: pass
+				if line.find('<h3 id=') >= 0 and line.find('id=' + sym) == -1:
+					app_node_dict = app_node_dict + [current]
+					current = None
+
+		# Find PaR report
+		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, 'par_utilization_hierarchical.rpt'])
+		# Collect resource utilization for each sram
+		for i in reversed(range(0,len(app_node_dict))):
+			mem = app_node_dict[i]
+			success = scrapeFor(mem,rpt)
+			if (not success): del app_node_dict[i]
+
+		# Add srams to master list
+		node_dict = node_dict + app_node_dict
 
 	return node_dict
 
 
 def main():
+	node_dict = []
 	node_dict = collectMemData()
 	# node_dict = node_dict + collectIRNodeData()
 

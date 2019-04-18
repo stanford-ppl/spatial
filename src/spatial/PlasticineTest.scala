@@ -364,12 +364,9 @@ trait PlasticineTest extends DSLTest { test =>
   case object Tst extends PIRBackend {
     val row:Int=14
     val col:Int=14
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/P14x14/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/P14x14/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/P14x14/$name/report"
     def runPasses():Result = {
       val result = genpir() >>
-      pirpass("gentst", s"--mapping=true --codegen=true --net=p2p --row=$row --col=$col --tungsten --psim=false".split(" ").toList) >>
+      pirpass("gentst", s"--mapping=true --codegen=true --net=inf --row=$row --col=$col --tungsten --psim=false".split(" ").toList) >>
       scommand(s"maketst", "make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
       runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
         result >> scommand(s"runtst", s"./tungsten $args".split(" "), timeout=1000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")

@@ -18,9 +18,7 @@ trait ReduceUnrolling extends UnrollingBase {
       val accum2 = accumHack(accum, load)
 
       val stopWhen2 = if (stopWhen.isDefined) Some(memories((stopWhen.get,0)).asInstanceOf[Reg[Bit]]) else stopWhen
-      var fullyUnroll = cchain.willFullyUnroll
-      if (spatialConfig.enablePIR) fullyUnroll &= !lhs.isInnerControl
-      if (fullyUnroll) {
+      if (cchain.willFullyUnroll) {
         fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2, mop)
       }
       else {

@@ -45,16 +45,4 @@ trait PIRGenReg extends PIRCodegen {
     case _ => super.genAccel(lhs, rhs)
   }
 
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@ArgInNew(init)  =>
-      super.genHost(lhs, rhs)
-      genInAccel(lhs, rhs)
-
-    case op@ArgOutNew(init) =>
-      super.genHost(lhs, rhs)
-      genInAccel(lhs, rhs)
-
-    case _ => super.genHost(lhs, rhs)
-  }
-
 }

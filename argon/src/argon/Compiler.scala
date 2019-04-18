@@ -71,7 +71,7 @@ trait Compiler extends DSLRunnable { self =>
       if (trace.length > 20) bug(s" .. [see ${config.logDir}${config.name}_exception.log]")
     }
     bug(s"This is due to a compiler bug. A log file has been created at: ")
-    bug(s"  ${config.logDir}${config.name}_exception.log")
+    bug(s"  ${config.logDir}/${config.name}_exception.log")
   }
 
   def stageApp(args: Array[String]): Block[_]

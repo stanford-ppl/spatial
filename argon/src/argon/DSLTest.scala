@@ -162,7 +162,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     }
 
     /** Run a backend command (either make or run) with given arguments and timeout. */
-    final def command(pass: String, args: Seq[String], timeout: Long, parse: String => Result, Error: String => Result): Result = {
+    final def command(pass: String, args: Seq[String], timeout: Long, parse: String => Result, Error: String => Result, wd:String=IR.config.genDir): Result = {
       import scala.concurrent.ExecutionContext.Implicits.global   // implicit execution context for Futures
 
       val cmdLog = new PrintStream(IR.config.logDir + s"/$pass.log")
@@ -183,7 +183,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       })
 
       try {
-        val f = Future{ scala.concurrent.blocking{ cmd.block(IR.config.genDir) } }
+        val f = Future{ scala.concurrent.blocking{ cmd.block(wd) } }
         val code = Await.result(f, duration.Duration(timeout, "sec"))
         val lines = cmd.stdout()
         val errs  = cmd.errors()

@@ -3,10 +3,10 @@ package emul.ResidualGenerator
 /** ResidualGenerator elaborates the possible banks that a lane of an access may access. */
 
 case class ResidualGenerator(A: Int, B: Seq[Int], M: Int) {
+  val bs = if (B.size == 1) s"${B.head}" else s"[${B.mkString(",")}]"
   // Used in chisel gen
   override def toString: String = {
-    assert(B.size == 1)
-    if (A == M) s"RG(${B.head})" else s"RG($A,${B.head},$M)"
+    if (A == M) s"RG($bs)" else s"RG($A,$bs,$M)"
   }
 
   def static: Boolean = (A == M)

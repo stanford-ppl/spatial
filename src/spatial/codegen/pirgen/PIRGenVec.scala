@@ -6,11 +6,6 @@ import spatial.lang._
 
 trait PIRGenVec extends PIRCodegen {
 
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case VecAlloc(elems)     => emit(src"val $lhs = Array($elems)")
-    case _ => super.genHost(lhs, rhs)
-  }
-
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case VecApply(vector, i) => 
       assert(i==0, s"VecApply of i != 0 for plasticine")

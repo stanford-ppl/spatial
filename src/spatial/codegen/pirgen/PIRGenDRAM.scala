@@ -76,28 +76,4 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
     case _ => super.genAccel(lhs, rhs)
   }
 
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMHostNew(dims,zero) =>
-      super.genHost(lhs, rhs)
-      genInAccel(lhs, rhs)
-
-    //case op@SetMem(dram, data) =>
-      //open(src"val $lhs = {")
-      //open(src"for (i <- 0 until $data.length) {")
-      //oobUpdate(op.A,dram,lhs,Nil){ oobApply(op.A,data,lhs,Nil){ emit(src"$dram(i) = $data(i)") } }
-      //close("}")
-      //close("}")
-
-    //case op@GetMem(dram, data) =>
-      //open(src"val $lhs = {")
-      //open(src"for (i <- 0 until $data.length) {")
-      //oobUpdate(op.A,data,lhs,Nil){ oobApply(op.A,dram,lhs,Nil){ emit(src"$data(i) = $dram(i)") } }
-      //close("}")
-      //close("}")
-
-    // Fringe templates expect byte-based addresses and sizes, while PIR gen expects word-based
-
-    case _ => super.genHost(lhs, rhs)
-  }
-
 }

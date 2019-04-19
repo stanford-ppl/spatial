@@ -46,7 +46,7 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixSinh(x) => emit(src"""$lhs.r := Math.sin($x, $lat, $backpressure,"$lhs").r""")
       case FixCosh(x) => emit(src"""$lhs.r := Math.cos($x, $lat, $backpressure,"$lhs").r""")
       case FixRecipSqrt(x) => emit(src"""$lhs.r := (${lhs}_one.div(Math.sqrt($x, ${s"""latencyOption("FixSqrt", Some(bitWidth(lhs.tp)))"""}, $backpressure), $lat, $backpressure, "$lhs")).r""")
-      case FixFMA(x,y,z) => emit(src"""$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).toFixed($lhs, "$lhs").r""")
+      case FixFMA(x,y,z) => emit(src"""$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure, "$lhs").toFixed($lhs, "cast_$lhs").r""")
       case FltFMA(x,y,z) => emit(src"""$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure,"$lhs").r""")
       case FltSqrt(x) => emit(src"""$lhs.r := Math.fsqrt($x, $lat, $backpressure,"$lhs").r""")
       case FltAdd(x,y) => emit(src"""$lhs.r := Math.fadd($x, $y, $lat, $backpressure,"$lhs").r""")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Example: python extract_parameters.py --schedule=DenseLoad --models_dir=/home/mattfel/sp_dse/spatial/resources/dse/dbg
+# Example: python extract_lattice_parameters.py --schedule=DenseLoad --models_dir=/home/mattfel/sp_dse/spatial/resources/dse/dbg
 
 import tensorflow as tf
 import tensorflow_lattice as tfl

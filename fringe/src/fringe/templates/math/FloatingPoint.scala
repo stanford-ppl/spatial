@@ -22,7 +22,7 @@ class FloatingPoint(val m: Int, val e: Int) extends Bundle {
 
   def msb():Bool = number(m+e-1)
 
-  def cast(dst: FloatingPoint, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, expect_neg: Bool = false.B, expect_pos: Bool = false.B): Unit = {
+  def cast(dst: FloatingPoint, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, expect_neg: Bool = false.B, expect_pos: Bool = false.B, myName: String = ""): Unit = {
     throw new Exception("Float casting not implemented yet")
   }
 
@@ -42,17 +42,17 @@ class FloatingPoint(val m: Int, val e: Int) extends Bundle {
     result
   }
 
-  def +(that: FloatingPoint): FloatingPoint = Math.fadd(this, that, None, true.B)
-  def -(that: FloatingPoint): FloatingPoint = Math.fsub(this, that, None, true.B)
-  def *(that: FloatingPoint): FloatingPoint = Math.fmul(this, that, None, true.B)
-  def /(that: FloatingPoint): FloatingPoint = Math.fdiv(this, that, None, true.B)
-  def <(that: FloatingPoint): Bool = Math.flt(this, that, None, true.B)
-  def >(that: FloatingPoint): Bool = Math.flt(that, this, None, true.B)
-  def <=(that: FloatingPoint): Bool = Math.flte(this, that, None, true.B)
-  def >=(that: FloatingPoint): Bool = Math.flte(that, this, None, true.B)
+  def +(that: FloatingPoint): FloatingPoint = Math.fadd(this, that, None, true.B, "")
+  def -(that: FloatingPoint): FloatingPoint = Math.fsub(this, that, None, true.B, "")
+  def *(that: FloatingPoint): FloatingPoint = Math.fmul(this, that, None, true.B, "")
+  def /(that: FloatingPoint): FloatingPoint = Math.fdiv(this, that, None, true.B, "")
+  def <(that: FloatingPoint): Bool = Math.flt(this, that, None, true.B, "")
+  def >(that: FloatingPoint): Bool = Math.flt(that, this, None, true.B, "")
+  def <=(that: FloatingPoint): Bool = Math.flte(this, that, None, true.B, "")
+  def >=(that: FloatingPoint): Bool = Math.flte(that, this, None, true.B, "")
 
-  def ===(that: FloatingPoint): Bool = Math.feql(this, that, None, true.B)
-  def =/=(that: FloatingPoint): Bool = Math.fneq(this, that, None, true.B)
+  def ===(that: FloatingPoint): Bool = Math.feql(this, that, None, true.B, "")
+  def =/=(that: FloatingPoint): Bool = Math.fneq(this, that, None, true.B, "")
 
   def ^(that: FloatingPoint): FloatingPoint = {
     assert(this.fmt == that.fmt)
@@ -76,9 +76,9 @@ class FloatingPoint(val m: Int, val e: Int) extends Bundle {
   }
 
 
-  def toFixed(sign: Boolean, dec: Int, frac: Int): FixedPoint = Math.flt2fix(this, sign, dec, frac, None, true.B, Truncate, Wrapping)
+  def toFixed(sign: Boolean, dec: Int, frac: Int, myName: String): FixedPoint = Math.flt2fix(this, sign, dec, frac, None, true.B, Truncate, Wrapping, myName)
 
-  def toFloat(m_out: Int, e_out: Int): FloatingPoint = Math.flt2flt(this, m_out, e_out, None, true.B)
+  def toFloat(m_out: Int, e_out: Int, myName: String): FloatingPoint = Math.flt2flt(this, m_out, e_out, None, true.B, myName)
 
   override def cloneType = (new FloatingPoint(m,e)).asInstanceOf[this.type] // See chisel3 bug 358
 
@@ -98,7 +98,7 @@ object FloatingPoint {
     val cst = Wire(new FloatingPoint(m,e))
     val tmp = Wire(new FixedPoint(true, init.getWidth, 0))
     tmp.r := init.asUInt
-    cst.r := Math.fix2flt(tmp,m,e,None,true.B)
+    cst.r := Math.fix2flt(tmp,m,e,None,true.B, "")
     cst
   }
 
@@ -106,7 +106,7 @@ object FloatingPoint {
     val cst = Wire(new FloatingPoint(m,e))
     val tmp = Wire(new FixedPoint(false, init.getWidth, 0))
     tmp.r := init
-    cst.r := Math.fix2flt(tmp,m,e,None,true.B)
+    cst.r := Math.fix2flt(tmp,m,e,None,true.B, "")
     cst
   }
 

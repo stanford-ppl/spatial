@@ -116,125 +116,137 @@ object Math {
 
 
   def add(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode, myName: String): FixedPoint = {
-    val latency = delay.getOrElse(0.0).toInt
-    // Allocate upcasted and result wires
-    val (a_upcast, b_upcast, result_upcast, result) = upcast(a, b)
+    class AddWrapper(s: Boolean, d: Int, f: Int, delay: Option[Double], myName: String) extends Module{
+      val io = IO(new Bundle{
+        val a = Input(UInt((d + f).W))
+        val b = Input(UInt((d + f).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val a = Wire(new FixedPoint(s,d,f)); a.r := io.a
+      val b = Wire(new FixedPoint(s,d,f)); b.r := io.b
+      val flow = io.flow
 
-    // Instantiate an unsigned addition
-    result_upcast.r := a_upcast.r + b_upcast.r
+      val latency = delay.getOrElse(0.0).toInt
+      // Allocate upcasted and result wires
+      val (a_upcast, b_upcast, result_upcast, result) = upcast(a, b)
 
-    // Downcast to result
-    val expect_neg = if (a.s | b.s) a_upcast.msb & b_upcast.msb   else false.B
-    val expect_pos = if (a.s | b.s) !a_upcast.msb & !b_upcast.msb else true.B
-    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, latency, myName))
-    fix2fixBox.io.a := result_upcast.r
-    fix2fixBox.io.expect_neg := expect_neg
-    fix2fixBox.io.expect_pos := expect_pos
-    fix2fixBox.io.flow := flow
-    result.r := fix2fixBox.io.b
+      // Instantiate an unsigned addition
+      result_upcast.r := a_upcast.r + b_upcast.r
+
+      // Downcast to result
+      val expect_neg = if (a.s | b.s) a_upcast.msb & b_upcast.msb   else false.B
+      val expect_pos = if (a.s | b.s) !a_upcast.msb & !b_upcast.msb else true.B
+      val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, latency, myName))
+      fix2fixBox.io.a := result_upcast.r
+      fix2fixBox.io.expect_neg := expect_neg
+      fix2fixBox.io.expect_pos := expect_pos
+      fix2fixBox.io.flow := flow
+      result.r := fix2fixBox.io.b
+      io.result := result.r
+    }
+
+    val module = Module(new AddWrapper(a.s, a.d, a.f, delay, myName))
+    module.io.a := a.r
+    module.io.b := b.r
+    module.io.flow := flow
+    val result = Wire(new FixedPoint(a.s,a.d,a.f))
+    result.r := module.io.result
     result
   }
 
   def sub(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode, myName: String): FixedPoint = {
-    val latency = delay.getOrElse(0.0).toInt
-    val (a_upcast, b_upcast, result_upcast, result) = upcast(a, b)
+    class SubWrapper(s: Boolean, d: Int, f: Int, delay: Option[Double], myName: String) extends Module{
+      val io = IO(new Bundle{
+        val a = Input(UInt((d + f).W))
+        val b = Input(UInt((d + f).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val a = Wire(new FixedPoint(s,d,f)); a.r := io.a
+      val b = Wire(new FixedPoint(s,d,f)); b.r := io.b
+      val flow = io.flow
 
-    // Instantiate an unsigned subtraction
-    result_upcast.r := a_upcast.r - b_upcast.r
+      val latency = delay.getOrElse(0.0).toInt
+      // Allocate upcasted and result wires
+      val (a_upcast, b_upcast, result_upcast, result) = upcast(a, b)
 
-    // Downcast to result
-    val expect_neg = if (a.s | b.s) a_upcast.msb & !b_upcast.msb else true.B
-    val expect_pos = if (a.s | b.s) !a_upcast.msb & b_upcast.msb else false.B
-    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, latency, myName))
-    fix2fixBox.io.a := result_upcast.r
-    fix2fixBox.io.expect_neg := expect_neg
-    fix2fixBox.io.expect_pos := expect_pos
-    fix2fixBox.io.flow := flow
-    result.r := fix2fixBox.io.b
+      // Instantiate an unsigned addition
+      result_upcast.r := a_upcast.r - b_upcast.r
+
+      // Downcast to result
+      val expect_neg = if (a.s | b.s) a_upcast.msb & b_upcast.msb   else false.B
+      val expect_pos = if (a.s | b.s) !a_upcast.msb & !b_upcast.msb else true.B
+      val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, latency, myName))
+      fix2fixBox.io.a := result_upcast.r
+      fix2fixBox.io.expect_neg := expect_neg
+      fix2fixBox.io.expect_pos := expect_pos
+      fix2fixBox.io.flow := flow
+      result.r := fix2fixBox.io.b
+      io.result := result.r
+    }
+
+    val module = Module(new SubWrapper(a.s, a.d, a.f, delay, myName))
+    module.io.a := a.r
+    module.io.b := b.r
+    module.io.flow := flow
+    val result = Wire(new FixedPoint(a.s,a.d,a.f))
+    result.r := module.io.result
     result
   }
 
   def mul(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode, myName: String): FixedPoint = {
-    val latency = if (globals.retime || delay.isDefined) delay.getOrElse(globals.target.fixmul_latency * a.getWidth)
-                  else 0.0
-    val intMode = round == Truncate && overflow == Wrapping && (a.f == 0 | b.f == 0)
+    class MulWrapper(s: Boolean, d: Int, f: Int, delay: Option[Double], myName: String) extends Module{
+      val io = IO(new Bundle{
+        val a = Input(UInt((d + f).W))
+        val b = Input(UInt((d + f).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val a = Wire(new FixedPoint(s,d,f)); a.r := io.a
+      val b = Wire(new FixedPoint(s,d,f)); b.r := io.b
+      val flow = io.flow
 
-    // Compute upcasted type and return type
-    val return_type = a.fmt combine b.fmt
-    val upcast_type = if (intMode) return_type else if (overflow == Wrapping) return_type.copy(ibits = a.d max b.d, fbits = a.f + b.f) else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f)
+      val latency = if (globals.retime || delay.isDefined) delay.getOrElse(globals.target.fixmul_latency * a.getWidth)
+                    else 0.0
+      val intMode = round == Truncate && overflow == Wrapping && (a.f == 0 | b.f == 0)
 
-    // Get upcasted operators
-    val result_upcast = Wire(new FixedPoint(upcast_type))
+      // Compute upcasted type and return type
+      val return_type = a.fmt combine b.fmt
+      val upcast_type = if (intMode) return_type else if (overflow == Wrapping) return_type.copy(ibits = a.d max b.d, fbits = a.f + b.f) else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f)
 
-    // Do upcasted operation
-    if (intMode) {
-      val rhs_bits = a.f - b.f
-      val a_upcast: UInt = if (rhs_bits > 0) util.Cat(a.r, util.Fill(rhs_bits, false.B))
-                           else a.r
-      val b_upcast: UInt = if (rhs_bits < 0 && b.litVal.isEmpty) util.Cat(b.r, util.Fill(-rhs_bits, false.B))
-                           else if (b.litVal.isDefined) b.litVal.get.U(a.getWidth.W)
-                           else b.r
-      result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow, myName) >> scala.math.max(a.f, b.f)
-    }
-    else if (overflow == Wrapping) {
-      val a_upcast: UInt = util.Cat(util.Fill(b.f + 0.max(b.d - a.d), a.msb), a.r)
-      val b_upcast: UInt = if (b.litVal.isDefined) b.litVal.get.U((0.max(a.d - b.d) + a.f+b.d+b.f).W)
-                           else util.Cat(util.Fill(0.max(a.d - b.d) + a.f, b.msb), b.r)
-
-      result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow, myName)
-    }
-    else {
-      val a_upcast: UInt = util.Cat(util.Fill(b.d+b.f, a.msb), a.r)
-      val b_upcast: UInt = if (b.litVal.isDefined) b.litVal.get.U((a.d+a.f+b.d+b.f).W)
-                           else util.Cat(util.Fill(a.d+a.f, b.msb), b.r)
-
-      result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow, myName)
-    }
-
-    // Downcast to result
-    val result = Wire(new FixedPoint(return_type))
-    val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
-    val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B
-    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, 0, "cast_" + myName))
-    fix2fixBox.io.a := result_upcast.r
-    fix2fixBox.io.expect_neg := expect_neg
-    fix2fixBox.io.expect_pos := expect_pos
-    fix2fixBox.io.flow := flow
-    result.r := fix2fixBox.io.b
-    result
-  }
-
-  def div(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode, myName: String): FixedPoint = {
-    val latency = if (globals.retime || delay.isDefined) delay.getOrElse(globals.target.fixdiv_latency * a.getWidth)
-                  else 0.0
-
-    val return_type = a.fmt combine b.fmt
-
-    if (a.f == 0 && b.f == 0) {
-      if (a.s | b.s) Math.div(a.sint, b.sint, Some(latency), flow, myName).FP(return_type)
-      else           Math.div(a.uint, b.uint, Some(latency), flow, myName).FP(return_type)
-    }
-    else {
-      // Interpret numerator as this type
-      val upcast_type = if (round == Truncate && overflow == Wrapping) return_type.copy(fbits = return_type.fbits + 1)
-                        else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f + 1)
-      // But upcast it to this type
-      val op_upcast_type = if (round == Truncate && overflow == Wrapping) return_type.copy(fbits = a.f + b.f + 1)
-                           else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f + 1)
-
+      // Get upcasted operators
       val result_upcast = Wire(new FixedPoint(upcast_type))
 
-      // TODO: Why is this not upcasting the denominator?
-      if (a.s | b.s) {
-        val a_upcast = a.upcastSInt(op_upcast_type, "cast_" + myName)
-        val b_upcast = b.sint
-        result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow, myName).asUInt
+      // Do upcasted operation
+      if (intMode) {
+        val rhs_bits = a.f - b.f
+        val a_upcast: UInt = if (rhs_bits > 0) util.Cat(a.r, util.Fill(rhs_bits, false.B))
+                             else a.r
+        val b_upcast: UInt = if (rhs_bits < 0 && b.litVal.isEmpty) util.Cat(b.r, util.Fill(-rhs_bits, false.B))
+                             else if (b.litVal.isDefined) b.litVal.get.U(a.getWidth.W)
+                             else b.r
+        result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow, myName) >> scala.math.max(a.f, b.f)
+      }
+      else if (overflow == Wrapping) {
+        val a_upcast: UInt = util.Cat(util.Fill(b.f + 0.max(b.d - a.d), a.msb), a.r)
+        val b_upcast: UInt = if (b.litVal.isDefined) b.litVal.get.U((0.max(a.d - b.d) + a.f+b.d+b.f).W)
+                             else util.Cat(util.Fill(0.max(a.d - b.d) + a.f, b.msb), b.r)
+
+        result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow, myName)
       }
       else {
-        val a_upcast = a.upcastUInt(op_upcast_type, "cast_" + myName)
-        val b_upcast = b.uint
-        result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow, myName)
+        val a_upcast: UInt = util.Cat(util.Fill(b.d+b.f, a.msb), a.r)
+        val b_upcast: UInt = if (b.litVal.isDefined) b.litVal.get.U((a.d+a.f+b.d+b.f).W)
+                             else util.Cat(util.Fill(a.d+a.f, b.msb), b.r)
+
+        result_upcast.r := mul(a_upcast, b_upcast, Some(latency), flow, myName)
       }
+
+      // Downcast to result
       val result = Wire(new FixedPoint(return_type))
       val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
       val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B
@@ -244,25 +256,119 @@ object Math {
       fix2fixBox.io.expect_pos := expect_pos
       fix2fixBox.io.flow := flow
       result.r := fix2fixBox.io.b
-      result
+      io.result := result.r
     }
+
+    val module = Module(new MulWrapper(a.s, a.d, a.f, delay, myName))
+    module.io.a := a.r
+    module.io.b := b.r
+    module.io.flow := flow
+    val result = Wire(new FixedPoint(a.s,a.d,a.f))
+    result.r := module.io.result
+    result
+  }
+
+  def div(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode, myName: String): FixedPoint = {
+    class DivWrapper(s: Boolean, d: Int, f: Int, delay: Option[Double], myName: String) extends Module{
+      val io = IO(new Bundle{
+        val a = Input(UInt((d + f).W))
+        val b = Input(UInt((d + f).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val a = Wire(new FixedPoint(s,d,f)); a.r := io.a
+      val b = Wire(new FixedPoint(s,d,f)); b.r := io.b
+      val flow = io.flow
+
+      val latency = if (globals.retime || delay.isDefined) delay.getOrElse(globals.target.fixdiv_latency * a.getWidth)
+                    else 0.0
+
+      val return_type = a.fmt combine b.fmt
+
+      if (a.f == 0 && b.f == 0) {
+        if (a.s | b.s) io.result := Math.div(a.sint, b.sint, Some(latency), flow, myName).FP(return_type).r
+        else           io.result := Math.div(a.uint, b.uint, Some(latency), flow, myName).FP(return_type).r
+      }
+      else {
+        // Interpret numerator as this type
+        val upcast_type = if (round == Truncate && overflow == Wrapping) return_type.copy(fbits = return_type.fbits + 1)
+                          else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f + 1)
+        // But upcast it to this type
+        val op_upcast_type = if (round == Truncate && overflow == Wrapping) return_type.copy(fbits = a.f + b.f + 1)
+                             else return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f + 1)
+
+        val result_upcast = Wire(new FixedPoint(upcast_type))
+
+        // TODO: Why is this not upcasting the denominator?
+        if (a.s | b.s) {
+          val a_upcast = a.upcastSInt(op_upcast_type, "cast_" + myName)
+          val b_upcast = b.sint
+          result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow, myName).asUInt
+        }
+        else {
+          val a_upcast = a.upcastUInt(op_upcast_type, "cast_" + myName)
+          val b_upcast = b.uint
+          result_upcast.r := Math.div(a_upcast, b_upcast, Some(latency), flow, myName)
+        }
+        val result = Wire(new FixedPoint(return_type))
+        val expect_neg = if (a.s | b.s) getRetimed(a.msb ^ b.msb, latency.toInt) else false.B
+        val expect_pos = if (a.s | b.s) getRetimed(!(a.msb ^ b.msb), latency.toInt) else true.B
+        val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, 0, "cast_" + myName))
+        fix2fixBox.io.a := result_upcast.r
+        fix2fixBox.io.expect_neg := expect_neg
+        fix2fixBox.io.expect_pos := expect_pos
+        fix2fixBox.io.flow := flow
+        result.r := fix2fixBox.io.b
+        io.result := result.r
+      }
+    }
+
+    val module = Module(new DivWrapper(a.s, a.d, a.f, delay, myName))
+    module.io.a := a.r
+    module.io.b := b.r
+    module.io.flow := flow
+    val result = Wire(new FixedPoint(a.s,a.d,a.f))
+    result.r := module.io.result
+    result
   }
 
   // TODO: No upcasting actually occurs here?
   def mod(a: FixedPoint, b: FixedPoint, delay: Option[Double], flow: Bool, round: RoundingMode, overflow: OverflowMode, myName: String): FixedPoint = {
-    val return_type = a.fmt combine b.fmt
-    val upcast_type = return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f)
+    class ModWrapper(s: Boolean, d: Int, f: Int, delay: Option[Double], myName: String) extends Module{
+      val io = IO(new Bundle{
+        val a = Input(UInt((d + f).W))
+        val b = Input(UInt((d + f).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val a = Wire(new FixedPoint(s,d,f)); a.r := io.a
+      val b = Wire(new FixedPoint(s,d,f)); b.r := io.b
+      val flow = io.flow
 
-    val result_upcast = Wire(new FixedPoint(upcast_type))
-    val result = Wire(new FixedPoint(return_type))
-    // Downcast to result
-    result_upcast.r := Math.mod(a.uint, b.uint, delay, flow, myName)
-    val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, 0, "cast_" + myName))
-    fix2fixBox.io.a := result_upcast.r
-    fix2fixBox.io.expect_neg := false.B
-    fix2fixBox.io.expect_pos := false.B
-    fix2fixBox.io.flow := flow
-    result.r := fix2fixBox.io.b
+      val return_type = a.fmt combine b.fmt
+      val upcast_type = return_type.copy(ibits = a.d + b.d, fbits = a.f + b.f)
+
+      val result_upcast = Wire(new FixedPoint(upcast_type))
+      val result = Wire(new FixedPoint(return_type))
+      // Downcast to result
+      result_upcast.r := Math.mod(a.uint, b.uint, delay, flow, myName)
+      val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, 0, "cast_" + myName))
+      fix2fixBox.io.a := result_upcast.r
+      fix2fixBox.io.expect_neg := false.B
+      fix2fixBox.io.expect_pos := false.B
+      fix2fixBox.io.flow := flow
+      result.r := fix2fixBox.io.b
+      io.result := result.r
+    }
+
+    val module = Module(new ModWrapper(a.s, a.d, a.f, delay, myName))
+    module.io.a := a.r
+    module.io.b := b.r
+    module.io.flow := flow
+    val result = Wire(new FixedPoint(a.s,a.d,a.f))
+    result.r := module.io.result
     result
   }
 

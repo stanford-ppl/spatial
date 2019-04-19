@@ -57,7 +57,7 @@ trait ISL {
       val needsCompile = try {
         if (emptiness_exists) {
           import sys.process._
-          val binVersion = "emptiness -version" !!
+          val binVersion = s"$emptiness_bin -version" !!
           val verFromBin = raw"Version: (\d)\.(\d)".r
           val verFromBin(binDec,binFrac) = binVersion.split("\n").filter(_.contains("Version:")).head
           val curVersion = source_string
@@ -67,7 +67,7 @@ trait ISL {
           binDec != curDec || binFrac != curFrac
         } else {true}
       } catch {
-        case _: Throwable => println("Unsure if emptiness needs to be recompiled... Recompiling to be safe"); true 
+        case e: Throwable => println("Unsure if emptiness needs to be recompiled... Recompiling to be safe"); true 
       }
       
       // step 4: if emptiness does not exist, compile it.

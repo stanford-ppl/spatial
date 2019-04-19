@@ -674,7 +674,7 @@ object Math {
       val m0 = Wire(new FixedPoint(s,d,f)); m0.r := io.m0
       val m1 = Wire(new FixedPoint(s,d,f)); m1.r := io.m1
       val add = Wire(new FixedPoint(s,d,f)); add.r := io.add
-      mul(m0, m1, delay, io.flow, Truncate, Wrapping, "fmamul_" + myName) + getRetimed(add, delay.getOrElse(0.0).toInt, io.flow)
+      io.result := (mul(m0, m1, delay, io.flow, Truncate, Wrapping, "fmamul_" + myName) + getRetimed(add, delay.getOrElse(0.0).toInt, io.flow)).r
     }
     
     val module = Module(new FMAWrapper(m0.s, m0.d, m0.f, delay, myName))

@@ -97,10 +97,11 @@ class Node:
 ################
 target = 'zcu' # i.e. out0/verilog-zcu/
 capstarget = 'ZCU'  #i.e. gen/ZCU/
+scrapetype = 'synth' # either scrape synth_ or par_ log
 spatialdir = '/home/mattfel/regression/synth/' + target + '/current-spatial/spatial/'
 gendir = spatialdir + 'gen/' + capstarget
 logdir = spatialdir + 'logs/' + capstarget
-# spatialdir='/home/mattfel/sp_area/spatial/out0'
+# spatialdir='/home/mattfel/sp_area/spatial/out1'
 # gendir = spatialdir
 # logdir = spatialdir + 'logs/'
 
@@ -225,7 +226,7 @@ def collectMemData():
 
 
 		# Find PaR report
-		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, 'par_utilization_hierarchical.rpt'])
+		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, scrapetype + '_utilization_hierarchical.rpt'])
 		# Collect resource utilization for each sram
 		for i in reversed(range(0,len(app_mem_dict))):
 			mem = app_mem_dict[i]
@@ -254,25 +255,52 @@ def collectIRNodeData():
 			data = file.read().split('\n')
 		for line in data:
 			# Start new node
+			declaration = False
 			if (line.find("FixMul") >= 0):
+				declaration = True
 				sym = re.search('id=(x[0-9]+)>', line).group(1)
 				current = Node(sym + "_" + appname, sym, "FixMul")
-				current.nbufs = '1' # default of 1
 			elif (line.find("FixDiv") >= 0):
+				declaration = True
 				sym = re.search('id=(x[0-9]+)>', line).group(1)
 				current = Node(sym + "_" + appname, sym, "FixDiv")
-				current.nbufs = '1' # default of 1
 			elif (line.find("FixAdd") >= 0):
+				declaration = True
 				sym = re.search('id=(x[0-9]+)>', line).group(1)
 				current = Node(sym + "_" + appname, sym, "FixAdd")
-				current.nbufs = '1' # default of 1
 			elif (line.find("FixSub") >= 0):
+				declaration = True
 				sym = re.search('id=(x[0-9]+)>', line).group(1)
 				current = Node(sym + "_" + appname, sym, "FixSub")
-				current.nbufs = '1' # default of 1
+			elif (line.find("FixFMA") >= 0):
+				declaration = True
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "FixFMA")
+			elif (line.find("UnbSatMul") >= 0):
+				declaration = True
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "UnbSatMul")
+			elif (line.find("SatMul") >= 0):
+				declaration = True
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "SatMul")
+			elif (line.find("UnbMul") >= 0):
+				declaration = True
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "UnbMul")
+
+			# Pull out constants:
+			if declaration: 
+				try: current.consta = re.search('a=([0-9\.]+)',line).group(1)
+				except: pass
+				try: current.constb = re.search('b=([0-9\.]+)',line).group(1)
+				except: pass
+				try: current.constc = re.search('c=([0-9\.]+)',line).group(1)
+				except: pass
 
 			# Scrape info if currently scanning node
 			if (current != None): 
+				if (line.find('Const') >= 0): print line
 				# Get buffer info
 				if line.find('>Type<') >= 0:
 					dec = re.search(',\_([0-9]+),',line).group(1)
@@ -285,7 +313,7 @@ def collectIRNodeData():
 					current = None
 
 		# Find PaR report
-		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, 'par_utilization_hierarchical.rpt'])
+		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, scrapetype + 'utilization_hierarchical.rpt'])
 		# Collect resource utilization for each sram
 		for i in reversed(range(0,len(app_node_dict))):
 			mem = app_node_dict[i]
@@ -295,13 +323,14 @@ def collectIRNodeData():
 		# Add srams to master list
 		node_dict = node_dict + app_node_dict
 
+		break
 	return node_dict
 
 
 def main():
 	node_dict = []
 	node_dict = collectMemData()
-	# node_dict = node_dict + collectIRNodeData()
+	node_dict = node_dict + collectIRNodeData()
 
 	node_dict[0].printAllFields()
 	for node in node_dict:

@@ -12,9 +12,7 @@ trait ForeachUnrolling extends UnrollingBase {
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A], mop: Boolean)(implicit ctx: SrcCtx): Sym[_] = rhs match {
     case OpForeach(ens, cchain, func, iters, stopWhen) =>
       val stopWhen2 = if (stopWhen.isDefined) Some(memories((stopWhen.get,0)).asInstanceOf[Reg[Bit]]) else stopWhen
-      var fullyUnroll = cchain.willFullyUnroll
-      if (spatialConfig.enablePIR) fullyUnroll &= !lhs.isInnerControl
-      if (fullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters, stopWhen2, mop)
+      if (cchain.willFullyUnroll) fullyUnrollForeach(lhs, f(ens), f(cchain), func, iters, stopWhen2, mop)
       else partiallyUnrollForeach(lhs, f(ens), f(cchain), func, iters, stopWhen2, mop)
 
     case _ => super.unrollCtrl(lhs,rhs,mop)
@@ -39,7 +37,7 @@ trait ForeachUnrolling extends UnrollingBase {
       lhs2    
     } else {
       val blocks = stageBlock {
-        unrLanes.foreach{p => 
+        unrLanes.foreach{ case List(p) => 
           dbgs(s"Staging lane $p (addr ${unrLanes.parAddr(p)}) of $unrLanes")
           val cchainPart = crossSection(cchain, unrLanes.parAddr(p))
           val blk   = inLanes(unrLanes,p){ substituteBlock(func) }
@@ -72,7 +70,7 @@ trait ForeachUnrolling extends UnrollingBase {
       lhs2      
     } else {
       val blocks = stageBlock { 
-        unrLanes.foreach{p => 
+        unrLanes.foreach{ case List(p) => 
           val i = is(p).map(List(_))
           val v = vs(p).map(List(_))
           dbgs(s"Staging lane $p (addr ${unrLanes.parAddr(p)}) of $unrLanes (is = $i, vs = $v)")

@@ -41,12 +41,4 @@ trait PIRGenStream extends PIRCodegen {
     case _ => super.genAccel(lhs, rhs)
   }
 
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@StreamInNew(bus)  =>
-      genInAccel(lhs, rhs)
-    case op@StreamOutNew(bus) =>
-      genInAccel(lhs, rhs)
-    case _ => super.genHost(lhs, rhs)
-  }
-
 }

@@ -12,7 +12,7 @@ trait ZynqBlackBoxes {
   // To avoid creating the same IP twice
   val createdIP = Set[String]()
 
-  class Divider(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val latency: Int) extends Module {
+  class Divider(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val latency: Int, val myName: String = "Divider") extends Module {
     val io = IO(new Bundle {
       val flow = Input(Bool())
       val dividend = Input(UInt(dividendWidth.W))
@@ -20,6 +20,7 @@ trait ZynqBlackBoxes {
       val out = Output(UInt(dividendWidth.W))
     })
 
+    override def desiredName = myName
     val fractionBits = 2
 
     val m = Module(new DivModBBox(dividendWidth, divisorWidth, signed, false, fractionBits, latency))
@@ -33,7 +34,7 @@ trait ZynqBlackBoxes {
     io.out := m.io.m_axis_dout_tdata(dividendWidth-1, fractionBits)
   }
 
-  class Modulo(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val latency: Int) extends Module {
+  class Modulo(val dividendWidth: Int, val divisorWidth: Int, val signed: Boolean, val latency: Int, val myName: String = "Modulo") extends Module {
     val io = IO(new Bundle {
       val flow = Input(Bool())
       val dividend = Input(UInt(dividendWidth.W))
@@ -41,6 +42,7 @@ trait ZynqBlackBoxes {
       val out = Output(UInt(dividendWidth.W))
     })
 
+    override def desiredName = myName
     val fractionBits = dividendWidth
 
     val m = Module(new DivModBBox(dividendWidth, divisorWidth, signed, true, fractionBits, latency))
@@ -89,7 +91,7 @@ generate_target {all} [get_ips $moduleName]
     }
   }
 
-  class Multiplier(val aWidth: Int, val bWidth: Int, val outWidth: Int, val signed: Boolean, val latency: Int) extends Module {
+  class Multiplier(val aWidth: Int, val bWidth: Int, val outWidth: Int, val signed: Boolean, val latency: Int, val myName: String = "Multiplier") extends Module {
     val io = IO(new Bundle {
       val flow = Input(Bool())
       val a = Input(UInt(aWidth.W))
@@ -97,6 +99,7 @@ generate_target {all} [get_ips $moduleName]
       val out = Output(UInt(outWidth.W))
     })
 
+    override def desiredName = myName
     assert(latency > 0, "ERROR: Latency must be > 0 to use Multiplier IP")
     val m = Module(new MultiplierBBox(aWidth, bWidth, outWidth, signed, latency))
     m.io.CLK := clock

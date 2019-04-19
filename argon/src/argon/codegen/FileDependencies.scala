@@ -1,13 +1,20 @@
 package argon
 package codegen
 
+import java.io.FileNotFoundException
+
 import utils.io.files
 
 trait FileDependencies extends Codegen {
   var dependencies: List[CodegenDep] = Nil
 
   lazy val files_list: Seq[String] = {
-    io.Source.fromURL(getClass.getResource("/files_list")).mkString("").split("\n")
+    val url = getClass.getResource("/files_list")
+    if (url == null)
+      throw new FileNotFoundException(
+        "File \"files_list\" is not found, please run bin/update_resources.sh before launching a SpatialApp.")
+
+    io.Source.fromURL(url).mkString("").split("\n")
   }
 
   sealed trait CodegenDep {

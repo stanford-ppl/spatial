@@ -76,7 +76,7 @@ class FixFMAAccum(
     val fixadd = Wire(new FixedPoint(s,d,f))
     fixadd.r := Mux(isFirstRound, 0.U, acc.io.rPort(0).output(0))
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B).r
+    result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B, "").r
     acc.io.rPort <> DontCare
     acc.io.wPort(0).data(0) := result.r
     acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, fmaLatency.toInt)
@@ -133,7 +133,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     val result = Wire(new FixedPoint(s,d,f))
     t match {
       case Accum.Add => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
-      case Accum.Mul => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), Math.mul(fixin1,fixadd, Some(opLatency), true.B, Truncate, Wrapping).r)
+      case Accum.Mul => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), Math.mul(fixin1,fixadd, Some(opLatency), true.B, Truncate, Wrapping, "").r)
       case Accum.Min => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
       case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
     }
@@ -159,7 +159,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
       val t2 = Wire(new FixedPoint(s,d,f))
       t1.r := a
       t2.r := b
-      Math.mul(t1, t2, Some(0), true.B, Truncate, Wrapping).r
+      Math.mul(t1, t2, Some(0), true.B, Truncate, Wrapping, "").r
     }, drain_latency, isDrainState, init = (init*scala.math.pow(2,f)).toLong)
     case Accum.Min => io.output := getRetimed(accums.map(_._1.io.rPort(0).output(0)).reduce[UInt]{case (a:UInt,b:UInt) =>
       val t1 = Wire(new FixedPoint(s,d,f))

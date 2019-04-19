@@ -3,14 +3,16 @@ package fringe.templates.math
 import chisel3._
 import fringe._
 import fringe.utils.implicits._
+import fringe.utils.getRetimed
 
 import scala.collection.mutable.Set
 
-class fix2fixBox(s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, rounding: RoundingMode, saturating: OverflowMode) extends Module {
+class fix2fixBox(s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, rounding: RoundingMode, saturating: OverflowMode, latency: Int, myName: String) extends Module {
   val io = IO(new Bundle {
     val a = Input(UInt((d1+f1).W))
     val expect_pos = Input(Bool())
     val expect_neg = Input(Bool())
+    val flow = Input(Bool())
     val b = Output(UInt((d2+f2).W))
   })
 
@@ -89,8 +91,8 @@ class fix2fixBox(s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, r
 
   }
 
-  if (has_dec & has_frac)       io.b := chisel3.util.Cat(new_dec, new_frac)
-  else if (has_dec & !has_frac) io.b := new_dec
-  else if (!has_dec & has_frac) io.b := tmp_frac
+  if (has_dec & has_frac)       io.b := getRetimed(chisel3.util.Cat(new_dec, new_frac), latency, io.flow)
+  else if (has_dec & !has_frac) io.b := getRetimed(new_dec, latency, io.flow)
+  else if (!has_dec & has_frac) io.b := getRetimed(tmp_frac, latency, io.flow)
 }
 

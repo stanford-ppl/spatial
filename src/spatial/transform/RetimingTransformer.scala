@@ -76,7 +76,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
       .filter{line => inputs.contains(line.input) }
       .map{line => line.input -> line }
       .toMap    // Unique-ify by line input - makes sure we only register one substitution per input
-      .foreach{case (in, line) =>
+      .collect{case (in, line) if !in.isConst =>
         val dly = line.value()
         logs(s"  $in -> $dly [${line.size}]")
         register(in, dly)

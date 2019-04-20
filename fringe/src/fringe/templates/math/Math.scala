@@ -690,21 +690,75 @@ object Math {
     result
   }
   def fix2fix(a: FixedPoint, s: Boolean, d: Int, f: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode, myName: String): FixedPoint = {
-    val latency = delay.getOrElse(0.0).toInt
+    class Fix2FixWrapper() extends Module{
+      val io = IO(new Bundle{
+        val b = Input(UInt((a.d + a.f).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val b = Wire(new FixedPoint(a.s,a.d,a.f)); b.r := io.b
+      val flow = io.flow
+
+      val latency = delay.getOrElse(0.0).toInt
+      val result = Wire(new FixedPoint(s,d,f))
+      result.r := globals.bigIP.fix2fix(b.r,b.s,b.d,b.f,s,d,f, latency, flow, rounding, saturating,myName)
+      io.result := result.r
+    }
+
+    val module = Module(new Fix2FixWrapper())
+    module.io.b := a.r
+    module.io.flow := flow
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a.r,a.s,a.d,a.f,s,d,f, latency, flow, rounding, saturating,myName)
+    result.r := module.io.result
     result
   }
   def fix2fix(a: UInt, s: Boolean, d: Int, f: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode, myName: String): FixedPoint = {
-    val latency = delay.getOrElse(0.0).toInt
+    class Fix2FixWrapper() extends Module{
+      val io = IO(new Bundle{
+        val b = Input(UInt((a.getWidth).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val b = io.b
+      val flow = io.flow
+
+      val latency = delay.getOrElse(0.0).toInt
+      val result = Wire(new FixedPoint(s,d,f))
+      result.r := globals.bigIP.fix2fix(b,false,b.getWidth,0,s,d,f, latency, flow, rounding, saturating, myName)
+      io.result := result.r
+    }
+
+    val module = Module(new Fix2FixWrapper())
+    module.io.b := a.r
+    module.io.flow := flow
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a,false,a.getWidth,0,s,d,f, latency, flow, rounding, saturating, myName)
+    result.r := module.io.result
     result
   }
   def fix2fix(a: SInt, s: Boolean, d: Int, f: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode, myName: String): FixedPoint = {
-    val latency = delay.getOrElse(0.0).toInt
+    class Fix2FixWrapper() extends Module{
+      val io = IO(new Bundle{
+        val b = Input(SInt((a.getWidth).W))
+        val flow = Input(Bool())
+        val result = Output(UInt((d + f).W))
+      })
+      override def desiredName = myName
+      val b = io.b
+      val flow = io.flow
+
+      val latency = delay.getOrElse(0.0).toInt
+      val result = Wire(new FixedPoint(s,d,f))
+      result.r := globals.bigIP.fix2fix(b.asUInt,true,b.getWidth,0,s,d,f, latency, flow, rounding, saturating, myName)
+      io.result := result.r
+    }
+
+    val module = Module(new Fix2FixWrapper())
+    module.io.b := a.r
+    module.io.flow := flow
     val result = Wire(new FixedPoint(s,d,f))
-    result.r := globals.bigIP.fix2fix(a.asUInt,true,a.getWidth,0,s,d,f, latency, flow, rounding, saturating, myName)
+    result.r := module.io.result
     result
   }
   def flt2fix(a: FloatingPoint, sign: Boolean, dec: Int, frac: Int, delay: Option[Double], flow: Bool, rounding: RoundingMode, saturating: OverflowMode, myName: String): FixedPoint = {

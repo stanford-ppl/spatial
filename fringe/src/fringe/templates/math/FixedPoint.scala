@@ -78,21 +78,21 @@ class FixedPoint(val s: Boolean, val d: Int, val f: Int, val litVal: Option[BigI
   def *(that: UInt): FixedPoint = this * that.trueFP(fmt)
   def *(that: SInt): FixedPoint = this * that.trueFP(fmt)
 
-  def mul(that: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String = "mul"): FixedPoint = Math.mul(this, that, delay, flow, rounding, saturating, myName)
+  // def mul(that: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String = "mul"): FixedPoint = Math.mul(this, that, delay, flow, rounding, saturating, myName)
 
   /** Fixed point division with standard truncation and overflow. */
   def /(that: FixedPoint): FixedPoint = Math.div(this, that, delay = None, flow = true.B, round = Truncate, overflow = Wrapping, "div")
   def /(that: UInt): FixedPoint = this / that.trueFP(fmt)
   def /(that: SInt): FixedPoint = this / that.trueFP(fmt)
 
-  def div(that: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String = "div"): FixedPoint = Math.div(this, that, delay, flow, rounding, saturating, myName)
+  // def div(that: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String = "div"): FixedPoint = Math.div(this, that, delay, flow, rounding, saturating, myName)
 
   /** Fixed point modulus with standard truncation and overflow. */
   def %(that: FixedPoint): FixedPoint = Math.mod(this, that, delay = None, flow = true.B, round = Truncate, overflow = Wrapping, "mod")
   def %(that: UInt): FixedPoint = this % that.trueFP(fmt)
   def %(that: SInt): FixedPoint = this % that.trueFP(fmt)
 
-  def mod(that: FixedPoint, delay: Option[Double], flow: Bool, myName: String): FixedPoint = Math.mod(this, that, delay, flow, round = Truncate, overflow = Wrapping, myName)
+  // def mod(that: FixedPoint, delay: Option[Double], flow: Bool, myName: String): FixedPoint = Math.mod(this, that, delay, flow, round = Truncate, overflow = Wrapping, myName)
 
   /** Fixed point floor (round towards negative infinity). */
   def floor: FixedPoint = Math.floor(this, "")

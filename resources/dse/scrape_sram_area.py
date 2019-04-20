@@ -8,6 +8,26 @@ from pyquery import PyQuery as pq
 import argparse
 import sys
 
+################
+## PROPERTIES ##
+################
+target = 'zcu' # i.e. out0/verilog-zcu/
+capstarget = 'ZCU'  #i.e. gen/ZCU/
+scrapetype = 'par' # either scrape synth_ or par_ log
+spatialdir = '/home/mattfel/regression/synth/' + target + '/current-spatial/spatial/'
+gendir = spatialdir + 'gen/' + capstarget
+logdir = spatialdir + 'logs/' + capstarget
+# spatialdir='/home/mattfel/sp_area/spatial/out1'
+# gendir = spatialdir
+# logdir = spatialdir + 'logs/'
+
+
+
+##########
+## CODE ##
+##########
+outputs = ["LUTs", "LaL", "LaM", "SRLs", "FFs", "RAMB32", "RAMB18", "URAM", "DSPs"]
+setups = ["fullname", "localname", "nodetype"]
 class Node:
 	def __init__(this, full, local, type):
 		this.fullname = full
@@ -20,48 +40,73 @@ class Node:
 	nodetype = ""
 
 	# Mem specific
-	nbufs = ""
-	bitwidth = ""
-	sgn = ""
-	dec = ""
-	frac = ""
-	dim0 = ""
-	dim1 = ""
-	dim2 = ""
-	dim3 = ""
-	dim4 = ""
-	N0 = ""
-	N1 = ""
-	N2 = ""
-	N3 = ""
-	N4 = ""
-	B0 = ""
-	B1 = ""
-	B2 = ""
-	B3 = ""
-	B4 = ""
-	a0 = ""
-	a1 = ""
-	a2 = ""
-	a3 = ""
-	a4 = ""
-	p0 = ""
-	p1 = ""
-	p2 = ""
-	p3 = ""
-	p4 = ""
-	hist0muxwidth = ""
-	hist0rlanes = ""
-	hist0wlanes = ""
-	hist1muxwidth = ""
-	hist1rlanes = ""
-	hist1wlanes = ""
-	hist2muxwidth = ""
-	hist2rlanes = ""
-	hist2wlanes = ""
-	consta = ""
-	constb = ""
-	constc = ""
+	tp_sgn = ""
+	tp_dec = ""
+	tp_frac = ""
+	mem_bitwidth = ""
+	mem_nbufs = ""
+	mem_dim0 = ""
+	mem_dim1 = ""
+	mem_dim2 = ""
+	mem_dim3 = ""
+	mem_dim4 = ""
+	mem_N0 = ""
+	mem_N1 = ""
+	mem_N2 = ""
+	mem_N3 = ""
+	mem_N4 = ""
+	mem_B0 = ""
+	mem_B1 = ""
+	mem_B2 = ""
+	mem_B3 = ""
+	mem_B4 = ""
+	mem_a0 = ""
+	mem_a1 = ""
+	mem_a2 = ""
+	mem_a3 = ""
+	mem_a4 = ""
+	mem_p0 = ""
+	mem_p1 = ""
+	mem_p2 = ""
+	mem_p3 = ""
+	mem_p4 = ""
+	mem_hist0muxwidth = ""
+	mem_hist0rlanes = ""
+	mem_hist0wlanes = ""
+	mem_hist1muxwidth = ""
+	mem_hist1rlanes = ""
+	mem_hist1wlanes = ""
+	mem_hist2muxwidth = ""
+	mem_hist2rlanes = ""
+	mem_hist2wlanes = ""
+	op_consta = ""
+	op_constb = ""
+	op_constc = ""
+	ctrl_level = ""
+	ctrl_style = ""
+	ctrl_children = ""
+	ctrl_ii = ""
+	ctrl_lat = ""
+	cchain_ctr0start = ""
+	cchain_ctr0stop = ""
+	cchain_ctr0step = ""
+	cchain_ctr0par = ""
+	cchain_ctr1start = ""
+	cchain_ctr1stop = ""
+	cchain_ctr1step = ""
+	cchain_ctr1par = ""
+	cchain_ctr2start = ""
+	cchain_ctr2stop = ""
+	cchain_ctr2step = ""
+	cchain_ctr2par = ""
+	cchain_ctr3start = ""
+	cchain_ctr3stop = ""
+	cchain_ctr3step = ""
+	cchain_ctr3par = ""
+	cchain_ctr4start = ""
+	cchain_ctr4stop = ""
+	cchain_ctr4step = ""
+	cchain_ctr4par = ""
 
 	## RESULTS
 	LUTs = 0
@@ -74,46 +119,24 @@ class Node:
 	URAM = 0
 	DSPs = 0
 
-	def printIDFields(this): 
-		print("fullname,localname,nodetype")
-	def printID(this): 
-		print("%s,%s,%s" % (this.fullname, this.localname, this.nodetype))
-	def printResultsFields(this):
-		print("LUTs,LaL,LaM,SRLs,FFs,RAMB32,RAMB18,URAM,DSPs")
-	def printResults(this):
-		print("%s,%s,%s,%s,%s,%s,%s,%s,%s" % (this.LUTs, this.LaL, this.LaM, this.SRLs, this.FFs, this.RAMB32, this.RAMB18, this.URAM, this.DSPs))
-	def printPropertiesFields(this):
-		print("nbufs,bitwidth,sgn,dec,frac,dim0,dim1,dim2,dim3,dim4,N0,N1,N2,N3,N4,B0,B1,B2,B3,B4,a0,a1,a2,a3,a4,p0,p1,p2,p3,p4,hist0muxwidth,hist0rlanes,hist0wlanes,hist1muxwidth,hist1rlanes,hist1wlanes,hist2muxwidth,hist2rlanes,hist2wlanes,consta,constb,constc")
-	def printProperties(this):
-		print("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" % (this.nbufs,this.bitwidth,this.sgn,this.dec,this.frac,this.dim0,this.dim1,this.dim2,this.dim3,this.dim4,this.N0,this.N1,this.N2,this.N3,this.N4,this.B0,this.B1,this.B2,this.B3,this.B4,this.a0,this.a1,this.a2,this.a3,this.a4,this.p0,this.p1,this.p2,this.p3,this.p4,this.hist0muxwidth,this.hist0rlanes,this.hist0wlanes,this.hist1muxwidth,this.hist1rlanes,this.hist1wlanes,this.hist2muxwidth,this.hist2rlanes,this.hist2wlanes,this.consta,this.constb,this.constc))
-	def printAllFields(this):
-		print("fullname,localname,nodetype,nbufs,bitwidth,sgn,dec,frac,dim0,dim1,dim2,dim3,dim4,N0,N1,N2,N3,N4,B0,B1,B2,B3,B4,a0,a1,a2,a3,a4,p0,p1,p2,p3,p4,hist0muxwidth,hist0rlanes,hist0wlanes,hist1muxwidth,hist1rlanes,hist1wlanes,hist2muxwidth,hist2rlanes,hist2wlanes,consta,constb,constc,LUTs,LaL,LaM,SRLs,FFs,RAMB32,RAMB18,URAM,DSPs")
-	def printAll(this):
-		print("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" % (this.fullname, this.localname, this.nodetype, this.nbufs,this.bitwidth,this.sgn,this.dec,this.frac,this.dim0,this.dim1,this.dim2,this.dim3,this.dim4,this.N0,this.N1,this.N2,this.N3,this.N4,this.B0,this.B1,this.B2,this.B3,this.B4,this.a0,this.a1,this.a2,this.a3,this.a4,this.p0,this.p1,this.p2,this.p3,this.p4,this.hist0muxwidth,this.hist0rlanes,this.hist0wlanes,this.hist1muxwidth,this.hist1rlanes,this.hist1wlanes,this.hist2muxwidth,this.hist2rlanes,this.hist2wlanes,this.consta,this.constb,this.constc,this.LUTs, this.LaL, this.LaM, this.SRLs, this.FFs, this.RAMB32, this.RAMB18, this.URAM, this.DSPs))
+	def _getAllFields(this): 
+		return setups + [attr for attr in dir(this) if (not attr.startswith('_')) and (attr not in setups) and (attr not in outputs)] + outputs
+	def _printAllFields(this): 
+		print ','.join(this._getAllFields())
+	def _printAll(this):
+		payload = [str(getattr(this, attrname)) for attrname in this._getAllFields()]
+		print ','.join(payload)
 
 
-################
-## PROPERTIES ##
-################
-target = 'zcu' # i.e. out0/verilog-zcu/
-capstarget = 'ZCU'  #i.e. gen/ZCU/
-scrapetype = 'synth' # either scrape synth_ or par_ log
-spatialdir = '/home/mattfel/regression/synth/' + target + '/current-spatial/spatial/'
-gendir = spatialdir + 'gen/' + capstarget
-logdir = spatialdir + 'logs/' + capstarget
-# spatialdir='/home/mattfel/sp_area/spatial/out1'
-# gendir = spatialdir
-# logdir = spatialdir + 'logs/'
 
-
-def scrapeFor(node,rpt): 
+def scrapeFor(node,rpt,sfx=''): 
 	try:
 		with open(rpt, 'r') as file:
 			results = file.read().split('\n')
 		sym = node.localname
-		# print "find %s in %s" % (sym, rpt)
+		ecode = 1
 		for line in results:
-			if (re.compile('^\|[ ]+' + sym + '.*').match(line)):
+			if (re.compile('^\|[ ]+' + sym + sfx + '.*').match(line)):
 				results = line.replace(' ','').split('|')[3:-1]
 				results = [re.sub('\(.*\)','',x) for x in results]
 				node.LUTs = results[0]
@@ -125,11 +148,17 @@ def scrapeFor(node,rpt):
 				node.RAMB18 = results[6]
 				node.URAM = results[7]
 				node.DSPs = results[8]
+				ecode = 0
 				break
-		return True
 	except:
-		print("No results for " + node.fullname)
-		return False
+		ecode = 2
+
+
+	if ecode == 0: return True
+	elif ecode == 1: print("No results for " + node.fullname + " (" + node.nodetype + ")"); return False
+	elif ecode == 2: print("Faulty results for " + node.fullname + " (" + node.nodetype + ")"); return False
+
+
 
 # Collect Mem Data
 def collectMemData():
@@ -161,56 +190,56 @@ def collectMemData():
 			if line.find('BankedSRAM') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "SRAMNew")
-				current.nbufs = '1' # default of 1
+				current.mem_nbufs = '1' # default of 1
 			elif line.find('LineBuffer') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "LineBufferNew")
-				current.nbufs = '1' # default of 1
+				current.mem_nbufs = '1' # default of 1
 			elif line.find('FIFO ') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "FIFONew")
-				current.nbufs = '1' # default of 1
+				current.mem_nbufs = '1' # default of 1
 			elif line.find('LIFO') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "LIFONew")
-				current.nbufs = '1' # default of 1
+				current.mem_nbufs = '1' # default of 1
 			elif line.find('(FF') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "RegNew")
-				current.nbufs = '1' # default of 1
+				current.mem_nbufs = '1' # default of 1
 			elif line.find('ShiftRegFile') >= 0:
 				sym = re.search('x[0-9]+', line).group(0)
 				current = Node(sym + "_" + appname, sym, "RegFileNew")
-				current.nbufs = '1' # default of 1
+				current.mem_nbufs = '1' # default of 1
 
 
 			# Scrape info if currently scanning node
 			if (current != None): 
 				# Get buffer info
 				if line.find('nBufs =') >= 0:
-					current.nbufs = int(re.search('nBufs = ([0-9]+)', line).group(1))
+					current.mem_nbufs = int(re.search('nBufs = ([0-9]+)', line).group(1))
 				# Get bitwidth/dims info
 				if line.find('>volume =') >= 0 and current.nodetype != "RegNew":
 					dims = re.search('dims List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
-					try: current.dim0 = dims[0]; current.dim1 = dims[1]; current.dim2 = dims[2]; current.dim3 = dims[3]; current.dim4 = dims[4]
+					try: current.mem_dim0 = dims[0]; current.mem_dim1 = dims[1]; current.mem_dim2 = dims[2]; current.mem_dim3 = dims[3]; current.mem_dim4 = dims[4]
 					except: pass
 				if line.find('>volume =') >= 0:
 					bitwidth = re.search('bw = ([0-9]+)', line).group(1)
-					try: current.bitwidth = bitwidth
+					try: current.mem_bitwidth = bitwidth
 					except: pass
 				# Get banking info
 				if line.find('nBanks') >= 0 and current.nodetype != "RegNew":
 					Ns = re.search('nBanks = List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
-					try: current.N0 = Ns[0]; current.N1 = Ns[1]; current.N2 = Ns[2]; current.N3 = Ns[3]; current.N4 = Ns[4]
+					try: current.mem_N0 = Ns[0]; current.mem_N1 = Ns[1]; current.mem_N2 = Ns[2]; current.mem_N3 = Ns[3]; current.mem_N4 = Ns[4]
 					except: pass
 					Bs = re.search('B = List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
-					try: current.B0 = Bs[0]; current.B1 = Bs[1]; current.B2 = Bs[2]; current.B3 = Bs[3]; current.B4 = Bs[4]
+					try: current.mem_B0 = Bs[0]; current.mem_B1 = Bs[1]; current.mem_B2 = Bs[2]; current.mem_B3 = Bs[3]; current.mem_B4 = Bs[4]
 					except: pass
 					As = re.search('a = List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
-					try: current.a0 = As[0]; current.a1 = As[1]; current.a2 = As[2]; current.a3 = As[3]; current.a4 = As[4]
+					try: current.mem_a0 = As[0]; current.mem_a1 = As[1]; current.mem_a2 = As[2]; current.mem_a3 = As[3]; current.mem_a4 = As[4]
 					except: pass
 					ps = re.search('p = List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
-					try: current.p0 = ps[0]; current.p1 = ps[1]; current.p2 = ps[2]; current.p3 = ps[3]; current.p4 = ps[4]
+					try: current.mem_p0 = ps[0]; current.mem_p1 = ps[1]; current.mem_p2 = ps[2]; current.mem_p3 = ps[3]; current.mem_p4 = ps[4]
 					except: pass
 				# Get histogram info
 				if line.find('muxwidth') >= 0:
@@ -218,7 +247,7 @@ def collectMemData():
 					if len(hist) > 9:
 						print "ERROR: %s in %s has more than 3 groups in its histogram!!! Dropping it..."
 						current = None
-					try: current.hist0muxwidth = hist[0]; current.hist0rlanes = hist[1]; current.hist0wlanes = hist[2]; current.hist1muxwidth = hist[3]; current.hist1rlanes = hist[4]; current.hist1wlanes = hist[5]; current.hist2muxwidth = hist[6]; current.hist2rlanes = hist[7]; current.hist2wlanes = hist[8]
+					try: current.mem_hist0muxwidth = hist[0]; current.mem_hist0rlanes = hist[1]; current.mem_hist0wlanes = hist[2]; current.mem_hist1muxwidth = hist[3]; current.mem_hist1rlanes = hist[4]; current.mem_hist1wlanes = hist[5]; current.mem_hist2muxwidth = hist[6]; current.mem_hist2rlanes = hist[7]; current.mem_hist2wlanes = hist[8]
 					except: pass
 				if line.find('</font></div></p>') >= 0:
 					app_mem_dict = app_mem_dict + [current]
@@ -291,29 +320,28 @@ def collectIRNodeData():
 
 			# Pull out constants:
 			if declaration: 
-				try: current.consta = re.search('a=([0-9\.]+)',line).group(1)
+				try: current.op_consta = re.search('a=([0-9\.]+)',line).group(1)
 				except: pass
-				try: current.constb = re.search('b=([0-9\.]+)',line).group(1)
+				try: current.op_constb = re.search('b=([0-9\.]+)',line).group(1)
 				except: pass
-				try: current.constc = re.search('c=([0-9\.]+)',line).group(1)
+				try: current.op_constc = re.search('c=([0-9\.]+)',line).group(1)
 				except: pass
 
 			# Scrape info if currently scanning node
 			if (current != None): 
-				if (line.find('Const') >= 0): print line
 				# Get buffer info
 				if line.find('>Type<') >= 0:
 					dec = re.search(',\_([0-9]+),',line).group(1)
 					frac = re.search(',\_([0-9]+)\]',line).group(1)
 					sgn = '1' if (line.find('[TRUE,') >= 0) else '0'
-					try: current.dec = dec; current.frac = frac; current.sgn = sgn
+					try: current.tp_dec = dec; current.tp_frac = frac; current.tp_sgn = sgn
 					except: pass
 				if line.find('<h3 id=') >= 0 and line.find('id=' + sym) == -1:
 					app_node_dict = app_node_dict + [current]
 					current = None
 
 		# Find PaR report
-		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, scrapetype + 'utilization_hierarchical.rpt'])
+		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, scrapetype + '_utilization_hierarchical.rpt'])
 		# Collect resource utilization for each sram
 		for i in reversed(range(0,len(app_node_dict))):
 			mem = app_node_dict[i]
@@ -323,18 +351,113 @@ def collectIRNodeData():
 		# Add srams to master list
 		node_dict = node_dict + app_node_dict
 
-		break
+	return node_dict
+
+def collectSMData():
+	# Collect other nodes data
+	irhtml='IR.html'
+	node_dict = []
+	allirhtmls=[]
+	for root, dirs, files in os.walk(gendir):
+	    if irhtml in files:
+	       f_name = os.path.join(root, irhtml)
+	       allirhtmls.append(f_name)
+	for app in allirhtmls:
+		current = None
+		inctr = -1
+		app_node_dict = []
+		appname = app.split('/')[-3]
+		with open(app, 'r') as file:
+			data = file.read().split('\n')
+		for line in data:
+			# Handle CounterNew and CounterChains
+			if (line.find("CounterNew") >= 0):
+				if inctr == -1:
+					current = Node("tmp_counter", "tmp_counter", "CounterChainNew")
+				inctr = inctr + 1
+				setattr(current, "cchain_ctr" + str(inctr) + "par", re.search('par=([0-9]+)', line).group(1))
+				try: setattr(current, "cchain_ctr" + str(inctr) + "start", re.search('start=([0-9]+)', line).group(1))
+				except: pass
+				try: setattr(current, "cchain_ctr" + str(inctr) + "stop", re.search('end=([0-9]+)', line).group(1))
+				except: pass
+				try: setattr(current, "cchain_ctr" + str(inctr) + "step", re.search('step=([0-9]+)', line).group(1))
+				except: pass
+			elif (line.find("CounterChainNew") >= 0):
+				assert (inctr >= 0)
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current.localname = sym 
+				current.fullname = sym + "_" + appname
+				app_node_dict = app_node_dict + [current]
+				current = None
+				inctr = -1
+			elif (line.find("UnrolledForeach") >= 0):
+				assert (inctr == -1)
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "UnrolledForeach"); current.ctrl_style = "Pipelined"
+			elif (line.find("ParallelPipe") >= 0):
+				assert (inctr == -1)
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "ParallelPipe"); current.ctrl_style = "ForkJoin"
+			elif (line.find("UnitPipe") >= 0):
+				assert (inctr == -1)
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "UnitPipe"); current.ctrl_style = "Pipelined"
+			elif (line.find("UnrolledReduce") >= 0):
+				assert (inctr == -1)
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "UnrolledReduce"); current.ctrl_style = "Pipelined"
+			elif (line.find("StateMachine") >= 0):
+				assert (inctr == -1)
+				sym = re.search('id=(x[0-9]+)>', line).group(1)
+				current = Node(sym + "_" + appname, sym, "StateMachine"); current.ctrl_style = "Sequenced"
+
+			# Scrape info if currently scanning node
+			if (current != None and inctr == -1): 
+				# Get buffer info
+				if line.find('>InitiationInterval<') >= 0:
+					ii = re.search('([0-9]+)', line).group(1) # should be only number in this line
+					current.ctrl_ii = ii
+				elif line.find('>BodyLatency<') >= 0:
+					lat = re.search('([0-9]+)', line).group(1) # should be only number in this line
+					current.ctrl_lat = lat
+				elif line.find('>ControlLevel<') >= 0:
+					level = "Inner" if ("Inner" in line) else "Outer"
+					current.ctrl_level = level
+				elif line.find('>Children<') >= 0:
+					children = line.count("Ctrl")
+					current.ctrl_children = children
+				elif line.find('>UserScheduleDirective<') >= 0:
+					style = re.search(': ([a-zA-Z]+)', line).group(1)
+					current.ctrl_style = style
+				elif line.find('<h3 id=') >= 0 and line.find('id=' + sym) == -1:
+					app_node_dict = app_node_dict + [current]
+					current = None
+
+
+		# Find PaR report
+		rpt = '/'.join(app.split('/')[0:-2] + ['verilog-' + target, scrapetype + '_utilization_hierarchical.rpt'])
+		# Collect resource utilization for each sram
+		for i in reversed(range(0,len(app_node_dict))):
+			mem = app_node_dict[i]
+			if mem.nodetype != "CounterChainNew": success = scrapeFor(mem,rpt,".*sm")
+			else: success = scrapeFor(mem,rpt)
+			if (not success): del app_node_dict[i]
+
+		# Add srams to master list
+		node_dict = node_dict + app_node_dict
+
 	return node_dict
 
 
 def main():
 	node_dict = []
-	node_dict = collectMemData()
+	node_dict = node_dict + collectMemData()
 	node_dict = node_dict + collectIRNodeData()
+	node_dict = node_dict + collectSMData()
 
-	node_dict[0].printAllFields()
+	node_dict[0]._printAllFields()
 	for node in node_dict:
-		node.printAll()
+		node._printAll()
 
 if __name__ == "__main__":
     main()

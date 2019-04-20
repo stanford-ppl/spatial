@@ -178,7 +178,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
 
     import scala.math.Ordering.Implicits._  // Seq ordering
-    val sortedAccesses = accesses.toSeq.sortBy(_.access.toString).sortBy(_.unroll)
+    val sortedAccesses = accesses.toSeq.sortBy{x => (x.access.toString, x.unroll)}
 
     sortedAccesses.foreach{a =>
       dbg(s"    Access: ${a.short} [${a.parent}]")

@@ -83,29 +83,29 @@ object implicits {
     def <+> (c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <+> c
     def <-> (c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <-> c
 
-    def mul(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
-      Math.mul(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
-    }
+    // def mul(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
+    //   Math.mul(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
+    // }
 
-    def div(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
-      Math.div(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
-    }
+    // def div(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
+    //   Math.div(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
+    // }
 
-    def mod(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
-      Math.mod(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
-    }
+    // def mod(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
+    //   Math.mod(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
+    // }
 
-    def mul(c: UInt, delay: Option[Double], flow: Bool, myName: String): UInt = {
-      Math.mul(b, c, delay, flow, myName)
-    }
+    // def mul(c: UInt, delay: Option[Double], flow: Bool, myName: String): UInt = {
+    //   Math.mul(b, c, delay, flow, myName)
+    // }
 
-    def div(c: UInt, delay: Option[Double], flow: Bool, myName: String): UInt = {
-      Math.div(b, c, delay, flow, myName)
-    }
+    // def div(c: UInt, delay: Option[Double], flow: Bool, myName: String): UInt = {
+    //   Math.div(b, c, delay, flow, myName)
+    // }
 
-    def mod(c: UInt, delay: Option[Double], flow: Bool, myName: String): UInt = {
-      Math.mod(b, c, delay, flow, myName)
-    }
+    // def mod(c: UInt, delay: Option[Double], flow: Bool, myName: String): UInt = {
+    //   Math.mod(b, c, delay, flow, myName)
+    // }
 
     /** Convert this to the given FixedPoint format, overflowing if outside the representable bounds. */
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = FixedPoint(s, d, f, b)
@@ -148,29 +148,29 @@ object implicits {
     def <+>(c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <+> c
     def <->(c: FixedPoint): FixedPoint = FixedPoint(c.s, b.getWidth max c.d, c.f, b) <-> c
 
-    def mul(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
-      Math.mul(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
-    }
+    // def mul(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
+    //   Math.mul(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
+    // }
 
-    def div(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
-      Math.div(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
-    }
+    // def div(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
+    //   Math.div(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
+    // }
 
-    def mod(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
-      Math.mod(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
-    }
+    // def mod(c: FixedPoint, delay: Option[Double], flow: Bool, rounding: RoundingMode = Truncate, saturating: OverflowMode = Wrapping, myName: String): FixedPoint = {
+    //   Math.mod(b.trueFP(c.fmt), c, delay, flow, rounding, saturating, myName)
+    // }
 
-    def mul(c: SInt, delay: Option[Double], flow: Bool, myName: String): SInt = {
-      Math.mul(b, c, delay, flow, myName)
-    }
+    // def mul(c: SInt, delay: Option[Double], flow: Bool, myName: String): SInt = {
+    //   Math.mul(b, c, delay, flow, myName)
+    // }
 
-    def div(c: SInt, delay: Option[Double], flow: Bool, myName: String): SInt = {
-      Math.div(b, c, delay, flow, myName)
-    }
+    // def div(c: SInt, delay: Option[Double], flow: Bool, myName: String): SInt = {
+    //   Math.div(b, c, delay, flow, myName)
+    // }
 
-    def mod(c: SInt, delay: Option[Double], flow: Bool, myName: String): SInt = {
-      Math.mod(b, c, delay, flow, myName)
-    }
+    // def mod(c: SInt, delay: Option[Double], flow: Bool, myName: String): SInt = {
+    //   Math.mod(b, c, delay, flow, myName)
+    // }
 
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = FixedPoint(s, d, f, b)
     def FP(fmt: emul.FixFormat): FixedPoint = FixedPoint(fmt.sign, fmt.ibits, fmt.fbits, b)

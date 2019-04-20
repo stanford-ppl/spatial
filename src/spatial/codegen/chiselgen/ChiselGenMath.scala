@@ -145,8 +145,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSLA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRU(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
-    case BitRandom(None) if lhs.parent.s.isDefined => emit(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn) === 1.U")
-    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn).r")
+    case BitRandom(None) if lhs.parent.s.isDefined => emit(src"""val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn, "$lhs") === 1.U""")
+    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"""$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn, "$lhs").r""")
     case FixRandom(x) =>
       val FixPtType(s,d,f) = lhs.tp
       emit(createWire(quote(lhs),remap(lhs.tp)))
@@ -157,14 +157,14 @@ trait ChiselGenMath extends ChiselGenCommon {
         case None => "4096"
       }
       emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
-      emit(src"val ${lhs}_rng = Module(new PRNG($seed))")
+      emit(src"""val ${lhs}_rng = Module(new PRNG($seed)); ${lhs}_rng.suggestName("$lhs")""")
       val en = if (lhs.parent.s.isDefined) src"$datapathEn" else "true.B"
       emit(src"${lhs}_rng.io.en := $en")
       emit(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     case FltRandom(None) if lhs.parent.s.isDefined => 
       val FltPtType(m,e) = lhs.tp
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, $datapathEn).r")
+      emit(src"""$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, $datapathEn, "$lhs").r""")
     case FltRandom(x) => throw new Exception(s"Can only generate random float with no bounds right now!")
 
     case FixAbs(x) =>

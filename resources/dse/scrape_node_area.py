@@ -130,28 +130,30 @@ class Node:
 
 
 def scrapeFor(node,rpt,sfx=''): 
-	try:
-		with open(rpt, 'r') as file:
-			results = file.read().split('\n')
-		sym = node.localname
-		ecode = 1
-		for line in results:
-			if (re.compile('^\|[ ]+' + sym + sfx + '.*').match(line)):
-				results = line.replace(' ','').split('|')[3:-1]
-				results = [re.sub('\(.*\)','',x) for x in results]
-				node.LUTs = results[0]
-				node.LaL = results[1]
-				node.LaM = results[2]
-				node.SRLs = results[3]
-				node.FFs = results[4]
-				node.RAMB32 = results[5]
-				node.RAMB18 = results[6]
-				node.URAM = results[7]
-				node.DSPs = results[8]
-				ecode = 0
-				break
-	except:
-		ecode = 2
+	if os.path.isfile(rpt): 
+		try:
+			with open(rpt, 'r') as file:
+				results = file.read().split('\n')
+			sym = node.localname
+			ecode = 1
+			for line in results:
+				if (re.compile('^\|[ ]+' + sym + sfx + '.*').match(line)):
+					results = line.replace(' ','').split('|')[3:-1]
+					results = [re.sub('\(.*\)','',x) for x in results]
+					node.LUTs = results[0]
+					node.LaL = results[1]
+					node.LaM = results[2]
+					node.SRLs = results[3]
+					node.FFs = results[4]
+					node.RAMB32 = results[5]
+					node.RAMB18 = results[6]
+					node.URAM = results[7]
+					node.DSPs = results[8]
+					ecode = 0
+					break
+		except:
+			ecode = 2
+	else: ecode = 1
 
 
 	if ecode == 0: return True

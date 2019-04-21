@@ -317,14 +317,12 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     def foreach(block: Lane => Unit): Unit = { dbgs(s"dolanes ${__doLanes}"); map(block) }
 
-    def mapFirst[A](block: => A):A = {
-      inLane(ulanes.head) { block }
-    }
+    def mapFirst[A](block: => A):A = inLane(ulanes.head) { block }
 
     // --- Each unrolling rule should do at least one of three things:
 
     // 1. Split a given vector as the substitution for the single original symbol
-    def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
+    final def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
       if (size > 1 || copyMode) map{ lns =>
         dbgs(s"Lane #$lns: ")
         val s2 = mirror(s, d)

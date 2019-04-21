@@ -370,7 +370,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       List(unrolled)
     }
 
-    def duplicateMem(mem: Sym[_])(blk: Int => Seq[(Sym[_],Int)]): Unit = ulanes.zipWithIndex.foreach{ case (lane, p) =>
+    def duplicateMem(mem: Sym[_])(blk: Int => Seq[(Sym[_],Int)]): Unit = foreach{ lane =>
+      val p = ulanes.indexOf(lane)
       val duplicates = lane.flatMap { l => blk(l) }.distinct
       dbgs(s"  Registering duplicates for memory: $mem")
       memContexts(p) ++= duplicates.map{case (mem2,d) =>

@@ -30,3 +30,12 @@ case class Residual(equ: ResidualGenerator) extends Data[Residual](SetBy.Analysi
   * Default: false
   */
 case class InCycle(is: Boolean) extends Data[InCycle](SetBy.Analysis.Self) 
+
+/** Metadata marking the type of the original number being converted in a *To* node (i.e. FixToFix)
+  * Having this as metadata makes data scraping easier  
+  *
+  * Getter:  sym.srcType = Some(typ)
+  * Setter:  sym.srcType = typ
+  * Default: None
+  */
+case class SrcType(typ: Type[_]) extends Data[SrcType](SetBy.Analysis.Self) 
